@@ -18,7 +18,8 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import com.holdenkarau.spark.testing.Utils.createTempDir
+import java.nio.file.Files
+
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.util.misc.{DataFrameUtil, SmartDataLakeLogger}
@@ -36,8 +37,8 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
-  val tempDir: java.io.File = createTempDir()
-  val tempPath: String = tempDir.toPath.toAbsolutePath.toString
+  private val tempDir = Files.createTempDirectory("test")
+  private val tempPath = tempDir.toAbsolutePath.toString
 
   before {
     instanceRegistry.clear()

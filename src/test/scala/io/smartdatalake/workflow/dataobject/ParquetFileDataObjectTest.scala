@@ -18,9 +18,6 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.io.File
-
-import com.holdenkarau.spark.testing.Utils
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.workflow.connection.HadoopFileConnection
 import org.apache.spark.sql.DataFrame
@@ -28,8 +25,8 @@ import org.apache.spark.sql.types.StructType
 
 class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjectSchemaBehavior {
 
-  val tempDir: File = Utils.createTempDir()
-  val tempPath: String = tempDir.toPath.toAbsolutePath.toString
+  private val tempDir = createTempDir
+  private val tempPath = tempDir.toAbsolutePath.toString
 
   import testSession.implicits._
 
