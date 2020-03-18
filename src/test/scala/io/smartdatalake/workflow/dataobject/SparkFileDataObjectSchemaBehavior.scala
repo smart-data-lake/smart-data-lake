@@ -24,8 +24,8 @@ import java.io.File
 import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.workflow.SchemaViolationException
 import org.apache.commons.io.FileUtils
-import org.apache.spark.sql.{AnalysisException, DataFrame, SparkSession}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
+import org.apache.spark.sql.{AnalysisException, DataFrame, SparkSession}
 import org.scalatest.{FunSuite, Matchers}
 
 trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
@@ -37,7 +37,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
     test("It is not possible to read from an non-existing file without user-defined-schema.") {
       val path = tempFilePath(fileExtension)
       val dataObj = createDataObject(path, None)
-      an [IllegalArgumentException] should be thrownBy dataObj.getDataFrame
+      an [IllegalArgumentException] should be thrownBy dataObj.getDataFrame()
     }
   }
 
@@ -56,7 +56,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
       createFile(path, Seq.empty[String].toDF())
       try {
         val dataObj = createDataObject(path, Some(StructType(schema)))
-        val df = dataObj.getDataFrame
+        val df = dataObj.getDataFrame()
 
         df.show()
         df.printSchema()
@@ -86,7 +86,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
       createFile(path, DataFrameUtil.getEmptyDataFrame(StructType(embeddedSchema)))
       try {
         val dataObj = createDataObject(path, Some(StructType(userSchema)))
-        val df = dataObj.getDataFrame
+        val df = dataObj.getDataFrame()
 
         df.show()
         df.printSchema()
@@ -107,7 +107,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
       createFile(path, DataFrameUtil.getEmptyDataFrame(StructType(embeddedSchema)))
       try {
         val dataObj = createDataObject(path, None)
-        val df = dataObj.getDataFrame
+        val df = dataObj.getDataFrame()
 
         df.show()
         df.printSchema()
@@ -281,7 +281,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
         val dataObj = createDataObject(path, Some(df.schema), Some(StructType(schemaMin)))
 
         noException should be thrownBy {
-          dataObj.getDataFrame
+          dataObj.getDataFrame()
         }
 
       } finally {
@@ -303,7 +303,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
         val dataObj = createDataObject(path, Some(df.schema), Some(StructType(schemaMin)))
 
         noException should be thrownBy {
-          dataObj.getDataFrame
+          dataObj.getDataFrame()
         }
 
       } finally {
@@ -325,7 +325,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
         val dataObj = createDataObject(path, Some(df.schema), Some(StructType(schemaMin)))
 
         val thrown = the [SchemaViolationException] thrownBy {
-          dataObj.getDataFrame
+          dataObj.getDataFrame()
         }
         println(thrown.getMessage)
 
@@ -348,7 +348,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
         val dataObj = createDataObject(path, Some(df.schema), Some(StructType(schemaMin)))
 
         val thrown = the [SchemaViolationException] thrownBy {
-          dataObj.getDataFrame
+          dataObj.getDataFrame()
         }
         println(thrown.getMessage)
 
@@ -371,7 +371,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
         val dataObj = createDataObject(path, Some(df.schema), Some(StructType(schemaMin)))
 
         val thrown = the [SchemaViolationException] thrownBy {
-          dataObj.getDataFrame
+          dataObj.getDataFrame()
         }
         println(thrown.getMessage)
 
@@ -394,7 +394,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
         val dataObj = createDataObject(path, Some(df.schema), Some(StructType(schemaMin)))
 
         val thrown = the [SchemaViolationException] thrownBy {
-          dataObj.getDataFrame
+          dataObj.getDataFrame()
         }
         println(thrown.getMessage)
 

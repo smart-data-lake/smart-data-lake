@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.action
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.util.filetransfer.FileTransfer
 import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRefDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, SubFeed}
@@ -39,12 +40,13 @@ case class FileTransferAction(override val id: ActionObjectId,
                               deleteDataAfterRead: Boolean = false,
                               overwrite: Boolean = true,
                               override val breakFileRefLineage: Boolean = false,
+                              override val initExecutionMode: Option[ExecutionMode] = None,
                               override val metadata: Option[ActionMetadata] = None)
                              ( implicit instanceRegistry: InstanceRegistry)
   extends FileSubFeedAction {
 
-  private val input = getInputDataObject[FileRefDataObject with CanCreateInputStream](inputId)
-  private val output = getOutputDataObject[FileRefDataObject with CanCreateOutputStream](outputId)
+  override val input: FileRefDataObject with CanCreateInputStream = getInputDataObject[FileRefDataObject with CanCreateInputStream](inputId)
+  override val output: FileRefDataObject with CanCreateOutputStream = getOutputDataObject[FileRefDataObject with CanCreateOutputStream](outputId)
   override val inputs: Seq[FileRefDataObject] = Seq(input)
   override val outputs: Seq[FileRefDataObject] = Seq(output)
 

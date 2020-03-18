@@ -19,14 +19,33 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
+import io.smartdatalake.definitions.ExecutionMode
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject}
+import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 
 abstract class SparkSubFeedsAction extends Action {
 
   override def inputs: Seq[DataObject with CanCreateDataFrame]
   override def outputs: Seq[DataObject with CanWriteDataFrame]
+
+  lazy protected val mainInput: Option[DataObject with CanCreateDataFrame] = initExecutionMode.flatMap {
+    _.mainInputId.map( inputId => inputs.find(_.id.id == inputId).getOrElse(throw ConfigurationException(s"$id has set an initExecutionMode with inputId $inputId, which was not found in inputs")))
+  }.orElse{
+    val paritionedInputs = inputs.collect{ case x: CanHandlePartitions => x }.filter(_.partitions.nonEmpty)
+    if (paritionedInputs.size==1) paritionedInputs.headOption else None
+  }.orElse{
+    if (inputs.size==1) inputs.headOption else None
+  }
+
+  lazy protected val mainOutput: Option[DataObject with CanWriteDataFrame] = initExecutionMode.flatMap {
+    _.mainOutputId.map( outputId => outputs.find(_.id.id == outputId).getOrElse(throw ConfigurationException(s"$id has set an initExecutionMode with outputId $outputId, which was not found in outputs")))
+  }.orElse{
+    val paritionedOutputs = outputs.collect{ case x: CanHandlePartitions => x }.filter(_.partitions.nonEmpty)
+    if (paritionedOutputs.size==1) paritionedOutputs.headOption else None
+  }.orElse{
+    if (outputs.size==1) outputs.headOption else None
+  }
 
   /**
    * Transform [[SparkSubFeed]]'s.
@@ -40,11 +59,30 @@ abstract class SparkSubFeedsAction extends Action {
   private def doTransform(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
     // convert subfeeds to SparkSubFeed type or initialize if not yet existing
     var preparedSubFeeds = subFeeds.map( SparkSubFeed.fromSubFeed )
+    // apply init execution mode if there are no partition values given in command line
+    require(initExecutionMode.isEmpty || mainInput.isDefined, throw ConfigurationException(s"$id has set an initExecutionMode without inputId but there are ${inputs.size} inputs with partitions. Please specify initExecutionMode.inputId to select input."))
+    require(initExecutionMode.isEmpty || mainOutput.isDefined, throw ConfigurationException(s"$id has set an initExecutionMode without outputId but there are ${outputs.size} outputs with partitions. Please specify initExecutionMode.outputId to select output."))
+    val mainInputSubFeed = mainInput.flatMap( input => subFeeds.find(_.dataObjectId==input.id))
+    preparedSubFeeds = if ( mainInputSubFeed.exists(_.isInstanceOf[InitSubFeed]) && mainInputSubFeed.exists(_.partitionValues.isEmpty)) {
+      preparedSubFeeds.map {
+        subFeed =>
+          if (subFeed.dataObjectId==mainInput.get.id) subFeed.copy(partitionValues = ActionHelper.applyExecutionMode(initExecutionMode, id, mainInput.get, mainOutput.get, subFeed.partitionValues))
+          else subFeed
+      }
+    } else preparedSubFeeds
     // break lineage if requested
     preparedSubFeeds = if (breakDataFrameLineage) preparedSubFeeds.map(_.breakLineage()) else preparedSubFeeds
     // persist if requested
     preparedSubFeeds = if (persist) preparedSubFeeds.map(_.persist) else preparedSubFeeds
-    transform(preparedSubFeeds)
+    // transform
+    val transformedSubFeeds = transform(preparedSubFeeds)
+    // update partition values to output's partition columns and update dataObjectId
+    transformedSubFeeds.map {
+      subFeed =>
+        val output = outputs.find(_.id == subFeed.dataObjectId)
+          .getOrElse(throw ConfigurationException(s"No output found for result ${subFeed.dataObjectId} in $id. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
+        ActionHelper.validateAndUpdateSubFeedPartitionValues(output, subFeed)
+    }
   }
 
   /**
@@ -65,7 +103,8 @@ abstract class SparkSubFeedsAction extends Action {
     // write output
     outputs.foreach { output =>
       val subFeed = transformedSubFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"subFeed for output ${output.id} not found"))
-      setSparkJobDescription(s"writing to DataObject ${subFeed.dataObjectId}")
+      logger.info(s"writing to DataObject ${output.id}, partitionValues ${subFeed.partitionValues}")
+      setSparkJobDescription(s"writing to DataObject ${output.id}")
       output.writeDataFrame(subFeed.dataFrame.get, subFeed.partitionValues)
     }
     // return
@@ -83,6 +122,11 @@ abstract class SparkSubFeedsAction extends Action {
    * This helps to reduce memory needed for caching the DataFrame content and can serve as a recovery point in case an task get's lost.
    */
   def persist: Boolean = false
+
+  /**
+   * Execution mode if this Action is a start node of a DAG run
+   */
+  def initExecutionMode: Option[ExecutionMode]
 
   /**
    * Enriches SparkSubFeeds with DataFrame if not existing

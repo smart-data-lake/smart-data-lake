@@ -19,7 +19,9 @@
 package io.smartdatalake.testutils
 
 import java.io.File
+import java.math.BigDecimal
 import java.nio.file.Files
+import java.sql.{Date, Timestamp}
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -55,6 +57,7 @@ object TestUtil extends SmartDataLakeLogger {
     val builder = SparkSession.builder()
       .config("hive.exec.dynamic.partition", "true")
       .config("hive.exec.dynamic.partition.mode", "nonstrict")
+      .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
       .config("spark.sql.shuffle.partitions", "2")
     //.config("spark.ui.enabled", "false") // we use this as webservice to test WebserviceFileDataObject
     // Enable hive support if available
@@ -148,11 +151,11 @@ object TestUtil extends SmartDataLakeLogger {
     val wireMockServer =
       new WireMockServer(
         wireMockConfig()
-        .port(port)
-        .httpsPort(httpsPort)
-        .bindAddress(host)
-        .keystorePath("src/test/resources/test_keystore.pkcs12")
-        .keystorePassword("mytruststorepassword")
+          .port(port)
+          .httpsPort(httpsPort)
+          .bindAddress(host)
+          .keystorePath("src/test/resources/test_keystore.pkcs12")
+          .keystorePassword("mytruststorepassword")
       )
     wireMockServer
       .start()
@@ -270,14 +273,14 @@ object TestUtil extends SmartDataLakeLogger {
     sessionWithoutHive.createDataFrame(sessionWithoutHive.sparkContext.makeRDD(Seq.empty[Row]),
       StructType(
         nullableStringField
-        :: notNullableStringField
-        :: nullableStructField
-        :: notNullableStructField
-        :: notNullableArrayField
-        :: nullableArrayField
-        :: notNullableMapField
-        :: nullableMapField
-        :: Nil
+          :: notNullableStringField
+          :: nullableStructField
+          :: notNullableStructField
+          :: notNullableArrayField
+          :: nullableArrayField
+          :: notNullableMapField
+          :: nullableMapField
+          :: Nil
       )
     )
   }
@@ -300,6 +303,43 @@ object TestUtil extends SmartDataLakeLogger {
     val rowsHierarchy: Seq[(String, String)] = Seq(("a","ab"), ("a","ac"), ("ac","aca"), ("b","ba"),
       ("c","ca"), ("ca","caa"), ("ca","cab"), ("c","cb"), ("cb","X"), ("c","cc"), ("cc","X"), ("X","Y"), ("Y","Z"))
     rowsHierarchy.toDF("parent", "child")
+  }
+
+  def makeRowManyTypes(r: (Boolean,Int,Int,Int,Int,String,String,String,String,String,String,Double,Double,String,String,String) ): Row = {
+    Row(r._1,r._2.byteValue(),r._3.shortValue(),r._4,r._5.longValue(), // BooleanType - LongType
+      Decimal(new BigDecimal(r._6),2,0),
+      Decimal(new BigDecimal(r._7),4,0),
+      Decimal(new BigDecimal(r._8),10,0),
+      Decimal(new BigDecimal(r._9),11,0),
+      Decimal(new BigDecimal(r._10),4,3),
+      Decimal(new BigDecimal(r._11),38,1),
+      r._12.floatValue(),r._13,Date.valueOf(r._14),Timestamp.valueOf(r._15),r._16) // FloatType - StringType
+  }
+  val rowsManyTypes: List[(Boolean,Int,Int,Int,Int,String,String,String,String,String,String,Double,Double,String,String,String)] = List(
+    (false,0,0,0,0,"0","0","0","0","0.0","0.0",0.0,0.0,"1970-01-01","1970-01-01 02:34:56.789","zero"),
+    (true,127,32767,Int.MaxValue,Int.MaxValue,"99","9999","9999999999","99999999999","1.234","1234567890123456789012345678901234567.8",
+      Float.MaxValue,Double.MaxValue,"2020-02-29","2020-02-29 12:34:56.789","maximal")
+  )
+  def dfManyTypes: DataFrame = {
+    val schemaManyTypes: StructType = StructType(
+      StructField("_boolean", BooleanType, nullable = true) ::
+        StructField("_byte", ByteType, nullable = true) ::
+        StructField("_short", ShortType, nullable = true) ::
+        StructField("_integer", IntegerType, nullable = true) ::
+        StructField("_long", LongType, nullable = true) ::
+        StructField("_decimal_2_0" , DecimalType(2, 0), nullable = true) ::
+        StructField("_decimal_4_0" , DecimalType(4, 0), nullable = true) ::
+        StructField("_decimal_10_0", DecimalType(10, 0), nullable = true) ::
+        StructField("_decimal_11_0", DecimalType(11, 0), nullable = true) ::
+        StructField("_decimal_4_3", DecimalType(4, 3), nullable = true) ::
+        StructField("_decimal_38_1", DecimalType(38, 1), nullable = true) ::
+        StructField("_float", FloatType, nullable = true) ::
+        StructField("_double", DoubleType, nullable = true) ::
+        StructField("_date", DateType, nullable = true) ::
+        StructField("_timestamp", TimestampType, nullable = true) ::
+        StructField("_string", StringType, nullable = true) ::
+        Nil)
+    sessionHiveCatalog.createDataFrame(rows=rowsManyTypes.map(makeRowManyTypes).asJava, schema=schemaManyTypes): DataFrame
   }
 
   def dfNonUnique: DataFrame = {

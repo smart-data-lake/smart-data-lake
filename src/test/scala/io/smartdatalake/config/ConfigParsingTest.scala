@@ -20,6 +20,7 @@ package io.smartdatalake.config
 
 import com.typesafe.config.ConfigFactory
 import configs.{Configs, Result}
+import io.smartdatalake.definitions.PartitionDiffMode
 import io.smartdatalake.workflow.action.{Action, FileTransferAction}
 import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, DataObject, RawFileDataObject}
 import org.scalatest.{FlatSpec, Matchers}
@@ -303,6 +304,10 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         | type = io.smartdatalake.config.TestAction
         | inputId = tdo1
         | outputId = tdo2
+        | executionMode = {
+        |  type = PartitionDiffMode
+        |  partitionColNb = 2
+        | }
         |}
         |
         |""".stripMargin).resolve
@@ -310,7 +315,7 @@ class ConfigParsingTest extends FlatSpec with Matchers {
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
 
     val testAction = Configs[TestAction].get(config, "a")
-    testAction shouldEqual Result.Success(TestAction(id = "a", arg1 = None, inputId = "tdo1", outputId = "tdo2"))
+    testAction shouldEqual Result.Success(TestAction(id = "a", arg1 = None, inputId = "tdo1", outputId = "tdo2", executionMode = Some(PartitionDiffMode(partitionColNb = Some(2)))))
   }
 
   "local substitution" should "be processed" in {

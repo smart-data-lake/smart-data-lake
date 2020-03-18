@@ -18,10 +18,11 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import io.smartdatalake.util.hdfs.PartitionValues
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 private[smartdatalake] trait CanCreateDataFrame {
 
-  def getDataFrame(implicit session: SparkSession) : DataFrame
+  def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession) : DataFrame
 
 }

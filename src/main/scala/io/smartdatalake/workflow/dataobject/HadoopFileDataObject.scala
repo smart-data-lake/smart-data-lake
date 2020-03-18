@@ -22,7 +22,7 @@ import java.io.{InputStream, OutputStream}
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
-import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.workflow.connection.HadoopFileConnection
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -54,14 +54,10 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    */
   final override def partitionLayout(): Option[String] = {
     if (partitions.nonEmpty) {
-      Some(getHadoopPartitionLayout(partitions))
+      Some(HdfsUtil.getHadoopPartitionLayout(partitions, separator))
     } else {
       None
     }
-  }
-
-  private def getHadoopPartitionLayout(partitionCols: Seq[String]) = {
-    partitions.map(col => s"$col=%$col%$separator").mkString
   }
 
   /**
@@ -156,10 +152,27 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     partitionValues.map { pv =>
       // check if valid init of partitions
       assert(partitions.inits.map(_.toSet).contains(pv.keys), s"${pv.keys.mkString(",")} is not a valid init of ${partitions.mkString(",")}")
-      val partitionLayout = getHadoopPartitionLayout(partitions.filter(pv.isDefinedAt))
+      val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitions.filter(pv.isDefinedAt), separator)
       val partitionPath = new Path(hadoopPath, pv.getPartitionString(partitionLayout))
       filesystem.delete(partitionPath, true) // recursive=true
     }
+  }
+
+  /**
+   * List partitions on data object's root path
+   */
+  override def listPartitions(implicit session: SparkSession): Seq[PartitionValues] = {
+    partitionLayout().map {
+      partitionLayout =>
+        // get search pattern for root directory
+        val pattern = PartitionLayout.replaceTokens(partitionLayout, PartitionValues(Map()))
+        // list directories and extract partition values
+        filesystem.globStatus( new Path(hadoopPath, pattern))
+          .filter{fs => fs.isDirectory}
+          .map(_.getPath.toString)
+          .map( path => PartitionLayout.extractPartitionValues(partitionLayout, "", path + separator))
+          .toSeq
+    }.getOrElse(Seq())
   }
 
   override def prepare(implicit session: SparkSession): Unit = {

@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -44,6 +44,13 @@ private[smartdatalake] trait Connection extends SdlConfigObject with ParsableFro
  * @param description Description of the content of the Connection
  * @param layer Name of the layer this Connection belongs to
  * @param subjectArea Name of the subject area this Connection belongs to
+ * @param tags Optional custom tags for this object
  */
-private[smartdatalake] case class ConnectionMetadata(name: Option[String] = None, description: Option[String] = None, layer: Option[String] = None, subjectArea: Option[String] = None)
+case class ConnectionMetadata(
+                               name: Option[String] = None,
+                               description: Option[String] = None,
+                               layer: Option[String] = None,
+                               subjectArea: Option[String] = None,
+                               tags: Seq[String] = Seq()
+                             )
 

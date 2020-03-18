@@ -25,6 +25,7 @@ import com.healthmarketscience.jackcess.DatabaseBuilder
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -48,7 +49,7 @@ case class AccessTableDataObject(override val id: DataObjectId,
                                 )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends TableDataObject {
 
-  override def getDataFrame(implicit session: SparkSession) : DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession) : DataFrame = {
 
     // currently, only the schema is being inferred using [[net.ucanaccess.jdbc.UcanaccessDriver]]...
     val tableSchema = session.read

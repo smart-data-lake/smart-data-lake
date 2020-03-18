@@ -23,12 +23,13 @@ import java.time.LocalDateTime
 
 import com.holdenkarau.spark.testing.Utils
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.definitions.PartitionDiffMode
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, CustomDfTransformerConfig}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
-import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SparkSubFeed}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
@@ -153,6 +154,53 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
       .as[Int].collect().toSeq
     assert(r1.size == 1)
     assert(r1.head == 5) // no transformer, rating should stay the same
+  }
+
+  test("copy with partition diff execution mode") {
+
+    // setup DataObjects
+    val feed = "partitiondiff"
+    val srcTable = Table(Some("default"), "copy_input")
+    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
+    val srcPath = tempPath+s"/${srcTable.fullName}"
+    val srcDO = HiveTableDataObject( "src1", srcPath, table = srcTable, partitions = Seq("type"), numInitialHdfsPartitions = 1)
+    instanceRegistry.register(srcDO)
+    val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("type","lastname","firstname")))
+    HiveUtil.dropTable(session, tgtTable.db.get, tgtTable.name )
+    val tgtPath = tempPath+s"/${tgtTable.fullName}"
+    val tgtDO = HiveTableDataObject( "tgt1", tgtPath, table = tgtTable, partitions = Seq("type"), numInitialHdfsPartitions = 1)
+    instanceRegistry.register(tgtDO)
+
+    // prepare action
+    val refTimestamp = LocalDateTime.now()
+    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", instanceRegistry, Some(refTimestamp))
+    val action = CopyAction("a1", srcDO.id, tgtDO.id, initExecutionMode = Some(PartitionDiffMode()))
+    val srcSubFeed = InitSubFeed("src1", Seq()) // InitSubFeed needed to test initExecutionMode!
+
+    // prepare & start first load
+    val l1 = Seq(("A","doe","john",5)).toDF("type", "lastname", "firstname", "rating")
+    val l1PartitionValues = Seq(PartitionValues(Map("type"->"A")))
+    srcDO.writeDataFrame(l1, l1PartitionValues) // prepare testdata
+    val tgtSubFeed1 = action.exec(Seq(srcSubFeed)).head
+
+    // check first load
+    assert(tgtSubFeed1.dataObjectId == tgtDO.id)
+    assert(tgtSubFeed1.partitionValues.toSet == l1PartitionValues.toSet)
+    assert(tgtDO.getDataFrame().count == 1)
+    assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet)
+
+    // prepare & start 2nd load
+    val l2 = Seq(("B","pan","peter",11)).toDF("type", "lastname", "firstname", "rating")
+    val l2PartitionValues = Seq(PartitionValues(Map("type"->"B")))
+    srcDO.writeDataFrame(l2, l2PartitionValues) // prepare testdata
+    assert(srcDO.getDataFrame().count == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
+    val tgtSubFeed2 = action.exec(Seq(srcSubFeed)).head
+
+    // check 2nd load
+    assert(tgtSubFeed2.dataObjectId == tgtDO.id)
+    assert(tgtSubFeed2.partitionValues.toSet == l2PartitionValues.toSet)
+    assert(tgtDO.getDataFrame().count == 2)
+    assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet ++ l2PartitionValues.toSet)
   }
 
 }

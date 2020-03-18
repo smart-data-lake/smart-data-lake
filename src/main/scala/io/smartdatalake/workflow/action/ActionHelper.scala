@@ -22,12 +22,14 @@ import java.sql.Timestamp
 import java.time.LocalDateTime
 
 import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.config.SdlConfigObject.ActionObjectId
+import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject, TableDataObject}
+import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.TimestampType
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
@@ -104,11 +106,16 @@ object ActionHelper extends SmartDataLakeLogger {
    */
   def applyBlackWhitelists(subFeed: SparkSubFeed, columnBlacklist: Option[Seq[String]], columnWhitelist: Option[Seq[String]]): SparkSubFeed = {
     val blackWhiteDfTransforms: Seq[DataFrame => DataFrame] = Seq(
-      columnBlacklist.map(l => ActionHelper.filterBlacklist(l) _),
-      columnWhitelist.map(l => ActionHelper.filterWhitelist(l) _)
+      columnBlacklist.map(l => filterBlacklist(l) _),
+      columnWhitelist.map(l => filterWhitelist(l) _)
     ).flatten
-    ActionHelper.multiTransformSubfeed(subFeed, blackWhiteDfTransforms)
+    multiTransformSubfeed(subFeed, blackWhiteDfTransforms)
   }
+
+  /**
+   * applies type casting decimal -> integral/float
+   */
+  def applyCastDecimal2IntegralFloat(subFeed: SparkSubFeed): SparkSubFeed = ActionHelper.multiTransformSubfeed(subFeed, Seq(_.castAllDecimal2IntegralFloat))
 
   /**
    * applies an optional additional transformation
@@ -116,14 +123,14 @@ object ActionHelper extends SmartDataLakeLogger {
   def applyAdditional(subFeed: SparkSubFeed,
                       additional: (SparkSubFeed,Option[DataFrame],Seq[String],LocalDateTime) => SparkSubFeed,
                       output: TableDataObject)(implicit session: SparkSession,
-                                                                 context: ActionPipelineContext): SparkSubFeed = {
+                                               context: ActionPipelineContext): SparkSubFeed = {
     logger.info(s"Starting applyAdditional context=$context")
     val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
     val table = output.table
     val pks = table.primaryKey
       .getOrElse( throw new ConfigurationException(s"There is no <primary-keys> defined for table ${table.name}."))
     val existingDf = if (output.isTableExisting) {
-      Some(output.getDataFrame)
+      Some(output.getDataFrame())
     } else None
     additional(subFeed, existingDf, pks, timestamp)
   }
@@ -135,19 +142,21 @@ object ActionHelper extends SmartDataLakeLogger {
                            transformer: Option[CustomDfTransformerConfig],
                            columnBlacklist: Option[Seq[String]],
                            columnWhitelist: Option[Seq[String]],
+                           standardizeDatatypes: Boolean,
                            output: DataObject,
                            additional: Option[(SparkSubFeed,Option[DataFrame],Seq[String],LocalDateTime) => SparkSubFeed])(
-                implicit session: SparkSession,
-                context: ActionPipelineContext): SparkSubFeed = {
+                            implicit session: SparkSession,
+                            context: ActionPipelineContext): SparkSubFeed = {
     var transformedSubFeed : SparkSubFeed = applyBlackWhitelists(applyCustomTransformation(inputSubFeed, transformer)(session),
       columnBlacklist: Option[Seq[String]],
       columnWhitelist: Option[Seq[String]]
     )
+    if (standardizeDatatypes) transformedSubFeed = applyCastDecimal2IntegralFloat(transformedSubFeed) // currently we cast decimals away only but later we may add further type casts
     if (additional.isDefined && output.isInstanceOf[TableDataObject]) {
       transformedSubFeed = applyAdditional(transformedSubFeed, additional.get, output.asInstanceOf[TableDataObject])(session,context)
     }
-    // update partition values to output's partition columns and update dataObjectId
-    ActionHelper.validateAndUpdateSubFeedPartitionValues(output, transformedSubFeed).copy(dataObjectId = output.id)
+    // return
+    transformedSubFeed
   }
 
   /**
@@ -180,7 +189,7 @@ object ActionHelper extends SmartDataLakeLogger {
 
   /**
    * Updates the partition values of a SubFeed to the partition columns of an output, removing not existing columns from the partition values.
-   * Further the transformed DataFrame validated to have the output's partition columns included.
+   * Further the transformed DataFrame is validated to have the output's partition columns included.
    *
    * @param output output DataObject
    * @param subFeed SubFeed with transformed DataFrame
@@ -192,7 +201,7 @@ object ActionHelper extends SmartDataLakeLogger {
         // validate output partition columns exist in DataFrame
         validateDataFrameContainsCols(subFeed.dataFrame.get, partitionedDO.partitions, s"for ${output.id}")
         // adapt subfeed
-        subFeed.updatePartitionValues()
+        subFeed.updatePartitionValues(partitionedDO.partitions)
       case _ => subFeed.clearPartitionValues()
     }
   }
@@ -240,11 +249,60 @@ object ActionHelper extends SmartDataLakeLogger {
     if (subFeed.dataFrame.isEmpty) {
       assert(input.id == subFeed.dataObjectId, s"DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
       logger.info(s"Getting DataFrame for DataObject ${input.id} filtered by partition values ${subFeed.partitionValues}")
-      val df = input.getDataFrame.colNamesLowercase // convert to lower case by default
+      val df = input.getDataFrame().colNamesLowercase // convert to lower case by default
       val filteredDf = ActionHelper.filterDataFrame(df, subFeed.partitionValues)
       subFeed.copy(dataFrame = Some(filteredDf))
     } else subFeed
   }
+
+  /**
+   * search common inits between to partition column definitions
+   */
+  def searchCommonInits(partitions1: Seq[String], partitions2: Seq[String]): Seq[Seq[String]] = {
+    partitions1.inits.toSeq.intersect(partitions2.inits.toSeq)
+      .filter(_.nonEmpty)
+  }
+
+  /**
+   * search greatest common init between to partition column definitions
+   */
+  def searchGreatestCommonInit(partitions1: Seq[String], partitions2: Seq[String]): Option[Seq[String]] = {
+    val commonInits = searchCommonInits(partitions1, partitions2)
+    if (commonInits.nonEmpty) Some(commonInits.maxBy(_.size))
+    else None
+  }
+
+  /**
+   * Apply execution mode to partition values
+   */
+  def applyExecutionMode(executionMode: Option[ExecutionMode], actionId: ActionObjectId, input: DataObject, output: DataObject, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[PartitionValues] = {
+    executionMode match {
+      case Some(mode:PartitionDiffMode) =>
+        (input,output) match {
+          case (partitionInput: CanHandlePartitions, partitionOutput: CanHandlePartitions)  =>
+            if (partitionInput.partitions.nonEmpty) {
+              if (partitionOutput.partitions.nonEmpty) {
+                // prepare common partition columns
+                val commonInits = searchCommonInits(partitionInput.partitions, partitionOutput.partitions)
+                require(commonInits.nonEmpty, throw ConfigurationException(s"$actionId has set initExecutionMode = 'partitionDiff' but no common init was found in partition columns for $input and $output"))
+                val commonPartitions = if (mode.partitionColNb.isDefined) {
+                  commonInits.find(_.size==mode.partitionColNb.get).getOrElse(throw ConfigurationException(s"$actionId has set initExecutionMode = 'partitionDiff' but no common init with ${mode.partitionColNb.get} was found in partition columns of $input and $output from $commonInits!"))
+                } else {
+                  commonInits.maxBy(_.size)
+                }
+                // calculate missing partition values
+                val partitionValuesToBeProcessed = partitionInput.listPartitions.map(_.filterKeys(commonPartitions)).toSet
+                  .diff(partitionOutput.listPartitions.map(_.filterKeys(commonPartitions)).toSet)
+                partitionValuesToBeProcessed.toSeq
+              } else throw ConfigurationException(s"$actionId has set initExecutionMode = 'partitionDiff' but $output has no partition columns defined!")
+            } else throw ConfigurationException(s"$actionId has set initExecutionMode = 'partitionDiff' but $input has no partition columns defined!")
+          case (_: CanHandlePartitions, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = 'partitionDiff' but $output does not support partitions!")
+          case (_, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = 'partitionDiff' but $input does not support partitions!")
+        }
+      case _ => partitionValues
+    }
+  }
+
 
   //  /**
   //   * Checks a historized hive table to verify that there is only one active record for any given primary key

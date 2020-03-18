@@ -22,8 +22,8 @@ import java.io.File
 
 import com.typesafe.config.ConfigFactory
 import org.apache.commons.io.FileUtils
-import org.apache.spark.sql.{DataFrame, Row, SaveMode}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
+import org.apache.spark.sql.{DataFrame, Row, SaveMode}
 
 /**
  * Unit tests for [[CsvFileDataObject]].
@@ -46,7 +46,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
          """.stripMargin)
       val dataObj = CsvFileDataObject.fromConfig(config, instanceRegistry)
 
-      val df = dataObj.getDataFrame
+      val df = dataObj.getDataFrame()
       df.schema shouldBe empty
       df shouldBe empty
     } finally {
@@ -71,7 +71,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
          """.stripMargin)
       val dataObj = CsvFileDataObject.fromConfig(config, instanceRegistry)
 
-      val df = dataObj.getDataFrame
+      val df = dataObj.getDataFrame()
       df.schema shouldBe empty
       df shouldBe empty
     } finally {
@@ -96,7 +96,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
          """.stripMargin)
       val dataObj = CsvFileDataObject.fromConfig(config, instanceRegistry)
 
-      val df = dataObj.getDataFrame
+      val df = dataObj.getDataFrame()
       df.schema shouldBe empty
       df shouldBe empty
     } finally {
@@ -136,7 +136,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
       val dataObj = CsvFileDataObject.fromConfig(config, instanceRegistry)
 
-      val df = dataObj.getDataFrame
+      val df = dataObj.getDataFrame()
 
       df.schema should contain theSameElementsInOrderAs Seq(
         StructField("header1", StringType, nullable = true),
@@ -185,7 +185,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
       val dataObj = CsvFileDataObject.fromConfig(config, instanceRegistry)
 
-      val df = dataObj.getDataFrame
+      val df = dataObj.getDataFrame()
 
       df.schema should contain theSameElementsInOrderAs Seq(
         StructField("header1", StringType, nullable = true),

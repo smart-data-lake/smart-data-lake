@@ -21,8 +21,8 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, FromConfigFactory, InstanceRegistry, ParsableFromConfig}
-import io.smartdatalake.util.misc.ProductUtil.getFieldData
-import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformerConfig, CustomDfsTransformerConfig}
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.ProductUtil._
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -60,8 +60,10 @@ case class ActionsExporterDataObject(id: DataObjectId,
    * @param session SparkSession to use
    * @return DataFrame including all Actions in the instanceRegistry, used for exporting the metadata
    */
-  override def getDataFrame(implicit session: SparkSession): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
     import session.implicits._
+
+    val listElementsSeparator = ","
 
     // Get all actions from registry
     val actions: Seq[Action with Product] = config match {
@@ -74,78 +76,38 @@ case class ActionsExporterDataObject(id: DataObjectId,
     // Extract data for export
     // type is derived from classname
     val exportActions = actions.map {
-      f =>
-        val metadata: Option[ActionMetadata] = getFieldData(f, "metadata") match {
-          case Some(Some(meta: ActionMetadata)) => Some(meta)
-          case _ => None
-        }
+      action =>
+        val metadata = getOptionalFieldData[ActionMetadata](action, "metadata")
+        // return tuple:
         (
           // id
-          getFieldData(f, "id") match {
-            case Some(x: String) => x
-            case _ => ""
-          },
+          action.id.id,
           // type
-          f.getClass.getSimpleName,
+          action.getClass.getSimpleName,
           // metadata name
-          metadata match {
-            case Some(x:ActionMetadata) => x.name.getOrElse("")
-            case _ => ""
-          },
+          metadata.flatMap(_.name),
           // metadata description
-          metadata match {
-            case Some(x:ActionMetadata) => x.description.getOrElse("")
-            case _ => ""
-          },
+          metadata.flatMap(_.description),
           // metadata feed
-          metadata match {
-            case Some(x:ActionMetadata) => x.feed.getOrElse("")
-            case _ => ""
-          },
+          metadata.flatMap(_.feed),
+          // metadata tags
+          metadata.map(_.tags).map(_.mkString(listElementsSeparator)),
           // inputId
-          getFieldData(f, "inputId") match {
-            case Some(x:String) => x
-            case _ =>
-              getFieldData(f, "inputIds") match {
-                case Some(x:Seq[_]) => x.asInstanceOf[Seq[DataObjectId]].map(_.id).mkString(",")
-                case _ => ""
-              }
-          },
+          getFieldData[Any](action, "inputId").map(getIdFromConfigObjectIdOrString) // dont know why this is a String and not a DataObjectId. Seems to be a speciality with value classes.
+            .orElse( getFieldData[Seq[Any]](action, "inputIds").map(_.map(getIdFromConfigObjectIdOrString).mkString(listElementsSeparator))),
           // outputId
-          getFieldData(f, "outputId") match {
-            case Some(x:String) => x
-            case _ =>
-              getFieldData(f, "outputIds") match {
-                case Some(x: Seq[_]) => x.asInstanceOf[Seq[DataObjectId]].map(_.id).mkString(",")
-                case _ => ""
-              }
-          },
+          getFieldData[Any](action, "outputId").map(getIdFromConfigObjectIdOrString) // dont know why this is a String and not a DataObjectId. Seems to be a speciality with value classes.
+            .orElse( getFieldData[Seq[Any]](action, "outputIds").map(_.map(getIdFromConfigObjectIdOrString).mkString(listElementsSeparator))),
           // transformer
-          getFieldData(f, "transformer") match {
-            case Some(x: CustomDfTransformerConfig) => x.toString
-            case Some(x: CustomDfsTransformerConfig) => x.toString
-            case _ => ""
-          },
+          getEventuallyOptionalFieldData[Any](action, "transformer").map(_.toString),
           // columnBlacklist
-          getFieldData(f, "columnBlacklist") match {
-            case Some(Some(x:String)) => x.mkString(",")
-            case _ => ""
-          },
+          getOptionalFieldData[Seq[String]](action, "columnBlacklist").map(_.mkString(listElementsSeparator)),
           // columnWhitelist
-          getFieldData(f, "columnWhitelist") match {
-            case Some(Some(x:String)) => x.mkString(",")
-            case _ => ""
-          },
+          getOptionalFieldData[Seq[String]](action, "columnWhitelist").map(_.mkString(listElementsSeparator)),
           // breakDataFrameLineage
-          getFieldData(f, "breakDataFrameLineage") match {
-            case Some(x:Boolean) => x.toString
-            case _ => ""
-          },
+          getFieldData[Boolean](action, "breakDataFrameLineage").map(_.toString),
           // persist
-          getFieldData(f, "persist") match {
-            case Some(x:Boolean) => x.toString
-            case _ => ""
-          }
+          getFieldData[Boolean](action, "persist").map(_.toString)
         )
     }
 
@@ -156,6 +118,7 @@ case class ActionsExporterDataObject(id: DataObjectId,
       "name",
       "description",
       "feed",
+      "tags",
       "inputId",
       "outputId",
       "transformer",

@@ -24,6 +24,7 @@ import io.smartdatalake.workflow.DAGHelper.NodeId
 import monix.eval.Task
 import monix.execution.Scheduler
 
+import scala.reflect._
 import scala.util.{Failure, Success, Try}
 
 private[smartdatalake] object DAGHelper {
@@ -44,6 +45,13 @@ private[smartdatalake] trait DAGResult {
   def resultId: String
 }
 
+private[smartdatalake] trait DAGEventListener[T <: DAGNode] {
+  def onNodeStart(node: T)
+  def onNodeSuccess(node: T)
+  def onNodeFailure(exception: Throwable)(node: T)
+  def onNodeSkipped(exception: Throwable)(node: T)
+}
+
 private[smartdatalake] case class TaskCancelledException(id: NodeId) extends Exception
 private[smartdatalake] case class TaskPredecessorFailureException(id: NodeId, ex: Throwable) extends Exception(ex)
 
@@ -56,20 +64,25 @@ private[smartdatalake] case class TaskPredecessorFailureException(id: NodeId, ex
  * @param incomingEdgesMap A lookup table for incoming edges indexed by node id.
  * @param startNodes Starting points for DAG execution.
  * @param endNodes End points for DAG execution.
+ * @tparam N: This is the DAG's main node type used for notifying the event listener. There may be other node types in the DAG for technical reasons, e.g. initialization
  */
-case class DAG private(sortedNodes: Seq[DAGNode],
-                       incomingEdgesMap: Map[NodeId, Seq[DAGEdge]],
-                       startNodes: Seq[DAGNode],
-                       endNodes: Seq[DAGNode]
-                      )
+case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
+                                     incomingEdgesMap: Map[NodeId, Seq[DAGEdge]],
+                                     startNodes: Seq[DAGNode],
+                                     endNodes: Seq[DAGNode]
+                                    )
   extends SmartDataLakeLogger {
 
+  /**
+   * Create text representation of the graph by using an ASCII graph layout library
+   */
   override def toString: String = {
     import com.github.mdr.ascii.layout._
+    val nodesLookup = sortedNodes.map( n => n.nodeId -> n).toMap
     val edges = incomingEdgesMap.values.flatMap {
-      incomingEdges => incomingEdges.map(incomingEdge => (incomingEdge.nodeIdFrom, incomingEdge.nodeIdTo))
+      incomingEdges => incomingEdges.map(incomingEdge => (nodesLookup(incomingEdge.nodeIdFrom), nodesLookup(incomingEdge.nodeIdTo)))
     }
-    val g = new Graph(vertices = sortedNodes.map(_.nodeId).toSet, edges = edges.toList)
+    val g = new Graph(vertices = sortedNodes.toSet, edges = edges.toList)
     GraphLayout.renderGraph(g)
   }
 
@@ -85,13 +98,16 @@ case class DAG private(sortedNodes: Seq[DAGNode],
    *
    * @see https://medium.com/@sderosiaux/are-scala-futures-the-past-69bd62b9c001
    *
+   * @param eventListener A instance of [[DAGEventListener]] to be notified about progress of DAG execution
    * @param operation A function that computes the result ([[DAGResult]]) for the current node,
    *                  given the result of its predecessors given.
    * @param scheduler The [[Scheduler]] to use for Tasks.
    *
    * @return
    */
-  def buildTaskGraph[A <: DAGResult](operation: (DAGNode, Seq[A]) => Seq[A])(implicit scheduler: Scheduler): Task[Seq[Try[A]]] = {
+  def buildTaskGraph[A <: DAGResult](eventListener: DAGEventListener[N])
+                                                  (operation: (DAGNode, Seq[A]) => Seq[A])
+                                                  (implicit scheduler: Scheduler): Task[Seq[Try[A]]] = {
 
     // this variable is used to stop execution on cancellation
     // using a local variable inside code of Futures is possible in Scala:
@@ -108,13 +124,13 @@ case class DAG private(sortedNodes: Seq[DAGNode],
             // Now the incoming results have finished computing.
             // It's time to compute the result of the current node.
             if (isCancelled) {
-              cancelledDAGResult(node)
+              cancelledDAGResult(node, eventListener)
             } else if (incomingResults.exists(_.isFailure)) {
               // a predecessor failed
-              incomingFailedResult(node, incomingResults)
+              incomingFailedResult(node, incomingResults, eventListener)
             } else {
               // compute the result for this node
-              computeNodeOperationResult(node, operation, incomingResults)
+              computeNodeOperationResult(node, operation, incomingResults, eventListener)
             }
         }.memoize // calculate only once per node, then remember value
         // pass on the result of the current node
@@ -133,29 +149,39 @@ case class DAG private(sortedNodes: Seq[DAGNode],
       })
   }
 
-  private def computeNodeOperationResult[A <: DAGResult](node: DAGNode, operation: (DAGNode, Seq[A]) => Seq[A], incomingResults: Seq[Try[A]]) = {
-    //onNodeStart
+  private def computeNodeOperationResult[A <: DAGResult](node: DAGNode, operation: (DAGNode, Seq[A]) => Seq[A], incomingResults: Seq[Try[A]], eventListener: DAGEventListener[N]): Try[Seq[A]] = {
+    notify(node, eventListener.onNodeStart)
     val result = Try(operation(node, incomingResults.map(_.get))) // or should we use "Try( blocking { operation(node, v) })"
     result match {
       case Failure(ex) =>
-        //onNodeFailure
+        notify(node, eventListener.onNodeFailure(ex))
         logger.error(s"Task ${node.nodeId} failed: $ex")
       case _ =>
-        //onNodeSucces
+        notify(node, eventListener.onNodeSuccess)
     }
     // return
     result
   }
 
-  private def incomingFailedResult[A <: DAGResult](node: DAGNode, incomingResults: Seq[Try[A]]) = {
+  private def incomingFailedResult[A <: DAGResult](node: DAGNode, incomingResults: Seq[Try[A]], eventListener: DAGEventListener[N]): Try[Seq[A]] = {
     val firstPredecessorException = incomingResults.find(_.isFailure).get.failed.get
     logger.debug(s"Task ${node.nodeId} is not executed because some predecessor had error $firstPredecessorException")
-    Failure(TaskPredecessorFailureException(node.nodeId, firstPredecessorException))
+    val exception = TaskPredecessorFailureException(node.nodeId, firstPredecessorException)
+    notify(node, eventListener.onNodeSkipped(exception))
+    Failure(exception)
   }
 
-  private def cancelledDAGResult[A <: DAGResult](node: DAGNode) = {
+  private def cancelledDAGResult[A <: DAGResult](node: DAGNode, eventListener: DAGEventListener[N]): Try[Seq[A]] = {
     logger.debug(s"Task ${node.nodeId} is cancelled because DAG execution is cancelled")
-    Failure(TaskCancelledException(node.nodeId))
+    val exception = TaskCancelledException(node.nodeId)
+    notify(node, eventListener.onNodeSkipped(exception))
+    Failure(exception)
+  }
+
+  private def notify(node: DAGNode, notifyFunc: N => Unit): Unit = {
+    // we can only notify the event listener, if node is of main DAGNode type N
+    // because of type erasure for generics we have to use reflection
+    if (classTag[N].runtimeClass.isInstance(node)) notifyFunc(node.asInstanceOf[N])
   }
 
   /**
@@ -180,7 +206,6 @@ case class DAG private(sortedNodes: Seq[DAGNode],
   }
 
   /**
-   *
    * Create a task that fetches a specific [[DAGResult]] produced by the node with id `nodeId`.
    *
    * @param tasks A map of tasks that compute (future) results indexed by node.
@@ -201,13 +226,17 @@ case class DAG private(sortedNodes: Seq[DAGNode],
 }
 
 object DAG extends SmartDataLakeLogger {
-  def create(nodes: Seq[DAGNode], edges: Seq[DAGEdge]): DAG = {
+
+  /**
+   * Create a DAG object from DAGNodes and DAGEdges
+   */
+  def create[N <: DAGNode : ClassTag](nodes: Seq[DAGNode], edges: Seq[DAGEdge]): DAG[N] = {
     val incomingIds = buildIncomingIdLookupTable(nodes, edges)
     // start nodes = all nodes without incoming edges
     val startNodes = incomingIds.filter(_._2.isEmpty)
 
     // end nodes = all nodes without outgoing edges
-    val endNodes = buidlOutgoingIdLookupTable(nodes, edges).filter(_._2.isEmpty)
+    val endNodes = buildOutgoingIdLookupTable(nodes, edges).filter(_._2.isEmpty)
 
     // sort node IDs topologically and check there are no loops
     val sortedNodeIds = sortStep(incomingIds.map {
@@ -231,7 +260,7 @@ object DAG extends SmartDataLakeLogger {
   /**
    * Create a lookup table to retrieve outgoing (target) node IDs for a node.
    */
-  private def buidlOutgoingIdLookupTable(nodes: Seq[DAGNode], edges: Seq[DAGEdge]) = {
+  private def buildOutgoingIdLookupTable(nodes: Seq[DAGNode], edges: Seq[DAGEdge]) = {
     val targetIDsforIncommingIDsMap = edges.groupBy(_.nodeIdFrom).mapValues(_.map(_.nodeIdTo))
     nodes.map(n => (n, targetIDsforIncommingIDsMap.getOrElse(n.nodeId, Seq()))).toMap
   }

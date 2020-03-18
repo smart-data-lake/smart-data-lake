@@ -21,7 +21,8 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.util.misc.{AclDef, DataFrameUtil}
+import io.smartdatalake.util.misc.AclDef
+import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SaveMode}
 
@@ -67,12 +68,12 @@ case class JsonFileDataObject( override val id: DataObjectId,
 
   override def afterRead(df: DataFrame): DataFrame  = {
     val dfSuper = super.afterRead(df)
-    if (stringify) DataFrameUtil.convertSchema2String(dfSuper) else dfSuper
+    if (stringify) dfSuper.castAll2String else dfSuper
   }
 
   override def beforeWrite(df: DataFrame): DataFrame  = {
     val dfSuper = super.beforeWrite(df)
-    if (stringify) DataFrameUtil.convertSchema2String(dfSuper) else dfSuper
+    if (stringify) dfSuper.castAll2String else dfSuper
   }
 
   /**

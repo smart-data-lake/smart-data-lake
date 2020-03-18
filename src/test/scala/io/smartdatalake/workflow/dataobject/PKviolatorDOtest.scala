@@ -18,20 +18,20 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import collection.mutable._
-import collection.JavaConverters._
 import com.holdenkarau.spark.testing.Utils.createTempDir
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
-import org.apache.spark.sql.{Column, Row, SparkSession}
-import org.apache.spark.sql.types.{ArrayType, StringType, StructField, StructType}
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import io.smartdatalake.workflow.dataobject.PKViolatorsDataObject.colListType
 import org.apache.spark.sql.functions.lit
+import org.apache.spark.sql.types.{StringType, StructField, StructType}
+import org.apache.spark.sql.{Column, Row, SparkSession}
+import org.scalatest.{BeforeAndAfter, FunSuite}
 
-import PKViolatorsDataObject.colListType
+import scala.collection.JavaConverters._
+import scala.collection.mutable._
 
 class PKviolatorDOtest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger{
 
@@ -61,7 +61,7 @@ class PKviolatorDOtest extends FunSuite with BeforeAndAfter with SmartDataLakeLo
     instanceRegistry.register(sourceDo)
 
     // actual: reading the table containing the PK violators
-    val actual = PKViolatorsDataObject("pkViol").getDataFrame
+    val actual = PKViolatorsDataObject("pkViol").getDataFrame()
 
     // creating expected
     val rows_expected: java.util.List[Row] = ArrayBuffer(
@@ -79,7 +79,7 @@ class PKviolatorDOtest extends FunSuite with BeforeAndAfter with SmartDataLakeLo
 
     // Comparing actual with expected
     val resultat: Boolean = expected.isEqual(actual)
-    if (!resultat) printFailedTestResult("PKviolatorDO_PKid",Seq(sourceDo.getDataFrame))(actual)(expected)
+    if (!resultat) printFailedTestResult("PKviolatorDO_PKid",Seq(sourceDo.getDataFrame()))(actual)(expected)
     assert(resultat)
   }
 
@@ -88,7 +88,7 @@ class PKviolatorDOtest extends FunSuite with BeforeAndAfter with SmartDataLakeLo
     val hiveTablePKidValueDO = createHiveTable(tableName= "hive_table_pk_id_Value", dirPath= tempPath, df= dfNonUniqueWithNull, primaryKeyColumns= Some(Seq("id","value")))
 
     // actual: reading the table containing the PK violators
-    val actual = PKViolatorsDataObject("pkViol").getDataFrame
+    val actual = PKViolatorsDataObject("pkViol").getDataFrame()
 
     // creating expected
     val rows_expected: java.util.List[Row] = ArrayBuffer(
@@ -108,7 +108,7 @@ class PKviolatorDOtest extends FunSuite with BeforeAndAfter with SmartDataLakeLo
 
     val resultat: Boolean = expected.isEqual(actual)
     if (!resultat) printFailedTestResult("PKviolators_noDataColumns",
-      Seq(hiveTablePKidValueDO.getDataFrame))(actual)(expected)
+      Seq(hiveTablePKidValueDO.getDataFrame()))(actual)(expected)
     assert(resultat)
   }
 
@@ -126,7 +126,7 @@ class PKviolatorDOtest extends FunSuite with BeforeAndAfter with SmartDataLakeLo
     val hiveTablePKidValueDO = createHiveTable(tableName= "hive_table_pk_id_Value", dirPath= tempPath, df= dfNonUniqueWithNull, primaryKeyColumns= Some(Seq("id","value")))
 
     // actual: reading the table containing the PK violators
-    val actual = PKViolatorsDataObject("pkViol").getDataFrame
+    val actual = PKViolatorsDataObject("pkViol").getDataFrame()
     println("actual:")
     actual.printSchema()
 
@@ -166,7 +166,7 @@ class PKviolatorDOtest extends FunSuite with BeforeAndAfter with SmartDataLakeLo
 
     val resultat: Boolean = expected.isEqual(actual)
     if (!resultat) printFailedTestResult("PKviolators_multipleDOs",
-      Seq(customDO.getDataFrame,hiveTablePKidDO.getDataFrame,hiveTableNoPKDO.getDataFrame,hiveTablePKidValueDO.getDataFrame))(actual)(expected)
+      Seq(customDO.getDataFrame(),hiveTablePKidDO.getDataFrame(),hiveTableNoPKDO.getDataFrame(),hiveTablePKidValueDO.getDataFrame()))(actual)(expected)
     assert(resultat)
   }
 

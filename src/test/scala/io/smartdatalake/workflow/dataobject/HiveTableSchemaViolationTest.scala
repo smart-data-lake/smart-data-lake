@@ -53,7 +53,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       primaryKeyColumns = Some(Seq("id"))
     )
 
-    noException should be thrownBy sourceDo.getDataFrame
+    noException should be thrownBy sourceDo.getDataFrame()
   }
 
   test("Read: SchemaMin equals Schema is valid (ignoring nullable)") {
@@ -66,7 +66,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       primaryKeyColumns = Some(Seq("id"))
     )
 
-    noException should be thrownBy sourceDo.getDataFrame
+    noException should be thrownBy sourceDo.getDataFrame()
   }
 
   test("Read: SchemaMin is valid subset of Schema") {
@@ -79,7 +79,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       primaryKeyColumns = Some(Seq("id"))
     )
 
-    noException should be thrownBy sourceDo.getDataFrame
+    noException should be thrownBy sourceDo.getDataFrame()
   }
 
   test("Read: Invalid schema - missing column") {
@@ -96,7 +96,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       primaryKeyColumns = Some(Seq("id"))
     )
 
-    val thrown = the [SchemaViolationException] thrownBy sourceDo.getDataFrame
+    val thrown = the [SchemaViolationException] thrownBy sourceDo.getDataFrame()
     println(thrown.getMessage)
   }
 
@@ -113,7 +113,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       primaryKeyColumns = Some(Seq("id"))
     )
 
-    val thrown = the [SchemaViolationException] thrownBy sourceDo.getDataFrame
+    val thrown = the [SchemaViolationException] thrownBy sourceDo.getDataFrame()
     println(thrown.getMessage)
   }
 

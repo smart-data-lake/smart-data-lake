@@ -28,6 +28,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.util.ChildFirstURLClassLoader
 
 import scala.annotation.tailrec
+import scala.util.Try
 
 /**
  * Utilities and conventions to name and validate command line parameters
@@ -52,13 +53,21 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
     val sessionBuilder = SparkSession.builder()
       .master(masterOpt)
       .appName(name)
+      .config("hive.exec.dynamic.partition", true) // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
+      .config("hive.exec.dynamic.partition.mode", "nonstrict") // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
+      .config("spark.sql.sources.partitionOverwriteMode", "dynamic") // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
       .optionalConfig( "deploy-mode", deployModeOpt)
       .optionalConfig( "spark.kryo.classesToRegister", kryoClassNamesOpt.map(_.mkString(",")))
       .optionalConfigs( sparkOptionsOpt )
       .optionalEnableHive(enableHive)
 
     // create session
-    sessionBuilder.getOrCreate()
+    val session = sessionBuilder.getOrCreate()
+    if (!Try(session.conf.get("spark.sql.sources.partitionOverwriteMode")).toOption.contains("dynamic"))
+      logger.warn("Spark property 'spark.sql.sources.partitionOverwriteMode' is not set to 'dynamic'. Overwriting Hadoop/Hive partitions will always overwrite the whole path/table and you might experience data loss!")
+
+    // return
+    session
   }
 
   /**

@@ -20,6 +20,7 @@ package io.smartdatalake.config
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, TransactionalSparkTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
@@ -34,17 +35,16 @@ import org.apache.spark.sql.SparkSession
  * @param arg1  some (optional) dummy argument
  */
 case class TestAction(override val id: ActionObjectId,
-                       inputId: DataObjectId,
-                       outputId: DataObjectId,
-                       arg1: Option[String],
-                       override val metadata: Option[ActionMetadata] = None
+                      inputId: DataObjectId,
+                      outputId: DataObjectId,
+                      arg1: Option[String],
+                      executionMode: Option[ExecutionMode] = None,
+                      override val metadata: Option[ActionMetadata] = None
                      )(implicit instanceRegistry: InstanceRegistry)
   extends Action {
 
   override def init(subFeed: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = { /*NOP*/ Seq() }
   override def exec(subFeed: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = { /*NOP*/ Seq() }
-
-  override def toString: String = s"${getClass.getSimpleName} (id=$id), arg1=$arg1, input=$inputs, output=$outputs"
 
   private[config] val input = instanceRegistry.get[DataObject with CanCreateDataFrame](inputId)
   private[config] val output = instanceRegistry.get[TransactionalSparkTableDataObject](outputId)

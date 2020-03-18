@@ -23,11 +23,13 @@ import java.nio.file.Files
 
 import com.holdenkarau.spark.testing.Utils
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.definitions.PartitionDiffMode
 import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.TryWithRessource
 import io.smartdatalake.workflow.action.customlogic.{CustomFileTransformer, CustomFileTransformerConfig}
 import io.smartdatalake.workflow.dataobject.CsvFileDataObject
-import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, InitSubFeed}
 import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -78,16 +80,55 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
     assert(r1.head.fileName == resourceFile)
 
     // read src with util and count
-    val dfSrc = srcDO.getDataFrame
+    val dfSrc = srcDO.getDataFrame()
     assert(dfSrc.columns.length > 2)
     val srcCount = dfSrc.count
 
     // read tgt with util and count
-    val dfTgt = tgtDO.getDataFrame
+    val dfTgt = tgtDO.getDataFrame()
     assert(dfTgt.columns.length == 2)
     val tgtCount = dfTgt.count
     assert(srcCount == tgtCount)
   }
+
+  test("custom csv-file transformation with partition diff execution mode") {
+
+    val feed = "filetransfer"
+    val srcDir = "testSrc"
+    val tgtDir = "testTgt"
+    val resourceFile = "AB_NYC_2019.csv"
+    val tempDir = Files.createTempDirectory(feed)
+
+    // copy data file to ftp
+    val srcPartitionValues = Seq(PartitionValues(Map("p"->"test")))
+    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve("p=test/" + resourceFile).toFile)
+
+    // setup DataObjects
+    val srcDO = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'), partitions = Seq("p"), csvOptions = Map("header" -> "true", "delimiter" -> CustomFileActionTest.delimiter))
+    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), partitions = Seq("p"), csvOptions = Map("header" -> "true", "delimiter" -> CustomFileActionTest.delimiter))
+    instanceRegistry.register(srcDO)
+    instanceRegistry.register(tgtDO)
+
+    // prepare & start load
+    implicit val context1 = ActionPipelineContext(feed, "test", instanceRegistry)
+    val fileTransformerConfig = CustomFileTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestFileTransformer"))
+    val action1 = CustomFileAction(id = "cfa", srcDO.id, tgtDO.id, fileTransformerConfig, false, 1, initExecutionMode = Some(PartitionDiffMode()))
+    val srcSubFeed = InitSubFeed("src1", srcPartitionValues) // InitSubFeed needed to test initExecutionMode!
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
+    assert(tgtSubFeed.dataObjectId == tgtDO.id)
+    assert(tgtSubFeed.partitionValues.toSet == srcPartitionValues.toSet)
+    assert(tgtDO.listPartitions.toSet == srcPartitionValues.toSet)
+
+    // check if file is present
+    assert(tgtDO.getFileRefs(Seq()).map(_.fileName) == Seq(resourceFile))
+    assert(tgtDO.getFileRefs(srcPartitionValues).map(_.fileName) == Seq(resourceFile))
+
+    // check counts
+    val dfSrc = srcDO.getDataFrame()
+    val dfTgt = tgtDO.getDataFrame()
+    assert(dfSrc.count == dfTgt.count)
+  }
+
 }
 object CustomFileActionTest {
   val delimiter = ","

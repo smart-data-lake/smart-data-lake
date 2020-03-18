@@ -28,7 +28,7 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.workflow.action.customlogic.{CustomDfsTransformer, CustomDfsTransformerConfig}
-import io.smartdatalake.workflow.action.{CopyAction, CustomSparkAction, DeduplicateAction, FileTransferAction, SparkSubFeedAction}
+import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, HiveTableDataObject, Table, TickTockHiveTableDataObject}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -298,7 +298,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(srcDO)
 
     // setup tgt1 CSV DataObject
-    val srcSchema = srcDO.getDataFrame.head.schema // infer schema from original CSV
+    val srcSchema = srcDO.getDataFrame().head.schema // infer schema from original CSV
     val tgt1DO = new CsvFileDataObject( "tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","), schema = Some(srcSchema))
     instanceRegistry.register(tgt1DO)
 
@@ -322,10 +322,10 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.exec
 
     // read src/tgt and count
-    val dfSrc = srcDO.getDataFrame
+    val dfSrc = srcDO.getDataFrame()
     val srcCount = dfSrc.count
-    val dfTgt1 = tgt1DO.getDataFrame
-    val dfTgt2 = tgt2DO.getDataFrame
+    val dfTgt1 = tgt1DO.getDataFrame()
+    val dfTgt2 = tgt2DO.getDataFrame()
     dfTgt2.show(3)
     val tgtCount = dfTgt2.count
     assert(srcCount == tgtCount)
@@ -354,7 +354,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgt1DO)
 
     // setup tgt2 CSV DataObject
-    val srcSchema = srcDO.getDataFrame.head.schema // infer schema from original CSV
+    val srcSchema = srcDO.getDataFrame().head.schema // infer schema from original CSV
     val tgt2DO = new CsvFileDataObject( "tgt2", tempDir.resolve(tgtDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","), schema = Some(srcSchema))
     instanceRegistry.register(tgt2DO)
 
@@ -376,9 +376,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.exec
 
     // read src/tgt and count
-    val dfSrc = srcDO.getDataFrame
+    val dfSrc = srcDO.getDataFrame()
     val srcCount = dfSrc.count
-    val dfTgt3 = tgt1DO.getDataFrame
+    val dfTgt3 = tgt1DO.getDataFrame()
     dfTgt3.show(3)
     val tgtCount = dfTgt3.count
     assert(srcCount == tgtCount)

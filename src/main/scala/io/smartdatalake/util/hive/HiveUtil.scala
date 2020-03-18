@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,11 +19,11 @@
 package io.smartdatalake.util.hive
 
 import io.smartdatalake.definitions.OutputType.OutputType
-import io.smartdatalake.definitions.{HiveTableLocationSuffix, OutputType}
+import io.smartdatalake.definitions.{Environment, HiveTableLocationSuffix, OutputType}
 import io.smartdatalake.util.evolution.SchemaEvolution
-import io.smartdatalake.util.hdfs.HdfsUtil.desiredFileSize
-import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.dataobject.Table
 import org.apache.spark.sql.functions.{array, col}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
@@ -619,5 +619,16 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       // If the table doesn't exist yet, start with tick
       s"$outputDir/${HiveTableLocationSuffix.Tick.toString}"
     }
+  }
+
+  def listPartitions(table: Table, partitions: Seq[String])(implicit session: SparkSession): Seq[PartitionValues] = {
+    import session.implicits._
+    val separator = Environment.defaultPathSeparator
+    if (partitions.nonEmpty) {
+      val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitions, separator)
+      // list directories and extract partition values
+      session.sql(s"show partitions ${table.fullName}").as[String].collect.toSeq
+        .map( path => PartitionLayout.extractPartitionValues(partitionLayout, "", path + separator))
+    } else Seq()
   }
 }

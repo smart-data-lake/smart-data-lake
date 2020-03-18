@@ -23,7 +23,6 @@ import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, Parsab
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.Connection
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.types.StructType
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
@@ -43,7 +42,7 @@ private[smartdatalake] trait DataObject extends SdlConfigObject with ParsableFro
   /**
    * Prepare & test [[DataObject]]'s prerequisits
    *
-   * This runs during the "prepare" operation of the DAG. FIXME: document if this is only for testing
+   * This runs during the "prepare" operation of the DAG.
    */
   def prepare(implicit session: SparkSession): Unit = Unit
 
@@ -102,5 +101,12 @@ private[smartdatalake] trait DataObject extends SdlConfigObject with ParsableFro
  * @param description Description of the content of the DataObject
  * @param layer Name of the layer this DataObject belongs to
  * @param subjectArea Name of the subject area this DataObject belongs to
+ * @param tags Optional custom tags for this object
  */
-private[smartdatalake] case class DataObjectMetadata(name: Option[String] = None, description: Option[String] = None, layer: Option[String] = None, subjectArea: Option[String] = None)
+case class DataObjectMetadata(
+                               name: Option[String] = None,
+                               description: Option[String] = None,
+                               layer: Option[String] = None,
+                               subjectArea: Option[String] = None,
+                               tags: Seq[String] = Seq()
+                             )

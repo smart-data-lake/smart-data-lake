@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.jms.{JmsQueueConsumerFactory, SynchronousJmsReceiver, TextMessageHandler}
 import io.smartdatalake.util.misc.CredentialsUtil
 import org.apache.spark.sql.types.StructType
@@ -61,7 +62,7 @@ case class JmsDataObject(override val id: DataObjectId,
   private implicit val jndiUser: String = CredentialsUtil.getCredentials(userVariable)
   private implicit val jndiPassword: String = CredentialsUtil.getCredentials(passwordVariable)
 
-  override def getDataFrame(implicit session: SparkSession): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
     val consumerFactory = new JmsQueueConsumerFactory(jndiContextFactory,
       jndiProviderUrl, jndiUser, jndiPassword, connectionFactory, queue)
     val receiver = new SynchronousJmsReceiver[String](consumerFactory,

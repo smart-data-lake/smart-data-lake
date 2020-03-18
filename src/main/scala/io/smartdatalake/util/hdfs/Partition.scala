@@ -48,6 +48,7 @@ private[smartdatalake] case class PartitionValues(elements: Map[String, Any]) {
   def nonEmpty: Boolean = elements.nonEmpty
   def keys: Set[String] = elements.keySet
   def isDefinedAt(colName: String): Boolean = elements.isDefinedAt(colName)
+  def filterKeys(colNames: Seq[String]): PartitionValues = this.copy(elements = elements.filterKeys(colNames.contains))
 }
 
 private[smartdatalake] object PartitionValues {
@@ -72,6 +73,14 @@ private[smartdatalake] object PartitionValues {
       }
       singlePartitionValues.reduce( (a,b) => PartitionValues(a.elements ++ b.elements))
     }
+  }
+
+  /**
+   * Return PartitionValues keys which are not included in given partition columns
+   */
+  def checkWrongPartitionValues(partitionValues: Seq[PartitionValues], partitions: Seq[String]): Seq[String] = {
+    if (partitionValues.nonEmpty) partitionValues.map(_.keys).reduce(_ ++ _).diff(partitions.toSet).toSeq
+    else Seq()
   }
 }
 

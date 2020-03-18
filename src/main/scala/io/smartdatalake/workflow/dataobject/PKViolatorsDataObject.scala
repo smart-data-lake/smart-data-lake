@@ -21,10 +21,11 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, FromConfigFactory, InstanceRegistry, ParsableFromConfig}
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{ArrayType, StringType, StructField, StructType}
-import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
 /**
  * Checks for Primary Key violations for all [[DataObject]]s with Primary Keys defined that are registered in the current [[InstanceRegistry]].
@@ -55,9 +56,9 @@ case class PKViolatorsDataObject(id: DataObjectId,
                                 (@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with ParsableFromConfig[PKViolatorsDataObject] {
 
-  override def getDataFrame(implicit session: SparkSession): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
 
-    import PKViolatorsDataObject.{colListType,columnNameName,columnValueName}
+    import PKViolatorsDataObject.{colListType, columnNameName, columnValueName}
     // Get all DataObjects from registry
     val dataObjects: Seq[DataObject with Product] = config match {
       case Some(configLocation) =>
@@ -74,7 +75,7 @@ case class PKViolatorsDataObject(id: DataObjectId,
 
     def getPKviolatorDf(tobj: TableDataObject) = {
       val pkColNames = tobj.table.primaryKey.get.toArray
-      val dfTable = tobj.getDataFrame
+      val dfTable = tobj.getDataFrame()
       val dfPKViolators = dfTable.getPKviolators(pkColNames)
       val scmTable = dfTable.schema
       val dataColumns = dfPKViolators.columns.diff(pkColNames)

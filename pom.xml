@@ -180,18 +180,15 @@
 						<copyright.name>${project.organization.name}</copyright.name>
 						<copyright.contact>${project.organization.url}</copyright.contact>
 					</properties>
+					<includes>
+						<include>src/**</include>
+					</includes>
 					<excludes>
-						<exclude>COPYING</exclude>
-						<exclude>CNAME</exclude>
-						<exclude>.github/</exclude>
-						<exclude>**/*.log</exclude>
 						<exclude>**/*.accdb</exclude>
 						<exclude>**/*.mdb</exclude>
 						<exclude>**/*.csv</exclude>
 						<exclude>**/*.keytab</exclude>
 						<exclude>**/*.pkcs12</exclude>
-						<exclude>**/*.yml</exclude>
-						<exclude>docs/images/*</exclude>
 					</excludes>
 					<mapping>
 						<scala>SLASHSTAR_STYLE</scala>

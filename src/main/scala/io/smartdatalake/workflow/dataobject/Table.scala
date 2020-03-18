@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,6 +25,8 @@ package io.smartdatalake.workflow.dataobject
  * @param name table name
  * @param query optional select query
  * @param primaryKey optional sequence of primary key columns
+ * @param foreignKeys optional sequence of foreign key definitions.
+ *                    This is used as metadata for a data catalog.
  * @param options
  */
 case class Table(
@@ -32,6 +34,7 @@ case class Table(
                   name: String,
                   query: Option[String] = None,
                   primaryKey: Option[Seq[String]] = None,
+                  foreignKeys: Option[Seq[ForeignKey]] = None,
                   options: Option[Map[String,String]] = None
                 ) {
   override def toString: String = s"""$fullName${primaryKey.map(pks => "("+pks.mkString(",")+")").getOrElse("")}"""
@@ -40,3 +43,18 @@ case class Table(
 
   def fullName: String = db.map(_ + ".").getOrElse("") + name
 }
+
+/**
+ * Foreign key definition
+ *
+ * @param db target database, if not defined it is assumed to be the same as the table owning the foreign key
+ * @param table referenced target table name
+ * @param columns mapping of source column(s) to referenced target table column(s)
+ * @param name optional name for foreign key, e.g to depict it's role
+ */
+case class ForeignKey(
+                       db: Option[String],
+                       table: String,
+                       columns: Map[String,String],
+                       name: Option[String]
+                     )

@@ -18,13 +18,18 @@
  */
 package io.smartdatalake.workflow.action
 
+import java.time.LocalDateTime
+
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
-import io.smartdatalake.util.misc.{DataFrameUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DAGNode, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 
+import scala.collection.mutable
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
@@ -62,7 +67,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * - directories exists or can be created
    * - connections can be created
    *
-   * This runs during the "prepare" operation of the DAG. FIXME: document if this is only for testing
+   * This runs during the "prepare" operation of the DAG.
    */
   def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     inputs.foreach(_.prepare)
@@ -71,7 +76,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
 
   /**
    * Initialize Action with [[SubFeed]]'s to be processed.
-   * If successfull
+   * If successful
    * - the DAG can be built
    * - Spark DataFrame lineage can be built
    *
@@ -126,11 +131,6 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
 
   /**
    * Handle class cast exception when getting objects from instance registry
-   *
-   * @param dataObjectId
-   * @param role
-   * @param registry
-   * @return
    */
   private def getDataObject[T <: DataObject](dataObjectId: DataObjectId, role: String)(implicit registry: InstanceRegistry, ct: ClassTag[T], tt: TypeTag[T]): T = {
     val dataObject = registry.get[T](dataObjectId)
@@ -146,6 +146,44 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   }
   protected def getInputDataObject[T <: DataObject: ClassTag: TypeTag](id: DataObjectId)(implicit registry: InstanceRegistry): T = getDataObject[T](id, "input")
   protected def getOutputDataObject[T <: DataObject: ClassTag: TypeTag](id: DataObjectId)(implicit registry: InstanceRegistry): T = getDataObject[T](id, "output")
+
+  /**
+   * A buffer to collect Action events
+   */
+  private val runtimeEvents = mutable.Buffer[RuntimeEvent]()
+
+  /**
+   * Adds an action event
+   */
+  def addRuntimeEvent(phase: String, state: RuntimeEventState, msg: String): Unit = {
+    runtimeEvents.append(RuntimeEvent(LocalDateTime.now, phase, state, msg))
+  }
+
+  /**
+   *
+   */
+  def getRuntimeState: Option[String] = {
+    if (runtimeEvents.nonEmpty) {
+      val lastEvent = runtimeEvents.last
+      val lastState = lastEvent.state.toString
+      lastEvent.state match {
+        case RuntimeEventState.SUCCEEDED =>
+          val duration = runtimeEvents.reverse
+            .find( event => event.state == RuntimeEventState.STARTED && event.phase == lastEvent.phase )
+            .map( start => java.time.Duration.between(start.tstmp, lastEvent.tstmp))
+          duration.map( d => s"$lastState $d")
+            .orElse(Some(lastState))
+        case _ => Some(lastState)
+      }
+    } else None
+  }
+
+  /**
+   * This is displayed in ascii graph visualization
+   */
+  final override def toString: String = {
+   nodeId + getRuntimeState.map(" "+_).getOrElse("")
+  }
 
   def toStringShort: String = {
     s"$id[${this.getClass.getSimpleName}]"
@@ -163,5 +201,20 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
  * @param name Readable name of the Action
  * @param description Description of the content of the Action
  * @param feed Name of the feed this Action belongs to
+ * @param tags Optional custom tags for this object
  */
-private[smartdatalake] case class ActionMetadata(name: Option[String] = None, description: Option[String] = None, feed: Option[String] = None)
+case class ActionMetadata(
+                           name: Option[String] = None,
+                           description: Option[String] = None,
+                           feed: Option[String] = None,
+                           tags: Seq[String] = Seq()
+                         )
+
+/**
+ * A structure to collect runtime information
+ */
+private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: String, state: RuntimeEventState, msg: String)
+private[smartdatalake] object RuntimeEventState extends Enumeration {
+  type RuntimeEventState = Value
+  val STARTED, SUCCEEDED, FAILED, SKIPPED = Value
+}

@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,9 +18,9 @@
  */
 package io.smartdatalake.util.avro
 
+import org.apache.avro.SchemaBuilder._
 import org.apache.avro.{Schema, SchemaBuilder}
-import org.apache.avro.SchemaBuilder.{BaseFieldTypeBuilder, BaseTypeBuilder, FieldAssembler, FieldDefault, RecordBuilder}
-import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, MapType, ShortType, StringType, StructType, TimestampType}
+import org.apache.spark.sql.types._
 
 // https://github.com/spotify/spark-bigquery/blob/master/src/main/scala/com/databricks/spark/avro/SchemaConverters.scala
 

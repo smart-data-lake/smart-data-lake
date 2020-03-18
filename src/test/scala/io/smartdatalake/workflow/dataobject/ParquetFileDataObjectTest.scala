@@ -48,7 +48,7 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
 
     val doSrc1 = ParquetFileDataObject.fromConfig(config, instanceRegistry)
     doSrc1.writeDataFrame(testDf, Seq())
-    val result = doSrc1.getDataFrame
+    val result = doSrc1.getDataFrame()
     assert(result.count() == 3)
   }
 
@@ -56,7 +56,7 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
 
     // write without connection
     val configTgt1 = ConfigFactory.parseString(s"""
-                                                   | id = src1
+                                                   | id = tgt1
                                                    | path = "${escapedFilePath(tempPath)}/test"
          """.stripMargin)
     val doTgt1 = ParquetFileDataObject.fromConfig(configTgt1, instanceRegistry)
@@ -71,7 +71,7 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
     instanceRegistry.register(HadoopFileConnection("con1", s"file:///${escapedFilePath(tempPath)}"))
     val doSrc1 = ParquetFileDataObject.fromConfig(configSrc1, instanceRegistry)
 
-    val result = doSrc1.getDataFrame
+    val result = doSrc1.getDataFrame()
     assert(result.count() == 3)
   }
 

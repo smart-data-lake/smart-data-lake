@@ -19,23 +19,26 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.{Config, ConfigFactory}
-import io.smartdatalake.config.{TestAction, TestDataObject}
+import io.smartdatalake.config.{TestAction, TestConnection, TestDataObject}
 import io.smartdatalake.workflow.action.ActionMetadata
 
 class ExportMetadataDataObjectTest extends DataObjectTestSuite {
 
   test("Test DataObjects Export (from classpath)") {
+    val con1 = TestConnection(id = "con1")
+    instanceRegistry.register(con1)
     val metaData = DataObjectMetadata(name = Some("Test DataObject"), Some("For Testing"))
-    val testDo = TestDataObject(id = "do1", arg1 = "Foo", args = List("Bar"), metadata = Some(metaData))
+    val testDo = TestDataObject(id = "do1", arg1 = "Foo", args = List("Bar"), metadata = Some(metaData), connectionId = Some("con1"))
     instanceRegistry.register(testDo)
 
     val config: Config = ConfigFactory.parseString("id = dataObjects-exporter")
 
     val dataObjectsExporter: DataObjectsExporterDataObject = DataObjectsExporterDataObject.fromConfig(config, instanceRegistry)
-    val df = dataObjectsExporter.getDataFrame
+    val df = dataObjectsExporter.getDataFrame()
     df.select("id").head().get(0) should be (testDo.id.id)
     df.select("name").head().get(0) should be (metaData.name.get)
     df.select("description").head().get(0) should be (metaData.description.get)
+    df.select("connectionId").head().get(0) should be (testDo.connectionId.get.id)
   }
 
   test("Test DataObjects Export (from config option)") {
@@ -46,26 +49,28 @@ class ExportMetadataDataObjectTest extends DataObjectTestSuite {
          """.stripMargin)
 
     val dataObjectsExporter = DataObjectsExporterDataObject.fromConfig(config, instanceRegistry)
-    val df = dataObjectsExporter.getDataFrame
+    val df = dataObjectsExporter.getDataFrame()
     df.select("id").head().get(0) should be ("testDataObjectFromConfig")
     df.select("name").head().get(0) should be ("Test DataObject From Config")
     df.select("description").head().get(0) should be ("Loaded from a Test Config")
   }
 
   test("Test Actions Export (from classpath)") {
+    val con1 = TestConnection(id = "con1")
+    instanceRegistry.register(con1)
     val do1 = TestDataObject(id = "do1", arg1 = "Foo", args = List("Bar"))
     instanceRegistry.register(do1)
-    val do2 = TestDataObject(id = "do2", arg1 = "Bar", args = List("Baz"))
+    val do2 = TestDataObject(id = "do2", arg1 = "Bar", args = List("Baz"), connectionId = Some("con1"))
     instanceRegistry.register(do2)
 
     val metaData = ActionMetadata(name = Some("Test Action"), Some("For Testing"), Some("test feed"))
-    val testAction = TestAction("testAction", "do1", "do2", None, Some(metaData))
+    val testAction = TestAction("testAction", "do1", "do2", None, None, Some(metaData))
     instanceRegistry.register(testAction)
 
     val config = ConfigFactory.parseString("id = actions-exporter")
 
     val actionsExporter = ActionsExporterDataObject.fromConfig(config, instanceRegistry)
-    val df = actionsExporter.getDataFrame
+    val df = actionsExporter.getDataFrame()
     df.select("id").head().get(0) should be (testAction.id.id)
     df.select("name").head().get(0) should be (metaData.name.get)
     df.select("description").head().get(0) should be (metaData.description.get)
@@ -80,7 +85,7 @@ class ExportMetadataDataObjectTest extends DataObjectTestSuite {
          """.stripMargin).resolve()
 
     val actionsExporter = ActionsExporterDataObject.fromConfig(config, instanceRegistry)
-    val df = actionsExporter.getDataFrame
+    val df = actionsExporter.getDataFrame()
     df.select("id").head().get(0) should be ("testActionFromConfig")
     df.select("name").head().get(0) should be ("Test Action From Config")
     df.select("description").head().get(0) should be ("Loaded from a Test Config")

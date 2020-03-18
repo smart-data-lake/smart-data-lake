@@ -24,7 +24,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.filetransfer.SshUtil
-import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.SftpFileRefConnection
 import net.schmizz.sshj.sftp.SFTPClient
@@ -108,6 +108,26 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
       case Success(r) => r
       case Failure(e) => throw new RuntimeException(s"Can't create OutputStream for $id and $path: ${e.getClass.getSimpleName} - ${e.getMessage}", e)
     }
+  }
+
+  /**
+   * extract partitions according to partition layout
+   */
+  /**
+   * List partitions on data object's root path
+   */
+  override def listPartitions(implicit session: SparkSession): Seq[PartitionValues] = {
+    partitionLayout.map {
+      partitionLayout =>
+        connection.execWithSFtpClient {
+          sftp =>
+            // get search pattern for root directory
+            val pattern = PartitionLayout.replaceTokens(partitionLayout, PartitionValues(Map()))
+            // list directories and extract partition values
+            SshUtil.sftpListFiles(path + separator + pattern)(sftp)
+              .map( f => PartitionLayout.extractPartitionValues(partitionLayout, "", f + separator))
+        }
+    }.getOrElse(Seq())
   }
 
   /**

@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@ Code copied/adapted/simplified from https://github.com/tbfenet/spark-jms-receive
 
 package io.smartdatalake.util.jms
 
-import javax.jms.{Session, MessageConsumer, Connection}
+import javax.jms.{Connection, MessageConsumer, Session}
 
 /**
  * JMS Message Consumer Factory

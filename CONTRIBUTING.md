@@ -18,6 +18,8 @@ All contributions are expected to uphold the [Code of Conduct](CODE_OF_CONDUCT.m
 If you see any unacceptable behavior, please report it to [smartdatalake@elca.ch](mailto:smartdatalake@elca.ch). 
 
 ## How to contribute
+Please note that all contributions are automatically licensed under this repository's license (GPLv3) according to the "inbound=outbound" principle of the [GitHub Service Terms](https://help.github.com/en/github/site-policy/github-terms-of-service#6-contributions-under-repository-license)
+
 ### Report issues
 Before you submit a bug report, please check if it has already been submitted under [Issues](https://github.com/smart-data-lake/smart-data-lake/issues).
 If it does, add your comments on the existing issue and provide additional information that might be missing. 

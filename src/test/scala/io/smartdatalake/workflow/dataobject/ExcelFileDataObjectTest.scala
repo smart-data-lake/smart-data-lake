@@ -30,8 +30,8 @@ import org.apache.poi.ss.usermodel
 import org.apache.poi.ss.usermodel.{DateUtil, Sheet, Workbook}
 import org.apache.poi.ss.util.DateFormatConverter
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
-import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.{DataFrame, Row}
 import org.scalatest.BeforeAndAfterAll
 
 import scala.reflect.runtime.universe._
@@ -73,7 +73,7 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
     val actionInputExcel = ExcelFileDataObject.fromConfig(xslxSampleConfig, instanceRegistry)
 
     // run
-    val df = actionInputExcel.getDataFrame(testSession)
+    val df = actionInputExcel.getDataFrame()
 
     // check
     val data = df.collect().toList
@@ -108,7 +108,7 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
     val actionInputExcel = ExcelFileDataObject.fromConfig(testConfig, instanceRegistry)
 
     // run
-    val df = actionInputExcel.getDataFrame(testSession)
+    val df = actionInputExcel.getDataFrame()
 
     // check
     val data: Array[Row] = df.collect()

@@ -23,8 +23,9 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.DateColumnType
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
-import io.smartdatalake.util.misc.{AclDef, DataFrameUtil}
-import org.apache.spark.sql.types.StructType
+import io.smartdatalake.util.misc.AclDef
+import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import org.apache.spark.sql.types.{DateType, StringType, StructType}
 import org.apache.spark.sql.{DataFrame, SaveMode}
 
 /**
@@ -102,10 +103,8 @@ case class CsvFileDataObject( override val id: DataObjectId,
     // standardize date column types
     dateColumnType match {
       case DateColumnType.String =>
-        // TODO: this converts all to string, but should only Date to String
-        DataFrameUtil.convertSchema2String(dfSuper)
-      case DateColumnType.Date =>
-        DataFrameUtil.convertDate2Datetime(dfSuper)
+        dfSuper.castDfColumnTyp(DateType, StringType)
+      case DateColumnType.Date => dfSuper.castAllDate2Timestamp
     }
   }
 

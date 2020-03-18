@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
 import org.apache.spark.sql.types.StructType
 
@@ -55,8 +56,8 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
      * Default is to validate the `schemaMin` and not apply any modification.
      */
     def beforeWrite(df: DataFrame): DataFrame = {
-        validateSchemaMin(df)
-        df
+      validateSchemaMin(df)
+      df
     }
 
     /**
@@ -65,8 +66,8 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
      * Default is to validate the `schemaMin` and not apply any modification.
      */
     def afterRead(df: DataFrame): DataFrame = {
-        validateSchemaMin(df)
-        df
+      validateSchemaMin(df)
+      df
     }
 
     /**
@@ -89,26 +90,40 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
      * @param session the current [[SparkSession]].
      * @return a new [[DataFrame]] containing the data stored in the file at `path`
      */
-    override def getDataFrame(implicit session: SparkSession) : DataFrame = {
-        val filesExists = checkFilesExisting
+    override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession) : DataFrame = {
+      val wrongPartitionValues = PartitionValues.checkWrongPartitionValues(partitionValues, partitions)
+      assert(wrongPartitionValues.isEmpty, s"getDataFrame got request with PartitionValues keys ${wrongPartitionValues.mkString(",")} not included in $id partition columns ${partitions.mkString(", ")}")
 
-        if (!filesExists) {
-            //without either schema or data, no data frame can be created
-            require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined if there are no existing files.")
+      val filesExists = checkFilesExisting
 
-            //schema exists so an empty data frame can be created --> create a directory at hadoopPath
-            //spark writes at least one file per partition, so the path must point to a directory and not a single file
-            //FIXME: document why this directory is required for all spark data objects on read --> or move it to the appropriate location
-            filesystem.mkdirs(hadoopPath)
-        }
+      if (!filesExists) {
+        //without either schema or data, no data frame can be created
+        require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined if there are no existing files.")
 
-        val df = session.read
+        // Schema exists so an empty data frame can be created
+        // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
+        filesystem.mkdirs(hadoopPath)
+      }
+
+      val df = if (partitions.isEmpty || partitionValues.isEmpty) {
+        session.read
           .format(format)
           .options(options)
-          .optionalSchema(readSchema(filesExists)).load(hadoopPath.toString)
+          .optionalSchema(readSchema(filesExists))
+          .load(hadoopPath.toString)
+      } else {
+        val reader = session.read
+          .format(format)
+          .options(options)
+          .optionalSchema(readSchema(filesExists))
+          .option("basePath", hadoopPath.toString) // this is needed for partitioned tables when subdirectories are read directly; it then keeps the partition columns from the subdirectory path in the dataframe
+        // create data frame for every partition value and then build union
+        val pathsToRead = partitionValues.map( pv => new Path(hadoopPath, getPartitionString(pv).get).toString)
+        pathsToRead.map(reader.load).reduce(_ union _)
+      }
 
-        // finalize & return DataFrame
-        afterRead(df)
+      // finalize & return DataFrame
+      afterRead(df)
     }
 
     /**

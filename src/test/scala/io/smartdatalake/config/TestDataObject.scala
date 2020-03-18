@@ -42,7 +42,7 @@ case class TestDataObject( id: DataObjectId,
 
   private val connection = connectionId.map( c => getConnection[TestConnection](c))
 
-  override def getDataFrame(implicit session: SparkSession): DataFrame = null
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = null
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {}
 

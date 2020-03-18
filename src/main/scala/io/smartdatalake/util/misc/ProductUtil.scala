@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,28 +18,53 @@
  */
 package io.smartdatalake.util.misc
 
+import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
+
 private[smartdatalake] object ProductUtil {
 
- /**
-  * Gets the field of a class with the given name.
-  * Used i.e. for the exporter:
-  * We want to export field data for different subtypes of [[DataObject]]s and [[io.smartdatalake.workflow.action.Action]]s
-  * but on the superclass, only id and metadata fields are defined.
-  *
-  * Returns the original field types (no conversion to string i.e) so you need to handle the proper
-  * types.
-  *
-  * @param subtypeOf
-  * @param name
-  * @return Some if the field exists, None otherwise
-  */
- def getFieldData(subtypeOf: Product, name:String) : Option[Any] = {
-  subtypeOf.getClass.getDeclaredFields.find(_.getName==name)
-    .map {
-     x =>
-      x.setAccessible(true)
-      x.get(subtypeOf)
-    }
- }
+  /**
+   * Gets the field value for a specified field of a case class instance by field name reflection.
+   * Used i.e. for the exporter:
+   * We want to export the different attributes of [[DataObject]]s and [[io.smartdatalake.workflow.action.Action]]s
+   * without knowing the concrete subclass.
+   *
+   * @param obj       the object to search extract the field from
+   * @param fieldName the field name to search by reflection on the given object
+   * @tparam T        type of the field to be extracted
+   * @return Some(field value) if the field exists, None otherwise
+   */
+  def getFieldData[T](obj: Product, fieldName: String): Option[T] = {
+    getRawFieldData(obj, fieldName).map(_.asInstanceOf[T])
+  }
 
+  /**
+   * Same as getFieldData, but helps extracting an optional field type
+   */
+  def getOptionalFieldData[T](obj: Product, fieldName: String): Option[T] = {
+    getRawFieldData(obj, fieldName).flatMap(_.asInstanceOf[Option[T]])
+  }
+
+  /**
+   * Same as getFieldData, but helps extracting an field which is optional for some objects but for others not
+   */
+  def getEventuallyOptionalFieldData[T](obj: Product, fieldName: String): Option[T] = {
+    getRawFieldData(obj, fieldName).flatMap {
+      case x: Option[_] => x.map(_.asInstanceOf[T])
+      case x => Some(x.asInstanceOf[T])
+    }
+  }
+
+  def getIdFromConfigObjectIdOrString(obj: Any) = obj match {
+    case id: String => id
+    case obj: ConfigObjectId => obj.id
+  }
+
+  private def getRawFieldData(obj: Product, fieldName: String): Option[Any] = {
+    obj.getClass.getDeclaredFields.find(_.getName == fieldName)
+      .map {
+        x =>
+          x.setAccessible(true)
+          x.get(obj)
+      }
+  }
 }

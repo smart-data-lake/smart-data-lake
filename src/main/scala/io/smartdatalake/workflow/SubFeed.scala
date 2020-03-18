@@ -41,6 +41,8 @@ trait SubFeed extends DAGResult {
 
   def clearPartitionValues(): SubFeed
 
+  def updatePartitionValues(partitions: Seq[String]): SubFeed
+
   override def resultId: String = dataObjectId.id
 }
 
@@ -56,14 +58,15 @@ case class SparkSubFeed(dataFrame: Option[DataFrame], override val dataObjectId:
   override def breakLineage(): SparkSubFeed = {
     this.copy(dataFrame = None)
   }
-  override def clearPartitionValues(): SparkSubFeed = copy(partitionValues = Seq())
+  override def clearPartitionValues(): SparkSubFeed = {
+    this.copy(partitionValues = Seq())
+  }
+  override def updatePartitionValues(partitions: Seq[String]): SparkSubFeed = {
+    val updatedPartitionValues = partitionValues.map( pvs => PartitionValues(pvs.elements.filterKeys(partitions.contains))).filter(_.nonEmpty)
+    this.copy(partitionValues = updatedPartitionValues)
+  }
   def persist: SparkSubFeed = {
     copy(dataFrame = this.dataFrame.map(_.persist))
-  }
-  def updatePartitionValues(): SparkSubFeed = {
-    assert(dataFrame.isDefined, "DataFrame must be defined to update partition values")
-    val updatedPartitionValues = partitionValues.map( pvs => PartitionValues(pvs.elements.filterKeys(dataFrame.get.columns.contains))).filter(_.nonEmpty)
-    this.copy(partitionValues = updatedPartitionValues)
   }
 }
 object SparkSubFeed {
@@ -90,6 +93,10 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]], override val dataObjectId
   override def clearPartitionValues(): FileSubFeed = {
     this.copy(partitionValues = Seq())
   }
+  override def updatePartitionValues(partitions: Seq[String]): FileSubFeed = {
+    val updatedPartitionValues = partitionValues.map( pvs => PartitionValues(pvs.elements.filterKeys(partitions.contains))).filter(_.nonEmpty)
+    this.copy(partitionValues = updatedPartitionValues)
+  }
 }
 object FileSubFeed {
   def fromSubFeed( subFeed: SubFeed ): FileSubFeed = {
@@ -109,5 +116,11 @@ object FileSubFeed {
 case class InitSubFeed(override val dataObjectId: DataObjectId, override val partitionValues: Seq[PartitionValues])
   extends SubFeed {
   override def breakLineage(): InitSubFeed = this
-  override def clearPartitionValues(): InitSubFeed = copy(partitionValues = Seq())
+  override def clearPartitionValues(): InitSubFeed = {
+    this.copy(partitionValues = Seq())
+  }
+  override def updatePartitionValues(partitions: Seq[String]): InitSubFeed = {
+    val updatedPartitionValues = partitionValues.map( pvs => PartitionValues(pvs.elements.filterKeys(partitions.contains))).filter(_.nonEmpty)
+    this.copy(partitionValues = updatedPartitionValues)
+  }
 }

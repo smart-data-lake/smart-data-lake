@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.action
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, TryWithRessource}
 import io.smartdatalake.workflow.action.customlogic.CustomFileTransformerConfig
 import io.smartdatalake.workflow.dataobject.{FileRefDataObject, HadoopFileDataObject}
@@ -35,23 +36,24 @@ import org.apache.spark.sql.SparkSession
  *
  * @param inputId inputs DataObject
  * @param outputId output DataObject
- * @param transformer a custom file transformer, which reads file from HadoopFileDataObject and writes it back to another HadoopFileDataObject
+ * @param transformer a custom file transformer, which reads a file from HadoopFileDataObject and writes it back to another HadoopFileDataObject
  * @param deleteDataAfterRead if the input files should be deleted after processing successfully
  * @param filesPerPartition number of files per Spark partition
  */
 case class CustomFileAction(override val id: ActionObjectId,
-                             inputId: DataObjectId,
-                             outputId: DataObjectId,
-                             transformer: CustomFileTransformerConfig,
-                             deleteDataAfterRead: Boolean = false,
-                             filesPerPartition: Int = 10,
-                             override val breakFileRefLineage: Boolean = false,
-                             override val metadata: Option[ActionMetadata] = None
+                            inputId: DataObjectId,
+                            outputId: DataObjectId,
+                            transformer: CustomFileTransformerConfig,
+                            deleteDataAfterRead: Boolean = false,
+                            filesPerPartition: Int = 10,
+                            override val breakFileRefLineage: Boolean = false,
+                            override val initExecutionMode: Option[ExecutionMode] = None,
+                            override val metadata: Option[ActionMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)
   extends FileSubFeedAction with SmartDataLakeLogger {
 
-  private val input = getInputDataObject[HadoopFileDataObject](inputId)
-  private val output = getOutputDataObject[HadoopFileDataObject](outputId)
+  override val input = getInputDataObject[HadoopFileDataObject](inputId)
+  override val output = getOutputDataObject[HadoopFileDataObject](outputId)
   override val inputs: Seq[HadoopFileDataObject] = Seq(input)
   override val outputs: Seq[HadoopFileDataObject] = Seq(output)
 

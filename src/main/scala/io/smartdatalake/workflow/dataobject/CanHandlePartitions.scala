@@ -21,6 +21,9 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.util.hdfs.PartitionValues
 import org.apache.spark.sql.SparkSession
 
+/**
+ * A trait to be implemented by DataObjects which store partitioned data
+ */
 private[smartdatalake] trait CanHandlePartitions {
 
   /**
@@ -32,4 +35,10 @@ private[smartdatalake] trait CanHandlePartitions {
    * Delete given partitions. This is used to cleanup partitions after they are processed.
    */
   def deletePartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = throw new RuntimeException(s"deletePartitions not implemented")
+
+  /**
+   * list partition values
+   */
+  def listPartitions(implicit session: SparkSession): Seq[PartitionValues]
 }
+

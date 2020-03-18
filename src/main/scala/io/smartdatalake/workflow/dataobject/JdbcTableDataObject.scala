@@ -65,7 +65,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def getDataFrame(implicit session: SparkSession): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
     val jdbcString: String = table.query.getOrElse(table.fullName)
     logger.info(s"($id) JDBC dbtable parameter: $jdbcString")
     val df = session.read.format("jdbc")

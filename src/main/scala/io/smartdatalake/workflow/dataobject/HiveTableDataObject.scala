@@ -86,7 +86,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
     require(isDbExisting, s"($id) Hive DB ${table.db.get} doesn't exist (needs to be created manually).")
   }
 
-  override def getDataFrame(implicit session: SparkSession): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
     val df = session.table(s"${table.fullName}")
     validateSchemaMin(df)
     df
@@ -130,6 +130,14 @@ case class HiveTableDataObject(override val id: DataObjectId,
 
   override def isTableExisting(implicit session: SparkSession): Boolean = {
     session.catalog.tableExists(table.db.get, table.name)
+  }
+
+  /**
+   * list hive table partitions
+   */
+  override def listPartitions(implicit session: SparkSession): Seq[PartitionValues] = {
+    if(isTableExisting) HiveUtil.listPartitions(table, partitions)
+    else Seq()
   }
 
   /**

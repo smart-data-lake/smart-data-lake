@@ -24,7 +24,7 @@ import java.time.LocalDateTime
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.TechnicalTableColumn
+import io.smartdatalake.definitions.{ExecutionMode, TechnicalTableColumn}
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, TransactionalSparkTableDataObject}
@@ -44,18 +44,21 @@ import org.apache.spark.sql.{DataFrame, Row, SparkSession}
  * @param ignoreOldDeletedNestedColumns if true, remove no longer existing columns from nested data types in Schema Evolution.
  *                                      Keeping deleted columns in complex data types has performance impact as all new data
  *                                      in the future has to be converted by a complex function.
+ * @param initExecutionMode optional execution mode if this Action is a start node of a DAG run
  */
-case class DeduplicateAction( override val id: ActionObjectId,
-                              inputId: DataObjectId,
-                              outputId: DataObjectId,
-                              transformer: Option[CustomDfTransformerConfig] = None,
-                              columnBlacklist: Option[Seq[String]] = None,
-                              columnWhitelist: Option[Seq[String]] = None,
-                              ignoreOldDeletedColumns: Boolean = false,
-                              ignoreOldDeletedNestedColumns: Boolean = true,
-                              override val breakDataFrameLineage: Boolean = false,
-                              override val persist: Boolean = false,
-                              override val metadata: Option[ActionMetadata] = None
+case class DeduplicateAction(override val id: ActionObjectId,
+                             inputId: DataObjectId,
+                             outputId: DataObjectId,
+                             transformer: Option[CustomDfTransformerConfig] = None,
+                             columnBlacklist: Option[Seq[String]] = None,
+                             columnWhitelist: Option[Seq[String]] = None,
+                             standardizeDatatypes: Boolean = false,
+                             ignoreOldDeletedColumns: Boolean = false,
+                             ignoreOldDeletedNestedColumns: Boolean = true,
+                             override val breakDataFrameLineage: Boolean = false,
+                             override val persist: Boolean = false,
+                             override val initExecutionMode: Option[ExecutionMode] = None,
+                             override val metadata: Option[ActionMetadata] = None
 )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedAction {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
@@ -71,7 +74,7 @@ case class DeduplicateAction( override val id: ActionObjectId,
 
     // apply transformations
     transformedSubFeed = ActionHelper.applyTransformations(
-      transformedSubFeed, transformer, columnBlacklist, columnWhitelist, output, Some(deduplicateDataFrame(_: SparkSubFeed,_: Option[DataFrame],_:Seq[String],_: LocalDateTime)))
+      transformedSubFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, Some(deduplicateDataFrame(_: SparkSubFeed,_: Option[DataFrame],_:Seq[String],_: LocalDateTime)))
 
     // return
     transformedSubFeed

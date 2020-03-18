@@ -29,6 +29,7 @@ import configs.Configs
 import configs.syntax._
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.SplunkConnection
 import io.smartdatalake.workflow.dataobject.SplunkFormatter.{fromSplunkStringFormat, toSplunkStringFormat}
@@ -59,7 +60,7 @@ case class SplunkDataObject(override val id: DataObjectId,
   private implicit val rowSeqEncoder: Encoder[Seq[Row]] = Encoders.kryo[Seq[Row]]
   private implicit val queryTimeIntervalEncoder: Encoder[QueryTimeInterval] = Encoders.kryo[QueryTimeInterval]
 
-  override def getDataFrame(implicit spark: SparkSession): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit spark: SparkSession): DataFrame = {
     readFromSplunk(params)
   }
 

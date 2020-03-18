@@ -33,11 +33,20 @@ import scala.concurrent.duration._
 
 case class TestResult(override val resultId: String, path: String = "") extends DAGResult
 
-case class TestNode(override val nodeId: NodeId) extends DAGNode
+case class TestNode(override val nodeId: NodeId) extends DAGNode {
+  override def toString: NodeId = nodeId // this is displayed in ascii graph visualization
+}
 
 case class TestEgde(override val nodeIdFrom: NodeId, override val nodeIdTo: NodeId, override val resultId: String = TestEdge.defaultResultId) extends DAGEdge
 object TestEdge {
   val defaultResultId = "-"
+}
+
+class TestEventListener extends DAGEventListener[TestNode] with SmartDataLakeLogger {
+  override def onNodeStart(node: TestNode): Unit = logger.info(s"${node.nodeId} started")
+  override def onNodeFailure(exception: Throwable)(node: TestNode): Unit = logger.error(s"${node.nodeId} failed with ${exception.getClass.getSimpleName}")
+  override def onNodeSkipped(exception: Throwable)(node: TestNode): Unit = logger.warn(s"${node.nodeId} skipped because ${exception.getClass.getSimpleName}")
+  override def onNodeSuccess(node: TestNode): Unit = logger.info(s"${node.nodeId} succeeded")
 }
 
 class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
@@ -47,12 +56,12 @@ class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
   }
 
   test("create and run dag: linear unordered") {
-    val dag = DAG.create(
+    val dag = DAG.create[TestNode](
       Seq(TestNode("A"), TestNode("C"), TestNode("B")),
       Seq(TestEgde("A", "B"),TestEgde("B", "C"))
     )
     println(dag.toString)
-    val task = dag.buildTaskGraph[TestResult] { defaultOp() }
+    val task = dag.buildTaskGraph[TestResult](new TestEventListener){ defaultOp() }
     val resultFuture = task.runToFuture
     val result = Await.result(resultFuture, 5.seconds)
       .map(_.get)
@@ -64,9 +73,9 @@ class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
   test("create and run dag: split and join with parallel execution") {
     val nodes = Seq(TestNode("A"), TestNode("B"), TestNode("C"), TestNode("D"))
     val edges = Seq(TestEgde("A", "B"),TestEgde("B", "D"),TestEgde("A", "C"),TestEgde("C", "D"))
-    val dag = DAG.create(nodes, edges)
+    val dag = DAG.create[TestNode](nodes, edges)
     println(dag.toString)
-    val task =  dag.buildTaskGraph[TestResult] { defaultOp() }
+    val task =  dag.buildTaskGraph[TestResult](new TestEventListener){ defaultOp() }
     val resultFuture = task.runToFuture
     val (result, tResult) = measureTime(
       Await.result(resultFuture, 10.seconds)
@@ -89,9 +98,9 @@ class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
     val singleScheduler = Scheduler.fixedPool("fixed", 1) // scheduler with 1 thread serializes execution (only one task at the time)
     val nodes = Seq(TestNode("A"), TestNode("B"), TestNode("C"), TestNode("D"))
     val edges = Seq(TestEgde("A", "B"),TestEgde("B", "D"),TestEgde("A", "C"),TestEgde("C", "D"))
-    val dag = DAG.create(nodes, edges)
+    val dag = DAG.create[TestNode](nodes, edges)
     println(dag.toString)
-    val task =  dag.buildTaskGraph[TestResult] { defaultOp() }
+    val task =  dag.buildTaskGraph[TestResult](new TestEventListener) { defaultOp() }
     val resultFuture = task.runToFuture(singleScheduler)
     val (result, tResult) = measureTime( Await.result(resultFuture, 10.seconds).map(_.get))
     println(result)
@@ -109,12 +118,12 @@ class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
   }
 
   test("cancel running dag: stop pending tasks") {
-    val dag = DAG.create(
+    val dag = DAG.create[TestNode](
       Seq(TestNode("A"), TestNode("C"), TestNode("B")),
       Seq(TestEgde("A", "B"),TestEgde("B", "C"))
     )
     println(dag.toString)
-    val task = dag.buildTaskGraph[TestResult] { defaultOp() }
+    val task = dag.buildTaskGraph[TestResult](new TestEventListener) { defaultOp() }
     val resultFuture = task.runToFuture
     Thread.sleep(100)
     resultFuture.cancel()
@@ -125,7 +134,7 @@ class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
   test("exception in running dag: run pending tasks if not dependent") {
     val nodes = Seq(TestNode("A"), TestNode("B"), TestNode("C"), TestNode("D"), TestNode("E"))
     val edges = Seq(TestEgde("A", "B"), TestEgde("B", "C"), TestEgde("A", "D"), TestEgde("D", "E"))
-    val dag = DAG.create(nodes, edges)
+    val dag = DAG.create[TestNode](nodes, edges)
     println(dag.toString)
     val opWithException = (node:DAGNode, inResults:Seq[TestResult]) => {
       node.nodeId match {
@@ -133,7 +142,7 @@ class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
         case _ => defaultOp()(node,inResults)
       }
     }
-    val task =  dag.buildTaskGraph[TestResult] ( opWithException )
+    val task =  dag.buildTaskGraph[TestResult](new TestEventListener) ( opWithException )
     val resultFuture = task.runToFuture
     val resultTry = Await.result(resultFuture, 10.seconds)
     println(resultTry)
@@ -154,16 +163,16 @@ class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
   test("create dag: detect loop") {
     intercept[AssertionError](DAG.create(
       Seq(TestNode("A"), TestNode("C"), TestNode("B")),
-      Seq(TestEgde("C", "A"),TestEgde("A", "B"),TestEgde("B", "C")))
-    )
+      Seq(TestEgde("C", "A"),TestEgde("A", "B"),TestEgde("B", "C"))
+    ))
   }
 
   test("create and run dag: unconnected subgraphs with parallel execution") {
     val nodes = Seq(TestNode("A"), TestNode("C"), TestNode("B"), TestNode("D"), TestNode("E"), TestNode("F"))
     val edges = Seq(TestEgde("A", "B"),TestEgde("B", "C"), TestEgde("D", "E"),TestEgde("D", "F"))
-    val dag = DAG.create(nodes, edges)
+    val dag = DAG.create[TestNode](nodes, edges)
     println(dag.toString)
-    val task =  dag.buildTaskGraph[TestResult] { defaultOp() }
+    val task =  dag.buildTaskGraph[TestResult](new TestEventListener) { defaultOp() }
     val resultFuture = task.runToFuture
     val (result, tResult) = measureTime( Await.result(resultFuture, 10.seconds).map(_.get))
     println(result)
@@ -186,9 +195,9 @@ class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
   def defaultOp(sleepMs: Int = 1000): ((DAGNode, Seq[TestResult]) => Seq[TestResult]) = {
     (node: DAGNode, inResults: Seq[TestResult]) => {
       // execute something
-      logger.info(s"start ${node.nodeId}")
+      logger.debug(s"start ${node.nodeId}")
       Thread.sleep(sleepMs)
-      logger.info(s"end ${node.nodeId}")
+      logger.debug(s"end ${node.nodeId}")
       // count execution
       execCntPerNode.getOrElseUpdate(node.nodeId, new AtomicInteger()).getAndIncrement()
       // prepare path for this result

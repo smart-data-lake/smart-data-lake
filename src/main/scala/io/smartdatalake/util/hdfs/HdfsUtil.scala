@@ -217,4 +217,8 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   def addLeadingSeparator(path:String, separator: Char): String = {
     if (path.startsWith(separator.toString)) path else separator + path
   }
+
+  def getHadoopPartitionLayout(partitionCols: Seq[String], separator: Char): String = {
+    partitionCols.map(col => s"$col=%$col%$separator").mkString
+  }
 }

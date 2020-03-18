@@ -23,7 +23,7 @@ import java.time.LocalDateTime
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.TechnicalTableColumn
+import io.smartdatalake.definitions.{ExecutionMode, TechnicalTableColumn}
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
@@ -46,6 +46,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param ignoreOldDeletedNestedColumns if true, remove no longer existing columns from nested data types in Schema Evolution.
  *                                      Keeping deleted columns in complex data types has performance impact as all new data
  *                                      in the future has to be converted by a complex function.
+ * @param initExecutionMode optional execution mode if this Action is a start node of a DAG run
  */
 case class HistorizeAction(
                             override val id: ActionObjectId,
@@ -54,6 +55,7 @@ case class HistorizeAction(
                             transformer: Option[CustomDfTransformerConfig] = None,
                             columnBlacklist: Option[Seq[String]] = None,
                             columnWhitelist: Option[Seq[String]] = None,
+                            standardizeDatatypes: Boolean = false,
                             filterClause: Option[String] = None,
                             historizeBlacklist: Option[Seq[String]] = None,
                             historizeWhitelist: Option[Seq[String]] = None,
@@ -61,6 +63,7 @@ case class HistorizeAction(
                             ignoreOldDeletedNestedColumns: Boolean = true,
                             override val breakDataFrameLineage: Boolean = false,
                             override val persist: Boolean = false,
+                            override val initExecutionMode: Option[ExecutionMode] = None,
                             override val metadata: Option[ActionMetadata] = None
                           )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedAction {
 
@@ -87,7 +90,7 @@ case class HistorizeAction(
 
     // apply transformations
     transformedSubFeed = ActionHelper.applyTransformations(
-      transformedSubFeed, transformer, columnBlacklist, columnWhitelist, output, Some(historizeDataFrame(_: SparkSubFeed,_: Option[DataFrame],_:Seq[String],_: LocalDateTime)))
+      transformedSubFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, Some(historizeDataFrame(_: SparkSubFeed,_: Option[DataFrame],_:Seq[String],_: LocalDateTime)))
 
     // return
     transformedSubFeed

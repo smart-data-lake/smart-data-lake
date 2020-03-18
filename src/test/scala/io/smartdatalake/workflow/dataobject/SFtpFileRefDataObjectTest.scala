@@ -27,9 +27,9 @@ import io.smartdatalake.workflow.connection.SftpFileRefConnection
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
 import org.apache.sshd.server.SshServer
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FunSuite}
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FunSuite, Matchers}
 
-class SFtpFileRefDataObjectTest extends FunSuite with BeforeAndAfterEach with BeforeAndAfterAll {
+class SFtpFileRefDataObjectTest extends FunSuite with Matchers with BeforeAndAfterEach with BeforeAndAfterAll {
 
   implicit val session: SparkSession = TestUtil.sessionHiveCatalog
   implicit val registry: InstanceRegistry = new InstanceRegistry
@@ -95,6 +95,7 @@ class SFtpFileRefDataObjectTest extends FunSuite with BeforeAndAfterEach with Be
     val fileRefs = sftpDO.getFileRefs(Seq())
     assert(fileRefs.size == 1)
     assert(fileRefs.head.fileName == resourceFile)
+    assert(sftpDO.listPartitions.isEmpty)
   }
 
   test("get FileRef's with partitions in filename") {
@@ -111,6 +112,7 @@ class SFtpFileRefDataObjectTest extends FunSuite with BeforeAndAfterEach with Be
       , connectionId = "con1"
       , partitions = Seq("town", "year")
       , partitionLayout = Some("AB_%town%_%year%" ))
+    val partitionValuesExpected = Seq(PartitionValues(Map("town" -> "NYC", "year" -> "2019")))
 
     // list all files and extract partitions
     val fileRefsAll = sftpDO.getFileRefs(Seq())
@@ -119,13 +121,17 @@ class SFtpFileRefDataObjectTest extends FunSuite with BeforeAndAfterEach with Be
     assert(fileRefsAll.head.partitionValues.keys == Set("town","year"))
 
     // list with matched partition filter
-    val fileRefsPartitionFilter = sftpDO.getFileRefs(Seq(PartitionValues(Map("town" -> "NYC", "year" -> "2019"))))
+    val fileRefsPartitionFilter = sftpDO.getFileRefs(partitionValuesExpected)
     assert(fileRefsPartitionFilter.size == 1)
     assert(fileRefsPartitionFilter.head.fileName == resourceFile)
 
     // list with unmatched partition filter
     val fileRefsPartitionNoMatchFilter = sftpDO.getFileRefs(Seq(PartitionValues(Map("town" -> "NYC", "year" -> "2020"))))
     assert(fileRefsPartitionNoMatchFilter.isEmpty)
+
+    // check list partition values
+    val partitionValuesListed = sftpDO.listPartitions
+    partitionValuesListed shouldEqual partitionValuesListed
   }
 
   test("get FileRef's with partitions as directories") {
@@ -143,6 +149,7 @@ class SFtpFileRefDataObjectTest extends FunSuite with BeforeAndAfterEach with Be
       , connectionId = "con1"
       , partitions = Seq("date", "town", "year")
       , partitionLayout = Some("%date%/AB_%town%_%year%" ))
+    val partitionValuesExpected = Seq(PartitionValues(Map("date" -> "20190101", "town" -> "NYC", "year" -> "2019")))
 
     // list all files and extract partitions
     val fileRefsAll = sftpDO.getFileRefs(Seq())
@@ -151,12 +158,16 @@ class SFtpFileRefDataObjectTest extends FunSuite with BeforeAndAfterEach with Be
     assert(fileRefsAll.head.partitionValues.keys == Set("date","town","year"))
 
     // list with matched partition filter
-    val fileRefsPartitionFilter = sftpDO.getFileRefs(Seq(PartitionValues(Map("date" -> "20190101", "town" -> "NYC", "year" -> "2019"))))
+    val fileRefsPartitionFilter = sftpDO.getFileRefs(partitionValuesExpected)
     assert(fileRefsPartitionFilter.size == 1)
     assert(fileRefsPartitionFilter.head.fileName == resourceFile)
 
     // list with unmatched partition filter
     val fileRefsPartitionNoMatchFilter = sftpDO.getFileRefs(Seq(PartitionValues(Map("date" -> "20190101", "town" -> "NYC", "year" -> "2020"))))
     assert(fileRefsPartitionNoMatchFilter.isEmpty)
+
+    // check list partition values
+    val partitionValuesListed = sftpDO.listPartitions
+    partitionValuesListed shouldEqual partitionValuesListed
   }
 }

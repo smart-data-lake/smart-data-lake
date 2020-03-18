@@ -20,7 +20,8 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, FromConfigFactory, InstanceRegistry, ParsableFromConfig}
-import io.smartdatalake.util.misc.ProductUtil.getFieldData
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.ProductUtil._
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -58,8 +59,10 @@ case class DataObjectsExporterDataObject(id: DataObjectId,
    * @param session SparkSession to use
    * @return DataFrame including all Dataobjects in the instanceRegistry, used for exporting the metadata
    */
-  override def getDataFrame(implicit session: SparkSession): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
     import session.implicits._
+
+    val listElementsSeparator = ","
 
     // Get all DataObjects from registry
     val dataObjects: Seq[DataObject with Product] = config match {
@@ -72,59 +75,34 @@ case class DataObjectsExporterDataObject(id: DataObjectId,
     // Extract data for export
     // type and creator are derived from simple classnames
     val exportObjects = dataObjects.map {
-      f =>
-        val metadata: Option[DataObjectMetadata] = getFieldData(f, "metadata") match {
-          case Some(Some(meta: DataObjectMetadata)) => Some(meta)
-          case _ => None
-        }
+      dataObject =>
+        val metadata = getOptionalFieldData[DataObjectMetadata](dataObject, "metadata")
+        // return tuple:
         (
           // id
-          getFieldData(f, "id") match {
-            case Some(x:String) => x
-            case _ => ""
-          },
+          dataObject.id.id,
           // type
-          f.getClass.getSimpleName,
+          dataObject.getClass.getSimpleName,
           // metadata name
-          metadata match {
-            case Some(x:DataObjectMetadata) => x.name.getOrElse("")
-            case _ => ""
-          },
+          metadata.flatMap(_.name),
           // metadata description
-          metadata match {
-            case Some(x:DataObjectMetadata) => x.description.getOrElse("")
-            case _ => ""
-          },
+          metadata.flatMap(_.description),
           // metadata layer
-          metadata match {
-            case Some(x:DataObjectMetadata) => x.layer.getOrElse("")
-            case _ => ""
-          },
+          metadata.flatMap(_.layer),
           // metadata subjectArea
-          metadata match {
-            case Some(x:DataObjectMetadata) => x.subjectArea.getOrElse("")
-            case _ => ""
-          },
+          metadata.flatMap(_.subjectArea),
+          // metadata tags
+          metadata.map(_.tags).map(_.mkString(listElementsSeparator)),
           // path
-          getFieldData(f, "path") match {
-            case Some(x:String) => x
-            case _ => ""
-          },
+          getFieldData[String](dataObject, "path"),
           // partitions
-          getFieldData(f, "partitions") match {
-            case Some(x: Seq[_]) => x.asInstanceOf[Seq[Any]].mkString(",")
-            case _ => ""
-          },
+          getFieldData[Seq[String]](dataObject, "partitions").map(_.mkString(listElementsSeparator)),
           // table
-          getFieldData(f, "table") match {
-            case Some(tbl: Table) => tbl.toString
-            case _ => ""
-          },
+          getFieldData[Table](dataObject, "table").map(_.toString),
           // creator
-          getFieldData(f, "creator") match {
-            case Some(x: CustomDfCreatorConfig) => x.toString
-            case _ => ""
-          }
+          getFieldData[CustomDfCreatorConfig](dataObject, "creator").map(_.toString),
+          // connectionId
+          getEventuallyOptionalFieldData[Any](dataObject, "connectionId").map(getIdFromConfigObjectIdOrString)
         )
     }
 
@@ -136,10 +114,12 @@ case class DataObjectsExporterDataObject(id: DataObjectId,
       "description",
       "layer",
       "subjectArea",
+      "tags",
       "path",
       "partitions",
       "table",
-      "creator"
+      "creator",
+      "connectionId"
     )
   }
 

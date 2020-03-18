@@ -44,7 +44,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
       .where($"col_name"==="Statistics").head.getAs[String](1)
     assert(statsStr.contains("3 rows"))
     // check table contents
-    assert(srcDO.getDataFrame.count==3)
+    assert(srcDO.getDataFrame().count==3)
   }
 
   test("write and analyze table with partitions and partition values") {
@@ -66,7 +66,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
       .where($"col_name"==="Partition Statistics").head.getAs[String](1)
     assert(statsPart2Str.contains("1 rows"))
     // check table contents
-    assert(srcDO.getDataFrame.count==3)
+    assert(srcDO.getDataFrame().count==3)
   }
 
   test("write and analyze table with partitions without partition values") {
@@ -88,7 +88,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
       .where($"col_name"==="Partition Statistics").head.getAs[String](1)
     assert(statsPart2Str.contains("1 rows"))
     // check table contents
-    assert(srcDO.getDataFrame.count==3)
+    assert(srcDO.getDataFrame().count==3)
   }
 
   test("write and analyze table with multi partition layout and partial partition values") {
@@ -114,7 +114,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
       .where($"col_name"==="Partition Statistics").head.getAs[String](1)
     assert(!statsPart3Str.contains("1 rows"))
     // check table contents
-    assert(srcDO.getDataFrame.count==3)
+    assert(srcDO.getDataFrame().count==3)
   }
 
   test("write and analyze table with multi partition layout and full partition values") {
@@ -140,7 +140,68 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
       .where($"col_name"==="Partition Statistics").head.getAs[String](1)
     assert(!statsPart3Str.contains("1 rows"))
     // check table contents
-    assert(srcDO.getDataFrame.count==3)
+    assert(srcDO.getDataFrame().count==3)
+  }
+
+  test("overwrite only one partition") {
+
+    // create data object
+    val srcTable = Table(Some("default"), "input")
+    HiveUtil.dropTable(testSession, srcTable.db.get, srcTable.name )
+    val srcPath = tempPath+s"/${srcTable.fullName}"
+    val srcDO = HiveTableDataObject( "input", srcPath, table = srcTable, partitions = Seq("p"), numInitialHdfsPartitions = 1)
+
+    // write test data 1 - create partition A and B
+    val partitionValuesCreated = Seq( PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
+    val df1 = Seq(("A",1),("A",2),("B",3),("B",4)).toDF("p", "value")
+    srcDO.writeDataFrame(df1, partitionValuesCreated )
+
+    // test 1
+    srcDO.getDataFrame().count shouldEqual 4 // four records should remain, 2 from partition A and 2 from partition B
+    partitionValuesCreated.toSet shouldEqual srcDO.listPartitions.toSet
+
+    // write test data 2 - overwrite partition B
+    val df2 = Seq(("B",5)).toDF("p", "value")
+    srcDO.writeDataFrame(df2, partitionValuesCreated )
+
+    // test 2
+    srcDO.getDataFrame().count shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
+    partitionValuesCreated.toSet shouldEqual srcDO.listPartitions.toSet
+  }
+
+  test("create and list partition one level") {
+
+    // create data object
+    val srcTable = Table(Some("default"), "input")
+    HiveUtil.dropTable(testSession, srcTable.db.get, srcTable.name )
+    val srcPath = tempPath+s"/${srcTable.fullName}"
+    val srcDO = HiveTableDataObject( "input", srcPath, table = srcTable, partitions = Seq("p"), numInitialHdfsPartitions = 1)
+
+    // write test files
+    val partitionValuesCreated = Seq(PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
+    val df = Seq(("A",1),("B",2)).toDF("p", "value")
+    srcDO.writeDataFrame(df, partitionValuesCreated )
+
+    val partitionValuesListed = srcDO.listPartitions
+    partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
+  }
+
+  test("create and list partition multi level") {
+
+    // create data object
+    val srcTable = Table(Some("default"), "input")
+    HiveUtil.dropTable(testSession, srcTable.db.get, srcTable.name )
+    val srcPath = tempPath+s"/${srcTable.fullName}"
+    val srcDO = HiveTableDataObject( "input", srcPath, table = srcTable, partitions = Seq("p1","p2"), numInitialHdfsPartitions = 1)
+
+    // write test files
+    val partitionValuesCreated = Seq( PartitionValues(Map("p1"->"A","p2"->"L2A")), PartitionValues(Map("p1"->"A","p2"->"L2B"))
+      , PartitionValues(Map("p1"->"B","p2"->"L2B")), PartitionValues(Map("p1"->"B","p2"->"L2C")))
+    val df = Seq(("A","L2A",1),("A","L2B",2),("B","L2B",3),("B","L2C",4)).toDF("p1", "p2", "value")
+    srcDO.writeDataFrame(df, partitionValuesCreated )
+
+    val partitionValuesListed = srcDO.listPartitions
+    partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
   }
 
   test("Reading from an non-existing path is not possible.") {
@@ -160,6 +221,6 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
        """.stripMargin)
     val dataObj = HiveTableDataObject.fromConfig(config, instanceRegistry)
 
-    an [Exception] should be thrownBy dataObj.getDataFrame
+    an [Exception] should be thrownBy dataObj.getDataFrame()
   }
 }

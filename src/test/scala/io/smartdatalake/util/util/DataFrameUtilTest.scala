@@ -21,9 +21,9 @@ package io.smartdatalake.util.util
 import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import org.apache.spark.sql.functions.lit
+import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, Row}
 import org.scalatest.Matchers
 
 class DataFrameUtilTest extends org.scalatest.FunSuite with Matchers with SmartDataLakeLogger {
@@ -174,7 +174,41 @@ class DataFrameUtilTest extends org.scalatest.FunSuite with Matchers with SmartD
       logger.error(s"Recommendation:")
       logger.error(s"Do not use function isDataFrameDataEqual anymore as it does not work with empty cells.")
     }
+    // Do not name boolean parameter even if IntelliJ tells you to do so!
+    // otherwise: [Error] macro applications do not support named and/or default arguments
     assert(true)
+  }
+
+  // other tests
+
+  test("castAllDate2Timestamp") {
+    val actual = dfManyTypes.castAllDate2Timestamp
+    val expected = actual.withColumn("_date",$"_date".cast(TimestampType))
+    val resultat: Boolean = actual.isEqual(expected)
+    if (!resultat) printFailedTestResult("castAllDate2Timestamp",Seq(dfManyTypes))(actual)(expected)
+    assert(resultat)
+  }
+
+  test("castAll2String") {
+    val actual = dfManyTypes.castAll2String
+    val expected = actual.columns.foldLeft(actual)({ (df, s) => df.withColumn(s,col(s).cast(StringType)) })
+    val resultat: Boolean = actual.isEqual(expected)
+    if (!resultat) printFailedTestResult("castAll2String",Seq(dfManyTypes))(actual)(expected)
+    assert(resultat)
+  }
+
+  test("castAllDecimal2IntegralFloat") {
+    val actual = dfManyTypes.castAllDecimal2IntegralFloat
+    val expected = actual
+      .withColumn("_decimal_2_0", $"_decimal_2_0".cast(ByteType))
+      .withColumn("_decimal_4_0", $"_decimal_4_0".cast(ShortType))
+      .withColumn("_decimal_10_0", $"_decimal_10_0".cast(IntegerType))
+      .withColumn("_decimal_11_0", $"_decimal_11_0".cast(LongType))
+      .withColumn("_decimal_4_3", $"_decimal_4_3".cast(FloatType))
+      .withColumn("_decimal_38_1", $"_decimal_38_1".cast(DoubleType))
+    val resultat: Boolean = actual.isEqual(expected)
+    if (!resultat) printFailedTestResult("castAllDecimal2IntegralFloat",Seq(dfManyTypes))(actual)(expected)
+    assert(resultat)
   }
 
   test("containsNull_df_complex") {

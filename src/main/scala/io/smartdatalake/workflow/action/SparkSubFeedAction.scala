@@ -18,8 +18,10 @@
  */
 package io.smartdatalake.workflow.action
 
+import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 
 abstract class SparkSubFeedAction extends Action {
@@ -46,11 +48,18 @@ abstract class SparkSubFeedAction extends Action {
   private def doTransform(subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // convert subfeed to SparkSubFeed type or initialize if not yet existing
     var preparedSubFeed = SparkSubFeed.fromSubFeed(subFeed)
+    // apply init execution mode if there are no partition values given in command line
+    preparedSubFeed = if (subFeed.isInstanceOf[InitSubFeed] && preparedSubFeed.partitionValues.isEmpty) {
+      preparedSubFeed.copy( partitionValues = ActionHelper.applyExecutionMode(initExecutionMode, id, input, output, preparedSubFeed.partitionValues))
+    } else preparedSubFeed
     // break lineage if requested
     preparedSubFeed = if (breakDataFrameLineage) preparedSubFeed.breakLineage() else preparedSubFeed
     // persist if requested
     preparedSubFeed = if (persist) preparedSubFeed.persist else preparedSubFeed
-    transform(preparedSubFeed)
+    // transform
+    val transformedSubFeed = transform(preparedSubFeed)
+    // update partition values to output's partition columns and update dataObjectId
+    ActionHelper.validateAndUpdateSubFeedPartitionValues(output, transformedSubFeed).copy(dataObjectId = output.id)
   }
 
   /**
@@ -66,10 +75,11 @@ abstract class SparkSubFeedAction extends Action {
    */
   override final def exec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == 1, s"Only one subfeed allowed for SparkSubFeedActions (Action $id, inputSubfeed's ${subFeeds.map(_.dataObjectId).mkString(",")})")
-    //transform
-    val transformedSubFeed = doTransform(subFeeds.head)
+    val subFeed = subFeeds.head
+    // transform
+    val transformedSubFeed = doTransform(subFeed)
     // write output
-    logger.info(s"writing to DataObject ${output.id}")
+    logger.info(s"writing to DataObject ${output.id}, partitionValues ${subFeed.partitionValues}")
     setSparkJobDescription( s"writing to DataObject ${output.id}" )
     output.writeDataFrame(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
     // return
@@ -96,4 +106,10 @@ abstract class SparkSubFeedAction extends Action {
    * This helps to reduce memory needed for caching the DataFrame content and can serve as a recovery point in case an task get's lost.
    */
   def persist: Boolean
+
+  /**
+   * Execution mode if this Action is a start node of a DAG run
+   */
+  def initExecutionMode: Option[ExecutionMode]
+
 }

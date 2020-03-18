@@ -22,7 +22,6 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
-
 import scala.collection.JavaConverters._
 
 /**
@@ -31,6 +30,88 @@ import scala.collection.JavaConverters._
 private[smartdatalake] object DataFrameUtil {
 
   implicit class DfSDL(df: DataFrame) extends SmartDataLakeLogger {
+
+
+    /**
+     * Casts type of given column to new [[DataType]].
+     *
+     * @param colName Name of column to cast
+     * @param newColType Type to cast to
+     * @return cast [[DataFrame]]
+     */
+    def castDfColumnTyp(colName: String, newColType: DataType): DataFrame = if (newColType == df.schema(colName).dataType) {
+      logger.debug(s"castDfColumnTyp: column is already of desired type. Nothing to do :)")
+      logger.debug(s"castDfColumnTyp: colName=$colName newColType=$newColType")
+      df
+    } else df.withColumn(colName, df(colName).cast(newColType))
+
+    /**
+     * Casts column of [[DecimalType]] to an [[IntegralType]] or [[FloatType]].
+     *
+     * @param colName Name of column to cast
+     * @return cast [[DataFrame]]
+     */
+    def castDecimalColumn2IntegralFloat(colName: String): DataFrame = {
+      val dataType: DataType = df.schema(colName).dataType
+
+      val newType: DataType = dataType match {
+        case decimalType: DecimalType =>
+          val preci = decimalType.precision
+          if(0 == decimalType.scale) {
+            if (preci < 3) ByteType
+            else if (preci < 5) ShortType
+            else if (preci < 11) IntegerType
+            else LongType
+          } else if (preci < 8) FloatType else DoubleType
+        case _ => dataType
+      }
+
+      df.castDfColumnTyp(colName, newType)
+    }
+
+    /**
+     * Casts type of all given columns to new [[DataType]].
+     *
+     * @param colNames Array of names of columns to cast
+     * @param newColType Type to cast to
+     * @return cast [[DataFrame]]
+     */
+    def castDfColumnTyp(colNames: Seq[String], newColType: DataType): DataFrame = colNames.foldLeft(df)({ (df, s) => df.castDfColumnTyp(s,newColType) })
+
+    /**
+     * Casts type of all columns of given [[DataType]] to new [[DataType]].
+     *
+     * @param currentColType Current type filter of columns to be casted
+     * @param newColType Type to cast to
+     * @return cast [[DataFrame]]
+     */
+    def castDfColumnTyp(currentColType: DataType, newColType: DataType): DataFrame = {
+      logger.debug(s"castDfColumnTyp: currentColType=$currentColType   newColType=$newColType")
+      logger.debug(s"castDfColumnTyp: df.columns=${df.columns.mkString(",")}")
+      val colNames = df.schema.filter( currentColType == _.dataType ).map(_.name)
+      df.castDfColumnTyp(colNames, newColType: DataType)
+    }
+
+    /**
+     * Casts type of all [[DataType]] columns to [[TimestampType]].
+     *
+     * @return casted [[DataFrame]]
+     */
+    def castAllDate2Timestamp: DataFrame = castDfColumnTyp(DateType, TimestampType)
+
+    /**
+     * Casts type of all columns to [[StringType]].
+     *
+     * @return casted [[DataFrame]]
+     */
+    def castAll2String: DataFrame = castDfColumnTyp(df.columns, StringType)
+
+    /**
+     * Casts type of all columns of [[DecimalType]] to an [[IntegralType]] or [[FloatType]].
+     *
+     * @return casted [[DataFrame]]
+     */
+    def castAllDecimal2IntegralFloat: DataFrame = df.columns.foldLeft(df)({ (df, s) => df.castDecimalColumn2IntegralFloat(s) })
 
     /**
      * Transforms column names of [[DataFrame]] to lowercase.
@@ -111,7 +192,7 @@ private[smartdatalake] object DataFrameUtil {
     def isCandidateKey(cols: Array[String]=df.columns): Boolean = !containsNull(cols) && isMinimalUnique(cols)
 
     /**
-     * Converts type of all [[DataType]] columns in a [[DataFrame]] to [[TimestampType]].
+     * checks whether schema is subschema of given [[StructType]].
      *
      * @param scm to test
      * @return result wether provided schema set is a subset of df.schema
@@ -119,7 +200,7 @@ private[smartdatalake] object DataFrameUtil {
     def isSubSchema(scm: StructType): Boolean = scm.toSet.subsetOf(df.schema.toSet)
 
     /**
-     * Converts type of all [[DataType]] columns in a [[DataFrame]] to [[TimestampType]].
+     * checks whether schema is superschema of given [[StructType]].
      *
      * @param scm to test
      * @return result wether provided schema set is a subset of df.schema
@@ -214,11 +295,11 @@ private[smartdatalake] object DataFrameUtil {
         rightNamesIndex.get(leftField.name) match {
           case Some(rightFieldsWithSameName) if rightFieldsWithSameName.foldLeft(false) {
             (hasPreviousSubset, rightField) =>
-            hasPreviousSubset || ( //if no previous match found check this rightField
-              (ignoreNullability || leftField.nullable == rightField.nullable) //either nullability is ignored or nullability must match
-                && deepIsTypeSubset(leftField.dataType, rightField.dataType, ignoreNullability //left field must be a subset of right field
-              )
-            )
+              hasPreviousSubset || ( //if no previous match found check this rightField
+                (ignoreNullability || leftField.nullable == rightField.nullable) //either nullability is ignored or nullability must match
+                  && deepIsTypeSubset(leftField.dataType, rightField.dataType, ignoreNullability //left field must be a subset of right field
+                )
+                )
           } => Set.empty //found a match
           case _ => Set(leftField) //left field is not contained in right
         }
@@ -277,42 +358,6 @@ private[smartdatalake] object DataFrameUtil {
         case _ => dataType
       }
     }
-  }
-
-  /**
-   * Converts type of all [[DataType]] columns in a [[DataFrame]] to [[TimestampType]].
-   *
-   * @param df [[DataFrame]] to convert
-   * @return converted [[DataFrame]]
-   */
-  def convertDate2Datetime(df: DataFrame): DataFrame = {
-    df.dtypes.filter { s => DateType.toString.equals(s._2.toString) }.foldLeft(df) {
-      (df, s) => castDfColumnTyp(df, s._1, TimestampType)
-    }
-  }
-
-  /**
-   * Converts type of all columns in a [[DataFrame]] to [[StringType]].
-   *
-   * @param df [[DataFrame]] to convert
-   * @return converted [[DataFrame]]
-   */
-  def convertSchema2String(df: DataFrame): DataFrame = {
-    df.dtypes.filterNot { s => StringType.toString.equals(s._2.toString) }.foldLeft(df) {
-      (df, s) => castDfColumnTyp(df, s._1, StringType)
-    }
-  }
-
-  /**
-   * Converts type of column in [[DataFrame]] to different type.
-   *
-   * @param df [[DataFrame]] to convert
-   * @param colName Name of column to convert
-   * @param colType Type to convert to
-   * @return converted [[DataFrame]]
-   */
-  def castDfColumnTyp(df: DataFrame, colName: String, colType: DataType): DataFrame = {
-    df.withColumn(colName, df(colName).cast(colType))
   }
 
   /**

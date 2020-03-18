@@ -21,8 +21,9 @@ package io.smartdatalake.workflow.action
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject, TableDataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 
@@ -33,17 +34,20 @@ import org.apache.spark.sql.SparkSession
  * @param outputId output DataObject
  * @param deleteDataAfterRead a flag to enable deletion of input partitions after copying.
  * @param transformer a custom transformation that is applied to each SubFeed separately
+ * @param initExecutionMode optional execution mode if this Action is a start node of a DAG run
  */
-case class CopyAction( override val id: ActionObjectId,
-                       inputId: DataObjectId,
-                       outputId: DataObjectId,
-                       deleteDataAfterRead: Boolean = false,
-                       transformer: Option[CustomDfTransformerConfig] = None,
-                       columnBlacklist: Option[Seq[String]] = None,
-                       columnWhitelist: Option[Seq[String]] = None,
-                       override val breakDataFrameLineage: Boolean = false,
-                       override val persist: Boolean = false,
-                       override val metadata: Option[ActionMetadata] = None
+case class CopyAction(override val id: ActionObjectId,
+                      inputId: DataObjectId,
+                      outputId: DataObjectId,
+                      deleteDataAfterRead: Boolean = false,
+                      transformer: Option[CustomDfTransformerConfig] = None,
+                      columnBlacklist: Option[Seq[String]] = None,
+                      columnWhitelist: Option[Seq[String]] = None,
+                      standardizeDatatypes: Boolean = false,
+                      override val breakDataFrameLineage: Boolean = false,
+                      override val persist: Boolean = false,
+                      override val initExecutionMode: Option[ExecutionMode] = None,
+                      override val metadata: Option[ActionMetadata] = None
                      )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedAction {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
@@ -58,7 +62,7 @@ case class CopyAction( override val id: ActionObjectId,
 
     // apply transformations
     transformedSubFeed = ActionHelper.applyTransformations(
-      transformedSubFeed, transformer, columnBlacklist, columnWhitelist, output, None)
+      transformedSubFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, None)
 
     // return transformed subfeed
     transformedSubFeed
@@ -89,5 +93,4 @@ object CopyAction extends FromConfigFactory[Action] {
     implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
     config.extract[CopyAction].value
   }
-
 }

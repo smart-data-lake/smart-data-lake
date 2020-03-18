@@ -20,7 +20,8 @@ package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
@@ -41,6 +42,7 @@ case class CustomSparkAction ( override val id: ActionObjectId,
                                transformer: CustomDfsTransformerConfig,
                                override val breakDataFrameLineage: Boolean = false,
                                override val persist: Boolean = false,
+                               override val initExecutionMode: Option[ExecutionMode] = None,
                                override val metadata: Option[ActionMetadata] = None
 )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedsAction {
 
@@ -54,13 +56,20 @@ case class CustomSparkAction ( override val id: ActionObjectId,
 
     // create input subfeeds if they don't exist yet
     val enrichedSubfeeds: Seq[SparkSubFeed] = enrichSubFeedsDataFrame(inputs, subFeeds)
+    val mainInputEnrichedSubFeed = mainInput.flatMap( input => enrichedSubfeeds.find(_.dataObjectId==input.id))
 
     // Apply custom transformation to all subfeeds
     transformer.transform(enrichedSubfeeds.map( subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap)
       .map {
+        // create output subfeeds from transformed dataframes
         case (dataObjectId, dataFrame) =>
-          // TODO: have a flag propagatePartitionValues in action configuration - when enabled search for matching columns between dataFrame.schema and partitionValues from inputSubFeeds and propagate partitionValues
-          SparkSubFeed(Some(dataFrame),dataObjectId, Seq()) // partition values not available here, will be updated next
+          val output = outputs.find(_.id.id == dataObjectId)
+            .getOrElse(throw ConfigurationException(s"No output found for result ${dataObjectId} in $id. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
+          // if main output, get partition values from main input
+          val partitionValues = if (mainInput.isDefined && mainOutput.exists(_.id.id == dataObjectId)) {
+            mainInputEnrichedSubFeed.map(_.partitionValues).getOrElse(Seq())
+          } else Seq()
+          SparkSubFeed(Some(dataFrame),dataObjectId, partitionValues)
       }.toSeq
   }
 

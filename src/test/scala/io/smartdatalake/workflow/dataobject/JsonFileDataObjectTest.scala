@@ -19,17 +19,17 @@
 package io.smartdatalake.workflow.dataobject
 
 import java.io._
+import java.nio.file.Files
 
-import com.holdenkarau.spark.testing._
 import com.typesafe.config.ConfigFactory
+import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types._
 
 class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjectSchemaBehavior {
 
-  val tempDir: File = Utils.createTempDir()
-  val tempPath: String = tempDir.toPath.toAbsolutePath.toString
+  val hdfs = FileSystem.get(testSession.sparkContext.hadoopConfiguration)
 
   case class Data(name: String, age: Int)
 
@@ -37,9 +37,11 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
 
   test("test stringify") {
 
+    val tempDir = Files.createTempDirectory("jsonTest").toString
+
     val config = ConfigFactory.parseString( s"""
          | id = src1
-         | path = "${escapedFilePath(tempPath + "/test.json")}"
+         | path = "${escapedFilePath(tempDir)}"
          | json-options { multiLine = false }
          | stringify = true
          """.stripMargin)
@@ -51,15 +53,13 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
         |{"string":"string3","int":3,"array":[3,6,9],"dict": {"key": "value3", "extra_key": "extra_value3"}}
       """.stripMargin
 
-    val hdfs = FileSystem.get(testSession.sparkContext.hadoopConfiguration)
-    val output = hdfs.create(new Path(tempPath + "/test.json"), true)
-
+    val output = hdfs.create(new Path(tempDir+"/test.json"), true)
     val os = new BufferedOutputStream(output)
     os.write(jsonStr.getBytes("UTF-8"))
     os.close()
 
     val aj = JsonFileDataObject.fromConfig(config, instanceRegistry)
-    val result = aj.getDataFrame
+    val result = aj.getDataFrame()
     result.show
     assert(result.count() == 3)
 
@@ -68,15 +68,25 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
       StructField("dict", StringType),
       StructField("int", StringType),
       StructField("string", StringType)))
-    assert(result.schema == expectedSchema)
+
+    val testResult = result.schema == expectedSchema
+
+    if (!testResult) {
+      println("Schemata differ:")
+      println(s"result.schema  = ${result.schema.simpleString}")
+      println(s"expectedSchema = ${expectedSchema.simpleString}")
+    }
+    assert(testResult)
   }
 
 
   test("testDefaultParsing") {
 
+    val tempDir = Files.createTempDirectory("jsonTest").toString
+
     val config = ConfigFactory.parseString( s"""
          | id = src1
-         | path = "${escapedFilePath(tempPath + "/test.json")}"
+         | path = "${escapedFilePath(tempDir)}"
          """.stripMargin)
 
     val jsonStr =
@@ -94,15 +104,13 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
         |  }
         |}""".stripMargin
 
-    val hdfs = FileSystem.get(testSession.sparkContext.hadoopConfiguration)
-    val output = hdfs.create(new Path(tempPath + "/test.json"), true)
-
+    val output = hdfs.create(new Path(tempDir+"/test.json"), true)
     val os = new BufferedOutputStream(output)
     os.write(jsonStr.getBytes("UTF-8"))
     os.close()
 
     val aj = JsonFileDataObject.fromConfig(config, instanceRegistry)
-    val result = aj.getDataFrame
+    val result = aj.getDataFrame()
     result.show()
     assert(result.count() == 1)
 
@@ -117,12 +125,17 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
     ))
     result.printSchema()
     assert(result.schema == expectedSchema)
+
+    FileUtils.deleteDirectory(new File(tempDir))
   }
 
   test("jsonLinesParsing") {
+
+    val tempDir = Files.createTempDirectory("jsonTest").toString
+
     val config = ConfigFactory.parseString( s"""
          | id = src1
-         | path = "${escapedFilePath(tempPath + "/test.json")}"
+         | path = "${escapedFilePath(tempDir)}"
          | json-options { multiLine = false }
          """.stripMargin)
 
@@ -133,15 +146,13 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
         |{"string":"string3","int":3,"array":[3,6,9],"dict": {"key": "value3", "extra_key": "extra_value3"}}
       """.stripMargin
 
-    val hdfs = FileSystem.get(testSession.sparkContext.hadoopConfiguration)
-    val output = hdfs.create(new Path(tempPath + "/test.json"), true)
-
+    val output = hdfs.create(new Path(tempDir+"/test.json"), true)
     val os = new BufferedOutputStream(output)
     os.write(jsonStr.getBytes("UTF-8"))
     os.close()
 
     val aj = JsonFileDataObject.fromConfig(config, instanceRegistry)
-    val result = aj.getDataFrame
+    val result = aj.getDataFrame()
     assert(result.count() == 3)
 
     val expectedSchema = StructType(List(
@@ -152,6 +163,8 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
       StructField("int", LongType),
       StructField("string", StringType)))
     assert(result.schema == expectedSchema)
+
+    FileUtils.deleteDirectory(new File(tempDir))
   }
 
   testsFor(readNonExistingSources(createDataObject, ".json"))

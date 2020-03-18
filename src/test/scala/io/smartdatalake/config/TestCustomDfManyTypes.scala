@@ -16,9 +16,21 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow.dataobject
+package io.smartdatalake.config
 
-/**
- * Exception if a table is missing
- */
-private[smartdatalake] class TableMissingException(message: String) extends RuntimeException(message) {}
+import io.smartdatalake.testutils.TestUtil.dfManyTypes
+import io.smartdatalake.workflow.action.customlogic.CustomDfCreator
+import org.apache.spark.sql.{DataFrame, SparkSession}
+
+class TestCustomDfManyTypes extends CustomDfCreator {
+  /**
+   * function to create a dataFrame
+   *
+   * @param session : the Spark Session
+   * @param config  Input Config of action
+   * @return Map outputID -> dataFrame
+   */
+  override def exec(session: SparkSession, config: Map[String, String]): DataFrame = dfManyTypes
+
+  override def equals(obj: Any): Boolean = getClass.equals(obj.getClass)
+}
