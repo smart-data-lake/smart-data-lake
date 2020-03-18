@@ -66,7 +66,7 @@ case class SmartDataLakeBuilderConfig(feedSel: String = null,
   def getPartitionValues: Option[Seq[PartitionValues]] = partitionValues.orElse(multiPartitionValues)
 }
 
-case class GlobalConfig( kryoClasses: Option[Seq[String]] = None, sparkOptions: Option[Map[String,String]] = None)
+case class GlobalConfig( kryoClasses: Option[Seq[String]] = None, sparkOptions: Option[Map[String,String]] = None, enableHive: Boolean = true)
 
 /**
  * Abstract Smart Data Lake Command Line Application.
@@ -189,7 +189,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       appConfig.master.get,
       appConfig.deployMode,
       globalConfig.kryoClasses,
-      globalConfig.sparkOptions)
+      globalConfig.sparkOptions,
+      globalConfig.enableHive
+    )
     LogUtil.setLogLevel(session.sparkContext)
 
     // create and execute actions
