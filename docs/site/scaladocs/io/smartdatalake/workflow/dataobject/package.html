@@ -1,0 +1,961 @@
+<!DOCTYPE html >
+<html>
+        <head>
+          <title>dataobject - Smart Data Lake 1.0.0-SNAPSHOT API - io.smartdatalake.workflow.dataobject</title>
+          <meta name="description" content="dataobject - Smart Data Lake 1.0.0 - SNAPSHOT API - io.smartdatalake.workflow.dataobject" />
+          <meta name="keywords" content="dataobject Smart Data Lake 1.0.0 SNAPSHOT API io.smartdatalake.workflow.dataobject" />
+          <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+          
+      <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
+      <link href="../../../../lib/diagrams.css" media="screen" type="text/css" rel="stylesheet" id="diagrams-css" />
+      <script type="text/javascript" src="../../../../lib/jquery.js" id="jquery-js"></script>
+      <script type="text/javascript" src="../../../../lib/jquery-ui.js"></script>
+      <script type="text/javascript" src="../../../../lib/template.js"></script>
+      <script type="text/javascript" src="../../../../lib/tools.tooltip.js"></script>
+      
+      <script type="text/javascript">
+         if(top === self) {
+            var url = '../../../../index.html';
+            var hash = 'io.smartdatalake.workflow.dataobject.package';
+            var anchor = window.location.hash;
+            var anchor_opt = '';
+            if (anchor.length >= 1)
+              anchor_opt = '@' + anchor.substring(1);
+            window.location.href = url + '#' + hash + anchor_opt;
+         }
+   	  </script>
+    
+        </head>
+        <body class="value">
+      <div id="definition">
+        <img alt="Package" src="../../../../lib/package_big.png" />
+        <p id="owner"><a href="../../../package.html" class="extype" name="io">io</a>.<a href="../../package.html" class="extype" name="io.smartdatalake">smartdatalake</a>.<a href="../package.html" class="extype" name="io.smartdatalake.workflow">workflow</a></p>
+        <h1>dataobject</h1><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      </div>
+
+      <h4 id="signature" class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">package</span>
+      </span>
+      <span class="symbol">
+        <span class="name">dataobject</span>
+      </span>
+      </h4>
+      
+          <div id="comment" class="fullcommenttop"></div>
+        
+
+      <div id="mbrsel">
+        <div id="textfilter"><span class="pre"></span><span class="input"><input id="mbrsel-input" type="text" accesskey="/" /></span><span class="post"></span></div>
+        
+        
+        <div id="visbl">
+            <span class="filtertype">Visibility</span>
+            <ol><li class="public in"><span>Public</span></li><li class="all out"><span>All</span></li></ol>
+          </div>
+      </div>
+
+      <div id="template">
+        <div id="allMembers">
+        
+
+        <div id="types" class="types members">
+              <h3>Type Members</h3>
+              <ol><li name="io.smartdatalake.workflow.dataobject.AccessTableDataObject" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="AccessTableDataObjectextendsTableDataObjectwithSmartDataLakeLoggerwithProductwithSerializable"></a>
+      <a id="AccessTableDataObject:AccessTableDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="AccessTableDataObject.html"><span class="name">AccessTableDataObject</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="preSql">preSql: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="postSql">postSql: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="table">table: <a href="Table.html" class="extype" name="io.smartdatalake.workflow.dataobject.Table">Table</a></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.TableDataObject">TableDataObject</span> with <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@AccessTableDataObjectextendsTableDataObjectwithSmartDataLakeLoggerwithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt"><span class="extype" name="DataObject">DataObject</span> of type JDBC / Access.</p><div class="fullcomment"><div class="comment cmt"><p><span class="extype" name="DataObject">DataObject</span> of type JDBC / Access.
+Provides access to a Access DB to an Action. The functionality is handled seperately from <a href="JdbcTableDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.JdbcTableDataObject">JdbcTableDataObject</a>
+to avoid problems with net.ucanaccess.jdbc.UcanaccessDriver
+</p></div></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.ActionsExporterDataObject" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="ActionsExporterDataObjectextendsDataObjectwithCanCreateDataFramewithParsableFromConfig[io.smartdatalake.workflow.dataobject.ActionsExporterDataObject]withProductwithSerializable"></a>
+      <a id="ActionsExporterDataObject:ActionsExporterDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="ActionsExporterDataObject.html"><span class="name">ActionsExporterDataObject</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="config">config: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame">CanCreateDataFrame</span> with <span class="extype" name="io.smartdatalake.config.ParsableFromConfig">ParsableFromConfig</span>[<a href="ActionsExporterDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.ActionsExporterDataObject">ActionsExporterDataObject</a>] with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@ActionsExporterDataObjectextendsDataObjectwithCanCreateDataFramewithParsableFromConfig[io.smartdatalake.workflow.dataobject.ActionsExporterDataObject]withProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Exports a util <span class="extype" name="DataFrame">DataFrame</span> that contains properties and metadata extracted from all <span class="extype" name="io.smartdatalake.workflow.action.Action">io.smartdatalake.workflow.action.Action</span>s
+that are registered in the current <span class="extype" name="InstanceRegistry">InstanceRegistry</span>.</p><div class="fullcomment"><div class="comment cmt"><p>Exports a util <span class="extype" name="DataFrame">DataFrame</span> that contains properties and metadata extracted from all <span class="extype" name="io.smartdatalake.workflow.action.Action">io.smartdatalake.workflow.action.Action</span>s
+that are registered in the current <span class="extype" name="InstanceRegistry">InstanceRegistry</span>.</p><p>Alternatively, it can export the properties and metadata of all <span class="extype" name="io.smartdatalake.workflow.action.Action">io.smartdatalake.workflow.action.Action</span>s defined in config files. For this, the
+configuration &quot;config&quot; has to be set to the location of the config.</p><p>Example:</p><pre>dataObjects = {
+ ...
+ actions-exporter {
+   <span class="kw">type</span> = ActionsExporterDataObject
+   config = path/to/myconfiguration.conf
+ }
+ ...
+}</pre><p>The config value can point to a configuration file or a directory containing configuration files.
+</p></div><dl class="attributes block"> <dt>See also</dt><dd><span class="cmt"><p>Refer to <span class="extype" name="ConfigLoader.loadConfigFromFilesystem()">ConfigLoader.loadConfigFromFilesystem()</span> for details about the configuration loading.</p></span></dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.AvroFileDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="AvroFileDataObjectextendsSparkFileDataObjectwithCanCreateDataFramewithCanWriteDataFramewithProductwithSerializable"></a>
+      <a id="AvroFileDataObject:AvroFileDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="AvroFileDataObject.html"><span class="name">AvroFileDataObject</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="saveMode">saveMode: <span class="extype" name="org.apache.spark.sql.SaveMode">SaveMode</span> = <span class="symbol">SaveMode.Overwrite</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</span>] = <span class="symbol">None</span></span>, <span name="connectionId">connectionId: <span class="extype" name="scala.Option">Option</span>[<a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.SparkFileDataObject">SparkFileDataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame">CanCreateDataFrame</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame">CanWriteDataFrame</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@AvroFileDataObjectextendsSparkFileDataObjectwithCanCreateDataFramewithCanWriteDataFramewithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.CsvFileDataObject" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="CsvFileDataObjectextendsSparkFileDataObjectwithCanCreateDataFramewithCanWriteDataFramewithProductwithSerializable"></a>
+      <a id="CsvFileDataObject:CsvFileDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="CsvFileDataObject.html"><span class="name">CsvFileDataObject</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="schema">schema: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="org.apache.spark.sql.types.StructType">StructType</span>] = <span class="symbol">None</span></span>, <span name="csvOptions">csvOptions: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Map()</span></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="dateColumnType">dateColumnType: <a href="../../definitions/DateColumnType$.html#DateColumnType=io.smartdatalake.definitions.DateColumnType.Value" class="extmbr" name="io.smartdatalake.definitions.DateColumnType.DateColumnType">DateColumnType</a> = <span class="symbol"><span class="name"><a href="../../../package.html">DateColumnType.Date</a></span></span></span>, <span name="saveMode">saveMode: <span class="extype" name="org.apache.spark.sql.SaveMode">SaveMode</span> = <span class="symbol">SaveMode.Overwrite</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</span>] = <span class="symbol">None</span></span>, <span name="connectionId">connectionId: <span class="extype" name="scala.Option">Option</span>[<a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.SparkFileDataObject">SparkFileDataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame">CanCreateDataFrame</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame">CanWriteDataFrame</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@CsvFileDataObjectextendsSparkFileDataObjectwithCanCreateDataFramewithCanWriteDataFramewithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt"><span class="extype" name="DataObject">DataObject</span> of type CSV.</p><div class="fullcomment"><div class="comment cmt"><p><span class="extype" name="DataObject">DataObject</span> of type CSV.
+Provides details to an Action to access a CSV file.
+The schema can be infered from the csv file header line. For this set option header=true. Otherwise a schema must be configured by attribute schema.
+</p></div></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.CustomDfDataObject" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="CustomDfDataObjectextendsDataObjectwithCanCreateDataFramewithProductwithSerializable"></a>
+      <a id="CustomDfDataObject:CustomDfDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="CustomDfDataObject.html"><span class="name">CustomDfDataObject</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="creator">creator: <a href="../action/customlogic/CustomDfCreatorConfig.html" class="extype" name="io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig">CustomDfCreatorConfig</a></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame">CanCreateDataFrame</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@CustomDfDataObjectextendsDataObjectwithCanCreateDataFramewithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Generic <span class="extype" name="DataObject">DataObject</span> containing a config object.</p><div class="fullcomment"><div class="comment cmt"><p>Generic <span class="extype" name="DataObject">DataObject</span> containing a config object.
+E.g. used to implement a CustomAction that reads a Webservice.
+</p></div></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.DataObjectsExporterDataObject" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="DataObjectsExporterDataObjectextendsDataObjectwithCanCreateDataFramewithParsableFromConfig[io.smartdatalake.workflow.dataobject.DataObjectsExporterDataObject]withProductwithSerializable"></a>
+      <a id="DataObjectsExporterDataObject:DataObjectsExporterDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="DataObjectsExporterDataObject.html"><span class="name">DataObjectsExporterDataObject</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="config">config: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame">CanCreateDataFrame</span> with <span class="extype" name="io.smartdatalake.config.ParsableFromConfig">ParsableFromConfig</span>[<a href="DataObjectsExporterDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectsExporterDataObject">DataObjectsExporterDataObject</a>] with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@DataObjectsExporterDataObjectextendsDataObjectwithCanCreateDataFramewithParsableFromConfig[io.smartdatalake.workflow.dataobject.DataObjectsExporterDataObject]withProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Exports a util <span class="extype" name="DataFrame">DataFrame</span> that contains properties and metadata extracted from all <span class="extype" name="DataObject">DataObject</span>s
+that are registered in the current <span class="extype" name="InstanceRegistry">InstanceRegistry</span>.</p><div class="fullcomment"><div class="comment cmt"><p>Exports a util <span class="extype" name="DataFrame">DataFrame</span> that contains properties and metadata extracted from all <span class="extype" name="DataObject">DataObject</span>s
+that are registered in the current <span class="extype" name="InstanceRegistry">InstanceRegistry</span>.</p><p>Alternatively, it can export the properties and metadata of all <span class="extype" name="DataObject">DataObject</span>s defined in config files. For this, the
+configuration &quot;config&quot; has to be set to the location of the config.</p><p>Example:</p><pre>```dataObjects = {
+ ...
+ dataobject-exporter {
+   <span class="kw">type</span> = DataObjectsExporterDataObject
+   config = path/to/myconfiguration.conf
+ }
+ ...
+}</pre><p>The config value can point to a configuration file or a directory containing configuration files.
+</p></div><dl class="attributes block"> <dt>See also</dt><dd><span class="cmt"><p>Refer to <span class="extype" name="ConfigLoader.loadConfigFromFilesystem()">ConfigLoader.loadConfigFromFilesystem()</span> for details about the configuration loading.</p></span></dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.ExcelFileDataObject" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="ExcelFileDataObjectextendsSparkFileDataObjectwithCanCreateDataFramewithCanWriteDataFramewithProductwithSerializable"></a>
+      <a id="ExcelFileDataObject:ExcelFileDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="ExcelFileDataObject.html"><span class="name">ExcelFileDataObject</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="excelOptions">excelOptions: <a href="ExcelOptions.html" class="extype" name="io.smartdatalake.workflow.dataobject.ExcelOptions">ExcelOptions</a></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="schema">schema: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="org.apache.spark.sql.types.StructType">StructType</span>] = <span class="symbol">None</span></span>, <span name="saveMode">saveMode: <span class="extype" name="org.apache.spark.sql.SaveMode">SaveMode</span> = <span class="symbol">SaveMode.Overwrite</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</span>] = <span class="symbol">None</span></span>, <span name="connectionId">connectionId: <span class="extype" name="scala.Option">Option</span>[<a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.SparkFileDataObject">SparkFileDataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame">CanCreateDataFrame</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame">CanWriteDataFrame</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@ExcelFileDataObjectextendsSparkFileDataObjectwithCanCreateDataFramewithCanWriteDataFramewithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt"><span class="extype" name="DataObject">DataObject</span> of type Excel.</p><div class="fullcomment"><div class="comment cmt"><p><span class="extype" name="DataObject">DataObject</span> of type Excel.
+Provides details to a Action to access Excel files.</p></div></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.ExcelOptions" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="ExcelOptionsextendsProductwithSerializable"></a>
+      <a id="ExcelOptions:ExcelOptions"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="ExcelOptions.html"><span class="name">ExcelOptions</span></a><span class="params">(<span name="sheetName">sheetName: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="numLinesToSkip">numLinesToSkip: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="startColumn">startColumn: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="endColumn">endColumn: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="rowLimit">rowLimit: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="useHeader">useHeader: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Boolean">Boolean</span>] = <span class="symbol">Some(true)</span></span>, <span name="treatEmptyValuesAsNulls">treatEmptyValuesAsNulls: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Boolean">Boolean</span>] = <span class="symbol">Some(true)</span></span>, <span name="inferSchema">inferSchema: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Boolean">Boolean</span>] = <span class="symbol">Some(true)</span></span>, <span name="timestampFormat">timestampFormat: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Some(&quot;dd-MM-yyyy HH:mm:ss&quot;)</span></span>, <span name="maxRowsInMemory">maxRowsInMemory: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="excerptSize">excerptSize: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@ExcelOptionsextendsProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.HiveTableDataObject" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="HiveTableDataObjectextendsTableDataObjectwithCanWriteDataFramewithCanHandlePartitionswithSmartDataLakeLoggerwithProductwithSerializable"></a>
+      <a id="HiveTableDataObject:HiveTableDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="HiveTableDataObject.html"><span class="name">HiveTableDataObject</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="analyzeTableAfterWrite">analyzeTableAfterWrite: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="dateColumnType">dateColumnType: <a href="../../definitions/DateColumnType$.html#DateColumnType=io.smartdatalake.definitions.DateColumnType.Value" class="extmbr" name="io.smartdatalake.definitions.DateColumnType.DateColumnType">DateColumnType</a> = <span class="symbol"><span class="name"><a href="../../../package.html">DateColumnType.Date</a></span></span></span>, <span name="table">table: <a href="Table.html" class="extype" name="io.smartdatalake.workflow.dataobject.Table">Table</a></span>, <span name="numInitialHdfsPartitions">numInitialHdfsPartitions: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">16</span></span>, <span name="saveMode">saveMode: <span class="extype" name="org.apache.spark.sql.SaveMode">SaveMode</span> = <span class="symbol">SaveMode.Overwrite</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</span>] = <span class="symbol">None</span></span>, <span name="connectionId">connectionId: <span class="extype" name="scala.Option">Option</span>[<a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.TableDataObject">TableDataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame">CanWriteDataFrame</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanHandlePartitions">CanHandlePartitions</span> with <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@HiveTableDataObjectextendsTableDataObjectwithCanWriteDataFramewithCanHandlePartitionswithSmartDataLakeLoggerwithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt"><span class="extype" name="DataObject">DataObject</span> of type Hive.</p><div class="fullcomment"><div class="comment cmt"><p><span class="extype" name="DataObject">DataObject</span> of type Hive.
+Provides details to access Hive tables to an Action
+</p></div><dl class="paramcmts block"><dt class="param">id</dt><dd class="cmt"><p>unique name of this data object</p></dd><dt class="param">path</dt><dd class="cmt"><p>hadoop directory for this table. If it doesn't contain scheme and authority, the connections pathPrefix is applied.
+            If pathPrefix is not defined or doesn't define scheme and authority, default schema and authority is applied.</p></dd><dt class="param">partitions</dt><dd class="cmt"><p>partition columns for this data object</p></dd><dt class="param">analyzeTableAfterWrite</dt><dd class="cmt"><p>enable compute statistics after writing data (default=false)</p></dd><dt class="param">table</dt><dd class="cmt"><p>hive table to be written by this output</p></dd><dt class="param">numInitialHdfsPartitions</dt><dd class="cmt"><p>number of files created when writing into an empty table (otherwise the number will be derived from the existing data)</p></dd><dt class="param">saveMode</dt><dd class="cmt"><p>spark <span class="extype" name="SaveMode">SaveMode</span> to use when writing files, default is &quot;overwrite&quot;</p></dd><dt class="param">acl</dt><dd class="cmt"><p>override connections permissions for files created tables hadoop directory with this connection</p></dd><dt class="param">connectionId</dt><dd class="cmt"><p>optional id of <a href="../connection/HiveTableConnection.html" class="extype" name="io.smartdatalake.workflow.connection.HiveTableConnection">io.smartdatalake.workflow.connection.HiveTableConnection</a></p></dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.JdbcTableDataObject" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="JdbcTableDataObjectextendsTransactionalSparkTableDataObjectwithSmartDataLakeLoggerwithProductwithSerializable"></a>
+      <a id="JdbcTableDataObject:JdbcTableDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="JdbcTableDataObject.html"><span class="name">JdbcTableDataObject</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="createSql">createSql: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="preSql">preSql: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="postSql">postSql: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="table">table: <a href="Table.html" class="extype" name="io.smartdatalake.workflow.dataobject.Table">Table</a></span>, <span name="jdbcFetchSize">jdbcFetchSize: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">1000</span></span>, <span name="failIfTableMissing">failIfTableMissing: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">true</span></span>, <span name="connectionId">connectionId: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.TransactionalSparkTableDataObject">TransactionalSparkTableDataObject</span> with <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@JdbcTableDataObjectextendsTransactionalSparkTableDataObjectwithSmartDataLakeLoggerwithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt"><span class="extype" name="DataObject">DataObject</span> of type JDBC.</p><div class="fullcomment"><div class="comment cmt"><p><span class="extype" name="DataObject">DataObject</span> of type JDBC.
+Provides details for an action to access tables in a database through JDBC.
+</p></div></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.JmsDataObject" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="JmsDataObjectextendsDataObjectwithCanCreateDataFramewithProductwithSerializable"></a>
+      <a id="JmsDataObject:JmsDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="JmsDataObject.html"><span class="name">JmsDataObject</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="jndiContextFactory">jndiContextFactory: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="jndiProviderUrl">jndiProviderUrl: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="userVariable">userVariable: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="passwordVariable">passwordVariable: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="batchSize">batchSize: <span class="extype" name="scala.Int">Int</span></span>, <span name="maxWaitSec">maxWaitSec: <span class="extype" name="scala.Int">Int</span></span>, <span name="maxBatchAgeSec">maxBatchAgeSec: <span class="extype" name="scala.Int">Int</span></span>, <span name="txBatchSize">txBatchSize: <span class="extype" name="scala.Int">Int</span></span>, <span name="connectionFactory">connectionFactory: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="queue">queue: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame">CanCreateDataFrame</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@JmsDataObjectextendsDataObjectwithCanCreateDataFramewithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt"><span class="extype" name="DataObject">DataObject</span> of type JMS queue.</p><div class="fullcomment"><div class="comment cmt"><p><span class="extype" name="DataObject">DataObject</span> of type JMS queue.
+Provides details to an Action to access JMS queues.
+</p></div><dl class="paramcmts block"><dt class="param">jndiContextFactory</dt><dd class="cmt"><p>JNDI Context Factory</p></dd><dt class="param">jndiProviderUrl</dt><dd class="cmt"><p>JNDI Provider URL</p></dd><dt class="param">userVariable</dt><dd class="cmt"><p>Variable containing the JNDI user</p></dd><dt class="param">passwordVariable</dt><dd class="cmt"><p>Variable containing the JNDI password</p></dd><dt class="param">batchSize</dt><dd class="cmt"><p>JMS batch size</p></dd><dt class="param">connectionFactory</dt><dd class="cmt"><p>JMS Connection Factory</p></dd><dt class="param">queue</dt><dd class="cmt"><p>Name of MQ Queue</p></dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.JsonFileDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="JsonFileDataObjectextendsSparkFileDataObjectwithCanCreateDataFramewithCanWriteDataFramewithProductwithSerializable"></a>
+      <a id="JsonFileDataObject:JsonFileDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="JsonFileDataObject.html"><span class="name">JsonFileDataObject</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="jsonOptions">jsonOptions: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="saveMode">saveMode: <span class="extype" name="org.apache.spark.sql.SaveMode">SaveMode</span> = <span class="symbol">SaveMode.Overwrite</span></span>, <span name="stringify">stringify: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</span>] = <span class="symbol">None</span></span>, <span name="connectionId">connectionId: <span class="extype" name="scala.Option">Option</span>[<a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.SparkFileDataObject">SparkFileDataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame">CanCreateDataFrame</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame">CanWriteDataFrame</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@JsonFileDataObjectextendsSparkFileDataObjectwithCanCreateDataFramewithCanWriteDataFramewithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.PKViolatorsDataObject" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="PKViolatorsDataObjectextendsDataObjectwithCanCreateDataFramewithParsableFromConfig[io.smartdatalake.workflow.dataobject.PKViolatorsDataObject]withProductwithSerializable"></a>
+      <a id="PKViolatorsDataObject:PKViolatorsDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="PKViolatorsDataObject.html"><span class="name">PKViolatorsDataObject</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="config">config: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame">CanCreateDataFrame</span> with <span class="extype" name="io.smartdatalake.config.ParsableFromConfig">ParsableFromConfig</span>[<a href="PKViolatorsDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.PKViolatorsDataObject">PKViolatorsDataObject</a>] with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@PKViolatorsDataObjectextendsDataObjectwithCanCreateDataFramewithParsableFromConfig[io.smartdatalake.workflow.dataobject.PKViolatorsDataObject]withProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Checks for Primary Key violations for all <span class="extype" name="DataObject">DataObject</span>s with Primary Keys defined that are registered in the current <span class="extype" name="InstanceRegistry">InstanceRegistry</span>.</p><div class="fullcomment"><div class="comment cmt"><p>Checks for Primary Key violations for all <span class="extype" name="DataObject">DataObject</span>s with Primary Keys defined that are registered in the current <span class="extype" name="InstanceRegistry">InstanceRegistry</span>.
+Returns the list of Primary Key violations as a <span class="extype" name="DataFrame">DataFrame</span>.</p><p>Alternatively, it can check for Primary Key violations of all <span class="extype" name="DataObject">DataObject</span>s defined in config files. For this, the
+configuration &quot;config&quot; has to be set to the location of the config.</p><p>Example:</p><pre>```dataObjects = {
+ ...
+ primarykey-violations {
+   <span class="kw">type</span> = PKViolatorsDataObject
+   config = path/to/myconfiguration.conf
+ }
+ ...
+}</pre><p>The config value can point to a configuration file or a directory containing configuration files.
+</p></div><dl class="attributes block"> <dt>See also</dt><dd><span class="cmt"><p>Refer to <span class="extype" name="ConfigLoader.loadConfigFromFilesystem()">ConfigLoader.loadConfigFromFilesystem()</span> for details about the configuration loading.</p></span></dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.ParquetFileDataObject" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="ParquetFileDataObjectextendsSparkFileDataObjectwithCanCreateDataFramewithCanWriteDataFramewithProductwithSerializable"></a>
+      <a id="ParquetFileDataObject:ParquetFileDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="ParquetFileDataObject.html"><span class="name">ParquetFileDataObject</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="saveMode">saveMode: <span class="extype" name="org.apache.spark.sql.SaveMode">SaveMode</span> = <span class="symbol">SaveMode.Overwrite</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</span>] = <span class="symbol">None</span></span>, <span name="connectionId">connectionId: <span class="extype" name="scala.Option">Option</span>[<a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.SparkFileDataObject">SparkFileDataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame">CanCreateDataFrame</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame">CanWriteDataFrame</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@ParquetFileDataObjectextendsSparkFileDataObjectwithCanCreateDataFramewithCanWriteDataFramewithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt"><span class="extype" name="DataObject">DataObject</span> of type Hive.</p><div class="fullcomment"><div class="comment cmt"><p><span class="extype" name="DataObject">DataObject</span> of type Hive.
+Provides details to access files on hadoop in parquet format to an Action.
+</p></div><dl class="paramcmts block"><dt class="param">id</dt><dd class="cmt"><p>unique name of this data object</p></dd><dt class="param">path</dt><dd class="cmt"><p>hadoop directory where this data object reads/writes it's files. If it doesn't contain scheme and authority,
+            the connections pathPrefix is applied. If pathPrefix is not defined or doesn't define scheme and authority,
+            default schema and authority is applied.</p></dd><dt class="param">partitions</dt><dd class="cmt"><p>partition columns for this data object</p></dd><dt class="param">saveMode</dt><dd class="cmt"><p>spark <span class="extype" name="SaveMode">SaveMode</span> to use when writing files, default is &quot;overwrite&quot;</p></dd><dt class="param">acl</dt><dd class="cmt"><p>override connections permissions for files created with this connection</p></dd><dt class="param">connectionId</dt><dd class="cmt"><p>optional id of <a href="../connection/HadoopFileConnection.html" class="extype" name="io.smartdatalake.workflow.connection.HadoopFileConnection">io.smartdatalake.workflow.connection.HadoopFileConnection</a></p></dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.QueryTimeInterval" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="QueryTimeIntervalextendsProductwithSerializable"></a>
+      <a id="QueryTimeInterval:QueryTimeInterval"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="QueryTimeInterval.html"><span class="name">QueryTimeInterval</span></a><span class="params">(<span name="from">from: <span class="extype" name="java.time.LocalDateTime">LocalDateTime</span></span>, <span name="to">to: <span class="extype" name="java.time.LocalDateTime">LocalDateTime</span></span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@QueryTimeIntervalextendsProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.RawFileDataObject" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="RawFileDataObjectextendsHadoopFileDataObjectwithProductwithSerializable"></a>
+      <a id="RawFileDataObject:RawFileDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="RawFileDataObject.html"><span class="name">RawFileDataObject</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</span>] = <span class="symbol">None</span></span>, <span name="connectionId">connectionId: <span class="extype" name="scala.Option">Option</span>[<a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.HadoopFileDataObject">HadoopFileDataObject</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@RawFileDataObjectextendsHadoopFileDataObjectwithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">DataObject of type raw for files with unknown content.</p><div class="fullcomment"><div class="comment cmt"><p>DataObject of type raw for files with unknown content.
+Provides details to an Action to access raw files.
+</p></div></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="SFtpFileRefDataObjectextendsFileRefDataObjectwithCanCreateInputStreamwithCanCreateOutputStreamwithSmartDataLakeLoggerwithProductwithSerializable"></a>
+      <a id="SFtpFileRefDataObject:SFtpFileRefDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="SFtpFileRefDataObject.html"><span class="name">SFtpFileRefDataObject</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="connectionId">connectionId: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="partitionLayout">partitionLayout: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.FileRefDataObject">FileRefDataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateInputStream">CanCreateInputStream</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateOutputStream">CanCreateOutputStream</span> with <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@SFtpFileRefDataObjectextendsFileRefDataObjectwithCanCreateInputStreamwithCanCreateOutputStreamwithSmartDataLakeLoggerwithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Connects to SFtp files
+Needs java library &quot;com.hieronymus % sshj % 0.21.1&quot;
+The following authentication mechanisms are supported
+-&gt; public/private-key: private key must be saved in ~/.ssh, public key must be registered on server.</p><div class="fullcomment"><div class="comment cmt"><p>Connects to SFtp files
+Needs java library &quot;com.hieronymus % sshj % 0.21.1&quot;
+The following authentication mechanisms are supported
+-&gt; public/private-key: private key must be saved in ~/.ssh, public key must be registered on server.
+-&gt; user/pwd authentication: user and password is taken from two variables set as parameters.
+                            These variables could come from clear text (CLEAR), a file (FILE) or an environment variable (ENV)
+</p></div><dl class="paramcmts block"><dt class="param">partitionLayout</dt><dd class="cmt"><p>partition layout defines how partition values can be extracted from the path.
+                        Use &quot;%&lt;colname&gt;%&quot; as token to extract the value for a partition column.
+                        With &quot;%&lt;colname:regex&gt;%&quot; a regex can be given to limit search. This is especially useful
+                        if there is no char to delimit the last token from the rest of the path or also between
+                        two tokens.</p></dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.SplunkDataObject" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="SplunkDataObjectextendsDataObjectwithCanCreateDataFramewithSplunkServicewithProductwithSerializable"></a>
+      <a id="SplunkDataObject:SplunkDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="SplunkDataObject.html"><span class="name">SplunkDataObject</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="params">params: <a href="SplunkParams.html" class="extype" name="io.smartdatalake.workflow.dataobject.SplunkParams">SplunkParams</a></span>, <span name="connectionId">connectionId: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame">CanCreateDataFrame</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.SplunkService">SplunkService</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@SplunkDataObjectextendsDataObjectwithCanCreateDataFramewithSplunkServicewithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt"><span class="extype" name="DataObject">DataObject</span> of type Splunk.</p><div class="fullcomment"><div class="comment cmt"><p><span class="extype" name="DataObject">DataObject</span> of type Splunk.
+Provides details to an action to access Splunk logs.
+</p></div></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.SplunkParams" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="SplunkParamsextendsProductwithSerializable"></a>
+      <a id="SplunkParams:SplunkParams"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="SplunkParams.html"><span class="name">SplunkParams</span></a><span class="params">(<span name="query">query: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="queryFrom">queryFrom: <span class="extype" name="java.time.LocalDateTime">LocalDateTime</span></span>, <span name="queryTo">queryTo: <span class="extype" name="java.time.LocalDateTime">LocalDateTime</span></span>, <span name="queryTimeInterval">queryTimeInterval: <span class="extype" name="java.time.Duration">Duration</span> = <span class="symbol">ofMinutes(10)</span></span>, <span name="columnNames">columnNames: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq(&quot;_raw&quot;, &quot;_time&quot;)</span></span>, <span name="parallelRequests">parallelRequests: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">2</span></span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@SplunkParamsextendsProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.Table" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="TableextendsProductwithSerializable"></a>
+      <a id="Table:Table"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="Table.html"><span class="name">Table</span></a><span class="params">(<span name="db">db: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>, <span name="name">name: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="query">query: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="primaryKey">primaryKey: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="options">options: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@TableextendsProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Table attributes
+</p><div class="fullcomment"><div class="comment cmt"><p>Table attributes
+</p></div><dl class="paramcmts block"><dt class="param">db</dt><dd class="cmt"><p>optional override of db defined by connection</p></dd><dt class="param">name</dt><dd class="cmt"><p>table name</p></dd><dt class="param">query</dt><dd class="cmt"><p>optional select query</p></dd><dt class="param">primaryKey</dt><dd class="cmt"><p>optional sequence of primary key columns</p></dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="TickTockHiveTableDataObjectextendsTransactionalSparkTableDataObjectwithCanHandlePartitionswithSmartDataLakeLoggerwithProductwithSerializable"></a>
+      <a id="TickTockHiveTableDataObject:TickTockHiveTableDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="TickTockHiveTableDataObject.html"><span class="name">TickTockHiveTableDataObject</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="analyzeTableAfterWrite">analyzeTableAfterWrite: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="dateColumnType">dateColumnType: <a href="../../definitions/DateColumnType$.html#DateColumnType=io.smartdatalake.definitions.DateColumnType.Value" class="extmbr" name="io.smartdatalake.definitions.DateColumnType.DateColumnType">DateColumnType</a> = <span class="symbol"><span class="name"><a href="../../../package.html">DateColumnType.Date</a></span></span></span>, <span name="table">table: <a href="Table.html" class="extype" name="io.smartdatalake.workflow.dataobject.Table">Table</a></span>, <span name="numInitialHdfsPartitions">numInitialHdfsPartitions: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">16</span></span>, <span name="saveMode">saveMode: <span class="extype" name="org.apache.spark.sql.SaveMode">SaveMode</span> = <span class="symbol">SaveMode.Overwrite</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</span>] = <span class="symbol">None</span></span>, <span name="connectionId">connectionId: <span class="extype" name="scala.Option">Option</span>[<a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.TransactionalSparkTableDataObject">TransactionalSparkTableDataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanHandlePartitions">CanHandlePartitions</span> with <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@TickTockHiveTableDataObjectextendsTransactionalSparkTableDataObjectwithCanHandlePartitionswithSmartDataLakeLoggerwithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.WebserviceFileDataObject" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="WebserviceFileDataObjectextendsFileRefDataObjectwithCanCreateInputStreamwithSmartDataLakeLoggerwithProductwithSerializable"></a>
+      <a id="WebserviceFileDataObject:WebserviceFileDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="WebserviceFileDataObject.html"><span class="name">WebserviceFileDataObject</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="webserviceOptions">webserviceOptions: <a href="WebserviceOptions.html" class="extype" name="io.smartdatalake.workflow.dataobject.WebserviceOptions">WebserviceOptions</a></span>, <span name="partitionDefs">partitionDefs: <span class="extype" name="scala.Seq">Seq</span>[<a href="WebservicePartitionDefinition.html" class="extype" name="io.smartdatalake.workflow.dataobject.WebservicePartitionDefinition">WebservicePartitionDefinition</a>] = <span class="symbol">Seq()</span></span>, <span name="partitionLayout">partitionLayout: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.FileRefDataObject">FileRefDataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateInputStream">CanCreateInputStream</span> with <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@WebserviceFileDataObjectextendsFileRefDataObjectwithCanCreateInputStreamwithSmartDataLakeLoggerwithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt"><span class="extype" name="DataObject">DataObject</span> to call webservice and return response as InputStream
+This is implemented as FileRefDataObject because the response is treated as some file content.</p><div class="fullcomment"><div class="comment cmt"><p><span class="extype" name="DataObject">DataObject</span> to call webservice and return response as InputStream
+This is implemented as FileRefDataObject because the response is treated as some file content.
+FileRefDataObjects support partitioned data. For a WebserviceFileDataObject partitions are mapped as query parameters to create query string.
+All possible query parameter values must be given in configuration.</p></div><dl class="paramcmts block"><dt class="param">partitionDefs</dt><dd class="cmt"><p>list of partitions with list of possible values for every entry</p></dd><dt class="param">partitionLayout</dt><dd class="cmt"><p>definition of partitions in query string. Use %&lt;partitionColName&gt;% as placeholder for partition column value in layout.</p></dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.WebserviceOptions" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="WebserviceOptionsextendsProductwithSerializable"></a>
+      <a id="WebserviceOptions:WebserviceOptions"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="WebserviceOptions.html"><span class="name">WebserviceOptions</span></a><span class="params">(<span name="url">url: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="connectionTimeoutMs">connectionTimeoutMs: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="readTimeoutMs">readTimeoutMs: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="authHeader">authHeader: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="clientIdVariable">clientIdVariable: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="clientSecretVariable">clientSecretVariable: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="keycloakAuth">keycloakAuth: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.util.webservice.KeycloakConfig">KeycloakConfig</span>] = <span class="symbol">None</span></span>, <span name="userVariable">userVariable: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="passwordVariable">passwordVariable: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="token">token: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@WebserviceOptionsextendsProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.WebservicePartitionDefinition" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="WebservicePartitionDefinitionextendsProductwithSerializable"></a>
+      <a id="WebservicePartitionDefinition:WebservicePartitionDefinition"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="WebservicePartitionDefinition.html"><span class="name">WebservicePartitionDefinition</span></a><span class="params">(<span name="name">name: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="values">values: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@WebservicePartitionDefinitionextendsProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.XmlFileDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="XmlFileDataObjectextendsSparkFileDataObjectwithCanCreateDataFramewithCanWriteDataFramewithProductwithSerializable"></a>
+      <a id="XmlFileDataObject:XmlFileDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="XmlFileDataObject.html"><span class="name">XmlFileDataObject</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="rowTag">rowTag: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="xmlOptions">xmlOptions: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="saveMode">saveMode: <span class="extype" name="org.apache.spark.sql.SaveMode">SaveMode</span> = <span class="symbol">SaveMode.Overwrite</span></span>, <span name="flatten">flatten: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</span>] = <span class="symbol">None</span></span>, <span name="connectionId">connectionId: <span class="extype" name="scala.Option">Option</span>[<a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.SparkFileDataObject">SparkFileDataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame">CanCreateDataFrame</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame">CanWriteDataFrame</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@XmlFileDataObjectextendsSparkFileDataObjectwithCanCreateDataFramewithCanWriteDataFramewithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li></ol>
+            </div>
+
+        
+
+        <div id="values" class="values members">
+              <h3>Value Members</h3>
+              <ol><li name="io.smartdatalake.workflow.dataobject.AccessTableDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="AccessTableDataObject"></a>
+      <a id="AccessTableDataObject:AccessTableDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="AccessTableDataObject$.html"><span class="name">AccessTableDataObject</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>] with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@AccessTableDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.ActionsExporterDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="ActionsExporterDataObject"></a>
+      <a id="ActionsExporterDataObject:ActionsExporterDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="ActionsExporterDataObject$.html"><span class="name">ActionsExporterDataObject</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<a href="ActionsExporterDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.ActionsExporterDataObject">ActionsExporterDataObject</a>] with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@ActionsExporterDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.AvroFileDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="AvroFileDataObject"></a>
+      <a id="AvroFileDataObject:AvroFileDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="AvroFileDataObject$.html"><span class="name">AvroFileDataObject</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>] with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@AvroFileDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.CsvFileDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="CsvFileDataObject"></a>
+      <a id="CsvFileDataObject:CsvFileDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="CsvFileDataObject$.html"><span class="name">CsvFileDataObject</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>] with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@CsvFileDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.CustomDfDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="CustomDfDataObject"></a>
+      <a id="CustomDfDataObject:CustomDfDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="CustomDfDataObject$.html"><span class="name">CustomDfDataObject</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>] with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@CustomDfDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.DataObjectsExporterDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="DataObjectsExporterDataObject"></a>
+      <a id="DataObjectsExporterDataObject:DataObjectsExporterDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="DataObjectsExporterDataObject$.html"><span class="name">DataObjectsExporterDataObject</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<a href="DataObjectsExporterDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectsExporterDataObject">DataObjectsExporterDataObject</a>] with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@DataObjectsExporterDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.ExcelFileDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="ExcelFileDataObject"></a>
+      <a id="ExcelFileDataObject:ExcelFileDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="ExcelFileDataObject$.html"><span class="name">ExcelFileDataObject</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>] with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@ExcelFileDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.HiveTableDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="HiveTableDataObject"></a>
+      <a id="HiveTableDataObject:HiveTableDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="HiveTableDataObject$.html"><span class="name">HiveTableDataObject</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>] with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@HiveTableDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.JdbcTableDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="JdbcTableDataObject"></a>
+      <a id="JdbcTableDataObject:JdbcTableDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="JdbcTableDataObject$.html"><span class="name">JdbcTableDataObject</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>] with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@JdbcTableDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.JmsDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="JmsDataObject"></a>
+      <a id="JmsDataObject:JmsDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="JmsDataObject$.html"><span class="name">JmsDataObject</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>] with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@JmsDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.JsonFileDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="JsonFileDataObject"></a>
+      <a id="JsonFileDataObject:JsonFileDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="JsonFileDataObject$.html"><span class="name">JsonFileDataObject</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>] with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@JsonFileDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.PKViolatorsDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="PKViolatorsDataObject"></a>
+      <a id="PKViolatorsDataObject:PKViolatorsDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="PKViolatorsDataObject$.html"><span class="name">PKViolatorsDataObject</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<a href="PKViolatorsDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.PKViolatorsDataObject">PKViolatorsDataObject</a>] with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@PKViolatorsDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.ParquetFileDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="ParquetFileDataObject"></a>
+      <a id="ParquetFileDataObject:ParquetFileDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="ParquetFileDataObject$.html"><span class="name">ParquetFileDataObject</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>] with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@ParquetFileDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.RawFileDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="RawFileDataObject"></a>
+      <a id="RawFileDataObject:RawFileDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="RawFileDataObject$.html"><span class="name">RawFileDataObject</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>] with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@RawFileDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="SFtpFileRefDataObject"></a>
+      <a id="SFtpFileRefDataObject:SFtpFileRefDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="SFtpFileRefDataObject$.html"><span class="name">SFtpFileRefDataObject</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>] with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@SFtpFileRefDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.SplunkDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="SplunkDataObject"></a>
+      <a id="SplunkDataObject:SplunkDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="SplunkDataObject$.html"><span class="name">SplunkDataObject</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>] with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@SplunkDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.SplunkFormatter" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="SplunkFormatter"></a>
+      <a id="SplunkFormatter:SplunkFormatter"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="SplunkFormatter$.html"><span class="name">SplunkFormatter</span></a>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@SplunkFormatter" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.SplunkParams" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="SplunkParams"></a>
+      <a id="SplunkParams:SplunkParams"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="SplunkParams$.html"><span class="name">SplunkParams</span></a><span class="result"> extends <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@SplunkParams" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="TickTockHiveTableDataObject"></a>
+      <a id="TickTockHiveTableDataObject:TickTockHiveTableDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="TickTockHiveTableDataObject$.html"><span class="name">TickTockHiveTableDataObject</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>] with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@TickTockHiveTableDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.WebserviceFileDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="WebserviceFileDataObject"></a>
+      <a id="WebserviceFileDataObject:WebserviceFileDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="WebserviceFileDataObject$.html"><span class="name">WebserviceFileDataObject</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>] with <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@WebserviceFileDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.XmlFileDataObject" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="XmlFileDataObject"></a>
+      <a id="XmlFileDataObject:XmlFileDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="XmlFileDataObject$.html"><span class="name">XmlFileDataObject</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>] with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.package@XmlFileDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li></ol>
+            </div>
+
+        
+
+        
+        </div>
+
+        <div id="inheritedMembers">
+        
+        
+        </div>
+
+        <div id="groupedMembers">
+        <div class="group" name="Ungrouped">
+              <h3>Ungrouped</h3>
+              
+            </div>
+        </div>
+
+      </div>
+
+      <div id="tooltip"></div>
+
+      <div id="footer">  </div>
+
+
+    </body>
+      </html>

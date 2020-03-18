@@ -1,0 +1,274 @@
+<!DOCTYPE html >
+<html>
+        <head>
+          <title>customlogic - Smart Data Lake 1.0.0-SNAPSHOT API - io.smartdatalake.workflow.action.customlogic</title>
+          <meta name="description" content="customlogic - Smart Data Lake 1.0.0 - SNAPSHOT API - io.smartdatalake.workflow.action.customlogic" />
+          <meta name="keywords" content="customlogic Smart Data Lake 1.0.0 SNAPSHOT API io.smartdatalake.workflow.action.customlogic" />
+          <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+          
+      <link href="../../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
+      <link href="../../../../../lib/diagrams.css" media="screen" type="text/css" rel="stylesheet" id="diagrams-css" />
+      <script type="text/javascript" src="../../../../../lib/jquery.js" id="jquery-js"></script>
+      <script type="text/javascript" src="../../../../../lib/jquery-ui.js"></script>
+      <script type="text/javascript" src="../../../../../lib/template.js"></script>
+      <script type="text/javascript" src="../../../../../lib/tools.tooltip.js"></script>
+      
+      <script type="text/javascript">
+         if(top === self) {
+            var url = '../../../../../index.html';
+            var hash = 'io.smartdatalake.workflow.action.customlogic.package';
+            var anchor = window.location.hash;
+            var anchor_opt = '';
+            if (anchor.length >= 1)
+              anchor_opt = '@' + anchor.substring(1);
+            window.location.href = url + '#' + hash + anchor_opt;
+         }
+   	  </script>
+    
+        </head>
+        <body class="value">
+      <div id="definition">
+        <img alt="Package" src="../../../../../lib/package_big.png" />
+        <p id="owner"><a href="../../../../package.html" class="extype" name="io">io</a>.<a href="../../../package.html" class="extype" name="io.smartdatalake">smartdatalake</a>.<a href="../../package.html" class="extype" name="io.smartdatalake.workflow">workflow</a>.<a href="../package.html" class="extype" name="io.smartdatalake.workflow.action">action</a></p>
+        <h1>customlogic</h1><span class="permalink">
+      <a href="../../../../../index.html#io.smartdatalake.workflow.action.customlogic.package" title="Permalink" target="_top">
+        <img src="../../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      </div>
+
+      <h4 id="signature" class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">package</span>
+      </span>
+      <span class="symbol">
+        <span class="name">customlogic</span>
+      </span>
+      </h4>
+      
+          <div id="comment" class="fullcommenttop"></div>
+        
+
+      <div id="mbrsel">
+        <div id="textfilter"><span class="pre"></span><span class="input"><input id="mbrsel-input" type="text" accesskey="/" /></span><span class="post"></span></div>
+        
+        
+        <div id="visbl">
+            <span class="filtertype">Visibility</span>
+            <ol><li class="public in"><span>Public</span></li><li class="all out"><span>All</span></li></ol>
+          </div>
+      </div>
+
+      <div id="template">
+        <div id="allMembers">
+        
+
+        <div id="types" class="types members">
+              <h3>Type Members</h3>
+              <ol><li name="io.smartdatalake.workflow.action.customlogic.CustomDfCreator" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
+      <a id="CustomDfCreatorextendsSerializable"></a>
+      <a id="CustomDfCreator:CustomDfCreator"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="CustomDfCreator.html"><span class="name">CustomDfCreator</span></a><span class="result"> extends <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../../index.html#io.smartdatalake.workflow.action.customlogic.package@CustomDfCreatorextendsSerializable" title="Permalink" target="_top">
+        <img src="../../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Interface to define custom logic for DataFrame transformations
+</p>
+    </li><li name="io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="CustomDfCreatorConfigextendsProductwithSerializable"></a>
+      <a id="CustomDfCreatorConfig:CustomDfCreatorConfig"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="CustomDfCreatorConfig.html"><span class="name">CustomDfCreatorConfig</span></a><span class="params">(<span name="className">className: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="scalaFile">scalaFile: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="scalaCode">scalaCode: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="options">options: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../../index.html#io.smartdatalake.workflow.action.customlogic.package@CustomDfCreatorConfigextendsProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.action.customlogic.CustomDfCreatorWrapper" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="CustomDfCreatorWrapperextendsCustomDfCreator"></a>
+      <a id="CustomDfCreatorWrapper:CustomDfCreatorWrapper"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="CustomDfCreatorWrapper.html"><span class="name">CustomDfCreatorWrapper</span></a><span class="result"> extends <a href="CustomDfCreator.html" class="extype" name="io.smartdatalake.workflow.action.customlogic.CustomDfCreator">CustomDfCreator</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../../index.html#io.smartdatalake.workflow.action.customlogic.package@CustomDfCreatorWrapperextendsCustomDfCreator" title="Permalink" target="_top">
+        <img src="../../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.action.customlogic.CustomDfTransformer" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
+      <a id="CustomDfTransformerextendsSerializable"></a>
+      <a id="CustomDfTransformer:CustomDfTransformer"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="CustomDfTransformer.html"><span class="name">CustomDfTransformer</span></a><span class="result"> extends <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../../index.html#io.smartdatalake.workflow.action.customlogic.package@CustomDfTransformerextendsSerializable" title="Permalink" target="_top">
+        <img src="../../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Interface to define custom logic for a DataFrame
+</p>
+    </li><li name="io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="CustomDfTransformerConfigextendsProductwithSerializable"></a>
+      <a id="CustomDfTransformerConfig:CustomDfTransformerConfig"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="CustomDfTransformerConfig.html"><span class="name">CustomDfTransformerConfig</span></a><span class="params">(<span name="className">className: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="scalaFile">scalaFile: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="scalaCode">scalaCode: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="options">options: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Map()</span></span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../../index.html#io.smartdatalake.workflow.action.customlogic.package@CustomDfTransformerConfigextendsProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
+      <a id="CustomDfsTransformerextendsSerializable"></a>
+      <a id="CustomDfsTransformer:CustomDfsTransformer"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="CustomDfsTransformer.html"><span class="name">CustomDfsTransformer</span></a><span class="result"> extends <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../../index.html#io.smartdatalake.workflow.action.customlogic.package@CustomDfsTransformerextendsSerializable" title="Permalink" target="_top">
+        <img src="../../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Same trait as <a href="CustomDfTransformer.html" class="extype" name="io.smartdatalake.workflow.action.customlogic.CustomDfTransformer">CustomDfTransformer</a> but supported multiple input and outputs.</p>
+    </li><li name="io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="CustomDfsTransformerConfigextendsProductwithSerializable"></a>
+      <a id="CustomDfsTransformerConfig:CustomDfsTransformerConfig"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="CustomDfsTransformerConfig.html"><span class="name">CustomDfsTransformerConfig</span></a><span class="params">(<span name="className">className: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="scalaFile">scalaFile: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="scalaCode">scalaCode: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="options">options: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Map()</span></span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../../index.html#io.smartdatalake.workflow.action.customlogic.package@CustomDfsTransformerConfigextendsProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.action.customlogic.CustomFileTransformer" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
+      <a id="CustomFileTransformerextendsSerializable"></a>
+      <a id="CustomFileTransformer:CustomFileTransformer"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="CustomFileTransformer.html"><span class="name">CustomFileTransformer</span></a><span class="result"> extends <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../../index.html#io.smartdatalake.workflow.action.customlogic.package@CustomFileTransformerextendsSerializable" title="Permalink" target="_top">
+        <img src="../../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Interface to define custom file transformation for CustomFileAction
+</p>
+    </li><li name="io.smartdatalake.workflow.action.customlogic.CustomFileTransformerConfig" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="CustomFileTransformerConfigextendsProductwithSerializable"></a>
+      <a id="CustomFileTransformerConfig:CustomFileTransformerConfig"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="CustomFileTransformerConfig.html"><span class="name">CustomFileTransformerConfig</span></a><span class="params">(<span name="className">className: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="scalaFile">scalaFile: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="scalaCode">scalaCode: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../../index.html#io.smartdatalake.workflow.action.customlogic.package@CustomFileTransformerConfigextendsProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.action.customlogic.CustomFileTransformerWrapper" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="CustomFileTransformerWrapperextendsCustomFileTransformerwithSmartDataLakeLogger"></a>
+      <a id="CustomFileTransformerWrapper:CustomFileTransformerWrapper"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="CustomFileTransformerWrapper.html"><span class="name">CustomFileTransformerWrapper</span></a><span class="result"> extends <a href="CustomFileTransformer.html" class="extype" name="io.smartdatalake.workflow.action.customlogic.CustomFileTransformer">CustomFileTransformer</a> with <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../../index.html#io.smartdatalake.workflow.action.customlogic.package@CustomFileTransformerWrapperextendsCustomFileTransformerwithSmartDataLakeLogger" title="Permalink" target="_top">
+        <img src="../../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li></ol>
+            </div>
+
+        
+
+        
+
+        
+
+        
+        </div>
+
+        <div id="inheritedMembers">
+        
+        
+        </div>
+
+        <div id="groupedMembers">
+        <div class="group" name="Ungrouped">
+              <h3>Ungrouped</h3>
+              
+            </div>
+        </div>
+
+      </div>
+
+      <div id="tooltip"></div>
+
+      <div id="footer">  </div>
+
+
+    </body>
+      </html>

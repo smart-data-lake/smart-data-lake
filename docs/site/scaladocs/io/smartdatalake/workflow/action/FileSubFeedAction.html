@@ -1,0 +1,906 @@
+<!DOCTYPE html >
+<html>
+        <head>
+          <title>FileSubFeedAction - Smart Data Lake 1.0.0-SNAPSHOT API - io.smartdatalake.workflow.action.FileSubFeedAction</title>
+          <meta name="description" content="FileSubFeedAction - Smart Data Lake 1.0.0 - SNAPSHOT API - io.smartdatalake.workflow.action.FileSubFeedAction" />
+          <meta name="keywords" content="FileSubFeedAction Smart Data Lake 1.0.0 SNAPSHOT API io.smartdatalake.workflow.action.FileSubFeedAction" />
+          <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+          
+      <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
+      <link href="../../../../lib/diagrams.css" media="screen" type="text/css" rel="stylesheet" id="diagrams-css" />
+      <script type="text/javascript" src="../../../../lib/jquery.js" id="jquery-js"></script>
+      <script type="text/javascript" src="../../../../lib/jquery-ui.js"></script>
+      <script type="text/javascript" src="../../../../lib/template.js"></script>
+      <script type="text/javascript" src="../../../../lib/tools.tooltip.js"></script>
+      
+      <script type="text/javascript">
+         if(top === self) {
+            var url = '../../../../index.html';
+            var hash = 'io.smartdatalake.workflow.action.FileSubFeedAction';
+            var anchor = window.location.hash;
+            var anchor_opt = '';
+            if (anchor.length >= 1)
+              anchor_opt = '@' + anchor.substring(1);
+            window.location.href = url + '#' + hash + anchor_opt;
+         }
+   	  </script>
+    
+        </head>
+        <body class="type">
+      <div id="definition">
+        <img alt="Class" src="../../../../lib/class_big.png" />
+        <p id="owner"><a href="../../../package.html" class="extype" name="io">io</a>.<a href="../../package.html" class="extype" name="io.smartdatalake">smartdatalake</a>.<a href="../package.html" class="extype" name="io.smartdatalake.workflow">workflow</a>.<a href="package.html" class="extype" name="io.smartdatalake.workflow.action">action</a></p>
+        <h1>FileSubFeedAction</h1><h3><span class="morelinks"><div>Related Doc:
+            <a href="package.html" class="extype" name="io.smartdatalake.workflow.action">package action</a>
+          </div></span></h3><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      </div>
+
+      <h4 id="signature" class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">abstract </span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <span class="name">FileSubFeedAction</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.action.Action">Action</span></span>
+      </span>
+      </h4>
+      
+          <div id="comment" class="fullcommenttop"><div class="toggleContainer block">
+          <span class="toggle">Linear Supertypes</span>
+          <div class="superTypes hiddenContent"><span class="extype" name="io.smartdatalake.workflow.action.Action">Action</span>, <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span>, <span class="extype" name="io.smartdatalake.workflow.DAGNode">DAGNode</span>, <span class="extype" name="io.smartdatalake.config.ParsableFromConfig">ParsableFromConfig</span>[<span class="extype" name="io.smartdatalake.workflow.action.Action">Action</span>], <span class="extype" name="io.smartdatalake.config.SdlConfigObject">SdlConfigObject</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
+        </div><div class="toggleContainer block">
+            <span class="toggle">Known Subclasses</span>
+            <div class="subClasses hiddenContent"><a href="CustomFileAction.html" class="extype" name="io.smartdatalake.workflow.action.CustomFileAction">CustomFileAction</a>, <a href="FileTransferAction.html" class="extype" name="io.smartdatalake.workflow.action.FileTransferAction">FileTransferAction</a></div>
+          </div></div>
+        
+
+      <div id="mbrsel">
+        <div id="textfilter"><span class="pre"></span><span class="input"><input id="mbrsel-input" type="text" accesskey="/" /></span><span class="post"></span></div>
+        <div id="order">
+              <span class="filtertype">Ordering</span>
+              <ol>
+                
+                <li class="alpha in"><span>Alphabetic</span></li>
+                <li class="inherit out"><span>By Inheritance</span></li>
+              </ol>
+            </div>
+        <div id="ancestors">
+                <span class="filtertype">Inherited<br />
+                </span>
+                <ol id="linearization">
+                  <li class="in" name="io.smartdatalake.workflow.action.FileSubFeedAction"><span>FileSubFeedAction</span></li><li class="in" name="io.smartdatalake.workflow.action.Action"><span>Action</span></li><li class="in" name="io.smartdatalake.util.misc.SmartDataLakeLogger"><span>SmartDataLakeLogger</span></li><li class="in" name="io.smartdatalake.workflow.DAGNode"><span>DAGNode</span></li><li class="in" name="io.smartdatalake.config.ParsableFromConfig"><span>ParsableFromConfig</span></li><li class="in" name="io.smartdatalake.config.SdlConfigObject"><span>SdlConfigObject</span></li><li class="in" name="scala.AnyRef"><span>AnyRef</span></li><li class="in" name="scala.Any"><span>Any</span></li>
+                </ol>
+              </div><div id="ancestors">
+            <span class="filtertype"></span>
+            <ol>
+              <li class="hideall out"><span>Hide All</span></li>
+              <li class="showall in"><span>Show All</span></li>
+            </ol>
+          </div>
+        <div id="visbl">
+            <span class="filtertype">Visibility</span>
+            <ol><li class="public in"><span>Public</span></li><li class="all out"><span>All</span></li></ol>
+          </div>
+      </div>
+
+      <div id="template">
+        <div id="allMembers">
+        <div id="constructors" class="members">
+              <h3>Instance Constructors</h3>
+              <ol><li name="io.smartdatalake.workflow.action.FileSubFeedAction#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="&lt;init&gt;():io.smartdatalake.workflow.action.FileSubFeedAction"></a>
+      <a id="&lt;init&gt;:FileSubFeedAction"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">new</span>
+      </span>
+      <span class="symbol">
+        <span class="name">FileSubFeedAction</span><span class="params">()</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@&lt;init&gt;():io.smartdatalake.workflow.action.FileSubFeedAction" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li></ol>
+            </div>
+
+        
+
+        <div id="values" class="values members">
+              <h3>Abstract Value Members</h3>
+              <ol><li name="io.smartdatalake.workflow.action.FileSubFeedAction#breakFileRefLineage" visbl="pub" data-isabs="true" fullComment="yes" group="Ungrouped">
+      <a id="breakFileRefLineage:Boolean"></a>
+      <a id="breakFileRefLineage:Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">abstract </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">breakFileRefLineage</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@breakFileRefLineage:Boolean" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Stop propagating input FileRefs through action and instead get new FileRefs from DataObject according to the SubFeed's partitionValue.</p><div class="fullcomment"><div class="comment cmt"><p>Stop propagating input FileRefs through action and instead get new FileRefs from DataObject according to the SubFeed's partitionValue.
+This is needed to reprocess all files of a path/partition instead of the FileRef's passed from the previous Action.
+</p></div></div>
+    </li><li name="io.smartdatalake.workflow.action.FileSubFeedAction#execSubFeed" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
+      <a id="execSubFeed(subFeeds:io.smartdatalake.workflow.FileSubFeed)(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):io.smartdatalake.workflow.FileSubFeed"></a>
+      <a id="execSubFeed(FileSubFeed)(SparkSession,ActionPipelineContext):FileSubFeed"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">abstract </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">execSubFeed</span><span class="params">(<span name="subFeeds">subFeeds: <a href="../FileSubFeed.html" class="extype" name="io.smartdatalake.workflow.FileSubFeed">FileSubFeed</a></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <a href="../FileSubFeed.html" class="extype" name="io.smartdatalake.workflow.FileSubFeed">FileSubFeed</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@execSubFeed(subFeeds:io.smartdatalake.workflow.FileSubFeed)(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):io.smartdatalake.workflow.FileSubFeed" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.config.ParsableFromConfig#factory" visbl="pub" data-isabs="true" fullComment="yes" group="Ungrouped">
+      <a id="factory:io.smartdatalake.config.FromConfigFactory[CO]"></a>
+      <a id="factory:FromConfigFactory[Action]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">abstract </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">factory</span><span class="result">: <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<span class="extype" name="io.smartdatalake.workflow.action.Action">Action</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@factory:io.smartdatalake.config.FromConfigFactory[CO]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Returns the factory that can parse this type (that is, type <code>CO</code>).</p><div class="fullcomment"><div class="comment cmt"><p>Returns the factory that can parse this type (that is, type <code>CO</code>).</p><p>Typically, implementations of this method should return the companion object of the implementing class.
+The companion object in turn should implement <span class="extype" name="FromConfigFactory">FromConfigFactory</span>.
+</p></div><dl class="paramcmts block"><dt>returns</dt><dd class="cmt"><p>the factory (object) for this class.</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd>ParsableFromConfig</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.Action#id" visbl="pub" data-isabs="true" fullComment="yes" group="Ungrouped">
+      <a id="id:io.smartdatalake.config.SdlConfigObject.ActionObjectId"></a>
+      <a id="id:ActionObjectId"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">abstract </span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">id</span><span class="result">: <a href="../../config/SdlConfigObject$$ActionObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ActionObjectId">ActionObjectId</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@id:io.smartdatalake.config.SdlConfigObject.ActionObjectId" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">A unique identifier for this instance.</p><div class="fullcomment"><div class="comment cmt"><p>A unique identifier for this instance.
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action → SdlConfigObject</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.FileSubFeedAction#initSubFeed" visbl="pub" data-isabs="true" fullComment="yes" group="Ungrouped">
+      <a id="initSubFeed(subFeed:io.smartdatalake.workflow.FileSubFeed)(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):io.smartdatalake.workflow.FileSubFeed"></a>
+      <a id="initSubFeed(FileSubFeed)(SparkSession,ActionPipelineContext):FileSubFeed"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">abstract </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">initSubFeed</span><span class="params">(<span name="subFeed">subFeed: <a href="../FileSubFeed.html" class="extype" name="io.smartdatalake.workflow.FileSubFeed">FileSubFeed</a></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <a href="../FileSubFeed.html" class="extype" name="io.smartdatalake.workflow.FileSubFeed">FileSubFeed</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@initSubFeed(subFeed:io.smartdatalake.workflow.FileSubFeed)(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):io.smartdatalake.workflow.FileSubFeed" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Initialize Action with a <a href="../FileSubFeed.html" class="extype" name="io.smartdatalake.workflow.FileSubFeed">FileSubFeed</a> to be processed
+</p><div class="fullcomment"><div class="comment cmt"><p>Initialize Action with a <a href="../FileSubFeed.html" class="extype" name="io.smartdatalake.workflow.FileSubFeed">FileSubFeed</a> to be processed
+</p></div><dl class="paramcmts block"><dt class="param">subFeed</dt><dd class="cmt"><p>subFeed to be processed (referencing files to be read)</p></dd><dt>returns</dt><dd class="cmt"><p>processed subFeed (referencing files written by this action)</p></dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.Action#inputs" visbl="pub" data-isabs="true" fullComment="yes" group="Ungrouped">
+      <a id="inputs:Seq[io.smartdatalake.workflow.dataobject.DataObject]"></a>
+      <a id="inputs:Seq[DataObject]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">abstract </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">inputs</span><span class="result">: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@inputs:Seq[io.smartdatalake.workflow.dataobject.DataObject]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Input <span class="extype" name="DataObject">DataObject</span>s
+To be implemented by subclasses
+</p><div class="fullcomment"><div class="comment cmt"><p>Input <span class="extype" name="DataObject">DataObject</span>s
+To be implemented by subclasses
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.Action#metadata" visbl="pub" data-isabs="true" fullComment="yes" group="Ungrouped">
+      <a id="metadata:Option[io.smartdatalake.workflow.action.ActionMetadata]"></a>
+      <a id="metadata:Option[ActionMetadata]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">abstract </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">metadata</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.action.ActionMetadata">ActionMetadata</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@metadata:Option[io.smartdatalake.workflow.action.ActionMetadata]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Additional metadata for the Action
+</p><div class="fullcomment"><div class="comment cmt"><p>Additional metadata for the Action
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.Action#outputs" visbl="pub" data-isabs="true" fullComment="yes" group="Ungrouped">
+      <a id="outputs:Seq[io.smartdatalake.workflow.dataobject.DataObject]"></a>
+      <a id="outputs:Seq[DataObject]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">abstract </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">outputs</span><span class="result">: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@outputs:Seq[io.smartdatalake.workflow.dataobject.DataObject]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Output <span class="extype" name="DataObject">DataObject</span>s
+To be implemented by subclasses
+</p><div class="fullcomment"><div class="comment cmt"><p>Output <span class="extype" name="DataObject">DataObject</span>s
+To be implemented by subclasses
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.FileSubFeedAction#postExecSubFeed" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
+      <a id="postExecSubFeed(inputSubFeed:io.smartdatalake.workflow.SubFeed,outputSubFeed:io.smartdatalake.workflow.SubFeed)(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
+      <a id="postExecSubFeed(SubFeed,SubFeed)(SparkSession,ActionPipelineContext):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">abstract </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">postExecSubFeed</span><span class="params">(<span name="inputSubFeed">inputSubFeed: <a href="../SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a></span>, <span name="outputSubFeed">outputSubFeed: <a href="../SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@postExecSubFeed(inputSubFeed:io.smartdatalake.workflow.SubFeed,outputSubFeed:io.smartdatalake.workflow.SubFeed)(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li></ol>
+            </div>
+
+        <div id="values" class="values members">
+              <h3>Concrete Value Members</h3>
+              <ol><li name="scala.AnyRef#!=" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="!=(x$1:Any):Boolean"></a>
+      <a id="!=(Any):Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span title="gt4s: $bang$eq" class="name">!=</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.Any">Any</span></span>)</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@!=(x$1:Any):Boolean" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
+    </li><li name="scala.AnyRef###" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="##():Int"></a>
+      <a id="##():Int"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span title="gt4s: $hash$hash" class="name">##</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.Int">Int</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@##():Int" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
+    </li><li name="scala.AnyRef#==" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="==(x$1:Any):Boolean"></a>
+      <a id="==(Any):Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span title="gt4s: $eq$eq" class="name">==</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.Any">Any</span></span>)</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@==(x$1:Any):Boolean" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
+    </li><li name="scala.Any#asInstanceOf" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="asInstanceOf[T0]:T0"></a>
+      <a id="asInstanceOf[T0]:T0"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">asInstanceOf</span><span class="tparams">[<span name="T0">T0</span>]</span><span class="result">: <span class="extype" name="scala.Any.asInstanceOf.T0">T0</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@asInstanceOf[T0]:T0" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Any</dd></dl></div>
+    </li><li name="scala.AnyRef#clone" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="clone():Object"></a>
+      <a id="clone():AnyRef"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">clone</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.AnyRef">AnyRef</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@clone():Object" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Attributes</dt><dd>protected[<a href="../../../../java$lang.html" class="extype" name="java.lang">java.lang</a>] </dd><dt>Definition Classes</dt><dd>AnyRef</dd><dt>Annotations</dt><dd>
+                <span class="name">@throws</span><span class="args">(<span>
+      
+      <span class="defval" name="classOf[java.lang.CloneNotSupportedException]">...</span>
+    </span>)</span>
+              
+        </dd></dl></div>
+    </li><li name="scala.AnyRef#eq" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="eq(x$1:AnyRef):Boolean"></a>
+      <a id="eq(AnyRef):Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">eq</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.AnyRef">AnyRef</span></span>)</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@eq(x$1:AnyRef):Boolean" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li name="scala.AnyRef#equals" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="equals(x$1:Any):Boolean"></a>
+      <a id="equals(Any):Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">equals</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.Any">Any</span></span>)</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@equals(x$1:Any):Boolean" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.FileSubFeedAction#exec" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="exec(subFeeds:Seq[io.smartdatalake.workflow.SubFeed])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Seq[io.smartdatalake.workflow.SubFeed]"></a>
+      <a id="exec(Seq[SubFeed])(SparkSession,ActionPipelineContext):Seq[SubFeed]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">exec</span><span class="params">(<span name="subFeeds">subFeeds: <span class="extype" name="scala.Seq">Seq</span>[<a href="../SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Seq">Seq</span>[<a href="../SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@exec(subFeeds:Seq[io.smartdatalake.workflow.SubFeed])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Seq[io.smartdatalake.workflow.SubFeed]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Action.exec implementation</p><div class="fullcomment"><div class="comment cmt"><p>Action.exec implementation</p></div><dl class="paramcmts block"><dt class="param">subFeeds</dt><dd class="cmt"><p><a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a>'s to be processed</p></dd><dt>returns</dt><dd class="cmt"><p>processed <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a>'s</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.action.FileSubFeedAction">FileSubFeedAction</a> → Action</dd></dl></div>
+    </li><li name="scala.AnyRef#finalize" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="finalize():Unit"></a>
+      <a id="finalize():Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">finalize</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@finalize():Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Attributes</dt><dd>protected[<a href="../../../../java$lang.html" class="extype" name="java.lang">java.lang</a>] </dd><dt>Definition Classes</dt><dd>AnyRef</dd><dt>Annotations</dt><dd>
+                <span class="name">@throws</span><span class="args">(<span>
+      
+      <span class="symbol">classOf[java.lang.Throwable]</span>
+    </span>)</span>
+              
+        </dd></dl></div>
+    </li><li name="scala.AnyRef#getClass" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="getClass():Class[_]"></a>
+      <a id="getClass():Class[_]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">getClass</span><span class="params">()</span><span class="result">: <span class="extype" name="java.lang.Class">Class</span>[_]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@getClass():Class[_]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.Action#getInputDataObject" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="getInputDataObject[T&lt;:io.smartdatalake.workflow.dataobject.DataObject](id:io.smartdatalake.config.SdlConfigObject.DataObjectId)(implicitevidence$1:scala.reflect.ClassTag[T],implicitevidence$2:reflect.runtime.universe.TypeTag[T],implicitregistry:io.smartdatalake.config.InstanceRegistry):T"></a>
+      <a id="getInputDataObject[T&lt;:DataObject](DataObjectId)(ClassTag[T],scala.reflect.api.JavaUniverse.TypeTag[T],InstanceRegistry):T"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">getInputDataObject</span><span class="tparams">[<span name="T">T &lt;: <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span></span>]</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="arg0">arg0: <span class="extype" name="scala.reflect.ClassTag">ClassTag</span>[<span class="extype" name="io.smartdatalake.workflow.action.Action.getInputDataObject.T">T</span>]</span>, <span name="arg1">arg1: <span class="extype" name="scala.reflect.api.TypeTags.TypeTag">scala.reflect.api.JavaUniverse.TypeTag</span>[<span class="extype" name="io.smartdatalake.workflow.action.Action.getInputDataObject.T">T</span>]</span>, <span name="registry">registry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result">: <span class="extype" name="io.smartdatalake.workflow.action.Action.getInputDataObject.T">T</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@getInputDataObject[T&lt;:io.smartdatalake.workflow.dataobject.DataObject](id:io.smartdatalake.config.SdlConfigObject.DataObjectId)(implicitevidence$1:scala.reflect.ClassTag[T],implicitevidence$2:reflect.runtime.universe.TypeTag[T],implicitregistry:io.smartdatalake.config.InstanceRegistry):T" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Attributes</dt><dd>protected </dd><dt>Definition Classes</dt><dd>Action</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.Action#getOutputDataObject" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="getOutputDataObject[T&lt;:io.smartdatalake.workflow.dataobject.DataObject](id:io.smartdatalake.config.SdlConfigObject.DataObjectId)(implicitevidence$3:scala.reflect.ClassTag[T],implicitevidence$4:reflect.runtime.universe.TypeTag[T],implicitregistry:io.smartdatalake.config.InstanceRegistry):T"></a>
+      <a id="getOutputDataObject[T&lt;:DataObject](DataObjectId)(ClassTag[T],scala.reflect.api.JavaUniverse.TypeTag[T],InstanceRegistry):T"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">getOutputDataObject</span><span class="tparams">[<span name="T">T &lt;: <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span></span>]</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="arg0">arg0: <span class="extype" name="scala.reflect.ClassTag">ClassTag</span>[<span class="extype" name="io.smartdatalake.workflow.action.Action.getOutputDataObject.T">T</span>]</span>, <span name="arg1">arg1: <span class="extype" name="scala.reflect.api.TypeTags.TypeTag">scala.reflect.api.JavaUniverse.TypeTag</span>[<span class="extype" name="io.smartdatalake.workflow.action.Action.getOutputDataObject.T">T</span>]</span>, <span name="registry">registry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result">: <span class="extype" name="io.smartdatalake.workflow.action.Action.getOutputDataObject.T">T</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@getOutputDataObject[T&lt;:io.smartdatalake.workflow.dataobject.DataObject](id:io.smartdatalake.config.SdlConfigObject.DataObjectId)(implicitevidence$3:scala.reflect.ClassTag[T],implicitevidence$4:reflect.runtime.universe.TypeTag[T],implicitregistry:io.smartdatalake.config.InstanceRegistry):T" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Attributes</dt><dd>protected </dd><dt>Definition Classes</dt><dd>Action</dd></dl></div>
+    </li><li name="scala.AnyRef#hashCode" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="hashCode():Int"></a>
+      <a id="hashCode():Int"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">hashCode</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.Int">Int</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@hashCode():Int" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.FileSubFeedAction#init" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="init(subFeeds:Seq[io.smartdatalake.workflow.SubFeed])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Seq[io.smartdatalake.workflow.SubFeed]"></a>
+      <a id="init(Seq[SubFeed])(SparkSession,ActionPipelineContext):Seq[SubFeed]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">init</span><span class="params">(<span name="subFeeds">subFeeds: <span class="extype" name="scala.Seq">Seq</span>[<a href="../SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Seq">Seq</span>[<a href="../SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@init(subFeeds:Seq[io.smartdatalake.workflow.SubFeed])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Seq[io.smartdatalake.workflow.SubFeed]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Action.init implementation</p><div class="fullcomment"><div class="comment cmt"><p>Action.init implementation</p></div><dl class="paramcmts block"><dt class="param">subFeeds</dt><dd class="cmt"><p><a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a>'s to be processed</p></dd><dt>returns</dt><dd class="cmt"><p>processed <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a>'s</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.action.FileSubFeedAction">FileSubFeedAction</a> → Action</dd></dl></div>
+    </li><li name="scala.Any#isInstanceOf" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="isInstanceOf[T0]:Boolean"></a>
+      <a id="isInstanceOf[T0]:Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">isInstanceOf</span><span class="tparams">[<span name="T0">T0</span>]</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@isInstanceOf[T0]:Boolean" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Any</dd></dl></div>
+    </li><li name="io.smartdatalake.util.misc.SmartDataLakeLogger#logger" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="logger:org.slf4j.Logger"></a>
+      <a id="logger:Logger"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">lazy val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">logger</span><span class="result">: <span class="extype" name="org.slf4j.Logger">Logger</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@logger:org.slf4j.Logger" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Attributes</dt><dd>protected </dd><dt>Definition Classes</dt><dd>SmartDataLakeLogger</dd></dl></div>
+    </li><li name="scala.AnyRef#ne" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="ne(x$1:AnyRef):Boolean"></a>
+      <a id="ne(AnyRef):Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">ne</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.AnyRef">AnyRef</span></span>)</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@ne(x$1:AnyRef):Boolean" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.Action#nodeId" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="nodeId:String"></a>
+      <a id="nodeId:String"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">nodeId</span><span class="result">: <span class="extype" name="scala.Predef.String">String</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@nodeId:String" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">provide an implementation of the DAG node id
+</p><div class="fullcomment"><div class="comment cmt"><p>provide an implementation of the DAG node id
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action → DAGNode</dd></dl></div>
+    </li><li name="scala.AnyRef#notify" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="notify():Unit"></a>
+      <a id="notify():Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">notify</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@notify():Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li name="scala.AnyRef#notifyAll" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="notifyAll():Unit"></a>
+      <a id="notifyAll():Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">notifyAll</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@notifyAll():Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.FileSubFeedAction#postExec" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="postExec(inputSubFeeds:Seq[io.smartdatalake.workflow.SubFeed],outputSubFeeds:Seq[io.smartdatalake.workflow.SubFeed])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
+      <a id="postExec(Seq[SubFeed],Seq[SubFeed])(SparkSession,ActionPipelineContext):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">postExec</span><span class="params">(<span name="inputSubFeeds">inputSubFeeds: <span class="extype" name="scala.Seq">Seq</span>[<a href="../SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a>]</span>, <span name="outputSubFeeds">outputSubFeeds: <span class="extype" name="scala.Seq">Seq</span>[<a href="../SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@postExec(inputSubFeeds:Seq[io.smartdatalake.workflow.SubFeed],outputSubFeeds:Seq[io.smartdatalake.workflow.SubFeed])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Executes operations needed after executing an action.</p><div class="fullcomment"><div class="comment cmt"><p>Executes operations needed after executing an action.
+In this step any operation on Input- or Output-DataObjects needed after the main task is executed,
+e.g. JdbcTableDataObjects postSql or CopyActions deleteInputData.
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.action.FileSubFeedAction">FileSubFeedAction</a> → Action</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.Action#preExec" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="preExec(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
+      <a id="preExec(SparkSession,ActionPipelineContext):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">preExec</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@preExec(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Executes operations needed before executing an action.</p><div class="fullcomment"><div class="comment cmt"><p>Executes operations needed before executing an action.
+In this step any operation on Input- or Output-DataObjects needed before the main task is executed,
+e.g. JdbcTableDataObjects preSql
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.Action#prepare" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="prepare(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
+      <a id="prepare(SparkSession,ActionPipelineContext):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">prepare</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@prepare(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Prepare DataObjects prerequisits.</p><div class="fullcomment"><div class="comment cmt"><p>Prepare DataObjects prerequisits.
+In this step preconditions are prepared &amp; tested:
+- directories exists or can be created
+- connections can be created
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.Action#setSparkJobDescription" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="setSparkJobDescription(operation:String)(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
+      <a id="setSparkJobDescription(String)(SparkSession):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">setSparkJobDescription</span><span class="params">(<span name="operation">operation: <span class="extype" name="scala.Predef.String">String</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@setSparkJobDescription(operation:String)(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Sets the util job description for better traceability in the Spark UI
+</p><div class="fullcomment"><div class="comment cmt"><p>Sets the util job description for better traceability in the Spark UI
+</p></div><dl class="paramcmts block"><dt class="param">operation</dt><dd class="cmt"><p>operation description (be short...)</p></dd><dt class="param">session</dt><dd class="cmt"><p>util session</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
+    </li><li name="scala.AnyRef#synchronized" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="synchronized[T0](x$1:=&gt;T0):T0"></a>
+      <a id="synchronized[T0](⇒T0):T0"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">synchronized</span><span class="tparams">[<span name="T0">T0</span>]</span><span class="params">(<span name="arg0">arg0: ⇒ <span class="extype" name="java.lang.AnyRef.synchronized.T0">T0</span></span>)</span><span class="result">: <span class="extype" name="java.lang.AnyRef.synchronized.T0">T0</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@synchronized[T0](x$1:=&gt;T0):T0" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li name="scala.AnyRef#toString" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="toString():String"></a>
+      <a id="toString():String"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">toString</span><span class="params">()</span><span class="result">: <span class="extype" name="java.lang.String">String</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@toString():String" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.Action#toStringMedium" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="toStringMedium:String"></a>
+      <a id="toStringMedium:String"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">toStringMedium</span><span class="result">: <span class="extype" name="scala.Predef.String">String</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@toStringMedium:String" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.Action#toStringShort" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="toStringShort:String"></a>
+      <a id="toStringShort:String"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">toStringShort</span><span class="result">: <span class="extype" name="scala.Predef.String">String</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@toStringShort:String" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
+    </li><li name="scala.AnyRef#wait" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="wait():Unit"></a>
+      <a id="wait():Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">wait</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@wait():Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd><dt>Annotations</dt><dd>
+                <span class="name">@throws</span><span class="args">(<span>
+      
+      <span class="defval" name="classOf[java.lang.InterruptedException]">...</span>
+    </span>)</span>
+              
+        </dd></dl></div>
+    </li><li name="scala.AnyRef#wait" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="wait(x$1:Long,x$2:Int):Unit"></a>
+      <a id="wait(Long,Int):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">wait</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.Long">Long</span></span>, <span name="arg1">arg1: <span class="extype" name="scala.Int">Int</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@wait(x$1:Long,x$2:Int):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd><dt>Annotations</dt><dd>
+                <span class="name">@throws</span><span class="args">(<span>
+      
+      <span class="defval" name="classOf[java.lang.InterruptedException]">...</span>
+    </span>)</span>
+              
+        </dd></dl></div>
+    </li><li name="scala.AnyRef#wait" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="wait(x$1:Long):Unit"></a>
+      <a id="wait(Long):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">wait</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.Long">Long</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@wait(x$1:Long):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd><dt>Annotations</dt><dd>
+                <span class="name">@throws</span><span class="args">(<span>
+      
+      <span class="defval" name="classOf[java.lang.InterruptedException]">...</span>
+    </span>)</span>
+              
+        </dd></dl></div>
+    </li></ol>
+            </div>
+
+        
+
+        
+        </div>
+
+        <div id="inheritedMembers">
+        <div class="parent" name="io.smartdatalake.workflow.action.Action">
+              <h3>Inherited from <span class="extype" name="io.smartdatalake.workflow.action.Action">Action</span></h3>
+            </div><div class="parent" name="io.smartdatalake.util.misc.SmartDataLakeLogger">
+              <h3>Inherited from <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span></h3>
+            </div><div class="parent" name="io.smartdatalake.workflow.DAGNode">
+              <h3>Inherited from <span class="extype" name="io.smartdatalake.workflow.DAGNode">DAGNode</span></h3>
+            </div><div class="parent" name="io.smartdatalake.config.ParsableFromConfig">
+              <h3>Inherited from <span class="extype" name="io.smartdatalake.config.ParsableFromConfig">ParsableFromConfig</span>[<span class="extype" name="io.smartdatalake.workflow.action.Action">Action</span>]</h3>
+            </div><div class="parent" name="io.smartdatalake.config.SdlConfigObject">
+              <h3>Inherited from <span class="extype" name="io.smartdatalake.config.SdlConfigObject">SdlConfigObject</span></h3>
+            </div><div class="parent" name="scala.AnyRef">
+              <h3>Inherited from <span class="extype" name="scala.AnyRef">AnyRef</span></h3>
+            </div><div class="parent" name="scala.Any">
+              <h3>Inherited from <span class="extype" name="scala.Any">Any</span></h3>
+            </div>
+        
+        </div>
+
+        <div id="groupedMembers">
+        <div class="group" name="Ungrouped">
+              <h3>Ungrouped</h3>
+              
+            </div>
+        </div>
+
+      </div>
+
+      <div id="tooltip"></div>
+
+      <div id="footer">  </div>
+
+
+    </body>
+      </html>
