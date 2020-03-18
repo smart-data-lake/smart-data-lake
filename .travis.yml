@@ -1,0 +1,14 @@
+language: scala
+jdk: openjdk8
+scala: 2.11.11
+script: mvn test
+
+cache:
+  directories:
+  - $HOME/.m2
+
+# safelist to only build develop and master branch
+branches:
+  only:
+  - master
+  - develop
