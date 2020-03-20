@@ -32,6 +32,14 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 /**
  * [[DataObject]] of type JDBC.
  * Provides details for an action to access tables in a database through JDBC.
+ * @param id unique name of this data object
+ * @param createSql DDL-statement to be executed in prepare phase
+ * @param preSql SQL-statement to be executed before writing to table
+ * @param postSql SQL-statement to be executed after writing to table
+ * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
+ * @param table The jdbc table to be read
+ * @jdbcFetchSize Number of rows to be fetched together by the Jdbc driver
+ * @connectionId Id of JdbcConnection configuration
  */
 case class JdbcTableDataObject(override val id: DataObjectId,
                                createSql: Option[String] = None,
@@ -40,7 +48,6 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                override val schemaMin: Option[StructType] = None,
                                override var table: Table,
                                jdbcFetchSize: Int = 1000,
-                               failIfTableMissing: Boolean = true,
                                connectionId: ConnectionId,
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit val instanceRegistry: InstanceRegistry)

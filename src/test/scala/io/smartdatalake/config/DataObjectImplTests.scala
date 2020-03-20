@@ -198,7 +198,6 @@ class DataObjectImplTests extends FlatSpec with Matchers {
         |     primaryKey = [id1, id2]
         |   }
         |   jdbcFetchSize = 5
-        |   failIfTableMissing = false
         | }
         |}
         |""".stripMargin).resolve
@@ -218,8 +217,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
         query = Some("dummy query"),
         primaryKey = Some(Seq("id1", "id2"))
       ),
-      jdbcFetchSize = 5,
-      failIfTableMissing = false
+      jdbcFetchSize = 5
     )(registry2)
   }
 
