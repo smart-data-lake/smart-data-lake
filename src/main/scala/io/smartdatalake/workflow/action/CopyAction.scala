@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject}
@@ -43,6 +43,7 @@ case class CopyAction(override val id: ActionObjectId,
                       transformer: Option[CustomDfTransformerConfig] = None,
                       columnBlacklist: Option[Seq[String]] = None,
                       columnWhitelist: Option[Seq[String]] = None,
+                      filterClause: Option[String] = None,
                       standardizeDatatypes: Boolean = false,
                       override val breakDataFrameLineage: Boolean = false,
                       override val persist: Boolean = false,
@@ -62,7 +63,7 @@ case class CopyAction(override val id: ActionObjectId,
 
     // apply transformations
     transformedSubFeed = ActionHelper.applyTransformations(
-      transformedSubFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, None)
+      transformedSubFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, None, filterClause)
 
     // return transformed subfeed
     transformedSubFeed

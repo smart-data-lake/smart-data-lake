@@ -59,6 +59,17 @@ object ActionHelper extends SmartDataLakeLogger {
   }
 
   /**
+    * Apply filter to a [[DataFrame]].
+    *
+    * @param df [[DataFrame]] to be filtered
+    * @param filterClauseExpr Spark expression to apply to the dataframe
+    * @return [[DataFrame]] with all rows filter given expression above
+    */
+  def filterRows(filterClauseExpr: Column)(df: DataFrame): DataFrame = {
+    df.where(filterClauseExpr)
+  }
+
+  /**
    * create util literal column from [[LocalDateTime ]]
    */
   def ts1(t: java.time.LocalDateTime): Column = lit(t.toString).cast(TimestampType)
@@ -113,6 +124,16 @@ object ActionHelper extends SmartDataLakeLogger {
   }
 
   /**
+    * applies filterClauseExpr
+    */
+  def applyFilter(subFeed: SparkSubFeed, filterClauseExpr: Option[Column]): SparkSubFeed = {
+    val filterDfTransform: Seq[DataFrame => DataFrame] = Seq(
+      filterClauseExpr.map(l => ActionHelper.filterRows(l) _)
+    ).flatten
+    ActionHelper.multiTransformSubfeed(subFeed, filterDfTransform)
+  }
+
+  /**
    * applies type casting decimal -> integral/float
    */
   def applyCastDecimal2IntegralFloat(subFeed: SparkSubFeed): SparkSubFeed = ActionHelper.multiTransformSubfeed(subFeed, Seq(_.castAllDecimal2IntegralFloat))
@@ -144,13 +165,25 @@ object ActionHelper extends SmartDataLakeLogger {
                            columnWhitelist: Option[Seq[String]],
                            standardizeDatatypes: Boolean,
                            output: DataObject,
-                           additional: Option[(SparkSubFeed,Option[DataFrame],Seq[String],LocalDateTime) => SparkSubFeed])(
+                           additional: Option[(SparkSubFeed,Option[DataFrame],Seq[String],LocalDateTime) => SparkSubFeed],
+                           filterClause: Option[String] = None)(
                             implicit session: SparkSession,
                             context: ActionPipelineContext): SparkSubFeed = {
+
     var transformedSubFeed : SparkSubFeed = applyBlackWhitelists(applyCustomTransformation(inputSubFeed, transformer)(session),
       columnBlacklist: Option[Seq[String]],
       columnWhitelist: Option[Seq[String]]
     )
+
+    // parse filter clause
+    val filterClauseExpr = try {
+      filterClause.map(expr)
+    } catch {
+      case e:Exception => throw new ConfigurationException(s"Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
+    }
+
+    if (filterClauseExpr.isDefined) transformedSubFeed = applyFilter(inputSubFeed, filterClauseExpr)
+
     if (standardizeDatatypes) transformedSubFeed = applyCastDecimal2IntegralFloat(transformedSubFeed) // currently we cast decimals away only but later we may add further type casts
     if (additional.isDefined && output.isInstanceOf[TableDataObject]) {
       transformedSubFeed = applyAdditional(transformedSubFeed, additional.get, output.asInstanceOf[TableDataObject])(session,context)

@@ -52,6 +52,7 @@ case class DeduplicateAction(override val id: ActionObjectId,
                              transformer: Option[CustomDfTransformerConfig] = None,
                              columnBlacklist: Option[Seq[String]] = None,
                              columnWhitelist: Option[Seq[String]] = None,
+                             filterClause: Option[String] = None,
                              standardizeDatatypes: Boolean = false,
                              ignoreOldDeletedColumns: Boolean = false,
                              ignoreOldDeletedNestedColumns: Boolean = true,
@@ -74,7 +75,7 @@ case class DeduplicateAction(override val id: ActionObjectId,
 
     // apply transformations
     transformedSubFeed = ActionHelper.applyTransformations(
-      transformedSubFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, Some(deduplicateDataFrame(_: SparkSubFeed,_: Option[DataFrame],_:Seq[String],_: LocalDateTime)))
+      transformedSubFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, Some(deduplicateDataFrame(_: SparkSubFeed,_: Option[DataFrame],_:Seq[String],_: LocalDateTime)), filterClause)
 
     // return
     transformedSubFeed
