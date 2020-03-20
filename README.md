@@ -55,10 +55,13 @@ The file format used is [HOCON](https://github.com/lightbend/config/blob/master/
 To see how all this works in action, head over to the [Getting Started](docs/GettingStarted.md) page.
 
 # Major Contributors
-At the moment, there is one contributors which has done major investments into this project:
+At the moment we have the following contributors on this project:
+
+![SBB](docs/images/SBB_logo.png)  
+[www.sbb.ch](http://www.sbb.ch) : Provided the previously developed software as a foundation for the open source project   
 
 ![ELCA](docs/images/ELCA_logo.png)  
-[www.elca.ch](www.elca.ch)   
+[www.elca.ch](http://www.elca.ch) : Did the comprehensive revision and provision as open source project 
 
 # Additional Documentation
 [Getting Started](docs/GettingStarted.md)  
