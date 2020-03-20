@@ -60,6 +60,6 @@ object Environment {
   var schemaValidationDeepComarison: Boolean = true
 
   // static configurations
-  val configPathsForLocalSubstitution: Seq[String] = Seq("path", "table.name", "create-sql", "pre-sql", "post-sql")
+  val configPathsForLocalSubstitution: Seq[String] = Seq("path", "table.name", "create-sql", "createSql", "pre-sql", "preSql", "post-sql", "postSql")
   val defaultPathSeparator: Char = '/'
 }
