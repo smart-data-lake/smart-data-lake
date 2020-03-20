@@ -1,5 +1,5 @@
 # Smart Data Lake
-![Build Status](https://github.com/pgruetter/smart-data-lake-dev/workflows/Smart%20Data%20Lake/badge.svg)
+![Build Status](https://github.com/smart-data-lake/smart-data-lake/workflows/Smart%20Data%20Lake/badge.svg)
  
 Smart Data Lake Builder is a data lake automation framework that makes loading and transforming data a breeze. 
 It is implemented in Scala and builds on top of open-source big data technologies like [Apache Hadoop](https://hadoop.apache.org/) and [Apache Spark](https://spark.apache.org/), including connectors for diverse data sources (HadoopFS, Hive, JDBC, Splunk,  Webservice, SFTP, JMS, Excel, Access) and file formats.
