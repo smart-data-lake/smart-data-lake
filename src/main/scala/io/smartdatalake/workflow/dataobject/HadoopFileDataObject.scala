@@ -175,16 +175,6 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     }.getOrElse(Seq())
   }
 
-  override def prepare(implicit session: SparkSession): Unit = {
-    // try creating path if not existing
-    if (!filesystem.exists(hadoopPath)) {
-      Try(filesystem.mkdirs(hadoopPath)) match {
-        case Success(_) => Unit
-        case Failure(_) => throw new RuntimeException(s"($id) Could not create hadoop path $hadoopPath.")
-      }
-    }
-  }
-
   override def getFileRefs(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[FileRef] = {
     val paths: Seq[(PartitionValues,String)] = getSearchPaths(partitionValues)
     // search paths and prepare FileRef's
