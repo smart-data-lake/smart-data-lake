@@ -20,7 +20,8 @@ package io.smartdatalake.config
 
 import com.typesafe.config.ConfigFactory
 import configs.{Configs, Result}
-import io.smartdatalake.definitions.PartitionDiffMode
+import io.smartdatalake.config.ConfigParser.localSubstitution
+import io.smartdatalake.definitions.{Environment, PartitionDiffMode}
 import io.smartdatalake.workflow.action.{Action, FileTransferAction}
 import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, DataObject, RawFileDataObject}
 import org.scalatest.{FlatSpec, Matchers}
@@ -318,7 +319,7 @@ class ConfigParsingTest extends FlatSpec with Matchers {
     testAction shouldEqual Result.Success(TestAction(id = "a", arg1 = None, inputId = "tdo1", outputId = "tdo2", executionMode = Some(PartitionDiffMode(partitionColNb = Some(2)))))
   }
 
-  "local substitution" should "be processed" in {
+  "single local substitution" should "be processed" in {
     val config = ConfigFactory.parseString(
       """{
         | id = 10
@@ -326,7 +327,32 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         | path = "test~{id}/~{name}"
         |}""".stripMargin
     )
-    val configSubstituted = ConfigParser.localSubstitution(config, "path")
-    configSubstituted.getString("path") shouldEqual "test10/abc"
+
+    val configSubstituted1 = ConfigParser.localSubstitution(config, "path")
+    configSubstituted1.getString("path") shouldEqual "test10/abc"
+  }
+
+
+  "all local substitution" should "be processed" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = 10
+        | name = abc
+        | path = "test~{id}/~{name}"
+        | pre-sql = "test~{id}/~{name}"
+        | postSql = "test~{id}/~{name}"
+        | table {
+        |  name = "test~{id}/~{name}"
+        | }
+        |}""".stripMargin
+    )
+
+    val refinedConfig = Environment.configPathsForLocalSubstitution.foldLeft(config){
+      case (config, path) => localSubstitution(config, path)
+    }
+    refinedConfig.getString("path") shouldEqual "test10/abc"
+    refinedConfig.getString("pre-sql") shouldEqual "test10/abc"
+    refinedConfig.getString("postSql") shouldEqual "test10/abc"
+    refinedConfig.getString("table.name") shouldEqual "test10/abc"
   }
 }
