@@ -232,7 +232,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val r1 = session.table(s"${tgtTable.fullName}")
       .select($"rating")
       .as[Int].collect().toSeq
-    assert(r1.size == 1) // should be increased by 1 through TestDfTransformer
+    assert(r1.size == 1)
   }
 
 }

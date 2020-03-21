@@ -59,17 +59,6 @@ object ActionHelper extends SmartDataLakeLogger {
   }
 
   /**
-    * Apply filter to a [[DataFrame]].
-    *
-    * @param df [[DataFrame]] to be filtered
-    * @param filterClauseExpr Spark expression to apply to the dataframe
-    * @return [[DataFrame]] with all rows filter given expression above
-    */
-  def filterRows(filterClauseExpr: Column)(df: DataFrame): DataFrame = {
-    df.where(filterClauseExpr)
-  }
-
-  /**
    * create util literal column from [[LocalDateTime ]]
    */
   def ts1(t: java.time.LocalDateTime): Column = lit(t.toString).cast(TimestampType)
@@ -127,10 +116,8 @@ object ActionHelper extends SmartDataLakeLogger {
     * applies filterClauseExpr
     */
   def applyFilter(subFeed: SparkSubFeed, filterClauseExpr: Option[Column]): SparkSubFeed = {
-    val filterDfTransform: Seq[DataFrame => DataFrame] = Seq(
-      filterClauseExpr.map(l => ActionHelper.filterRows(l) _)
-    ).flatten
-    ActionHelper.multiTransformSubfeed(subFeed, filterDfTransform)
+    val filterDfTransform = filterClauseExpr.map( expr => (df: DataFrame) => df.where(expr))
+    ActionHelper.multiTransformSubfeed(subFeed, filterDfTransform.toSeq)
   }
 
   /**
