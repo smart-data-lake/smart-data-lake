@@ -166,7 +166,7 @@ object ActionHelper extends SmartDataLakeLogger {
                            standardizeDatatypes: Boolean,
                            output: DataObject,
                            additional: Option[(SparkSubFeed,Option[DataFrame],Seq[String],LocalDateTime) => SparkSubFeed],
-                           filterClause: Option[String] = None)(
+                           filterClauseExpr: Option[Column] = None)(
                             implicit session: SparkSession,
                             context: ActionPipelineContext): SparkSubFeed = {
 
@@ -174,13 +174,6 @@ object ActionHelper extends SmartDataLakeLogger {
       columnBlacklist: Option[Seq[String]],
       columnWhitelist: Option[Seq[String]]
     )
-
-    // parse filter clause
-    val filterClauseExpr = try {
-      filterClause.map(expr)
-    } catch {
-      case e:Exception => throw new ConfigurationException(s"Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
-    }
 
     if (filterClauseExpr.isDefined) transformedSubFeed = applyFilter(inputSubFeed, filterClauseExpr)
 
