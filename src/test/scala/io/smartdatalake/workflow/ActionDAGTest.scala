@@ -18,17 +18,15 @@
  */
 package io.smartdatalake.workflow
 
-import java.io.File
 import java.nio.file.Files
 import java.time.LocalDateTime
 
-import com.holdenkarau.spark.testing.Utils
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.hive.HiveUtil
-import io.smartdatalake.workflow.action.customlogic.{CustomDfsTransformer, CustomDfsTransformerConfig}
 import io.smartdatalake.workflow.action._
+import io.smartdatalake.workflow.action.customlogic.{CustomDfsTransformer, CustomDfsTransformerConfig}
 import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, HiveTableDataObject, Table, TickTockHiveTableDataObject}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
