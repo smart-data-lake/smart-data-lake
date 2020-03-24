@@ -54,7 +54,7 @@ class HadoopFileDataObjectTest extends DataObjectTestSuite {
     dataObject.getDataFrame().count shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
     partitionValuesCreated.toSet shouldEqual dataObject.listPartitions.toSet
 
-    FileUtils.deleteDirectory(tempDir.toFile)
+    Try(FileUtils.deleteDirectory(tempDir.toFile))
   }
 
   test("create and list partition one level") {
@@ -71,7 +71,7 @@ class HadoopFileDataObjectTest extends DataObjectTestSuite {
     val partitionValuesListed = dataObject.listPartitions
     partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
 
-    FileUtils.deleteDirectory(tempDir.toFile)
+    Try(FileUtils.deleteDirectory(tempDir.toFile))
   }
 
   test("create and list partition multi level") {
@@ -89,7 +89,7 @@ class HadoopFileDataObjectTest extends DataObjectTestSuite {
     val partitionValuesListed = dataObject.listPartitions
     partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
 
-    FileUtils.deleteDirectory(tempDir.toFile)
+    Try(FileUtils.deleteDirectory(tempDir.toFile))
   }
 
   test("create empty partition") {
