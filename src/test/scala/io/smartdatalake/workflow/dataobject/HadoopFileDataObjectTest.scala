@@ -23,6 +23,8 @@ import java.nio.file.Files
 import io.smartdatalake.util.hdfs.PartitionValues
 import org.apache.commons.io.FileUtils
 
+import scala.util.Try
+
 /**
  * Unit tests for [[HadoopFileDataObjectTest]].
  */
