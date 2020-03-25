@@ -21,6 +21,7 @@ package io.smartdatalake.app
 import java.io.File
 import java.time.LocalDateTime
 
+import com.typesafe.config.Config
 import configs.syntax._
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -73,8 +74,8 @@ case class GlobalConfig( kryoClasses: Option[Seq[String]] = None, sparkOptions: 
 abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
   // read version from package manifest (not defined if project is executed in IntellJ)
-  val appVersion = Option(getClass.getPackage.getImplementationVersion).getOrElse("develop")
-  val appName = getClass.getSimpleName.replaceAll("\\$$","") // remove $ from object name and use it as appName
+  val appVersion: String = Option(getClass.getPackage.getImplementationVersion).getOrElse("develop")
+  val appName: String = getClass.getSimpleName.replaceAll("\\$$","") // remove $ from object name and use it as appName
 
   /**
    * Create a new SDL configuration and initialize it with environment variables if they are set.
@@ -97,7 +98,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * The Parser defines how to extract the options from the command line args.
    * Subclasses SmartDataLakeBuilder can define additional options to be extracted.
    */
-  protected val parser = new OptionParser[SmartDataLakeBuilderConfig](appName) {
+  protected val parser: OptionParser[SmartDataLakeBuilderConfig] = new OptionParser[SmartDataLakeBuilderConfig](appName) {
     override def showUsageOnError = true
 
     head(appName, appVersion)
@@ -168,15 +169,18 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     logger.info(s"Deploy-Mode: ${appConfig.deployMode}")
 
     // load config
-    val config = appConfig.configuration match {
+    val config:Config = appConfig.configuration match {
       case Some(configuration) => ConfigLoader.loadConfigFromFilesystem(configuration)
       case None => ConfigLoader.loadConfigFromClasspath
     }
+    require(config.hasPath("actions"), s"No configuration parsed or it does not have a section called actions")
+    require(config.hasPath("dataObjects"), s"No configuration parsed or it does not have a section called dataObjects")
     val globalConfig = config.get[Option[GlobalConfig]]("global").value.getOrElse(GlobalConfig())
 
     // parse config objects and search actions to execute by feedSel
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     val actions = registry.getActions.filter(_.metadata.flatMap(_.feed).exists( _.matches(appConfig.feedSel)))
+    require(actions.nonEmpty, s"No action was selected with the given criteria (${appConfig.feedSel}). At least one action needs to be selected.")
     logger.info(s"selected actions ${actions.map(_.id).mkString(", ")}")
 
     // create Spark Session
