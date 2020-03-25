@@ -114,6 +114,9 @@ case class HiveTableDataObject(override val id: DataObjectId,
       logger.info(s"Analyze table ${table.fullName}.")
       HiveUtil.analyze(session, table.db.get, table.name, partitions, partitionValues)
     }
+
+    // make sure empty partitions are created as well
+    partitionValues.diff(listPartitions).foreach( createEmptyPartition )
   }
 
   override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
@@ -139,6 +142,10 @@ case class HiveTableDataObject(override val id: DataObjectId,
   override def listPartitions(implicit session: SparkSession): Seq[PartitionValues] = {
     if(isTableExisting) HiveUtil.listPartitions(table, partitions)
     else Seq()
+  }
+
+  override def createEmptyPartition(partitionValues: PartitionValues)(implicit session: SparkSession): Unit = {
+    HiveUtil.createEmptyPartition(table, partitionValues)
   }
 
   /**
