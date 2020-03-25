@@ -111,7 +111,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
 
   override def isDbExisting(implicit session: SparkSession): Boolean = {
-    val cntTableInCatalog = s"select count(*) from INFORMATION_SCHEMA.SCHEMATA where TABLE_SCHEMA=upper('${table.db.get}')"
+    val cntTableInCatalog = s"select count(*) from INFORMATION_SCHEMA.SCHEMATA where upper(TABLE_SCHEMA)=upper('${table.db.get}')"
     def evalTableExistsInCatalog( rs:ResultSet ) : Boolean = {
       rs.next
       rs.getInt(1) == 1
@@ -120,7 +120,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
 
   override def isTableExisting(implicit session: SparkSession): Boolean = {
-    val cntTableInCatalog = s"select count(*) from INFORMATION_SCHEMA.TABLES where TABLE_NAME=upper('${table.name}') and TABLE_SCHEMA=upper('${table.db.get}')"
+    val cntTableInCatalog = s"select count(*) from INFORMATION_SCHEMA.TABLES where upper(TABLE_NAME)=upper('${table.name}') and upper(TABLE_SCHEMA)=upper('${table.db.get}')"
     def evalTableExistsInCatalog( rs:ResultSet ) : Boolean = {
       rs.next
       rs.getInt(1)==1
