@@ -180,7 +180,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // parse config objects and search actions to execute by feedSel
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     val actions = registry.getActions.filter(_.metadata.flatMap(_.feed).exists( _.matches(appConfig.feedSel)))
-    require(actions.nonEmpty, s"No action was selected with the given criteria (${appConfig.feedSel}). At least one action needs to be selected.")
+    require(actions.nonEmpty, s"No action matched the given feed selector: ${appConfig.feedSel}. At least one action needs to be selected.")
     logger.info(s"selected actions ${actions.map(_.id).mkString(", ")}")
 
     // create Spark Session
