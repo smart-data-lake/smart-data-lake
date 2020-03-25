@@ -169,7 +169,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     logger.info(s"Deploy-Mode: ${appConfig.deployMode}")
 
     // load config
-    val config:Config = appConfig.configuration match {
+    val config: Config = appConfig.configuration match {
       case Some(configuration) => ConfigLoader.loadConfigFromFilesystem(configuration)
       case None => ConfigLoader.loadConfigFromClasspath
     }
