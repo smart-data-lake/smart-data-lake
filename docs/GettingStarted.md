@@ -80,7 +80,7 @@ We used an open data set for these tests which you can download from [Kaggle](ht
 1. For simplicity, put all files in one working directory: The smartdatalake-jar-with-dependencies, the application.conf and the sample CSV file.
 1. Execute the feed: 
     
-    `java smartdatalake-jar-with-dependencies.jar io.smartdatalake.app.workflow.DefaultSmartDataLakeBuilder --feed-sel gettings-started --name gettings-started`
+    `java -jar smartdatalake-jar-with-dependencies.jar --feed-sel getting-started --name getting-started`
    
 1. Check to see if the target folder was created and contains the Excel file.   
 
