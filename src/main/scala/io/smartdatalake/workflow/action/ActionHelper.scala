@@ -248,8 +248,9 @@ object ActionHelper extends SmartDataLakeLogger {
   def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed)(implicit session: SparkSession): SparkSubFeed = {
     if (subFeed.dataFrame.isEmpty) {
       assert(input.id == subFeed.dataObjectId, s"DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
-      logger.info(s"Getting DataFrame for DataObject ${input.id} filtered by partition values ${subFeed.partitionValues}")
-      val df = input.getDataFrame().colNamesLowercase // convert to lower case by default
+      logger.info(s"Getting DataFrame for DataObject ${input.id} filtered by partition values ${subFeed.partitionValues.mkString(", ")}")
+      val df = input.getDataFrame(subFeed.partitionValues)
+        .colNamesLowercase // convert to lower case by default
       val filteredDf = ActionHelper.filterDataFrame(df, subFeed.partitionValues)
       subFeed.copy(dataFrame = Some(filteredDf))
     } else subFeed
