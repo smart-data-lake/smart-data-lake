@@ -163,6 +163,21 @@
 				</configuration>
 			</plugin>
 
+			<!-- rewrite pom for compiling with different scala version profiles -->
+			<plugin>
+				<groupId>org.spurint.maven.plugins</groupId>
+				<artifactId>scala-cross-maven-plugin</artifactId>
+				<version>0.2.1</version>
+				<executions>
+					<execution>
+						<id>rewrite-pom</id>
+						<goals>
+							<goal>rewrite-pom</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
 			<!-- Copies files in resources folders to target folder. -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
