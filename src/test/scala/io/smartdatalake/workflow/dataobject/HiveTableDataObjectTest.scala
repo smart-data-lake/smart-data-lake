@@ -204,6 +204,23 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
   }
 
+  test("create empty partition") {
+
+    // create data object
+    val srcTable = Table(Some("default"), "input")
+    HiveUtil.dropTable(testSession, srcTable.db.get, srcTable.name )
+    val srcPath = tempPath+s"/${srcTable.fullName}"
+    val srcDO = HiveTableDataObject( "input", srcPath, table = srcTable, partitions = Seq("p1","p2"), numInitialHdfsPartitions = 1)
+
+    // write test files
+    val partitionValuesCreated = Seq( PartitionValues(Map("p1"->"A","p2"->"L2A")), PartitionValues(Map("p1"->"X","p2"->"L2X")))
+    val df = Seq(("A","L2A",1)).toDF("p1", "p2", "value")
+    srcDO.writeDataFrame(df, partitionValuesCreated )
+
+    val partitionValuesListed = srcDO.listPartitions
+    partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
+  }
+
   test("Reading from an non-existing path is not possible.") {
     val srcTable = Table(Some("default"), "emptytesttable")
 

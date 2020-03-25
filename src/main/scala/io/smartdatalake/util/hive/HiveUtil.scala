@@ -631,4 +631,9 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
         .map( path => PartitionLayout.extractPartitionValues(partitionLayout, "", path + separator))
     } else Seq()
   }
+
+  def createEmptyPartition(table: Table, partitionValues: PartitionValues)(implicit session: SparkSession): Unit = {
+    val partitionDef = partitionValues.elements.map{ case (k,v) => s"$k='$v'"}.mkString(", ")
+    execSqlStmt(session, s"ALTER TABLE ${table.fullName} ADD IF NOT EXISTS PARTITION ($partitionDef)")
+  }
 }
