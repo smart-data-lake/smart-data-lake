@@ -293,12 +293,16 @@ object ActionHelper extends SmartDataLakeLogger {
                 }
                 // calculate missing partition values
                 val partitionValuesToBeProcessed = partitionInput.listPartitions.map(_.filterKeys(commonPartitions)).toSet
-                  .diff(partitionOutput.listPartitions.map(_.filterKeys(commonPartitions)).toSet)
-                partitionValuesToBeProcessed.toSeq
-              } else throw ConfigurationException(s"$actionId has set initExecutionMode = 'partitionDiff' but $output has no partition columns defined!")
-            } else throw ConfigurationException(s"$actionId has set initExecutionMode = 'partitionDiff' but $input has no partition columns defined!")
-          case (_: CanHandlePartitions, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = 'partitionDiff' but $output does not support partitions!")
-          case (_, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = 'partitionDiff' but $input does not support partitions!")
+                  .diff(partitionOutput.listPartitions.map(_.filterKeys(commonPartitions)).toSet).toSeq
+                val ordering = PartitionValues.getOrdering(commonPartitions)
+                mode.nbOfPartitionValuesPerRun match {
+                  case Some(n) => partitionValuesToBeProcessed.sorted(ordering).take(n)
+                  case None => partitionValuesToBeProcessed.sorted(ordering)
+                }
+              } else throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $output has no partition columns defined!")
+            } else throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $input has no partition columns defined!")
+          case (_: CanHandlePartitions, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $output does not support partitions!")
+          case (_, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $input does not support partitions!")
         }
       case _ => partitionValues
     }

@@ -279,6 +279,13 @@ private[smartdatalake] object DataFrameUtil {
       }
     }
 
+    /**
+     * If colName is defined, creates an additional column with a given expression on a DataFrame
+     */
+    def withOptionalColumn(colName: Option[String], expr: Column): DataFrame = {
+      if (colName.isDefined) df.withColumn(colName.get, expr)
+      else df
+    }
 
     /**
      * Computes the set difference of `right` minus `left`, i.e: `Set(right)` \ `Set(left)`.
