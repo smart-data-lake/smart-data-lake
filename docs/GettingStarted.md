@@ -44,7 +44,7 @@ dataObjects {
   }
 }
 
-action {
+actions {
   getting-started {
     type = CopyAction
     inputId = ab-csv-org
