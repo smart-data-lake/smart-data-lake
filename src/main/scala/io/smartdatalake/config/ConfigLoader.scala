@@ -93,7 +93,7 @@ object ConfigLoader extends SmartDataLakeLogger {
     val jsonFiles = configFileIndex("json")
     val propertyFiles = configFileIndex("properties")
     if (confFiles.isEmpty && jsonFiles.isEmpty && propertyFiles.isEmpty) {
-      logger.warn(s"$hadoopPath does not contain valid configuration files. " +
+      logger.error(s"Path $hadoopPath does not contain valid configuration files. " +
         s"Ensure the configuration files have one of the following extensions: ${configFileExtensions.map(ext => s".$ext").mkString(", ")}")
     }
     //read file extensions in the same order as typesafe config
