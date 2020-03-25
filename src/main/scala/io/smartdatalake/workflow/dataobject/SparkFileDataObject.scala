@@ -147,7 +147,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
         .save(hadoopPathString)
 
       // make sure empty partitions are created as well
-      partitionValues.diff(listPartitions).foreach( createEmptyPartition )
+      createMissingPartitions(partitionValues)
     }
 }
 
