@@ -20,12 +20,15 @@ package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.expr
+
+import scala.util.{Failure, Success, Try}
 
 /**
  * [[Action]] to copy files (i.e. from stage to integration)
@@ -43,6 +46,7 @@ case class CopyAction(override val id: ActionObjectId,
                       transformer: Option[CustomDfTransformerConfig] = None,
                       columnBlacklist: Option[Seq[String]] = None,
                       columnWhitelist: Option[Seq[String]] = None,
+                      filterClause: Option[String] = None,
                       standardizeDatatypes: Boolean = false,
                       override val breakDataFrameLineage: Boolean = false,
                       override val persist: Boolean = false,
@@ -55,6 +59,12 @@ case class CopyAction(override val id: ActionObjectId,
   override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
   override val outputs: Seq[DataObject with CanWriteDataFrame] = Seq(output)
 
+  // parse filter clause
+  private val filterClauseExpr = Try(filterClause.map(expr)) match {
+    case Success(result) => result
+    case Failure(e) => throw new ConfigurationException(s"(${id}) Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
+  }
+
   override def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
 
     // enrich DataFrames if not yet existing
@@ -62,7 +72,7 @@ case class CopyAction(override val id: ActionObjectId,
 
     // apply transformations
     transformedSubFeed = ActionHelper.applyTransformations(
-      transformedSubFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, None)
+      transformedSubFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, None, filterClauseExpr)
 
     // return transformed subfeed
     transformedSubFeed

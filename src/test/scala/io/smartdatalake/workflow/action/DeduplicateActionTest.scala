@@ -106,4 +106,35 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
     // prepare & start 1st load
     intercept[IllegalArgumentException]{DeduplicateAction("dda", srcDO.id, tgtDO.id)}
   }
+
+  test("deduplicate with filter clause") {
+
+    // setup DataObjects
+    val feed = "deduplicate"
+    val srcTable = Table(Some("default"), "deduplicate_input")
+    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
+    val srcPath = tempPath+s"/${srcTable.fullName}"
+    val srcDO = HiveTableDataObject( "src1", srcPath, table = srcTable, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(srcDO)
+    val tgtTable = Table(Some("default"), "deduplicate_output", None, Some(Seq("lastname","firstname")))
+    HiveUtil.dropTable(session, tgtTable.db.get, tgtTable.name )
+    val tgtPath = tempPath+s"/${tgtTable.fullName}"
+    val tgtDO = TickTockHiveTableDataObject( "tgt1", tgtPath, table = tgtTable, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(tgtDO)
+
+    // prepare & start 1st load
+    val refTimestamp1 = LocalDateTime.now()
+    val context1 = ActionPipelineContext(feed, "test", instanceRegistry, Some(refTimestamp1))
+    val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, filterClause = Some("lastname='jonson'"))
+    val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
+    TestUtil.prepareHiveTable(srcTable, srcPath, l1)
+    val srcSubFeed = SparkSubFeed(None, "src1", Seq())
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(session, context1).head
+    assert(tgtSubFeed.dataObjectId == tgtDO.id)
+
+    val r1 = session.table(s"${tgtTable.fullName}")
+      .select($"rating")
+      .as[Int].collect().toSeq
+    assert(r1.size == 1)
+  }
 }
