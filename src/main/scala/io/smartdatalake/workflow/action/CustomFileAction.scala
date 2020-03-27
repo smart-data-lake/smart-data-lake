@@ -96,9 +96,6 @@ case class CustomFileAction(override val id: ActionObjectId,
       else logger.error(s"transformed $tgt with error $ex")
     }
 
-    // apply ACL's
-    output.applyAcls
-
     // return
     subFeed.copy(fileRefs = Some(tgtFileRefs), dataObjectId = output.id)
   }

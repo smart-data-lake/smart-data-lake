@@ -19,9 +19,9 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.definitions.ExecutionMode
-import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRefDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, InitSubFeed, SubFeed}
-import org.apache.spark.sql.SparkSession
+import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, CanHandlePartitions, FileRefDataObject}
+import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, InitSubFeed, SparkSubFeed, SubFeed}
+import org.apache.spark.sql.{SaveMode, SparkSession}
 
 abstract class FileSubFeedAction extends Action {
 
@@ -36,8 +36,8 @@ abstract class FileSubFeedAction extends Action {
   def output:  FileRefDataObject with CanCreateOutputStream
 
   /**
-   * Initialize Action with for a given [[FileSubFeed]]
-   * Note that is only checks the prerequisits to do the processing and simulates the output FileRef's that would be created.
+   * Initialize Action with a given [[FileSubFeed]]
+   * Note that this only checks the prerequisits to do the processing and simulates the output FileRef's that would be created.
    *
    * @param subFeed subFeed to be processed (referencing files to be read)
    * @return processed subFeed (referencing files that would be written by this action)
@@ -86,6 +86,13 @@ abstract class FileSubFeedAction extends Action {
     } else preparedSubFeed
     // break lineage if requested
     preparedSubFeed = if (breakFileRefLineage) preparedSubFeed.breakLineage() else preparedSubFeed
+    // delete existing files on overwrite
+    if (output.saveMode == SaveMode.Overwrite) {
+      if (output.partitions.nonEmpty)
+        if (subFeed.partitionValues.nonEmpty) output.deletePartitions(subFeed.partitionValues)
+        else logger.warn(s"($id) Cannot delete data from partitioned data object ${output.id} as no partition values are given but saveMode=overwrite")
+      else output.deleteAll
+    }
     // transform
     val transformedSubFeed = execSubFeed(preparedSubFeed)
     // update partition values to output's partition columns and update dataObjectId
@@ -93,6 +100,7 @@ abstract class FileSubFeedAction extends Action {
   }
 
   override final def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.postExec(inputSubFeeds,outputSubFeeds)
     assert(inputSubFeeds.size == 1, s"Only one inputSubFeed allowed for FileSubFeedAction (Action $id, inputSubfeed's ${inputSubFeeds.map(_.dataObjectId).mkString(",")})")
     assert(outputSubFeeds.size == 1, s"Only one outputSubFeed allowed for FileSubFeedAction (Action $id, inputSubfeed's ${outputSubFeeds.map(_.dataObjectId).mkString(",")})")
     postExecSubFeed(inputSubFeeds.head, outputSubFeeds.head)

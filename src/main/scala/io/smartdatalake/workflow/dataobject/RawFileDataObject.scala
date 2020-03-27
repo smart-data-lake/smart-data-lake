@@ -22,14 +22,17 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.misc.AclDef
+import org.apache.spark.sql.SaveMode
 
 /**
  * DataObject of type raw for files with unknown content.
  * Provides details to an Action to access raw files.
+ * @param saveMode Overwrite or Append new data.
  */
 case class RawFileDataObject( override val id: DataObjectId,
                               override val path: String,
                               override val partitions: Seq[String] = Seq(),
+                              override val saveMode: SaveMode = SaveMode.Overwrite,
                               override val acl: Option[AclDef] = None,
                               override val connectionId: Option[ConnectionId] = None,
                               override val metadata: Option[DataObjectMetadata] = None

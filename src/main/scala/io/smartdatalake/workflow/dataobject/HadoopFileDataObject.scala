@@ -209,6 +209,10 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     }
   }
 
+  override def deleteAll(implicit session: SparkSession): Unit = {
+    filesystem.delete(hadoopPath, true) // recursive=true
+  }
+
   protected[workflow] def applyAcls(implicit session: SparkSession): Unit = {
     val aclToApply = acl().orElse(connection.flatMap(_.acl))
     if (aclToApply.isDefined) AclUtil.addACLs(acl().get, hadoopPath)(filesystem)
