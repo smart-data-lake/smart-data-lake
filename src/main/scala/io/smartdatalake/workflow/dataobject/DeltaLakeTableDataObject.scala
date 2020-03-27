@@ -46,7 +46,7 @@ import scala.collection.JavaConverters._
  * @param table DeltaLake table to be written by this output
  * @param numInitialHdfsPartitions number of files created when writing into an empty table (otherwise the number will be derived from the existing data)
  * @param saveMode spark [[SaveMode]] to use when writing files, default is "overwrite"
- * @param retentionPeriod DeltaLake table retention period of old transactions for time travel feature in days
+ * @param retentionPeriod DeltaLake table retention period of old transactions for time travel feature in hours
  * @param acl override connections permissions for files created tables hadoop directory with this connection
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
  * @param metadata meta data
@@ -59,7 +59,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override var table: Table,
                                     numInitialHdfsPartitions: Int = 16,
                                     saveMode: SaveMode = SaveMode.Overwrite,
-                                    retentionPeriod: Int = 7,
+                                    retentionPeriod: Int = 7*24, // hours
                                     acl: Option[AclDef] = None,
                                     connectionId: Option[ConnectionId] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
