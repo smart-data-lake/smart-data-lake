@@ -19,9 +19,10 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.delta.tables.DeltaTable
-import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.{DateColumnType, Environment}
+import io.smartdatalake.util.misc.DataFrameUtil.arrayToSeq
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.{AclDef, AclUtil}
@@ -129,6 +130,34 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   // Delta Lake is not connected to Hive Metastore. It is a file based Spark API.
   // We therefore cannot check isTableExisting.
   override def isTableExisting(implicit session: SparkSession): Boolean = true
+
+  /**
+   * Configure whether [[io.smartdatalake.workflow.action.Action]]s should fail if the input file(s) are missing
+   * on the file system.
+   *
+   * Default is false.
+   */
+  def failIfFilesMissing: Boolean = false
+
+  /**
+   * Check if the input files exist.
+   *
+   * @throws IllegalArgumentException if `failIfFilesMissing` = true and no files found at `path`.
+   */
+  protected def checkFilesExisting(implicit session:SparkSession): Boolean = {
+    val files = if (filesystem.exists(hadoopPath.getParent)) {
+      arrayToSeq(filesystem.globStatus(hadoopPath))
+    } else {
+      Seq.empty
+    }
+
+    if (files.isEmpty) {
+      logger.warn(s"($id) No files found at $hadoopPath. Can not import any data.")
+      require(!failIfFilesMissing, s"($id) failIfFilesMissing is enabled and no files to process have been found in $hadoopPath.")
+    }
+
+    files.nonEmpty
+  }
 
   /**
    * @inheritdoc

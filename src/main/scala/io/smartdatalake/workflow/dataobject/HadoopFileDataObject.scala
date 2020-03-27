@@ -24,6 +24,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SerializableHadoopConfiguration, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.DataFrameUtil.arrayToSeq
 import io.smartdatalake.workflow.connection.HadoopFileConnection
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
@@ -123,7 +124,6 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
 
     files.nonEmpty
   }
-  def arrayToSeq[T](arr: Array[T]): Seq[T] = if (arr!=null) arr.toSeq else Seq()
 
   override def deleteFileRefs(fileRefs: Seq[FileRef])(implicit session:SparkSession): Unit = {
     // delete given files on hdfs

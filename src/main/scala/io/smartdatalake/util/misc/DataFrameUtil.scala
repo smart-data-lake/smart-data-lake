@@ -29,6 +29,8 @@ import scala.collection.JavaConverters._
  */
 private[smartdatalake] object DataFrameUtil {
 
+  def arrayToSeq[T](arr: Array[T]): Seq[T] = if (arr==null) Seq() else arr.toSeq
+
   implicit class DfSDL(df: DataFrame) extends SmartDataLakeLogger {
 
 
@@ -388,19 +390,6 @@ private[smartdatalake] object DataFrameUtil {
       }
     }
     else df
-  }
-
-  /**
-   * Removes a given column from a [[DataFrame]]
-   *
-   * @param df [[DataFrame]] to edit
-   * @param cols column to remove
-   * @return [[DataFrame]] without removed columns
-   */
-  def dropColumns(df: DataFrame, cols: List[String]): DataFrame = {
-    var dfDropped = df
-    cols.foreach(col => dfDropped = dfDropped.drop(col))
-    dfDropped
   }
 
   /**
