@@ -344,7 +344,7 @@
 		</dependency>
 		<dependency>
 			<groupId>com.databricks</groupId>
-			<artifactId>dbutils-api_${scala.minor.version}</artifactId>
+			<artifactId>dbutils-api_2.11</artifactId>
 			<version>0.0.4</version>
 		</dependency>
 		<!-- Log4j is used in some unit tests to disable some exception logging -->
