@@ -33,6 +33,8 @@ import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
+import scala.util.{Failure, Success, Try}
+
 /**
  * [[Action]] to deduplicate a subfeed.
  * Deduplication keeps the last record for every key, also after it has been deleted in the source.
@@ -52,6 +54,7 @@ case class DeduplicateAction(override val id: ActionObjectId,
                              transformer: Option[CustomDfTransformerConfig] = None,
                              columnBlacklist: Option[Seq[String]] = None,
                              columnWhitelist: Option[Seq[String]] = None,
+                             filterClause: Option[String] = None,
                              standardizeDatatypes: Boolean = false,
                              ignoreOldDeletedColumns: Boolean = false,
                              ignoreOldDeletedNestedColumns: Boolean = true,
@@ -66,7 +69,13 @@ case class DeduplicateAction(override val id: ActionObjectId,
   override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
   override val outputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
 
-  require(output.table.primaryKey.isDefined, s"Primary key must be defined for output DataObject of $toStringMedium")
+  require(output.table.primaryKey.isDefined, s"(${id}) Primary key must be defined for output DataObject")
+
+  // parse filter clause
+  private val filterClauseExpr = Try(filterClause.map(expr)) match {
+    case Success(result) => result
+    case Failure(e) => throw new ConfigurationException(s"(${id}) Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
+  }
 
   override def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // create input subfeeds if not yet existing
@@ -74,7 +83,7 @@ case class DeduplicateAction(override val id: ActionObjectId,
 
     // apply transformations
     transformedSubFeed = ActionHelper.applyTransformations(
-      transformedSubFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, Some(deduplicateDataFrame(_: SparkSubFeed,_: Option[DataFrame],_:Seq[String],_: LocalDateTime)))
+      transformedSubFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, Some(deduplicateDataFrame(_: SparkSubFeed,_: Option[DataFrame],_:Seq[String],_: LocalDateTime)), filterClauseExpr)
 
     // return
     transformedSubFeed

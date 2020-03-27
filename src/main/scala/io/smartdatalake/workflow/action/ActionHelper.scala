@@ -113,6 +113,14 @@ object ActionHelper extends SmartDataLakeLogger {
   }
 
   /**
+    * applies filterClauseExpr
+    */
+  def applyFilter(subFeed: SparkSubFeed, filterClauseExpr: Option[Column]): SparkSubFeed = {
+    val filterDfTransform = filterClauseExpr.map( expr => (df: DataFrame) => df.where(expr))
+    ActionHelper.multiTransformSubfeed(subFeed, filterDfTransform.toSeq)
+  }
+
+  /**
    * applies type casting decimal -> integral/float
    */
   def applyCastDecimal2IntegralFloat(subFeed: SparkSubFeed): SparkSubFeed = ActionHelper.multiTransformSubfeed(subFeed, Seq(_.castAllDecimal2IntegralFloat))
@@ -144,13 +152,18 @@ object ActionHelper extends SmartDataLakeLogger {
                            columnWhitelist: Option[Seq[String]],
                            standardizeDatatypes: Boolean,
                            output: DataObject,
-                           additional: Option[(SparkSubFeed,Option[DataFrame],Seq[String],LocalDateTime) => SparkSubFeed])(
+                           additional: Option[(SparkSubFeed,Option[DataFrame],Seq[String],LocalDateTime) => SparkSubFeed],
+                           filterClauseExpr: Option[Column] = None)(
                             implicit session: SparkSession,
                             context: ActionPipelineContext): SparkSubFeed = {
+
     var transformedSubFeed : SparkSubFeed = applyBlackWhitelists(applyCustomTransformation(inputSubFeed, transformer)(session),
       columnBlacklist: Option[Seq[String]],
       columnWhitelist: Option[Seq[String]]
     )
+
+    if (filterClauseExpr.isDefined) transformedSubFeed = applyFilter(inputSubFeed, filterClauseExpr)
+
     if (standardizeDatatypes) transformedSubFeed = applyCastDecimal2IntegralFloat(transformedSubFeed) // currently we cast decimals away only but later we may add further type casts
     if (additional.isDefined && output.isInstanceOf[TableDataObject]) {
       transformedSubFeed = applyAdditional(transformedSubFeed, additional.get, output.asInstanceOf[TableDataObject])(session,context)

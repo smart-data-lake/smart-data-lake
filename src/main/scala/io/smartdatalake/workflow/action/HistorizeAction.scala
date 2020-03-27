@@ -32,6 +32,8 @@ import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
+import scala.util.{Failure, Success, Try}
+
 /**
  * [[Action]] to historize a subfeed.
  * Historization creates a technical history of data by creating valid-from/to columns.
@@ -72,17 +74,16 @@ case class HistorizeAction(
   override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
   override val outputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
 
-  // validations
-  // parse filter clause
-  private val filterClauseExpr = try {
-    filterClause.map(expr)
-  } catch {
-    case e:Exception => throw new ConfigurationException(s"Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
-  }
   // historize black/white list
-  require(historizeWhitelist.isEmpty || historizeBlacklist.isEmpty, s"historizeWhitelist and historizeBlacklist mustn't be used at the same time in $toStringShort")
+  require(historizeWhitelist.isEmpty || historizeBlacklist.isEmpty, s"(${id}) HistorizeWhitelist and historizeBlacklist mustn't be used at the same time")
   // primary key
-  require(output.table.primaryKey.isDefined, s"Primary key must be defined for output DataObject of $toStringShort")
+  require(output.table.primaryKey.isDefined, s"(${id}) Primary key must be defined for output DataObject")
+
+  // parse filter clause
+  private val filterClauseExpr = Try(filterClause.map(expr)) match {
+    case Success(result) => result
+    case Failure(e) => throw new ConfigurationException(s"(${id}) Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
+  }
 
   def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // create input subfeeds if not yet existing
@@ -90,7 +91,7 @@ case class HistorizeAction(
 
     // apply transformations
     transformedSubFeed = ActionHelper.applyTransformations(
-      transformedSubFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, Some(historizeDataFrame(_: SparkSubFeed,_: Option[DataFrame],_:Seq[String],_: LocalDateTime)))
+      transformedSubFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, Some(historizeDataFrame(_: SparkSubFeed,_: Option[DataFrame],_:Seq[String],_: LocalDateTime)), filterClauseExpr)
 
     // return
     transformedSubFeed

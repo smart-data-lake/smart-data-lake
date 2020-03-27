@@ -23,6 +23,7 @@ import java.sql.ResultSet
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils, DfSDL}
 import io.smartdatalake.workflow.connection.JdbcTableConnection
@@ -111,7 +112,11 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
 
   override def isDbExisting(implicit session: SparkSession): Boolean = {
-    val cntTableInCatalog = s"select count(*) from INFORMATION_SCHEMA.SCHEMATA where TABLE_SCHEMA=upper('${table.db.get}')"
+    val cntTableInCatalog =
+      if (Environment.enableJdbcCaseSensitivity)
+        s"select count(*) from INFORMATION_SCHEMA.SCHEMATA where TABLE_SCHEMA='${table.db.get}'"
+      else
+        s"select count(*) from INFORMATION_SCHEMA.SCHEMATA where upper(TABLE_SCHEMA)=upper('${table.db.get}')"
     def evalTableExistsInCatalog( rs:ResultSet ) : Boolean = {
       rs.next
       rs.getInt(1) == 1
@@ -120,7 +125,11 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
 
   override def isTableExisting(implicit session: SparkSession): Boolean = {
-    val cntTableInCatalog = s"select count(*) from INFORMATION_SCHEMA.TABLES where TABLE_NAME=upper('${table.name}') and TABLE_SCHEMA=upper('${table.db.get}')"
+    val cntTableInCatalog =
+      if (Environment.enableJdbcCaseSensitivity)
+        s"select count(*) from INFORMATION_SCHEMA.TABLES where TABLE_NAME='${table.name}' and TABLE_SCHEMA='${table.db.get}'"
+      else
+        s"select count(*) from INFORMATION_SCHEMA.TABLES where upper(TABLE_NAME)=upper('${table.name}') and upper(TABLE_SCHEMA)=upper('${table.db.get}')"
     def evalTableExistsInCatalog( rs:ResultSet ) : Boolean = {
       rs.next
       rs.getInt(1)==1
