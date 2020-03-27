@@ -18,24 +18,40 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import io.delta.tables.DeltaTable
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.DateColumnType
+import io.smartdatalake.definitions.{DateColumnType, Environment}
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
-import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.util.hive.HiveUtil
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.{AclDef, AclUtil}
 import io.smartdatalake.workflow.connection.HiveTableConnection
-import org.apache.hadoop.fs.FileSystem
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
+import org.apache.spark.sql.{DataFrame, DataFrameWriter, Row, SaveMode, SparkSession}
 
 import scala.collection.JavaConverters._
 
+/**
+ * [[DataObject]] of type DeltaLakeTableDataObject.
+ * Provides details to access Hive tables to an Action
+ *
+ * @param id unique name of this data object
+ * @param path hadoop directory for this table. If it doesn't contain scheme and authority, the connections pathPrefix is applied.
+ *             If pathPrefix is not defined or doesn't define scheme and authority, default schema and authority is applied.
+ * @param partitions partition columns for this data object
+ * @param dateColumnType type of date column
+ * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
+ * @param table DeltaLake table to be written by this output
+ * @param numInitialHdfsPartitions number of files created when writing into an empty table (otherwise the number will be derived from the existing data)
+ * @param saveMode spark [[SaveMode]] to use when writing files, default is "overwrite"
+ * @param acl override connections permissions for files created tables hadoop directory with this connection
+ * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
+ * @param metadata meta data
+ */
 case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     path: String,
                                     override val partitions: Seq[String] = Seq(),
-                                    analyzeTableAfterWrite: Boolean = false,
                                     dateColumnType: DateColumnType = DateColumnType.Date,
                                     override val schemaMin: Option[StructType] = None,
                                     override var table: Table,
@@ -66,24 +82,13 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
   }
 
-  override def prepare(implicit session: SparkSession): Unit = {
-    require(isDbExisting, s"($id) DB ${table.db.get} doesn't exist (needs to be created manually).")
-  }
-
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
     val df = session.read.format("delta").load(hadoopPath.toString)
     validateSchemaMin(df)
     df
   }
 
-  override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
-    // create tables if possible
-    prepare(session)
-    if (!isTableExisting) {
-      logger.info(s"($id) Creating table ${table.fullName}.")
-      writeDataFrame(df, createTableOnly = true, partitionValues)
-    }
-  }
+  override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = prepare(session)
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])
                              (implicit session: SparkSession): Unit = {
@@ -92,7 +97,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   /**
-   * Writes DataFrame to HDFS/Parquet and creates Hive table.
+   * Writes DataFrame to HDFS/Parquet and creates DeltaLake table.
    * DataFrames are repartitioned in order not to write too many small files
    * or only a few HDFS files that are too large.
    */
@@ -101,49 +106,67 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     val dfPrepared = if (createTableOnly) {
       // create empty df with existing df's schema
       session.createDataFrame(List.empty[Row].asJava, df.schema)
-    } else {
-      // pass DataFrame straight through if numInitialHdfsPartitions == -1, in this case the file size in the responsibility of the framework and must be controlled in custom transformations
-      if(numInitialHdfsPartitions == -1) df
-      // estimate number of partitions from existing data, otherwise use numInitialHdfsPartitions
-      else if (isTableExisting) {
-        val currentHdfsPath = HdfsUtil.prefixHadoopPath(HiveUtil.existingTickTockLocation(table.db.get, session, table.name), None)
-        HdfsUtil.repartitionForHdfsFileSize(df, currentHdfsPath.toString)
-      } else df.repartition(numInitialHdfsPartitions)
+    } else df.repartition(Math.max(1,numInitialHdfsPartitions))
+
+    val deltaTableWriter: DataFrameWriter[Row] = dfPrepared.write.format("delta")
+
+    // write table
+    if (partitions.isEmpty) deltaTableWriter.mode(saveMode).save(hadoopPath.toString) else {
+      deltaTableWriter.partitionBy(partitions:_*).mode(saveMode).save(hadoopPath.toString)
     }
 
-    // write table and fix acls
-    if (partitions.isEmpty) dfPrepared.write.format("delta").save(hadoopPath.toString) else {
-      dfPrepared.write.format("delta").partitionBy(partitions:_*).save(hadoopPath.toString)
-    }
-    if (acl.isDefined) {
-      AclUtil.addACLs(acl.get, hadoopPath)(filesystem)
-    }
-    if (analyzeTableAfterWrite && !createTableOnly) {
-      logger.info(s"($id) Analyze table ${table.fullName}.")
-      HiveUtil.analyze(session, table.db.get, table.name, partitions, partitionValues)
-    }
+    // vacuum table to delete files and directories in the table that are not needed
+    DeltaTable.forPath(session, hadoopPath.toString).vacuum()
+
+    // fix acls
+    if (acl.isDefined) AclUtil.addACLs(acl.get, hadoopPath)(filesystem)
   }
 
-  override def isDbExisting(implicit session: SparkSession): Boolean = {
-    session.catalog.databaseExists(table.db.get)
-  }
+  // Delta Lake is not connected to Hive Metastore. It is a file based Spark API.
+  // We therefore cannot check isDbExisting.
+  override def isDbExisting(implicit session: SparkSession): Boolean = true
 
-  override def isTableExisting(implicit session: SparkSession): Boolean = {
-    session.catalog.tableExists(table.db.get, table.name)
-  }
-
-  /**
-   * list hive table partitions
-   */
-  override def listPartitions(implicit session: SparkSession): Seq[PartitionValues] = {
-    if(isTableExisting) HiveUtil.listPartitions(table, partitions)
-    else Seq()
-  }
+  // Delta Lake is not connected to Hive Metastore. It is a file based Spark API.
+  // We therefore cannot check isTableExisting.
+  override def isTableExisting(implicit session: SparkSession): Boolean = true
 
   /**
    * @inheritdoc
    */
   override def factory: FromConfigFactory[DataObject] = TickTockHiveTableDataObject
+
+  protected val separator: Char = Environment.defaultPathSeparator
+
+  /**
+   * Return a [[String]] specifying the partition layout.
+   *
+   * For Hadoop the default partition layout is colname1=<value1>/colname2=<value2>/.../
+   */
+  final def partitionLayout(): Option[String] = {
+    if (partitions.nonEmpty) {
+      Some(HdfsUtil.getHadoopPartitionLayout(partitions, separator))
+    } else {
+      None
+    }
+  }
+
+  /**
+   * List partitions on data object's root path
+   */
+  override def listPartitions(implicit session: SparkSession): Seq[PartitionValues] = {
+    partitionLayout().map {
+      partitionLayout =>
+        // get search pattern for root directory
+        val pattern = PartitionLayout.replaceTokens(partitionLayout, PartitionValues(Map()))
+        // list directories and extract partition values
+        filesystem.globStatus( new Path(hadoopPath, pattern))
+          .filter{fs => fs.isDirectory}
+          .map(_.getPath.toString)
+          .map( path => PartitionLayout.extractPartitionValues(partitionLayout, "", path + separator))
+          .toSeq
+    }.getOrElse(Seq())
+  }
+
 }
 
 

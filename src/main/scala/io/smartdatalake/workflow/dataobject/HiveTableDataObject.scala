@@ -45,6 +45,7 @@ import scala.collection.JavaConverters._
  * @param acl override connections permissions for files created tables hadoop directory with this connection
  * @param analyzeTableAfterWrite enable compute statistics after writing data (default=false)
  * @param dateColumnType type of date column
+ * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
  * @param saveMode spark [[SaveMode]] to use when writing files, default is "overwrite"
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
  * @param numInitialHdfsPartitions number of files created when writing into an empty table (otherwise the number will be derived from the existing data)
