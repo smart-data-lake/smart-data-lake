@@ -55,6 +55,7 @@ case class JdbcTableConnection( override val id: ConnectionId,
     var conn: SqlConnection = null
     var stmt: Statement = null
     try {
+      Class.forName(driver)
       conn = getConnection
       stmt = conn.createStatement
       logger.info(s"execJdbcStatement: $sql")
@@ -71,6 +72,7 @@ case class JdbcTableConnection( override val id: ConnectionId,
     var stmt: Statement = null
     var rs: ResultSet = null
     try {
+      Class.forName(driver)
       conn = getConnection
       stmt = conn.createStatement
       logger.info(s"execJdbcQuery: $sql")

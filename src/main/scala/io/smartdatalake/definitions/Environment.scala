@@ -59,6 +59,12 @@ object Environment {
    */
   var schemaValidationDeepComarison: Boolean = true
 
+  /**
+   * Set to true if you want table and database names to be case sensitive when loading over JDBC.
+   * If your database supports case sensitive table names and you want to use that feature, set this to true.
+   */
+  var enableJdbcCaseSensitivity: Boolean = false
+
   // static configurations
   val configPathsForLocalSubstitution: Seq[String] = Seq("path", "table.name", "create-sql", "createSql", "pre-sql", "preSql", "post-sql", "postSql")
   val defaultPathSeparator: Char = '/'
