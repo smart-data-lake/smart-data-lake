@@ -321,8 +321,10 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     implicit val context1 = ActionPipelineContext(feed, "test", instanceRegistry)
     val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id, deleteDataAfterRead = true)
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
-    val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
-    assert(tgtSubFeed.dataObjectId == tgtDO.id)
+    action1.preExec
+    val tgtSubFeed1 = action1.exec(Seq(srcSubFeed)).head
+    action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed1))
+    assert(tgtSubFeed1.dataObjectId == tgtDO.id)
 
     // check 1
     val r1 = tgtDO.getFileRefs(Seq())
@@ -333,7 +335,9 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile+"2").toFile)
 
     // start load 2
-    action1.exec(Seq(srcSubFeed)).head
+    action1.preExec
+    val tgtSubFeed2 = action1.exec(Seq(srcSubFeed)).head
+    action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed2))
 
     // check 2
     val r2 = tgtDO.getFileRefs(Seq())

@@ -84,8 +84,13 @@ object SparkSubFeed {
  * @param fileRefs path to files to be processed
  * @param dataObjectId id of the DataObject this SubFeed corresponds to
  * @param partitionValues Values of Partitions transported by this SubFeed
+ * @param processedInputFileRefs used to remember processed input FileRef's for post processing (e.g. delete after read)
  */
-case class FileSubFeed(fileRefs: Option[Seq[FileRef]], override val dataObjectId: DataObjectId, override val partitionValues: Seq[PartitionValues])
+case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
+                       override val dataObjectId: DataObjectId,
+                       override val partitionValues: Seq[PartitionValues],
+                       processedInputFileRefs: Option[Seq[FileRef]] = None
+                      )
   extends SubFeed {
   override def breakLineage(): FileSubFeed = {
     this.copy(fileRefs = None)

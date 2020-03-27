@@ -44,7 +44,7 @@ case class CustomFileAction(override val id: ActionObjectId,
                             inputId: DataObjectId,
                             outputId: DataObjectId,
                             transformer: CustomFileTransformerConfig,
-                            deleteDataAfterRead: Boolean = false,
+                            override val deleteDataAfterRead: Boolean = false,
                             filesPerPartition: Int = 10,
                             override val breakFileRefLineage: Boolean = false,
                             override val initExecutionMode: Option[ExecutionMode] = None,
@@ -60,7 +60,7 @@ case class CustomFileAction(override val id: ActionObjectId,
   override def initSubFeed(subFeed: FileSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
     val inputFileRefs = subFeed.fileRefs.getOrElse( input.getFileRefs(subFeed.partitionValues))
     val tgtFileRefs = output.translateFileRefs(inputFileRefs)
-    subFeed.copy(fileRefs = Some(tgtFileRefs), dataObjectId = output.id)
+    subFeed.copy(fileRefs = Some(tgtFileRefs), dataObjectId = output.id, processedInputFileRefs = Some(inputFileRefs))
   }
 
   override def execSubFeed(subFeed: FileSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
@@ -97,15 +97,7 @@ case class CustomFileAction(override val id: ActionObjectId,
     }
 
     // return
-    subFeed.copy(fileRefs = Some(tgtFileRefs), dataObjectId = output.id)
-  }
-
-  override def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    // delete Input Files if desired
-    if(deleteDataAfterRead) (input, inputSubFeed) match {
-      case (fileRefInput: FileRefDataObject, fileSubFeed: FileSubFeed) =>
-        fileSubFeed.fileRefs.map( fileRefs => fileRefInput.deleteFileRefs(fileRefs))
-    }
+    subFeed.copy(fileRefs = Some(tgtFileRefs), dataObjectId = output.id, processedInputFileRefs = Some(inputFileRefs))
   }
 
   /**

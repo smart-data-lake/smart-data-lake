@@ -106,8 +106,13 @@ abstract class FileSubFeedAction extends Action {
     postExecSubFeed(inputSubFeeds.head, outputSubFeeds.head)
   }
 
-  def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit
-
+  def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    // delete Input Files if desired
+    if (deleteDataAfterRead()) (input, outputSubFeed) match {
+      case (fileRefInput: FileRefDataObject, fileSubFeed: FileSubFeed) =>
+        fileSubFeed.processedInputFileRefs.foreach(fileRefs => fileRefInput.deleteFileRefs(fileRefs))
+    }
+  }
 
   /**
    * Stop propagating input FileRefs through action and instead get new FileRefs from DataObject according to the SubFeed's partitionValue.
@@ -119,5 +124,10 @@ abstract class FileSubFeedAction extends Action {
    * Execution mode if this Action is a start node of a DAG run
    */
   def initExecutionMode: Option[ExecutionMode]
+
+  /**
+   * If true delete files after they are successfully processed.
+   */
+  def deleteDataAfterRead(): Boolean
 
 }
