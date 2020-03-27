@@ -61,7 +61,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
 
   private def createScheduler(parallelism: Int = 1) = Scheduler.fixedPool(s"dag-$runId", parallelism)
 
-  private def run[R<:DAGResult](op: String, parallelism: Int = 1)(operation: (DAGNode, Seq[R]) => Seq[R])(implicit session: SparkSession, context: ActionPipelineContext) = {
+  private def run[R<:DAGResult](op: String, parallelism: Int = 1)(operation: (DAGNode, Seq[R]) => Seq[R])(implicit session: SparkSession, context: ActionPipelineContext): Seq[R] = {
     val stageMetricsListener = new StageMetricsListener
     session.sparkContext.addSparkListener(stageMetricsListener)
     try {
@@ -72,9 +72,23 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
       // wait for result
       val result = Await.result(futureResult, Duration.Inf)
       scheduler.shutdown
-      logger.info(s"""$op result: ${result.map(_.getClass.getSimpleName).mkString(",")}""")
 
-      // extract subfeeds, throwing exceptions if there are errors
+      // collect all root exceptions
+      val dagExceptions = result.filter(_.isFailure).map(_.failed.get).flatMap {
+        case ex: DAGException => ex.getDAGRootExceptions
+        case ex => throw ex // this should not happen
+      }
+      // log all exceptions
+      dagExceptions.foreach {
+        case ex if (ex.severity <= ExceptionSeverity.CANCELLED) => logger.error(s"${ex.getClass.getSimpleName}: ${ex.getMessage}")
+        case ex => logger.warn(s"${ex.getClass.getSimpleName}: ${ex.getMessage}")
+      }
+      // log dag on error
+      if (dagExceptions.nonEmpty) ActionDAGRun.logDag(s"$op failed for dag $runId", dag)
+      // throw most severe exception
+      dagExceptions.sortBy(_.severity).foreach{ throw _ }
+
+      // extract & return subfeeds
       result.map(_.get)
     } finally {
       session.sparkContext.removeSparkListener(stageMetricsListener)
@@ -119,11 +133,9 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
     }
 
     // log dag execution
-    logger.info(s"""exec result dag $runId:
-                   |${dag.toString}
-      """.stripMargin)
+    ActionDAGRun.logDag(s"exec result dag $runId", dag)
 
-    //return result
+    // return
     result
   }
 }
@@ -154,10 +166,14 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
 
     // create dag
     val dag = DAG.create[Action](initAction +: actions, edges)
-    logger.info(s"""created dag $runId:
-      |${dag.toString}
-    """.stripMargin)
+    logDag(s"created dag $runId", dag)
 
     ActionDAGRun(dag, runId, partitionValues, parallelism)
+  }
+
+  def logDag(msg: String, dag: DAG[_]): Unit = {
+    logger.info(s"""$msg:
+                   |${dag.toString}
+    """.stripMargin)
   }
 }

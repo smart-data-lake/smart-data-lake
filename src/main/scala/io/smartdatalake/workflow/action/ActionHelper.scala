@@ -307,6 +307,9 @@ object ActionHelper extends SmartDataLakeLogger {
                 // calculate missing partition values
                 val partitionValuesToBeProcessed = partitionInput.listPartitions.map(_.filterKeys(commonPartitions)).toSet
                   .diff(partitionOutput.listPartitions.map(_.filterKeys(commonPartitions)).toSet).toSeq
+                // stop processing if no new data
+                if (partitionValuesToBeProcessed.isEmpty) throw NoDataToProcessWarning(actionId.id, s"($actionId) No partitions to process found for ${input.id}")
+                // sort and limit number of partitions processed
                 val ordering = PartitionValues.getOrdering(commonPartitions)
                 mode.nbOfPartitionValuesPerRun match {
                   case Some(n) => partitionValuesToBeProcessed.sorted(ordering).take(n)
