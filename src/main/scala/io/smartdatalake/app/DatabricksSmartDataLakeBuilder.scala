@@ -33,7 +33,7 @@ object DatabricksSmartDataLakeBuilder extends SmartDataLakeBuilder {
    * @param args Command-line arguments.
    */
   def main(args: Array[String]): Unit = {
-    logger.info(s"Start programm ${appName}")
+    logger.info(s"Start programm ${appType}")
 
     val config = initConfigFromEnvironment.copy (
       overrideJars = Some(Seq("config-1.3.4.jar"))

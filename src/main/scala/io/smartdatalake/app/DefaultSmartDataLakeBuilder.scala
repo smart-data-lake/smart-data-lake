@@ -26,15 +26,15 @@ package io.smartdatalake.app
 class DefaultSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
   def parseAndRun(args: Array[String], ignoreOverrideJars: Boolean = false): Unit = {
-    logger.info(s"Starting Program $appName v$appVersion")
+    logger.info(s"Starting Program $appType v$appVersion")
 
     parseCommandLineArguments(args, initConfigFromEnvironment) match {
       case Some(config) =>
         assert(config.overrideJars.isEmpty || ignoreOverrideJars, "Option override-jars is not supported by DefaultSmartDataLakeBuilder. Use DatabricksSmartDataLakeBuilder for this option.")
         run(config)
-        logger.info(s"$appName v$appVersion finished successfully.")
+        logger.info(s"$appType v$appVersion finished successfully.")
       case None =>
-        logger.error(s"$appName v$appVersion terminated due to an error.")
+        logger.error(s"$appType v$appVersion terminated due to an error.")
     }
   }
 }

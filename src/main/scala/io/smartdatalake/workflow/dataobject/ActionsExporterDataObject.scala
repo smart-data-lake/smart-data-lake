@@ -68,7 +68,7 @@ case class ActionsExporterDataObject(id: DataObjectId,
     // Get all actions from registry
     val actions: Seq[Action with Product] = config match {
       case Some(configLocation) =>
-        val config = ConfigLoader.loadConfigFromFilesystem(configLocation)
+        val config = ConfigLoader.loadConfigFromFilesystem(configLocation.split(',').toSeq)
         ConfigParser.parse(config).getActions.map(_.asInstanceOf[Action with Product])
       case None => instanceRegistry.getActions.map(_.asInstanceOf[Action with Product])
     }

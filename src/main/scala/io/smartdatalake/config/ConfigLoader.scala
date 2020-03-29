@@ -56,16 +56,17 @@ object ConfigLoader extends SmartDataLakeLogger {
   /**
    * Load the configuration from the file system location `configLocation`.
    *
-   * If `configLocation` is a directory, it is traversed in breadth-first search (BFS) order provided by HDFS file system.
+   * If `configLocation` is a directory, it is traversed in breadth-first search (BFS) order provided by hadoop file system.
    * Only file names ending in '.conf', '.json', or '.properties' are processed.
+   * If multiple entries are given, all entries must be on the same file system.
    * All processed config files are merged and files encountered later overwrite settings in files processed earlier.
    *
    * The order of loading is:
    *
    * 1. system properties
-   * 2. all application.conf files in BFS order
-   * 3. all application.json files in BFS order
-   * 4. all application.properties files in BFS order
+   * 2. all '.conf' files in BFS order
+   * 3. all '.json' files in BFS order
+   * 4. all '.properties' files in BFS order
    *
    * Configuration values take precedence in that order.
    *
@@ -76,24 +77,24 @@ object ConfigLoader extends SmartDataLakeLogger {
    * - '.properties' forces Java properties syntax
    *
    * @see [[com.typesafe.config.ConfigSyntax]]
-   * @param configLocation      a configuration file or directory containing configuration files.
+   * @param configLocations     configuration files or directories containing configuration files.
    * @return                    a resolved [[Config]] merged from all found configuration files.
    */
-  def loadConfigFromFilesystem(configLocation: String): Config = {
-    val hadoopPath = HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(configLocation))
-    logger.info(s"Loading configuration from filesystem location: ${hadoopPath.toUri}.")
-    implicit val fileSystem: FileSystem = HdfsUtil.getHadoopFs(hadoopPath)
+  def loadConfigFromFilesystem(configLocations: Seq[String]): Config = try {
+    val hadoopPaths = configLocations.map( l => HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(l)))
+    logger.info(s"Loading configuration from filesystem location: ${hadoopPaths.map(_.toUri).mkString(", ")}.")
+    implicit val fileSystem: FileSystem = HdfsUtil.getHadoopFs(hadoopPaths.head)
 
-    require(fileSystem.exists(hadoopPath), s"$hadoopPath is not a valid location.")
+    hadoopPaths.foreach( p => require(fileSystem.exists(p), s"$p is not a valid location."))
 
-    val configFileIndex = filesInBfsOrderByExtension(hadoopPath)
+    val configFileIndex = filesInBfsOrderByExtension(hadoopPaths)
     logger.debug(s"Configuration file index:\n${configFileIndex.map(e => s"\t${e._1} -> ${e._2.mkString(", ")}").mkString("\n")}")
 
     val confFiles = configFileIndex("conf")
     val jsonFiles = configFileIndex("json")
     val propertyFiles = configFileIndex("properties")
     if (confFiles.isEmpty && jsonFiles.isEmpty && propertyFiles.isEmpty) {
-      logger.error(s"Path $hadoopPath does not contain valid configuration files. " +
+      logger.error(s"Paths $hadoopPaths do not contain valid configuration files. " +
         s"Ensure the configuration files have one of the following extensions: ${configFileExtensions.map(ext => s".$ext").mkString(", ")}")
     }
     //read file extensions in the same order as typesafe config
@@ -148,12 +149,12 @@ object ConfigLoader extends SmartDataLakeLogger {
    *
    * This is an internal method to create a utility data structure.
    *
-   * @param rootPath      root [[Path]] pointing to a configuration file or a directory from where the traversal starts.
+   * @param rootPaths     root [[Path]]'s pointing to a configuration file or a directory from where the traversal starts.
    * @param fs            a configured HDFS [[FileSystem]] handle.
    * @return              a map with BFS ordered file lists for each file extension in [[ConfigLoader.configFileExtensions]].
    */
-  private def filesInBfsOrderByExtension(rootPath: Path)(implicit fs: FileSystem): Map[String, Seq[Path]] = {
-    val traversalQueue = mutable.Queue[Path](rootPath)
+  private def filesInBfsOrderByExtension(rootPaths: Seq[Path])(implicit fs: FileSystem): Map[String, Seq[Path]] = {
+    val traversalQueue = mutable.Queue[Path](rootPaths:_*)
     val readableFileIndex = configFileExtensions.map((_, new mutable.MutableList[Path]())).toMap
 
     while (traversalQueue.nonEmpty) {
