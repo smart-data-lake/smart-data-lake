@@ -106,6 +106,19 @@ object ConfigLoader extends SmartDataLakeLogger {
         mergeWithHdfsFiles(confFiles, config)
       )
     ).resolve()
+  } catch {
+    // catch if hadoop libraries are missing and output debug informations
+    case ex:UnsatisfiedLinkError =>
+      val libraryPath =
+        logger.error(s"There seems to be a problem loading hadoop binaries: ${ex.getClass.getSimpleName}: ${ex.getMessage}. Make sure directory of hadoop libary is listed in path environment variable (libraryPath=${System.getProperty("java.library.path")})")
+      // retry loading hadoop library on our own to catch better error message (e.g. 64/32bit problems)
+      try {
+        System.loadLibrary("hadoop")
+        logger.info("Wow, loading hadoop native library succeeded when doing on our own, strange there is an error when loaded by hadoop itself.")
+      } catch {
+        case ex:UnsatisfiedLinkError => logger.error(s"retry loading hadoop library on our own ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+      }
+      throw ex // throw original exception
   }
 
   /**
