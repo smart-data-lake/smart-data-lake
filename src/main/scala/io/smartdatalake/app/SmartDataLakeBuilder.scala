@@ -75,7 +75,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
   // read version from package manifest (not defined if project is executed in IntellJ)
   val appVersion: String = Option(getClass.getPackage.getImplementationVersion).getOrElse("develop")
-  val appType: String = getClass.getSimpleName.replaceAll("\\$$","") // remove $ from object name and use it as appName
+  val appType: String = getClass.getSimpleName.replaceAll("\\$$","") // remove $ from object name and use it as appType
 
   /**
    * Create a new SDL configuration and initialize it with environment variables if they are set.
