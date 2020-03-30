@@ -74,7 +74,7 @@ private[smartdatalake] trait DataObject extends SdlConfigObject with ParsableFro
    * @return
    */
   protected def getConnection[T <: Connection](connectionId: ConnectionId)(implicit registry: InstanceRegistry, ct: ClassTag[T], tt: TypeTag[T]): T = {
-    val connection = registry.get[T](connectionId)
+    val connection: T = registry.get[T](connectionId)
     try {
       // force class cast on generic type (otherwise the ClassCastException is thrown later)
       ct.runtimeClass.cast(connection).asInstanceOf[T]
