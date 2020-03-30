@@ -46,7 +46,7 @@ import scopt.OptionParser
  * @param keytabPath      Path to Kerberos keytab file for local mode.
  */
 case class SmartDataLakeBuilderConfig(feedSel: String = null,
-                                      applicationName: String = null,
+                                      applicationName: Option[String] = None,
                                       configuration: Option[String] = None,
                                       master: Option[String] = None,
                                       deployMode: Option[String] = None,
@@ -75,7 +75,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
   // read version from package manifest (not defined if project is executed in IntellJ)
   val appVersion: String = Option(getClass.getPackage.getImplementationVersion).getOrElse("develop")
-  val appName: String = getClass.getSimpleName.replaceAll("\\$$","") // remove $ from object name and use it as appName
+  val appType: String = getClass.getSimpleName.replaceAll("\\$$","") // remove $ from object name and use it as appType
 
   /**
    * Create a new SDL configuration and initialize it with environment variables if they are set.
@@ -98,22 +98,21 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * The Parser defines how to extract the options from the command line args.
    * Subclasses SmartDataLakeBuilder can define additional options to be extracted.
    */
-  protected val parser: OptionParser[SmartDataLakeBuilderConfig] = new OptionParser[SmartDataLakeBuilderConfig](appName) {
+  protected val parser: OptionParser[SmartDataLakeBuilderConfig] = new OptionParser[SmartDataLakeBuilderConfig](appType) {
     override def showUsageOnError = true
 
-    head(appName, appVersion)
+    head(appType, appVersion)
 
     opt[String]('f', "feed-sel")
       .required
       .action( (arg, config) => config.copy(feedSel = arg) )
       .text("Regex pattern to select the feed to execute.")
     opt[String]('n', "name")
-      .required
-      .action( (arg, config) => config.copy(applicationName = arg) )
-      .text("The name of the application.")
+      .action( (arg, config) => config.copy(applicationName = Some(arg)) )
+      .text("Optional name of the application. If not specified feed-sel is used.")
     opt[String]('c', "config")
       .action( (arg, config) => config.copy(configuration = Some(arg)) )
-      .text("A configuration file or a directory containing configuration files.")
+      .text("One or multiple configuration files or directories containing configuration files, separated by comma.")
     opt[String]('m', "master")
       .action( (arg, config) => config.copy(master = Some(arg)))
       .text("The Spark master URL passed to SparkContext (default=local[*], yarn, spark://HOST:PORT, mesos://HOST:PORT, k8s://HOST:PORT).")
@@ -167,10 +166,11 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     logger.info(s"Application: ${appConfig.applicationName}")
     logger.info(s"Master: ${appConfig.master}")
     logger.info(s"Deploy-Mode: ${appConfig.deployMode}")
+    val appName = appConfig.applicationName.getOrElse(appConfig.feedSel)
 
     // load config
     val config: Config = appConfig.configuration match {
-      case Some(configuration) => ConfigLoader.loadConfigFromFilesystem(configuration)
+      case Some(configuration) => ConfigLoader.loadConfigFromFilesystem(configuration.split(',').toSeq)
       case None => ConfigLoader.loadConfigFromClasspath
     }
     require(config.hasPath("actions"), s"No configuration parsed or it does not have a section called actions")
@@ -185,7 +185,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     // create Spark Session
     implicit val session: SparkSession = AppUtil.createSparkSession(
-      name = s"${appConfig.applicationName} ${appConfig.feedSel}",
+      name = appName,
       appConfig.master.get,
       appConfig.deployMode,
       globalConfig.kryoClasses,
@@ -193,7 +193,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     LogUtil.setLogLevel(session.sparkContext)
 
     // create and execute actions
-    implicit val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appConfig.applicationName, registry, referenceTimestamp = Some(LocalDateTime.now))
+    implicit val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appName, registry, referenceTimestamp = Some(LocalDateTime.now))
     // TODO: what about runId?
     val actionDAGRun = ActionDAGRun(actions, runId = "test", appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism )
     actionDAGRun.prepare
