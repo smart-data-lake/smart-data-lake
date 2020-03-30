@@ -80,7 +80,7 @@ object ConfigLoader extends SmartDataLakeLogger {
    * @param configLocations     configuration files or directories containing configuration files.
    * @return                    a resolved [[Config]] merged from all found configuration files.
    */
-  def loadConfigFromFilesystem(configLocations: Seq[String]): Config = try {
+  def loadConfigFromFilesystem(configLocations: Seq[String]): Config = {
     val hadoopPaths = configLocations.map( l => HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(l)))
     logger.info(s"Loading configuration from filesystem location: ${hadoopPaths.map(_.toUri).mkString(", ")}.")
     implicit val fileSystem: FileSystem = HdfsUtil.getHadoopFs(hadoopPaths.head)
