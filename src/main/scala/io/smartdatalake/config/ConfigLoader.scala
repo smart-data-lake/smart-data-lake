@@ -149,7 +149,7 @@ object ConfigLoader extends SmartDataLakeLogger {
    *
    * This is an internal method to create a utility data structure.
    *
-   * @param rootPaths     root [[Path]]'s pointing to a configuration file or a directory from where the traversal starts.
+   * @param rootPaths     root [[Path]]s pointing to a configuration file or a directory from where the traversal starts.
    * @param fs            a configured HDFS [[FileSystem]] handle.
    * @return              a map with BFS ordered file lists for each file extension in [[ConfigLoader.configFileExtensions]].
    */
