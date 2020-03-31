@@ -23,18 +23,40 @@ import org.scalatest.FunSuite
 
 class PartitionValuesTest extends FunSuite {
 
-  test("sorting of partition values") {
-    val ordering1 = PartitionValues.getOrdering(Seq("dt"))
+  test("sorting of partition values: 1 column") {
+    val orderingDt = PartitionValues.getOrdering(Seq("dt"))
     assert(
-      Seq(PartitionValues(Map("dt"->"20181201")),PartitionValues(Map("dt"->"20170101"))).sorted(ordering1)
-      ==
-      Seq(PartitionValues(Map("dt"->"20170101")),PartitionValues(Map("dt"->"20181201")))
+      Seq(PartitionValues(Map("dt" -> "20181201")), PartitionValues(Map("dt" -> "20170101"))).sorted(orderingDt)
+        ==
+        Seq(PartitionValues(Map("dt" -> "20170101")), PartitionValues(Map("dt" -> "20181201")))
     )
-    val ordering2 = PartitionValues.getOrdering(Seq("dt","cnt"))
+  }
+
+  test("sorting of partition values: 2 columns") {
+    val partValSeq = Seq(PartitionValues(Map("dt"->"20181201","cnt"->2)),PartitionValues(Map("cnt"->2,"dt"->"20170101")),PartitionValues(Map("dt"->"20181201","cnt"->1)))
+
+    val orderingDtCnt: Ordering[PartitionValues] = PartitionValues.getOrdering(Seq("dt","cnt"))
     assert(
-      Seq(PartitionValues(Map("dt"->"20181201","cnt"->2)),PartitionValues(Map("dt"->"20170101","cnt"->2)),PartitionValues(Map("dt"->"20181201","cnt"->1))).sorted(ordering2)
-      ==
-      Seq(PartitionValues(Map("dt"->"20170101","cnt"->2)),PartitionValues(Map("dt"->"20181201","cnt"->1)),PartitionValues(Map("dt"->"20181201","cnt"->2)))
+      partValSeq.sorted(orderingDtCnt)
+        ==
+        Seq(PartitionValues(Map("dt"->"20170101","cnt"->2)),PartitionValues(Map("dt"->"20181201","cnt"->1)),PartitionValues(Map("dt"->"20181201","cnt"->2)))
     )
+
+    // Reversing the order precedence
+    val orderingCntDt: Ordering[PartitionValues] = PartitionValues.getOrdering(Seq("cnt","dt"))
+    assert(
+      partValSeq.sorted(orderingCntDt)
+        ==
+        Seq(PartitionValues(Map("dt"->"20181201","cnt"->1)),PartitionValues(Map("dt"->"20170101","cnt"->2)),PartitionValues(Map("dt"->"20181201","cnt"->2)))
+    )
+
+    // not all columns considered for ordering: original order maintained
+    val orderingDt = PartitionValues.getOrdering(Seq("dt"))
+    assert(
+      partValSeq.sorted(orderingDt)
+        ==
+        Seq(PartitionValues(Map("dt"->"20170101","cnt"->2)),PartitionValues(Map("dt"->"20181201","cnt"->2)),PartitionValues(Map("dt"->"20181201","cnt"->1)))
+    )
+
   }
 }
