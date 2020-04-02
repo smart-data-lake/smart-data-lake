@@ -8,7 +8,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
 * Easily generateable from third party metadata (e.g. source system table catalog) to automate transformation of huge number of DataObjects
 
 ##### Support for complex workflows
-* Split, join, parallel execution, multiple start- & end-nodes possible
+* Fork, join, parallel execution, multiple start- & end-nodes possible
 * Future: Recovery of failed runs
 
 ##### Execution Engines
