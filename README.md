@@ -2,7 +2,7 @@
 ![Build Status](https://github.com/smart-data-lake/smart-data-lake/workflows/Smart%20Data%20Lake/badge.svg)
  
 Smart Data Lake Builder is a data lake automation framework that makes loading and transforming data a breeze. 
-It is implemented in Scala and builds on top of open-source big data technologies like [Apache Hadoop](https://hadoop.apache.org/) and [Apache Spark](https://spark.apache.org/), including connectors for diverse data sources (HadoopFS, Hive, JDBC, Splunk,  Webservice, SFTP, JMS, Excel, Access) and file formats.
+It is implemented in Scala and builds on top of open-source big data technologies like [Apache Hadoop](https://hadoop.apache.org/) and [Apache Spark](https://spark.apache.org/), including connectors for diverse data sources (HadoopFS, Hive, DeltaLake, JDBC, Splunk,  Webservice, SFTP, JMS, Excel, Access) and file formats.
 
 ### A Data Lake
 * is a central raw data store for analytics
@@ -13,20 +13,22 @@ It is implemented in Scala and builds on top of open-source big data technologie
 * a layered data architecture to provide not only raw data, but prepared, secured, high quality data according to business entities, ready to use for analytical use cases, also called «Smart Data»
 * a declarative, configuration-driven approach to creating data pipelines. Metadata about data pipelines allows for efficient operations, maintenance and more business self-service.
 
-### Benefits
+### Benefits of Smart Data Lake Builder
 * Cheaper implementation of data lakes
 * Increased productivity of data scientists
 * Higher level of self-service
 * Decreased operations and maintenance costs
 * Fully open source, no vendor lock-in
 
-### When should you consider using Smart Data Lake ?
+### When should you consider using Smart Data Lake Builder ?
 Some common use cases include:
 * Building Data Lakes, drastically increasing productivity and usability 
 * Data Apps - building complex data processing apps
 * DWH automation - reading and writing to relational databases via SQL 
 * Data migration - Efficiently create one-time data pipelines
 * Data Catalog / Data Lineage - Generated automatically from metadata 
+
+See [Features](docs/Features.md) for a comprehensive list of Smart Data Lake Builder features.
 
 ## How it works
 The following diagram shows the core concepts:
