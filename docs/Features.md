@@ -44,7 +44,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
 * Process all data
 * Partition parameters: give partition values to process for start nodes as parameter
 * Init Partition Diff: search missing partitions on start nodes and use as parameter
-* Future: Partition Diff (every action individually), Incremental (get last processed timestamp from target) , Continous (Streaming)
+* Future: Partition Diff (every action individually), Incremental (get last processed timestamp from target), Continous (Streaming)
 
 ##### Schema Evolution
 * Automatic evolution of data schemas (new column, removed column, changed datatype)
