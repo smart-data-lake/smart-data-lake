@@ -38,11 +38,6 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     def format: String
 
     /**
-     * Overwrite or Append new data
-     */
-    def saveMode: SaveMode
-
-    /**
      * Returns the configured options for the Spark [[DataFrameReader]]/[[DataFrameWriter]].
      *
      * @see [[DataFrameReader]]

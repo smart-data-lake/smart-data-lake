@@ -127,8 +127,8 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
 
   override def deleteFileRefs(fileRefs: Seq[FileRef])(implicit session:SparkSession): Unit = {
     // delete given files on hdfs
-    fileRefs.foreach { _ =>
-      filesystem.delete(new Path(path), false) // recursive=false
+    fileRefs.foreach { file =>
+      filesystem.delete(new Path(file.fullPath), false) // recursive=false
     }
   }
 
@@ -207,6 +207,10 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
       case Success(r) => r
       case Failure(e) => throw new RuntimeException(s"Can't create OutputStream for $id and $path: : ${e.getClass.getSimpleName} - ${e.getMessage}", e)
     }
+  }
+
+  override def deleteAll(implicit session: SparkSession): Unit = {
+    filesystem.delete(hadoopPath, true) // recursive=true
   }
 
   protected[workflow] def applyAcls(implicit session: SparkSession): Unit = {

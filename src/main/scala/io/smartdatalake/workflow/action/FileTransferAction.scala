@@ -37,7 +37,7 @@ import org.apache.spark.sql.SparkSession
 case class FileTransferAction(override val id: ActionObjectId,
                               inputId: DataObjectId,
                               outputId: DataObjectId,
-                              deleteDataAfterRead: Boolean = false,
+                              override val deleteDataAfterRead: Boolean = false,
                               overwrite: Boolean = true,
                               override val breakFileRefLineage: Boolean = false,
                               override val initExecutionMode: Option[ExecutionMode] = None,
@@ -57,7 +57,7 @@ case class FileTransferAction(override val id: ActionObjectId,
   override def initSubFeed(subFeed: FileSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
     val inputFileRefs = subFeed.fileRefs.getOrElse( input.getFileRefs(subFeed.partitionValues))
     val fileRefPairs = fileTransfer.init(inputFileRefs)
-    subFeed.copy(fileRefs = Some(fileRefPairs.map(_._2)), dataObjectId = output.id)
+    subFeed.copy(fileRefs = Some(fileRefPairs.map(_._2)), dataObjectId = output.id, processedInputFileRefs = Some(inputFileRefs))
   }
 
   override def execSubFeed(subFeed: FileSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
@@ -65,15 +65,7 @@ case class FileTransferAction(override val id: ActionObjectId,
     val inputFileRefs = subFeed.fileRefs.getOrElse( input.getFileRefs(subFeed.partitionValues))
     val fileRefPairs = fileTransfer.init(inputFileRefs)
     fileTransfer.exec(fileRefPairs)
-    subFeed.copy(fileRefs = Some(fileRefPairs.map(_._2)), dataObjectId = output.id)
-  }
-
-  override def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    // delete Input Files if desired
-    if(deleteDataAfterRead) (input, inputSubFeed) match {
-      case (fileRefInput: FileRefDataObject, fileSubFeed: FileSubFeed) =>
-        fileSubFeed.fileRefs.map( fileRefs => fileRefInput.deleteFileRefs(fileRefs))
-    }
+    subFeed.copy(fileRefs = Some(fileRefPairs.map(_._2)), dataObjectId = output.id, processedInputFileRefs = Some(inputFileRefs))
   }
 
   /**
