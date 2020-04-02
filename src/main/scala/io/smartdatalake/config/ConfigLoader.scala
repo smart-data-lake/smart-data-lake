@@ -80,7 +80,7 @@ object ConfigLoader extends SmartDataLakeLogger {
    * @param configLocations     configuration files or directories containing configuration files.
    * @return                    a resolved [[Config]] merged from all found configuration files.
    */
-  def loadConfigFromFilesystem(configLocations: Seq[String]): Config = {
+  def loadConfigFromFilesystem(configLocations: Seq[String]): Config = try {
     val hadoopPaths = configLocations.map( l => HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(l)))
     logger.info(s"Loading configuration from filesystem location: ${hadoopPaths.map(_.toUri).mkString(", ")}.")
     implicit val fileSystem: FileSystem = HdfsUtil.getHadoopFs(hadoopPaths.head)
@@ -109,8 +109,7 @@ object ConfigLoader extends SmartDataLakeLogger {
   } catch {
     // catch if hadoop libraries are missing and output debug informations
     case ex:UnsatisfiedLinkError =>
-      val libraryPath =
-        logger.error(s"There seems to be a problem loading hadoop binaries: ${ex.getClass.getSimpleName}: ${ex.getMessage}. Make sure directory of hadoop libary is listed in path environment variable (libraryPath=${System.getProperty("java.library.path")})")
+      logger.error(s"There seems to be a problem loading hadoop binaries: ${ex.getClass.getSimpleName}: ${ex.getMessage}. Make sure directory of hadoop libary is listed in path environment variable (libraryPath=${System.getProperty("java.library.path")})")
       // retry loading hadoop library on our own to catch better error message (e.g. 64/32bit problems)
       try {
         System.loadLibrary("hadoop")
