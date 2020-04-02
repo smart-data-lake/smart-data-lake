@@ -91,6 +91,9 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
                              (implicit session: SparkSession): Unit = {
     validateSchemaMin(df)
     writeDataFrame(df, createTableOnly=false, partitionValues)
+
+    // make sure empty partitions are created as well
+    createMissingPartitions(partitionValues)
   }
 
   /**
@@ -138,6 +141,11 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   override def listPartitions(implicit session: SparkSession): Seq[PartitionValues] = {
     if(isTableExisting) HiveUtil.listPartitions(table, partitions)
     else Seq()
+  }
+
+  override def createEmptyPartition(partitionValues: PartitionValues)(implicit session: SparkSession): Unit = {
+    if (partitionValues.keys == partitions.toSet) HiveUtil.createEmptyPartition(table, partitionValues)
+    else logger.warn(s"($id) No empty partition was created for $partitionValues because there are not all partition columns defined")
   }
 
   /**

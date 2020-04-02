@@ -261,8 +261,9 @@ object ActionHelper extends SmartDataLakeLogger {
   def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed)(implicit session: SparkSession): SparkSubFeed = {
     if (subFeed.dataFrame.isEmpty) {
       assert(input.id == subFeed.dataObjectId, s"DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
-      logger.info(s"Getting DataFrame for DataObject ${input.id} filtered by partition values ${subFeed.partitionValues}")
-      val df = input.getDataFrame().colNamesLowercase // convert to lower case by default
+      logger.info(s"Getting DataFrame for DataObject ${input.id} filtered by partition values ${subFeed.partitionValues.mkString(", ")}")
+      val df = input.getDataFrame(subFeed.partitionValues)
+        .colNamesLowercase // convert to lower case by default
       val filteredDf = ActionHelper.filterDataFrame(df, subFeed.partitionValues)
       subFeed.copy(dataFrame = Some(filteredDf))
     } else subFeed
@@ -305,12 +306,16 @@ object ActionHelper extends SmartDataLakeLogger {
                 }
                 // calculate missing partition values
                 val partitionValuesToBeProcessed = partitionInput.listPartitions.map(_.filterKeys(commonPartitions)).toSet
-                  .diff(partitionOutput.listPartitions.map(_.filterKeys(commonPartitions)).toSet)
-                partitionValuesToBeProcessed.toSeq
-              } else throw ConfigurationException(s"$actionId has set initExecutionMode = 'partitionDiff' but $output has no partition columns defined!")
-            } else throw ConfigurationException(s"$actionId has set initExecutionMode = 'partitionDiff' but $input has no partition columns defined!")
-          case (_: CanHandlePartitions, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = 'partitionDiff' but $output does not support partitions!")
-          case (_, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = 'partitionDiff' but $input does not support partitions!")
+                  .diff(partitionOutput.listPartitions.map(_.filterKeys(commonPartitions)).toSet).toSeq
+                val ordering = PartitionValues.getOrdering(commonPartitions)
+                mode.nbOfPartitionValuesPerRun match {
+                  case Some(n) => partitionValuesToBeProcessed.sorted(ordering).take(n)
+                  case None => partitionValuesToBeProcessed.sorted(ordering)
+                }
+              } else throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $output has no partition columns defined!")
+            } else throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $input has no partition columns defined!")
+          case (_: CanHandlePartitions, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $output does not support partitions!")
+          case (_, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $input does not support partitions!")
         }
       case _ => partitionValues
     }

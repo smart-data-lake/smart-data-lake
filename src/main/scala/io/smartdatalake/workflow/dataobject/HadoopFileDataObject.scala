@@ -175,6 +175,12 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     }.getOrElse(Seq())
   }
 
+  override def createEmptyPartition(partitionValues: PartitionValues)(implicit session: SparkSession): Unit = {
+    val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitions.filter(partitionValues.isDefinedAt), separator)
+    val partitionPath = new Path(hadoopPath, partitionValues.getPartitionString(partitionLayout))
+    filesystem.mkdirs(partitionPath)
+  }
+
   override def getFileRefs(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[FileRef] = {
     val paths: Seq[(PartitionValues,String)] = getSearchPaths(partitionValues)
     // search paths and prepare FileRef's

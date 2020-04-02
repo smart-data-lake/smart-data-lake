@@ -23,6 +23,8 @@ import java.nio.file.Files
 import io.smartdatalake.util.hdfs.PartitionValues
 import org.apache.commons.io.FileUtils
 
+import scala.util.Try
+
 /**
  * Unit tests for [[HadoopFileDataObjectTest]].
  */
@@ -88,5 +90,22 @@ class HadoopFileDataObjectTest extends DataObjectTestSuite {
     partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
 
     FileUtils.deleteDirectory(tempDir.toFile)
+  }
+
+  test("create empty partition") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, partitions = Seq("p1","p2"), csvOptions = Map("header" -> "true"))
+
+    // write test files
+    val partitionValuesCreated = Seq( PartitionValues(Map("p1"->"A","p2"->"L2A")), PartitionValues(Map("p1"->"X","p2"->"L2X")))
+    val df = Seq(("A","L2A",1)).toDF("p1", "p2", "value")
+    dataObject.writeDataFrame(df, partitionValuesCreated)
+
+    val partitionValuesListed = dataObject.listPartitions
+    partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
+
+    Try(FileUtils.deleteDirectory(tempDir.toFile))
   }
 }

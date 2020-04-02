@@ -40,5 +40,19 @@ private[smartdatalake] trait CanHandlePartitions {
    * list partition values
    */
   def listPartitions(implicit session: SparkSession): Seq[PartitionValues]
+
+  /**
+   * create empty partition
+   */
+  def createEmptyPartition(partitionValues: PartitionValues)(implicit session: SparkSession): Unit = throw new RuntimeException(s"createEmptyPartition not implemented")
+
+  /**
+   * Create empty partitions for partition values not yet existing
+   */
+  final def createMissingPartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+    val partitionValuesCols = partitionValues.map(_.keys).fold(Set())(_ ++ _).toSeq
+    partitionValues.diff(listPartitions.map(_.filterKeys(partitionValuesCols)))
+      .foreach(createEmptyPartition)
+  }
 }
 
