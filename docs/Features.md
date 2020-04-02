@@ -4,7 +4,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
 
 ##### Filebased metadata
 * Easily versionable with a VCS for DevOps
-* Flexiblestructure by spliting over multiple files and subdirectories
+* Flexible structure by splitting over multiple files and subdirectories
 * Easily generateable from third party metadata (e.g. source system table catalog) to automate transformation of huge number of DataObjects
 
 ##### Support for complex workflows
