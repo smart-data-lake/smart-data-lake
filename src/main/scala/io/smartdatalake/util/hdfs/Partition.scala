@@ -64,7 +64,7 @@ private[smartdatalake] object PartitionValues {
    */
   def getOrdering(partitions: Seq[String]): Ordering[PartitionValues] = new Ordering[PartitionValues] {
     def compare(pv1: PartitionValues, pv2: PartitionValues): Int = {
-      partitions.toStream.map{
+      partitions.map{
         p => (pv1(p), pv2(p)) match {
           case (v1: String, v2: String) => v1.compare(v2)
           case (v1: Byte, v2: Byte) => v1.compare(v2)
