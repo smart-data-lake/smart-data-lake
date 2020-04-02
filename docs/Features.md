@@ -4,7 +4,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
 
 ##### Filebased metadata
 * Easily versionable with a VCS for DevOps
-* Flexiblestructure by spliting over multiple files and subdirectories
+* Flexible structure by splitting over multiple files and subdirectories
 * Easily generateable from third party metadata (e.g. source system table catalog) to automate transformation of huge number of DataObjects
 
 ##### Support for complex workflows
@@ -29,7 +29,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
 ##### Customizable Transformations
 * Spark Transformations: 
   * Languages: SQL, Scala (Class, compile from config), Future: Python
-  * Many input DataFrames to many outputs DataFrames (but only one output recommended normally, in order to define dependencies as detailed as possible (lineage)
+  * Many input DataFrames to many outputs DataFrames (but only one output recommended normally, in order to define dependencies as detailed as possible (lineage))
 * File Transformations: 
   * Language: Scala
   * Only one to one (one Input Stream to one OutputStream)
@@ -44,7 +44,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
 * Process all data
 * Partition parameters: give partition values to process for start nodes as parameter
 * Init Partition Diff: search missing partitions on start nodes and use as parameter
-* Future: Partition Diff (every action individually), Incremental (get last processed timestamp from target) , Continous (Streaming)
+* Future: Partition Diff (every action individually), Incremental (get last processed timestamp from target), Continous (Streaming)
 
 ##### Schema Evolution
 * Automatic evolution of data schemas (new column, removed column, changed datatype)
