@@ -18,10 +18,9 @@
  */
 package io.smartdatalake.workflow.action
 
-import java.io.File
+import java.nio.file.Files
 import java.time.LocalDateTime
 
-import com.holdenkarau.spark.testing.Utils
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.TestUtil._
@@ -36,8 +35,8 @@ class CustomDfToDeltaTableTest extends FunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
 
-  val tempDir: File = Utils.createTempDir()
-  val tempPath: String = tempDir.toPath.toAbsolutePath.toString
+  val tempDir = Files.createTempDirectory("tempHadoopDO")
+  val tempPath: String = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
