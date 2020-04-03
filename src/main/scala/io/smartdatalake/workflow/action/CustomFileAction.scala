@@ -52,6 +52,8 @@ case class CustomFileAction(override val id: ActionObjectId,
                            )(implicit instanceRegistry: InstanceRegistry)
   extends FileSubFeedAction with SmartDataLakeLogger {
 
+  assert(filesPerPartition>0, s"($id) filesPerPartition must be greater than 0. Current value: $filesPerPartition")
+
   override val input = getInputDataObject[HadoopFileDataObject](inputId)
   override val output = getOutputDataObject[HadoopFileDataObject](outputId)
   override val inputs: Seq[HadoopFileDataObject] = Seq(input)
@@ -78,7 +80,7 @@ case class CustomFileAction(override val id: ActionObjectId,
     val tgtDO = output // avoid serialization of whole action by assigning output to local variable
     tgtDO.filesystem // init filesystem to prepare hadoop conf serialization
     val transformerVal = transformer // avoid serialization of whole action by assigning transformer to local variable
-    val nbOfPartitions = filePathPairs.size/filesPerPartition
+    val nbOfPartitions = math.max(filePathPairs.size/filesPerPartition,1)
     val transformedDs = filePathPairs.toDS.repartition(nbOfPartitions)
       .map { case (srcPath, tgtPath) =>
         val result =TryWithRessource.exec( srcDO.filesystem.open(new Path(srcPath))) { is =>
