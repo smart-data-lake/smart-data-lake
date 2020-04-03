@@ -198,8 +198,13 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     implicit val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appName, registry, referenceTimestamp = Some(LocalDateTime.now))
     // TODO: what about runId?
     val actionDAGRun = ActionDAGRun(actions, runId = "test", appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism )
-    actionDAGRun.prepare
-    actionDAGRun.init
-    actionDAGRun.exec
+    try {
+      actionDAGRun.prepare
+      actionDAGRun.init
+      actionDAGRun.exec
+    } catch {
+      // dont fail an not severe exceptions like having no data to process
+      case ex: DAGException if (ex.severity == ExceptionSeverity.SKIPPED) => logger.warn(s"dag run is skipped because of ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+    }
   }
 }

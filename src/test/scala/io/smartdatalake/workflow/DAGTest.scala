@@ -148,7 +148,7 @@ class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
     println(resultTry)
     assert(resultTry.size==2)
     // check failed task
-    intercept[TaskPredecessorFailureException](resultTry.filter(_.isFailure).map(_.get))
+    intercept[TaskPredecessorFailureWarning](resultTry.filter(_.isFailure).map(_.get))
     // check succeeded tasks
     val resultSucceeded = resultTry.filter(_.isSuccess).map(_.get)
     assert(resultSucceeded.head.path.endsWith("-E"))
