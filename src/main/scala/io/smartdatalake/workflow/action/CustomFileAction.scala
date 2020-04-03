@@ -78,7 +78,7 @@ case class CustomFileAction(override val id: ActionObjectId,
     val tgtDO = output // avoid serialization of whole action by assigning output to local variable
     tgtDO.filesystem // init filesystem to prepare hadoop conf serialization
     val transformerVal = transformer // avoid serialization of whole action by assigning transformer to local variable
-    val nbOfPartitions = filePathPairs.size/filesPerPartition
+    val nbOfPartitions = math.max(filePathPairs.size/filesPerPartition,1)
     val transformedDs = filePathPairs.toDS.repartition(nbOfPartitions)
       .map { case (srcPath, tgtPath) =>
         val result =TryWithRessource.exec( srcDO.filesystem.open(new Path(srcPath))) { is =>
