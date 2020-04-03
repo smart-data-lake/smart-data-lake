@@ -18,10 +18,9 @@
  */
 package io.smartdatalake.workflow.action
 
-import java.io.{File, PrintWriter}
+import java.io.PrintWriter
 import java.nio.file.Files
 
-import com.holdenkarau.spark.testing.Utils
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.PartitionDiffMode
 import io.smartdatalake.testutils.TestUtil
@@ -40,8 +39,8 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
 
-  val tempDir: File = Utils.createTempDir()
-  val tempPath: String = tempDir.toPath.toAbsolutePath.toString
+  private val tempDir = Files.createTempDirectory("test")
+  private val tempPath = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 

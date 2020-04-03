@@ -18,17 +18,14 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.io.File
-
-import com.holdenkarau.spark.testing.Utils
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.hive.HiveUtil
 
 class HiveTableDataObjectTest extends DataObjectTestSuite {
 
-  val tempDir: File = Utils.createTempDir()
-  val tempPath: String = tempDir.toPath.toAbsolutePath.toString
+  private val tempDir = createTempDir
+  private val tempPath = tempDir.toAbsolutePath.toString
 
   import testSession.implicits._
 

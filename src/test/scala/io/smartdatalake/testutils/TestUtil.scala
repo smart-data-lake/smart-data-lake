@@ -43,6 +43,7 @@ import org.apache.sshd.server.command.Command
 import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider
 import org.apache.sshd.server.session.ServerSession
 import org.apache.sshd.server.subsystem.sftp.SftpSubsystemFactory
+import org.scalacheck.Arbitrary
 
 import scala.collection.JavaConverters._
 import scala.util.Try
@@ -372,6 +373,29 @@ object TestUtil extends SmartDataLakeLogger {
     )
     rowsTwoCandidateKeys.toDF("string_id1", "string_id2", "int_id1", "int_id2", "int_id3", "x")
   }
+
+  def arbitraryDataFrame(schema: StructType, nbRecords: Int = 100)(implicit session: SparkSession): DataFrame = {
+    val nbOfArrayRecords = 3
+    import scala.collection.JavaConverters._
+    def arbitraryValue(dataType: DataType): Any = {
+      dataType match {
+        case IntegerType => Arbitrary.arbInt.arbitrary.sample.get
+        case LongType => Arbitrary.arbLong.arbitrary.sample.get
+        case StringType => Arbitrary.arbString.arbitrary.sample.get
+        case FloatType => Arbitrary.arbFloat.arbitrary.sample.get
+        case DoubleType => Arbitrary.arbDouble.arbitrary.sample.get
+        case TimestampType => Timestamp.from(Arbitrary.arbDate.arbitrary.sample.get.toInstant)
+        case d: StructType => arbitraryRow(d.fields)
+        case d: ArrayType => (1 to nbOfArrayRecords).map( x => arbitraryValue(d.elementType))
+      }
+    }
+    def arbitraryRow(fields: Array[StructField]): Row = {
+      val colValues = fields.map( f => arbitraryValue(f.dataType))
+      Row.fromSeq(colValues)
+    }
+    session.createDataFrame((1 to nbRecords).map( x => arbitraryRow(schema.fields)).asJava, schema)
+  }
+
 }
 
 

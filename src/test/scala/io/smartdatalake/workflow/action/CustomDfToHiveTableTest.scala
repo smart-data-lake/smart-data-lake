@@ -18,10 +18,9 @@
  */
 package io.smartdatalake.workflow.action
 
-import java.io.File
+import java.nio.file.Files
 import java.time.LocalDateTime
 
-import com.holdenkarau.spark.testing.Utils
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.TestUtil._
@@ -39,8 +38,8 @@ class CustomDfToHiveTableTest extends FunSuite with BeforeAndAfter {
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
   import sessionHiveCatalog.implicits._
 
-  val tempDir: File = Utils.createTempDir()
-  val tempPath: String = tempDir.toPath.toAbsolutePath.toString
+  private val tempDir = Files.createTempDirectory("test")
+  private val tempPath = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 

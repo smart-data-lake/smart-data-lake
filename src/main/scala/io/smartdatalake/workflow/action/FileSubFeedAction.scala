@@ -111,6 +111,7 @@ abstract class FileSubFeedAction extends Action {
     if (deleteDataAfterRead()) (input, outputSubFeed) match {
       case (fileRefInput: FileRefDataObject, fileSubFeed: FileSubFeed) =>
         fileSubFeed.processedInputFileRefs.foreach(fileRefs => fileRefInput.deleteFileRefs(fileRefs))
+      case x => throw new IllegalStateException(s"Unmatched case $x")
     }
   }
 

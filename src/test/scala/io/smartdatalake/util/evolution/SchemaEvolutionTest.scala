@@ -18,7 +18,6 @@
  */
 package io.smartdatalake.util.evolution
 
-import com.holdenkarau.spark.testing.DataframeGenerator
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.sql.SparkSession
@@ -87,9 +86,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("SF_STR_6", StringType)
     ))
 
-    val sqlCtx = session.sqlContext
-    val oldDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaOld).arbitrary.sample.get
-    val newDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaNew).arbitrary.sample.get
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
 
     // old -> new
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldDf, newDf))
@@ -139,9 +137,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("SF_NEW_DOUBLE", StringType)
     ))
 
-    val sqlCtx = session.sqlContext
-    val oldDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaOld).arbitrary.sample.get
-    val newDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaNew).arbitrary.sample.get
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
 
     assert(SchemaEvolution.newColumns(oldDf, newDf).toSet == Set("SF_NEW_STR_1", "SF_NEW_DOUBLE_1", "SF_NEW_DOUBLE_2", "SF_NEW_DOUBLE"))
 
@@ -170,8 +167,7 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("SF_STR_3", StringType)
     ))
 
-    val sqlCtx = session.sqlContext
-    val df = DataframeGenerator.arbitraryDataFrame(sqlCtx, schema).arbitrary.sample.get
+    val df = TestUtil.arbitraryDataFrame(schema)
 
     val order = Seq(
       "SF_NR_3",
@@ -216,9 +212,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("SF_STR_3", StringType)
     ))
 
-    val sqlCtx = session.sqlContext
-    val oldDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaOld).arbitrary.sample.get
-    val newDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaNew).arbitrary.sample.get
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
     assert(!SchemaEvolution.hasSameColNamesAndTypes(oldDf, newDf))
   }
 
@@ -251,9 +246,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("SF_STR_3", StringType)
     ))
 
-    val sqlCtx = session.sqlContext
-    val oldDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaOld).arbitrary.sample.get
-    val newDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaNew).arbitrary.sample.get
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
 
     assert(SchemaEvolution.deletedColumns(oldDf, newDf).toSet == Set("SF_STR_4", "SF_TIME_1", "SF_STR_5", "SF_STR_6"))
 
@@ -304,9 +298,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("SF_STR_6_1", StringType)
     ))
 
-    val sqlCtx = session.sqlContext
-    val oldDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaOld).arbitrary.sample.get
-    val newDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaNew).arbitrary.sample.get
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
@@ -348,9 +341,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("SF_STR_6", StringType)
     ))
 
-    val sqlCtx = session.sqlContext
-    val oldDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaOld).arbitrary.sample.get
-    val newDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaNew).arbitrary.sample.get
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
 
     val colsToIgnore = Seq("dl_ts_captured", "dl_ts_delimited")
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, colsToIgnore)
@@ -374,9 +366,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("sf_nr_3", StringType)
     ))
 
-    val sqlCtx = session.sqlContext
-    val oldDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaOld).arbitrary.sample.get
-    val newDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaNew).arbitrary.sample.get
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
@@ -391,9 +382,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val schemaOld = StructType(List(StructField("a", StringType), StructField("b", IntegerType), StructField("c", IntegerType),StructField("dl_ts_captured", TimestampType),StructField("dl_ts_delimited", TimestampType)))
     val schemaNew = StructType(List(StructField("a", StringType), StructField("b", IntegerType), StructField("d", IntegerType)))
 
-    val sqlCtx = session.sqlContext
-    val oldDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaOld).arbitrary.sample.get
-    val newDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaNew).arbitrary.sample.get
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
 
     val colsToIgnore = Seq("dl_ts_captured", "dl_ts_delimited")
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, colsToIgnore)
@@ -409,9 +399,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val schemaOld = StructType(List(StructField("a", StringType), StructField("b", StructType(List(StructField("b1", IntegerType),StructField("b2", IntegerType))))))
     val schemaNew = StructType(List(StructField("a", StringType), StructField("b", StructType(List(StructField("b1", IntegerType),StructField("b2", IntegerType),StructField("b3", IntegerType))))))
 
-    val sqlCtx = session.sqlContext
-    val oldDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaOld).arbitrary.sample.get
-    val newDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaNew).arbitrary.sample.get
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
@@ -428,9 +417,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val schemaOld = StructType(List(StructField("a", StringType), StructField("b", StructType(List(StructField("b1", IntegerType),StructField("b2", IntegerType))))))
     val schemaNew = StructType(List(StructField("a", StringType), StructField("b", StructType(List(StructField("b1", IntegerType),StructField("b2", StringType))))))
 
-    val sqlCtx = session.sqlContext
-    val oldDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaOld).arbitrary.sample.get
-    val newDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaNew).arbitrary.sample.get
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
@@ -445,9 +433,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val schemaOld = StructType(List(StructField("a", StringType), StructField("b", ArrayType(FloatType))))
     val schemaNew = StructType(List(StructField("a", StringType), StructField("b", ArrayType(DoubleType))))
 
-    val sqlCtx = session.sqlContext
-    val oldDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaOld).arbitrary.sample.get
-    val newDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaNew).arbitrary.sample.get
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
@@ -462,9 +449,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val schemaOld = StructType(List(StructField("a", StringType), StructField("b", ArrayType(StructType(List(StructField("b1", IntegerType),StructField("b2", IntegerType)))))))
     val schemaNew = StructType(List(StructField("a", StringType), StructField("b", ArrayType(StructType(List(StructField("b1", IntegerType),StructField("b2", IntegerType),StructField("b3", IntegerType)))))))
 
-    val sqlCtx = session.sqlContext
-    val oldDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaOld).arbitrary.sample.get
-    val newDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaNew).arbitrary.sample.get
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
@@ -479,9 +465,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val schemaOld = StructType(List(StructField("a", StringType), StructField("b", ArrayType(StructType(List(StructField("b1", IntegerType),StructField("b2", IntegerType),StructField("b3", IntegerType)))))))
     val schemaNew = StructType(List(StructField("a", StringType), StructField("b", ArrayType(StructType(List(StructField("b1", IntegerType),StructField("b2", IntegerType)))))))
 
-    val sqlCtx = session.sqlContext
-    val oldDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaOld).arbitrary.sample.get
-    val newDf = DataframeGenerator.arbitraryDataFrame(sqlCtx, schemaNew).arbitrary.sample.get
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, ignoreOldDeletedNestedColumns = false)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
