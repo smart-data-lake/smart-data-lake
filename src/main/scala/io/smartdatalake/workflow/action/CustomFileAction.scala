@@ -52,6 +52,8 @@ case class CustomFileAction(override val id: ActionObjectId,
                            )(implicit instanceRegistry: InstanceRegistry)
   extends FileSubFeedAction with SmartDataLakeLogger {
 
+  assert(filesPerPartition>0, s"($id) filesPerPartition must be greater than 0. Current value: $filesPerPartition")
+
   override val input = getInputDataObject[HadoopFileDataObject](inputId)
   override val output = getOutputDataObject[HadoopFileDataObject](outputId)
   override val inputs: Seq[HadoopFileDataObject] = Seq(input)
