@@ -92,6 +92,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
       case (node: Action, empty) =>
         node.prepare
         node.outputs.map(outputDO => DummyDAGResult(outputDO.id.id))
+      case x => throw new IllegalStateException(s"Unmatched case $x")
     }
   }
 
@@ -102,6 +103,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
         node.edges.map(dataObjectId => InitSubFeed(dataObjectId, partitionValues))
       case (node: Action, subFeeds) =>
         node.init(subFeeds)
+      case x => throw new IllegalStateException(s"Unmatched case $x")
     }
   }
 
@@ -116,6 +118,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
         node.postExec(subFeeds, resultSubFeeds)
         //return
         resultSubFeeds
+      case x => throw new IllegalStateException(s"Unmatched case $x")
     }
 
     // log dag execution
