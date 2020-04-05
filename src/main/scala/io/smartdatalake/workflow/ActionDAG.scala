@@ -93,7 +93,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
     } finally {
       session.sparkContext.removeSparkListener(stageMetricsListener)
       if (stageMetricsListener.stageMetricsCollection.nonEmpty) {
-        logger.info(s"Operation '$op' stage metrics:\n - ${stageMetricsListener.stageMetricsCollection.map(_.report()).mkString("\n - ")}")
+        logger.debug(s"Operation '$op' stage metrics:\n - ${stageMetricsListener.stageMetricsCollection.map(_.report()).mkString("\n - ")}")
       }
     }
   }
