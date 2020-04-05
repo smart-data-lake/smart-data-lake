@@ -25,7 +25,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.TaskSkippedDontStopWarning
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{ArrayType, StringType, StructField, StructType}
+import org.apache.spark.sql.types.{ArrayType, MapType, StringType, StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
 /**
@@ -47,12 +47,14 @@ import org.apache.spark.sql.{Column, DataFrame, SparkSession}
  * }
  * }}}
  *
- * The config value can point to a configuration file or a directory containing configuration files.
+ * @param config: The config value can point to a configuration file or a directory containing configuration files.
+ * @param flattenOutput: if true, key and data column are converted from type map<k,v> to string (default).
  *
  * @see Refer to [[ConfigLoader.loadConfigFromFilesystem()]] for details about the configuration loading.
  */
 case class PKViolatorsDataObject(id: DataObjectId,
                                  config: Option[String] = None,
+                                 flattenOutput: Boolean = false,
                                  override val metadata: Option[DataObjectMetadata] = None)
                                 (@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with ParsableFromConfig[PKViolatorsDataObject] {
@@ -73,6 +75,7 @@ case class PKViolatorsDataObject(id: DataObjectId,
     logger.info(s"Prepare DataFrame with primary key violations for ${dataObjectsWithPk.map(_.id).mkString(", ")}")
 
     def colName2colRepresentation(colName: String) = struct(lit(colName).as(columnNameName),col(colName).as(columnValueName))
+    def optionalCastColToString(doCast: Boolean)(col: Column) = if (doCast) col.cast(StringType) else col
 
     def getPKviolatorDf(tobj: TableDataObject) = {
       val pkColNames = tobj.table.primaryKey.get.toArray
@@ -82,11 +85,15 @@ case class PKViolatorsDataObject(id: DataObjectId,
         val scmTable = dfTable.schema
         val dataColumns = dfPKViolators.columns.diff(pkColNames)
         val colSchema: Column = lit(scmTable.toDDL).as("schema")
-        val keyCol: Column = array(pkColNames.map(colName2colRepresentation): _*).cast(colListType(false)).as("key")
-        val dataCol: Column = if (dataColumns.isEmpty) {
-          lit(null).cast(colListType(true))
-        } else {
-          array(dataColumns.map(colName2colRepresentation): _*).cast(colListType(true))
+        val keyCol: Column = optionalCastColToString(flattenOutput) {
+          array(pkColNames.map(colName2colRepresentation): _*).cast(colListType(false)).as("key")
+        }
+        val dataCol: Column = optionalCastColToString(flattenOutput) {
+          if (dataColumns.isEmpty) {
+            lit(null).cast(colListType(true))
+          } else {
+            array(dataColumns.map(colName2colRepresentation): _*).cast(colListType(true))
+          }.as("data")
         }
         Some( dfPKViolators.select(
           lit(tobj.id.id).as("data_object_id"),

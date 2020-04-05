@@ -128,8 +128,6 @@ class PKviolatorDOtest extends FunSuite with BeforeAndAfter with SmartDataLakeLo
 
     // actual: reading the table containing the PK violators
     val actual = PKViolatorsDataObject("pkViol").getDataFrame()
-    println("actual:")
-    actual.printSchema()
 
     // creating expected
     val rows_expectedWithData: java.util.List[Row] = ArrayBuffer(
@@ -161,9 +159,6 @@ class PKviolatorDOtest extends FunSuite with BeforeAndAfter with SmartDataLakeLo
 
     val expected = session.createDataFrame(rows_expectedWithData,PKviolatorSchema)
       .union(session.createDataFrame(rows_expectedWithOutData,PKviolatorSchemaWithOutDataCol).withColumn("data",nullDataCol))
-
-    println("expected:")
-    expected.printSchema()
 
     val resultat: Boolean = expected.isEqual(actual)
     if (!resultat) printFailedTestResult("PKviolators_multipleDOs",
