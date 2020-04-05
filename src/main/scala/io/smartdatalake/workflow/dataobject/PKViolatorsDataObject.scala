@@ -23,6 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, FromConfigFactory, InstanceRegistry, ParsableFromConfig}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import io.smartdatalake.workflow.TaskSkippedDontStopWarning
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{ArrayType, StringType, StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
@@ -75,23 +76,32 @@ case class PKViolatorsDataObject(id: DataObjectId,
 
     def getPKviolatorDf(tobj: TableDataObject) = {
       val pkColNames = tobj.table.primaryKey.get.toArray
-      val dfTable = tobj.getDataFrame()
-      val dfPKViolators = dfTable.getPKviolators(pkColNames)
-      val scmTable = dfTable.schema
-      val dataColumns = dfPKViolators.columns.diff(pkColNames)
-      val colSchema: Column = lit(scmTable.toDDL).as("schema")
-      val keyCol: Column = array(pkColNames.map(colName2colRepresentation):_*).cast(colListType(false)).as("key")
-      val dataCol: Column = if (dataColumns.isEmpty) {
-        lit(null).cast(colListType(true))
-      } else { array(dataColumns.map(colName2colRepresentation):_*).cast(colListType(true)) }
-      dfPKViolators.select(
-        lit(tobj.id.id).as("data_object_id"),
-        lit(tobj.table.db.get).as("db"),
-        lit(tobj.table.name).as("table"),
-        colSchema,keyCol,dataCol.as("data")
-      )
+      if (tobj.isTableExisting) {
+        val dfTable = tobj.getDataFrame()
+        val dfPKViolators = dfTable.getPKviolators(pkColNames)
+        val scmTable = dfTable.schema
+        val dataColumns = dfPKViolators.columns.diff(pkColNames)
+        val colSchema: Column = lit(scmTable.toDDL).as("schema")
+        val keyCol: Column = array(pkColNames.map(colName2colRepresentation): _*).cast(colListType(false)).as("key")
+        val dataCol: Column = if (dataColumns.isEmpty) {
+          lit(null).cast(colListType(true))
+        } else {
+          array(dataColumns.map(colName2colRepresentation): _*).cast(colListType(true))
+        }
+        Some( dfPKViolators.select(
+          lit(tobj.id.id).as("data_object_id"),
+          lit(tobj.table.db.get).as("db"),
+          lit(tobj.table.name).as("table"),
+          colSchema, keyCol, dataCol.as("data")
+        ))
+      } else {
+        // ignore if table missing, it might be not yet created but only exists in metadata...
+        logger.warn(s"(id) Table ${tobj.table.fullName} doesn't exist")
+        None
+      }
     }
-    val pkViolatorsDfs = dataObjectsWithPk.map(getPKviolatorDf)
+    val pkViolatorsDfs = dataObjectsWithPk.flatMap(getPKviolatorDf)
+    if (pkViolatorsDfs.isEmpty) throw new TaskSkippedDontStopWarning(id.id, s"($id) No existing table with primary key found")
 
     // combine & return dataframe
     def unionDf(df1: DataFrame, df2: DataFrame) = df1.union(df2)
