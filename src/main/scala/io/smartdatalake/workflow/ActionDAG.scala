@@ -49,7 +49,7 @@ private[smartdatalake] class ActionEventListener(operation: String) extends DAGE
   }
   override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
     node.addRuntimeEvent(operation, RuntimeEventState.FAILED, s"${exception.getClass.getSimpleName}: ${exception.getMessage}")
-    logger.error(s"${node.toStringShort}: $operation failed with")
+    logger.error(s"${node.toStringShort}: $operation failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
   }
   override def onNodeSkipped(exception: Throwable)(node: Action): Unit = {
     node.addRuntimeEvent(operation, RuntimeEventState.SKIPPED, s"${exception.getClass.getSimpleName}: ${exception.getMessage}")
@@ -80,8 +80,8 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
       }
       // log all exceptions
       dagExceptions.foreach {
-        case ex if (ex.severity <= ExceptionSeverity.CANCELLED) => logger.error(s"${ex.getClass.getSimpleName}: ${ex.getMessage}")
-        case ex => logger.warn(s"${ex.getClass.getSimpleName}: ${ex.getMessage}")
+        case ex if (ex.severity <= ExceptionSeverity.CANCELLED) => logger.error(s"$op: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+        case ex => logger.warn(s"$op: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
       }
       // log dag on error
       if (dagExceptions.nonEmpty) ActionDAGRun.logDag(s"$op failed for dag $runId", dag)
@@ -93,7 +93,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
     } finally {
       session.sparkContext.removeSparkListener(stageMetricsListener)
       if (stageMetricsListener.stageMetricsCollection.nonEmpty) {
-        logger.info(s"Operation '$op' stage metrics:\n - ${stageMetricsListener.stageMetricsCollection.map(_.report()).mkString("\n - ")}")
+        logger.debug(s"Operation '$op' stage metrics:\n - ${stageMetricsListener.stageMetricsCollection.map(_.report()).mkString("\n - ")}")
       }
     }
   }
