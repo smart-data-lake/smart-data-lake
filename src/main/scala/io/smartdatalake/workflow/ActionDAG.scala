@@ -78,18 +78,19 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
         case ex: DAGException => ex.getDAGRootExceptions
         case ex => throw ex // this should not happen
       }
+      val dagExceptionsToStop = dagExceptions.filter(_.severity <= ExceptionSeverity.SKIPPED)
       // log all exceptions
       dagExceptions.foreach {
         case ex if (ex.severity <= ExceptionSeverity.CANCELLED) => logger.error(s"$op: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
         case ex => logger.warn(s"$op: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
       }
       // log dag on error
-      if (dagExceptions.nonEmpty) ActionDAGRun.logDag(s"$op failed for dag $runId", dag)
+      if (dagExceptionsToStop.nonEmpty) ActionDAGRun.logDag(s"$op failed for dag $runId", dag)
       // throw most severe exception
-      dagExceptions.sortBy(_.severity).foreach{ throw _ }
+      dagExceptionsToStop.sortBy(_.severity).foreach{ throw _ }
 
       // extract & return subfeeds
-      result.map(_.get)
+      result.filter(_.isSuccess).map(_.get)
     } finally {
       session.sparkContext.removeSparkListener(stageMetricsListener)
       if (stageMetricsListener.stageMetricsCollection.nonEmpty) {
