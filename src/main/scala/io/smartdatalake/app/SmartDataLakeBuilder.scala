@@ -66,7 +66,19 @@ case class SmartDataLakeBuilderConfig(feedSel: String = null,
   def getPartitionValues: Option[Seq[PartitionValues]] = partitionValues.orElse(multiPartitionValues)
 }
 
-case class GlobalConfig( kryoClasses: Option[Seq[String]] = None, sparkOptions: Option[Map[String,String]] = None, enableHive: Boolean = true)
+case class GlobalConfig( kryoClasses: Option[Seq[String]] = None, sparkOptions: Option[Map[String,String]] = None, enableHive: Boolean = true) {
+  /**
+   * Create a spark session using settings from this global config
+   */
+  def createSparkSession(appName: String, master: String = "local[*]", deployMode: Option[String] = None): SparkSession = {
+    AppUtil.createSparkSession(appName, master, deployMode, kryoClasses, sparkOptions, enableHive)
+  }
+}
+object GlobalConfig {
+  private[smartdatalake] def from(config: Config): GlobalConfig = {
+    config.get[Option[GlobalConfig]]("global").value.getOrElse(GlobalConfig())
+  }
+}
 
 /**
  * Abstract Smart Data Lake Command Line Application.
@@ -175,7 +187,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     }
     require(config.hasPath("actions"), s"No configuration parsed or it does not have a section called actions")
     require(config.hasPath("dataObjects"), s"No configuration parsed or it does not have a section called dataObjects")
-    val globalConfig = config.get[Option[GlobalConfig]]("global").value.getOrElse(GlobalConfig())
+    val globalConfig = GlobalConfig.from(config)
 
     // parse config objects and search actions to execute by feedSel
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
@@ -184,14 +196,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     logger.info(s"selected actions ${actions.map(_.id).mkString(", ")}")
 
     // create Spark Session
-    implicit val session: SparkSession = AppUtil.createSparkSession(
-      name = appName,
-      appConfig.master.get,
-      appConfig.deployMode,
-      globalConfig.kryoClasses,
-      globalConfig.sparkOptions,
-      globalConfig.enableHive
-    )
+    implicit val session: SparkSession = globalConfig.createSparkSession(appName,  appConfig.master.get, appConfig.deployMode)
     LogUtil.setLogLevel(session.sparkContext)
 
     // create and execute actions
