@@ -107,4 +107,4 @@ There's a separate repository you should check out that contains many examples o
 https://github.com/smart-data-lake/sdl-examples
 
 ### Get in touch
-If you have issues, comments or feedback, please see [Contributing](Contributing.md) on how to get in touch.
+If you have issues, comments or feedback, please see [Contributing](Contribute.md) on how to get in touch.

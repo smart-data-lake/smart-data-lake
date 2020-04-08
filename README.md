@@ -70,5 +70,5 @@ To see how all this works in action, head over to the [Getting Started](docs/Get
 [Glossary](docs/Glossary.md)  
 [Troubleshooting](docs/Troubleshooting.md)    
 [FAQ](docs/FAQ.md)  
-[Contributing](docs/Contributing.md)  
+[Contributing](docs/Contribute.md)  
 [Running in the Public Cloud](docs/PublicCloud.md)  
