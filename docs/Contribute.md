@@ -1,6 +1,6 @@
 # Contributing
 
-Please check the [Contributing Guidelines](../CONTRIBUTING.md) and [Code of Conduct](../CODE_OF_CONDUCT.md)
+Please check the [Contributing Guidelines](https://github.com/smart-data-lake/smart-data-lake/blob/develop/CONTRIBUTING.md) and [Code of Conduct](https://github.com/smart-data-lake/smart-data-lake/blob/develop/CODE_OF_CONDUCT.md)
 first. 
 You'll find some additional information on how to setup your development environment.
 
