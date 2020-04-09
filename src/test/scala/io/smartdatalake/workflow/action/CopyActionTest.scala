@@ -65,13 +65,17 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // prepare & start load
     val refTimestamp1 = LocalDateTime.now()
     implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", instanceRegistry, Some(refTimestamp1))
-    val customTransformerConfig = CustomDfTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestDfTransformer"))
+    //val customTransformerConfig = CustomDfTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestDfTransformer"))
+    val customTransformerConfig = CustomDfTransformerConfig(sqlCode = Some("select * from copy_input"))
+
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformer = Some(customTransformerConfig))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     TestUtil.prepareHiveTable(srcTable, srcPath, l1)
     val srcSubFeed = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe")),PartitionValues(Map("lastname" -> "jonson"))))
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
+
+    srcSubFeed.dataFrame.get.show()
 
     val r1 = session.table(s"${tgtTable.fullName}")
       .select($"rating")

@@ -21,6 +21,7 @@ package io.smartdatalake.util.misc
 import java.io.InputStream
 
 import io.smartdatalake.config.ConfigurationException
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import scala.tools.reflect.ToolBox
 import scala.util.{Failure, Success, Try}
@@ -67,6 +68,10 @@ private[smartdatalake] object CustomCodeUtil {
       case Success(obj) => obj
       case Failure(e) => throw new ConfigurationException(s"Error while casting compiled code: " +e.getMessage)
     }
+  }
+
+  def compileSqlCode[T](sqlCode: String): T = {
+
   }
 
   def getClassInstanceByName[T](classname:String): T = {

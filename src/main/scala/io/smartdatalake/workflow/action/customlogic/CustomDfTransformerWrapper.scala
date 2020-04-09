@@ -23,6 +23,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 private[smartdatalake] class CustomDfTransformerWrapper(val fnExec: (SparkSession, Map[String,String], DataFrame, String) => DataFrame)
   extends CustomDfTransformer {
   def transform(session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectId: String) : DataFrame = {
+    df.createOrReplaceTempView(dataObjectId)
     fnExec(session, options, df, dataObjectId)
   }
 }

@@ -40,8 +40,8 @@ trait CustomDfTransformer extends Serializable {
 
 }
 
-case class CustomDfTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, options: Map[String,String] = Map()) {
-  require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined, "Either className or scalaFile must be defined for CustomDfTransformer")
+case class CustomDfTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Option[String] = None, options: Map[String,String] = Map()) {
+  require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || sqlCode.isDefined, "Either className or scalaFile or scalaCode or sqlCode must be defined for CustomDfTransformer")
 
   val impl : CustomDfTransformer = className.map {
     clazz => CustomCodeUtil.getClassInstanceByName[CustomDfTransformer](clazz)
@@ -57,11 +57,18 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
         val fnTransform = CustomCodeUtil.compileCode[(SparkSession, Map[String,String], DataFrame, String) => DataFrame](code)
         new CustomDfTransformerWrapper( fnTransform )
     }
+  }.orElse{
+    sqlCode.map {
+      code =>
+        val fnTransform = CustomCodeUtil.compileSqlCode[(SparkSession, Map[String,String], DataFrame, String) => DataFrame](code)
+        new CustomDfTransformerWrapper( fnTransform )
+    }
   }.get
 
   override def toString: String = {
     if(className.isDefined)       "className: "+className.get
     else if(scalaFile.isDefined)  "scalaFile: "+scalaFile.get
+    else if(sqlCode.isDefined)    "sqlCode: "+sqlCode.get
     else                          "scalaCode: "+scalaCode.get
   }
 
