@@ -23,6 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SaveMode}
 
@@ -59,9 +60,11 @@ case class ParquetFileDataObject( override val id: DataObjectId,
                                   override val saveMode: SaveMode = SaveMode.Overwrite,
                                   override val acl: Option[AclDef] = None,
                                   override val connectionId: Option[ConnectionId] = None,
-                                  override val metadata: Option[DataObjectMetadata] = None
+                                  override val metadata: Option[DataObjectMetadata] = None,
+                                  override val streamingOptions : Map[String, String] = Map(),
+                                  override val trigger : Trigger = Trigger.Once
                                 )(@transient implicit override val instanceRegistry: InstanceRegistry)
-  extends SparkFileDataObjectWithEmbeddedSchema with CanCreateDataFrame with CanWriteDataFrame {
+  extends SparkFileDataObjectWithEmbeddedSchema with CanCreateDataFrame with CanWriteDataFrame with CanWriteDataStream{
 
   override val format = "parquet"
 

@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.ExecutionMode
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, CanWriteDataStream,DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 
@@ -81,7 +81,16 @@ abstract class SparkSubFeedAction extends Action {
     // write output
     logger.info(s"writing to DataObject ${output.id}, partitionValues ${subFeed.partitionValues}")
     setSparkJobDescription( s"writing to DataObject ${output.id}" )
-    output.writeDataFrame(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
+
+    // Write from a streaming input
+    if(transformedSubFeed.dataFrame.get.isStreaming){
+      assert(output.isInstanceOf[CanWriteDataStream], s"Output type ${output.getClass.getSimpleName} does not support streaming inputs")
+      output.asInstanceOf[CanWriteDataStream].writeDataStream(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
+    // Write from a batch input
+    } else {
+      output.writeDataFrame(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
+    }
+
     // return
     Seq(transformedSubFeed)
   }

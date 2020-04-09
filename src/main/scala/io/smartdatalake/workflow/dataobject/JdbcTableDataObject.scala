@@ -27,6 +27,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils, DfSDL}
 import io.smartdatalake.workflow.connection.JdbcTableConnection
+import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
@@ -39,8 +40,8 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
  * @param postSql SQL-statement to be executed after writing to table
  * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
  * @param table The jdbc table to be read
- * @jdbcFetchSize Number of rows to be fetched together by the Jdbc driver
- * @connectionId Id of JdbcConnection configuration
+ * @param jdbcFetchSize Number of rows to be fetched together by the Jdbc driver
+ * @param connectionId Id of JdbcConnection configuration
  */
 case class JdbcTableDataObject(override val id: DataObjectId,
                                createSql: Option[String] = None,
@@ -50,9 +51,11 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                override var table: Table,
                                jdbcFetchSize: Int = 1000,
                                connectionId: ConnectionId,
+                               streamingOptions: Map[String, String] = Map(),
+                               trigger: Trigger = Trigger.Once,
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject {
+  extends TransactionalSparkTableDataObject with CanWriteDataStream {
 
   /**
    * Connection defines driver, url and db in central location
@@ -103,7 +106,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     writeJdbcDF(table, df)
   }
 
-  override def postWrite(implicit session: SparkSession): Unit = {
+   override def postWrite(implicit session: SparkSession): Unit = {
     super.postWrite
     postSql.foreach{ sql =>
       logger.info(s"($id) postSQL is being executed")
@@ -124,7 +127,9 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     connection.execJdbcQuery(cntTableInCatalog, evalTableExistsInCatalog)
   }
 
+
   override def isTableExisting(implicit session: SparkSession): Boolean = {
+
     val cntTableInCatalog =
       if (Environment.enableJdbcCaseSensitivity)
         s"select count(*) from INFORMATION_SCHEMA.TABLES where TABLE_NAME='${table.name}' and TABLE_SCHEMA='${table.db.get}'"
@@ -135,6 +140,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       rs.getInt(1)==1
     }
     connection.execJdbcQuery( cntTableInCatalog, evalTableExistsInCatalog )
+
   }
 
   def writeJdbcDF(table:Table, df:DataFrame)(implicit ss: SparkSession): Unit = {
