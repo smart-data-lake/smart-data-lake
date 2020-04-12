@@ -21,6 +21,7 @@ package io.smartdatalake.util.hdfs
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.dataobject.SparkFileDataObject
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{col, hash, lit, pmod}
 
@@ -30,9 +31,15 @@ import org.apache.spark.sql.functions.{col, hash, lit, pmod}
  * @param numberOfTasksPerPartition Number of Spark tasks to create per partition before writing to DataObject by repartitioning the DataFrame. This controls how many files are created in each Hadoop partition.
  * @param keyCols Optional key columns to distribute records over Spark tasks inside a Hadoop partition. If numberOfTasksPerPArtition is 1 this setting has no effect. If DataObject has Hadoop partitions defined, keyCols must be defined.
  * @param sortCols Optional columns to sort records inside files created.
+ * @param filename Option filename to rename target file if numberOfTasksPerPartition is 1
  */
-case class SparkRepartitionDef(numberOfTasksPerPartition: Int, keyCols: Seq[String] = Seq(), sortCols: Seq[String] = Seq()) extends SmartDataLakeLogger {
+case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
+                               keyCols: Seq[String] = Seq(),
+                               sortCols: Seq[String] = Seq(),
+                               filename: Option[String] = None
+                              ) extends SmartDataLakeLogger {
   assert(numberOfTasksPerPartition > 0, s"numberOfTasksPerPartition must be greater than 0")
+  assert(filename.isEmpty || numberOfTasksPerPartition == 1, s"if filename is defined then numberOfTasksPerPartition must be set to 1.")
 
   /**
    *

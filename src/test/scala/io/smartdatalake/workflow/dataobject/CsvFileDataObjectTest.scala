@@ -207,16 +207,17 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
   testsFor(validateSchemaMinOnWrite(createDataObjectWithSchemaMin(Map("header" -> "false", "inferSchema" -> "true")), fileExtension = ".csv"))
   testsFor(validateSchemaMinOnRead(createDataObjectWithSchemaMin(Map("header" -> "false", "inferSchema" -> "true")), fileExtension = ".csv"))
 
-  test("Writing file with numberOfTasksPerPartition=1 results in 1 file written") {
+  test("Writing file with numberOfTasksPerPartition=1 results in 1 file written, incl. rename") {
     val tempFile = File.createTempFile("temp", "csv")
     tempFile.deleteOnExit()
 
     val dfInit = (1 to 1000).map( i => ("test", i)).toDF("name", "cnt")
       .repartition(10)
-    val tgtDO = CsvFileDataObject(id="test1", path=escapedFilePath(tempFile.getPath), sparkRepartition=Some(SparkRepartitionDef(numberOfTasksPerPartition=1)))
+    val tgtDO = CsvFileDataObject(id="test1", path=escapedFilePath(tempFile.getPath), sparkRepartition=Some(SparkRepartitionDef(numberOfTasksPerPartition=1, filename=Some("data.csv"))))
     tgtDO.writeDataFrame(dfInit, Seq())
     val resultFileRefs = tgtDO.getFileRefs(Seq())
     resultFileRefs.size shouldBe 1
+    resultFileRefs.head.fileName shouldBe "data.csv"
   }
 
   test("Writing file with numberOfTasksPerPartition=2 results in 2 files written") {

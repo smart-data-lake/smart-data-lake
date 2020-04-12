@@ -20,6 +20,7 @@ package io.smartdatalake
 
 import configs.Configs
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, ConnectionId, DataObjectId}
+import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.webservice.KeycloakConfig
 import io.smartdatalake.workflow.action.customlogic._
 import io.smartdatalake.workflow.dataobject.{SplunkParams, WebserviceFileDataObject}
@@ -68,6 +69,8 @@ package object config {
   implicit val customDfsTransformerConfigReader: Configs[CustomDfsTransformerConfig] = Configs.derive[CustomDfsTransformerConfig]
 
   implicit val customFileTransformerConfigReader: Configs[CustomFileTransformerConfig] = Configs.derive[CustomFileTransformerConfig]
+
+  implicit val sparkRepartitionDefReader: Configs[SparkRepartitionDef] = Configs.derive[SparkRepartitionDef]
 
   // --------------------------------------------------------------------------------
 
