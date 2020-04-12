@@ -16,13 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
 package io.smartdatalake.workflow.action.customlogic
 
-import org.apache.spark.sql.{DataFrame, SparkSession}
-
-private[smartdatalake] class CustomDfTransformerWrapper(val fnExec: (SparkSession, Map[String,String], DataFrame, String) => DataFrame)
-  extends CustomDfTransformer {
-  def transform(session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectId: String) : DataFrame = {
-    fnExec(session, options, df, dataObjectId)
-  }
-}
+/**
+ * Exception is thrown if the SQL transformation can not be executed correctly
+ * @param message
+ */
+private[smartdatalake] class SQLTransformationException(message: String) extends RuntimeException(message) {}
