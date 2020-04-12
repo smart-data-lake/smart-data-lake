@@ -85,9 +85,9 @@ case class CsvFileDataObject( override val id: DataObjectId,
   override val fileName: String = "*.csv*"
 
   private val formatOptionsDefault = Map(
-    "header" -> "false",
+    "header" -> "true",
     "inferSchema" -> "false",
-    "delimiter" -> "|",
+    "delimiter" -> ",",
     "quote" -> null
   )
 
