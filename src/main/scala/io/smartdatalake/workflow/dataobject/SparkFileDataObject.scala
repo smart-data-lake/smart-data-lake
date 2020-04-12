@@ -38,11 +38,6 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     def format: String
 
     /**
-     * Overwrite or Append new data
-     */
-    def saveMode: SaveMode
-
-    /**
      * Returns the configured options for the Spark [[DataFrameReader]]/[[DataFrameWriter]].
      *
      * @see [[DataFrameReader]]
@@ -138,20 +133,22 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
      */
     override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
 
-        // prepare data
-        val dfPrepared = beforeWrite(df)
+      // prepare data
+      val dfPrepared = beforeWrite(df)
 
-        val hadoopPathString = hadoopPath.toString
-        logger.info(s"Writing data frame to $hadoopPathString")
+      val hadoopPathString = hadoopPath.toString
+      logger.info(s"Writing data frame to $hadoopPathString")
 
-        // write
-        dfPrepared.write.format(format)
-          .mode(saveMode)
-          .options(options)
-          .optionalPartitionBy(partitions)
-          .save(hadoopPathString)
+      // write
+      dfPrepared.write.format(format)
+        .mode(saveMode)
+        .options(options)
+        .optionalPartitionBy(partitions)
+        .save(hadoopPathString)
+
+      // make sure empty partitions are created as well
+      createMissingPartitions(partitionValues)
     }
-
 }
 
 /**

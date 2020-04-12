@@ -29,6 +29,8 @@ import scala.collection.JavaConverters._
  */
 private[smartdatalake] object DataFrameUtil {
 
+  def arrayToSeq[T](arr: Array[T]): Seq[T] = if (arr==null) Seq() else arr.toSeq
+
   implicit class DfSDL(df: DataFrame) extends SmartDataLakeLogger {
 
 
@@ -279,6 +281,13 @@ private[smartdatalake] object DataFrameUtil {
       }
     }
 
+    /**
+     * If colName is defined, creates an additional column with a given expression on a DataFrame
+     */
+    def withOptionalColumn(colName: Option[String], expr: Column): DataFrame = {
+      if (colName.isDefined) df.withColumn(colName.get, expr)
+      else df
+    }
 
     /**
      * Computes the set difference of `right` minus `left`, i.e: `Set(right)` \ `Set(left)`.
@@ -388,19 +397,6 @@ private[smartdatalake] object DataFrameUtil {
       }
     }
     else df
-  }
-
-  /**
-   * Removes a given column from a [[DataFrame]]
-   *
-   * @param df [[DataFrame]] to edit
-   * @param cols column to remove
-   * @return [[DataFrame]] without removed columns
-   */
-  def dropColumns(df: DataFrame, cols: List[String]): DataFrame = {
-    var dfDropped = df
-    cols.foreach(col => dfDropped = dfDropped.drop(col))
-    dfDropped
   }
 
   /**

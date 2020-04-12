@@ -85,7 +85,7 @@ This can hopefully be simplified in the future.
 1.  Now create a Job with the following details:<br/>
     Task: Upload JAR - Choose the smartdatalake-\<version>-jar-with-dependencies.jar<br/>
     Main Class: io.smartdatalake.app.DatabricksSmartDataLakeBuilder
-    Arguments: -c file:///dbfs/conf/ --feed-sel ab-azure --name azure -m yarn<br/>
+    Arguments: -c file:///dbfs/conf/ --feed-sel ab-azure -m yarn<br/>
     The option *--override-jars* is set automatically to the correct value for DatabricksConfigurableApp. 
     If you want to override any additional libraries, you can provide a list with this option. 
     

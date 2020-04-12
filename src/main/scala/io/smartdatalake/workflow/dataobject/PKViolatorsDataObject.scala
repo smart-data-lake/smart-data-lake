@@ -23,8 +23,9 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, FromConfigFactory, InstanceRegistry, ParsableFromConfig}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import io.smartdatalake.workflow.TaskSkippedDontStopWarning
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{ArrayType, StringType, StructField, StructType}
+import org.apache.spark.sql.types.{ArrayType, MapType, StringType, StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
 /**
@@ -46,12 +47,14 @@ import org.apache.spark.sql.{Column, DataFrame, SparkSession}
  * }
  * }}}
  *
- * The config value can point to a configuration file or a directory containing configuration files.
+ * @param config: The config value can point to a configuration file or a directory containing configuration files.
+ * @param flattenOutput: if true, key and data column are converted from type map<k,v> to string (default).
  *
  * @see Refer to [[ConfigLoader.loadConfigFromFilesystem()]] for details about the configuration loading.
  */
 case class PKViolatorsDataObject(id: DataObjectId,
                                  config: Option[String] = None,
+                                 flattenOutput: Boolean = false,
                                  override val metadata: Option[DataObjectMetadata] = None)
                                 (@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with ParsableFromConfig[PKViolatorsDataObject] {
@@ -62,7 +65,7 @@ case class PKViolatorsDataObject(id: DataObjectId,
     // Get all DataObjects from registry
     val dataObjects: Seq[DataObject with Product] = config match {
       case Some(configLocation) =>
-        val config = ConfigLoader.loadConfigFromFilesystem(configLocation)
+        val config = ConfigLoader.loadConfigFromFilesystem(configLocation.split(',').toSeq)
         ConfigParser.parse(config).getDataObjects.map(_.asInstanceOf[DataObject with Product])
       case None => instanceRegistry.getDataObjects.map(_.asInstanceOf[DataObject with Product])
     }
@@ -72,26 +75,40 @@ case class PKViolatorsDataObject(id: DataObjectId,
     logger.info(s"Prepare DataFrame with primary key violations for ${dataObjectsWithPk.map(_.id).mkString(", ")}")
 
     def colName2colRepresentation(colName: String) = struct(lit(colName).as(columnNameName),col(colName).as(columnValueName))
+    def optionalCastColToString(doCast: Boolean)(col: Column) = if (doCast) col.cast(StringType) else col
 
     def getPKviolatorDf(tobj: TableDataObject) = {
       val pkColNames = tobj.table.primaryKey.get.toArray
-      val dfTable = tobj.getDataFrame()
-      val dfPKViolators = dfTable.getPKviolators(pkColNames)
-      val scmTable = dfTable.schema
-      val dataColumns = dfPKViolators.columns.diff(pkColNames)
-      val colSchema: Column = lit(scmTable.toDDL).as("schema")
-      val keyCol: Column = array(pkColNames.map(colName2colRepresentation):_*).cast(colListType(false)).as("key")
-      val dataCol: Column = if (dataColumns.isEmpty) {
-        lit(null).cast(colListType(true))
-      } else { array(dataColumns.map(colName2colRepresentation):_*).cast(colListType(true)) }
-      dfPKViolators.select(
-        lit(tobj.id.id).as("data_object_id"),
-        lit(tobj.table.db.get).as("db"),
-        lit(tobj.table.name).as("table"),
-        colSchema,keyCol,dataCol.as("data")
-      )
+      if (tobj.isTableExisting) {
+        val dfTable = tobj.getDataFrame()
+        val dfPKViolators = dfTable.getPKviolators(pkColNames)
+        val scmTable = dfTable.schema
+        val dataColumns = dfPKViolators.columns.diff(pkColNames)
+        val colSchema: Column = lit(scmTable.toDDL).as("schema")
+        val keyCol: Column = optionalCastColToString(flattenOutput) {
+          array(pkColNames.map(colName2colRepresentation): _*).cast(colListType(false)).as("key")
+        }
+        val dataCol: Column = optionalCastColToString(flattenOutput) {
+          if (dataColumns.isEmpty) {
+            lit(null).cast(colListType(true))
+          } else {
+            array(dataColumns.map(colName2colRepresentation): _*).cast(colListType(true))
+          }.as("data")
+        }
+        Some( dfPKViolators.select(
+          lit(tobj.id.id).as("data_object_id"),
+          lit(tobj.table.db.get).as("db"),
+          lit(tobj.table.name).as("table"),
+          colSchema, keyCol, dataCol.as("data")
+        ))
+      } else {
+        // ignore if table missing, it might be not yet created but only exists in metadata...
+        logger.warn(s"(id) Table ${tobj.table.fullName} doesn't exist")
+        None
+      }
     }
-    val pkViolatorsDfs = dataObjectsWithPk.map(getPKviolatorDf)
+    val pkViolatorsDfs = dataObjectsWithPk.flatMap(getPKviolatorDf)
+    if (pkViolatorsDfs.isEmpty) throw new TaskSkippedDontStopWarning(id.id, s"($id) No existing table with primary key found")
 
     // combine & return dataframe
     def unionDf(df1: DataFrame, df2: DataFrame) = df1.union(df2)

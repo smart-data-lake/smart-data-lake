@@ -18,7 +18,8 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import com.holdenkarau.spark.testing.Utils.createTempDir
+import java.nio.file.Files
+
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
@@ -39,8 +40,8 @@ class PKviolatorDOtest extends FunSuite with BeforeAndAfter with SmartDataLakeLo
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
-  val tempDir: java.io.File = createTempDir()
-  val tempPath: String = tempDir.toPath.toAbsolutePath.toString
+  private val tempDir = Files.createTempDirectory("test")
+  private val tempPath = tempDir.toAbsolutePath.toString
 
   def colsField(colName: String, noColumnsPossible: Boolean): StructField = StructField(colName,colListType(noColumnsPossible),nullable = false)
 
@@ -127,8 +128,6 @@ class PKviolatorDOtest extends FunSuite with BeforeAndAfter with SmartDataLakeLo
 
     // actual: reading the table containing the PK violators
     val actual = PKViolatorsDataObject("pkViol").getDataFrame()
-    println("actual:")
-    actual.printSchema()
 
     // creating expected
     val rows_expectedWithData: java.util.List[Row] = ArrayBuffer(
@@ -160,9 +159,6 @@ class PKviolatorDOtest extends FunSuite with BeforeAndAfter with SmartDataLakeLo
 
     val expected = session.createDataFrame(rows_expectedWithData,PKviolatorSchema)
       .union(session.createDataFrame(rows_expectedWithOutData,PKviolatorSchemaWithOutDataCol).withColumn("data",nullDataCol))
-
-    println("expected:")
-    expected.printSchema()
 
     val resultat: Boolean = expected.isEqual(actual)
     if (!resultat) printFailedTestResult("PKviolators_multipleDOs",

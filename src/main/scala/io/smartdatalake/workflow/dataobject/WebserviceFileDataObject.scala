@@ -26,7 +26,7 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{CredentialsUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.webservice._
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.keycloak.admin.client.Keycloak
 import org.keycloak.representations.AccessTokenResponse
 
@@ -56,6 +56,9 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
   private val webServicePassword = webserviceOptions.passwordVariable.map(CredentialsUtil.getCredentials)
 
   val keycloak: Option[Keycloak] = webserviceOptions.keycloakAuth.map(_.prepare(webServiceClientId.get, webServiceClientSecret.get))
+
+  // not used for now as writing data is not yet implemented
+  override val saveMode: SaveMode = SaveMode.Overwrite
 
   override def partitions: Seq[String] = partitionDefs.map(_.name)
 

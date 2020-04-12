@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{SaveMode, SparkSession}
 
 private[smartdatalake] trait FileRefDataObject extends FileDataObject {
 
@@ -101,11 +101,21 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
     PartitionLayout.extractPartitionValues(partitionLayout().get, fileName, filePath.stripPrefix(path + separator))
   }
 
-
   /**
    * Delete given files. This is used to cleanup files after they are processed.
    */
   def deleteFileRefs(fileRefs: Seq[FileRef])(implicit session: SparkSession): Unit = throw new RuntimeException(s"deleteFileRefs not implemented for $id")
+
+  /**
+   * Delete all data. This is used to implement SaveMode.Overwrite.
+   */
+  def deleteAll(implicit session: SparkSession): Unit = throw new RuntimeException(s"deleteAll not implemented for $id")
+
+  /**
+   * Overwrite or Append new data.
+   * When writing partitioned data, this applies only to partitions concerned.
+   */
+  def saveMode: SaveMode
 }
 
 private[smartdatalake] case class FileRef( fullPath:String, fileName: String, partitionValues: PartitionValues) {

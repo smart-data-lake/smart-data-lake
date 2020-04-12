@@ -52,9 +52,6 @@ private[smartdatalake] trait DAGEventListener[T <: DAGNode] {
   def onNodeSkipped(exception: Throwable)(node: T)
 }
 
-private[smartdatalake] case class TaskCancelledException(id: NodeId) extends Exception
-private[smartdatalake] case class TaskPredecessorFailureException(id: NodeId, ex: Throwable) extends Exception(ex)
-
 /**
  * A generic directed acyclic graph (DAG) consisting of [[DAGNode]]s interconnected with directed [[DAGEdge]]s.
  *
@@ -151,22 +148,31 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
 
   private def computeNodeOperationResult[A <: DAGResult](node: DAGNode, operation: (DAGNode, Seq[A]) => Seq[A], incomingResults: Seq[Try[A]], eventListener: DAGEventListener[N]): Try[Seq[A]] = {
     notify(node, eventListener.onNodeStart)
-    val result = Try(operation(node, incomingResults.map(_.get))) // or should we use "Try( blocking { operation(node, v) })"
-    result match {
+    val resultRaw = Try(operation(node, incomingResults.map(_.get))) // or should we use "Try( blocking { operation(node, v) })"
+    val result = resultRaw match {
+      case Success(_) =>
+        notify(node, eventListener.onNodeSuccess)
+        resultRaw
+      case Failure(ex: TaskSkippedWarning) =>
+        notify(node, eventListener.onNodeSkipped(ex))
+        resultRaw
       case Failure(ex) =>
         notify(node, eventListener.onNodeFailure(ex))
         logger.error(s"Task ${node.nodeId} failed: $ex")
-      case _ =>
-        notify(node, eventListener.onNodeSuccess)
+        Failure(TaskFailedException(node.nodeId, ex))
     }
     // return
     result
   }
 
   private def incomingFailedResult[A <: DAGResult](node: DAGNode, incomingResults: Seq[Try[A]], eventListener: DAGEventListener[N]): Try[Seq[A]] = {
-    val firstPredecessorException = incomingResults.find(_.isFailure).get.failed.get
-    logger.debug(s"Task ${node.nodeId} is not executed because some predecessor had error $firstPredecessorException")
-    val exception = TaskPredecessorFailureException(node.nodeId, firstPredecessorException)
+    val predecessorExceptions = incomingResults.filter(_.isFailure).map(f => f.failed.get).map{
+      case ex: DAGException => ex
+      case ex => throw ex // this should not happen
+    }
+    val mostSeverPredecessoException = predecessorExceptions.minBy(_.severity)
+    logger.debug(s"Task ${node.nodeId} is not executed because some predecessor had error $predecessorExceptions")
+    val exception = TaskPredecessorFailureWarning(node.nodeId, mostSeverPredecessoException, predecessorExceptions)
     notify(node, eventListener.onNodeSkipped(exception))
     Failure(exception)
   }

@@ -24,6 +24,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SerializableHadoopConfiguration, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.DataFrameUtil.arrayToSeq
 import io.smartdatalake.workflow.connection.HadoopFileConnection
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
@@ -123,12 +124,11 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
 
     files.nonEmpty
   }
-  def arrayToSeq[T](arr: Array[T]): Seq[T] = if (arr!=null) arr.toSeq else Seq()
 
   override def deleteFileRefs(fileRefs: Seq[FileRef])(implicit session:SparkSession): Unit = {
     // delete given files on hdfs
-    fileRefs.foreach { _ =>
-      filesystem.delete(new Path(path), false) // recursive=false
+    fileRefs.foreach { file =>
+      filesystem.delete(new Path(file.fullPath), false) // recursive=false
     }
   }
 
@@ -175,6 +175,12 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     }.getOrElse(Seq())
   }
 
+  override def createEmptyPartition(partitionValues: PartitionValues)(implicit session: SparkSession): Unit = {
+    val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitions.filter(partitionValues.isDefinedAt), separator)
+    val partitionPath = new Path(hadoopPath, partitionValues.getPartitionString(partitionLayout))
+    filesystem.mkdirs(partitionPath)
+  }
+
   override def getFileRefs(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[FileRef] = {
     val paths: Seq[(PartitionValues,String)] = getSearchPaths(partitionValues)
     // search paths and prepare FileRef's
@@ -207,6 +213,10 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
       case Success(r) => r
       case Failure(e) => throw new RuntimeException(s"Can't create OutputStream for $id and $path: : ${e.getClass.getSimpleName} - ${e.getMessage}", e)
     }
+  }
+
+  override def deleteAll(implicit session: SparkSession): Unit = {
+    filesystem.delete(hadoopPath, true) // recursive=true
   }
 
   protected[workflow] def applyAcls(implicit session: SparkSession): Unit = {

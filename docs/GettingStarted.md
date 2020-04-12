@@ -80,15 +80,18 @@ We used an open data set for these tests which you can download from [Kaggle](ht
 1. For simplicity, put all files in one working directory: The smartdatalake-jar-with-dependencies, the application.conf and the sample CSV file.
 1. Execute the feed: 
     
-    `java -jar smartdatalake-jar-with-dependencies.jar --feed-sel getting-started --name getting-started`
+    `java -jar smartdatalake-jar-with-dependencies.jar --feed-sel getting-started`
    
 1. Check to see if the target folder was created and contains the Excel file.   
 
 Note, that you need to run the jar file with Java 8 (or higher). 
    
 Use `--help` to see additional command line parameters and options.
-The `-c` option for example can be used to define a location of your application.conf if it's not in the working directory.
-You can also define a path that contains one or multiple configuration files that all get combined.   
+
+The `-c` option for example can be used to define one ore more locations of your configurations files, if SDLB should not look for the application.conf resource in your classpath.
+You can define configuration files directly or directories which contain configuration files.
+If a directory is given, all configuration files found in this directory and it's subdirectories will be merged together.   
+
 If you placed the CSV file in another directory, you need to define it's location in your application.conf instead of just providing the name of the CSV file.
 
 That's it!   
@@ -104,4 +107,4 @@ There's a separate repository you should check out that contains many examples o
 https://github.com/smart-data-lake/sdl-examples
 
 ### Get in touch
-If you have issues, comments or feedback, please see [Contributing](Contributing.md) on how to get in touch.
+If you have issues, comments or feedback, please see [Contributing](Contribute.md) on how to get in touch.

@@ -43,7 +43,7 @@ object SdlConfigObject {
   }
 
   /**
-   * Value class for data object identifiers.
+   * Value class for connection identifiers.
    */
   case class ConnectionId(id: String) extends AnyVal with ConfigObjectId {
     override def toString: String = "Connection~"+id

@@ -52,6 +52,7 @@ private[smartdatalake] object FileTransfer {
   def apply( srcDO: DataObject, tgtDO: DataObject, deleteSource: Boolean, overwrite: Boolean): FileTransfer = {
     (srcDO, tgtDO) match {
       case (inputDO: FileRefDataObject with CanCreateInputStream, outputDO: FileRefDataObject with CanCreateOutputStream) => new StreamFileTransfer(inputDO, outputDO, deleteSource, overwrite)
+      case x => throw new IllegalStateException(s"Unmatched case $x")
     }
   }
 }

@@ -28,29 +28,31 @@ import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.SftpFileRefConnection
 import net.schmizz.sshj.sftp.SFTPClient
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{SaveMode, SparkSession}
 
 import scala.util.{Failure, Success, Try}
 
 /**
-  * Connects to SFtp files
-  * Needs java library "com.hieronymus % sshj % 0.21.1"
-  * The following authentication mechanisms are supported
-  * -> public/private-key: private key must be saved in ~/.ssh, public key must be registered on server.
-  * -> user/pwd authentication: user and password is taken from two variables set as parameters.
-  *                             These variables could come from clear text (CLEAR), a file (FILE) or an environment variable (ENV)
-  *
-  *  @param partitionLayout partition layout defines how partition values can be extracted from the path.
-  *                         Use "%<colname>%" as token to extract the value for a partition column.
-  *                         With "%<colname:regex>%" a regex can be given to limit search. This is especially useful
-  *                         if there is no char to delimit the last token from the rest of the path or also between
-  *                         two tokens.
-  */
+ * Connects to SFtp files
+ * Needs java library "com.hieronymus % sshj % 0.21.1"
+ * The following authentication mechanisms are supported
+ * -> public/private-key: private key must be saved in ~/.ssh, public key must be registered on server.
+ * -> user/pwd authentication: user and password is taken from two variables set as parameters.
+ *                             These variables could come from clear text (CLEAR), a file (FILE) or an environment variable (ENV)
+ *
+ * @param partitionLayout partition layout defines how partition values can be extracted from the path.
+ *                        Use "%<colname>%" as token to extract the value for a partition column.
+ *                        With "%<colname:regex>%" a regex can be given to limit search. This is especially useful
+ *                        if there is no char to delimit the last token from the rest of the path or also between
+ *                        two tokens.
+ * @param saveMode Overwrite or Append new data.
+ */
 case class SFtpFileRefDataObject(override val id: DataObjectId,
                                  override val path: String,
                                  connectionId: ConnectionId,
                                  override val partitions: Seq[String] = Seq(),
                                  override val partitionLayout: Option[String] = None,
+                                 override val saveMode: SaveMode = SaveMode.Overwrite,
                                  override val metadata: Option[DataObjectMetadata] = None)
                                 (@transient implicit val instanceRegistry: InstanceRegistry)
   extends FileRefDataObject with CanCreateInputStream with CanCreateOutputStream with SmartDataLakeLogger {

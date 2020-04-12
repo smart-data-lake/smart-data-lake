@@ -18,17 +18,15 @@
  */
 package io.smartdatalake.workflow.action
 
-import java.io.File
 import java.nio.file.Files
 
-import com.holdenkarau.spark.testing.Utils
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.connection.SftpFileRefConnection
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed}
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.sshd.server.SshServer
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 
@@ -36,8 +34,8 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
 
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
 
-  val tempDir: File = Utils.createTempDir()
-  val tempPath: String = tempDir.toPath.toAbsolutePath.toString
+  private val tempDir = Files.createTempDirectory("test")
+  private val tempPath = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
@@ -298,6 +296,91 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     val r1 = tgtDO.getFileRefs(Seq())
     assert(r1.size == 1)
     assert(r1.head.fileName == resourceFile)
+  }
+
+  test("copy file from hadoop to hadoop without partitions and mode overwrite and deleteDataAfterRead") {
+
+    val feed = "filetransfer"
+    val srcDir = "testSrc"
+    val tgtDir = "testTgt"
+    val resourceFile = "AB_NYC_2019.csv"
+    val tempDir = Files.createTempDirectory(feed)
+
+    // copy data 1 file to hadoop
+    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile+"1").toFile)
+
+    // setup DataObjects
+    val srcDO = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"))
+    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"), saveMode = SaveMode.Overwrite)
+    instanceRegistry.register(srcDO)
+    instanceRegistry.register(tgtDO)
+
+    // prepare & start load 1
+    implicit val context1 = ActionPipelineContext(feed, "test", instanceRegistry)
+    val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id, deleteDataAfterRead = true)
+    val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
+    action1.preExec
+    val tgtSubFeed1 = action1.exec(Seq(srcSubFeed)).head
+    action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed1))
+    assert(tgtSubFeed1.dataObjectId == tgtDO.id)
+
+    // check 1
+    val r1 = tgtDO.getFileRefs(Seq())
+    assert(r1.size == 1)
+    assert(r1.head.fileName == resourceFile+"1")
+
+    // copy data 2 file to hadoop
+    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile+"2").toFile)
+
+    // start load 2
+    action1.preExec
+    val tgtSubFeed2 = action1.exec(Seq(srcSubFeed)).head
+    action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed2))
+
+    // check 2
+    val r2 = tgtDO.getFileRefs(Seq())
+    assert(r2.size == 1)
+    assert(r2.head.fileName == resourceFile+"2")
+  }
+
+  test("copy file from hadoop to hadoop without partitions and mode append and deleteDataAfterRead") {
+
+    val feed = "filetransfer"
+    val srcDir = "testSrc"
+    val tgtDir = "testTgt"
+    val resourceFile = "AB_NYC_2019.csv"
+    val tempDir = Files.createTempDirectory(feed)
+
+    // copy data 1 file to hadoop
+    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile+"1").toFile)
+
+    // setup DataObjects
+    val srcDO = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"))
+    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"), saveMode = SaveMode.Append)
+    instanceRegistry.register(srcDO)
+    instanceRegistry.register(tgtDO)
+
+    // prepare & start load 1
+    implicit val context1 = ActionPipelineContext(feed, "test", instanceRegistry)
+    val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id, deleteDataAfterRead = true)
+    val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
+    assert(tgtSubFeed.dataObjectId == tgtDO.id)
+
+    // check 1
+    val r1 = tgtDO.getFileRefs(Seq())
+    assert(r1.size == 1)
+    assert(r1.head.fileName == resourceFile+"1")
+
+    // copy data 2 file to hadoop
+    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile+"2").toFile)
+
+    // start load 2
+    action1.exec(Seq(srcSubFeed)).head
+
+    // check 2
+    val r2 = tgtDO.getFileRefs(Seq())
+    assert(r2.size == 2)
   }
 
   test("copy webservice output to hadoop file") {

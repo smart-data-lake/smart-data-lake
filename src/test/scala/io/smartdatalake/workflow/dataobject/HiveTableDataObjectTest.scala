@@ -18,17 +18,14 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.io.File
-
-import com.holdenkarau.spark.testing.Utils
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.hive.HiveUtil
 
 class HiveTableDataObjectTest extends DataObjectTestSuite {
 
-  val tempDir: File = Utils.createTempDir()
-  val tempPath: String = tempDir.toPath.toAbsolutePath.toString
+  private val tempDir = createTempDir
+  private val tempPath = tempDir.toAbsolutePath.toString
 
   import testSession.implicits._
 
@@ -198,6 +195,23 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val partitionValuesCreated = Seq( PartitionValues(Map("p1"->"A","p2"->"L2A")), PartitionValues(Map("p1"->"A","p2"->"L2B"))
       , PartitionValues(Map("p1"->"B","p2"->"L2B")), PartitionValues(Map("p1"->"B","p2"->"L2C")))
     val df = Seq(("A","L2A",1),("A","L2B",2),("B","L2B",3),("B","L2C",4)).toDF("p1", "p2", "value")
+    srcDO.writeDataFrame(df, partitionValuesCreated )
+
+    val partitionValuesListed = srcDO.listPartitions
+    partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
+  }
+
+  test("create empty partition") {
+
+    // create data object
+    val srcTable = Table(Some("default"), "input")
+    HiveUtil.dropTable(testSession, srcTable.db.get, srcTable.name )
+    val srcPath = tempPath+s"/${srcTable.fullName}"
+    val srcDO = HiveTableDataObject( "input", srcPath, table = srcTable, partitions = Seq("p1","p2"), numInitialHdfsPartitions = 1)
+
+    // write test files
+    val partitionValuesCreated = Seq( PartitionValues(Map("p1"->"A","p2"->"L2A")), PartitionValues(Map("p1"->"X","p2"->"L2X")))
+    val df = Seq(("A","L2A",1)).toDF("p1", "p2", "value")
     srcDO.writeDataFrame(df, partitionValuesCreated )
 
     val partitionValuesListed = srcDO.listPartitions

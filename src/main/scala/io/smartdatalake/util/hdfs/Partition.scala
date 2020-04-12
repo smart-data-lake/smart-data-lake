@@ -54,6 +54,29 @@ private[smartdatalake] case class PartitionValues(elements: Map[String, Any]) {
 private[smartdatalake] object PartitionValues {
   val singleColFormat = "<partitionColName>=<partitionValue>[,<partitionValue>,...]"
   val multiColFormat = "<partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>[;(<partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>;...]"
+
+  /**
+   * Defines an Ordering for sorting PartitionValues.
+   * Sorting a list of partition values is only possible, if the partition columns to be considered are defined.
+   * As PartitionValues is a generic structure, the type of a value needs to be inferred for comparision.
+   * @param partitions partition columns to use for sorting
+   * @return Ordering to be used e.g. with Seq.sort|sortBy
+   */
+  def getOrdering(partitions: Seq[String]): Ordering[PartitionValues] = new Ordering[PartitionValues] {
+    def compare(pv1: PartitionValues, pv2: PartitionValues): Int = {
+      partitions.map{
+        p => (pv1(p), pv2(p)) match {
+          case (v1: String, v2: String) => v1.compare(v2)
+          case (v1: Byte, v2: Byte) => v1.compare(v2)
+          case (v1: Short, v2: Short) => v1.compare(v2)
+          case (v1: Int, v2: Int) => v1.compare(v2)
+          case (v1: Long, v2: Long) => v1.compare(v2)
+          case (v1: Char, v2: Char) => v1.compare(v2)
+          case _ => 0 // if not an ordered type, we don't use it for sorting
+        }
+      }.find(_!=0).getOrElse(0)
+    }
+  }
   def parseSingleColArg(arg: String): Seq[PartitionValues] ={
     val keyValues = arg.split("=")
     if (keyValues.size!=2) throw new IllegalArgumentException(s"partition values $arg doesn't match format $singleColFormat")

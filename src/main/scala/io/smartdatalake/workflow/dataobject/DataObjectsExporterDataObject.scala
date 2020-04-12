@@ -67,7 +67,7 @@ case class DataObjectsExporterDataObject(id: DataObjectId,
     // Get all DataObjects from registry
     val dataObjects: Seq[DataObject with Product] = config match {
       case Some(configLocation) =>
-        val config = ConfigLoader.loadConfigFromFilesystem(configLocation)
+        val config = ConfigLoader.loadConfigFromFilesystem(configLocation.split(',').toSeq)
         ConfigParser.parse(config).getDataObjects.map(_.asInstanceOf[DataObject with Product])
       case None => instanceRegistry.getDataObjects.map(_.asInstanceOf[DataObject with Product])
     }

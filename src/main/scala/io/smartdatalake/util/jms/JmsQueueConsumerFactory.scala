@@ -19,14 +19,12 @@
 package io.smartdatalake.util.jms
 
 import java.util
-import java.util.Hashtable
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import javax.jms.{Connection, ConnectionFactory, MessageConsumer, Queue, Session}
+import javax.jms._
 import javax.naming.{Context, InitialContext}
 
-import collection.JavaConverters._
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 
 /**
  * JMS Queue Consumer Factory
@@ -67,7 +65,7 @@ extends MessageConsumerFactory with SmartDataLakeLogger
     logger.debug(s"${this.getClass.getSimpleName}.makeConnection called.")
     val ctx = InitialContextHolder.getInitialContext(properties)
     val propsContent =
-      properties.entrySet().iterator().map(x => (s"${x.getKey} -> ${x.getValue}")).mkString(",")
+      properties.entrySet().asScala.map(x => (s"${x.getKey} -> ${x.getValue}")).mkString(",")
     logger.debug(s"InitialContext from properties: ${propsContent}")
     logger.debug(s"InitialContext.lookup(${connectionFactoryName})")
     val connectionFactory: ConnectionFactory =

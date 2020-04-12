@@ -32,5 +32,6 @@ sealed trait ExecutionMode {
  * @param partitionColNb optional number of partition columns to use as a common 'init'.
  * @param mainInputId optional selection of inputId to be used for partition comparision. Only needed if there are multiple input DataObject's.
  * @param mainOutputId optional selection of outputId to be used for partition comparision. Only needed if there are multiple output DataObject's.
+ * @param nbOfPartitionValuesPerRun optional restriction of the number of partition values per run.
  */
-case class PartitionDiffMode(partitionColNb: Option[Int] = None, override val mainInputId: Option[String] = None, override val mainOutputId: Option[String] = None) extends ExecutionMode
+case class PartitionDiffMode(partitionColNb: Option[Int] = None, override val mainInputId: Option[String] = None, override val mainOutputId: Option[String] = None, nbOfPartitionValuesPerRun: Option[Int] = None) extends ExecutionMode

@@ -25,35 +25,35 @@ import org.scalatest.{FlatSpec, Matchers}
 class ConfigLoaderTest extends FlatSpec with Matchers {
 
   "ConfigLoader" must "parse a single configuration file" in {
-    val config = ConfigLoader.loadConfigFromFilesystem(getClass.getResource("/config/config.conf").toString)
+    val config = ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/config.conf").toString))
     config.getString("config") shouldBe "config"
   }
 
   it must "parse all configuration files in a directory and its sub-directories" in {
-    val config = ConfigLoader.loadConfigFromFilesystem(getClass.getResource("/config").toString)
+    val config = ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config").toString))
     config.getString("config") shouldBe "config"
     config.getString("config2") shouldBe "config2"
     config.getString("foo") shouldBe "foo"
   }
 
   it must "overwrite values in configurations in BFS order and by extension precedence" in {
-    val config = ConfigLoader.loadConfigFromFilesystem(getClass.getResource("/config").toString)
+    val config = ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config").toString))
     config.getString("overwrite") shouldBe "overwritten by config2"
     config.getString("donotoverwrite") shouldBe "original"
     config.getString("overwrite2") shouldBe "overwritten by bar"
   }
 
   it must "fail parsing a non-existing location" in {
-    an [IllegalArgumentException] should be thrownBy ConfigLoader.loadConfigFromFilesystem("foo/bar")
+    an [IllegalArgumentException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq("foo/bar"))
   }
 
   it must "not parse a file that is not a config file" in {
-    val config = ConfigLoader.loadConfigFromFilesystem(getClass.getResource("/config/subdirectory/file.txt").toString)
+    val config = ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/subdirectory/file.txt").toString))
     an [ConfigException] should be thrownBy config.getString("noconfig")
   }
 
   it must "only parse config files in directories" in {
-    val config = ConfigLoader.loadConfigFromFilesystem(getClass.getResource("/config/subdirectory").toString)
+    val config = ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/subdirectory").toString))
     config.getString("foo") shouldBe "foo"
     config.getString("config2") shouldBe "config2"
     an [ConfigException] should be thrownBy config.getString("noconfig")

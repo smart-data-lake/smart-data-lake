@@ -49,7 +49,7 @@ private[smartdatalake] class ActionEventListener(operation: String) extends DAGE
   }
   override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
     node.addRuntimeEvent(operation, RuntimeEventState.FAILED, s"${exception.getClass.getSimpleName}: ${exception.getMessage}")
-    logger.error(s"${node.toStringShort}: $operation failed with")
+    logger.error(s"${node.toStringShort}: $operation failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
   }
   override def onNodeSkipped(exception: Throwable)(node: Action): Unit = {
     node.addRuntimeEvent(operation, RuntimeEventState.SKIPPED, s"${exception.getClass.getSimpleName}: ${exception.getMessage}")
@@ -61,7 +61,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
 
   private def createScheduler(parallelism: Int = 1) = Scheduler.fixedPool(s"dag-$runId", parallelism)
 
-  private def run[R<:DAGResult](op: String, parallelism: Int = 1)(operation: (DAGNode, Seq[R]) => Seq[R])(implicit session: SparkSession, context: ActionPipelineContext) = {
+  private def run[R<:DAGResult](op: String, parallelism: Int = 1)(operation: (DAGNode, Seq[R]) => Seq[R])(implicit session: SparkSession, context: ActionPipelineContext): Seq[R] = {
     val stageMetricsListener = new StageMetricsListener
     session.sparkContext.addSparkListener(stageMetricsListener)
     try {
@@ -72,14 +72,29 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
       // wait for result
       val result = Await.result(futureResult, Duration.Inf)
       scheduler.shutdown
-      logger.info(s"""$op result: ${result.map(_.getClass.getSimpleName).mkString(",")}""")
 
-      // extract subfeeds, throwing exceptions if there are errors
-      result.map(_.get)
+      // collect all root exceptions
+      val dagExceptions = result.filter(_.isFailure).map(_.failed.get).flatMap {
+        case ex: DAGException => ex.getDAGRootExceptions
+        case ex => throw ex // this should not happen
+      }
+      val dagExceptionsToStop = dagExceptions.filter(_.severity <= ExceptionSeverity.SKIPPED)
+      // log all exceptions
+      dagExceptions.foreach {
+        case ex if (ex.severity <= ExceptionSeverity.CANCELLED) => logger.error(s"$op: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+        case ex => logger.warn(s"$op: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+      }
+      // log dag on error
+      if (dagExceptionsToStop.nonEmpty) ActionDAGRun.logDag(s"$op failed for dag $runId", dag)
+      // throw most severe exception
+      dagExceptionsToStop.sortBy(_.severity).foreach{ throw _ }
+
+      // extract & return subfeeds
+      result.filter(_.isSuccess).map(_.get)
     } finally {
       session.sparkContext.removeSparkListener(stageMetricsListener)
       if (stageMetricsListener.stageMetricsCollection.nonEmpty) {
-        logger.info(s"Operation '$op' stage metrics:\n - ${stageMetricsListener.stageMetricsCollection.map(_.report()).mkString("\n - ")}")
+        logger.debug(s"Operation '$op' stage metrics:\n - ${stageMetricsListener.stageMetricsCollection.map(_.report()).mkString("\n - ")}")
       }
     }
   }
@@ -92,6 +107,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
       case (node: Action, empty) =>
         node.prepare
         node.outputs.map(outputDO => DummyDAGResult(outputDO.id.id))
+      case x => throw new IllegalStateException(s"Unmatched case $x")
     }
   }
 
@@ -102,6 +118,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
         node.edges.map(dataObjectId => InitSubFeed(dataObjectId, partitionValues))
       case (node: Action, subFeeds) =>
         node.init(subFeeds)
+      case x => throw new IllegalStateException(s"Unmatched case $x")
     }
   }
 
@@ -116,14 +133,13 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
         node.postExec(subFeeds, resultSubFeeds)
         //return
         resultSubFeeds
+      case x => throw new IllegalStateException(s"Unmatched case $x")
     }
 
     // log dag execution
-    logger.info(s"""exec result dag $runId:
-                   |${dag.toString}
-      """.stripMargin)
+    ActionDAGRun.logDag(s"exec result dag $runId", dag)
 
-    //return result
+    // return
     result
   }
 }
@@ -154,10 +170,14 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
 
     // create dag
     val dag = DAG.create[Action](initAction +: actions, edges)
-    logger.info(s"""created dag $runId:
-      |${dag.toString}
-    """.stripMargin)
+    logDag(s"created dag $runId", dag)
 
     ActionDAGRun(dag, runId, partitionValues, parallelism)
+  }
+
+  def logDag(msg: String, dag: DAG[_]): Unit = {
+    logger.info(s"""$msg:
+                   |${dag.toString}
+    """.stripMargin)
   }
 }

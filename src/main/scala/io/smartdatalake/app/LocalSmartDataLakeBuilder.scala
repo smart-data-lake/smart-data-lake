@@ -33,7 +33,7 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
    * @param args Command-line arguments.
    */
   def main(args: Array[String]): Unit = {
-    logger.info(s"Starting Program $appName v$appVersion")
+    logger.info(s"Starting Program $appType v$appVersion")
 
     // Set local defaults
     val config = initConfigFromEnvironment.copy(
@@ -51,9 +51,9 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
         // start
         run(config)
-        logger.info(s"$appName finished successfully.")
+        logger.info(s"$appType finished successfully.")
       case None =>
-        logAndThrowException(s"Aborting ${appName} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
+        logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
     }
   }
 }

@@ -83,6 +83,7 @@ case class CopyAction(override val id: ActionObjectId,
     if (deleteDataAfterRead) (input, inputSubFeed) match {
       case (partitionInput: CanHandlePartitions, sparkSubFeed: SparkSubFeed) =>
         if (sparkSubFeed.partitionValues.nonEmpty) partitionInput.deletePartitions(sparkSubFeed.partitionValues)
+      case x => throw new IllegalStateException(s"Unmatched case $x")
     }
   }
 
