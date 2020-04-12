@@ -23,6 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.DateColumnType
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
+import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import org.apache.spark.sql.types.{DateType, StringType, StructType}
@@ -61,6 +62,7 @@ import org.apache.spark.sql.{DataFrame, SaveMode}
  * @param schema An optional data object schema. If defined, any automatic schema inference is avoided.
  * @param csvOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
  * @param dateColumnType Specifies the string format used for writing date typed data.
+ * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop.
  **/
 case class CsvFileDataObject( override val id: DataObjectId,
                               override val path: String,
@@ -70,6 +72,7 @@ case class CsvFileDataObject( override val id: DataObjectId,
                               override val schemaMin: Option[StructType] = None,
                               dateColumnType: DateColumnType = DateColumnType.Date,
                               override val saveMode: SaveMode = SaveMode.Overwrite,
+                              override val sparkRepartition: Option[SparkRepartitionDef] = None,
                               override val acl: Option[AclDef] = None,
                               override val connectionId: Option[ConnectionId] = None,
                               override val metadata: Option[DataObjectMetadata] = None
