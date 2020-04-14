@@ -289,9 +289,9 @@ object ActionHelper extends SmartDataLakeLogger {
   /**
    * Apply execution mode to partition values
    */
-  def applyExecutionMode(executionMode: Option[ExecutionMode], actionId: ActionObjectId, input: DataObject, output: DataObject, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[PartitionValues] = {
+  def applyExecutionMode(executionMode: ExecutionMode, actionId: ActionObjectId, input: DataObject, output: DataObject, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[PartitionValues] = {
     executionMode match {
-      case Some(mode:PartitionDiffMode) =>
+      case mode:PartitionDiffMode =>
         (input,output) match {
           case (partitionInput: CanHandlePartitions, partitionOutput: CanHandlePartitions)  =>
             if (partitionInput.partitions.nonEmpty) {
