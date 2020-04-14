@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow.action.customlogic
 
-import io.smartdatalake.util.misc.{CustomCodeUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.CustomCodeUtil
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -38,8 +38,7 @@ trait CustomDfsTransformer extends Serializable {
  * @param sqlCode Optional map of DataObjectId and corresponding SQL Code
  * @param options
  */
-case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Map[String,String] = Map(), options: Map[String,String] = Map())
-extends SmartDataLakeLogger {
+case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Map[String,String] = Map(), options: Map[String,String] = Map()) {
   require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || !sqlCode.isEmpty, "Either className, scalaFile, scalaCode or sqlCode must be defined for CustomDfsTransformer")
 
 
@@ -79,7 +78,6 @@ extends SmartDataLakeLogger {
       // register all input DataObjects as temporary table
       for( (dataObjectId,df) <- dfs) {
         val objectId = invalidTableNameCharacters.replaceAllIn(dataObjectId, "_")
-        // TODO: Detect if multiple dataobjects end up with the same name after replacing characters
         // Using createTempView does not work because the same data object might be created more than once
         df.createOrReplaceTempView(objectId)
       }
