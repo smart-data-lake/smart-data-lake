@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.action.customlogic
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.CustomCodeUtil
+import org.apache.spark.sql.catalyst.analysis.TempTableAlreadyExistsException
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -75,10 +76,12 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
     else {
       val invalidTableNameCharacters = "[^a-zA-Z0-9_]".r
       val objectId = invalidTableNameCharacters.replaceAllIn(dataObjectId.id, "_")
-      df.createOrReplaceTempView(s"$objectId")
+
       try {
+        df.createTempView(s"$objectId")
         session.sql(sqlCode.get)
       } catch {
+        case _: TempTableAlreadyExistsException => throw new SQLTransformationException(s"Can not create temp table with name ${objectId}. If you want to use SQL transformations, make sure the name is unique when replacing all special characters with underscores.")
         case e : Throwable => throw new SQLTransformationException(s"Could not execute SQL query. Check your query and remember that special characters are replaced by underscores (name of the temp view used was: ${objectId}). Error: ${e.getMessage}")
       }
 
