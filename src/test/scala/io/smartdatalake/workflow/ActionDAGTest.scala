@@ -155,17 +155,17 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val srcTable1 = Table(Some("default"), "input1")
     HiveUtil.dropTable(session, srcTable1.db.get, srcTable1.name )
     val srcPath1 = tempPath+s"/${srcTable1.fullName}"
-    val srcDO1 = HiveTableDataObject( "input1", srcPath1, table = srcTable1, numInitialHdfsPartitions = 1)
+    val srcDO1 = HiveTableDataObject( "src1", srcPath1, table = srcTable1, numInitialHdfsPartitions = 1)
     instanceRegistry.register(srcDO1)
     val srcTable2 = Table(Some("default"), "input2")
     HiveUtil.dropTable(session, srcTable2.db.get, srcTable2.name )
     val srcPath2 = tempPath+s"/${srcTable2.fullName}"
-    val srcDO2 = HiveTableDataObject( "input2", srcPath2, table = srcTable2, numInitialHdfsPartitions = 1)
+    val srcDO2 = HiveTableDataObject( "src2", srcPath2, table = srcTable2, numInitialHdfsPartitions = 1)
     instanceRegistry.register(srcDO2)
     val tgtTable = Table(Some("default"), "output", None, Some(Seq("lastname","firstname")))
     HiveUtil.dropTable(session, tgtTable.db.get, tgtTable.name )
     val tgtPath = tempPath+s"/${tgtTable.fullName}"
-    val tgtDO = HiveTableDataObject("output", tgtPath, table = tgtTable, numInitialHdfsPartitions = 1)
+    val tgtDO = HiveTableDataObject("tgt1", tgtPath, table = tgtTable, numInitialHdfsPartitions = 1)
     instanceRegistry.register(tgtDO)
 
     // prepare DAG
@@ -175,7 +175,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     srcDO1.writeDataFrame(l1, Seq())
     srcDO2.writeDataFrame(l1, Seq())
     val actions = Seq(
-      CustomSparkAction("a", inputIds = Seq(srcDO1.id, srcDO2.id), outputIds = Seq(tgtDO.id), CustomDfsTransformerConfig(className=Some("io.smartdatalake.workflow.action.TestDfsTransformerDummy")))
+      CustomSparkAction("a", inputIds = Seq(srcDO1.id, srcDO2.id), outputIds = Seq(tgtDO.id), CustomDfsTransformerConfig(className=Some("io.smartdatalake.workflow.action.TestDfsTransformerFilterDummy")))
     )
     val dag = ActionDAGRun(actions, "test")
 
