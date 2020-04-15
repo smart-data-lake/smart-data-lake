@@ -23,7 +23,6 @@ import java.time.LocalDateTime
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DAGNode, SparkSubFeed, SubFeed}
@@ -72,6 +71,16 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     inputs.foreach(_.prepare)
     outputs.foreach(_.prepare)
+
+    // Make sure that data object names are still unique when replacing special characters with underscore
+    // Requirement from SQL transformations because temp view names can not contain special characters
+    val invalidTableNameCharacters = "[^a-zA-Z0-9_]".r
+    val duplicateNames = context.instanceRegistry.getDataObjects.map {
+      dataObj => invalidTableNameCharacters.replaceAllIn(dataObj.id.id, "_")
+    }.groupBy(identity).collect { case (x, List(_,_,_*)) => x }.toList
+
+    require(duplicateNames.size==0, s"The names of your DataObjects are not unique when replacing special characters with underscore. Duplicates: ${duplicateNames.mkString(",")}")
+
   }
 
   /**
