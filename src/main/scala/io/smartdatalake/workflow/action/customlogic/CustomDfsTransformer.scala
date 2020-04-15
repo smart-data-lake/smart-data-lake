@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.workflow.action.customlogic
 
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.CustomCodeUtil
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -38,7 +39,7 @@ trait CustomDfsTransformer extends Serializable {
  * @param sqlCode Optional map of DataObjectId and corresponding SQL Code
  * @param options
  */
-case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Map[String,String] = Map(), options: Map[String,String] = Map()) {
+case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Map[DataObjectId,String] = Map(), options: Map[String,String] = Map()) {
   require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || !sqlCode.isEmpty, "Either className, scalaFile, scalaCode or sqlCode must be defined for CustomDfsTransformer")
 
 
@@ -90,7 +91,7 @@ case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFi
           } catch {
             case e : Throwable => throw new SQLTransformationException(s"Could not execute SQL query. Check your query and remember that special characters are replaced by underscores. Error: ${e.getMessage}")
           }
-          (dataObjectId, df)
+          (dataObjectId.id, df)
         }
       }
 

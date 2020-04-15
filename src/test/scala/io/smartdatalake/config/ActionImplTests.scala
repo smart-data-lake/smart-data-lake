@@ -21,7 +21,7 @@ package io.smartdatalake.config
 import com.typesafe.config.{Config, ConfigException, ConfigFactory}
 import io.smartdatalake.config.SdlConfigObject._
 import io.smartdatalake.workflow.action
-import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformerConfig, CustomFileTransformerConfig}
+import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformerConfig, CustomDfsTransformerConfig, CustomFileTransformerConfig}
 import org.scalatest.{FlatSpec, Matchers}
 
 
@@ -84,6 +84,35 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
       inputId = "tdo1",
       outputId = "tdo2",
       transformer = Some(customTransformerConfig)
+    )
+  }
+
+  "CustomSparkAction" should "be parsable" in {
+
+    val customTransformerConfig = CustomDfsTransformerConfig(
+      sqlCode = Map(DataObjectId("test") -> "select * from test")
+    )
+
+    val config = ConfigFactory.parseString(
+      """
+        |actions = {
+        | 123 = {
+        |   type = CustomSparkAction
+        |   inputIds = [tdo1]
+        |   outputIds = [tdo2]
+        |   transformer = {
+        |     sqlCode = {test = "select * from test"}
+        |   }
+        | }
+        |}
+        |""".stripMargin).withFallback(dataObjectConfig).resolve
+
+    implicit val registry: InstanceRegistry = ConfigParser.parse(config)
+    registry.getActions.head shouldBe action.CustomSparkAction(
+      id = "123",
+      inputIds = Seq("tdo1"),
+      outputIds = Seq("tdo2"),
+      transformer = customTransformerConfig
     )
   }
 
