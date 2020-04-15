@@ -26,7 +26,14 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{col, hash, lit, pmod}
 
 /**
- * This controls repartitioning of the DataFrame before writing with Spark to Hadoop
+ * This controls repartitioning of the DataFrame before writing with Spark to Hadoop.
+ *
+ * When writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition
+ * multiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,
+ * keyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).
+ *
+ * When writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal
+ * to numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.
  *
  * @param numberOfTasksPerPartition Number of Spark tasks to create per partition before writing to DataObject by repartitioning the DataFrame. This controls how many files are created in each Hadoop partition.
  * @param keyCols Optional key columns to distribute records over Spark tasks inside a Hadoop partition. If numberOfTasksPerPArtition is 1 this setting has no effect. If DataObject has Hadoop partitions defined, keyCols must be defined.
