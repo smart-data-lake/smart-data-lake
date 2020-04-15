@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.action.customlogic
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.CustomCodeUtil
+import io.smartdatalake.workflow.action.ActionHelper
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -74,11 +75,9 @@ case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFi
     }
     // Work with SQL Transformations
     else {
-      val invalidTableNameCharacters = "[^a-zA-Z0-9_]".r
-
       // register all input DataObjects as temporary table
       for( (dataObjectId,df) <- dfs) {
-        val objectId = invalidTableNameCharacters.replaceAllIn(dataObjectId, "_")
+        val objectId =  ActionHelper.replaceSpecialCharactersWithUnderscore(dataObjectId)
         // Using createTempView does not work because the same data object might be created more than once
         df.createOrReplaceTempView(objectId)
       }

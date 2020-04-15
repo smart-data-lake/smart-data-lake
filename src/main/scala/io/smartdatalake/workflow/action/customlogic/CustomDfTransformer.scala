@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.action.customlogic
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.CustomCodeUtil
+import io.smartdatalake.workflow.action.ActionHelper
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -73,8 +74,7 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
     }
     // Work with SQL Transformations
     else {
-      val invalidTableNameCharacters = "[^a-zA-Z0-9_]".r
-      val objectId = invalidTableNameCharacters.replaceAllIn(dataObjectId.id, "_")
+      val objectId = ActionHelper.replaceSpecialCharactersWithUnderscore(dataObjectId.id)
 
       try {
         df.createOrReplaceTempView(s"$objectId")

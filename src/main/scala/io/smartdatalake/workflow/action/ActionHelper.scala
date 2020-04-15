@@ -324,6 +324,18 @@ object ActionHelper extends SmartDataLakeLogger {
     }
   }
 
+  /**
+   * Replace all special characters in a String with underscore
+   * Used to get valid temp view names
+   * @param str
+   * @return
+   */
+  def replaceSpecialCharactersWithUnderscore(str: String) : String = {
+    val invalidCharacters = "[^a-zA-Z0-9_]".r
+    invalidCharacters.replaceAllIn(str, "_")
+  }
+
+
 
   //  /**
   //   * Checks a historized hive table to verify that there is only one active record for any given primary key
