@@ -63,10 +63,10 @@ abstract class SparkSubFeedsAction extends Action {
     require(initExecutionMode.isEmpty || mainInput.isDefined, throw ConfigurationException(s"$id has set an initExecutionMode without inputId but there are ${inputs.size} inputs with partitions. Please specify initExecutionMode.inputId to select input."))
     require(initExecutionMode.isEmpty || mainOutput.isDefined, throw ConfigurationException(s"$id has set an initExecutionMode without outputId but there are ${outputs.size} outputs with partitions. Please specify initExecutionMode.outputId to select output."))
     val mainInputSubFeed = mainInput.flatMap( input => subFeeds.find(_.dataObjectId==input.id))
-    preparedSubFeeds = if ( mainInputSubFeed.exists(_.isInstanceOf[InitSubFeed]) && mainInputSubFeed.exists(_.partitionValues.isEmpty)) {
+    preparedSubFeeds = if ( initExecutionMode.isDefined && mainInputSubFeed.exists(_.isInstanceOf[InitSubFeed]) && mainInputSubFeed.exists(_.partitionValues.isEmpty)) {
       preparedSubFeeds.map {
         subFeed =>
-          if (subFeed.dataObjectId==mainInput.get.id) subFeed.copy(partitionValues = ActionHelper.applyExecutionMode(initExecutionMode, id, mainInput.get, mainOutput.get, subFeed.partitionValues))
+          if (subFeed.dataObjectId==mainInput.get.id) subFeed.copy(partitionValues = ActionHelper.applyExecutionMode(initExecutionMode.get, id, mainInput.get, mainOutput.get, subFeed.partitionValues))
           else subFeed
       }
     } else preparedSubFeeds

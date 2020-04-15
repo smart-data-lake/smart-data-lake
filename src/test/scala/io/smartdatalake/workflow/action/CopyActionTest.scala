@@ -122,6 +122,42 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(r1.head == 6) // should be increased by 1 through TestDfTransformer
   }
 
+  test("copy load with transformation from sql code") {
+
+    // setup DataObjects
+    val feed = "copy"
+    val srcTable = Table(Some("default"), "copy_input")
+    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
+    val srcPath = tempPath+s"/${srcTable.fullName}"
+    val srcDO = HiveTableDataObject( "src1", srcPath, table = srcTable, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(srcDO)
+    val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("lastname","firstname")))
+    HiveUtil.dropTable(session, tgtTable.db.get, tgtTable.name )
+    val tgtPath = tempPath+s"/${tgtTable.fullName}"
+    val tgtDO = HiveTableDataObject( "tgt1", tgtPath, Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(tgtDO)
+
+    // prepare & start load
+    val refTimestamp1 = LocalDateTime.now()
+    implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", instanceRegistry, Some(refTimestamp1))
+    val customTransformerConfig = CustomDfTransformerConfig(sqlCode = Some("select * from copy_input where rating = 5"))
+    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformer = Some(customTransformerConfig))
+    val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
+    TestUtil.prepareHiveTable(srcTable, srcPath, l1)
+    val srcSubFeed = SparkSubFeed(None, "src1", Seq())
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
+    assert(tgtSubFeed.dataObjectId == tgtDO.id)
+
+    session.table(s"${tgtTable.fullName}").show
+    session.table(s"${tgtTable.fullName}").printSchema
+
+    val r1 = session.table(s"${tgtTable.fullName}")
+      .select($"lastname")
+      .as[String].collect().toSeq
+    assert(r1.size == 1) // only one record has rating 5 (see where condition)
+    assert(r1.head == "jonson")
+  }
+
   // Almost the same as copy load but without any transformation
   test("copy load without transformer (similar to old ingest action)") {
 

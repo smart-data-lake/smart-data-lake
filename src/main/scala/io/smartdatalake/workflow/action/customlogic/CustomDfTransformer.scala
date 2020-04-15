@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.action.customlogic
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.CustomCodeUtil
+import io.smartdatalake.workflow.action.ActionHelper
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -40,10 +41,11 @@ trait CustomDfTransformer extends Serializable {
 
 }
 
-case class CustomDfTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, options: Map[String,String] = Map()) {
-  require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined, "Either className or scalaFile must be defined for CustomDfTransformer")
+case class CustomDfTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Option[String] = None, options: Map[String,String] = Map()) {
+  require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || sqlCode.isDefined, "Either className, scalaFile, scalaCode or sqlCode must be defined for CustomDfTransformer")
 
-  val impl : CustomDfTransformer = className.map {
+
+  val impl : Option[CustomDfTransformer] = className.map {
     clazz => CustomCodeUtil.getClassInstanceByName[CustomDfTransformer](clazz)
   }.orElse{
     scalaFile.map {
@@ -57,15 +59,30 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
         val fnTransform = CustomCodeUtil.compileCode[(SparkSession, Map[String,String], DataFrame, String) => DataFrame](code)
         new CustomDfTransformerWrapper( fnTransform )
     }
-  }.get
+  }
 
   override def toString: String = {
     if(className.isDefined)       "className: "+className.get
     else if(scalaFile.isDefined)  "scalaFile: "+scalaFile.get
-    else                          "scalaCode: "+scalaCode.get
+    else if(scalaCode.isDefined)  "scalaCode: "+scalaCode.get
+    else                          "sqlCode: "+sqlCode.get
   }
 
   def transform(df: DataFrame, dataObjectId: DataObjectId)(implicit session: SparkSession) : DataFrame = {
-    impl.transform(session, options, df, dataObjectId.id)
+    if(className.isDefined || scalaFile.isDefined || scalaCode.isDefined) {
+      impl.get.transform(session, options, df, dataObjectId.id)
+    }
+    // Work with SQL Transformations
+    else {
+      val objectId = ActionHelper.replaceSpecialCharactersWithUnderscore(dataObjectId.id)
+
+      try {
+        df.createOrReplaceTempView(s"$objectId")
+        session.sql(sqlCode.get)
+      } catch {
+        case e : Throwable => throw new SQLTransformationException(s"Could not execute SQL query. Check your query and remember that special characters are replaced by underscores (name of the temp view used was: ${objectId}). Error: ${e.getMessage}")
+      }
+
+    }
   }
 }
