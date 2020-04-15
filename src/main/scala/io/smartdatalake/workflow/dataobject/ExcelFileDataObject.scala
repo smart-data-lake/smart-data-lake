@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.misc.{AclDef, DataFrameUtil}
 import org.apache.spark.sql.types.{LongType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SaveMode}
@@ -48,6 +49,7 @@ import org.apache.spark.sql.{DataFrame, Row, SaveMode}
  *
  * @param excelOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
  * @param schema An optional data object schema. If defined, any automatic schema inference is avoided.
+ * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop. Default is numberOfTasksPerPartition = 1.
  */
 case class ExcelFileDataObject(override val id: DataObjectId,
                                override val path: String,
@@ -56,6 +58,7 @@ case class ExcelFileDataObject(override val id: DataObjectId,
                                override val schema: Option[StructType] = None,
                                override val schemaMin: Option[StructType] = None,
                                override val saveMode: SaveMode = SaveMode.Overwrite,
+                               override val sparkRepartition: Option[SparkRepartitionDef] = Some(SparkRepartitionDef(numberOfTasksPerPartition = 1)),
                                override val acl: Option[AclDef] = None,
                                override val connectionId: Option[ConnectionId] = None,
                                override val metadata: Option[DataObjectMetadata] = None
@@ -75,7 +78,6 @@ case class ExcelFileDataObject(override val id: DataObjectId,
   override val options: Map[String, String] = excelOptions.toMap(schema).filter {
       case (_, v) => v.isDefined
   }.mapValues(_.get.toString).map(identity) // make serializable
-
 
   /**
    * @inheritdoc
