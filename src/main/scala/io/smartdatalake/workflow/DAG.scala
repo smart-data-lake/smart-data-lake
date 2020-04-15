@@ -275,7 +275,7 @@ object DAG extends SmartDataLakeLogger {
   /**
    * Create a lookup table to retrieve incoming (source) node IDs for a node.
    */
-  private def buildIncomingIdLookupTable(nodes: Seq[DAGNode], edges: Seq[DAGEdge]) = {
+  private def buildIncomingIdLookupTable(nodes: Seq[DAGNode], edges: Seq[DAGEdge]): Map[DAGNode, Seq[NodeId]] = {
     val incomingIDsForTargetIDMap = edges.groupBy(_.nodeIdTo).mapValues(_.map(_.nodeIdFrom).distinct)
     nodes.map(n => (n, incomingIDsForTargetIDMap.getOrElse(n.nodeId, Seq.empty))).toMap
   }
