@@ -23,7 +23,7 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.DAGHelper.NodeId
 import monix.eval.Task
 import monix.execution.Scheduler
-
+import scala.annotation.tailrec
 import scala.reflect._
 import scala.util.{Failure, Success, Try}
 
@@ -64,10 +64,10 @@ private[smartdatalake] trait DAGEventListener[T <: DAGNode] {
  * @tparam N: This is the DAG's main node type used for notifying the event listener. There may be other node types in the DAG for technical reasons, e.g. initialization
  */
 case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
-                                     incomingEdgesMap: Map[NodeId, Seq[DAGEdge]],
-                                     startNodes: Seq[DAGNode],
-                                     endNodes: Seq[DAGNode]
-                                    )
+                                                incomingEdgesMap: Map[NodeId, Seq[DAGEdge]],
+                                                startNodes: Seq[DAGNode],
+                                                endNodes: Seq[DAGNode]
+                                               )
   extends SmartDataLakeLogger {
 
   /**
@@ -103,8 +103,8 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
    * @return
    */
   def buildTaskGraph[A <: DAGResult](eventListener: DAGEventListener[N])
-                                                  (operation: (DAGNode, Seq[A]) => Seq[A])
-                                                  (implicit scheduler: Scheduler): Task[Seq[Try[A]]] = {
+                                    (operation: (DAGNode, Seq[A]) => Seq[A])
+                                    (implicit scheduler: Scheduler): Task[Seq[Try[A]]] = {
 
     // this variable is used to stop execution on cancellation
     // using a local variable inside code of Futures is possible in Scala:
@@ -237,7 +237,7 @@ object DAG extends SmartDataLakeLogger {
    * Create a DAG object from DAGNodes and DAGEdges
    */
   def create[N <: DAGNode : ClassTag](nodes: Seq[DAGNode], edges: Seq[DAGEdge]): DAG[N] = {
-    val incomingIds = buildIncomingIdLookupTable(nodes, edges)
+    val incomingIds: Map[DAGNode, Seq[NodeId]] = buildIncomingIdLookupTable(nodes, edges)
     // start nodes = all nodes without incoming edges
     val startNodes = incomingIds.filter(_._2.isEmpty)
 
@@ -267,7 +267,7 @@ object DAG extends SmartDataLakeLogger {
   /**
    * Create a lookup table to retrieve outgoing (target) node IDs for a node.
    */
-  private def buildOutgoingIdLookupTable(nodes: Seq[DAGNode], edges: Seq[DAGEdge]) = {
+  private def buildOutgoingIdLookupTable(nodes: Seq[DAGNode], edges: Seq[DAGEdge]): Map[DAGNode, Seq[NodeId]] = {
     val targetIDsforIncomingIDsMap = edges.groupBy(_.nodeIdFrom).mapValues(_.map(_.nodeIdTo))
     nodes.map(n => (n, targetIDsforIncomingIDsMap.getOrElse(n.nodeId, Seq()))).toMap
   }
@@ -275,7 +275,7 @@ object DAG extends SmartDataLakeLogger {
   /**
    * Create a lookup table to retrieve incoming (source) node IDs for a node.
    */
-  private def buildIncomingIdLookupTable(nodes: Seq[DAGNode], edges: Seq[DAGEdge]) = {
+  private def buildIncomingIdLookupTable(nodes: Seq[DAGNode], edges: Seq[DAGEdge]): Map[DAGNode, Seq[NodeId]] = {
     //val incomingIDsForTargetIDMap = edges.groupBy(_.nodeIdTo).mapValues(_.map(_.nodeIdFrom))
     val distinctIncomingIDsForTargetIDMap = edges.groupBy(e => (e.nodeIdTo, e.nodeIdFrom)).keys
     val incomingIDsForTargetIDMap = distinctIncomingIDsForTargetIDMap.groupBy(_._1).mapValues(_.map(_._2).toSeq)
@@ -289,17 +289,18 @@ object DAG extends SmartDataLakeLogger {
    * Sort by recursively searching the start nodes and removing them for the next call.
    */
   def sortStep(incomingIds: Map[NodeId, Seq[NodeId]]): Seq[NodeId] = {
-    // recursion stop condition
-    if(incomingIds.isEmpty) return Seq.empty
-    // search start nodes = nodes without incoming nodes
-    val (startNodeIds, remainingNodeIds) = incomingIds.partition(_._2.isEmpty)
-    assert(startNodeIds.nonEmpty, s"Loop detected in remaining nodes ${incomingIds.keys.mkString(", ")}")
-    // remove start nodes from incoming node list of remaining nodes
-    val remainingNodeIdsWithoutIncomingStartNodes = remainingNodeIds.mapValues {
-      inIds => inIds.filterNot(startNodeIds.keys.toSet) //eliminated all occurrences of seen nodes, not just the first one
+    @tailrec
+    def go(sortedNodes: Seq[NodeId], incomingIds: Map[NodeId, Seq[NodeId]]): Seq[NodeId] = {
+      // search start nodes = nodes without incoming nodes
+      val (startNodeIds, nonStartNodeIds) = incomingIds.partition(_._2.isEmpty)
+      assert(startNodeIds.nonEmpty, s"Loop detected in remaining nodes ${incomingIds.keys.mkString(", ")}")
+      // remove start nodes from incoming node list of remaining nodes
+      val nonStartNodeIdsWithoutIncomingStartNodes: Map[NodeId, Seq[NodeId]] = nonStartNodeIds.mapValues(_.filterNot(startNodeIds.isDefinedAt))
+      val newSortedNotes = sortedNodes ++ startNodeIds.keys
+      if (nonStartNodeIdsWithoutIncomingStartNodes.isEmpty) newSortedNotes
+      else go(newSortedNotes, nonStartNodeIdsWithoutIncomingStartNodes)
     }
-
-    //recursively sort remaining IDs
-    startNodeIds.keys.toSeq ++ sortStep(remainingNodeIdsWithoutIncomingStartNodes)
+    go(Seq(),incomingIds)
   }
+
 }
