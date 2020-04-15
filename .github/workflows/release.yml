@@ -1,0 +1,112 @@
+name: master release
+
+on: 
+  pull_request:
+    branches: 
+      - master
+    types: [closed]
+
+jobs:
+  build-release:
+    if: github.event.pull_request.merged == true
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Git Checkout
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+        ref: master
+    - name: JDK 8 Set
+      uses: actions/setup-java@v1.3.0
+      with: 
+        java-version: 1.8
+    - name: Maven Cache
+      uses: actions/cache@v1.1.2
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-maven-
+        
+    - name: Maven Get Version
+      run: |
+        echo ::set-env name=MVN_CURRENT_VERSION::$(mvn -B -f /home/runner/work/smart-data-lake/smart-data-lake/pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec)
+    - name: Set Release Version
+      run: |
+        echo ::set-env name=MVN_RELEASE_VERSION::$(mvn -B -f /home/runner/work/smart-data-lake/smart-data-lake/pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec | sed 's/-SNAPSHOT//g')
+    #- name: Printenv
+    #  run: |
+    #    echo "MVN_CURRENT_VERSION=${MVN_CURRENT_VERSION}
+    #    echo "MVN_RELEASE_VERSION=${MVN_RELEASE_VERSION}
+    #    printenv
+    - name: Maven Set Release Version
+      run: mvn versions:set -DnewVersion=${MVN_RELEASE_VERSION}
+      
+    - name: Maven Deploy to Bintray
+      env:
+        BINTRAY_API_KEY: ${{ secrets.BINTRAY_API_KEY }}
+      run: |
+        mkdir -p ~/.m2
+        echo "<settings><servers><server><id>bintray-smart-data-lake-smart-data-lake</id><username>smartdatalake</username><password>${BINTRAY_API_KEY}</password></server></servers></settings>" > ~/.m2/settings.xml
+        mvn clean deploy -f pom.xml
+        
+    - name: Git Commit and Tag Release
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A
+        git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to committ
+        git tag -f ${MVN_RELEASE_VERSION} -m "Release ${MVN_RELEASE_VERSION}"
+    - name: Git Pull Master
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git pull
+    - name: Git Push Master
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        
+                  
+    # DEVELOP BRANCH
+    - name: Develop Git Checkout
+      uses: actions/checkout@v2
+      with:
+        ref: develop
+        fetch-depth: 0
+    - name: Git Merge to develop
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git branch
+        git fetch --all
+        git branch
+        git checkout develop
+        git merge origin/master
+        git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to committ
+    
+    - name: Develop Git Push Release
+      uses: ad-m/github-push-action@master
+      with:
+        branch: develop
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Develop Get Next Version
+      id: bump_version
+      uses: christian-draeger/increment-semantic-version@1.0.1
+      with:
+        current-version: ${{ env.MVN_RELEASE_VERSION }}
+        version-fragment: bug
+    - name: Develop Set Next Snapshot version
+      run: mvn versions:set -DnewVersion=${{ steps.bump_version.outputs.next-version }}-SNAPSHOT
+    - name: Develop Git Commit Snapshot
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git commit -m "Increment to next SNAPSHOT release" -a
+    - name: Develop Git Push Snapshot
+      uses: ad-m/github-push-action@master
+      with:
+        branch: develop
+        github_token: ${{ secrets.GITHUB_TOKEN }}
