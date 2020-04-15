@@ -255,9 +255,10 @@ object DAG extends SmartDataLakeLogger {
     val sortedNodes = sortedNodeIds.map(nodeIdsToNodeMap)
 
     //lookup table to retrieve edges by ID pairs (fromId, toId)
-    val edgeIdPairToEdgeMap = edges.map(e => (e.nodeIdFrom, e.nodeIdTo) -> e).toMap
+    val edgeIdPairToEdgeMap = edges.groupBy(e => (e.nodeIdFrom, e.nodeIdTo))
+
     val incomingEdgesMap = incomingIds.map {
-      case (node, incomingIds) => (node.nodeId, incomingIds.map(incomingId => edgeIdPairToEdgeMap(incomingId,node.nodeId)))
+      case (node, incomingIds) => (node.nodeId, incomingIds.flatMap(incomingId => edgeIdPairToEdgeMap(incomingId,node.nodeId)))
     }
 
     DAG(sortedNodes, incomingEdgesMap, startNodes.keys.toSeq, endNodes.keys.toSeq)
@@ -267,15 +268,18 @@ object DAG extends SmartDataLakeLogger {
    * Create a lookup table to retrieve outgoing (target) node IDs for a node.
    */
   private def buildOutgoingIdLookupTable(nodes: Seq[DAGNode], edges: Seq[DAGEdge]) = {
-    val targetIDsforIncommingIDsMap = edges.groupBy(_.nodeIdFrom).mapValues(_.map(_.nodeIdTo))
-    nodes.map(n => (n, targetIDsforIncommingIDsMap.getOrElse(n.nodeId, Seq()))).toMap
+    val targetIDsforIncomingIDsMap = edges.groupBy(_.nodeIdFrom).mapValues(_.map(_.nodeIdTo))
+    nodes.map(n => (n, targetIDsforIncomingIDsMap.getOrElse(n.nodeId, Seq()))).toMap
   }
 
   /**
    * Create a lookup table to retrieve incoming (source) node IDs for a node.
    */
   private def buildIncomingIdLookupTable(nodes: Seq[DAGNode], edges: Seq[DAGEdge]) = {
-    val incomingIDsForTargetIDMap = edges.groupBy(_.nodeIdTo).mapValues(_.map(_.nodeIdFrom))
+    //val incomingIDsForTargetIDMap = edges.groupBy(_.nodeIdTo).mapValues(_.map(_.nodeIdFrom))
+    val distinctIncomingIDsForTargetIDMap = edges.groupBy(e => (e.nodeIdTo, e.nodeIdFrom)).keys
+    val incomingIDsForTargetIDMap = distinctIncomingIDsForTargetIDMap.groupBy(_._1).mapValues(_.map(_._2).toSeq)
+
     nodes.map(n => (n, incomingIDsForTargetIDMap.getOrElse(n.nodeId, Seq.empty))).toMap
   }
 
@@ -292,8 +296,9 @@ object DAG extends SmartDataLakeLogger {
     assert(startNodeIds.nonEmpty, s"Loop detected in remaining nodes ${incomingIds.keys.mkString(", ")}")
     // remove start nodes from incoming node list of remaining nodes
     val remainingNodeIdsWithoutIncomingStartNodes = remainingNodeIds.mapValues {
-      inIds => inIds.diff(startNodeIds.keys.toSeq)
+      inIds => inIds.filterNot(startNodeIds.keys.toSet) //eliminated all occurrences of seen nodes, not just the first one
     }
+
     //recursively sort remaining IDs
     startNodeIds.keys.toSeq ++ sortStep(remainingNodeIdsWithoutIncomingStartNodes)
   }
