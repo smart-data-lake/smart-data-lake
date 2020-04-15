@@ -147,6 +147,49 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(r2.head == 5)
   }
 
+  test("action dag where first actions has multiple input subfeeds") {
+    // Action B and C depend on Action A
+
+    // setup DataObjects
+    val feed = "actionpipeline"
+    val srcTable1 = Table(Some("default"), "input1")
+    HiveUtil.dropTable(session, srcTable1.db.get, srcTable1.name )
+    val srcPath1 = tempPath+s"/${srcTable1.fullName}"
+    val srcDO1 = HiveTableDataObject( "src1", srcPath1, table = srcTable1, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(srcDO1)
+    val srcTable2 = Table(Some("default"), "input2")
+    HiveUtil.dropTable(session, srcTable2.db.get, srcTable2.name )
+    val srcPath2 = tempPath+s"/${srcTable2.fullName}"
+    val srcDO2 = HiveTableDataObject( "src2", srcPath2, table = srcTable2, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(srcDO2)
+    val tgtTable = Table(Some("default"), "output", None, Some(Seq("lastname","firstname")))
+    HiveUtil.dropTable(session, tgtTable.db.get, tgtTable.name )
+    val tgtPath = tempPath+s"/${tgtTable.fullName}"
+    val tgtDO = HiveTableDataObject("tgt1", tgtPath, table = tgtTable, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(tgtDO)
+
+    // prepare DAG
+    val refTimestamp1 = LocalDateTime.now()
+    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", instanceRegistry, Some(refTimestamp1))
+    val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
+    srcDO1.writeDataFrame(l1, Seq())
+    srcDO2.writeDataFrame(l1, Seq())
+    val actions = Seq(
+      CustomSparkAction("a", inputIds = Seq(srcDO1.id, srcDO2.id), outputIds = Seq(tgtDO.id), CustomDfsTransformerConfig(className=Some("io.smartdatalake.workflow.action.TestDfsTransformerFilterDummy")))
+    )
+    val dag = ActionDAGRun(actions, "test")
+
+    // exec dag
+    dag.prepare
+    dag.init
+    dag.exec
+
+    val r1 = tgtDO.getDataFrame(Seq())
+      .select($"rating")
+      .as[Int].collect.toSeq
+    assert(r1 == Seq(5))
+  }
+
   test("action dag with four dependencies") {
     // Action B and C depend on Action A
     // Action D depends on Action B and C (uses CustomSparkAction with multiple inputs)

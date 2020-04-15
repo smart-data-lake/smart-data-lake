@@ -267,3 +267,10 @@ class TestDfsTransformerDummy extends CustomDfsTransformer {
     dfs.map{ case (id, df) => (id.replaceFirst("src","tgt"), df) }
   }
 }
+
+class TestDfsTransformerFilterDummy extends CustomDfsTransformer {
+  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
+    // return only the first df sorted by ID
+    dfs.toSeq.sortBy(_._1).take(1).map{ case (id, df) => (id.replaceFirst("src","tgt"), df) }.toMap
+  }
+}
