@@ -289,9 +289,9 @@ object ActionHelper extends SmartDataLakeLogger {
   /**
    * Apply execution mode to partition values
    */
-  def applyExecutionMode(executionMode: Option[ExecutionMode], actionId: ActionObjectId, input: DataObject, output: DataObject, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[PartitionValues] = {
+  def applyExecutionMode(executionMode: ExecutionMode, actionId: ActionObjectId, input: DataObject, output: DataObject, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[PartitionValues] = {
     executionMode match {
-      case Some(mode:PartitionDiffMode) =>
+      case mode:PartitionDiffMode =>
         (input,output) match {
           case (partitionInput: CanHandlePartitions, partitionOutput: CanHandlePartitions)  =>
             if (partitionInput.partitions.nonEmpty) {
@@ -323,6 +323,18 @@ object ActionHelper extends SmartDataLakeLogger {
       case _ => partitionValues
     }
   }
+
+  /**
+   * Replace all special characters in a String with underscore
+   * Used to get valid temp view names
+   * @param str
+   * @return
+   */
+  def replaceSpecialCharactersWithUnderscore(str: String) : String = {
+    val invalidCharacters = "[^a-zA-Z0-9_]".r
+    invalidCharacters.replaceAllIn(str, "_")
+  }
+
 
 
   //  /**

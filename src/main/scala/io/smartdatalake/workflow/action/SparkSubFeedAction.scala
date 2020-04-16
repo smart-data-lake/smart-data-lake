@@ -49,8 +49,8 @@ abstract class SparkSubFeedAction extends Action {
     // convert subfeed to SparkSubFeed type or initialize if not yet existing
     var preparedSubFeed = SparkSubFeed.fromSubFeed(subFeed)
     // apply init execution mode if there are no partition values given in command line
-    preparedSubFeed = if (subFeed.isInstanceOf[InitSubFeed] && preparedSubFeed.partitionValues.isEmpty) {
-      preparedSubFeed.copy( partitionValues = ActionHelper.applyExecutionMode(initExecutionMode, id, input, output, preparedSubFeed.partitionValues))
+    preparedSubFeed = if (initExecutionMode.isDefined && subFeed.isInstanceOf[InitSubFeed] && preparedSubFeed.partitionValues.isEmpty) {
+      preparedSubFeed.copy( partitionValues = ActionHelper.applyExecutionMode(initExecutionMode.get, id, input, output, preparedSubFeed.partitionValues))
     } else preparedSubFeed
     // break lineage if requested
     preparedSubFeed = if (breakDataFrameLineage) preparedSubFeed.breakLineage() else preparedSubFeed

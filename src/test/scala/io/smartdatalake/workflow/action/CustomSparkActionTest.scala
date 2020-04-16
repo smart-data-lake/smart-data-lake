@@ -22,6 +22,7 @@ import java.nio.file.Files
 import java.time.LocalDateTime
 
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.PartitionDiffMode
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -198,6 +199,55 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtDO.getDataFrame().count == 1)
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet)
   }
+
+  test("copy load with 2 transformations from sql code") {
+
+    // setup DataObjects
+    val feed = "copy"
+    val srcTable = Table(Some("default"), "copy_input")
+    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
+    val srcPath = tempPath+s"/${srcTable.fullName}"
+    val srcDO = HiveTableDataObject( "src1", srcPath, table = srcTable, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(srcDO)
+
+    val tgtTable1 = Table(Some("default"), "copy_output_1", None, Some(Seq("lastname","firstname")))
+    HiveUtil.dropTable(session, tgtTable1.db.get, tgtTable1.name )
+    val tgtPath1 = tempPath+s"/${tgtTable1.fullName}"
+    val tgtDO1 = HiveTableDataObject( "tgt1", tgtPath1, Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable1, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(tgtDO1)
+
+    val tgtTable2 = Table(Some("default"), "copy_output_2", None, Some(Seq("lastname","firstname")))
+    HiveUtil.dropTable(session, tgtTable2.db.get, tgtTable2.name )
+    val tgtPath2 = tempPath+s"/${tgtTable2.fullName}"
+    val tgtDO2 = HiveTableDataObject( "tgt2", tgtPath2, Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable2, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(tgtDO2)
+
+    // prepare & start load
+    val refTimestamp1 = LocalDateTime.now()
+    implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", instanceRegistry, Some(refTimestamp1))
+    val customTransformerConfig = CustomDfsTransformerConfig(sqlCode = Map(DataObjectId("tgt1")->"select * from copy_input where rating = 5", DataObjectId("tgt2")->"select * from copy_input where rating = 3"))
+    val action1 = CustomSparkAction("ca", List(srcDO.id), List(tgtDO1.id,tgtDO2.id), transformer = customTransformerConfig)
+    val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
+    TestUtil.prepareHiveTable(srcTable, srcPath, l1)
+    val srcSubFeed = SparkSubFeed(None, "src1", Seq())
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
+
+    session.table(s"${tgtTable1.fullName}").show
+
+    val r1 = session.table(s"${tgtTable1.fullName}")
+      .select($"lastname")
+      .as[String].collect().toSeq
+    assert(r1.size == 1) // only one record has rating 5 (see where condition)
+    assert(r1.head == "jonson")
+
+    val r2 = session.table(s"${tgtTable2.fullName}")
+      .select($"lastname")
+      .as[String].collect().toSeq
+    assert(r2.size == 1) // only one record has rating 5 (see where condition)
+    assert(r2.head == "doe")
+
+  }
+
 }
 
 
@@ -215,5 +265,12 @@ class TestDfsTransformerDummy extends CustomDfsTransformer {
   override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
     // one to one...
     dfs.map{ case (id, df) => (id.replaceFirst("src","tgt"), df) }
+  }
+}
+
+class TestDfsTransformerFilterDummy extends CustomDfsTransformer {
+  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
+    // return only the first df sorted by ID
+    dfs.toSeq.sortBy(_._1).take(1).map{ case (id, df) => (id.replaceFirst("src","tgt"), df) }.toMap
   }
 }

@@ -18,12 +18,15 @@
  */
 package io.smartdatalake
 
-import configs.Configs
+import com.typesafe.config.ConfigUtil
+import configs.{Configs, Result}
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, ConnectionId, DataObjectId}
+import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.webservice.KeycloakConfig
 import io.smartdatalake.workflow.action.customlogic._
 import io.smartdatalake.workflow.dataobject.{SplunkParams, WebserviceFileDataObject}
 import org.apache.spark.sql.types.StructType
+import scala.collection.JavaConverters._
 
 import scala.language.implicitConversions
 
@@ -65,9 +68,14 @@ package object config {
 
   implicit val customDfTransformerConfigReader: Configs[CustomDfTransformerConfig] = Configs.derive[CustomDfTransformerConfig]
 
+  implicit def mapDataObjectIdStringReader(implicit mapReader: Configs[Map[String,String]]): Configs[Map[DataObjectId, String]] = {
+    Configs.fromConfig { c => mapReader.extract(c).map(_.map{ case (k,v) => (DataObjectId(k), v)})}
+  }
   implicit val customDfsTransformerConfigReader: Configs[CustomDfsTransformerConfig] = Configs.derive[CustomDfsTransformerConfig]
 
   implicit val customFileTransformerConfigReader: Configs[CustomFileTransformerConfig] = Configs.derive[CustomFileTransformerConfig]
+
+  implicit val sparkRepartitionDefReader: Configs[SparkRepartitionDef] = Configs.derive[SparkRepartitionDef]
 
   // --------------------------------------------------------------------------------
 

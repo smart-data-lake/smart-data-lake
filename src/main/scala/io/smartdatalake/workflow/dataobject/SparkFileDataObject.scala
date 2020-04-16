@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
@@ -32,123 +32,140 @@ import org.apache.spark.sql.types.StructType
 private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject with CanCreateDataFrame with CanWriteDataFrame
   with UserDefinedSchema with SchemaValidation {
 
-    /**
-     * The Spark-Format provider to be used
-     */
-    def format: String
+  /**
+   * The Spark-Format provider to be used
+   */
+  def format: String
 
-    /**
-     * Returns the configured options for the Spark [[DataFrameReader]]/[[DataFrameWriter]].
-     *
-     * @see [[DataFrameReader]]
-     * @see [[DataFrameWriter]]
-     */
-    def options: Map[String, String] = Map()
+  /**
+   * Returns the configured options for the Spark [[DataFrameReader]]/[[DataFrameWriter]].
+   *
+   * @see [[DataFrameReader]]
+   * @see [[DataFrameWriter]]
+   */
+  def options: Map[String, String] = Map()
 
-    /**
-     * Callback that enables potential transformation to be applied to `df` before the data is written.
-     *
-     * Default is to validate the `schemaMin` and not apply any modification.
-     */
-    def beforeWrite(df: DataFrame): DataFrame = {
-      validateSchemaMin(df)
-      df
+  /**
+   * Definition of repartition operation before writing DataFrame with Spark to Hadoop.
+   */
+  def sparkRepartition: Option[SparkRepartitionDef]
+  assert(sparkRepartition.map(_.filename).isEmpty || partitions.isEmpty, s"($id) Cannot rename file with SparkRepartitionDef for partitioned DataObject")
+
+  /**
+   * Callback that enables potential transformation to be applied to `df` before the data is written.
+   *
+   * Default is to validate the `schemaMin` and not apply any modification.
+   */
+  def beforeWrite(df: DataFrame): DataFrame = {
+    validateSchemaMin(df)
+    df
+  }
+
+  /**
+   * Callback that enables potential transformation to be applied to `df` after the data is read.
+   *
+   * Default is to validate the `schemaMin` and not apply any modification.
+   */
+  def afterRead(df: DataFrame): DataFrame = {
+    validateSchemaMin(df)
+    df
+  }
+
+  /**
+   * Returns the user-defined schema for reading from the data source. By default, this should return `schema` but it
+   * may be customized by data objects that have a source schema and ignore the user-defined schema on read operations.
+   *
+   * If a user-defined schema is returned, it overrides any schema inference. If no user-defined schema is set, the
+   * schema may be inferred depending on the configuration and type of data frame reader.
+   *
+   * @param sourceExists Whether the source file/table exists already. Existing sources may have a source schema.
+   * @return The schema to use for the data frame reader when reading from the source.
+   */
+  def readSchema(sourceExists: Boolean): Option[StructType] = schema
+
+  /**
+   * Constructs an Apache Spark [[DataFrame]] from the underlying file content.
+   *
+   * @see [[DataFrameReader]]
+   *
+   * @param session the current [[SparkSession]].
+   * @return a new [[DataFrame]] containing the data stored in the file at `path`
+   */
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession) : DataFrame = {
+    val wrongPartitionValues = PartitionValues.checkWrongPartitionValues(partitionValues, partitions)
+    assert(wrongPartitionValues.isEmpty, s"getDataFrame got request with PartitionValues keys ${wrongPartitionValues.mkString(",")} not included in $id partition columns ${partitions.mkString(", ")}")
+
+    val filesExists = checkFilesExisting
+
+    if (!filesExists) {
+      //without either schema or data, no data frame can be created
+      require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined if there are no existing files.")
+
+      // Schema exists so an empty data frame can be created
+      // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
+      filesystem.mkdirs(hadoopPath)
     }
 
-    /**
-     * Callback that enables potential transformation to be applied to `df` after the data is read.
-     *
-     * Default is to validate the `schemaMin` and not apply any modification.
-     */
-    def afterRead(df: DataFrame): DataFrame = {
-      validateSchemaMin(df)
-      df
-    }
-
-    /**
-     * Returns the user-defined schema for reading from the data source. By default, this should return `schema` but it
-     * may be customized by data objects that have a source schema and ignore the user-defined schema on read operations.
-     *
-     * If a user-defined schema is returned, it overrides any schema inference. If no user-defined schema is set, the
-     * schema may be inferred depending on the configuration and type of data frame reader.
-     *
-     * @param sourceExists Whether the source file/table exists already. Existing sources may have a source schema.
-     * @return The schema to use for the data frame reader when reading from the source.
-     */
-    def readSchema(sourceExists: Boolean): Option[StructType] = schema
-
-    /**
-     * Constructs an Apache Spark [[DataFrame]] from the underlying file content.
-     *
-     * @see [[DataFrameReader]]
-     *
-     * @param session the current [[SparkSession]].
-     * @return a new [[DataFrame]] containing the data stored in the file at `path`
-     */
-    override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession) : DataFrame = {
-      val wrongPartitionValues = PartitionValues.checkWrongPartitionValues(partitionValues, partitions)
-      assert(wrongPartitionValues.isEmpty, s"getDataFrame got request with PartitionValues keys ${wrongPartitionValues.mkString(",")} not included in $id partition columns ${partitions.mkString(", ")}")
-
-      val filesExists = checkFilesExisting
-
-      if (!filesExists) {
-        //without either schema or data, no data frame can be created
-        require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined if there are no existing files.")
-
-        // Schema exists so an empty data frame can be created
-        // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
-        filesystem.mkdirs(hadoopPath)
-      }
-
-      val df = if (partitions.isEmpty || partitionValues.isEmpty) {
-        session.read
-          .format(format)
-          .options(options)
-          .optionalSchema(readSchema(filesExists))
-          .load(hadoopPath.toString)
-      } else {
-        val reader = session.read
-          .format(format)
-          .options(options)
-          .optionalSchema(readSchema(filesExists))
-          .option("basePath", hadoopPath.toString) // this is needed for partitioned tables when subdirectories are read directly; it then keeps the partition columns from the subdirectory path in the dataframe
-        // create data frame for every partition value and then build union
-        val pathsToRead = partitionValues.map( pv => new Path(hadoopPath, getPartitionString(pv).get).toString)
-        pathsToRead.map(reader.load).reduce(_ union _)
-      }
-
-      // finalize & return DataFrame
-      afterRead(df)
-    }
-
-    /**
-     * Writes the provided [[DataFrame]] to the filesystem.
-     *
-     * The `partitionValues` attribute is used to partition the output by the given columns on the file system.
-     *
-     * @see [[DataFrameWriter.partitionBy]]
-     * @param df the [[DataFrame]] to write to the file system.
-     * @param partitionValues The partition layout to write.
-     * @param session the current [[SparkSession]].
-     */
-    override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
-
-      // prepare data
-      val dfPrepared = beforeWrite(df)
-
-      val hadoopPathString = hadoopPath.toString
-      logger.info(s"Writing data frame to $hadoopPathString")
-
-      // write
-      dfPrepared.write.format(format)
-        .mode(saveMode)
+    val df = if (partitions.isEmpty || partitionValues.isEmpty) {
+      session.read
+        .format(format)
         .options(options)
-        .optionalPartitionBy(partitions)
-        .save(hadoopPathString)
-
-      // make sure empty partitions are created as well
-      createMissingPartitions(partitionValues)
+        .optionalSchema(readSchema(filesExists))
+        .load(hadoopPath.toString)
+    } else {
+      val reader = session.read
+        .format(format)
+        .options(options)
+        .optionalSchema(readSchema(filesExists))
+        .option("basePath", hadoopPath.toString) // this is needed for partitioned tables when subdirectories are read directly; it then keeps the partition columns from the subdirectory path in the dataframe
+      // create data frame for every partition value and then build union
+      val pathsToRead = partitionValues.map( pv => new Path(hadoopPath, getPartitionString(pv).get).toString)
+      pathsToRead.map(reader.load).reduce(_ union _)
     }
+
+    // finalize & return DataFrame
+    afterRead(df)
+  }
+
+  /**
+   * Writes the provided [[DataFrame]] to the filesystem.
+   *
+   * The `partitionValues` attribute is used to partition the output by the given columns on the file system.
+   *
+   * @see [[DataFrameWriter.partitionBy]]
+   * @param df the [[DataFrame]] to write to the file system.
+   * @param partitionValues The partition layout to write.
+   * @param session the current [[SparkSession]].
+   */
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+
+    // prepare data
+    var dfPrepared = beforeWrite(df)
+    dfPrepared = sparkRepartition.map(_.prepareDataFrame(dfPrepared,partitions, partitionValues.size, id))
+      .getOrElse(dfPrepared)
+
+    val hadoopPathString = hadoopPath.toString
+    logger.info(s"Writing data frame to $hadoopPathString")
+
+    // write
+    dfPrepared.write.format(format)
+      .mode(saveMode)
+      .options(options)
+      .optionalPartitionBy(partitions)
+      .save(hadoopPathString)
+
+    // make sure empty partitions are created as well
+    createMissingPartitions(partitionValues)
+
+    // rename file according to sparkRepartition (only if not partitioned and numberOfTasksPerPartition=1)
+    sparkRepartition.flatMap(_.filename).foreach {
+      filename =>
+        require(partitions.isEmpty, s"($id) Cannot rename file with SparkRepartitionDef for partitioned DataObject")
+        val files = getFileRefs(Seq())
+        require(files.size <= 1, s"($id) Number of files should not be greater than 1 because SparkRepartitionDef.numberOfTasksPerPartition should be set to 1 if filename is set!")
+        files.map(f => new Path(f.fullPath)).foreach( p => filesystem.rename(p, new Path(p.getParent, filename)))
+    }
+  }
 }
 
 /**

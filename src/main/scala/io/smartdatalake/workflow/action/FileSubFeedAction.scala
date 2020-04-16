@@ -61,8 +61,8 @@ abstract class FileSubFeedAction extends Action {
     // convert subfeeds to FileSubFeed type or initialize if not yet existing
     var preparedSubFeed = FileSubFeed.fromSubFeed(subFeed)
     // apply init execution mode if there are no partition values given in command line
-    preparedSubFeed = if (subFeed.isInstanceOf[InitSubFeed] && preparedSubFeed.partitionValues.isEmpty) {
-      preparedSubFeed.copy( partitionValues = ActionHelper.applyExecutionMode(initExecutionMode, id, input, output, preparedSubFeed.partitionValues))
+    preparedSubFeed = if (initExecutionMode.isDefined && subFeed.isInstanceOf[InitSubFeed] && preparedSubFeed.partitionValues.isEmpty) {
+      preparedSubFeed.copy( partitionValues = ActionHelper.applyExecutionMode(initExecutionMode.get, id, input, output, preparedSubFeed.partitionValues))
     } else preparedSubFeed
     // break lineage if requested
     preparedSubFeed = if (breakFileRefLineage) preparedSubFeed.breakLineage() else preparedSubFeed
@@ -81,8 +81,8 @@ abstract class FileSubFeedAction extends Action {
     // convert subfeeds to FileSubFeed type or initialize if not yet existing
     var preparedSubFeed = FileSubFeed.fromSubFeed(subFeed)
     // apply init execution mode if there are no partition values given in command line
-    preparedSubFeed = if (subFeed.isInstanceOf[InitSubFeed] && preparedSubFeed.partitionValues.isEmpty) {
-      preparedSubFeed.copy( partitionValues = ActionHelper.applyExecutionMode(initExecutionMode, id, input, output, preparedSubFeed.partitionValues))
+    preparedSubFeed = if (initExecutionMode.isDefined && subFeed.isInstanceOf[InitSubFeed] && preparedSubFeed.partitionValues.isEmpty) {
+      preparedSubFeed.copy( partitionValues = ActionHelper.applyExecutionMode(initExecutionMode.get, id, input, output, preparedSubFeed.partitionValues))
     } else preparedSubFeed
     // break lineage if requested
     preparedSubFeed = if (breakFileRefLineage) preparedSubFeed.breakLineage() else preparedSubFeed

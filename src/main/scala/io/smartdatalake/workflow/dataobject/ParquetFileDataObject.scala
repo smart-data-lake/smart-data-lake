@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import org.apache.spark.sql.streaming.Trigger
@@ -48,6 +49,7 @@ import org.apache.spark.sql.{DataFrame, SaveMode}
  *             Only files ending with *.parquet* are considered as data for this DataObject.
  * @param partitions partition columns for this data object
  * @param saveMode spark [[SaveMode]] to use when writing files, default is "overwrite"
+ * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop.
  * @param acl override connections permissions for files created with this connection
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HadoopFileConnection]]
  * @param metadata Metadata describing this data object.
@@ -58,6 +60,7 @@ case class ParquetFileDataObject( override val id: DataObjectId,
                                   override val schema: Option[StructType] = None,
                                   override val schemaMin: Option[StructType] = None,
                                   override val saveMode: SaveMode = SaveMode.Overwrite,
+                                  override val sparkRepartition: Option[SparkRepartitionDef] = None,
                                   override val acl: Option[AclDef] = None,
                                   override val connectionId: Option[ConnectionId] = None,
                                   override val metadata: Option[DataObjectMetadata] = None,

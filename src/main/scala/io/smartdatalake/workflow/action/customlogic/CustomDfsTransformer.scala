@@ -18,7 +18,9 @@
  */
 package io.smartdatalake.workflow.action.customlogic
 
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.CustomCodeUtil
+import io.smartdatalake.workflow.action.ActionHelper
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -30,11 +32,20 @@ trait CustomDfsTransformer extends Serializable {
 
 }
 
-case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, options: Map[String,String] = Map()) {
-  require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined, "Either className or scalaFile must be defined for CustomDfTransformer")
+/**
+ *
+ * @param className Optional class name to load transformer code from
+ * @param scalaFile Optional file where scala code for transformation is loaded from
+ * @param scalaCode Optional scala code for transformation
+ * @param sqlCode Optional map of DataObjectId and corresponding SQL Code
+ * @param options
+ */
+case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Map[DataObjectId,String] = Map(), options: Map[String,String] = Map()) {
+  require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || !sqlCode.isEmpty, "Either className, scalaFile, scalaCode or sqlCode must be defined for CustomDfsTransformer")
+
 
   // Load Transformer code from appropriate location
-  val impl: CustomDfsTransformer = className.map {
+  val impl: Option[CustomDfsTransformer] = className.map {
     clazz => CustomCodeUtil.getClassInstanceByName[CustomDfsTransformer](clazz)
   }.orElse{
     scalaFile.map {
@@ -48,15 +59,41 @@ case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFi
         val fnTransform = CustomCodeUtil.compileCode[(SparkSession, Map[String,String], Map[String,DataFrame]) => Map[String,DataFrame]](code)
         new CustomDfsTransformerWrapper( fnTransform )
     }
-  }.get
+  }
 
   override def toString: String = {
     if(className.isDefined)       "className: "+className.get
     else if(scalaFile.isDefined)  "scalaFile: "+scalaFile.get
-    else                          "scalaCode: "+scalaCode.get
+    else if(scalaCode.isDefined)  "scalaCode: "+scalaCode.get
+    else                          "sqlCode: "+sqlCode
+
   }
 
   def transform(dfs: Map[String,DataFrame])(implicit session: SparkSession) : Map[String,DataFrame] = {
-    impl.transform(session, options, dfs)
+    if(className.isDefined || scalaFile.isDefined || scalaCode.isDefined) {
+      impl.get.transform(session, options, dfs)
+    }
+    // Work with SQL Transformations
+    else {
+      // register all input DataObjects as temporary table
+      for( (dataObjectId,df) <- dfs) {
+        val objectId =  ActionHelper.replaceSpecialCharactersWithUnderscore(dataObjectId)
+        // Using createTempView does not work because the same data object might be created more than once
+        df.createOrReplaceTempView(objectId)
+      }
+
+      // execute all queries and return them under corresponding dataObjectId
+      sqlCode.map {
+        case (dataObjectId,sqlCode) => {
+          val df = try {
+            session.sql(sqlCode)
+          } catch {
+            case e : Throwable => throw new SQLTransformationException(s"Could not execute SQL query. Check your query and remember that special characters are replaced by underscores. Error: ${e.getMessage}")
+          }
+          (dataObjectId.id, df)
+        }
+      }
+
+    }
   }
 }
