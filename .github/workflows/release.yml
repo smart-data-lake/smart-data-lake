@@ -41,7 +41,7 @@ jobs:
     #    echo "MVN_RELEASE_VERSION=${MVN_RELEASE_VERSION}
     #    printenv
     - name: Maven Set Release Version
-      run: mvn versions:set -DnewVersion=${MVN_RELEASE_VERSION}
+      run: sed -i "/${MVN_CURRENT_VERSION}/{s//${MVN_RELEASE_VERSION}/;:p;n;bp}" pom.xml
       
     - name: Maven Deploy to Bintray
       env:
