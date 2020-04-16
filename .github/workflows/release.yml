@@ -41,7 +41,7 @@ jobs:
     #    echo "MVN_RELEASE_VERSION=${MVN_RELEASE_VERSION}
     #    printenv
     - name: Maven Set Release Version
-      run: mvn versions:set -DnewVersion=${MVN_RELEASE_VERSION}
+      run: sed -i "/${MVN_CURRENT_VERSION}/{s//${MVN_RELEASE_VERSION}/;:p;n;bp}" pom.xml
       
     - name: Maven Deploy to Bintray
       env:
@@ -99,7 +99,7 @@ jobs:
         current-version: ${{ env.MVN_RELEASE_VERSION }}
         version-fragment: bug
     - name: Develop Set Next Snapshot version
-      run: mvn versions:set -DnewVersion=${{ steps.bump_version.outputs.next-version }}-SNAPSHOT
+      run: sed -i "/${MVN_RELEASE_VERSION}/{s//${{ steps.bump_version.outputs.next-version }}-SNAPSHOT/;:p;n;bp}" pom.xml
     - name: Develop Git Commit Snapshot
       run: |
         git config --local user.email "action@github.com"
