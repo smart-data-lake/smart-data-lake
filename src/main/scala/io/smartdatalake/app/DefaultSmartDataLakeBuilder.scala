@@ -1,0 +1,53 @@
+/*
+ * Smart Data Lake - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+package io.smartdatalake.app
+
+/**
+ * Default Smart Data Lake Command Line Application.
+ *
+ * Implementation Note: This must be a class and not an object in order to be found by reflection in DatabricksSmartDataLakeBuilder
+ */
+class DefaultSmartDataLakeBuilder extends SmartDataLakeBuilder {
+
+  def parseAndRun(args: Array[String], ignoreOverrideJars: Boolean = false): Unit = {
+    logger.info(s"Starting Program $appType v$appVersion")
+
+    parseCommandLineArguments(args, initConfigFromEnvironment) match {
+      case Some(config) =>
+        assert(config.overrideJars.isEmpty || ignoreOverrideJars, "Option override-jars is not supported by DefaultSmartDataLakeBuilder. Use DatabricksSmartDataLakeBuilder for this option.")
+        run(config)
+        logger.info(s"$appType v$appVersion finished successfully.")
+      case None =>
+        logger.error(s"$appType v$appVersion terminated due to an error.")
+    }
+  }
+}
+
+object DefaultSmartDataLakeBuilder {
+
+  /**
+   * Entry-Point of the application.
+   *
+   * @param args Command-line arguments.
+   */
+  def main(args: Array[String]): Unit = {
+    val app = new DefaultSmartDataLakeBuilder
+    app.parseAndRun(args)
+  }
+}

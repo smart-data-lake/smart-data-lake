@@ -1,0 +1,29 @@
+# Troubleshooting
+
+## Windows: missing winutils
+Error: `java.io.IOException: Could not locate executable null\bin\winutils.exe in the Hadoop binaries`
+
+Cause: The `winutils.exe` executable can not be found.   
+Download hadoop winutils binaries (e.g https://github.com/steveloughran/winutils/archive/tag_2017-08=29-hadoop-2.8.1-native.zip)  
+Extract binaries for desired hadoop version into folder (e.g. hadoop-2.8.1\bin)  
+set HADOOP_HOME evironment variable (e.g. HADOOP_HOME=...\hadoop-2.8.1).  
+Note that the binary files need to be located at %HADOOP_HOME%\bin!
+
+## Windows: `/tmp/hive` is not writable
+Solution: Change to `%HADOOP_HOME%\bin` and execute `winutils chmod 777 /tmp/hive`.
+
+## Resources not copied
+Symptom: Tests fail due to missing or outdated resources or the execution starts but can not find the feeds specified. IntelliJ might not copy the resource files to the target directory. 
+
+Solution: Execute the maven goal `resources:resources` (`mvn resources:resources`) manually after you changed any resource file.
+
+## Maven compile error: tools.jar
+Error Message: `Could not find artifact jdk.tools:jdk.tools:jar:1.7 at specified path ...`
+
+Context: Hadoop/Spark has a dependency on the tools.jar file which is installed as part of the JDK installation.
+
+Possible Reasons:
+ 1. Your system does not have a JDK installed (only a JRE).
+    - Fix: Make sure a JDK is installed and your PATH and JAVA_HOME environment variables are pointing to the JDK installation.
+ 1. You are using a Java 9 JDK or higher. The tools.jar has been removed in JDK 9. See: https://openjdk.java.net/jeps/220
+    - Fix: Downgrade your JDK to Java 8.
