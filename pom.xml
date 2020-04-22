@@ -34,11 +34,21 @@
 	<!-- Used for license header by maven-license-plugin -->
 	<name>Smart Data Lake</name>
 	<description>Build your data lake the smart way.</description>
+	<url>http://www.smartdatalake.io</url>
 	<inceptionYear>2019</inceptionYear>
 	<organization>
 		<name>ELCA Informatique SA</name>
 		<url>https://www.elca.ch</url>
 	</organization>
+
+	<developers>
+		<developer>
+			<name>Smart Data Lake</name>
+			<email>smartdatalake@elca.ch</email>
+			<organization>ELCA Informatik AG</organization>
+			<organizationUrl>http://www.elca.ch</organizationUrl>
+		</developer>
+	</developers>
 
 	<profiles>
 		<profile>
