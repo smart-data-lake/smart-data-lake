@@ -25,20 +25,45 @@ import java.io.File
  * Extend this class and call parseKerberosSpecificParameters
  * if you want to force Kerberos specific parameters to be enforced.
  */
-private[smartdatalake] abstract class KerberosSmartDataLakeBuilder extends SmartDataLakeBuilder {
+abstract class KerberosSmartDataLakeBuilderImpl extends SmartDataLakeBuilder {
 
   // define additional options for kerberos to parse from command line arguments
   parser.opt[String]('d', "kerberos-domain")
-    .required()
-    .action( (arg, config) => config.copy(kerberosDomain = Some(arg)))
+    .action((arg, config) => config.copy(kerberosDomain = Some(arg)))
     .text("Kerberos-Domain for authentication (USERNAME@KERBEROS-DOMAIN).")
   parser.opt[String]('u', "username")
-    .required()
-    .action( (arg, config) => config.copy(username = Some(arg)))
+    .action((arg, config) => config.copy(username = Some(arg)))
     .text("Kerberos username for authentication (USERNAME@KERBEROS-DOMAIN).")
   parser.opt[File]('k', "keytab-path")
-    .required()
     .action((arg, config) => config.copy(keytabPath = Some(arg)))
     .text("Path to the Kerberos keytab file for authentication.")
 
+}
+
+object KerberosSmartDataLakeBuilder extends KerberosSmartDataLakeBuilderImpl {
+
+  def main(args: Array[String]): Unit = {
+    logger.info(s"Start programm $appType")
+
+    //Get environment variables to check if we have a valid kerberos configuration
+    val config = parseCommandLineArguments(args, initConfigFromEnvironment)
+
+    config match {
+      case Some(c) =>
+
+        //If local authenticate the application - unnecessary on cluster
+        val username = c.username.getOrElse(throw new IllegalArgumentException("Username needs to be set in local mode!"))
+        val kerberosDomain = c.kerberosDomain.getOrElse(throw new IllegalArgumentException("Kerberos domain needs to be set in local mode!"))
+        val kp = c.keytabPath.map(_.getPath).orElse(Some(ClassLoader.getSystemClassLoader.getResource(s"$username.keytab")).map(_.getPath))
+          .getOrElse(throw new IllegalArgumentException("Couldn't find keytab file for authentication."))
+        val principal = s"$username@$kerberosDomain"
+
+        if (c.master.contains("local[*]")) AppUtil.authenticate(kp, principal)
+        run(c)
+        logger.info(s"$appType v$appVersion finished successfully.")
+
+      case None =>
+        logger.error(s"$appType v$appVersion terminated due to an error.")
+    }
+  }
 }
