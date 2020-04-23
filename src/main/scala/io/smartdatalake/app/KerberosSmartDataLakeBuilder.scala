@@ -25,7 +25,7 @@ import java.io.File
  * Extend this class and call parseKerberosSpecificParameters
  * if you want to force Kerberos specific parameters to be enforced.
  */
-private[smartdatalake] abstract class KerberosSmartDataLakeBuilderImpl extends SmartDataLakeBuilder {
+abstract class KerberosSmartDataLakeBuilderImpl extends SmartDataLakeBuilder {
 
   // define additional options for kerberos to parse from command line arguments
   parser.opt[String]('d', "kerberos-domain")
