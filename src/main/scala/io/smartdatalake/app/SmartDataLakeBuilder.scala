@@ -165,7 +165,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
   /**
    * Run the application with the provided configuarion.
-   *
    * @param appConfig Application configuration (parsed from command line).
    */
   def run(appConfig: SmartDataLakeBuilderConfig): Unit = {
