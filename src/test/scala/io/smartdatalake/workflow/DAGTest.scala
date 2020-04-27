@@ -43,10 +43,17 @@ object TestEdge {
 }
 
 class TestEventListener extends DAGEventListener[TestNode] with SmartDataLakeLogger {
-  override def onNodeStart(node: TestNode): Unit = logger.info(s"${node.nodeId} started")
-  override def onNodeFailure(exception: Throwable)(node: TestNode): Unit = logger.error(s"${node.nodeId} failed with ${exception.getClass.getSimpleName}")
+  // count how many nodes are currently running
+  val concurrentRuns: AtomicInteger = new AtomicInteger(0)
+  // record the maximum number of concurrently running noes
+  val maxConcurrentRuns: AtomicInteger = new AtomicInteger(0)
+  override def onNodeStart(node: TestNode): Unit = {
+    concurrentRuns.incrementAndGet
+    maxConcurrentRuns.set(Math.max(concurrentRuns.get,maxConcurrentRuns.get))
+    logger.info(s"${node.nodeId} started (" + concurrentRuns.get +" job(s) running currently)") }
+  override def onNodeFailure(exception: Throwable)(node: TestNode): Unit = { logger.error(s"${node.nodeId} failed with ${exception.getClass.getSimpleName}"); concurrentRuns.decrementAndGet }
   override def onNodeSkipped(exception: Throwable)(node: TestNode): Unit = logger.warn(s"${node.nodeId} skipped because ${exception.getClass.getSimpleName}")
-  override def onNodeSuccess(node: TestNode): Unit = logger.info(s"${node.nodeId} succeeded")
+  override def onNodeSuccess(node: TestNode): Unit = { logger.info(s"${node.nodeId} succeeded"); concurrentRuns.decrementAndGet }
 }
 
 class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
@@ -61,7 +68,7 @@ class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
       Seq(TestEgde("A", "B"),TestEgde("B", "C"))
     )
     println(dag.toString)
-    val task = dag.buildTaskGraph[TestResult](new TestEventListener){ defaultOp() }
+    val task = dag.buildTaskGraph[TestResult](new TestEventListener){ defaultOp(300) }
     val resultFuture = task.runToFuture
     val result = Await.result(resultFuture, 5.seconds)
       .map(_.get)
@@ -75,7 +82,8 @@ class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
     val edges = Seq(TestEgde("A", "B"),TestEgde("B", "D"),TestEgde("A", "C"),TestEgde("C", "D"))
     val dag = DAG.create[TestNode](nodes, edges)
     println(dag.toString)
-    val task =  dag.buildTaskGraph[TestResult](new TestEventListener){ defaultOp() }
+    val testEventListener: TestEventListener = new TestEventListener
+    val task =  dag.buildTaskGraph[TestResult](testEventListener){ defaultOp() }
     val resultFuture = task.runToFuture
     val (result, tResult) = measureTime(
       Await.result(resultFuture, 10.seconds)
@@ -90,8 +98,9 @@ class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
     // check all nodes are executed
     val nodesNotExecuted = nodes.map(_.nodeId).toSet -- execCntPerNode.keySet
     assert(nodesNotExecuted.isEmpty, s"Nodes $nodesNotExecuted have not been executed")
-    // check parallel execution -> if not run in parallel this takes at least 4 seconds, otherwise only 2
-    assert(tResult < 4, "Calculation took longer than 4 seconds, is this really executing in parallel?")
+    // check parallel execution, in this case it is not possible for more than 2 jobs to run concurrently
+    logger.info("Maximum number of parallel executions was " +testEventListener.maxConcurrentRuns.get)
+    assert(testEventListener.maxConcurrentRuns.get() == 2)
   }
 
   test("create and run dag: split and join with serialized execution") {
@@ -100,7 +109,8 @@ class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
     val edges = Seq(TestEgde("A", "B"),TestEgde("B", "D"),TestEgde("A", "C"),TestEgde("C", "D"))
     val dag = DAG.create[TestNode](nodes, edges)
     println(dag.toString)
-    val task =  dag.buildTaskGraph[TestResult](new TestEventListener) { defaultOp() }
+    val testEventListener: TestEventListener = new TestEventListener
+    val task =  dag.buildTaskGraph[TestResult](testEventListener) { defaultOp(300) }
     val resultFuture = task.runToFuture(singleScheduler)
     val (result, tResult) = measureTime( Await.result(resultFuture, 10.seconds).map(_.get))
     println(result)
@@ -112,9 +122,9 @@ class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
     // check all nodes are executed
     val nodesNotExecuted = nodes.map(_.nodeId).toSet -- execCntPerNode.keySet
     assert(nodesNotExecuted.isEmpty, s"Nodes $nodesNotExecuted have not been executed")
-    // check parallel execution -> if not run in parallel this takes at least 4 seconds, otherwise only 2
-    //TODO: this assertion is not reliable.
-    assert(tResult >= 4, "Calculation took less than 4 seconds, this is to fast for serialized execution")
+    // parallel execution is not permitted in this case, as serialization is forced
+    logger.info("Maximum number of parallel executions was " +testEventListener.maxConcurrentRuns.get)
+    assert(testEventListener.maxConcurrentRuns.get() == 1)
   }
 
   test("cancel running dag: stop pending tasks") {
@@ -123,7 +133,7 @@ class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
       Seq(TestEgde("A", "B"),TestEgde("B", "C"))
     )
     println(dag.toString)
-    val task = dag.buildTaskGraph[TestResult](new TestEventListener) { defaultOp() }
+    val task = dag.buildTaskGraph[TestResult](new TestEventListener) { defaultOp(500) }
     val resultFuture = task.runToFuture
     Thread.sleep(100)
     resultFuture.cancel()
@@ -139,7 +149,7 @@ class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
     val opWithException = (node:DAGNode, inResults:Seq[TestResult]) => {
       node.nodeId match {
         case "B" => throw new RuntimeException("test exception on node B")
-        case _ => defaultOp()(node,inResults)
+        case _ => defaultOp(500)(node,inResults)
       }
     }
     val task =  dag.buildTaskGraph[TestResult](new TestEventListener) ( opWithException )
@@ -172,7 +182,8 @@ class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
     val edges = Seq(TestEgde("A", "B"),TestEgde("B", "C"), TestEgde("D", "E"),TestEgde("D", "F"))
     val dag = DAG.create[TestNode](nodes, edges)
     println(dag.toString)
-    val task =  dag.buildTaskGraph[TestResult](new TestEventListener) { defaultOp() }
+    val testEventListener: TestEventListener = new TestEventListener
+    val task =  dag.buildTaskGraph[TestResult](testEventListener){ defaultOp() }
     val resultFuture = task.runToFuture
     val (result, tResult) = measureTime( Await.result(resultFuture, 10.seconds).map(_.get))
     println(result)
@@ -186,7 +197,9 @@ class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
     // check all nodes are executed
     val nodesNotExecuted = nodes.map(_.nodeId).toSet -- execCntPerNode.keySet
     assert(nodesNotExecuted.isEmpty, s"Nodes $nodesNotExecuted have not been executed")
-    assert(tResult < 4, "Calculation took longer than 4 seconds, is this really executing in parallel?")
+    // check parallel execution
+    logger.info("Maximum number of parallel executions was " +testEventListener.maxConcurrentRuns.get)
+    assert(testEventListener.maxConcurrentRuns.get() >= 2)
   }
 
 
