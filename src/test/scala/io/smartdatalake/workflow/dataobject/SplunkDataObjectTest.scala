@@ -23,6 +23,7 @@ import java.time.{Duration, LocalDateTime}
 import com.splunk.{JobExportArgs, Service}
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
+import io.smartdatalake.definitions.UserPassAuthMode
 import io.smartdatalake.workflow.connection.{SplunkConnection, SplunkConnectionService}
 import org.apache.commons.lang3.StringEscapeUtils.escapeJava
 import org.apache.spark.sql.Row
@@ -94,7 +95,7 @@ class SplunkDataObjectTest extends DataObjectTestSuite {
   }
 
   private def createDO(query: String = "TEST_PURPOSES_ONLY", columnNames: String = "TEST_PURPOSES_ONLY") = {
-    instanceRegistry.register(SplunkConnection( "con1", "splunk.test.com", 8888, "CLEAR#REPLACEME", "CLEAR#REPLACEME"))
+    instanceRegistry.register(SplunkConnection( "con1", "splunk.test.com", 8888, UserPassAuthMode("CLEAR#REPLACEME", "CLEAR#REPLACEME")))
     val config = ConfigFactory.parseString(
       s"""
          |{
@@ -116,7 +117,7 @@ class SplunkDataObjectTest extends DataObjectTestSuite {
 
   private def createSutWithStubs(ais: SplunkDataObject): SplunkDataObject with SplunkStub = {
     val con = instanceRegistry.get[SplunkConnection](ConnectionId("con1"))
-    val conStub = new SplunkConnection("con1sut", con.host, con.port, con.userVariable, con.passwordVariable) with SplunkConnectionStub
+    val conStub = new SplunkConnection("con1sut", con.host, con.port, con.authMode) with SplunkConnectionStub
     instanceRegistry.register(conStub)
     new SplunkDataObject( "src1", ais.params, "con1sut") with SplunkStub
   }
