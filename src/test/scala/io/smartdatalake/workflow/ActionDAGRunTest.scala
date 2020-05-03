@@ -28,7 +28,7 @@ import org.scalatest.FunSuite
 class ActionDAGRunTest extends FunSuite {
 
   test("convert ActionDAGRunState to json and back") {
-    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(), Map("a" -> RuntimeInfo(RuntimeEventState.SUCCEEDED, startTstmp = Some(LocalDateTime.now()), duration = Some(Duration.ofMinutes(5)), msg = Some("test"))))
+    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(), 1, 1, Map("a" -> RuntimeInfo(RuntimeEventState.SUCCEEDED, startTstmp = Some(LocalDateTime.now()), duration = Some(Duration.ofMinutes(5)), msg = Some("test"))))
     val json = state.toJson
     assert(ActionDAGRunState.fromJson(json) == state)
   }

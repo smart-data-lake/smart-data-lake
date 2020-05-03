@@ -23,10 +23,13 @@ import java.time.LocalDateTime
 
 import com.typesafe.config.Config
 import configs.syntax._
+import io.smartdatalake.config.SdlConfigObject.ActionObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, InstanceRegistry}
-import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.{LogUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow._
+import io.smartdatalake.workflow.action.RuntimeEventState
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
 import scopt.OptionParser
 
@@ -45,7 +48,8 @@ import scopt.OptionParser
  * @param kerberosDomain  Kerberos domain (`username`@`kerberosDomain`) for local mode.
  * @param keytabPath      Path to Kerberos keytab file for local mode.
  */
-case class SmartDataLakeBuilderConfig(feedSel: String = null,
+case class SmartDataLakeBuilderConfig(cmd: String = null,
+                                      feedSel: String = null,
                                       applicationName: Option[String] = None,
                                       configuration: Option[String] = None,
                                       master: Option[String] = None,
@@ -57,12 +61,20 @@ case class SmartDataLakeBuilderConfig(feedSel: String = null,
                                       multiPartitionValues: Option[Seq[PartitionValues]] = None,
                                       parallelism: Int = 1,
                                       statePath: Option[String] = None,
+                                      runId: Option[Int] = None,
                                       overrideJars: Option[Seq[String]] = None
                                 ) {
   def validate(): Unit = {
-    assert(master.nonEmpty, "spark master must be defined in configuration")
-    assert(!master.contains("yarn") || deployMode.nonEmpty, "spark deploy-mode must be set if spark master=yarn")
-    assert(partitionValues.isEmpty || multiPartitionValues.isEmpty, "partitionValues and multiPartitionValues cannot be defined at the same time")
+    assert(!applicationName.exists(_.contains("_")), s"Application name must not contain character '_' ($applicationName)")
+    cmd match {
+      case "start" =>
+        assert(master.nonEmpty, "spark master must be defined in configuration")
+        assert(!master.contains("yarn") || deployMode.nonEmpty, "spark deploy-mode must be set if spark master=yarn")
+        assert(partitionValues.isEmpty || multiPartitionValues.isEmpty, "partitionValues and multiPartitionValues cannot be defined at the same time")
+        assert(statePath.isEmpty || applicationName.isDefined, "application name must be defined if state path is set")
+      case "recover" =>
+        assert(statePath.nonEmpty, "state path must be defined for recovery")
+    }
   }
   def getPartitionValues: Option[Seq[PartitionValues]] = partitionValues.orElse(multiPartitionValues)
 }
@@ -103,7 +115,10 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       deployMode = sys.env.get("SDL_SPARK_DEPLOY_MODE").orElse(Some("client")),
       username = sys.env.get("SDL_KERBEROS_USER"),
       kerberosDomain = sys.env.get("SDL_KERBEROS_DOMAIN"),
-      keytabPath = sys.env.get("SDL_KEYTAB_PATH").map(new File(_))
+      keytabPath = sys.env.get("SDL_KEYTAB_PATH").map(new File(_)),
+      configuration = sys.env.get("SDL_CONFIGURATION"),
+      parallelism = sys.env.get("SDL_PARALELLISM").map(_.toInt).getOrElse(1),
+      statePath = sys.env.get("SDL_STATE_PATH")
     )
   }
 
@@ -116,32 +131,49 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     head(appType, appVersion)
 
-    opt[String]('f', "feed-sel")
-      .required
-      .action( (arg, config) => config.copy(feedSel = arg) )
-      .text("Regex pattern to select the feed to execute.")
-    opt[String]('n', "name")
-      .action( (arg, config) => config.copy(applicationName = Some(arg)) )
-      .text("Optional name of the application. If not specified feed-sel is used.")
-    opt[String]('c', "config")
-      .action( (arg, config) => config.copy(configuration = Some(arg)) )
-      .text("One or multiple configuration files or directories containing configuration files, separated by comma.")
-    opt[String]('m', "master")
-      .action( (arg, config) => config.copy(master = Some(arg)))
-      .text("The Spark master URL passed to SparkContext (default=local[*], yarn, spark://HOST:PORT, mesos://HOST:PORT, k8s://HOST:PORT).")
-    opt[String]('x', "deploy-mode")
-      .action( (arg, config) => config.copy(deployMode = Some(arg)))
-      .text("The Spark deploy mode passed to SparkContext (default=client, cluster).")
-    opt[String]("partition-values")
-      .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseSingleColArg(arg))))
-      .text(s"Partition values to process in format ${PartitionValues.singleColFormat}.")
-    opt[String]("multi-partition-values")
-      .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseMultiColArg(arg))))
-      .text(s"Multi partition values to process in format ${PartitionValues.multiColFormat}.")
-    opt[Int]("parallelism")
-      .action((arg, config) => config.copy(parallelism = arg))
-      .text(s"Parallelism for DAG run.")
-    opt[String]("statePath")
+    cmd("start")
+      .action( (_, config) => config.copy(cmd = "start"))
+      .text("Start a SmartDataLakeBuilder run")
+      .children(
+        opt[String]('f', "feed-sel")
+          .required
+          .action( (arg, config) => config.copy(feedSel = arg) )
+          .text("Regex pattern to select the feed to execute."),
+        opt[String]('n', "name")
+          .action( (arg, config) => config.copy(applicationName = Some(arg)) )
+          .text("Optional name of the application. If not specified feed-sel is used."),
+        opt[String]('c', "config")
+          .action( (arg, config) => config.copy(configuration = Some(arg)) )
+          .text("One or multiple configuration files or directories containing configuration files, separated by comma."),
+        opt[String]('m', "master")
+          .action( (arg, config) => config.copy(master = Some(arg)))
+          .text("The Spark master URL passed to SparkContext (default=local[*], yarn, spark://HOST:PORT, mesos://HOST:PORT, k8s://HOST:PORT)."),
+        opt[String]('x', "deploy-mode")
+          .action( (arg, config) => config.copy(deployMode = Some(arg)))
+          .text("The Spark deploy mode passed to SparkContext (default=client, cluster)."),
+        opt[String]("partition-values")
+          .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseSingleColArg(arg))))
+          .text(s"Partition values to process in format ${PartitionValues.singleColFormat}."),
+        opt[String]("multi-partition-values")
+          .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseMultiColArg(arg))))
+          .text(s"Multi partition values to process in format ${PartitionValues.multiColFormat}."),
+        opt[Int]("parallelism")
+          .action((arg, config) => config.copy(parallelism = arg))
+          .text(s"Parallelism for DAG run.")
+      )
+    cmd("recover")
+      .action( (_, config) => config.copy(cmd = "recover"))
+      .text("Recover a SmartDataLakeBuilder run")
+      .children(
+        opt[String]('n', "name")
+          .required()
+          .action( (arg, config) => config.copy(applicationName = Some(arg)) )
+          .text("Name of the application to recover."),
+        opt[String]('n', "runId")
+          .action( (arg, config) => config.copy(runId = Some(arg.toInt)) )
+          .text("Optional runId of the application run to recover. If not specified latest is used.")
+      )
+    opt[String]("state-path")
       .action((arg, config) => config.copy(statePath = Some(arg)))
       .text(s"Path to save run state files.")
     opt[String]("override-jars")
@@ -173,6 +205,43 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * @param appConfig Application configuration (parsed from command line).
    */
   def run(appConfig: SmartDataLakeBuilderConfig): Unit = {
+    appConfig.cmd match {
+      case "start" => startRun(appConfig)
+      case "recover" => recoverRun(appConfig)
+    }
+  }
+
+  /**
+   * Recover previous failed run.
+   *
+   * @param appConfig: this app config only contains informations about the run to recover. It is used to search for the failed run and get's replaced with the appConfig of that run to call startRun.
+   */
+  def recoverRun(appConfig: SmartDataLakeBuilderConfig) = {
+    assert(appConfig.applicationName.nonEmpty, "Application name must be defined for recovery")
+    val appName = appConfig.applicationName.get
+
+    // search latest state file
+    assert(appConfig.statePath.nonEmpty, "State path must be defined for recovery")
+    val stateStore = ActionDAGRunStateStore(appConfig.statePath.get, appName)
+    val (file, runId, attemptId) = stateStore.getLatestState(appConfig.runId)
+    val runState = stateStore.recoverRunState(file)
+    val actionsToSkip = runState.actionsState
+      .filter { case (id,info) => info.state==RuntimeEventState.SUCCEEDED }
+      .map { case (id,info) => ActionObjectId(id) }.toSeq
+    startRun(runState.appConfig, Some(runId), Some(attemptId+1), actionsToSkip, Some(stateStore)) // increase attemptId
+  }
+
+  /**
+   * Start run.
+   *
+   * @param appConfig
+   * @param runIdIn
+   * @param attemptIdIn
+   * @param actionsToSkip
+   * @param stateStoreIn
+   * @return
+   */
+  def startRun(appConfig: SmartDataLakeBuilderConfig, runIdIn: Option[Int] = None, attemptIdIn: Option[Int] = None, actionsToSkip: Seq[ActionObjectId] = Seq(), stateStoreIn: Option[ActionDAGRunStateStore] = None) = {
 
     // validate application config
     appConfig.validate()
@@ -200,13 +269,17 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     logger.info(s"selected actions ${actions.map(_.id).mkString(", ")}")
 
     // create Spark Session
-    implicit val session: SparkSession = globalConfig.createSparkSession(appName,  appConfig.master.get, appConfig.deployMode)
+    implicit val session: SparkSession = globalConfig.createSparkSession(appName, appConfig.master.get, appConfig.deployMode)
     LogUtil.setLogLevel(session.sparkContext)
+
+    // get latest runId
+    val stateStore = stateStoreIn.orElse( appConfig.statePath.map( p => ActionDAGRunStateStore(p, appName)))
+    val runId = runIdIn.orElse(stateStore.flatMap(_.getLatestRunId)).getOrElse(1)
+    val attemptId = attemptIdIn.getOrElse(1)
 
     // create and execute actions
     implicit val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appName, registry, referenceTimestamp = Some(LocalDateTime.now), appConfig)
-    // TODO: what about runId?
-    val actionDAGRun = ActionDAGRun(actions, runId = "test", appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, appConfig.statePath )
+    val actionDAGRun = ActionDAGRun(actions, runId, attemptId, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, stateStore )
     try {
       actionDAGRun.prepare
       actionDAGRun.init

@@ -44,10 +44,7 @@ private[smartdatalake] case class InitDAGNode(override val nodeId: NodeId, edges
 
 private[smartdatalake] case class DummyDAGResult(override val resultId: String) extends DAGResult
 
-private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, partitionValues: Seq[PartitionValues], parallelism: Int, statePath: Option[String]) extends SmartDataLakeLogger {
-
-  private val stateHadoopPath = statePath.map( p => HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(p)))
-  private lazy val fileSystem: FileSystem = HdfsUtil.getHadoopFs(stateHadoopPath.get)
+private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, attemptId: Int, partitionValues: Seq[PartitionValues], parallelism: Int, stateStore: Option[ActionDAGRunStateStore]) extends SmartDataLakeLogger {
 
   private def createScheduler(parallelism: Int = 1) = Scheduler.fixedPool(s"dag-$runId", parallelism)
 
@@ -141,18 +138,10 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
   }
 
   /**
-   * Persist state of dag to file
+   * Save state of dag to file
    */
-  def persistState(implicit session: SparkSession, context: ActionPipelineContext): Unit = synchronized {
-    stateHadoopPath.foreach {
-      p =>
-        logger.info(s"persist state to filesystem location: ${p.toUri}.")
-        val state = ActionDAGRunState(context.appConfig, getRuntimeInfos)
-        val json = state.toJson
-        val os = fileSystem.create(p, true) // overwrite if exists
-        os.write(json.getBytes("UTF-8"))
-        os.close()
-    }
+  def saveState(implicit session: SparkSession, context: ActionPipelineContext): Unit = synchronized {
+    stateStore.foreach(_.saveState(ActionDAGRunState(context.appConfig, runId, attemptId, getRuntimeInfos)))
   }
 
   private class ActionEventListener(operation: String)(implicit session: SparkSession, context: ActionPipelineContext) extends DAGEventListener[Action] with SmartDataLakeLogger {
@@ -163,17 +152,17 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
     override def onNodeSuccess(node: Action): Unit = {
       node.addRuntimeEvent(operation, RuntimeEventState.SUCCEEDED)
       logger.info(s"${node.toStringShort}: $operation: succeeded")
-      if (operation=="exec") persistState
+      if (operation=="exec") saveState
     }
     override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
       node.addRuntimeEvent(operation, RuntimeEventState.FAILED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
       logger.error(s"${node.toStringShort}: $operation failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
-      if (operation=="exec") persistState
+      if (operation=="exec") saveState
     }
     override def onNodeSkipped(exception: Throwable)(node: Action): Unit = {
       node.addRuntimeEvent(operation, RuntimeEventState.SKIPPED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
       logger.warn(s"${node.toStringShort}: $operation: skipped because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
-      if (operation=="exec") persistState
+      if (operation=="exec") saveState
     }
   }
 }
@@ -181,7 +170,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
 /**
  * ActionDAGRunState contains all configuration and state of an ActionDAGRun needed to start a recovery run in case of failure.
  */
-case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, actionsState: Map[String, RuntimeInfo] ) {
+case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, actionsState: Map[String, RuntimeInfo] ) {
   def toJson: String = ActionDAGRunState.toJson(this)
 }
 object ActionDAGRunState {
@@ -216,24 +205,66 @@ object ActionDAGRunState {
   ))
 }
 
-private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
+case class ActionDAGRunStateStore(statePath: String, appName: String) extends SmartDataLakeLogger {
+
+  private val hadoopStatePath = HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(statePath))
+  implicit private val filesystem: FileSystem = HdfsUtil.getHadoopFs(hadoopStatePath)
+  if (!filesystem.exists(hadoopStatePath)) filesystem.mkdirs(hadoopStatePath)
+
+  def saveState(state: ActionDAGRunState): Unit = {
+    val json = state.toJson
+    val file = new Path(hadoopStatePath, s"${appName}_${state.runId}_${state.attemptId}.json")
+    val os = filesystem.create(file, true) // overwrite if exists
+    os.write(json.getBytes("UTF-8"))
+    os.close()
+    logger.info(s"updated state into ${file.toUri}")
+  }
+
+  def getLatestState(runId: Option[Int] = None): (Path,Int,Int) = {
+    val stateFiles = getFiles
+    val latestStateFile = stateFiles
+      .filter(x => runId.isEmpty || runId.contains(x._3))
+      .sortBy(x => (x._2, x._3)).lastOption
+    require(latestStateFile.nonEmpty, s"No state file for application $appName and runId ${runId.getOrElse("latest")} found.")
+    latestStateFile.get
+  }
+
+  def getLatestRunId: Option[Int] = {
+    val stateFiles = getFiles
+    val latestStateFile = stateFiles
+      .sortBy(x => (x._2, x._3)).lastOption
+    latestStateFile.map(_._2)
+  }
+
+  private def getFiles: Seq[(Path,Int,Int)] = {
+    val filenameMatcher = "([^_]+)_([0-9]+)_([0-9]+).json".r
+    filesystem.listStatus(hadoopStatePath)
+      .filter( x => x.isFile && x.getPath.getName.startsWith(appName))
+      .flatMap( x => x.getPath.getName match {
+        case filenameMatcher(appName, runId, attemptId) => Some((x.getPath, appName, runId.toInt, attemptId.toInt))
+        case _ => None
+      })
+      .filter(x => x._2==appName)
+      .map(x => (x._1, x._3, x._4))
+  }
 
   /**
    * recover previous run state
    */
-  def recoverRunState(statePath: String): ActionDAGRunState = {
-    val stateHadoopPath = HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(statePath))
-    val fileSystem: FileSystem = HdfsUtil.getHadoopFs(stateHadoopPath)
-    require(fileSystem.isFile(stateHadoopPath), s"Cannot recover previous run state. $statePath doesn't exists or is not a file.")
-    val is = fileSystem.open(stateHadoopPath)
+  def recoverRunState(stateFile: Path): ActionDAGRunState = {
+    require(filesystem.isFile(stateFile), s"Cannot recover previous run state. ${stateFile.toUri} doesn't exists or is not a file.")
+    val is = filesystem.open(stateFile)
     val json = scala.io.Source.fromInputStream(is)(Codec.UTF8).mkString
     ActionDAGRunState.fromJson(json)
   }
+}
+
+private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
 
   /**
    * create ActionDAGRun
    */
-  def apply(actions: Seq[Action], runId: String, partitionValues: Seq[PartitionValues] = Seq(), parallelism: Int = 1, statePath: Option[String] = None)(implicit session: SparkSession, context: ActionPipelineContext): ActionDAGRun = {
+  def apply(actions: Seq[Action], runId: Int, attemptId: Int, partitionValues: Seq[PartitionValues] = Seq(), parallelism: Int = 1, stateStore: Option[ActionDAGRunStateStore] = None)(implicit session: SparkSession, context: ActionPipelineContext): ActionDAGRun = {
 
     // prepare edges: list of actions dependencies
     // this can be created by combining input and output ids between actions
@@ -256,7 +287,7 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
     val dag = DAG.create[Action](initAction +: actions, edges)
     logDag(s"created dag $runId", dag)
 
-    ActionDAGRun(dag, runId, partitionValues, parallelism, statePath)
+    ActionDAGRun(dag, runId, attemptId, partitionValues, parallelism, stateStore)
   }
 
   def logDag(msg: String, dag: DAG[_]): Unit = {

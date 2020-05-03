@@ -76,7 +76,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
       DeduplicateAction("a", srcDO.id, tgt1DO.id)
     , CopyAction("b", tgt1DO.id, tgt2DO.id)
     )
-    val dag: ActionDAGRun = ActionDAGRun(actions, "test")
+    val dag: ActionDAGRun = ActionDAGRun(actions, 1, 1)
 
     // exec dag
     dag.prepare
@@ -110,16 +110,18 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgt2DO)
 
     // prepare DAG
-    val statePath = "stateTest/run.json"
+    val statePath = "stateTest/"
     val refTimestamp1 = LocalDateTime.now()
-    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+    val appName = "test"
+    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, appName, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig(applicationName=Some(appName)))
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
     val actions: Seq[SparkSubFeedAction] = Seq(
       DeduplicateAction("a", srcDO.id, tgt1DO.id)
       , CopyAction("b", tgt1DO.id, tgt2DO.id)
     )
-    val dag: ActionDAGRun = ActionDAGRun(actions, "test", statePath = Some(statePath))
+    val stateStore = ActionDAGRunStateStore(statePath, appName)
+    val dag: ActionDAGRun = ActionDAGRun(actions, 1, 1, stateStore = Some(stateStore))
 
     // exec dag
     dag.prepare
@@ -127,7 +129,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.exec
 
     // check recover previous state
-    val previousRunState = ActionDAGRun.recoverRunState(statePath)
+    val latestState = stateStore.getLatestState()
+    val previousRunState = stateStore.recoverRunState(latestState._1)
     assert(previousRunState.actionsState.mapValues(_.state) == actions.map( a => (a.id.id, RuntimeEventState.SUCCEEDED)).toMap)
 
     val r1 = session.table(s"${tgt2Table.fullName}")
@@ -175,7 +178,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
       CopyAction("b", tgtADO.id, tgtBDO.id),
       CopyAction("c", tgtADO.id, tgtCDO.id)
     )
-    val dag = ActionDAGRun(actions, "test")
+    val dag = ActionDAGRun(actions, 1, 1)
 
     // exec dag
     dag.prepare
@@ -225,7 +228,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val actions = Seq(
       CustomSparkAction("a", inputIds = Seq(srcDO1.id, srcDO2.id), outputIds = Seq(tgtDO.id), CustomDfsTransformerConfig(className=Some("io.smartdatalake.workflow.action.TestDfsTransformerFilterDummy")))
     )
-    val dag = ActionDAGRun(actions, "test")
+    val dag = ActionDAGRun(actions, 1, 1)
 
     // exec dag
     dag.prepare
@@ -286,7 +289,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
       CopyAction("C", tgtADO.id, tgtCDO.id),
       CustomSparkAction("D", List(tgtBDO.id,tgtCDO.id), List(tgtDDO.id), transformer = customTransfomer)
     )
-    val dag = ActionDAGRun(actions, "test")
+    val dag = ActionDAGRun(actions, 1, 1)
 
     // exec dag
     dag.prepare
@@ -350,7 +353,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
       DeduplicateAction("a", srcDO.id, tgt1DO.id),
       CopyAction("b", tgt1DO.id, tgt2DO.id)
     )
-    val dag = ActionDAGRun(actions, "test", partitionValues = Seq(PartitionValues(Map("dt"->"20180101"))))
+    val dag = ActionDAGRun(actions, 1, 1, partitionValues = Seq(PartitionValues(Map("dt"->"20180101"))))
 
     // exec dag
     dag.prepare
@@ -404,7 +407,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val action1 = FileTransferAction("fta", srcDO.id, tgt1DO.id)
     val action2 = CopyAction("ca", tgt1DO.id, tgt2DO.id)
-    val dag = ActionDAGRun(Seq(action1, action2), "test")
+    val dag = ActionDAGRun(Seq(action1, action2), 1, 1)
 
     // run dag
     dag.prepare
@@ -458,7 +461,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val action1 = CopyAction("ca1", srcDO.id, tgt1DO.id)
     val action2 = CopyAction("ca2", tgt1DO.id, tgt2DO.id)
     val action3 = FileTransferAction("fta", tgt2DO.id, tgt3DO.id)
-    val dag = ActionDAGRun(Seq(action1, action2, action3), "test")
+    val dag = ActionDAGRun(Seq(action1, action2, action3), 1, 1)
 
     // run dag
     dag.prepare
@@ -503,7 +506,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
       DeduplicateAction("a", srcDO.id, tgt1DO.id, initExecutionMode = Some(PartitionDiffMode()))
       , CopyAction("b", tgt1DO.id, tgt2DO.id)
     )
-    val dag: ActionDAGRun = ActionDAGRun(actions, "test")
+    val dag: ActionDAGRun = ActionDAGRun(actions, 1, 1)
 
     // first dag run
     dag.prepare

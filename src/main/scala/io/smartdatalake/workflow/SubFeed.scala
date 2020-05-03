@@ -113,7 +113,7 @@ object FileSubFeed {
 }
 
 /**
- * A InitSubFeed is used to initialize first Nodes of an [[DAG]].
+ * A InitSubFeed is used to initialize first Nodes of a [[DAG]].
  *
  * @param dataObjectId id of the DataObject this SubFeed corresponds to
  * @param partitionValues Values of Partitions transported by this SubFeed
