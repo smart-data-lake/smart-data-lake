@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.action
 import java.nio.file.Files
 import java.time.LocalDateTime
 
+import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.TestUtil._
@@ -55,7 +56,7 @@ class CustomDfToDeltaTableTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start load
     val startTime = LocalDateTime.now()
-    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", instanceRegistry, Some(startTime))
+    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", instanceRegistry, Some(startTime), SmartDataLakeBuilderConfig())
     val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id)
     val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
     testAction.exec(Seq(srcSubFeed))
@@ -80,7 +81,7 @@ class CustomDfToDeltaTableTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start load
     val startTime = LocalDateTime.now()
-    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", instanceRegistry, Some(startTime))
+    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", instanceRegistry, Some(startTime), SmartDataLakeBuilderConfig())
     val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id)
     val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
     testAction.exec(Seq(srcSubFeed))

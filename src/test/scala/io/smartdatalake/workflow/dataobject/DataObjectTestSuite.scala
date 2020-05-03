@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import java.nio.file.Files
 
+import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.testutils.TestUtil
@@ -38,7 +39,7 @@ trait DataObjectTestSuite extends FunSuite with Matchers with BeforeAndAfter {
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
-  protected lazy val testContext: ActionPipelineContext = ActionPipelineContext("testFeed", "testSource", instanceRegistry)
+  protected lazy val testContext: ActionPipelineContext = ActionPipelineContext("testFeed", "testSource", instanceRegistry, None, SmartDataLakeBuilderConfig())
 
   protected def createTempDir = Files.createTempDirectory("test")
 

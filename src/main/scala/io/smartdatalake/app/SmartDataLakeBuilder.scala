@@ -56,6 +56,7 @@ case class SmartDataLakeBuilderConfig(feedSel: String = null,
                                       partitionValues: Option[Seq[PartitionValues]] = None,
                                       multiPartitionValues: Option[Seq[PartitionValues]] = None,
                                       parallelism: Int = 1,
+                                      statePath: Option[String] = None,
                                       overrideJars: Option[Seq[String]] = None
                                 ) {
   def validate(): Unit = {
@@ -140,6 +141,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     opt[Int]("parallelism")
       .action((arg, config) => config.copy(parallelism = arg))
       .text(s"Parallelism for DAG run.")
+    opt[String]("statePath")
+      .action((arg, config) => config.copy(statePath = Some(arg)))
+      .text(s"Path to save run state files.")
     opt[String]("override-jars")
       .action((arg, config) => config.copy(overrideJars = Some(arg.split(','))))
       .text("Comma separated list of jars for child-first class loader. The jars must be present in classpath.")
@@ -200,9 +204,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     LogUtil.setLogLevel(session.sparkContext)
 
     // create and execute actions
-    implicit val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appName, registry, referenceTimestamp = Some(LocalDateTime.now))
+    implicit val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appName, registry, referenceTimestamp = Some(LocalDateTime.now), appConfig)
     // TODO: what about runId?
-    val actionDAGRun = ActionDAGRun(actions, runId = "test", appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism )
+    val actionDAGRun = ActionDAGRun(actions, runId = "test", appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, appConfig.statePath )
     try {
       actionDAGRun.prepare
       actionDAGRun.init

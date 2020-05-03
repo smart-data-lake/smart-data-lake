@@ -229,6 +229,14 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
       }
     }
   }
+
+  /**
+   * Get the nodes of this DAG
+   * Note: we must filter nodes which are not of the preliminary node type of this DAG, e.g. InitDAGNode
+   *
+   * @return list of nodes of the preliminary node type of this DAG
+   */
+  def getNodes: Seq[N] = sortedNodes.collect { case n: N => n }
 }
 
 object DAG extends SmartDataLakeLogger {

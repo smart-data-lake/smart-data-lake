@@ -18,17 +18,23 @@
  */
 package io.smartdatalake.workflow
 
+import java.time.{LocalDateTime, Duration => JavaDuration}
+
+import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.metrics.StageMetricsListener
-import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.DAGHelper._
-import io.smartdatalake.workflow.action.{Action, RuntimeEventState}
+import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
+import io.smartdatalake.workflow.action.{Action, RuntimeEventState, RuntimeInfo}
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.io.Codec
 
 private[smartdatalake] case class ActionDAGEdge(override val nodeIdFrom: NodeId, override val nodeIdTo: NodeId, override val resultId: String) extends DAGEdge
 
@@ -38,26 +44,10 @@ private[smartdatalake] case class InitDAGNode(override val nodeId: NodeId, edges
 
 private[smartdatalake] case class DummyDAGResult(override val resultId: String) extends DAGResult
 
-private[smartdatalake] class ActionEventListener(operation: String) extends DAGEventListener[Action] with SmartDataLakeLogger {
-  override def onNodeStart(node: Action): Unit = {
-    node.addRuntimeEvent(operation, RuntimeEventState.STARTED, "-")
-    logger.info(s"${node.toStringShort}: $operation started")
-  }
-  override def onNodeSuccess(node: Action): Unit = {
-    node.addRuntimeEvent(operation, RuntimeEventState.SUCCEEDED, "-")
-    logger.info(s"${node.toStringShort}: $operation: succeeded")
-  }
-  override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
-    node.addRuntimeEvent(operation, RuntimeEventState.FAILED, s"${exception.getClass.getSimpleName}: ${exception.getMessage}")
-    logger.error(s"${node.toStringShort}: $operation failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
-  }
-  override def onNodeSkipped(exception: Throwable)(node: Action): Unit = {
-    node.addRuntimeEvent(operation, RuntimeEventState.SKIPPED, s"${exception.getClass.getSimpleName}: ${exception.getMessage}")
-    logger.warn(s"${node.toStringShort}: $operation: skipped because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
-  }
-}
+private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, partitionValues: Seq[PartitionValues], parallelism: Int, statePath: Option[String]) extends SmartDataLakeLogger {
 
-private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, partitionValues: Seq[PartitionValues], parallelism: Int) extends SmartDataLakeLogger {
+  private val stateHadoopPath = statePath.map( p => HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(p)))
+  private lazy val fileSystem: FileSystem = HdfsUtil.getHadoopFs(stateHadoopPath.get)
 
   private def createScheduler(parallelism: Int = 1) = Scheduler.fixedPool(s"dag-$runId", parallelism)
 
@@ -142,14 +132,108 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
     // return
     result
   }
+
+  /**
+   * Collect runtime information from for every action of the dag
+   */
+  def getRuntimeInfos: Map[String, RuntimeInfo] = {
+    dag.getNodes.map( a => (a.id.id, a.getRuntimeInfo.getOrElse(RuntimeInfo(RuntimeEventState.PENDING)))).toMap
+  }
+
+  /**
+   * Persist state of dag to file
+   */
+  def persistState(implicit session: SparkSession, context: ActionPipelineContext): Unit = synchronized {
+    stateHadoopPath.foreach {
+      p =>
+        logger.info(s"persist state to filesystem location: ${p.toUri}.")
+        val state = ActionDAGRunState(context.appConfig, getRuntimeInfos)
+        val json = state.toJson
+        val os = fileSystem.create(p, true) // overwrite if exists
+        os.write(json.getBytes("UTF-8"))
+        os.close()
+    }
+  }
+
+  private class ActionEventListener(operation: String)(implicit session: SparkSession, context: ActionPipelineContext) extends DAGEventListener[Action] with SmartDataLakeLogger {
+    override def onNodeStart(node: Action): Unit = {
+      node.addRuntimeEvent(operation, RuntimeEventState.STARTED)
+      logger.info(s"${node.toStringShort}: $operation started")
+    }
+    override def onNodeSuccess(node: Action): Unit = {
+      node.addRuntimeEvent(operation, RuntimeEventState.SUCCEEDED)
+      logger.info(s"${node.toStringShort}: $operation: succeeded")
+      if (operation=="exec") persistState
+    }
+    override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
+      node.addRuntimeEvent(operation, RuntimeEventState.FAILED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
+      logger.error(s"${node.toStringShort}: $operation failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
+      if (operation=="exec") persistState
+    }
+    override def onNodeSkipped(exception: Throwable)(node: Action): Unit = {
+      node.addRuntimeEvent(operation, RuntimeEventState.SKIPPED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
+      logger.warn(s"${node.toStringShort}: $operation: skipped because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
+      if (operation=="exec") persistState
+    }
+  }
+}
+
+/**
+ * ActionDAGRunState contains all configuration and state of an ActionDAGRun needed to start a recovery run in case of failure.
+ */
+case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, actionsState: Map[String, RuntimeInfo] ) {
+  def toJson: String = ActionDAGRunState.toJson(this)
+}
+object ActionDAGRunState {
+  // json4s is used because kxbmap configs supports converting case classes to config only from verion 5.0 which isn't yet stable
+  // json4s is included with spark-core
+  // Note that key-type of Maps must be String in json4s (e.g. actionsState...)
+  import org.json4s._
+  import org.json4s.jackson.JsonMethods._
+  import org.json4s.jackson.Serialization
+  def toJson(actionDAGRunState: ActionDAGRunState): String = {
+    implicit val formats: Formats = Serialization.formats(NoTypeHints) + RuntimeEventStateSerializer + DurationSerializer + LocalDateTimeSerializer
+    pretty(parse(Serialization.write(actionDAGRunState)))
+  }
+  def fromJson(stateJson: String): ActionDAGRunState = {
+    implicit val formats: Formats = DefaultFormats + RuntimeEventStateSerializer + DurationSerializer + LocalDateTimeSerializer
+    parse(stateJson).extract[ActionDAGRunState]
+  }
+  // custom serialization for RuntimeEventState which is shorter than the default
+  case object RuntimeEventStateSerializer extends CustomSerializer[RuntimeEventState](format => (
+    { case JString(state) => RuntimeEventState.withName(state) },
+    { case state: RuntimeEventState => JString(state.toString) }
+  ))
+  // custom serialization for Duration
+  case object DurationSerializer extends CustomSerializer[JavaDuration](format => (
+    { case JString(dur) => JavaDuration.parse(dur) },
+    { case dur: JavaDuration => JString(dur.toString) }
+  ))
+  // custom serialization for LocalDateTime
+  case object LocalDateTimeSerializer extends CustomSerializer[LocalDateTime](format => (
+    { case JString(tstmp) => LocalDateTime.parse(tstmp) },
+    { case tstmp: LocalDateTime => JString(tstmp.toString) }
+  ))
 }
 
 private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
 
   /**
+   * recover previous run state
+   */
+  def recoverRunState(statePath: String): ActionDAGRunState = {
+    val stateHadoopPath = HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(statePath))
+    val fileSystem: FileSystem = HdfsUtil.getHadoopFs(stateHadoopPath)
+    require(fileSystem.isFile(stateHadoopPath), s"Cannot recover previous run state. $statePath doesn't exists or is not a file.")
+    val is = fileSystem.open(stateHadoopPath)
+    val json = scala.io.Source.fromInputStream(is)(Codec.UTF8).mkString
+    ActionDAGRunState.fromJson(json)
+  }
+
+  /**
    * create ActionDAGRun
    */
-  def apply(actions: Seq[Action], runId: String, partitionValues: Seq[PartitionValues] = Seq(), parallelism: Int = 1)(implicit session: SparkSession, context: ActionPipelineContext): ActionDAGRun = {
+  def apply(actions: Seq[Action], runId: String, partitionValues: Seq[PartitionValues] = Seq(), parallelism: Int = 1, statePath: Option[String] = None)(implicit session: SparkSession, context: ActionPipelineContext): ActionDAGRun = {
 
     // prepare edges: list of actions dependencies
     // this can be created by combining input and output ids between actions
@@ -172,7 +256,7 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
     val dag = DAG.create[Action](initAction +: actions, edges)
     logDag(s"created dag $runId", dag)
 
-    ActionDAGRun(dag, runId, partitionValues, parallelism)
+    ActionDAGRun(dag, runId, partitionValues, parallelism, statePath)
   }
 
   def logDag(msg: String, dag: DAG[_]): Unit = {

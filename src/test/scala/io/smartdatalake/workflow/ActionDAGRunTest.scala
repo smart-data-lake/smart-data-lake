@@ -16,19 +16,21 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
 package io.smartdatalake.workflow
 
-import java.time.LocalDateTime
+import java.time.{Duration, LocalDateTime}
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
-import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.workflow.action.{RuntimeEventState, RuntimeInfo}
+import org.scalatest.FunSuite
 
-private[smartdatalake] case class ActionPipelineContext(
-  feed: String,
-  application: String,
-  instanceRegistry: InstanceRegistry,
-  referenceTimestamp: Option[LocalDateTime] = None,
-  appConfig: SmartDataLakeBuilderConfig // application config is needed to persist action dag state for recovery
-) {
-  def getReferenceTimestampOrNow: LocalDateTime = referenceTimestamp.getOrElse(LocalDateTime.now)
+class ActionDAGRunTest extends FunSuite {
+
+  test("convert ActionDAGRunState to json and back") {
+    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(), Map("a" -> RuntimeInfo(RuntimeEventState.SUCCEEDED, startTstmp = Some(LocalDateTime.now()), duration = Some(Duration.ofMinutes(5)), msg = Some("test"))))
+    val json = state.toJson
+    assert(ActionDAGRunState.fromJson(json) == state)
+  }
+
 }

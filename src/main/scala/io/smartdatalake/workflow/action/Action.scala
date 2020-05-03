@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow.action
 
-import java.time.LocalDateTime
+import java.time.{Duration, LocalDateTime}
 
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
@@ -163,26 +163,19 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   /**
    * Adds an action event
    */
-  def addRuntimeEvent(phase: String, state: RuntimeEventState, msg: String): Unit = {
+  def addRuntimeEvent(phase: String, state: RuntimeEventState, msg: Option[String] = None): Unit = {
     runtimeEvents.append(RuntimeEvent(LocalDateTime.now, phase, state, msg))
   }
 
   /**
-   *
+   * get latest runtime information for this action as string
    */
-  def getRuntimeState: Option[String] = {
+  def getRuntimeInfo: Option[RuntimeInfo] = {
     if (runtimeEvents.nonEmpty) {
       val lastEvent = runtimeEvents.last
-      val lastState = lastEvent.state.toString
-      lastEvent.state match {
-        case RuntimeEventState.SUCCEEDED =>
-          val duration = runtimeEvents.reverse
-            .find( event => event.state == RuntimeEventState.STARTED && event.phase == lastEvent.phase )
-            .map( start => java.time.Duration.between(start.tstmp, lastEvent.tstmp))
-          duration.map( d => s"$lastState $d")
-            .orElse(Some(lastState))
-        case _ => Some(lastState)
-      }
+      val startEvent = runtimeEvents.reverse.find( event => event.state == RuntimeEventState.STARTED && event.phase == lastEvent.phase )
+      val duration = startEvent.map( start => Duration.between(start.tstmp, lastEvent.tstmp))
+      Some(RuntimeInfo(lastEvent.state, startTstmp = startEvent.map(_.tstmp), duration = duration, msg = lastEvent.msg))
     } else None
   }
 
@@ -190,7 +183,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * This is displayed in ascii graph visualization
    */
   final override def toString: String = {
-   nodeId + getRuntimeState.map(" "+_).getOrElse("")
+   nodeId + getRuntimeInfo.map(" "+_).getOrElse("")
   }
 
   def toStringShort: String = {
@@ -221,8 +214,15 @@ case class ActionMetadata(
 /**
  * A structure to collect runtime information
  */
-private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: String, state: RuntimeEventState, msg: String)
+private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: String, state: RuntimeEventState, msg: Option[String])
 private[smartdatalake] object RuntimeEventState extends Enumeration {
   type RuntimeEventState = Value
-  val STARTED, SUCCEEDED, FAILED, SKIPPED = Value
+  val STARTED, SUCCEEDED, FAILED, SKIPPED, PENDING = Value
 }
+private[smartdatalake] case class RuntimeInfo(state: RuntimeEventState, startTstmp: Option[LocalDateTime] = None, duration: Option[Duration] = None, msg: Option[String] = None) {
+  override def toString: String = {
+    duration.map(d => s"$state $d")
+      .getOrElse(state.toString)
+  }
+}
+
