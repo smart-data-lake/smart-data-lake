@@ -23,7 +23,7 @@ import java.time.{Duration, LocalDateTime}
 import com.splunk.{JobExportArgs, Service}
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
-import io.smartdatalake.definitions.UserPassAuthMode
+import io.smartdatalake.definitions.BasicAuthMode
 import io.smartdatalake.workflow.connection.{SplunkConnection, SplunkConnectionService}
 import org.apache.commons.lang3.StringEscapeUtils.escapeJava
 import org.apache.spark.sql.Row
@@ -95,7 +95,7 @@ class SplunkDataObjectTest extends DataObjectTestSuite {
   }
 
   private def createDO(query: String = "TEST_PURPOSES_ONLY", columnNames: String = "TEST_PURPOSES_ONLY") = {
-    instanceRegistry.register(SplunkConnection( "con1", "splunk.test.com", 8888, UserPassAuthMode("CLEAR#REPLACEME", "CLEAR#REPLACEME")))
+    instanceRegistry.register(SplunkConnection( "con1", "splunk.test.com", 8888, BasicAuthMode("CLEAR#REPLACEME", "CLEAR#REPLACEME")))
     val config = ConfigFactory.parseString(
       s"""
          |{

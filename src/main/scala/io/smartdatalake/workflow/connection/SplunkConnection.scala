@@ -22,8 +22,7 @@ import com.splunk.{SSLSecurityProtocol, Service, ServiceArgs}
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{AuthenticationMode, TokenAuthMode, UserPassAuthMode}
-import io.smartdatalake.util.misc.CredentialsUtil
+import io.smartdatalake.definitions._
 
 /**
  * Connection information for splunk queries
@@ -37,60 +36,30 @@ import io.smartdatalake.util.misc.CredentialsUtil
 case class SplunkConnection( override val id: ConnectionId,
                              host: String,
                              port: Int,
-                             authMode: AuthenticationMode,
+                             authMode: SplunkAuthMode,
                              override val metadata: Option[ConnectionMetadata] = None
                            ) extends Connection with SplunkConnectionService {
 
 
   override def connectToSplunk: Service = {
 
-    val basicConnectionArgs = new ServiceArgs
-    basicConnectionArgs.setHost(host)
-    basicConnectionArgs.setPort(port)
-    basicConnectionArgs.setSSLSecurityProtocol(SSLSecurityProtocol.TLSv1_2)
+    val connectionArgs = new ServiceArgs
+    connectionArgs.setHost(host)
+    connectionArgs.setPort(port)
+    connectionArgs.setSSLSecurityProtocol(SSLSecurityProtocol.TLSv1_2)
 
-    val connectionArgs = authMode match {
-      case UserPassAuthMode(u, p) => addUsernamePass(basicConnectionArgs, u, p)
-      case TokenAuthMode(t) => addToken(basicConnectionArgs,t)
+    authMode match {
+      case BasicAuthMode(u,p) => {
+        connectionArgs.setUsername(authMode.splunkOpts(AuthUser.name))
+        connectionArgs.setPassword(authMode.splunkOpts(AuthPassword.name))
+      }
+      case TokenAuthMode(t) => {
+        connectionArgs
+          .setToken(authMode.splunkOpts(AuthToken.name))
+      }
     }
 
     Service.connect(connectionArgs)
-  }
-
-  /**
-   * Add username/password to the connection parameters for authentication
-   *
-   * @param connectionArgs : basic connection details for the Splunk connector
-   * @param userVariable : A variable referencing the username. Variable convention as per passwords.
-   * @param passwordVariable : A variable referencing the password. Variable convention as per passwords.
-   * @return : A service configuration including credentials
-   */
-  private def addUsernamePass(connectionArgs: ServiceArgs, userVariable: String, passwordVariable: String): ServiceArgs = {
-
-    val splunkConnectionUser = CredentialsUtil.getCredentials(userVariable)
-    val splunkConnectionPassword = CredentialsUtil.getCredentials(passwordVariable)
-
-    connectionArgs.setUsername(splunkConnectionUser)
-    connectionArgs.setPassword(splunkConnectionPassword)
-
-    connectionArgs
-
-  }
-
-  /**
-   * Add a token to the connection parameters for authentication
-   *
-   * @param connectionArgs : basic connection details for the Splunk connector
-   * @param tokenVariable : A variable referencing the user token. Variable convention as per passwords.
-   * @return : A service configuration including credentials
-   */
-  private def addToken(connectionArgs: ServiceArgs, tokenVariable: String): ServiceArgs = {
-
-    val splunkToken = CredentialsUtil.getCredentials(tokenVariable)
-    connectionArgs.setPassword(splunkToken)
-
-    connectionArgs
-
   }
 
   /**
