@@ -49,7 +49,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * Definition of repartition operation before writing DataFrame with Spark to Hadoop.
    */
   def sparkRepartition: Option[SparkRepartitionDef]
-  assert(sparkRepartition.map(_.filename).isEmpty || partitions.isEmpty, s"($id) Cannot rename file with SparkRepartitionDef for partitioned DataObject")
+  assert(sparkRepartition.flatMap(_.filename).isEmpty || partitions.isEmpty, s"($id) Cannot rename file with SparkRepartitionDef for partitioned DataObject")
 
   /**
    * Callback that enables potential transformation to be applied to `df` before the data is written.
