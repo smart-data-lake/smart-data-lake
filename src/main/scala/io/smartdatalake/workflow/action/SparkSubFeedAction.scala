@@ -79,7 +79,7 @@ abstract class SparkSubFeedAction extends Action {
     // transform
     val transformedSubFeed = doTransform(subFeed)
     // write output
-    logger.info(s"writing to DataObject ${output.id}, partitionValues ${subFeed.partitionValues}")
+    logger.info(s"writing to DataObject ${output.id}, partitionValues ${transformedSubFeed.partitionValues}")
     setSparkJobDescription( s"writing to DataObject ${output.id}" )
     output.writeDataFrame(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
     // return
