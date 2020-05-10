@@ -22,14 +22,12 @@ import java.io.File
 import java.time.LocalDateTime
 
 import com.typesafe.config.Config
-import configs.syntax._
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{LogUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SmartDataLakeLogger}
 import io.smartdatalake.workflow._
 import org.apache.spark.sql.SparkSession
 import scopt.OptionParser
-
 
 /**
  * This case class represents a default configuration for the App.
@@ -64,20 +62,6 @@ case class SmartDataLakeBuilderConfig(feedSel: String = null,
     assert(partitionValues.isEmpty || multiPartitionValues.isEmpty, "partitionValues and multiPartitionValues cannot be defined at the same time")
   }
   def getPartitionValues: Option[Seq[PartitionValues]] = partitionValues.orElse(multiPartitionValues)
-}
-
-case class GlobalConfig( kryoClasses: Option[Seq[String]] = None, sparkOptions: Option[Map[String,String]] = None, enableHive: Boolean = true) {
-  /**
-   * Create a spark session using settings from this global config
-   */
-  def createSparkSession(appName: String, master: String = "local[*]", deployMode: Option[String] = None): SparkSession = {
-    AppUtil.createSparkSession(appName, master, deployMode, kryoClasses, sparkOptions, enableHive)
-  }
-}
-object GlobalConfig {
-  private[smartdatalake] def from(config: Config): GlobalConfig = {
-    config.get[Option[GlobalConfig]]("global").value.getOrElse(GlobalConfig())
-  }
 }
 
 /**
@@ -168,7 +152,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    *
    * @param appConfig Application configuration (parsed from command line).
    */
-  def run(appConfig: SmartDataLakeBuilderConfig): Unit = {
+  def run(appConfig: SmartDataLakeBuilderConfig): Unit = try {
 
     // validate application config
     appConfig.validate()
@@ -211,5 +195,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       // dont fail an not severe exceptions like having no data to process
       case ex: DAGException if (ex.severity == ExceptionSeverity.SKIPPED) => logger.warn(s"dag run is skipped because of ${ex.getClass.getSimpleName}: ${ex.getMessage}")
     }
+  } finally {
+    // make sure memory logger timer task is stopped
+    MemoryUtils.stopMemoryLogger()
   }
 }
