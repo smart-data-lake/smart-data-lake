@@ -47,7 +47,7 @@ private[smartdatalake] trait DAGResult {
 
 private[smartdatalake] trait DAGEventListener[T <: DAGNode] {
   def onNodeStart(node: T)
-  def onNodeSuccess(node: T)
+  def onNodeSuccess(results: Seq[DAGResult])(node: T)
   def onNodeFailure(exception: Throwable)(node: T)
   def onNodeSkipped(exception: Throwable)(node: T)
 }
@@ -150,8 +150,8 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
     notify(node, eventListener.onNodeStart)
     val resultRaw = Try(operation(node, incomingResults.map(_.get))) // or should we use "Try( blocking { operation(node, v) })"
     val result = resultRaw match {
-      case Success(_) =>
-        notify(node, eventListener.onNodeSuccess)
+      case Success(r) =>
+        notify(node, eventListener.onNodeSuccess(r))
         resultRaw
       case Failure(ex: TaskSkippedWarning) =>
         notify(node, eventListener.onNodeSkipped(ex))

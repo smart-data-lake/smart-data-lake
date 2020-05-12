@@ -140,7 +140,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
   /**
    * Save state of dag to file
    */
-  def saveState(implicit session: SparkSession, context: ActionPipelineContext): Unit = synchronized {
+  def saveState(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     stateStore.foreach(_.saveState(ActionDAGRunState(context.appConfig, runId, attemptId, getRuntimeInfos)))
   }
 
@@ -149,8 +149,8 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
       node.addRuntimeEvent(operation, RuntimeEventState.STARTED)
       logger.info(s"${node.toStringShort}: $operation started")
     }
-    override def onNodeSuccess(node: Action): Unit = {
-      node.addRuntimeEvent(operation, RuntimeEventState.SUCCEEDED)
+    override def onNodeSuccess(results: Seq[DAGResult])(node: Action): Unit = {
+      node.addRuntimeEvent(operation, RuntimeEventState.SUCCEEDED, results = results.collect{ case x: SubFeed => x })
       logger.info(s"${node.toStringShort}: $operation: succeeded")
       if (operation=="exec") saveState
     }
@@ -211,7 +211,7 @@ case class ActionDAGRunStateStore(statePath: String, appName: String) extends Sm
   implicit private val filesystem: FileSystem = HdfsUtil.getHadoopFs(hadoopStatePath)
   if (!filesystem.exists(hadoopStatePath)) filesystem.mkdirs(hadoopStatePath)
 
-  def saveState(state: ActionDAGRunState): Unit = {
+  def saveState(state: ActionDAGRunState): Unit = synchronized {
     val json = state.toJson
     val file = new Path(hadoopStatePath, s"${appName}_${state.runId}_${state.attemptId}.json")
     val os = filesystem.create(file, true) // overwrite if exists

@@ -163,8 +163,8 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   /**
    * Adds an action event
    */
-  def addRuntimeEvent(phase: String, state: RuntimeEventState, msg: Option[String] = None): Unit = {
-    runtimeEvents.append(RuntimeEvent(LocalDateTime.now, phase, state, msg))
+  def addRuntimeEvent(phase: String, state: RuntimeEventState, msg: Option[String] = None, results: Seq[SubFeed] = Seq()): Unit = {
+    runtimeEvents.append(RuntimeEvent(LocalDateTime.now, phase, state, msg, results))
   }
 
   /**
@@ -175,7 +175,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
       val lastEvent = runtimeEvents.last
       val startEvent = runtimeEvents.reverse.find( event => event.state == RuntimeEventState.STARTED && event.phase == lastEvent.phase )
       val duration = startEvent.map( start => Duration.between(start.tstmp, lastEvent.tstmp))
-      Some(RuntimeInfo(lastEvent.state, startTstmp = startEvent.map(_.tstmp), duration = duration, msg = lastEvent.msg))
+      Some(RuntimeInfo(lastEvent.state, startTstmp = startEvent.map(_.tstmp), duration = duration, msg = lastEvent.msg, results = lastEvent.results))
     } else None
   }
 
@@ -214,12 +214,12 @@ case class ActionMetadata(
 /**
  * A structure to collect runtime information
  */
-private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: String, state: RuntimeEventState, msg: Option[String])
+private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: String, state: RuntimeEventState, msg: Option[String], results: Seq[SubFeed])
 private[smartdatalake] object RuntimeEventState extends Enumeration {
   type RuntimeEventState = Value
   val STARTED, SUCCEEDED, FAILED, SKIPPED, PENDING = Value
 }
-private[smartdatalake] case class RuntimeInfo(state: RuntimeEventState, startTstmp: Option[LocalDateTime] = None, duration: Option[Duration] = None, msg: Option[String] = None) {
+private[smartdatalake] case class RuntimeInfo(state: RuntimeEventState, startTstmp: Option[LocalDateTime] = None, duration: Option[Duration] = None, msg: Option[String] = None, results: Seq[SubFeed] = Seq()) {
   override def toString: String = {
     duration.map(d => s"$state $d")
       .getOrElse(state.toString)
