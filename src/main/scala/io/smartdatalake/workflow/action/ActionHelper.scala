@@ -311,10 +311,13 @@ object ActionHelper extends SmartDataLakeLogger {
                 if (partitionValuesToBeProcessed.isEmpty) throw NoDataToProcessWarning(actionId.id, s"($actionId) No partitions to process found for ${input.id}")
                 // sort and limit number of partitions processed
                 val ordering = PartitionValues.getOrdering(commonPartitions)
-                mode.nbOfPartitionValuesPerRun match {
+                val selectedPartitionValues = mode.nbOfPartitionValuesPerRun match {
                   case Some(n) => partitionValuesToBeProcessed.sorted(ordering).take(n)
                   case None => partitionValuesToBeProcessed.sorted(ordering)
                 }
+                logger.info(s"($actionId) $PartitionDiffMode selected partition values ${selectedPartitionValues.mkString(", ")} to process")
+                //return
+                selectedPartitionValues
               } else throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $output has no partition columns defined!")
             } else throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $input has no partition columns defined!")
           case (_: CanHandlePartitions, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $output does not support partitions!")
