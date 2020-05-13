@@ -46,7 +46,7 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
     .text("Kerberos username for authentication (USERNAME@KERBEROS-DOMAIN) in local mode.")
   parser.opt[File]('k', "keytab-path")
     .action((arg, config) => config.copy(keytabPath = Some(arg)))
-    .text("Path to the Kerberos keytab file for authentication.")
+    .text("Path to the Kerberos keytab file for authentication in local mode.")
 
   /**
    * Entry-Point of the application.
@@ -70,7 +70,7 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
         require( System.getenv("HADOOP_HOME")!=null, "Env variable HADOOP_HOME needs to be set in local mode!" )
         require( !config.master.contains("yarn") || System.getenv("SPARK_HOME")!=null, "Env variable SPARK_HOME needs to be set in local mode with master=yarn!" )
 
-        //If local authenticate the application - unnecessary on cluster
+        // authenticate with kerberos if configured
         if (config.kerberosDomain.isDefined) {
           require(config.username.isDefined, "Parameter 'username' must be set for kerberos authentication!")
           val kp = config.keytabPath.map(_.getPath).orElse(Some(ClassLoader.getSystemClassLoader.getResource(s"${config.username.get}.keytab")).map(_.getPath))
