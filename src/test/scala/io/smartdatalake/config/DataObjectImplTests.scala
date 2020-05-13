@@ -301,10 +301,14 @@ class DataObjectImplTests extends FlatSpec with Matchers {
         |   type = SplunkConnection
         |   host = test.host
         |   port = 8080
-        |   userVariable = "CLEAR#testuser"
-            passwordVariable = "CLEAR#secret"
+        |   auth-mode = {
+        |        type = BasicAuthMode
+        |        user = "CLEAR#testuser"
+        |        password = "CLEAR#secret"
+        |    }
         | }
         |}
+        |
         |dataObjects = {
         | 123 = {
         |   type = SplunkDataObject
