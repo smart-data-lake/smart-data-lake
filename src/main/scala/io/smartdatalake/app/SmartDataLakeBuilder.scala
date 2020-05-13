@@ -70,7 +70,7 @@ case class GlobalConfig( kryoClasses: Option[Seq[String]] = None, sparkOptions: 
   /**
    * Create a spark session using settings from this global config
    */
-  def createSparkSession(appName: String, master: String = "local[*]", deployMode: Option[String] = None): SparkSession = {
+  def createSparkSession(appName: String, master: Option[String], deployMode: Option[String] = None): SparkSession = {
     AppUtil.createSparkSession(appName, master, deployMode, kryoClasses, sparkOptions, enableHive)
   }
 }
@@ -90,21 +90,13 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   val appType: String = getClass.getSimpleName.replaceAll("\\$$","") // remove $ from object name and use it as appType
 
   /**
-   * Create a new SDL configuration and initialize it with environment variables if they are set.
+   * Create a new SDL configuration.
    *
-   * This method also sets default values if environment variables are not set.
+   * Could be used in the future to set default values.
    *
    * @return a new, initialized [[SmartDataLakeBuilderConfig]].
    */
-  def initConfigFromEnvironment: SmartDataLakeBuilderConfig = {
-    SmartDataLakeBuilderConfig(
-      master = sys.env.get("SDL_SPARK_MASTER_URL").orElse(Some("local[*]")),
-      deployMode = sys.env.get("SDL_SPARK_DEPLOY_MODE").orElse(Some("client")),
-      username = sys.env.get("SDL_KERBEROS_USER"),
-      kerberosDomain = sys.env.get("SDL_KERBEROS_DOMAIN"),
-      keytabPath = sys.env.get("SDL_KEYTAB_PATH").map(new File(_))
-    )
-  }
+  def initConfigFromEnvironment: SmartDataLakeBuilderConfig = SmartDataLakeBuilderConfig()
 
   /**
    * The Parser defines how to extract the options from the command line args.
@@ -125,12 +117,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     opt[String]('c', "config")
       .action( (arg, config) => config.copy(configuration = Some(arg)) )
       .text("One or multiple configuration files or directories containing configuration files, separated by comma.")
-    opt[String]('m', "master")
-      .action( (arg, config) => config.copy(master = Some(arg)))
-      .text("The Spark master URL passed to SparkContext (default=local[*], yarn, spark://HOST:PORT, mesos://HOST:PORT, k8s://HOST:PORT).")
-    opt[String]('x', "deploy-mode")
-      .action( (arg, config) => config.copy(deployMode = Some(arg)))
-      .text("The Spark deploy mode passed to SparkContext (default=client, cluster).")
     opt[String]("partition-values")
       .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseSingleColArg(arg))))
       .text(s"Partition values to process in format ${PartitionValues.singleColFormat}.")
@@ -196,7 +182,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     logger.info(s"selected actions ${actions.map(_.id).mkString(", ")}")
 
     // create Spark Session
-    implicit val session: SparkSession = globalConfig.createSparkSession(appName,  appConfig.master.get, appConfig.deployMode)
+    implicit val session: SparkSession = globalConfig.createSparkSession(appName,  appConfig.master, appConfig.deployMode)
     LogUtil.setLogLevel(session.sparkContext)
 
     // create and execute actions
