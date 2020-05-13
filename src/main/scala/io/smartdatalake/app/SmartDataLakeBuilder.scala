@@ -161,8 +161,10 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // init config
     logger.info(s"Feed selector: ${appConfig.feedSel}")
     logger.info(s"Application: ${appConfig.applicationName}")
-    logger.info(s"Master: ${appConfig.master}")
-    logger.info(s"Deploy-Mode: ${appConfig.deployMode}")
+    logger.info(s"Master: ${appConfig.master.getOrElse(sys.props.get("spark.master"))}")
+    logger.info(s"Deploy-Mode: ${appConfig.deployMode.getOrElse(sys.props.get("spark.submit.deployMode"))}")
+    logger.debug(s"Environment: "+sys.env.map(x => x._1+"="+x._2).mkString(" "))
+    logger.debug(s"System properties: "+sys.props.toMap.map(x => x._1+"="+x._2).mkString(" "))
     val appName = appConfig.applicationName.getOrElse(appConfig.feedSel)
 
     // load config
