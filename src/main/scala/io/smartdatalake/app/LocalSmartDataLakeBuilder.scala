@@ -56,10 +56,13 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
   def main(args: Array[String]): Unit = {
     logger.info(s"Starting Program $appType v$appVersion")
 
-    // Set local defaults
+    // Set defaults from environment variables
     val config = initConfigFromEnvironment.copy(
-      master = Some("local[*]"),
-      deployMode = Some("client")
+      master = sys.env.get("SDL_SPARK_MASTER_URL").orElse(Some("local[*]")),
+      deployMode = sys.env.get("SDL_SPARK_DEPLOY_MODE").orElse(Some("client")),
+      username = sys.env.get("SDL_KERBEROS_USER"),
+      kerberosDomain = sys.env.get("SDL_KERBEROS_DOMAIN"),
+      keytabPath = sys.env.get("SDL_KEYTAB_PATH").map(new File(_))
     )
 
     // Parse all command line arguments
