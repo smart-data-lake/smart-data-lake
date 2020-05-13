@@ -48,7 +48,7 @@ case class GlobalConfig( kryoClasses: Option[Seq[String]] = None, sparkOptions: 
   /**
    * Create a spark session using settings from this global config
    */
-  def createSparkSession(appName: String, master: String = "local[*]", deployMode: Option[String] = None): SparkSession = {
+  def createSparkSession(appName: String, master: Option[String], deployMode: Option[String] = None): SparkSession = {
     // prepare additional spark options
     val executorPlugins = (sparkOptions.flatMap(_.get("spark.executor.plugins")).toSeq ++ (if (memoryLogTimer.isDefined) Seq("io.smartdatalake.app.MemoryLoggerExecutorPlugin") else Seq())).mkString(",")
     val sparkOptionsExtended = sparkOptions.getOrElse(Map()) + ("spark.executor.plugins" -> executorPlugins)
