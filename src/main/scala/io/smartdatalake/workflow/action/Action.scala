@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow.action
 
-import java.time.LocalDateTime
+import java.time.{Duration, LocalDateTime}
 
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
@@ -168,9 +168,9 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   }
 
   /**
-   *
+   * get latest runtime state and duration if successfully finished.
    */
-  def getRuntimeState: Option[String] = {
+  def getRuntimeState: (Option[RuntimeEventState], Option[Duration]) = {
     if (runtimeEvents.nonEmpty) {
       val lastEvent = runtimeEvents.last
       val lastState = lastEvent.state.toString
@@ -178,19 +178,20 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
         case RuntimeEventState.SUCCEEDED =>
           val duration = runtimeEvents.reverse
             .find( event => event.state == RuntimeEventState.STARTED && event.phase == lastEvent.phase )
-            .map( start => java.time.Duration.between(start.tstmp, lastEvent.tstmp))
-          duration.map( d => s"$lastState $d")
-            .orElse(Some(lastState))
-        case _ => Some(lastState)
+            .map( start => Duration.between(start.tstmp, lastEvent.tstmp))
+          duration.map( d => (Some(lastEvent.state), Some(d)))
+            .getOrElse((Some(lastEvent.state),None))
+        case _ => (Some(lastEvent.state),None)
       }
-    } else None
+    } else (None,None)
   }
 
   /**
    * This is displayed in ascii graph visualization
    */
   final override def toString: String = {
-   nodeId + getRuntimeState.map(" "+_).getOrElse("")
+    val (state,duration) = getRuntimeState
+    nodeId + state.map(" "+_).getOrElse("") + duration.map(" "+_).getOrElse("")
   }
 
   def toStringShort: String = {

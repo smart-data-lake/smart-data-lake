@@ -22,6 +22,7 @@ import io.smartdatalake.metrics.StageMetricsListener
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.DAGHelper._
+import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{Action, RuntimeEventState}
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
@@ -141,6 +142,14 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
 
     // return
     result
+  }
+
+  /**
+   * Get Action count per RuntimeEventState
+   */
+  def getStatistics: Seq[(Option[RuntimeEventState],Int)] = {
+    dag.sortedNodes.collect { case n: Action => n }.map(_.getRuntimeState._1)
+      .groupBy(identity).mapValues(_.size).toSeq.sortBy(_._1)
   }
 }
 

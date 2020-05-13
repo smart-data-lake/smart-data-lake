@@ -50,8 +50,8 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
         require( !config.master.contains("yarn") || System.getenv("SPARK_HOME")!=null, "Env variable SPARK_HOME needs to be set in local mode with master=yarn!" )
 
         // start
-        run(config)
-        logger.info(s"$appType finished successfully.")
+        val stats = run(config)
+        logger.info(s"$appType finished successfully: $stats")
       case None =>
         logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
     }

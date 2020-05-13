@@ -168,7 +168,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    *
    * @param appConfig Application configuration (parsed from command line).
    */
-  def run(appConfig: SmartDataLakeBuilderConfig): Unit = {
+  def run(appConfig: SmartDataLakeBuilderConfig): String = {
 
     // validate application config
     appConfig.validate()
@@ -211,5 +211,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       // dont fail an not severe exceptions like having no data to process
       case ex: DAGException if (ex.severity == ExceptionSeverity.SKIPPED) => logger.warn(s"dag run is skipped because of ${ex.getClass.getSimpleName}: ${ex.getMessage}")
     }
+
+    // return result statistics as string
+    actionDAGRun.getStatistics.map( x => x._1.getOrElse("None")+"="+x._2).mkString(" ")
   }
 }

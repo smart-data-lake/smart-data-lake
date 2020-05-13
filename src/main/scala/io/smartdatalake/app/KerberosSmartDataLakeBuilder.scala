@@ -59,8 +59,8 @@ object KerberosSmartDataLakeBuilder extends KerberosSmartDataLakeBuilderImpl {
         val principal = s"$username@$kerberosDomain"
 
         if (c.master.contains("local[*]")) AppUtil.authenticate(kp, principal)
-        run(c)
-        logger.info(s"$appType v$appVersion finished successfully.")
+        val stats = run(c)
+        logger.info(s"$appType v$appVersion finished successfully: $stats")
 
       case None =>
         logger.error(s"$appType v$appVersion terminated due to an error.")
