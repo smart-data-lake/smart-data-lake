@@ -133,8 +133,8 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * @param operation operation description (be short...)
    * @param session util session
    */
-  def setSparkJobDescription(operation: String)(implicit session: SparkSession) : Unit = {
-    session.sparkContext.setJobDescription(s"${this.getClass.getSimpleName}.$id: $operation")
+  def setSparkJobMetadata(operation: Option[String] = None)(implicit session: SparkSession) : Unit = {
+    session.sparkContext.setJobGroup(s"${this.getClass.getSimpleName}.$id", operation.getOrElse("").take(255))
   }
 
   /**

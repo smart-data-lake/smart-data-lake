@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.ExecutionMode
+import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
@@ -103,9 +104,14 @@ abstract class SparkSubFeedsAction extends Action {
     // write output
     outputs.foreach { output =>
       val subFeed = transformedSubFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"subFeed for output ${output.id} not found"))
-      logger.info(s"writing to DataObject ${output.id}, partitionValues ${subFeed.partitionValues}")
-      setSparkJobDescription(s"writing to DataObject ${output.id}")
-      output.writeDataFrame(subFeed.dataFrame.get, subFeed.partitionValues)
+      val msg = s"($id) start writing DataFrame to ${output.id}" + (if (subFeed.partitionValues.nonEmpty) s", partitionValues ${subFeed.partitionValues.mkString(" ")}" else "")
+      logger.info(msg)
+      setSparkJobMetadata(Some(msg))
+      val (_,d) = PerformanceUtils.measureDuration {
+        output.writeDataFrame(subFeed.dataFrame.get, subFeed.partitionValues)
+      }
+      logger.info(s"($id) finished writing DataFrame to ${output.id}, took $d")
+      setSparkJobMetadata(None)
     }
     // return
     transformedSubFeeds

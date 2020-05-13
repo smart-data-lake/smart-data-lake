@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.ExecutionMode
+import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
@@ -79,9 +80,14 @@ abstract class SparkSubFeedAction extends Action {
     // transform
     val transformedSubFeed = doTransform(subFeed)
     // write output
-    logger.info(s"writing to DataObject ${output.id}, partitionValues ${transformedSubFeed.partitionValues}")
-    setSparkJobDescription( s"writing to DataObject ${output.id}" )
-    output.writeDataFrame(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
+    val msg = s"($id) start writing to ${output.id}" + (if (transformedSubFeed.partitionValues.nonEmpty) s", partitionValues ${transformedSubFeed.partitionValues.mkString(" ")}" else "")
+    logger.info(msg)
+    setSparkJobMetadata(Some(msg))
+    val (_,d) = PerformanceUtils.measureDuration {
+      output.writeDataFrame(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
+    }
+    logger.info(s"($id) finished writing DataFrame to ${output.id}, took $d")
+    setSparkJobMetadata()
     // return
     Seq(transformedSubFeed)
   }
