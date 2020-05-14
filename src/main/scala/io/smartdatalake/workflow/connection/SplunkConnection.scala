@@ -54,11 +54,11 @@ case class SplunkConnection( override val id: ConnectionId,
     connectionArgs.setSSLSecurityProtocol(SSLSecurityProtocol.TLSv1_2)
 
     authMode match {
-      case TokenAuthMode(t) =>
-        connectionArgs.setToken(CredentialsUtil.getCredentials(t))
-      case BasicAuthMode(u,p) =>
-        connectionArgs.setUsername(CredentialsUtil.getCredentials(u))
-        connectionArgs.setPassword(CredentialsUtil.getCredentials(p))
+      case m: TokenAuthMode =>
+        connectionArgs.setToken(m.token)
+      case m: BasicAuthMode =>
+        connectionArgs.setUsername(m.user)
+        connectionArgs.setPassword(m.password)
     }
 
     Service.connect(connectionArgs)
