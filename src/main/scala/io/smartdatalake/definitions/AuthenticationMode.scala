@@ -28,11 +28,11 @@ sealed trait AuthMode
 /**
  * Derive options for various connection types to connect by basic authentication
  */
-case class BasicAuthMode(user: String, password: String) extends AuthMode
+case class BasicAuthMode(userVariable: String, passwordVariable: String) extends AuthMode
 
 /**
  * Derive options for various connection types to connect by token
   */
-case class TokenAuthMode(token: String) extends AuthMode
+case class TokenAuthMode(tokenVariable: String) extends AuthMode
 
 

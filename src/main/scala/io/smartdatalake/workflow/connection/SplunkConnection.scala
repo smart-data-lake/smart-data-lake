@@ -23,6 +23,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions._
+import io.smartdatalake.util.misc.CredentialsUtil
 
 /**
  * Connection information for splunk queries
@@ -40,7 +41,7 @@ case class SplunkConnection( override val id: ConnectionId,
                              override val metadata: Option[ConnectionMetadata] = None
                            ) extends Connection with SplunkConnectionService {
 
-  // Allow only supported authentication modes
+ // Allow only supported authentication modes
  private val supportedAuths = Seq(classOf[BasicAuthMode], classOf[TokenAuthMode])
  require(supportedAuths.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}")
 
@@ -54,10 +55,10 @@ case class SplunkConnection( override val id: ConnectionId,
 
     authMode match {
       case TokenAuthMode(t) =>
-        connectionArgs.setToken(t)
+        connectionArgs.setToken(CredentialsUtil.getCredentials(t))
       case BasicAuthMode(u,p) =>
-        connectionArgs.setUsername(u)
-        connectionArgs.setPassword(p)
+        connectionArgs.setUsername(CredentialsUtil.getCredentials(u))
+        connectionArgs.setPassword(CredentialsUtil.getCredentials(p))
     }
 
     Service.connect(connectionArgs)
