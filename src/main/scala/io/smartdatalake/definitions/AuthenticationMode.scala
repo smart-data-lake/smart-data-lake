@@ -18,6 +18,8 @@
  */
 package io.smartdatalake.definitions
 
+import io.smartdatalake.util.misc.CredentialsUtil
+
 /**
  * Authentication modes define how an application authenticates itself
  * to a given data object/connection
@@ -28,11 +30,23 @@ sealed trait AuthMode
 /**
  * Derive options for various connection types to connect by basic authentication
  */
-case class BasicAuthMode(userVariable: String, passwordVariable: String) extends AuthMode
+case class BasicAuthMode(userVariable: String, passwordVariable: String) extends AuthMode {
+  val user: String = CredentialsUtil.getCredentials(userVariable)
+  val password: String = CredentialsUtil.getCredentials(passwordVariable)
+}
 
 /**
  * Derive options for various connection types to connect by token
   */
-case class TokenAuthMode(tokenVariable: String) extends AuthMode
+case class TokenAuthMode(tokenVariable: String) extends AuthMode {
+  val token: String = CredentialsUtil.getCredentials(tokenVariable)
+}
 
+/**
+ * Validate by user and private/public key
+ * Private key is read from .ssh
+ */
+case class PublicKeyAuthMode(userVariable: String) extends AuthMode {
+  val user: String = CredentialsUtil.getCredentials(userVariable)
+}
 

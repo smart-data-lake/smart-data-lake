@@ -43,7 +43,7 @@ case class SplunkConnection( override val id: ConnectionId,
 
  // Allow only supported authentication modes
  private val supportedAuths = Seq(classOf[BasicAuthMode], classOf[TokenAuthMode])
- require(supportedAuths.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}")
+ require(supportedAuths.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
 
   override def connectToSplunk: Service = {
 
@@ -54,11 +54,13 @@ case class SplunkConnection( override val id: ConnectionId,
     connectionArgs.setSSLSecurityProtocol(SSLSecurityProtocol.TLSv1_2)
 
     authMode match {
-      case TokenAuthMode(t) =>
-        connectionArgs.setToken(CredentialsUtil.getCredentials(t))
-      case BasicAuthMode(u,p) =>
-        connectionArgs.setUsername(CredentialsUtil.getCredentials(u))
-        connectionArgs.setPassword(CredentialsUtil.getCredentials(p))
+      case m: TokenAuthMode =>
+        connectionArgs.setToken(m.token)
+      case m: BasicAuthMode =>
+        connectionArgs.setUsername(m.user)
+        connectionArgs.setPassword(m.password)
+      case _ =>
+        throw new IllegalArgumentException(s"${authMode.getClass.getSimpleName} not supported.")
     }
 
     Service.connect(connectionArgs)
