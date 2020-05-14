@@ -303,8 +303,8 @@ class DataObjectImplTests extends FlatSpec with Matchers {
         |   port = 8080
         |   auth-mode = {
         |        type = BasicAuthMode
-        |        user = "CLEAR#testuser"
-        |        password = "CLEAR#secret"
+        |        user-variable = "CLEAR#testuser"
+        |        password-variable = "CLEAR#secret"
         |    }
         | }
         |}
