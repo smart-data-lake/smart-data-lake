@@ -21,8 +21,9 @@ package io.smartdatalake.workflow.connection
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.{AuthMode, BasicAuthMode, PublicKeyAuthMode}
 import io.smartdatalake.util.filetransfer.SshUtil
-import io.smartdatalake.util.misc.{CredentialsUtil, TryWithResourcePool}
+import io.smartdatalake.util.misc.TryWithResourcePool
 import net.schmizz.sshj.sftp.SFTPClient
 import org.apache.commons.pool2.impl.{DefaultPooledObject, GenericObjectPool}
 import org.apache.commons.pool2.{BasePooledObjectFactory, PooledObject}
@@ -33,8 +34,7 @@ import org.apache.commons.pool2.{BasePooledObjectFactory, PooledObject}
  * @param id unique id of this connection
  * @param host sftp host
  * @param port port of sftp service, default is 22
- * @param userVariable user variable to use for connection
- * @param passwordVariable optional password variable to use for connection. If password is given, authentication is done by user/password, otherwise public key authentication is used
+ * @param authMode authentication information: for now BasicAuthMode and PublicKeyAuthMode are supported.
  * @param ignoreHostKeyVerification do not validate host key if true, default is false
  * @param maxParallelConnections number of parallel sftp connections created by an instance of this connection
  * @param metadata
@@ -42,15 +42,15 @@ import org.apache.commons.pool2.{BasePooledObjectFactory, PooledObject}
 case class SftpFileRefConnection( override val id: ConnectionId,
                                   host: String,
                                   port: Int = 22,
-                                  userVariable: String,
-                                  passwordVariable: Option[String] = None,
+                                  authMode: AuthMode,
                                   ignoreHostKeyVerification: Boolean = false,
                                   maxParallelConnections: Int = 1,
                                   override val metadata: Option[ConnectionMetadata] = None
                                  ) extends Connection {
 
-  private implicit val sftpConnectionUser = CredentialsUtil.getCredentials(userVariable)
-  private implicit val sftpConnectionPassword = passwordVariable.map(CredentialsUtil.getCredentials)
+  // Allow only supported authentication modes
+  private val supportedAuths = Seq(classOf[BasicAuthMode], classOf[PublicKeyAuthMode])
+  require(supportedAuths.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
 
   def execWithSFtpClient[A]( func: SFTPClient => A ): A = {
     TryWithResourcePool.exec(pool){
@@ -64,7 +64,13 @@ case class SftpFileRefConnection( override val id: ConnectionId,
   pool.setMaxIdle(1) // keep max one idle sftp connection
   pool.setMinEvictableIdleTimeMillis(1000) // timeout to close sftp connection if not in use
   private class SftpClientPoolFactory extends BasePooledObjectFactory[SFTPClient] {
-    override def create(): SFTPClient = SshUtil.connect(host, port, sftpConnectionUser, sftpConnectionPassword, ignoreHostKeyVerification).newSFTPClient()
+    override def create(): SFTPClient = {
+      authMode match {
+        case m: BasicAuthMode => SshUtil.connectWithUserPw(host, port, m.user, m.password, ignoreHostKeyVerification).newSFTPClient()
+        case m: PublicKeyAuthMode => SshUtil.connectWithPublicKey(host, port, m.user, ignoreHostKeyVerification).newSFTPClient()
+        case _ => throw new IllegalArgumentException(s"${authMode.getClass.getSimpleName} not supported.")
+      }
+    }
     override def wrap(sftp: SFTPClient): PooledObject[SFTPClient] = new DefaultPooledObject(sftp)
     override def destroyObject(p: PooledObject[SFTPClient]): Unit =
       p.getObject.close()

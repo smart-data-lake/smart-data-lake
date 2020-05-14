@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.dataobject
 import java.nio.file.{Files, Path}
 
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.definitions.BasicAuthMode
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.connection.SftpFileRefConnection
@@ -51,7 +52,7 @@ class SFtpFileRefDataObjectTest extends FunSuite with Matchers with BeforeAndAft
 
   override def beforeEach(): Unit = {
     registry.clear()
-    registry.register(SftpFileRefConnection( "con1", "localhost", sshPort, "CLEAR#"+sshUser, Some("CLEAR#"+sshPwd), ignoreHostKeyVerification = true))
+    registry.register(SftpFileRefConnection( "con1", "localhost", sshPort, BasicAuthMode("CLEAR#"+sshUser, "CLEAR#"+sshPwd), ignoreHostKeyVerification = true))
     tempDir = Files.createTempDirectory("sftp-test")
   }
 

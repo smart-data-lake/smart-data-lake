@@ -42,4 +42,11 @@ case class TokenAuthMode(tokenVariable: String) extends AuthMode {
   val token: String = CredentialsUtil.getCredentials(tokenVariable)
 }
 
+/**
+ * Validate by user and private/public key
+ * Private key is read from .ssh
+ */
+case class PublicKeyAuthMode(userVariable: String) extends AuthMode {
+  val user: String = CredentialsUtil.getCredentials(userVariable)
+}
 
