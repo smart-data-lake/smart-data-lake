@@ -36,30 +36,32 @@ import io.smartdatalake.definitions._
 case class SplunkConnection( override val id: ConnectionId,
                              host: String,
                              port: Int,
-                             authMode: SplunkAuthMode,
+                             authMode: AuthMode,
                              override val metadata: Option[ConnectionMetadata] = None
                            ) extends Connection with SplunkConnectionService {
 
+  // Allow only supported authentication modes
+ private val supportedAuths = Seq(classOf[BasicAuthMode], classOf[TokenAuthMode])
+ require(supportedAuths.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}")
 
   override def connectToSplunk: Service = {
 
     val connectionArgs = new ServiceArgs
+
     connectionArgs.setHost(host)
     connectionArgs.setPort(port)
     connectionArgs.setSSLSecurityProtocol(SSLSecurityProtocol.TLSv1_2)
 
     authMode match {
-      case BasicAuthMode(u,p) => {
-        connectionArgs.setUsername(authMode.splunkOpts(AuthUser.name))
-        connectionArgs.setPassword(authMode.splunkOpts(AuthPassword.name))
-      }
-      case TokenAuthMode(t) => {
-        connectionArgs
-          .setToken(authMode.splunkOpts(AuthToken.name))
-      }
+      case TokenAuthMode(t) =>
+        connectionArgs.setToken(t)
+      case BasicAuthMode(u,p) =>
+        connectionArgs.setUsername(u)
+        connectionArgs.setPassword(p)
     }
 
     Service.connect(connectionArgs)
+
   }
 
   /**

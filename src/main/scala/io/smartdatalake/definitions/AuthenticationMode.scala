@@ -18,60 +18,21 @@
  */
 package io.smartdatalake.definitions
 
-import io.smartdatalake.util.misc.CredentialsUtil
-
-/**
- * AuthMode Parameters define keys on authentication mode maps
- * which can be imported and referenced in connections
- */
-sealed trait AuthModeParameter { def name: String }
-
-case object AuthToken extends AuthModeParameter{val name="token"}
-case object AuthUser extends AuthModeParameter{val name="user"}
-case object AuthPassword extends AuthModeParameter{val name="password"}
-
 /**
  * Authentication modes define how an application authenticates itself
  * to a given data object/connection
  *
  */
-sealed trait AuthenticationMode {
-  /**
-   * Each mode should at a minimum provide a method to decrypt the credentials
-    * @return : Map of decrypted credentials
-   */
-  def simpleOpts: Map[String, String]
-}
-
-/**
- * The individual traits indicate which modes are supported by each connection type
- * and prevent passing unsupported credentials into a connection/DO
- */
-sealed trait SplunkAuthMode extends AuthenticationMode { def splunkOpts: Map[String, String]}
-sealed trait KafkaAuthMode extends AuthenticationMode { def kafkaOpts: Map[String, String]}
-sealed trait HttpAuthMode extends AuthenticationMode { def headerOpts: Map[String, String]}
+sealed trait AuthMode
 
 /**
  * Derive options for various connection types to connect by basic authentication
  */
-case class BasicAuthMode(user: String, password: String)
-  extends SplunkAuthMode
-{
-  val simpleOpts: Map[String, String] = Map(
-    (AuthUser.name,CredentialsUtil.getCredentials(user)),
-    (AuthPassword.name, CredentialsUtil.getCredentials(password))
-  )
-  val splunkOpts = simpleOpts
-}
+case class BasicAuthMode(user: String, password: String) extends AuthMode
 
 /**
  * Derive options for various connection types to connect by token
   */
-case class TokenAuthMode(token: String)
-  extends SplunkAuthMode
-{
-  val simpleOpts: Map[String, String] = Map((AuthToken.name,CredentialsUtil.getCredentials(token)))
-  val splunkOpts: Map[String, String] = simpleOpts
-}
+case class TokenAuthMode(token: String) extends AuthMode
 
 
