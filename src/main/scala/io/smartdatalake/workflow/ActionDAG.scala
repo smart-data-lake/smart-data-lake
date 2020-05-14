@@ -154,13 +154,13 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
    */
   def getStatistics: Seq[(Option[RuntimeEventState],Int)] = {
     dag.sortedNodes.collect { case n: Action => n }.map(_.getRuntimeState._1)
-      .groupBy(identity).mapValues(_.size).toSeq.sortBy(_._1)
+      .groupBy(identity).mapValues(_.size).toSeq.sortBy(_._1.getOrElse(RuntimeEventState.NONE))
   }
 
   def notifyActionMetric(actionId: ActionObjectId, dataObjectId: Option[DataObjectId], metrics: ActionMetrics): Unit = {
     val action = dag.sortedNodes.collect{ case a:Action => a }
       .find(_.nodeId == actionId.id).getOrElse(throw new IllegalStateException(s"Unknown action $actionId"))
-    action.onMetric(dataObjectId, metrics)
+    action.onRuntimeMetrics(dataObjectId, metrics)
   }
 }
 
@@ -191,6 +191,9 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
     // create dag
     val dag = DAG.create[Action](initAction +: actions, edges)
     logDag(s"created dag $runId", dag)
+
+    // enable runtime metrics
+    actions.foreach(_.enableRuntimeMetrics())
 
     ActionDAGRun(dag, runId, partitionValues, parallelism)
   }

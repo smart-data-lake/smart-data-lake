@@ -191,13 +191,17 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
 
   /**
    * Runtime metrics
+   *
+   * Note: runtime metrics are disabled by default, because they are only collected when running Actions from an ActionDAG.
+   * This is not the case for Tests other use cases. If enabled exceptions are thrown if metrics are not found.
    */
-  def onMetric(dataObjectId: Option[DataObjectId], metrics: ActionMetrics): Unit = {
+  def enableRuntimeMetrics(): Unit = runtimeMetricsEnabled = true
+  def onRuntimeMetrics(dataObjectId: Option[DataObjectId], metrics: ActionMetrics): Unit = {
     if (dataObjectId.isDefined) {
       if (outputs.exists(_.id == dataObjectId.get)) {
-        val dataObjectMetrics = dataObjectMetricsMap.getOrElseUpdate(dataObjectId.get, mutable.Buffer[ActionMetrics]())
+        val dataObjectMetrics = dataObjectRuntimeMetricsMap.getOrElseUpdate(dataObjectId.get, mutable.Buffer[ActionMetrics]())
         dataObjectMetrics.append(metrics)
-        if (dataObjectMetricsDelivered.contains(dataObjectId.get)) {
+        if (dataObjectRuntimeMetricsDelivered.contains(dataObjectId.get)) {
           logger.error(s"($id) Late arriving metrics for ${dataObjectId.get} detected. Final metrics have already been delivered. Statistics in previous logs might be wrong.")
         }
       } else logger.warn(s"($id) Metrics received for ${dataObjectId.get} which doesn't belong to outputs (${metrics}")
@@ -205,16 +209,18 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
     if (logger.isDebugEnabled) logger.debug(s"($id) Metrics received:\n" + metrics.getAsText)
   }
   def getFinalMetrics(dataObjectId: DataObjectId): Option[ActionMetrics] = {
+    if (!runtimeMetricsEnabled) return None
     // remember for which data object final metrics has been delivered, so that we can warn on late arriving metrics!
-    dataObjectMetricsDelivered.append(dataObjectId)
+    dataObjectRuntimeMetricsDelivered.append(dataObjectId)
     // return latest metrics
-    val metrics = dataObjectMetricsMap.get(dataObjectId)
+    val metrics = dataObjectRuntimeMetricsMap.get(dataObjectId)
     val latestMetrics = metrics.flatMap( m => Try(m.maxBy(_.getOrder)).toOption)
     if (metrics.isEmpty)  throw new IllegalStateException(s"($id) Metrics for $dataObjectId not found")
     latestMetrics
   }
-  private val dataObjectMetricsMap = mutable.Map[DataObjectId,mutable.Buffer[ActionMetrics]]()
-  private val dataObjectMetricsDelivered = mutable.Buffer[DataObjectId]()
+  private var runtimeMetricsEnabled = false
+  private val dataObjectRuntimeMetricsMap = mutable.Map[DataObjectId,mutable.Buffer[ActionMetrics]]()
+  private val dataObjectRuntimeMetricsDelivered = mutable.Buffer[DataObjectId]()
 
   /**
    * This is displayed in ascii graph visualization
@@ -255,5 +261,5 @@ case class ActionMetadata(
 private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: String, state: RuntimeEventState, msg: String)
 private[smartdatalake] object RuntimeEventState extends Enumeration {
   type RuntimeEventState = Value
-  val STARTED, SUCCEEDED, FAILED, SKIPPED = Value
+  val STARTED, SUCCEEDED, FAILED, SKIPPED, NONE = Value
 }

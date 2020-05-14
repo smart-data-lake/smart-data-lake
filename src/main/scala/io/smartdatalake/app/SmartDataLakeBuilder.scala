@@ -27,6 +27,7 @@ import io.smartdatalake.config.{ConfigLoader, ConfigParser, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{LogUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow._
+import io.smartdatalake.workflow.action.RuntimeEventState
 import org.apache.spark.sql.SparkSession
 import scopt.OptionParser
 
@@ -200,6 +201,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     }
 
     // return result statistics as string
-    actionDAGRun.getStatistics.map( x => x._1.getOrElse("None")+"="+x._2).mkString(" ")
+    actionDAGRun.getStatistics.map( x => x._1.getOrElse(RuntimeEventState.NONE)+"="+x._2).mkString(" ")
   }
 }
