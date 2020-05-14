@@ -42,7 +42,7 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
     UserGroupInformation.loginUserFromKeytab(userAtRealm, keytab)
   }
 
-  def createSparkSession(name:String, masterOpt: String,
+  def createSparkSession(name:String, masterOpt: Option[String] = None,
                          deployModeOpt: Option[String] = None,
                          kryoClassNamesOpt: Option[Seq[String]] = None,
                          sparkOptionsOpt: Option[Map[String,String]] = None,
@@ -51,7 +51,7 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
 
     // create configObject
     val sessionBuilder = SparkSession.builder()
-      .master(masterOpt)
+      .optionalMaster(masterOpt)
       .appName(name)
       .config("hive.exec.dynamic.partition", true) // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
       .config("hive.exec.dynamic.partition.mode", "nonstrict") // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
@@ -114,6 +114,10 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
    * pimpMyLibrary pattern to add SparkSession.Builder utility functions
    */
   private implicit class SparkSessionBuilderUtils( builder: SparkSession.Builder ) {
+    def optionalMaster( value: Option[String] ): SparkSession.Builder = {
+      if (value.isDefined) builder.master(value.get)
+      else builder
+    }
     def optionalConfig( key: String, value: Option[String] ): SparkSession.Builder = {
       if (value.isDefined) {
         logger.info(s"Additional sparkOption: ${createMaskedSecretsKVLog(key,value.get)}")
