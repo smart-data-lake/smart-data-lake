@@ -43,7 +43,7 @@ case class SplunkConnection( override val id: ConnectionId,
 
  // Allow only supported authentication modes
  private val supportedAuths = Seq(classOf[BasicAuthMode], classOf[TokenAuthMode])
- require(supportedAuths.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}")
+ require(supportedAuths.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
 
   override def connectToSplunk: Service = {
 
