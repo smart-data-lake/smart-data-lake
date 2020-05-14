@@ -59,6 +59,8 @@ case class SplunkConnection( override val id: ConnectionId,
       case m: BasicAuthMode =>
         connectionArgs.setUsername(m.user)
         connectionArgs.setPassword(m.password)
+      case _ =>
+        throw new IllegalArgumentException(s"${authMode.getClass.getSimpleName} not supported.")
     }
 
     Service.connect(connectionArgs)
