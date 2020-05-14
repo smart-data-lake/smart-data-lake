@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.config
 
-import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
+import io.smartdatalake.config.SdlConfigObject.{ConfigObjectId, validateId}
 
 import scala.language.implicitConversions
 
@@ -31,6 +31,8 @@ private[smartdatalake] trait SdlConfigObject {
    * A unique identifier for this instance.
    */
   def id: ConfigObjectId
+
+  validateId(id.id)
 }
 
 object SdlConfigObject {
@@ -61,6 +63,15 @@ object SdlConfigObject {
    */
   case class ActionObjectId(id: String) extends AnyVal with ConfigObjectId {
     override def toString: String = "Action~"+id
+  }
+
+  /**
+   * Check allowed characters for id
+   * Convention is important for custom sql transformation and Spark metrics parsing.
+   */
+  def validateId(id: String): Unit = {
+    val regex = "([a-zA-Z0-9_-])+"
+    if (!id.matches(regex)) throw ConfigurationException(s"Id $id is not valid. It must match regex '$regex'.")
   }
 
   implicit def stringToConnectionId(str: String): ConnectionId = ConnectionId(str)

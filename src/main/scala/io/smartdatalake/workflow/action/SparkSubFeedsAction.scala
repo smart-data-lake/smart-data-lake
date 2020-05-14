@@ -104,14 +104,15 @@ abstract class SparkSubFeedsAction extends Action {
     // write output
     outputs.foreach { output =>
       val subFeed = transformedSubFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"subFeed for output ${output.id} not found"))
-      val msg = s"($id) start writing DataFrame to ${output.id}" + (if (subFeed.partitionValues.nonEmpty) s", partitionValues ${subFeed.partitionValues.mkString(" ")}" else "")
-      logger.info(msg)
+      val msg = s"writing DataFrame to ${output.id}" + (if (subFeed.partitionValues.nonEmpty) s", partitionValues ${subFeed.partitionValues.mkString(" ")}" else "")
+      logger.info(s"($id) start " + msg)
       setSparkJobMetadata(Some(msg))
       val (_,d) = PerformanceUtils.measureDuration {
         output.writeDataFrame(subFeed.dataFrame.get, subFeed.partitionValues)
       }
-      logger.info(s"($id) finished writing DataFrame to ${output.id}, took $d")
-      setSparkJobMetadata(None)
+      setSparkJobMetadata()
+      val finalMetricsInfos = getFinalMetrics(output.id).map(_.getMainInfos)
+      logger.info(s"($id) finished writing DataFrame to ${output.id}: duration=$d" + finalMetricsInfos.map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse(""))
     }
     // return
     transformedSubFeeds

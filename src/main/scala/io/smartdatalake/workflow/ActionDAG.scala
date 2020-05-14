@@ -18,12 +18,13 @@
  */
 package io.smartdatalake.workflow
 
-import io.smartdatalake.metrics.StageMetricsListener
+import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.DAGHelper._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
-import io.smartdatalake.workflow.action.{Action, RuntimeEventState}
+import io.smartdatalake.workflow.action.{Action, RuntimeEventState, SparkSubFeedAction}
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import org.apache.spark.sql.SparkSession
@@ -42,20 +43,27 @@ private[smartdatalake] case class DummyDAGResult(override val resultId: String) 
 private[smartdatalake] class ActionEventListener(operation: String) extends DAGEventListener[Action] with SmartDataLakeLogger {
   override def onNodeStart(node: Action): Unit = {
     node.addRuntimeEvent(operation, RuntimeEventState.STARTED, "-")
-    logger.info(s"${node.toStringShort}: $operation started")
+    logger.info(s"(${node.id}): $operation started")
   }
   override def onNodeSuccess(node: Action): Unit = {
     node.addRuntimeEvent(operation, RuntimeEventState.SUCCEEDED, "-")
-    logger.info(s"${node.toStringShort}: $operation: succeeded")
+    logger.info(s"(${node.id}): $operation: succeeded")
   }
   override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
     node.addRuntimeEvent(operation, RuntimeEventState.FAILED, s"${exception.getClass.getSimpleName}: ${exception.getMessage}")
-    logger.error(s"${node.toStringShort}: $operation failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
+    logger.error(s"(${node.id}): $operation failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
   }
   override def onNodeSkipped(exception: Throwable)(node: Action): Unit = {
     node.addRuntimeEvent(operation, RuntimeEventState.SKIPPED, s"${exception.getClass.getSimpleName}: ${exception.getMessage}")
-    logger.warn(s"${node.toStringShort}: $operation: skipped because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
+    logger.warn(s"(${node.id}): $operation: skipped because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
   }
+}
+
+private[smartdatalake] trait ActionMetrics {
+  def getId: String
+  def getOrder: Long
+  def getMainInfos: Map[String,Any]
+  def getAsText: String
 }
 
 private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, partitionValues: Seq[PartitionValues], parallelism: Int) extends SmartDataLakeLogger {
@@ -63,7 +71,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
   private def createScheduler(parallelism: Int = 1) = Scheduler.fixedPool(s"dag-$runId", parallelism)
 
   private def run[R<:DAGResult](op: String, parallelism: Int = 1)(operation: (DAGNode, Seq[R]) => Seq[R])(implicit session: SparkSession, context: ActionPipelineContext): Seq[R] = {
-    val stageMetricsListener = new StageMetricsListener
+    val stageMetricsListener = new SparkStageMetricsListener(notifyActionMetric)
     session.sparkContext.addSparkListener(stageMetricsListener)
     try {
       implicit val scheduler: SchedulerService = createScheduler(parallelism)
@@ -94,9 +102,6 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
       result.filter(_.isSuccess).map(_.get)
     } finally {
       session.sparkContext.removeSparkListener(stageMetricsListener)
-      if (stageMetricsListener.stageMetricsCollection.nonEmpty) {
-        logger.debug(s"Operation '$op' stage metrics:\n - ${stageMetricsListener.stageMetricsCollection.map(_.report()).mkString("\n - ")}")
-      }
     }
   }
 
@@ -150,6 +155,12 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
   def getStatistics: Seq[(Option[RuntimeEventState],Int)] = {
     dag.sortedNodes.collect { case n: Action => n }.map(_.getRuntimeState._1)
       .groupBy(identity).mapValues(_.size).toSeq.sortBy(_._1)
+  }
+
+  def notifyActionMetric(actionId: ActionObjectId, dataObjectId: Option[DataObjectId], metrics: ActionMetrics): Unit = {
+    val action = dag.sortedNodes.collect{ case a:Action => a }
+      .find(_.nodeId == actionId.id).getOrElse(throw new IllegalStateException(s"Unknown action $actionId"))
+    action.onMetric(dataObjectId, metrics)
   }
 }
 
