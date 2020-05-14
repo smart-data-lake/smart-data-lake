@@ -23,9 +23,9 @@ import java.util.concurrent.TimeUnit
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.{AuthMode, BasicAuthMode}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.jms.{JmsQueueConsumerFactory, SynchronousJmsReceiver, TextMessageHandler}
-import io.smartdatalake.util.misc.CredentialsUtil
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -37,8 +37,7 @@ import scala.concurrent.duration.Duration
  *
  * @param jndiContextFactory JNDI Context Factory
  * @param jndiProviderUrl JNDI Provider URL
- * @param userVariable Variable containing the JNDI user
- * @param passwordVariable Variable containing the JNDI password
+ * @param authMode authentication information: for now BasicAuthMode and PublicKeyAuthMode are supported.
  * @param batchSize JMS batch size
  * @param connectionFactory JMS Connection Factory
  * @param queue Name of MQ Queue
@@ -46,9 +45,8 @@ import scala.concurrent.duration.Duration
 case class JmsDataObject(override val id: DataObjectId,
                          jndiContextFactory: String,
                          jndiProviderUrl: String,
-                         userVariable: String,
                          override val schemaMin: Option[StructType],
-                         passwordVariable: String,
+                         authMode: AuthMode,
                          batchSize: Int,
                          maxWaitSec: Int,
                          maxBatchAgeSec: Int,
@@ -59,12 +57,13 @@ case class JmsDataObject(override val id: DataObjectId,
                         (implicit instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with SchemaValidation {
 
-  private implicit val jndiUser: String = CredentialsUtil.getCredentials(userVariable)
-  private implicit val jndiPassword: String = CredentialsUtil.getCredentials(passwordVariable)
+  // Allow only supported authentication modes
+  private val supportedAuths = Seq(classOf[BasicAuthMode])
+  require(supportedAuths.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
+  val basicAuthMode = authMode.asInstanceOf[BasicAuthMode]
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
-    val consumerFactory = new JmsQueueConsumerFactory(jndiContextFactory,
-      jndiProviderUrl, jndiUser, jndiPassword, connectionFactory, queue)
+    val consumerFactory = new JmsQueueConsumerFactory(jndiContextFactory, jndiProviderUrl, basicAuthMode.user, basicAuthMode.password, connectionFactory, queue)
     val receiver = new SynchronousJmsReceiver[String](consumerFactory,
       TextMessageHandler.convert2Text, batchSize, Duration(maxWaitSec, TimeUnit.SECONDS),
       Duration(maxBatchAgeSec, TimeUnit.SECONDS), txBatchSize, session)
