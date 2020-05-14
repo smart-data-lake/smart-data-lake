@@ -100,6 +100,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * e.g. JdbcTableDataObjects preSql
    */
   def preExec(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    setSparkJobMetadata(None) // init spark jobGroupId to identify metrics
     inputs.foreach(_.preRead)
     outputs.foreach(_.preWrite)
   }

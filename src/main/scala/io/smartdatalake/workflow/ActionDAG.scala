@@ -71,38 +71,32 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
   private def createScheduler(parallelism: Int = 1) = Scheduler.fixedPool(s"dag-$runId", parallelism)
 
   private def run[R<:DAGResult](op: String, parallelism: Int = 1)(operation: (DAGNode, Seq[R]) => Seq[R])(implicit session: SparkSession, context: ActionPipelineContext): Seq[R] = {
-    val stageMetricsListener = new SparkStageMetricsListener(notifyActionMetric)
-    session.sparkContext.addSparkListener(stageMetricsListener)
-    try {
-      implicit val scheduler: SchedulerService = createScheduler(parallelism)
-      val task = dag.buildTaskGraph[R](new ActionEventListener(op))(operation)
-      val futureResult = task.runToFuture(scheduler)
+    implicit val scheduler: SchedulerService = createScheduler(parallelism)
+    val task = dag.buildTaskGraph[R](new ActionEventListener(op))(operation)
+    val futureResult = task.runToFuture(scheduler)
 
-      // wait for result
-      val result = Await.result(futureResult, Duration.Inf)
-      scheduler.shutdown
+    // wait for result
+    val result = Await.result(futureResult, Duration.Inf)
+    scheduler.shutdown
 
-      // collect all root exceptions
-      val dagExceptions = result.filter(_.isFailure).map(_.failed.get).flatMap {
-        case ex: DAGException => ex.getDAGRootExceptions
-        case ex => throw ex // this should not happen
-      }
-      val dagExceptionsToStop = dagExceptions.filter(_.severity <= ExceptionSeverity.SKIPPED)
-      // log all exceptions
-      dagExceptions.foreach {
-        case ex if (ex.severity <= ExceptionSeverity.CANCELLED) => logger.error(s"$op: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
-        case ex => logger.warn(s"$op: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
-      }
-      // log dag on error
-      if (dagExceptionsToStop.nonEmpty) ActionDAGRun.logDag(s"$op failed for dag $runId", dag)
-      // throw most severe exception
-      dagExceptionsToStop.sortBy(_.severity).foreach{ throw _ }
-
-      // extract & return subfeeds
-      result.filter(_.isSuccess).map(_.get)
-    } finally {
-      session.sparkContext.removeSparkListener(stageMetricsListener)
+    // collect all root exceptions
+    val dagExceptions = result.filter(_.isFailure).map(_.failed.get).flatMap {
+      case ex: DAGException => ex.getDAGRootExceptions
+      case ex => throw ex // this should not happen
     }
+    val dagExceptionsToStop = dagExceptions.filter(_.severity <= ExceptionSeverity.SKIPPED)
+    // log all exceptions
+    dagExceptions.foreach {
+      case ex if (ex.severity <= ExceptionSeverity.CANCELLED) => logger.error(s"$op: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+      case ex => logger.warn(s"$op: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+    }
+    // log dag on error
+    if (dagExceptionsToStop.nonEmpty) ActionDAGRun.logDag(s"$op failed for dag $runId", dag)
+    // throw most severe exception
+    dagExceptionsToStop.sortBy(_.severity).foreach{ throw _ }
+
+    // extract & return subfeeds
+    result.filter(_.isSuccess).map(_.get)
   }
 
   def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
@@ -130,18 +124,23 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
 
   def exec(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     // run exec for every node
-    val result = run[SubFeed]("exec") {
-      case (node: InitDAGNode, _) =>
-        node.edges.map(dataObjectId => InitSubFeed(dataObjectId, partitionValues))
-      case (node: Action, subFeeds) =>
-        node.preExec
-        val resultSubFeeds = node.exec(subFeeds)
-        node.postExec(subFeeds, resultSubFeeds)
-        //return
-        resultSubFeeds
-      case x => throw new IllegalStateException(s"Unmatched case $x")
+    val stageMetricsListener = new SparkStageMetricsListener(notifyActionMetric)
+    session.sparkContext.addSparkListener(stageMetricsListener)
+    val result = try {
+      run[SubFeed] ("exec") {
+        case (node: InitDAGNode, _) =>
+          node.edges.map(dataObjectId => InitSubFeed(dataObjectId, partitionValues))
+        case (node: Action, subFeeds) =>
+          node.preExec
+          val resultSubFeeds = node.exec(subFeeds)
+          node.postExec(subFeeds, resultSubFeeds)
+          //return
+          resultSubFeeds
+        case x => throw new IllegalStateException(s"Unmatched case $x")
+      }
+    } finally {
+      session.sparkContext.removeSparkListener(stageMetricsListener)
     }
-
     // log dag execution
     ActionDAGRun.logDag(s"exec result dag $runId", dag)
 
