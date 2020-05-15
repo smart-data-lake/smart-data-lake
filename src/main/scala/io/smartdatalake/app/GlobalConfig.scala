@@ -23,7 +23,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.util.misc.MemoryUtils
 import org.apache.spark.sql.SparkSession
 import configs.syntax._
-import org.apache.spark.ExecutorPlugin
+import org.apache.spark.{ExecutorPlugin, SparkEnv}
 
 /**
  * Global configuration options
@@ -50,8 +50,11 @@ case class GlobalConfig( kryoClasses: Option[Seq[String]] = None, sparkOptions: 
    */
   def createSparkSession(appName: String, master: Option[String], deployMode: Option[String] = None): SparkSession = {
     // prepare additional spark options
+    // enable MemoryLoggerExecutorPlugin if memoryLogTimer is enabled
     val executorPlugins = (sparkOptions.flatMap(_.get("spark.executor.plugins")).toSeq ++ (if (memoryLogTimer.isDefined) Seq("io.smartdatalake.app.MemoryLoggerExecutorPlugin") else Seq())).mkString(",")
-    val sparkOptionsExtended = sparkOptions.getOrElse(Map()) + ("spark.executor.plugins" -> executorPlugins)
+    // config for MemoryLoggerExecutorPlugin can only be transfered to Executor by spark-options
+    val memoryLogOptions = if (memoryLogTimer.isDefined) Map("smartdatalake.intervalSec"->memoryLogTimer.get.intervalSec.toString, "smartdatalake.logLinuxMem"->memoryLogTimer.get.logLinuxMem.toString, "smartdatalake.logLinuxCgroupMem"->memoryLogTimer.get.logLinuxCgroupMem.toString, "smartdatalake.logBuffers"->memoryLogTimer.get.logBuffers.toString) else Map()
+    val sparkOptionsExtended = sparkOptions.getOrElse(Map()) ++ memoryLogOptions + ("spark.executor.plugins" -> executorPlugins)
     AppUtil.createSparkSession(appName, master, deployMode, kryoClasses, Some(sparkOptionsExtended), enableHive)
   }
 }
@@ -83,8 +86,10 @@ case class MemoryLogTimerConfig( intervalSec: Int, logLinuxMem: Boolean = true, 
  */
 private[smartdatalake] class MemoryLoggerExecutorPlugin extends ExecutorPlugin {
   override def init(): Unit = {
-    assert(GlobalConfig.globalConfig.isDefined, "globalConfig must be loaded when using MemoryLoggerExecutorPlugin")
-    if (GlobalConfig.globalConfig.get.memoryLogTimer.isDefined) GlobalConfig.globalConfig.get.memoryLogTimer.get.startTimer()
+    // config can only be transfered to Executor by spark-options
+    val sparkConf = SparkEnv.get.conf
+    val memoryLogConfig = MemoryLogTimerConfig(sparkConf.get("smartdatalake.intervalSec").toInt, sparkConf.get("smartdatalake.logLinuxMem").toBoolean, sparkConf.get("smartdatalake.logLinuxCgroupMem").toBoolean, sparkConf.get("smartdatalake.logBuffers").toBoolean)
+    memoryLogConfig.startTimer()
   }
   override def shutdown(): Unit = {
     MemoryUtils.stopMemoryLogger()
