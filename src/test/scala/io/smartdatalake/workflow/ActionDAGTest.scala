@@ -71,10 +71,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", instanceRegistry, Some(refTimestamp1))
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
     TestUtil.prepareHiveTable(srcTable, srcPath, l1)
-    val actions: Seq[SparkSubFeedAction] = Seq(
-      DeduplicateAction("a", srcDO.id, tgt1DO.id)
-    , CopyAction("b", tgt1DO.id, tgt2DO.id)
-    )
+    val action1 = DeduplicateAction("a", srcDO.id, tgt1DO.id)
+    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id)
+    val actions: Seq[SparkSubFeedAction] = Seq(action1, action2)
     val dag: ActionDAGRun = ActionDAGRun(actions, "test")
 
     // exec dag
@@ -82,11 +81,18 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.init
     dag.exec
 
+    // check result
     val r1 = session.table(s"${tgt2Table.fullName}")
       .select($"rating")
       .as[Int].collect().toSeq
     assert(r1.size == 1)
     assert(r1.head == 5)
+
+    // check metrics for HiveTableDataObject
+    val action2MainMetrics = action2.getFinalMetrics(action2.outputId).get.getMainInfos
+    assert(action2MainMetrics("records_written")==1)
+    assert(action2MainMetrics.isDefinedAt("bytes_written"))
+    assert(action2MainMetrics("num_tasks")==1)
   }
 
   test("action dag with 2 dependent actions from same predecessor") {
@@ -421,9 +427,14 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dfSrc = srcDO.getDataFrame()
     val srcCount = dfSrc.count
     val dfTgt3 = tgt1DO.getDataFrame()
-    dfTgt3.show(3)
     val tgtCount = dfTgt3.count
     assert(srcCount == tgtCount)
+
+    // check metrics for CsvFileDataObject
+    val action2MainMetrics = action2.getFinalMetrics(action2.outputId).get.getMainInfos
+    assert(action2MainMetrics("records_written")==40)
+    assert(action2MainMetrics.isDefinedAt("bytes_written"))
+    assert(action2MainMetrics("num_tasks")==1)
   }
 
   test("action dag with 2 actions in sequence and initExecutionMode=PartitionDiffMode") {

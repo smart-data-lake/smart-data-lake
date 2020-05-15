@@ -83,8 +83,8 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
         }
 
         // start
-        run(config)
-        logger.info(s"$appType finished successfully.")
+        val stats = run(config)
+        logger.info(s"$appType finished successfully: $stats")
       case None =>
         logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
     }
