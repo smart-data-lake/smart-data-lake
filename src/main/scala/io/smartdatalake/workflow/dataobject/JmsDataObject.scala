@@ -37,7 +37,7 @@ import scala.concurrent.duration.Duration
  *
  * @param jndiContextFactory JNDI Context Factory
  * @param jndiProviderUrl JNDI Provider URL
- * @param authMode authentication information: for now BasicAuthMode and PublicKeyAuthMode are supported.
+ * @param authMode authentication information: for now BasicAuthMode is supported.
  * @param batchSize JMS batch size
  * @param connectionFactory JMS Connection Factory
  * @param queue Name of MQ Queue

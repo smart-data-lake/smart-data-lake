@@ -33,7 +33,7 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
  * @param id unique id of this connection
  * @param url jdbc connection url
  * @param driver class name of jdbc driver
- * @param authMode optional authentication information: for now BasicAuthMode and PublicKeyAuthMode are supported.
+ * @param authMode optional authentication information: for now BasicAuthMode is supported.
  * @param db jdbc database
  * @param metadata
  */
