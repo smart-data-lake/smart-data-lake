@@ -26,6 +26,7 @@ import io.smartdatalake.config.{ConfigLoader, ConfigParser, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SmartDataLakeLogger}
 import io.smartdatalake.workflow._
+import io.smartdatalake.workflow.action.RuntimeEventState
 import org.apache.spark.sql.SparkSession
 import scopt.OptionParser
 
@@ -137,7 +138,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    *
    * @param appConfig Application configuration (parsed from command line).
    */
-  def run(appConfig: SmartDataLakeBuilderConfig): Unit = try {
+  def run(appConfig: SmartDataLakeBuilderConfig): String = try {
 
     // validate application config
     appConfig.validate()
@@ -182,6 +183,10 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       // dont fail an not severe exceptions like having no data to process
       case ex: DAGException if (ex.severity == ExceptionSeverity.SKIPPED) => logger.warn(s"dag run is skipped because of ${ex.getClass.getSimpleName}: ${ex.getMessage}")
     }
+
+    // return result statistics as string
+    actionDAGRun.getStatistics.map( x => x._1.getOrElse(RuntimeEventState.NONE)+"="+x._2).mkString(" ")
+
   } finally {
     // make sure memory logger timer task is stopped
     MemoryUtils.stopMemoryLogger()

@@ -31,8 +31,8 @@ class DefaultSmartDataLakeBuilder extends SmartDataLakeBuilder {
     parseCommandLineArguments(args, initConfigFromEnvironment) match {
       case Some(config) =>
         assert(config.overrideJars.isEmpty || ignoreOverrideJars, "Option override-jars is not supported by DefaultSmartDataLakeBuilder. Use DatabricksSmartDataLakeBuilder for this option.")
-        run(config)
-        logger.info(s"$appType v$appVersion finished successfully.")
+        val stats = run(config)
+        logger.info(s"$appType v$appVersion finished successfully: $stats")
       case None =>
         logger.error(s"$appType v$appVersion terminated due to an error.")
     }

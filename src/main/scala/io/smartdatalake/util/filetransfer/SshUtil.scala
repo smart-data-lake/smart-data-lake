@@ -35,7 +35,25 @@ import scala.util.{Failure, Success, Try}
 
 private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
 
-  def connect(host: String, port: Int, user: String, password: Option[String], ignoreHostKeyValidation: Boolean = false): SSHClient = {
+  def connectWithUserPw(host: String, port: Int, user: String, password: String, ignoreHostKeyValidation: Boolean = false): SSHClient = {
+    val ssh = connect(host, port, ignoreHostKeyValidation)
+    logger.info(s"host connected, trying to authenticate by user/password...")
+    ssh.authPassword(user, password)
+    logger.info(s"SSH authentication by user/password successful.")
+    // return
+    ssh
+  }
+
+  def connectWithPublicKey(host: String, port: Int, user: String, ignoreHostKeyValidation: Boolean = false): SSHClient = {
+    val ssh = connect(host, port, ignoreHostKeyValidation)
+    logger.info(s"host connected, trying to authenticate by public key...")
+    ssh.authPublickey(user)
+    logger.info(s"SSH authentication by public key successful.")
+    //return
+    ssh
+  }
+
+  private def connect(host: String, port: Int, ignoreHostKeyValidation: Boolean): SSHClient = {
     val ssh = new SSHClient()
     // disable host key validation
     if(ignoreHostKeyValidation) ssh.addHostKeyVerifier(new PromiscuousVerifier)
@@ -43,35 +61,8 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
     else ssh.loadKnownHosts()
     logger.info(s"connecting to host $host by ssh")
     ssh.connect(host, port)
-    logger.info(s"host connected, trying to authenticate...")
-    // try different auth mechanisms
-    val authUser = if (password.isDefined) tryUserPwAuth(ssh, host, user, password.get)
-    else tryPublicKeyAuth(ssh, user)
-    authUser match {
-      case Success(_) =>
-        logger.info(s"authenticated")
-        //return
-        ssh
-      case Failure(ex) =>
-        throw ex
-    }
-  }
-
-  private def tryPublicKeyAuth(ssh:SSHClient, username:String) : Try[String] = {
-    Try{
-      logger.debug(s"try SSH authentication by authorized keys.")
-      ssh.authPublickey(username)
-      logger.info(s"SSH authentication by authorized keys successful.")
-      username
-    }
-  }
-
-  private def tryUserPwAuth(ssh:SSHClient, host:String, username:String, password:String) : Try[String] = {
-    Try {
-      ssh.authPassword(username, password)
-      logger.info(s"SSH authentication by user/password successful.")
-      username
-    }
+    // return
+    ssh
   }
 
   /**
