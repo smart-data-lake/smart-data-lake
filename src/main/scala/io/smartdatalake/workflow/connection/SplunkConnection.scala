@@ -22,6 +22,7 @@ import com.splunk.{SSLSecurityProtocol, Service, ServiceArgs}
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions._
 import io.smartdatalake.util.misc.CredentialsUtil
 
 /**
@@ -30,29 +31,40 @@ import io.smartdatalake.util.misc.CredentialsUtil
  * @param id unique id of this connection
  * @param host
  * @param port
- * @param userVariable
- * @param passwordVariable
+ * @param authMode
  * @param metadata
  */
 case class SplunkConnection( override val id: ConnectionId,
-                                host: String,
-                                port: Int,
-                                userVariable: String,
-                                passwordVariable: String,
-                                override val metadata: Option[ConnectionMetadata] = None
-                               ) extends Connection with SplunkConnectionService {
+                             host: String,
+                             port: Int,
+                             authMode: AuthMode,
+                             override val metadata: Option[ConnectionMetadata] = None
+                           ) extends Connection with SplunkConnectionService {
 
-  private implicit val splunkConnectionUser = CredentialsUtil.getCredentials(userVariable)
-  private implicit val splunkConnectionPassword = CredentialsUtil.getCredentials(passwordVariable)
+ // Allow only supported authentication modes
+ private val supportedAuths = Seq(classOf[BasicAuthMode], classOf[TokenAuthMode])
+ require(supportedAuths.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
 
   override def connectToSplunk: Service = {
+
     val connectionArgs = new ServiceArgs
-    connectionArgs.setUsername(splunkConnectionUser)
-    connectionArgs.setPassword(splunkConnectionPassword)
+
     connectionArgs.setHost(host)
     connectionArgs.setPort(port)
     connectionArgs.setSSLSecurityProtocol(SSLSecurityProtocol.TLSv1_2)
+
+    authMode match {
+      case m: TokenAuthMode =>
+        connectionArgs.setToken(m.token)
+      case m: BasicAuthMode =>
+        connectionArgs.setUsername(m.user)
+        connectionArgs.setPassword(m.password)
+      case _ =>
+        throw new IllegalArgumentException(s"${authMode.getClass.getSimpleName} not supported.")
+    }
+
     Service.connect(connectionArgs)
+
   }
 
   /**
