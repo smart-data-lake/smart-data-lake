@@ -21,9 +21,13 @@ object MemoryUtils extends SmartDataLakeLogger {
   def startMemoryLogger(intervalSec: Int, logLinuxMem: Boolean = false, logLinuxCgroupMem: Boolean = false, logBuffers: Boolean = false): Unit = {
     timer.scheduleAtFixedRate(new MemoryLogTimerTask(logLinuxMem, logLinuxCgroupMem, logBuffers), 0, intervalSec * 1000)
     timerStarted = true
+    logger.info("Memory logger timer task started.")
   }
   def stopMemoryLogger(): Unit = {
-    if (timerStarted) timer.cancel()
+    if (timerStarted) {
+      timer.cancel()
+      logger.info("Memory logger timer task stopped.")
+    }
   }
 
   private class MemoryLogTimerTask(logLinuxMem: Boolean, logLinuxCgroupMem: Boolean, logBuffers: Boolean) extends TimerTask {
@@ -35,9 +39,9 @@ object MemoryUtils extends SmartDataLakeLogger {
   def logHeapInfo(logLinuxMem: Boolean, logLinuxCgroupMem: Boolean, logBuffers: Boolean): Unit = {
     val memStats = getMemoryUtilization ++ getThreadUtilization ++
       (if(logBuffers) getDirectBufferPools ++ getMappedBufferPools else Seq()) ++
-      (if(logLinuxMem) getLinuxMem ++ getK8sCGroupMem else Seq())
+      (if(logLinuxMem) getLinuxMem ++ getCGroupMem else Seq())
     logger.info(s"memory info ${memStats.map{ case (k,v) => s"$k=$v"}.mkString(", ")}")
-    if(logLinuxCgroupMem) logger.debug("cgroup memory statistics", getK8sCGroupMemStat)
+    if(logLinuxCgroupMem) logger.debug("cgroup memory statistics", getCGroupMemStat)
   }
 
   def logHeapInfoLegacy(): Unit = {
@@ -96,7 +100,7 @@ object MemoryUtils extends SmartDataLakeLogger {
     )
   }
 
-  private def getK8sCGroupMem: Seq[(String,Any)] = try {
+  private def getCGroupMem: Seq[(String,Any)] = try {
     def getCGroupMem( key: String ) = {
       val commandString = s"cat /sys/fs/cgroup/memory/$key"
       val cmd = Array("/bin/sh", "-c", commandString)
@@ -107,16 +111,16 @@ object MemoryUtils extends SmartDataLakeLogger {
     val limit = getCGroupMem("memory.limit_in_bytes")
     val usage = getCGroupMem("memory.usage_in_bytes")
     Seq(
-      "k8sLimit" -> formatBytesMB(limit),
-      "k8sUsage" -> formatBytesMB(usage)
+      "cGroupLimit" -> formatBytesMB(limit),
+      "cGroupUsage" -> formatBytesMB(usage)
     )
   } catch {
     case e: Exception =>
-      logger.warn("could not get k8s process memory: "+e.getMessage)
+      logger.warn("could not get cGroup process memory: "+e.getMessage)
       Seq()
   }
 
-  private def getK8sCGroupMemStat: Map[String,String] = {
+  private def getCGroupMemStat: Map[String,String] = {
     val commandString = s"cat /sys/fs/cgroup/memory/memory.stat"
     val cmd = Array("/bin/sh", "-c", commandString)
     val p = Runtime.getRuntime.exec(cmd)
