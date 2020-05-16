@@ -40,7 +40,7 @@ See [Running Spark on YARN](https://spark.apache.org/docs/latest/running-on-yarn
     ```
 
 1.  Submit application to YARN cluster with spark-submit (make sure spark-submit version is 2.x and scala minor version is 2.11).
-    Dont forget to replace the SmartDataLake version (2x).
+    Don't forget to replace the SmartDataLake version (2x).
     ```bash
     spark-submit --master yarn --deploy-mode client --jars target/smartdatalake_2.11-1.0.3-jar-with-dependencies.jar --class io.smartdatalake.app.DefaultSmartDataLakeBuilder target/smartdatalake_2.11-1.0.3-jar-with-dependencies.jar --feed-sel ab-csv -c file://`pwd`/application.conf
     ```
