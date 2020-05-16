@@ -4,6 +4,8 @@ Smart Data Lake can be easily executed on a YARN cluster by spark-submit.
 The following steps will show you how to set everything up and start a first data load.
 See [Running Spark on YARN](https://spark.apache.org/docs/latest/running-on-yarn.html) for detailed Spark configuration options.
 
+1.  Make sure you have a Spark 2.x Scala 2.11 release installed (spark-submit command needed)
+
 1.  Build the project (with activated profile fat-jar) if you haven't done that already: 
     ```bash
     mvn package -DskipTests -Pscala-2.11 -Pfat-jar)
@@ -39,8 +41,7 @@ See [Running Spark on YARN](https://spark.apache.org/docs/latest/running-on-yarn
     }
     ```
 
-1.  Submit application to YARN cluster with spark-submit (make sure spark-submit version is 2.x and scala minor version is 2.11).
-    Don't forget to replace the SmartDataLake version (2x).
+1.  Submit application to YARN cluster with spark-submit.  Don't forget to replace the SmartDataLake version (2x). On windows you also need to manually local directory of application.conf file in the following command.
     ```bash
     spark-submit --master yarn --deploy-mode client --jars target/smartdatalake_2.11-1.0.3-jar-with-dependencies.jar --class io.smartdatalake.app.DefaultSmartDataLakeBuilder target/smartdatalake_2.11-1.0.3-jar-with-dependencies.jar --feed-sel ab-csv -c file://`pwd`/application.conf
     ```
