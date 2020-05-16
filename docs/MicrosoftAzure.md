@@ -31,36 +31,18 @@ This can hopefully be simplified in the future.
     If something is wrong with the init script, the cluster will not start.
 1.  On your local machine, create a second file called application.conf with the following content:
     ```hocon   
-    connections {}
-    
     dataObjects {
-     
       ab-csv-dbfs {
         type = CsvFileDataObject
         path = "file:///dbfs/data/AB_NYC_2019.csv"
-        csv-options {
-          delimiter = ","
-          escape = "\\"
-          header = "true"
-          quote = "\""
-        }
       }
-    
       ab-reduced-csv-dbfs {
         type = CsvFileDataObject
         path = "file:///dbfs/data/~{id}/nyc_reduced.csv"
-        csv-options = {
-          delimiter = ","
-          escape = "\\"
-          header = "true"
-          quote = "\""
-        }
       }
-   
     }
     
     actions {
-    
       loadDbfs2Dbfs {
         type = CopyAction
         inputId = ab-csv-dbfs
@@ -69,7 +51,6 @@ This can hopefully be simplified in the future.
           feed = ab-azure
         }
       }
-    
     }
     ```
 1.  Upload the file to the conf folder in dbfs:

@@ -271,7 +271,7 @@
 					<archive>
 						<manifest>
 							<addClasspath>true</addClasspath>
-							<mainClass>io.smartdatalake.app.DefaultSmartDataLakeBuilder</mainClass>
+							<mainClass>io.smartdatalake.app.LocalSmartDataLakeBuilder</mainClass>
 						</manifest>
 						<manifestEntries>
 							<Implementation-Version>${project.version}</Implementation-Version>
@@ -314,7 +314,7 @@
 					</descriptorRefs>
 					<archive>
 						<manifest>
-							<mainClass>io.smartdatalake.app.DefaultSmartDataLakeBuilder</mainClass>
+							<mainClass>io.smartdatalake.app.LocalSmartDataLakeBuilder</mainClass>
 						</manifest>
 						<manifestEntries>
 							<Implementation-Version>${project.version}</Implementation-Version>
