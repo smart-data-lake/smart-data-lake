@@ -19,7 +19,9 @@
 
 package io.smartdatalake.metrics
 
+import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.ActionMetrics
 import org.apache.spark.scheduler.{SparkListener, SparkListenerJobStart, SparkListenerStageCompleted}
 import org.joda.time.format.{DateTimeFormat, DateTimeFormatter, PeriodFormatter, PeriodFormatterBuilder}
 import org.joda.time.{Duration, Instant}
@@ -31,23 +33,23 @@ import scala.collection.mutable
  *
  * @see [[org.apache.spark.scheduler.StageInfo]] for more details on these metrics.
  */
-private[smartdatalake] case class SparkStageMetrics(jobId: Int, jobDescription: String, stageId: Int, stageName: String,
-                             submissionTimestamp: Long, completionTimeStamp: Long,
-                             executorRuntimeInMillis: Long, executorCpuTimeInNanos: Long,
-                             executorDeserializeTimeInMillis: Long, executorDeserializeCpuTimeInNanos: Long,
-                             resultSerializationTimeInMillis: Long, resultSizeInBytes: Long,
-                             jvmGarbageCollectionTimeInMillis: Long,
-                             memoryBytesSpilled: Long, diskBytesSpilled: Long,
-                             peakExecutionMemoryInBytes: Long,
-                             bytesRead: Long, recordsRead: Long,
-                             bytesWritten: Long, recordsWritten: Long,
-                             shuffleFetchWaitTimeInMillis: Long,
-                             shuffleRemoteBlocksFetched: Long, shuffleLocalBlocksFetched: Long, shuffleTotalBlocksFetched: Long,
-                             shuffleRemoteBytesRead: Long, shuffleLocalBytesRead: Long, shuffleTotalBytesRead: Long,
-                             shuffleRecordsRead: Long,
-                             shuffleWriteTimeInNanos: Long, shuffleBytesWritten: Long,
-                             shuffleRecordsWritten: Long
-                            ) {
+private[smartdatalake] case class SparkStageMetrics(jobInfo: JobInfo, stageId: Int, stageName: String, numTasks: Int,
+                                                    submissionTimestamp: Long, completionTimeStamp: Long,
+                                                    executorRuntimeInMillis: Long, executorCpuTimeInNanos: Long,
+                                                    executorDeserializeTimeInMillis: Long, executorDeserializeCpuTimeInNanos: Long,
+                                                    resultSerializationTimeInMillis: Long, resultSizeInBytes: Long,
+                                                    jvmGarbageCollectionTimeInMillis: Long,
+                                                    memoryBytesSpilled: Long, diskBytesSpilled: Long,
+                                                    peakExecutionMemoryInBytes: Long,
+                                                    bytesRead: Long, recordsRead: Long,
+                                                    bytesWritten: Long, recordsWritten: Long,
+                                                    shuffleFetchWaitTimeInMillis: Long,
+                                                    shuffleRemoteBlocksFetched: Long, shuffleLocalBlocksFetched: Long, shuffleTotalBlocksFetched: Long,
+                                                    shuffleRemoteBytesRead: Long, shuffleLocalBytesRead: Long, shuffleTotalBytesRead: Long,
+                                                    shuffleRecordsRead: Long,
+                                                    shuffleWriteTimeInNanos: Long, shuffleBytesWritten: Long,
+                                                    shuffleRecordsWritten: Long
+                                                   ) extends ActionMetrics {
 
   lazy val stageSubmissionTime: Instant  = new Instant(submissionTimestamp)
   lazy val stageCompletionTime: Instant  = new Instant(completionTimeStamp)
@@ -86,13 +88,16 @@ private[smartdatalake] case class SparkStageMetrics(jobId: Int, jobDescription: 
   /**
    * @return A printable string reporting all metrics.
    */
-  def report(valueSeparator: String = "="): String = {
+  def getAsText(): String = {
+    val valueSeparator: String = "="
     val durationStringWithSeparator = durationString(valueSeparator, durationFormatter)(_, _)
     val keyValueStringWithSeparator = keyValueString(valueSeparator)(_, _)
 
-    s"""job_id=$jobId stage_id=$stageId:
-       |    ${keyValueStringWithSeparator("job_description", jobDescription)}
+    s"""job_id=${jobInfo.id} stage_id=$stageId:
+       |    ${keyValueStringWithSeparator("job_group", jobInfo.group)}
+       |    ${keyValueStringWithSeparator("job_description", jobInfo.description)}
        |    ${keyValueStringWithSeparator("stage_name", stageName)}
+       |    ${keyValueStringWithSeparator("num_tasks", numTasks.toString)}
        |    ${keyValueStringWithSeparator("submitted", {stageSubmissionTime.toDateTime.toString(dateTimeFormat)})}
        |    ${keyValueStringWithSeparator("completed", {stageCompletionTime.toDateTime.toString(dateTimeFormat)})}
        |    ${durationStringWithSeparator("runtime", stageRuntime)}
@@ -111,53 +116,55 @@ private[smartdatalake] case class SparkStageMetrics(jobId: Int, jobDescription: 
        |    ${keyValueStringWithSeparator("records_read", recordsRead.toString)}
        |    ${keyValueStringWithSeparator("records_written", recordsWritten.toString)}
        |    ${durationStringWithSeparator("shuffle_fetch_waittime", shuffleFetchWaitTime)}
-       |    ${keyValueStringWithSeparator("schuffle_remote_blocks_fetched", shuffleRemoteBlocksFetched.toString)}
-       |    ${keyValueStringWithSeparator("schuffle_local_blocks_fetched", shuffleLocalBlocksFetched.toString)}
-       |    ${keyValueStringWithSeparator("schuffle_total_blocks_fetched", shuffleTotalBlocksFetched.toString)}
-       |    ${keyValueStringWithSeparator("schuffle_remote_bytes_read", shuffleRemoteBytesRead.toString)} B
-       |    ${keyValueStringWithSeparator("schuffle_local_bytes_read", shuffleLocalBytesRead.toString)}  B
-       |    ${keyValueStringWithSeparator("schuffle_total_bytes_read", shuffleTotalBytesRead.toString )} B
-       |    ${keyValueStringWithSeparator("schuffle_records_read", shuffleRecordsRead.toString)}
+       |    ${keyValueStringWithSeparator("shuffle_remote_blocks_fetched", shuffleRemoteBlocksFetched.toString)}
+       |    ${keyValueStringWithSeparator("shuffle_local_blocks_fetched", shuffleLocalBlocksFetched.toString)}
+       |    ${keyValueStringWithSeparator("shuffle_total_blocks_fetched", shuffleTotalBlocksFetched.toString)}
+       |    ${keyValueStringWithSeparator("shuffle_remote_bytes_read", shuffleRemoteBytesRead.toString)} B
+       |    ${keyValueStringWithSeparator("shuffle_local_bytes_read", shuffleLocalBytesRead.toString)}  B
+       |    ${keyValueStringWithSeparator("shuffle_total_bytes_read", shuffleTotalBytesRead.toString )} B
+       |    ${keyValueStringWithSeparator("shuffle_records_read", shuffleRecordsRead.toString)}
        |    ${durationStringWithSeparator("shuffle_write_time", shuffleWriteTime)}
-       |    ${keyValueStringWithSeparator("schuffle_bytes_written", shuffleBytesWritten.toString)} B
-       |    ${keyValueStringWithSeparator("schuffle_records_written", shuffleRecordsWritten.toString)}""".stripMargin
+       |    ${keyValueStringWithSeparator("shuffle_bytes_written", shuffleBytesWritten.toString)} B
+       |    ${keyValueStringWithSeparator("shuffle_records_written", shuffleRecordsWritten.toString)}""".stripMargin
+  }
+
+  def getId: String = jobInfo.toString
+  def getOrder: Long = stageId
+  def getMainInfos: Map[String, Any] = {
+    Map("records_written" -> recordsWritten, "bytes_written" -> bytesWritten, "num_tasks" -> numTasks, "stage" -> stageName.split(' ').head )
   }
 }
+private[smartdatalake] case class JobInfo(id: Int, group: String, description: String)
 
 /**
  * Collects spark metrics for spark stages.
  */
-private[smartdatalake] class StageMetricsListener extends SparkListener with SmartDataLakeLogger {
+private[smartdatalake] class SparkStageMetricsListener(notifyStageMetricsFunc: (ActionObjectId, Option[DataObjectId], ActionMetrics) => Unit) extends SparkListener with SmartDataLakeLogger {
 
   /**
    * Stores jobID and jobDescription indexed by stage ids.
    */
-  val jobInfoLookupTable: mutable.Map[Int, (Int, String)] = mutable.Map.empty
-
-  /**
-   * Holds the metrics for all completed stages.
-   */
-  val stageMetricsCollection: mutable.ListBuffer[SparkStageMetrics] = mutable.ListBuffer.empty
+  val jobInfoLookupTable: mutable.Map[Int, JobInfo] = mutable.Map.empty
 
   /**
    * On job start, register the job ids and stage ids.
    */
   override def onJobStart(jobStart: SparkListenerJobStart): Unit = {
     jobStart.stageIds.foreach { stageId =>
-      jobInfoLookupTable(stageId) = (jobStart.jobId, jobStart.properties.getProperty("spark.job.description"))
+      jobInfoLookupTable(stageId) = JobInfo(jobStart.jobId, jobStart.properties.getProperty("spark.jobGroup.id"), jobStart.properties.getProperty("spark.job.description"))
     }
   }
 
   /**
-   * On stage completion store the spark metrics
+   * On stage complete notify spark metrics
    */
   override def onStageCompleted(stageCompleted: SparkListenerStageCompleted): Unit = {
+    // extract useful informations/metrics
     val stageId = stageCompleted.stageInfo.stageId
     val taskMetrics = stageCompleted.stageInfo.taskMetrics
     val shuffleReadMetrics = taskMetrics.shuffleReadMetrics
-    val (jobId, jobDescription) = jobInfoLookupTable(stageId)
-
-    stageMetricsCollection += SparkStageMetrics(jobId, jobDescription, stageId, stageCompleted.stageInfo.name,
+    val jobInfo = jobInfoLookupTable(stageId)
+    val sparkStageMetrics = SparkStageMetrics(jobInfo, stageId, stageCompleted.stageInfo.name, stageCompleted.stageInfo.numTasks,
       stageCompleted.stageInfo.submissionTime.getOrElse(-1L), stageCompleted.stageInfo.completionTime.getOrElse(-1L),
       taskMetrics.executorRunTime, taskMetrics.executorCpuTime, taskMetrics.executorDeserializeTime, taskMetrics.executorDeserializeCpuTime,
       taskMetrics.resultSerializationTime, taskMetrics.resultSize,
@@ -172,5 +179,21 @@ private[smartdatalake] class StageMetricsListener extends SparkListener with Sma
       shuffleReadMetrics.recordsRead,
       taskMetrics.shuffleWriteMetrics.writeTime, taskMetrics.shuffleWriteMetrics.bytesWritten, taskMetrics.shuffleWriteMetrics.recordsWritten
     )
+    // extract concerned Action and DataObject
+    val actionIdRegex = "Action~([a-zA-Z0-9_-]+)".r.unanchored
+    val actionId = sparkStageMetrics.jobInfo.group match {
+      case actionIdRegex(id) => Some(ActionObjectId(id))
+      case _ =>
+        logger.warn(s"Couldn't extract ActionId from sparkJobGroupId (${sparkStageMetrics.jobInfo.group})")
+        None
+    }
+    if (actionId.isDefined) {
+      val dataObjectIdRegex = "DataObject~([a-zA-Z0-9_-]+)".r.unanchored
+      val dataObjectId = sparkStageMetrics.jobInfo.description match {
+        case dataObjectIdRegex(id) => Some(DataObjectId(id))
+        case _ => None // there are some stages which are created by Spark DataFrame operations which dont belong to manipulation Actions target DataObject's, e.g. pivot operator
+      }
+      notifyStageMetricsFunc(actionId.get, dataObjectId, sparkStageMetrics)
+    }
   }
 }

@@ -132,9 +132,9 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
     val hdfs = FileSystem.get(sc.hadoopConfiguration)
     try {
       hdfs.delete(new Path(path), true) // recursive=true
-      logger.info(s"HDFS path ${path} deleted.")
+      logger.info(s"Hadoop path ${path} deleted.")
     } catch {
-      case e: Exception => if (doWarn) logger.warn(s"HDFS path ${path} couldn't be deleted (${e.getMessage})")
+      case e: Exception => if (doWarn) logger.warn(s"Hadoop path ${path} couldn't be deleted (${e.getMessage})")
     }
   }
 

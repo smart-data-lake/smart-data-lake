@@ -42,7 +42,7 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
     UserGroupInformation.loginUserFromKeytab(userAtRealm, keytab)
   }
 
-  def createSparkSession(name:String, masterOpt: String,
+  def createSparkSession(name:String, masterOpt: Option[String] = None,
                          deployModeOpt: Option[String] = None,
                          kryoClassNamesOpt: Option[Seq[String]] = None,
                          sparkOptionsOpt: Option[Map[String,String]] = None,
@@ -51,7 +51,7 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
 
     // create configObject
     val sessionBuilder = SparkSession.builder()
-      .master(masterOpt)
+      .optionalMaster(masterOpt)
       .appName(name)
       .config("hive.exec.dynamic.partition", true) // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
       .config("hive.exec.dynamic.partition.mode", "nonstrict") // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
@@ -114,15 +114,19 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
    * pimpMyLibrary pattern to add SparkSession.Builder utility functions
    */
   private implicit class SparkSessionBuilderUtils( builder: SparkSession.Builder ) {
+    def optionalMaster( value: Option[String] ): SparkSession.Builder = {
+      if (value.isDefined) builder.master(value.get)
+      else builder
+    }
     def optionalConfig( key: String, value: Option[String] ): SparkSession.Builder = {
       if (value.isDefined) {
-        logger.info(s"Additional sparkOption: $key=$value")
+        logger.info(s"Additional sparkOption: ${createMaskedSecretsKVLog(key,value.get)}")
         builder.config(key, value.get)
       } else builder
     }
     def optionalConfigs( options: Option[Map[String,String]] ): SparkSession.Builder = {
       if (options.isDefined) {
-        logger.info("Additional sparkOptions: " + options.get.map{ case (k,v) => s"$k=$v" }.mkString(", "))
+        logger.info("Additional sparkOptions: " + options.get.map{ case (k,v) => createMaskedSecretsKVLog(k,v) }.mkString(", "))
         options.get.foldLeft( builder ){
           case (sb,(key,value)) => sb.config(key,value)
         }
@@ -132,5 +136,19 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
       if (enable) builder.enableHiveSupport()
       else builder
     }
+  }
+
+  /**
+   * Create log message text for key/value, where secrets are masked.
+   * For now only s3 secrets are catched.
+   */
+  def createMaskedSecretsKVLog(key: String, value: String): String = {
+    // regexp for s3 secrets, see https://databricks.com/blog/2017/05/30/entropy-based-log-redaction-apache-spark-databricks.html
+    val s3secretPattern = "(?<![A-Za-z0-9/+])([A-Za-z0-9/+=]|%2F|%2B|%3D|%252F|%252B|%253D){40}(?![A-Za-z0-9/+=])".r
+    val maskedValue = value match {
+      case s3secretPattern(_) => "..."
+      case v => v
+    }
+    s"$key=$maskedValue"
   }
 }

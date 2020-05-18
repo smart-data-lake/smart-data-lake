@@ -19,6 +19,7 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.definitions.ExecutionMode
+import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, CanHandlePartitions, FileRefDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, InitSubFeed, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -94,7 +95,11 @@ abstract class FileSubFeedAction extends Action {
       else output.deleteAll
     }
     // transform
-    val transformedSubFeed = execSubFeed(preparedSubFeed)
+    logger.info( s"($id) start writing files to ${output.id}" + (if (preparedSubFeed.partitionValues.nonEmpty) s", partitionValues ${preparedSubFeed.partitionValues.mkString(" ")}" else ""))
+    val (transformedSubFeed,d) = PerformanceUtils.measureDuration {
+      execSubFeed(preparedSubFeed)
+    }
+    logger.info(s"($id) finished writing files to ${output.id}, took $d")
     // update partition values to output's partition columns and update dataObjectId
     Seq(transformedSubFeed.updatePartitionValues(output.partitions).copy(dataObjectId = output.id))
   }

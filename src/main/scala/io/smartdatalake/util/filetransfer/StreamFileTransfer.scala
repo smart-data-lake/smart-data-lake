@@ -36,7 +36,7 @@ private[smartdatalake] class StreamFileTransfer(override val srcDO: FileRefDataO
   override def exec(fileRefPairs: Seq[(FileRef,FileRef)])(implicit session: SparkSession): Unit = {
     assert(fileRefPairs != null, "fileRefPairs is null - FileTransfer must be initialized first")
     fileRefPairs.foreach { case (srcFileRef, tgtFileRef) =>
-      logger.info(s"Copy ${srcDO.toStringShort}:${srcFileRef.toStringShort} -> ${tgtDO.toStringShort}:${tgtFileRef.toStringShort}")
+      logger.info(s"Copy ${srcDO.id}:${srcFileRef.toStringShort} -> ${tgtDO.id}:${tgtFileRef.toStringShort}")
       // get streams
       TryWithRessource.exec(srcDO.createInputStream(srcFileRef.fullPath)) { is =>
         TryWithRessource.exec( tgtDO.createOutputStream(tgtFileRef.fullPath, overwrite)) { os =>

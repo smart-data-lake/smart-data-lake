@@ -132,7 +132,6 @@ object ActionHelper extends SmartDataLakeLogger {
                       additional: (SparkSubFeed,Option[DataFrame],Seq[String],LocalDateTime) => SparkSubFeed,
                       output: TableDataObject)(implicit session: SparkSession,
                                                context: ActionPipelineContext): SparkSubFeed = {
-    logger.info(s"Starting applyAdditional context=$context")
     val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
     val table = output.table
     val pks = table.primaryKey
@@ -261,7 +260,7 @@ object ActionHelper extends SmartDataLakeLogger {
   def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed)(implicit session: SparkSession): SparkSubFeed = {
     if (subFeed.dataFrame.isEmpty) {
       assert(input.id == subFeed.dataObjectId, s"DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
-      logger.info(s"Getting DataFrame for DataObject ${input.id} filtered by partition values ${subFeed.partitionValues.mkString(", ")}")
+      logger.info(s"getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
       val df = input.getDataFrame(subFeed.partitionValues)
         .colNamesLowercase // convert to lower case by default
       val filteredDf = ActionHelper.filterDataFrame(df, subFeed.partitionValues)
@@ -311,10 +310,13 @@ object ActionHelper extends SmartDataLakeLogger {
                 if (partitionValuesToBeProcessed.isEmpty) throw NoDataToProcessWarning(actionId.id, s"($actionId) No partitions to process found for ${input.id}")
                 // sort and limit number of partitions processed
                 val ordering = PartitionValues.getOrdering(commonPartitions)
-                mode.nbOfPartitionValuesPerRun match {
+                val selectedPartitionValues = mode.nbOfPartitionValuesPerRun match {
                   case Some(n) => partitionValuesToBeProcessed.sorted(ordering).take(n)
                   case None => partitionValuesToBeProcessed.sorted(ordering)
                 }
+                logger.info(s"($actionId) $PartitionDiffMode selected partition values ${selectedPartitionValues.mkString(", ")} to process")
+                //return
+                selectedPartitionValues
               } else throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $output has no partition columns defined!")
             } else throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $input has no partition columns defined!")
           case (_: CanHandlePartitions, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $output does not support partitions!")
