@@ -18,6 +18,8 @@
  */
 package io.smartdatalake.app
 
+import io.smartdatalake.config.ConfigurationException
+
 /**
  * Default Smart Data Lake Command Line Application.
  *
@@ -34,7 +36,7 @@ class DefaultSmartDataLakeBuilder extends SmartDataLakeBuilder {
         val stats = run(config)
         logger.info(s"$appType v$appVersion finished successfully: $stats")
       case None =>
-        logger.error(s"$appType v$appVersion terminated due to an error.")
+        logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
     }
   }
 }
