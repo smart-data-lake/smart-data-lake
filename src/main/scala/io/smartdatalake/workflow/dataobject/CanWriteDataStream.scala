@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.PartitionValues
 import org.apache.spark.sql.streaming.Trigger
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 
 private[smartdatalake] trait CanWriteDataStream extends CanWriteDataFrame {
 
@@ -40,18 +40,15 @@ private[smartdatalake] trait CanWriteDataStream extends CanWriteDataFrame {
 
     require(streamingOptions.contains("checkpointLocation"), s"Checkpoint location must be specified for streaming sources.")
 
+    // lambda function is ambiguous with foreachBatch in scala 2.12... we need to create a real function...
+    def microBatchWriter(df_microbatch: Dataset[Row], batchid: Long): Unit = writeDataFrame(df_microbatch, partitionValues)
+
     df
       .writeStream
       .trigger(trigger)
       .options(streamingOptions)
-      .foreachBatch((df_microbatch, batchid) =>
-        writeDataFrame(df_microbatch, partitionValues)
-      )
+      .foreachBatch(microBatchWriter _)
       .start()
       .awaitTermination()
-
   }
-
-
-
 }
