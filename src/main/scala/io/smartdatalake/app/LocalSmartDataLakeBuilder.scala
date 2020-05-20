@@ -71,7 +71,7 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
       case Some(config) =>
 
         // checking environment variables for local mode
-        require( !EnvironmentUtil.isWindowsOS || System.getenv("HADOOP_HOME")!=null, "Env variable HADOOP_HOME needs to be set in local mode on Windows!" )
+        require( !EnvironmentUtil.isWindowsOS || System.getenv("HADOOP_HOME")!=null, "Env variable HADOOP_HOME needs to be set in local mode in Windows!" )
         require( !config.master.contains("yarn") || System.getenv("SPARK_HOME")!=null, "Env variable SPARK_HOME needs to be set in local mode with master=yarn!" )
 
         // authenticate with kerberos if configured
