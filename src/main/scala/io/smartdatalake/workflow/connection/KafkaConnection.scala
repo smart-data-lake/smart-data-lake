@@ -29,6 +29,14 @@ import org.apache.kafka.clients.consumer.ConsumerConfig
 
 import scala.collection.JavaConverters._
 
+/**
+ * Connection information for kafka
+ *
+ * @param id unique id of this connection
+ * @param brokers comma separated list of kafka bootstrap server incl. port, e.g. "host1:9092,host2:9092:
+ * @param schemaRegistry url of schema registry service, e.g. "https://host2"
+ * @param metadata
+ */
 case class KafkaConnection(override val id: ConnectionId,
                            brokers: String,
                            schemaRegistry: Option[String],

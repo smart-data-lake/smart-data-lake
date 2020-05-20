@@ -56,8 +56,8 @@ import scala.collection.JavaConverters._
   *                   convert to a complex type according to the avro schema. To expand it select "value.*". If no columns are
   *                   given all columns will be selected.
   * @param datePartitionCol partition column name to extract timestamp into on batch read
-  * @param datePartitionTimeFormat time format for timestamp in datePartitionCol, definition according to java DateTimeFormatter.
-  * @param datePartitionTimeUnit time unit for timestamp in datePartitionCol, definition according to java ChronoUnit.
+  * @param datePartitionTimeFormat time format for timestamp in datePartitionCol, definition according to java DateTimeFormatter (e.g. "yyyyMMdd").
+  * @param datePartitionTimeUnit time unit for timestamp in datePartitionCol, definition according to java ChronoUnit (e.g. "days").
   * @param batchReadConsecutivePartitionsAsRanges Set to true if consecutive partitions should be combined as one range of offsets when batch reading from topic. This results in less tasks but can be a performance problem when reading many partitions. (default=false)
   * @param batchReadMaxOffsetsPerTask Set number of offsets per Spark task when batch reading from topic.
   * @param kafkaOptions Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)
