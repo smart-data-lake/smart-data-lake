@@ -52,6 +52,8 @@ case class TestDataObject( id: DataObjectId,
 
   override def isTableExisting(implicit session: SparkSession): Boolean = true
 
+  override def dropTable(implicit session: SparkSession): Unit = throw new NotImplementedError()
+
   override def factory: FromConfigFactory[DataObject] = TestDataObject
 }
 
