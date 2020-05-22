@@ -47,7 +47,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
         |     permission="rwxr-x---"
         |     acls = [
         |       {
-        |         typ="group"
+        |         aclType="group"
         |         name="test"
         |         permission="r-x"
         |       }
@@ -64,7 +64,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
       path = "/path/to/foo",
       partitions = Seq.empty,
       saveMode = SaveMode.Append,
-      acl = Some(AclDef(permission = "rwxr-x---", acls = Seq(AclElement(typ = "group", name = "test", permission = "r-x")))),
+      acl = Some(AclDef(permission = "rwxr-x---", acls = Seq(AclElement(aclType = "group", name = "test", permission = "r-x")))),
       metadata = Some(DataObjectMetadata(name = Some("test"), description = Some("i am a test")))
     )
   }
