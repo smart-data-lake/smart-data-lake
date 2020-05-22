@@ -216,7 +216,6 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
                     hiveDb: String, partitions: Seq[String], saveMode: SaveMode,
                     hdfsOutputType: OutputType = OutputType.Parquet, numInitialHdfsPartitions: Int = -1): Unit = {
     implicit val sss = session
-    val startTime = System.nanoTime
     logger.info(s"writeDfToHive: starting for table $hiveDb.$hiveTable, outputDir: $outputDir, partitions:$partitions")
 
     // check if all partition cols are present in DataFrame
@@ -329,8 +328,6 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       }
     }
     session.conf.set("spark.sql.files.maxRecordsPerFile", originalMaxRecordsPerFile.toLong)
-    val elapsedTime = System.nanoTime - startTime
-    logger.info( s"writeDfToHive: Time measurement $table ${elapsedTime/1000000000L}.${elapsedTime/1000000 % 1000}s" )
   }
 
 
@@ -352,7 +349,6 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
                     hiveDb: String, partitions: Seq[String], saveMode: SaveMode,
                     hdfsOutputType: OutputType = OutputType.Parquet): Unit = {
     implicit val sss = session
-    val startTime = System.nanoTime
     logger.info(s"writeDfToHiveWithTickTock: starting for table $hiveDb.$hiveTable, outputDir: $outputDir, partitions:$partitions")
 
     // check if all partition cols are present in DataFrame
@@ -457,8 +453,6 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       session.sql(s"DROP TABLE IF EXISTS $existingTable")
       session.sql(s"ALTER TABLE $table RENAME TO $existingTable")
     }
-    val elapsedTime = System.nanoTime - startTime
-    logger.info( s"writeDfToHive: Zeitmessung $table ${elapsedTime/1000000000L}.${elapsedTime/1000000 % 1000}s" )
   }
 
   /**

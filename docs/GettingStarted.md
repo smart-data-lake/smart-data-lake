@@ -28,12 +28,6 @@ dataObjects {
   ab-csv-org {
     type = CsvFileDataObject
     path = "AB_NYC_2019.csv"
-    csv-options {
-      delimiter = ","
-      escape = "\\"
-      header = "true"
-      quote = "\""
-    }
   }
   ab-excel {
     type = ExcelFileDataObject

@@ -23,7 +23,8 @@ import java.sql.{DriverManager, ResultSet, Statement, Connection => SqlConnectio
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.util.misc.{CredentialsUtil, SmartDataLakeLogger}
+import io.smartdatalake.definitions.{AuthMode, BasicAuthMode}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 
 /**
  * Connection information for jdbc tables.
@@ -32,24 +33,21 @@ import io.smartdatalake.util.misc.{CredentialsUtil, SmartDataLakeLogger}
  * @param id unique id of this connection
  * @param url jdbc connection url
  * @param driver class name of jdbc driver
- * @param userVariable variable used to get the user
- * @param passwordVariable variable used to get the password
+ * @param authMode optional authentication information: for now BasicAuthMode is supported.
  * @param db jdbc database
  * @param metadata
  */
 case class JdbcTableConnection( override val id: ConnectionId,
                                 url: String,
                                 driver: String,
-                                userVariable: Option[String] = None,
-                                passwordVariable: Option[String] = None,
+                                authMode: Option[AuthMode] = None,
                                 db: Option[String] = None,
                                 override val metadata: Option[ConnectionMetadata] = None
                                ) extends Connection with SmartDataLakeLogger {
 
-  require((userVariable.isEmpty && passwordVariable.isEmpty) || (userVariable.isDefined && passwordVariable.isDefined), s"userVariable and passwordVariable must both be empty or both be defined. Please fix for $toStringShort")
-
-  val user: Option[String] = userVariable.map(CredentialsUtil.getCredentials)
-  val password: Option[String] = passwordVariable.map(CredentialsUtil.getCredentials)
+  // Allow only supported authentication modes
+  private val supportedAuths = Seq(classOf[BasicAuthMode])
+  require(authMode.isEmpty || supportedAuths.contains(authMode.get.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
 
   def execJdbcStatement(sql:String ) : Boolean = {
     var conn: SqlConnection = null
@@ -87,8 +85,17 @@ case class JdbcTableConnection( override val id: ConnectionId,
   }
 
   private def getConnection: SqlConnection = {
-    if (user.isDefined) DriverManager.getConnection(url, user.get, password.get)
-    else DriverManager.getConnection(url)
+    if (authMode.isDefined) authMode.get match {
+      case m: BasicAuthMode => DriverManager.getConnection(url, m.user, m.password)
+      case _ => throw new IllegalArgumentException(s"${authMode.getClass.getSimpleName} not supported.")
+    } else DriverManager.getConnection(url)
+  }
+
+  def getAuthModeSparkOptions: Map[String,String] = {
+    if (authMode.isDefined) authMode.get match {
+      case m: BasicAuthMode => Map( "user" -> m.user, "password" -> m.password )
+      case _ => throw new IllegalArgumentException(s"${authMode.getClass.getSimpleName} not supported.")
+    } else Map()
   }
 
   /**
