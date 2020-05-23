@@ -25,12 +25,13 @@ import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, Parsab
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.dataobject.DataObject
-import io.smartdatalake.workflow.{ActionPipelineContext, DAGNode, SparkSubFeed, SubFeed}
+import io.smartdatalake.workflow._
 import org.apache.spark.sql.SparkSession
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
+import scala.util.Try
 
 /**
  * An action defines a [[DAGNode]], that is, a transformation from input [[DataObject]]s to output [[DataObject]]s in
@@ -99,6 +100,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * e.g. JdbcTableDataObjects preSql
    */
   def preExec(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    setSparkJobMetadata(None) // init spark jobGroupId to identify metrics
     inputs.foreach(_.preRead)
     outputs.foreach(_.preWrite)
   }
@@ -130,11 +132,14 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   /**
    * Sets the util job description for better traceability in the Spark UI
    *
+   * Note: This sets Spark local properties, which are propagated to the respective executor tasks.
+   * We rely on this to match metrics back to Actions and DataObjects.
+   * As writing to a DataObject on the Driver happens uninterrupted in the same exclusive thread, this is suitable.
+   *
    * @param operation operation description (be short...)
-   * @param session util session
    */
-  def setSparkJobDescription(operation: String)(implicit session: SparkSession) : Unit = {
-    session.sparkContext.setJobDescription(s"${this.getClass.getSimpleName}.$id: $operation")
+  def setSparkJobMetadata(operation: Option[String] = None)(implicit session: SparkSession) : Unit = {
+    session.sparkContext.setJobGroup(s"${this.getClass.getSimpleName}.$id", operation.getOrElse("").take(255))
   }
 
   /**
@@ -168,7 +173,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   }
 
   /**
-   * get latest runtime information for this action as string
+   * get latest runtime information for this action
    */
   def getRuntimeInfo: Option[RuntimeInfo] = {
     if (runtimeEvents.nonEmpty) {
@@ -178,6 +183,39 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
       Some(RuntimeInfo(lastEvent.state, startTstmp = startEvent.map(_.tstmp), duration = duration, msg = lastEvent.msg, results = lastEvent.results))
     } else None
   }
+
+  /**
+   * Runtime metrics
+   *
+   * Note: runtime metrics are disabled by default, because they are only collected when running Actions from an ActionDAG.
+   * This is not the case for Tests other use cases. If enabled exceptions are thrown if metrics are not found.
+   */
+  def enableRuntimeMetrics(): Unit = runtimeMetricsEnabled = true
+  def onRuntimeMetrics(dataObjectId: Option[DataObjectId], metrics: ActionMetrics): Unit = {
+    if (dataObjectId.isDefined) {
+      if (outputs.exists(_.id == dataObjectId.get)) {
+        val dataObjectMetrics = dataObjectRuntimeMetricsMap.getOrElseUpdate(dataObjectId.get, mutable.Buffer[ActionMetrics]())
+        dataObjectMetrics.append(metrics)
+        if (dataObjectRuntimeMetricsDelivered.contains(dataObjectId.get)) {
+          logger.error(s"($id) Late arriving metrics for ${dataObjectId.get} detected. Final metrics have already been delivered. Statistics in previous logs might be wrong.")
+        }
+      } else logger.warn(s"($id) Metrics received for ${dataObjectId.get} which doesn't belong to outputs (${metrics}")
+    } else logger.debug(s"($id) Metrics received for unspecified DataObject (${metrics.getId})")
+    if (logger.isDebugEnabled) logger.debug(s"($id) Metrics received:\n" + metrics.getAsText)
+  }
+  def getFinalMetrics(dataObjectId: DataObjectId): Option[ActionMetrics] = {
+    if (!runtimeMetricsEnabled) return None
+    // remember for which data object final metrics has been delivered, so that we can warn on late arriving metrics!
+    dataObjectRuntimeMetricsDelivered.append(dataObjectId)
+    // return latest metrics
+    val metrics = dataObjectRuntimeMetricsMap.get(dataObjectId)
+    val latestMetrics = metrics.flatMap( m => Try(m.maxBy(_.getOrder)).toOption)
+    if (metrics.isEmpty)  throw new IllegalStateException(s"($id) Metrics for $dataObjectId not found")
+    latestMetrics
+  }
+  private var runtimeMetricsEnabled = false
+  private val dataObjectRuntimeMetricsMap = mutable.Map[DataObjectId,mutable.Buffer[ActionMetrics]]()
+  private val dataObjectRuntimeMetricsDelivered = mutable.Buffer[DataObjectId]()
 
   /**
    * This is displayed in ascii graph visualization
@@ -217,7 +255,7 @@ case class ActionMetadata(
 private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: String, state: RuntimeEventState, msg: Option[String], results: Seq[SubFeed])
 private[smartdatalake] object RuntimeEventState extends Enumeration {
   type RuntimeEventState = Value
-  val STARTED, SUCCEEDED, FAILED, SKIPPED, PENDING = Value
+  val STARTED, SUCCEEDED, FAILED, SKIPPED, PENDING, NONE = Value
 }
 private[smartdatalake] case class RuntimeInfo(state: RuntimeEventState, startTstmp: Option[LocalDateTime] = None, duration: Option[Duration] = None, msg: Option[String] = None, results: Seq[SubFeed] = Seq()) {
   override def toString: String = {

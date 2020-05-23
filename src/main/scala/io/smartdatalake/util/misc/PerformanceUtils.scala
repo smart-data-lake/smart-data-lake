@@ -18,6 +18,8 @@
  */
 package io.smartdatalake.util.misc
 
+import java.time.Duration
+
 private[smartdatalake] object PerformanceUtils {
   /**
    * Measures time for some code block in seconds (float)
@@ -31,4 +33,18 @@ private[smartdatalake] object PerformanceUtils {
     val t = (System.currentTimeMillis()-t0).toFloat / 1000
     (result, t)
   }
+
+  /**
+   * Measures duration for some code block
+   * @param code2exec code block to be executed
+   * @tparam T: return type of code block
+   * @return tuple of code block return value and duration
+   */
+  def measureDuration[T](code2exec: => T): (T,Duration) = {
+    val t0 = System.currentTimeMillis()
+    val result = code2exec
+    val d = Duration.ofMillis(System.currentTimeMillis()-t0)
+    (result, d)
+  }
+
 }

@@ -22,7 +22,7 @@ import java.io.InputStreamReader
 
 import com.typesafe.config.{Config, ConfigFactory}
 import io.smartdatalake.util.hdfs.HdfsUtil
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{EnvironmentUtil, SmartDataLakeLogger}
 import org.apache.hadoop.fs.permission.FsAction
 import org.apache.hadoop.fs.{FileSystem, Path}
 
@@ -202,7 +202,7 @@ object ConfigLoader extends SmartDataLakeLogger {
    */
   private def hasPermission(path: Path, action: FsAction)(implicit fs: FileSystem): Boolean = {
     try {
-      if (isWindowsOS) true // Workaround: checking permissions on windows doesn't work with Hadoop (version 2.6)
+      if (EnvironmentUtil.isWindowsOS) true // Workaround: checking permissions on windows doesn't work with Hadoop (version 2.6)
       else {
         fs.access(path, action)
         true
@@ -212,9 +212,5 @@ object ConfigLoader extends SmartDataLakeLogger {
         logger.warn(s"Cannot access $path: ${t.getClass.getSimpleName}: ${t.getMessage}")
         false
     }
-  }
-
-  private def isWindowsOS = {
-    sys.env.get("OS").exists(_.toLowerCase.startsWith("windows"))
   }
 }

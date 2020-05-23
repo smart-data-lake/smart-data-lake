@@ -25,14 +25,16 @@ import com.typesafe.config.Config
 import configs.syntax._
 import io.smartdatalake.config.SdlConfigObject.ActionObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, InstanceRegistry}
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SmartDataLakeLogger}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.{LogUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState
+import io.smartdatalake.workflow.action.RuntimeEventState
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
 import scopt.OptionParser
-
 
 /**
  * This case class represents a default configuration for the App.
@@ -68,7 +70,6 @@ case class SmartDataLakeBuilderConfig(cmd: String = null,
     assert(!applicationName.exists(_.contains("_")), s"Application name must not contain character '_' ($applicationName)")
     cmd match {
       case "start" =>
-        assert(master.nonEmpty, "spark master must be defined in configuration")
         assert(!master.contains("yarn") || deployMode.nonEmpty, "spark deploy-mode must be set if spark master=yarn")
         assert(partitionValues.isEmpty || multiPartitionValues.isEmpty, "partitionValues and multiPartitionValues cannot be defined at the same time")
         assert(statePath.isEmpty || applicationName.isDefined, "application name must be defined if state path is set")
@@ -77,20 +78,6 @@ case class SmartDataLakeBuilderConfig(cmd: String = null,
     }
   }
   def getPartitionValues: Option[Seq[PartitionValues]] = partitionValues.orElse(multiPartitionValues)
-}
-
-case class GlobalConfig( kryoClasses: Option[Seq[String]] = None, sparkOptions: Option[Map[String,String]] = None, enableHive: Boolean = true) {
-  /**
-   * Create a spark session using settings from this global config
-   */
-  def createSparkSession(appName: String, master: String = "local[*]", deployMode: Option[String] = None): SparkSession = {
-    AppUtil.createSparkSession(appName, master, deployMode, kryoClasses, sparkOptions, enableHive)
-  }
-}
-object GlobalConfig {
-  private[smartdatalake] def from(config: Config): GlobalConfig = {
-    config.get[Option[GlobalConfig]]("global").value.getOrElse(GlobalConfig())
-  }
 }
 
 /**
@@ -103,24 +90,13 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   val appType: String = getClass.getSimpleName.replaceAll("\\$$","") // remove $ from object name and use it as appType
 
   /**
-   * Create a new SDL configuration and initialize it with environment variables if they are set.
+   * Create a new SDL configuration.
    *
-   * This method also sets default values if environment variables are not set.
+   * Could be used in the future to set default values.
    *
    * @return a new, initialized [[SmartDataLakeBuilderConfig]].
    */
-  def initConfigFromEnvironment: SmartDataLakeBuilderConfig = {
-    SmartDataLakeBuilderConfig(
-      master = sys.env.get("SDL_SPARK_MASTER_URL").orElse(Some("local[*]")),
-      deployMode = sys.env.get("SDL_SPARK_DEPLOY_MODE").orElse(Some("client")),
-      username = sys.env.get("SDL_KERBEROS_USER"),
-      kerberosDomain = sys.env.get("SDL_KERBEROS_DOMAIN"),
-      keytabPath = sys.env.get("SDL_KEYTAB_PATH").map(new File(_)),
-      configuration = sys.env.get("SDL_CONFIGURATION"),
-      parallelism = sys.env.get("SDL_PARALELLISM").map(_.toInt).getOrElse(1),
-      statePath = sys.env.get("SDL_STATE_PATH")
-    )
-  }
+  def initConfigFromEnvironment: SmartDataLakeBuilderConfig = SmartDataLakeBuilderConfig()
 
   /**
    * The Parser defines how to extract the options from the command line args.
@@ -131,6 +107,25 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     head(appType, appVersion)
 
+    opt[String]('f', "feed-sel")
+      .required
+      .action( (arg, config) => config.copy(feedSel = arg) )
+      .text("Regex pattern to select the feed to execute.")
+    opt[String]('n', "name")
+      .action( (arg, config) => config.copy(applicationName = Some(arg)) )
+      .text("Optional name of the application. If not specified feed-sel is used.")
+    opt[String]('c', "config")
+      .action( (arg, config) => config.copy(configuration = Some(arg)) )
+      .text("One or multiple configuration files or directories containing configuration files, separated by comma.")
+    opt[String]("partition-values")
+      .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseSingleColArg(arg))))
+      .text(s"Partition values to process in format ${PartitionValues.singleColFormat}.")
+    opt[String]("multi-partition-values")
+      .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseMultiColArg(arg))))
+      .text(s"Multi partition values to process in format ${PartitionValues.multiColFormat}.")
+    opt[Int]("parallelism")
+      .action((arg, config) => config.copy(parallelism = arg))
+      .text(s"Parallelism for DAG run.")
     cmd("start")
       .action( (_, config) => config.copy(cmd = "start"))
       .text("Start a SmartDataLakeBuilder run")
@@ -145,12 +140,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         opt[String]('c', "config")
           .action( (arg, config) => config.copy(configuration = Some(arg)) )
           .text("One or multiple configuration files or directories containing configuration files, separated by comma."),
-        opt[String]('m', "master")
-          .action( (arg, config) => config.copy(master = Some(arg)))
-          .text("The Spark master URL passed to SparkContext (default=local[*], yarn, spark://HOST:PORT, mesos://HOST:PORT, k8s://HOST:PORT)."),
-        opt[String]('x', "deploy-mode")
-          .action( (arg, config) => config.copy(deployMode = Some(arg)))
-          .text("The Spark deploy mode passed to SparkContext (default=client, cluster)."),
         opt[String]("partition-values")
           .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseSingleColArg(arg))))
           .text(s"Partition values to process in format ${PartitionValues.singleColFormat}."),
@@ -204,11 +193,14 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    *
    * @param appConfig Application configuration (parsed from command line).
    */
-  def run(appConfig: SmartDataLakeBuilderConfig): Unit = {
+  def run(appConfig: SmartDataLakeBuilderConfig): String = try {
     appConfig.cmd match {
       case "start" => startRun(appConfig)
       case "recover" => recoverRun(appConfig)
     }
+  } finally {
+    // make sure memory logger timer task is stopped
+    MemoryUtils.stopMemoryLogger()
   }
 
   /**
@@ -249,8 +241,10 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // init config
     logger.info(s"Feed selector: ${appConfig.feedSel}")
     logger.info(s"Application: ${appConfig.applicationName}")
-    logger.info(s"Master: ${appConfig.master}")
-    logger.info(s"Deploy-Mode: ${appConfig.deployMode}")
+    logger.info(s"Master: ${appConfig.master.getOrElse(sys.props.get("spark.master"))}")
+    logger.info(s"Deploy-Mode: ${appConfig.deployMode.getOrElse(sys.props.get("spark.submit.deployMode"))}")
+    logger.debug(s"Environment: " + sys.env.map(x => x._1 + "=" + x._2).mkString(" "))
+    logger.debug(s"System properties: " + sys.props.toMap.map(x => x._1 + "=" + x._2).mkString(" "))
     val appName = appConfig.applicationName.getOrElse(appConfig.feedSel)
 
     // load config
@@ -264,22 +258,22 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     // parse config objects and search actions to execute by feedSel
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
-    val actions = registry.getActions.filter(_.metadata.flatMap(_.feed).exists( _.matches(appConfig.feedSel)))
+    val actions = registry.getActions.filter(_.metadata.flatMap(_.feed).exists(_.matches(appConfig.feedSel)))
     require(actions.nonEmpty, s"No action matched the given feed selector: ${appConfig.feedSel}. At least one action needs to be selected.")
     logger.info(s"selected actions ${actions.map(_.id).mkString(", ")}")
 
     // create Spark Session
-    implicit val session: SparkSession = globalConfig.createSparkSession(appName, appConfig.master.get, appConfig.deployMode)
+    implicit val session: SparkSession = globalConfig.createSparkSession(appName, appConfig.master, appConfig.deployMode)
     LogUtil.setLogLevel(session.sparkContext)
 
     // get latest runId
-    val stateStore = stateStoreIn.orElse( appConfig.statePath.map( p => ActionDAGRunStateStore(p, appName)))
+    val stateStore = stateStoreIn.orElse(appConfig.statePath.map(p => ActionDAGRunStateStore(p, appName)))
     val runId = runIdIn.orElse(stateStore.flatMap(_.getLatestRunId)).getOrElse(1)
     val attemptId = attemptIdIn.getOrElse(1)
 
     // create and execute actions
     implicit val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appName, registry, referenceTimestamp = Some(LocalDateTime.now), appConfig)
-    val actionDAGRun = ActionDAGRun(actions, runId, attemptId, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, stateStore )
+    val actionDAGRun = ActionDAGRun(actions, runId, attemptId, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, stateStore)
     try {
       actionDAGRun.prepare
       actionDAGRun.init
@@ -288,5 +282,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       // dont fail an not severe exceptions like having no data to process
       case ex: DAGException if (ex.severity == ExceptionSeverity.SKIPPED) => logger.warn(s"dag run is skipped because of ${ex.getClass.getSimpleName}: ${ex.getMessage}")
     }
+
+    // return result statistics as string
+    actionDAGRun.getStatistics.map(x => x._1.getOrElse(RuntimeEventState.NONE) + "=" + x._2).mkString(" ")
   }
 }

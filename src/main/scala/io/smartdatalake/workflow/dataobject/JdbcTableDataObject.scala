@@ -25,7 +25,7 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils, DfSDL}
+import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.connection.JdbcTableConnection
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
@@ -82,8 +82,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
           "driver" -> connection.driver,
           "dbtable" -> jdbcString,
           "fetchSize" -> jdbcFetchSize.toString))
-      .optionalOption("user", connection.user)
-      .optionalOption("password", connection.password)
+      .options(connection.getAuthModeSparkOptions)
       .load()
     validateSchemaMin(df)
     df.colNamesLowercase
@@ -146,8 +145,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     )
     df.write.mode(SaveMode.Append).format("jdbc")
       .options(opts)
-      .optionalOption("user", connection.user)
-      .optionalOption("password", connection.password)
+      .options(connection.getAuthModeSparkOptions)
       .save
   }
 
