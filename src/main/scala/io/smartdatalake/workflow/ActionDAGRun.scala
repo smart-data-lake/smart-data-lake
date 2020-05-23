@@ -18,27 +18,19 @@
  */
 package io.smartdatalake.workflow
 
-import java.time.{LocalDateTime, Duration => JavaDuration}
-
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.DAGHelper._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{Action, RuntimeEventState, RuntimeInfo}
-import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
-import io.smartdatalake.workflow.action.{Action, RuntimeEventState, SparkSubFeedAction}
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
-import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.io.Codec
 
 private[smartdatalake] case class ActionDAGEdge(override val nodeIdFrom: NodeId, override val nodeIdTo: NodeId, override val resultId: String) extends DAGEdge
 
@@ -50,19 +42,19 @@ private[smartdatalake] case class DummyDAGResult(override val resultId: String) 
 
 private[smartdatalake] class ActionEventListener(operation: String) extends DAGEventListener[Action] with SmartDataLakeLogger {
   override def onNodeStart(node: Action): Unit = {
-    node.addRuntimeEvent(operation, RuntimeEventState.STARTED, "-")
+    node.addRuntimeEvent(operation, RuntimeEventState.STARTED)
     logger.info(s"(${node.id}): $operation started")
   }
-  override def onNodeSuccess(node: Action): Unit = {
-    node.addRuntimeEvent(operation, RuntimeEventState.SUCCEEDED, "-")
+  override def onNodeSuccess(results: Seq[DAGResult])(node: Action): Unit = {
+    node.addRuntimeEvent(operation, RuntimeEventState.SUCCEEDED)
     logger.info(s"(${node.id}): $operation: succeeded")
   }
   override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
-    node.addRuntimeEvent(operation, RuntimeEventState.FAILED, s"${exception.getClass.getSimpleName}: ${exception.getMessage}")
+    node.addRuntimeEvent(operation, RuntimeEventState.FAILED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
     logger.error(s"(${node.id}): $operation failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
   }
   override def onNodeSkipped(exception: Throwable)(node: Action): Unit = {
-    node.addRuntimeEvent(operation, RuntimeEventState.SKIPPED, s"${exception.getClass.getSimpleName}: ${exception.getMessage}")
+    node.addRuntimeEvent(operation, RuntimeEventState.SKIPPED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
     logger.warn(s"(${node.id}): $operation: skipped because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
   }
 }
@@ -74,7 +66,7 @@ private[smartdatalake] trait ActionMetrics {
   def getAsText: String
 }
 
-private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, partitionValues: Seq[PartitionValues], parallelism: Int) extends SmartDataLakeLogger {
+private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, attemptId: Int, partitionValues: Seq[PartitionValues], parallelism: Int, stateStore: Option[ActionDAGRunStateStore]) extends SmartDataLakeLogger {
 
   private def createScheduler(parallelism: Int = 1) = Scheduler.fixedPool(s"dag-$runId", parallelism)
 
@@ -196,107 +188,14 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
   /**
    * Get Action count per RuntimeEventState
    */
-  def getStatistics: Seq[(Option[RuntimeEventState],Int)] = {
-    dag.sortedNodes.collect { case n: Action => n }.map(_.getRuntimeState._1)
-      .groupBy(identity).mapValues(_.size).toSeq.sortBy(_._1.getOrElse(RuntimeEventState.NONE))
+  def getStatistics: Seq[(RuntimeEventState,Int)] = {
+    getRuntimeInfos.map(_._2.state).groupBy(identity).mapValues(_.size).toSeq.sortBy(_._1)
   }
 
   def notifyActionMetric(actionId: ActionObjectId, dataObjectId: Option[DataObjectId], metrics: ActionMetrics): Unit = {
-    val action = dag.sortedNodes.collect{ case a:Action => a }
+    val action = dag.getNodes
       .find(_.nodeId == actionId.id).getOrElse(throw new IllegalStateException(s"Unknown action $actionId"))
     action.onRuntimeMetrics(dataObjectId, metrics)
-  }
-}
-
-/**
- * ActionDAGRunState contains all configuration and state of an ActionDAGRun needed to start a recovery run in case of failure.
- */
-case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, actionsState: Map[String, RuntimeInfo] ) {
-  def toJson: String = ActionDAGRunState.toJson(this)
-}
-object ActionDAGRunState {
-  // json4s is used because kxbmap configs supports converting case classes to config only from verion 5.0 which isn't yet stable
-  // json4s is included with spark-core
-  // Note that key-type of Maps must be String in json4s (e.g. actionsState...)
-  import org.json4s._
-  import org.json4s.jackson.JsonMethods._
-  import org.json4s.jackson.Serialization
-  def toJson(actionDAGRunState: ActionDAGRunState): String = {
-    implicit val formats: Formats = Serialization.formats(NoTypeHints) + RuntimeEventStateSerializer + DurationSerializer + LocalDateTimeSerializer
-    pretty(parse(Serialization.write(actionDAGRunState)))
-  }
-  def fromJson(stateJson: String): ActionDAGRunState = {
-    implicit val formats: Formats = DefaultFormats + RuntimeEventStateSerializer + DurationSerializer + LocalDateTimeSerializer
-    parse(stateJson).extract[ActionDAGRunState]
-  }
-  // custom serialization for RuntimeEventState which is shorter than the default
-  case object RuntimeEventStateSerializer extends CustomSerializer[RuntimeEventState](format => (
-    { case JString(state) => RuntimeEventState.withName(state) },
-    { case state: RuntimeEventState => JString(state.toString) }
-  ))
-  // custom serialization for Duration
-  case object DurationSerializer extends CustomSerializer[JavaDuration](format => (
-    { case JString(dur) => JavaDuration.parse(dur) },
-    { case dur: JavaDuration => JString(dur.toString) }
-  ))
-  // custom serialization for LocalDateTime
-  case object LocalDateTimeSerializer extends CustomSerializer[LocalDateTime](format => (
-    { case JString(tstmp) => LocalDateTime.parse(tstmp) },
-    { case tstmp: LocalDateTime => JString(tstmp.toString) }
-  ))
-}
-
-case class ActionDAGRunStateStore(statePath: String, appName: String) extends SmartDataLakeLogger {
-
-  private val hadoopStatePath = HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(statePath))
-  implicit private val filesystem: FileSystem = HdfsUtil.getHadoopFs(hadoopStatePath)
-  if (!filesystem.exists(hadoopStatePath)) filesystem.mkdirs(hadoopStatePath)
-
-  def saveState(state: ActionDAGRunState): Unit = synchronized {
-    val json = state.toJson
-    val file = new Path(hadoopStatePath, s"${appName}_${state.runId}_${state.attemptId}.json")
-    val os = filesystem.create(file, true) // overwrite if exists
-    os.write(json.getBytes("UTF-8"))
-    os.close()
-    logger.info(s"updated state into ${file.toUri}")
-  }
-
-  def getLatestState(runId: Option[Int] = None): (Path,Int,Int) = {
-    val stateFiles = getFiles
-    val latestStateFile = stateFiles
-      .filter(x => runId.isEmpty || runId.contains(x._3))
-      .sortBy(x => (x._2, x._3)).lastOption
-    require(latestStateFile.nonEmpty, s"No state file for application $appName and runId ${runId.getOrElse("latest")} found.")
-    latestStateFile.get
-  }
-
-  def getLatestRunId: Option[Int] = {
-    val stateFiles = getFiles
-    val latestStateFile = stateFiles
-      .sortBy(x => (x._2, x._3)).lastOption
-    latestStateFile.map(_._2)
-  }
-
-  private def getFiles: Seq[(Path,Int,Int)] = {
-    val filenameMatcher = "([^_]+)_([0-9]+)_([0-9]+).json".r
-    filesystem.listStatus(hadoopStatePath)
-      .filter( x => x.isFile && x.getPath.getName.startsWith(appName))
-      .flatMap( x => x.getPath.getName match {
-        case filenameMatcher(appName, runId, attemptId) => Some((x.getPath, appName, runId.toInt, attemptId.toInt))
-        case _ => None
-      })
-      .filter(x => x._2==appName)
-      .map(x => (x._1, x._3, x._4))
-  }
-
-  /**
-   * recover previous run state
-   */
-  def recoverRunState(stateFile: Path): ActionDAGRunState = {
-    require(filesystem.isFile(stateFile), s"Cannot recover previous run state. ${stateFile.toUri} doesn't exists or is not a file.")
-    val is = filesystem.open(stateFile)
-    val json = scala.io.Source.fromInputStream(is)(Codec.UTF8).mkString
-    ActionDAGRunState.fromJson(json)
   }
 }
 

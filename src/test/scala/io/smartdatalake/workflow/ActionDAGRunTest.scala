@@ -22,18 +22,28 @@ package io.smartdatalake.workflow
 import java.time.{Duration, LocalDateTime}
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
+import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.{RuntimeEventState, RuntimeInfo}
+import org.apache.spark.sql.SparkSession
 import org.scalatest.FunSuite
 
 class ActionDAGRunTest extends FunSuite {
 
+  protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+  import session.implicits._
+
   test("convert ActionDAGRunState to json and back") {
-    val infoA = RuntimeInfo(RuntimeEventState.SUCCEEDED, startTstmp = Some(LocalDateTime.now()), duration = Some(Duration.ofMinutes(5)), msg = Some("test"), results = Seq(SparkSubFeed(None, "do1", partitionValues = Seq(PartitionValues(Map("test"->1))))))
+    val df = Seq(("a",1)).toDF("txt", "value")
+    val infoA = RuntimeInfo(RuntimeEventState.SUCCEEDED, startTstmp = Some(LocalDateTime.now()), duration = Some(Duration.ofMinutes(5)), msg = Some("test"), results = Seq(SparkSubFeed(Some(df), "do1", partitionValues = Seq(PartitionValues(Map("test"->1))))))
     val state = ActionDAGRunState(SmartDataLakeBuilderConfig(), 1, 1, Map("a" -> infoA))
     val json = state.toJson
-    val deserialized = ActionDAGRunState.fromJson(json)
-    assert(deserialized == state)
+    // dataFrame should not be serialized
+    val expectedState = state.copy(actionsState = state.actionsState.mapValues(actionState => actionState.copy(results = actionState.results.map{
+      case result: SparkSubFeed => result.copy(dataFrame = None)
+    })))
+    val deserializedState = ActionDAGRunState.fromJson(json)
+    assert(deserializedState == expectedState)
   }
 
 }

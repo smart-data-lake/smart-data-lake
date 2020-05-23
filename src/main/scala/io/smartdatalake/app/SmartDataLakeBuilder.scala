@@ -208,19 +208,21 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    *
    * @param appConfig: this app config only contains informations about the run to recover. It is used to search for the failed run and get's replaced with the appConfig of that run to call startRun.
    */
-  def recoverRun(appConfig: SmartDataLakeBuilderConfig) = {
+  private def recoverRun(appConfig: SmartDataLakeBuilderConfig): String = {
     assert(appConfig.applicationName.nonEmpty, "Application name must be defined for recovery")
     val appName = appConfig.applicationName.get
 
     // search latest state file
     assert(appConfig.statePath.nonEmpty, "State path must be defined for recovery")
     val stateStore = ActionDAGRunStateStore(appConfig.statePath.get, appName)
-    val (file, runId, attemptId) = stateStore.getLatestState(appConfig.runId)
-    val runState = stateStore.recoverRunState(file)
+    val stateFile = stateStore.getLatestState(appConfig.runId)
+    val runState = stateStore.recoverRunState(stateFile.path)
+    // skip all succeeded actions
     val actionsToSkip = runState.actionsState
       .filter { case (id,info) => info.state==RuntimeEventState.SUCCEEDED }
       .map { case (id,info) => ActionObjectId(id) }.toSeq
-    startRun(runState.appConfig, Some(runId), Some(attemptId+1), actionsToSkip, Some(stateStore)) // increase attemptId
+    // start run, increase attempt counter
+    startRun(runState.appConfig, Some(stateFile.runId), Some(stateFile.attemptId+1), actionsToSkip, Some(stateStore))
   }
 
   /**
@@ -233,7 +235,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * @param stateStoreIn
    * @return
    */
-  def startRun(appConfig: SmartDataLakeBuilderConfig, runIdIn: Option[Int] = None, attemptIdIn: Option[Int] = None, actionsToSkip: Seq[ActionObjectId] = Seq(), stateStoreIn: Option[ActionDAGRunStateStore] = None) = {
+  private def startRun(appConfig: SmartDataLakeBuilderConfig, runIdIn: Option[Int] = None, attemptIdIn: Option[Int] = None, actionsToSkip: Seq[ActionObjectId] = Seq(), stateStoreIn: Option[ActionDAGRunStateStore] = None): String = {
 
     // validate application config
     appConfig.validate()
@@ -284,6 +286,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     }
 
     // return result statistics as string
-    actionDAGRun.getStatistics.map(x => x._1.getOrElse(RuntimeEventState.NONE) + "=" + x._2).mkString(" ")
+    actionDAGRun.getStatistics.map(x => x._1 + "=" + x._2).mkString(" ")
   }
 }

@@ -255,7 +255,7 @@ case class ActionMetadata(
 private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: String, state: RuntimeEventState, msg: Option[String], results: Seq[SubFeed])
 private[smartdatalake] object RuntimeEventState extends Enumeration {
   type RuntimeEventState = Value
-  val STARTED, SUCCEEDED, FAILED, SKIPPED, PENDING, NONE = Value
+  val STARTED, SUCCEEDED, FAILED, SKIPPED, PENDING = Value
 }
 private[smartdatalake] case class RuntimeInfo(state: RuntimeEventState, startTstmp: Option[LocalDateTime] = None, duration: Option[Duration] = None, msg: Option[String] = None, results: Seq[SubFeed] = Seq()) {
   override def toString: String = {
