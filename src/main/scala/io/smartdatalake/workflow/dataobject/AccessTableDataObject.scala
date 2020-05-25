@@ -117,6 +117,8 @@ case class AccessTableDataObject(override val id: DataObjectId,
     tableExisting
   }
 
+  override def dropTable(implicit session: SparkSession): Unit = throw new NotImplementedError
+
   /**
    * @inheritdoc
    */

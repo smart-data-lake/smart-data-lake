@@ -161,11 +161,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     files.nonEmpty
   }
 
-  /**
-   * @inheritdoc
-   */
-  override def factory: FromConfigFactory[DataObject] = TickTockHiveTableDataObject
-
   protected val separator: Char = Environment.defaultPathSeparator
 
   /**
@@ -197,6 +192,13 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
           .toSeq
     }.getOrElse(Seq())
   }
+
+  override def dropTable(implicit session: SparkSession): Unit = throw new NotImplementedError()
+
+  /**
+   * @inheritdoc
+   */
+  override def factory: FromConfigFactory[DataObject] = TickTockHiveTableDataObject
 
 }
 
