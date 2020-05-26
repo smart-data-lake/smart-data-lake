@@ -267,7 +267,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
         val topicPartitionsStart = getTopicPartitionsAtTstmp(topicPartitions, startTimeIncl)
           .map{ case (topicPartition, start) => (topicPartition, Option(start).map(_.timestamp))}
         val minStartTime = topicPartitionsStart.flatMap(_._2).sorted.headOption
-        val isEmpty = minStartTime.exists(_ >= endTimeExcl.toInstant(ZoneOffset.UTC).toEpochMilli)
+        val isEmpty = minStartTime.isEmpty || minStartTime.exists(_ >= endTimeExcl.toInstant(ZoneOffset.UTC).toEpochMilli)
         (startTimeIncl, isEmpty, minStartTime)
     }.takeWhile {
       case (startTimeIncl, isEmpty, minStartTime) =>
