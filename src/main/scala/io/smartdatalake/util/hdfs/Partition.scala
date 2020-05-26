@@ -42,6 +42,9 @@ private[smartdatalake] case class PartitionValues(elements: Map[String, Any]) {
     // "and" filter concatenation of each element
     elements.map {case (k,v) => col(k) === lit(v)}.reduce( (a,b) => a and b)
   }
+  override def toString: String = {
+    elements.map {case (k,v) => s"$k=$v"}.mkString("/")
+  }
   def apply(colName: String): Any = elements(colName)
   def get(colName: String): Option[Any] = elements.get(colName)
   def isEmpty: Boolean = elements.isEmpty

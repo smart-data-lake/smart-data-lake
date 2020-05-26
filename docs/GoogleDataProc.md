@@ -15,37 +15,18 @@ The following steps will show you how to set everything up and start a first dat
  
     For a simple test that loads from your Google Storage bucket and writes back to it, you can use the following sample application.conf:
     ```hocon
-    connections {
-    }
-    
     dataObjects {
-     
       ab-csv-google {
         type = CsvFileDataObject
         path = "gs://yourbucketname/AB_NYC_2019.csv"
-        csv-options {
-          delimiter = ","
-          escape = "\\"
-          header = "true"
-          quote = "\""
-        }
       }
-    
       ab-reduced-csv-google {
         type = CsvFileDataObject
         path = "gs://yourbucketname/~{id}/nyc_reduced.csv"
-        csv-options = {
-          delimiter = ","
-          escape = "\\"
-          header = "true"
-          quote = "\""
-        }
       }
-    
     }
     
-    actions {
-    
+    actions { 
       loadGoogle2Google {
         type = CopyAction
         inputId = ab-csv-google
@@ -54,7 +35,6 @@ The following steps will show you how to set everything up and start a first dat
           feed = ab-google
         }
       }
-    
     }
     ```        
     Make sure to replace `yourbucketname` in the data objects ab-csv-google and ab-reduced-csv-google with your real bucket name. 

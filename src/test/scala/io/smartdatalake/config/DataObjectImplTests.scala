@@ -23,7 +23,7 @@ import java.time.{Duration, LocalDateTime}
 
 import com.typesafe.config.{ConfigException, ConfigFactory}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.DateColumnType
+import io.smartdatalake.definitions.{DateColumnType, BasicAuthMode}
 import io.smartdatalake.util.misc.{AclDef, AclElement}
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.connection.{JdbcTableConnection, SplunkConnection}
@@ -47,7 +47,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
         |     permission="rwxr-x---"
         |     acls = [
         |       {
-        |         typ="group"
+        |         aclType="group"
         |         name="test"
         |         permission="r-x"
         |       }
@@ -64,7 +64,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
       path = "/path/to/foo",
       partitions = Seq.empty,
       saveMode = SaveMode.Append,
-      acl = Some(AclDef(permission = "rwxr-x---", acls = Seq(AclElement(typ = "group", name = "test", permission = "r-x")))),
+      acl = Some(AclDef(permission = "rwxr-x---", acls = Seq(AclElement(aclType = "group", name = "test", permission = "r-x")))),
       metadata = Some(DataObjectMetadata(name = Some("test"), description = Some("i am a test")))
     )
   }
@@ -301,10 +301,14 @@ class DataObjectImplTests extends FlatSpec with Matchers {
         |   type = SplunkConnection
         |   host = test.host
         |   port = 8080
-        |   userVariable = "CLEAR#testuser"
-            passwordVariable = "CLEAR#secret"
+        |   auth-mode = {
+        |        type = BasicAuthMode
+        |        user-variable = "CLEAR#testuser"
+        |        password-variable = "CLEAR#secret"
+        |    }
         | }
         |}
+        |
         |dataObjects = {
         | 123 = {
         |   type = SplunkDataObject
@@ -322,7 +326,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
         |""".stripMargin).resolve
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     val registry2 = new InstanceRegistry()
-    registry2.register(SplunkConnection("con123","test.host", 8080, "CLEAR#testuser", "CLEAR#secret"))
+    registry2.register(SplunkConnection("con123","test.host", 8080, BasicAuthMode("CLEAR#testuser", "CLEAR#secret")))
     registry.getDataObjects.head shouldBe SplunkDataObject(
       id = "123",
       connectionId = "con123",

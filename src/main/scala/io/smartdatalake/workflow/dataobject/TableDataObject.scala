@@ -33,6 +33,8 @@ private[smartdatalake] trait TableDataObject extends DataObject with CanCreateDa
 
   def isTableExisting(implicit session: SparkSession): Boolean
 
+  def dropTable(implicit session: SparkSession): Unit
+
   def getPKduplicates(implicit session: SparkSession): DataFrame = if (table.primaryKey.isEmpty) {
     getDataFrame().where(lit(false))
   } else {

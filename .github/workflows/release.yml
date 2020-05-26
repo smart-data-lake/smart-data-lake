@@ -18,6 +18,7 @@ jobs:
       with:
         fetch-depth: 0
         ref: master
+        persist-credentials: false
     - name: JDK 8 Set
       uses: actions/setup-java@v1.3.0
       with: 
@@ -41,15 +42,22 @@ jobs:
     #    echo "MVN_RELEASE_VERSION=${MVN_RELEASE_VERSION}
     #    printenv
     - name: Maven Set Release Version
-      run: mvn versions:set -DnewVersion=${MVN_RELEASE_VERSION}
+      run: sed -i "/${MVN_CURRENT_VERSION}/{s//${MVN_RELEASE_VERSION}/;:p;n;bp}" pom.xml
       
-    - name: Maven Deploy to Bintray
+    - name: Maven Deploy to Bintray for Scala 2.11
       env:
         BINTRAY_API_KEY: ${{ secrets.BINTRAY_API_KEY }}
       run: |
         mkdir -p ~/.m2
         echo "<settings><servers><server><id>bintray-smart-data-lake-smart-data-lake</id><username>smartdatalake</username><password>${BINTRAY_API_KEY}</password></server></servers></settings>" > ~/.m2/settings.xml
-        mvn clean deploy -f pom.xml
+        mvn clean scala:doc-jar deploy -f pom.xml
+    - name: Maven Deploy to Bintray for Scala 2.12
+      env:
+        BINTRAY_API_KEY: ${{ secrets.BINTRAY_API_KEY }}
+      run: |
+        mkdir -p ~/.m2
+        echo "<settings><servers><server><id>bintray-smart-data-lake-smart-data-lake</id><username>smartdatalake</username><password>${BINTRAY_API_KEY}</password></server></servers></settings>" > ~/.m2/settings.xml
+        mvn -P scala-2.12 clean scala:doc-jar deploy -f pom.xml
         
     - name: Git Commit and Tag Release
       run: |
@@ -66,7 +74,7 @@ jobs:
     - name: Git Push Master
       uses: ad-m/github-push-action@master
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ secrets.PAT_ACTIONS }}
         
                   
     # DEVELOP BRANCH
@@ -75,6 +83,7 @@ jobs:
       with:
         ref: develop
         fetch-depth: 0
+        persist-credentials: false
     - name: Git Merge to develop
       run: |
         git config --local user.email "action@github.com"
@@ -90,7 +99,7 @@ jobs:
       uses: ad-m/github-push-action@master
       with:
         branch: develop
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ secrets.PAT_ACTIONS }}
     
     - name: Develop Get Next Version
       id: bump_version
@@ -99,7 +108,7 @@ jobs:
         current-version: ${{ env.MVN_RELEASE_VERSION }}
         version-fragment: bug
     - name: Develop Set Next Snapshot version
-      run: mvn versions:set -DnewVersion=${{ steps.bump_version.outputs.next-version }}-SNAPSHOT
+      run: sed -i "/${MVN_RELEASE_VERSION}/{s//${{ steps.bump_version.outputs.next-version }}-SNAPSHOT/;:p;n;bp}" pom.xml
     - name: Develop Git Commit Snapshot
       run: |
         git config --local user.email "action@github.com"
@@ -109,4 +118,4 @@ jobs:
       uses: ad-m/github-push-action@master
       with:
         branch: develop
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ secrets.PAT_ACTIONS }}

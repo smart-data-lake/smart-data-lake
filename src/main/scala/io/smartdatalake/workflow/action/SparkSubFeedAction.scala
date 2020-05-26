@@ -18,8 +18,8 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.ExecutionMode
+import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, CanWriteDataStream,DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
@@ -79,18 +79,22 @@ abstract class SparkSubFeedAction extends Action {
     // transform
     val transformedSubFeed = doTransform(subFeed)
     // write output
-    logger.info(s"writing to DataObject ${output.id}, partitionValues ${subFeed.partitionValues}")
-    setSparkJobDescription( s"writing to DataObject ${output.id}" )
-
-    // Write from a streaming input
-    if(transformedSubFeed.dataFrame.get.isStreaming){
-      assert(output.isInstanceOf[CanWriteDataStream], s"Output type ${output.getClass.getSimpleName} does not support streaming inputs")
-      output.asInstanceOf[CanWriteDataStream].writeDataStream(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
-    // Write from a batch input
-    } else {
-      output.writeDataFrame(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
+    val msg = s"writing to ${output.id}" + (if (transformedSubFeed.partitionValues.nonEmpty) s", partitionValues ${transformedSubFeed.partitionValues.mkString(" ")}" else "")
+    logger.info(s"($id) start " + msg)
+    setSparkJobMetadata(Some(msg))
+    val (_,d) = PerformanceUtils.measureDuration {
+      // Write from a streaming input
+      if(transformedSubFeed.dataFrame.get.isStreaming){
+        assert(output.isInstanceOf[CanWriteDataStream], s"Output type ${output.getClass.getSimpleName} does not support streaming inputs")
+        output.asInstanceOf[CanWriteDataStream].writeDataStream(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
+        // Write from a batch input
+      } else {
+        output.writeDataFrame(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
+      }
     }
-
+    setSparkJobMetadata()
+    val finalMetricsInfos = getFinalMetrics(output.id).map(_.getMainInfos)
+    logger.info(s"($id) finished writing DataFrame to ${output.id}: duration=$d" + finalMetricsInfos.map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse(""))
     // return
     Seq(transformedSubFeed)
   }

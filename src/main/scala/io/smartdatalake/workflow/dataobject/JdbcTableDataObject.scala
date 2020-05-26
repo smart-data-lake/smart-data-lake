@@ -25,7 +25,7 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils, DfSDL}
+import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.connection.JdbcTableConnection
 import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.types.StructType
@@ -42,6 +42,8 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
  * @param table The jdbc table to be read
  * @param jdbcFetchSize Number of rows to be fetched together by the Jdbc driver
  * @param connectionId Id of JdbcConnection configuration
+ * @param jdbcOptions Any jdbc options according to [[https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html]].
+ *                    Note that some options above set and override some of this options explicitly.
  */
 case class JdbcTableDataObject(override val id: DataObjectId,
                                createSql: Option[String] = None,
@@ -51,6 +53,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                override var table: Table,
                                jdbcFetchSize: Int = 1000,
                                connectionId: ConnectionId,
+                               jdbcOptions: Map[String, String] = Map(),
                                streamingOptions: Map[String, String] = Map(),
                                trigger: Trigger = Trigger.Once,
                                override val metadata: Option[DataObjectMetadata] = None
@@ -77,16 +80,15 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
-    val jdbcString: String = table.query.getOrElse(table.fullName)
-    logger.info(s"($id) JDBC dbtable parameter: $jdbcString")
+    val queryOrTable = Map(table.query.map(q => ("query",q)).getOrElse(("dbtable"->table.fullName)))
     val df = session.read.format("jdbc")
+      .options(jdbcOptions)
       .options(
         Map("url" -> connection.url,
           "driver" -> connection.driver,
-          "dbtable" -> jdbcString,
           "fetchSize" -> jdbcFetchSize.toString))
-      .optionalOption("user", connection.user)
-      .optionalOption("password", connection.password)
+      .options(connection.getAuthModeSparkOptions)
+      .options(queryOrTable)
       .load()
     validateSchemaMin(df)
     df.colNamesLowercase
@@ -101,9 +103,19 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+    require(table.query.isEmpty, s"($id) Cannot write to jdbc DataObject defined by a query.")
     validateSchemaMin(df)
     // write table
-    writeJdbcDF(table, df)
+    // No need to define any partitions as parallelization will be defined according to the data frame's partitions
+    df.write.mode(SaveMode.Append).format("jdbc")
+      .options(jdbcOptions)
+      .options(Map(
+        "url" -> connection.url,
+        "driver" -> connection.driver,
+        "dbtable" -> s"${table.fullName}"
+      ))
+      .options(connection.getAuthModeSparkOptions)
+      .save
   }
 
    override def postWrite(implicit session: SparkSession): Unit = {
@@ -143,24 +155,15 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
   }
 
-  def writeJdbcDF(table:Table, df:DataFrame)(implicit ss: SparkSession): Unit = {
-    // No need to define any partitions as parallelization will be defined according to the data frame's partitions
-    val opts = Map(
-      "url" -> connection.url,
-      "driver" -> connection.driver,
-      "dbtable" -> s"${table.fullName}"
-    )
-    df.write.mode(SaveMode.Append).format("jdbc")
-      .options(opts)
-      .optionalOption("user", connection.user)
-      .optionalOption("password", connection.password)
-      .save
+  override def dropTable(implicit session: SparkSession): Unit = {
+    connection.execJdbcStatement(s"drop table if exists ${table.fullName}")
   }
 
   /**
    * @inheritdoc
    */
   override def factory: FromConfigFactory[DataObject] = JdbcTableDataObject
+
 }
 
 object JdbcTableDataObject extends FromConfigFactory[DataObject] {

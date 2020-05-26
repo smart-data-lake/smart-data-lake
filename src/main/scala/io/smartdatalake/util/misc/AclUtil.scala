@@ -32,19 +32,19 @@ import scala.collection.JavaConverters._
  *   permission="rwxr-x---"
  *   acls [
  *     {
- *       type="group"
- *       name="T_datalake_application"
+ *       aclType="group"
+ *       name="t_datalake_application"
  *       permission="r-x"
  *     }
  * ...
  */
 private[smartdatalake] case class AclDef (permission: String, acls: Seq[AclElement])
-private[smartdatalake] case class AclElement (typ:String, name:String, permission: String) {
+private[smartdatalake] case class AclElement (aclType:String, name:String, permission: String) {
   /**
-   * @return ACL specification as string, i.e. "T_datalake_application:r-x"
+   * @return ACL specification as string, i.e. "group:t_datalake_application:r-x"
    */
   def getAclSpec: String = {
-    s"$typ:$name:$permission"
+    s"$aclType:$name:$permission"
   }
 }
 
