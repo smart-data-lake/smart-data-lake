@@ -106,26 +106,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     override def showUsageOnError = true
 
     head(appType, appVersion)
-
-    opt[String]('f', "feed-sel")
-      .required
-      .action( (arg, config) => config.copy(feedSel = arg) )
-      .text("Regex pattern to select the feed to execute.")
-    opt[String]('n', "name")
-      .action( (arg, config) => config.copy(applicationName = Some(arg)) )
-      .text("Optional name of the application. If not specified feed-sel is used.")
-    opt[String]('c', "config")
-      .action( (arg, config) => config.copy(configuration = Some(arg)) )
-      .text("One or multiple configuration files or directories containing configuration files, separated by comma.")
-    opt[String]("partition-values")
-      .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseSingleColArg(arg))))
-      .text(s"Partition values to process in format ${PartitionValues.singleColFormat}.")
-    opt[String]("multi-partition-values")
-      .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseMultiColArg(arg))))
-      .text(s"Multi partition values to process in format ${PartitionValues.multiColFormat}.")
-    opt[Int]("parallelism")
-      .action((arg, config) => config.copy(parallelism = arg))
-      .text(s"Parallelism for DAG run.")
     cmd("start")
       .action( (_, config) => config.copy(cmd = "start"))
       .text("Start a SmartDataLakeBuilder run")
@@ -150,6 +130,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
           .action((arg, config) => config.copy(parallelism = arg))
           .text(s"Parallelism for DAG run.")
       )
+    note("")
     cmd("recover")
       .action( (_, config) => config.copy(cmd = "recover"))
       .text("Recover a SmartDataLakeBuilder run")
@@ -162,16 +143,17 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
           .action( (arg, config) => config.copy(runId = Some(arg.toInt)) )
           .text("Optional runId of the application run to recover. If not specified latest is used.")
       )
+    note("")
+    note("General options:")
     opt[String]("state-path")
       .action((arg, config) => config.copy(statePath = Some(arg)))
       .text(s"Path to save run state files.")
     opt[String]("override-jars")
       .action((arg, config) => config.copy(overrideJars = Some(arg.split(','))))
       .text("Comma separated list of jars for child-first class loader. The jars must be present in classpath.")
-
     help("help").text("Display the help text.")
-
     version("version").text("Display version information.")
+    checkConfig( c => if (Option(c.cmd).isEmpty) failure("no command given") else success )
   }
 
 
