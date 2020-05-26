@@ -24,7 +24,7 @@ import java.time.{Duration, LocalDateTime}
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.{RuntimeEventState, RuntimeInfo}
+import io.smartdatalake.workflow.action.{ResultRuntimeInfo, RuntimeEventState, RuntimeInfo}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.FunSuite
 
@@ -35,15 +35,20 @@ class ActionDAGRunTest extends FunSuite {
 
   test("convert ActionDAGRunState to json and back") {
     val df = Seq(("a",1)).toDF("txt", "value")
-    val infoA = RuntimeInfo(RuntimeEventState.SUCCEEDED, startTstmp = Some(LocalDateTime.now()), duration = Some(Duration.ofMinutes(5)), msg = Some("test"), results = Seq(SparkSubFeed(Some(df), "do1", partitionValues = Seq(PartitionValues(Map("test"->1))))))
+    val infoA = RuntimeInfo(RuntimeEventState.SUCCEEDED, startTstmp = Some(LocalDateTime.now()), duration = Some(Duration.ofMinutes(5)), msg = Some("test"), results = Seq(ResultRuntimeInfo(SparkSubFeed(Some(df), "do1", partitionValues = Seq(PartitionValues(Map("test"->1)))),Map("test"->1, "test2"->"abc"))))
     val state = ActionDAGRunState(SmartDataLakeBuilderConfig(), 1, 1, Map("a" -> infoA))
     val json = state.toJson
-    // dataFrame should not be serialized
-    val expectedState = state.copy(actionsState = state.actionsState.mapValues(actionState => actionState.copy(results = actionState.results.map{
-      case result: SparkSubFeed => result.copy(dataFrame = None)
-    })))
+    //println(json)
+    // remove DataFrame from SparkSubFeed, it should not be serialized
+    val expectedState = state.copy(actionsState = state.actionsState
+      .mapValues(actionState => actionState
+        .copy(results = actionState.results.map( result => result
+          .copy(subFeed = result.subFeed match {
+            case subFeed: SparkSubFeed => subFeed.copy(dataFrame = None)
+            case subFeed => subFeed
+          })))))
+    // check
     val deserializedState = ActionDAGRunState.fromJson(json)
     assert(deserializedState == expectedState)
   }
-
 }

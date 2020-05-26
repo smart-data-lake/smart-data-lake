@@ -98,7 +98,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(action2MainMetrics.isDefinedAt("bytes_written"))
     assert(action2MainMetrics("num_tasks")==1)
 
-    // check state: nothing to recover
+    // check state: two actions succeeded
     val latestState = stateStore.getLatestState()
     val previousRunState = stateStore.recoverRunState(latestState.path)
     assert(previousRunState.actionsState.mapValues(_.state) == actions.map( a => (a.id.id, RuntimeEventState.SUCCEEDED)).toMap)

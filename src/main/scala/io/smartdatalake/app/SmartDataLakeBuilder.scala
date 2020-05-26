@@ -217,12 +217,15 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     val stateStore = ActionDAGRunStateStore(appConfig.statePath.get, appName)
     val stateFile = stateStore.getLatestState(appConfig.runId)
     val runState = stateStore.recoverRunState(stateFile.path)
+    logger.info(s"recovering application ${appName} runId=${runState.runId} lastAttemptId=${runState.attemptId}")
     // skip all succeeded actions
     val actionsToSkip = runState.actionsState
       .filter { case (id,info) => info.state==RuntimeEventState.SUCCEEDED }
+    val actionIdsToSkip = actionsToSkip
       .map { case (id,info) => ActionObjectId(id) }.toSeq
+    val initialSubFeeds = actionsToSkip.flatMap(_._2.results.map(_.subFeed)).toSeq
     // start run, increase attempt counter
-    startRun(runState.appConfig, Some(stateFile.runId), Some(stateFile.attemptId+1), actionsToSkip, Some(stateStore))
+    startRun(runState.appConfig, Some(stateFile.runId), Some(stateFile.attemptId+1), actionIdsToSkip, initialSubFeeds, Some(stateStore))
   }
 
   /**
@@ -231,11 +234,11 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * @param appConfig
    * @param runIdIn
    * @param attemptIdIn
-   * @param actionsToSkip
+   * @param actionIdsToSkip
    * @param stateStoreIn
    * @return
    */
-  private def startRun(appConfig: SmartDataLakeBuilderConfig, runIdIn: Option[Int] = None, attemptIdIn: Option[Int] = None, actionsToSkip: Seq[ActionObjectId] = Seq(), stateStoreIn: Option[ActionDAGRunStateStore] = None): String = {
+  private def startRun(appConfig: SmartDataLakeBuilderConfig, runIdIn: Option[Int] = None, attemptIdIn: Option[Int] = None, actionIdsToSkip: Seq[ActionObjectId] = Seq(), initialSubFeeds: Seq[SubFeed] = Seq(), stateStoreIn: Option[ActionDAGRunStateStore] = None): String = {
 
     // validate application config
     appConfig.validate()
@@ -258,11 +261,19 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     require(config.hasPath("dataObjects"), s"No configuration parsed or it does not have a section called dataObjects")
     val globalConfig = GlobalConfig.from(config)
 
-    // parse config objects and search actions to execute by feedSel
+    // parse config objects and select actions by feedSel
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
-    val actions = registry.getActions.filter(_.metadata.flatMap(_.feed).exists(_.matches(appConfig.feedSel)))
-    require(actions.nonEmpty, s"No action matched the given feed selector: ${appConfig.feedSel}. At least one action needs to be selected.")
-    logger.info(s"selected actions ${actions.map(_.id).mkString(", ")}")
+    val actionsSelected = registry.getActions.filter(_.metadata.flatMap(_.feed).exists(_.matches(appConfig.feedSel)))
+    require(actionsSelected.nonEmpty, s"No action matched the given feed selector: ${appConfig.feedSel}. At least one action needs to be selected.")
+    logger.info(s"selected actions ${actionsSelected.map(_.id).mkString(", ")}")
+
+    // filter actions to skip
+    val actionIdsSelected = actionsSelected.map(_.id)
+    val missingActionsToSkip = actionIdsToSkip.filterNot( id => actionIdsSelected.contains(id))
+    if (missingActionsToSkip.nonEmpty) logger.warn(s"actions to skip ${missingActionsToSkip.mkString(" ,")} not found in selected actions")
+    val actionIdsSkipped = actionIdsSelected.filter( id => actionIdsToSkip.contains(id))
+    val actionsToExec = actionsSelected.filterNot( action => actionIdsToSkip.contains(action.id))
+    logger.info(s"actions to execute ${actionsToExec.map(_.id).mkString(", ")}" + (if (actionIdsSkipped.nonEmpty) s", actions skipped ${actionIdsSkipped.mkString(", ")}"))
 
     // create Spark Session
     implicit val session: SparkSession = globalConfig.createSparkSession(appName, appConfig.master, appConfig.deployMode)
@@ -274,14 +285,15 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     val attemptId = attemptIdIn.getOrElse(1)
 
     // create and execute actions
+    logger.info(s"starting application ${appName} runId=$runId attemptId=$attemptId")
     implicit val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appName, registry, referenceTimestamp = Some(LocalDateTime.now), appConfig)
-    val actionDAGRun = ActionDAGRun(actions, runId, attemptId, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, stateStore)
+    val actionDAGRun = ActionDAGRun(actionsSelected, runId, attemptId, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, stateStore)
     try {
       actionDAGRun.prepare
       actionDAGRun.init
       actionDAGRun.exec
     } catch {
-      // dont fail an not severe exceptions like having no data to process
+      // don't fail an not severe exceptions like having no data to process
       case ex: DAGException if (ex.severity == ExceptionSeverity.SKIPPED) => logger.warn(s"dag run is skipped because of ${ex.getClass.getSimpleName}: ${ex.getMessage}")
     }
 
