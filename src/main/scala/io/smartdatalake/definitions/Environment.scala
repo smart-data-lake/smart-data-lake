@@ -44,6 +44,7 @@ object Environment {
 
   /**
    * Limit setting ACL's to user home (default=true)
+   Declare on which level in the directory hierarchy your user homes are (usually on level 2)
    */
   var hdfsAclsLimitToUserHome = true
   var hdfsAclsUserHomeLevel = 2
