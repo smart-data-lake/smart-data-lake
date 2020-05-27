@@ -50,16 +50,16 @@ private[smartdatalake] case class AclElement (aclType:String, name:String, permi
 }
 
 /**
- * Utils for setting ACL's on Hadoop Filesystems
+ * Utils for setting ACLs on Hadoop Filesystems
  *
- * Setting ACL's in the direction hierarchy is a sensitive task.
- * In SmartDataLake ACL's can be configured for HadoopFileDataObjects.
- * Setting ACL's on a given path of a DataObject has to
- * 1) overwrite ACL's on the directory and its subdirectories
- * 2) modify ACL's on the parent directories up to a certain level configured by hdfsAclMinLevelPermissionModify
- * Additional limitations for overwriting ACL's can be configured by hdfsAclMinLevelPermissionOverwrite
+ * Setting ACLs in the directory hierarchy is a sensitive task.
+ * In SmartDataLake ACLs can be configured for HadoopFileDataObjects.
+ * Setting ACLs on a given path of a DataObject has to
+ * 1) overwrite ACLs on the directory and its subdirectories
+ * 2) modify ACLs on the parent directories up to a certain level configured by hdfsAclMinLevelPermissionModify
+ * Additional limitations for overwriting ACLs can be configured by hdfsAclMinLevelPermissionOverwrite
  *
- * By default changing ACLs is also limited to the user home directory. This is configured by hdfsAclsLimitToUserHome and hdfsAclsUserHomeLevel.
+ * By default, changing ACLs is also limited to the user home directory. This is configured by hdfsAclsLimitToUserHome and hdfsAclsUserHomeLevel.
  * It checks if path at hdfsAclsUserHomeLevel ends with username.
  *
  * A common structure for directories on HDFS is as follows:
