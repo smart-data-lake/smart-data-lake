@@ -31,6 +31,24 @@ object Environment {
   var hdfsAclsRequired: Boolean = false
 
   /**
+   * Modifying ACL's is only allowed up to the following level (default=2)
+   * See also [[io.smartdatalake.util.misc.AclUtil]]
+   */
+  var hdfsAclsMinLevelPermissionModify = 2 // up to user home
+
+  /**
+   * Overwriting ACL's is only allowed up to the following level (default=2)
+   * See also [[io.smartdatalake.util.misc.AclUtil]]
+   */
+  var hdfsAclsMinLevelPermissionOverwrite = 5 // incl. and underneath feed
+
+  /**
+   * Limit setting ACL's to user home (default=true)
+   */
+  var hdfsAclsLimitToUserHome = true
+  var hdfsAclsUserHomeLevel = 2
+
+  /**
    * Set default hadoop schema and authority for path
    */
   var hadoopDefaultSchemeAuthority: Option[URI] = None

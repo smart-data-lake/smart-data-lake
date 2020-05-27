@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.util.misc
 
+import io.smartdatalake.definitions.Environment
 import org.apache.hadoop.fs.permission.{AclEntry, FsPermission}
 import org.apache.hadoop.fs.{FileSystem, Path}
 
@@ -48,60 +49,57 @@ private[smartdatalake] case class AclElement (aclType:String, name:String, permi
   }
 }
 
+/**
+ * Utils for setting ACL's on Hadoop Filesystems
+ *
+ * Setting ACL's in the direction hierarchy is a sensitive task.
+ * In SmartDataLake ACL's can be configured for HadoopFileDataObjects.
+ * Setting ACL's on a given path of a DataObject has to
+ * 1) overwrite ACL's on the directory and its subdirectories
+ * 2) modify ACL's on the parent directories up to a certain level configured by hdfsAclMinLevelPermissionModify
+ * Additional limitations for overwriting ACL's can be configured by hdfsAclMinLevelPermissionOverwrite
+ *
+ * By default changing ACLs is also limited to the user home directory. This is configured by hdfsAclsLimitToUserHome and hdfsAclsUserHomeLevel.
+ * It checks if path at hdfsAclsUserHomeLevel ends with username.
+ *
+ * A common structure for directories on HDFS is as follows:
+ * hdfs://nameservice1/user/app_dir/<layer>/<source_name>/<feed_name>
+ *
+ * Levels are counted as follows
+ * Root hdfs://nameservice1/ or also "/" -> 0
+ * User Dir on Hadoop hdfs://nameservice1/user -> 1
+ * User Home hdfs://nameservice1/user/app_dir -> 2
+ * Layer hdfs://nameservice1/user/app_dir/<layer> -> 3
+ * Source hdfs://nameservice1/user/app_dir/<layer>/<source_name> -> 4
+ * Feed hdfs://nameservice1/user/app_dir/<layer>/<source_name>/<feed_name> -> 5
+ * ...
+ *
+ * In this structure good limitations are: MinLevelPermissionModify=2, MinLevelPermissionOverwrite=5
+ */
 private[smartdatalake] object AclUtil extends SmartDataLakeLogger {
 
-
+  //TODO: make this more generic
   private val BasicAclSpecApp = "user::rwx,group::r-x,other::---" // app
   private val BasicAclSpecLab = "user::rwx,group::rwx,other::---" // lab
   private val BasicAclSpecUser = "user::rwx,group::---,other::---" // user
-
   private val AppUserSubstring = "_app_" // bsp. fbd_t_app_datalake, fbd_app_datalake
   private val LabUserSubstring = "_lab_" // bsp. fbd_t_lab_datalake
 
-  //
-  // Threshholds for Hadoop path level, between these threshholds, the permission and ACLs may be overwritten
-  //
-  // Root /: level 0
-  // User Dir on Hadoop /user, /user/: 1
-  // User Home /user/lab_datalake: 2
-  // Layer /user/lab_datalake/stage|integration|btl: 3
-  // Source /user/lab_datalake/stage|integration|btl/<source_name>: 4
-  // Feed /user/lab_datalake/stage|integration|btl/<source_name>/<feed_name>: 5
-  //
-  private val MinLevelPermissionOverwrite = 5 // incl. and underneath /user/lab_datalake/stage|integration|btl/<source_name>/<feed_name>
-  private val MinLevelPermissionModify = 2 // up to user home /user/<lab|app|fbd_lab|fbd_app> oder /tmp/<app|lab>
-
   /**
-   * Sets configured permissions and ACLs on files for each source (S) and feed (F)
-   * In Hadoop the directories are structured as followed:
+   * Sets configured permissions and ACLs on files respecting hdfsAclMinLevelPermissionModify and hdfsAclMinLevelPermissionOverwrite
    *
-   * /user/labX|appX|uX
-   * stage/S1
-   * stage/S2
-   * |-/F1
-   * |-/...
-   * |-/Fn
-   * ...
-   * stage/Sn
-   * integration/S1
-   * integration/S2
-   * ...
-   * integration/Sn
-   * ...
-   *
-   * The ACLs are set on this hierarchy as followed:
-   *
-   * - /user/labX|appX|uX: modify
-   * - /user/labX|appX|uX/stage|integration: modify
-   * - /user/labX|appX|uX/stage|integration/Sn: modify
-   * - /user/labX|appX|uX/stage|integration/Sn/Fn: overwrite recursively
+   * ACLs for everything in the given directory are overwritten
+   * ACLs for parent directories are modified up to userHome and hdfsAclMinLevelPermissionModify
    *
    * @param aclConfig with ACL entries and permissions
    * @param path Hadoop path on which the ACL's should be applied
    */
   def addACLs(aclConfig: AclDef, path: Path)(implicit fileSystem: FileSystem): Unit = {
 
-    checkUserPath(currentUser, path.toString)
+    // check if modification allowed
+    if (Environment.hdfsAclsLimitToUserHome) checkUserPath(currentUser, path)
+    require(getPathLevel(path) > Environment.hdfsAclsMinLevelPermissionOverwrite, s"ACLs can't be overwritten on path '$path', level=${getPathLevel(path)} because hdfsAclsMinLevelPermissionOverwrite=${Environment.hdfsAclsMinLevelPermissionOverwrite}")
+    require(Environment.hdfsAclsMinLevelPermissionOverwrite >= Environment.hdfsAclsMinLevelPermissionModify, s"hdfsAclsMinLevelPermissionOverwrite (${Environment.hdfsAclsMinLevelPermissionOverwrite}) must be greater than or equal to hdfsAclsMinLevelPermissionModify (${Environment.hdfsAclsMinLevelPermissionModify})")
 
     if (exists(fileSystem, Some(path))) {
       logger.info(s"writing ACLs for path <$path> with config $aclConfig")
@@ -110,15 +108,15 @@ private[smartdatalake] object AclUtil extends SmartDataLakeLogger {
       val configuredAcls = AclEntry.parseAclSpec(aclSpec, true).asScala.toSeq
       val combinedAcls = basicAcls ++ configuredAcls
       val permission = readPermission(aclConfig.permission)
-      val modifyAclsOnPath = modifyAcls(fileSystem, combinedAcls, _: Option[Path])
-      val setAclsAndPermissionsOnPath = overridePermissionAndAcl(fileSystem, permission, combinedAcls, _: Option[Path])
+      val modifyAclsOnPath = modifyAcls(fileSystem, combinedAcls, _: Path)
+      val setAclsAndPermissionsOnPath = overridePermissionAndAcl(fileSystem, permission, combinedAcls, _: Path)
 
       // 1.) overwrite permissions on path
-      setAclsAndPermissionsOnPath(Some(path))
+      setAclsAndPermissionsOnPath(path)
       // 2.) overwrite permissions of childrens
-      traverseDirectory(fileSystem, Some(path), setAclsAndPermissionsOnPath)
+      traverseDirectory(fileSystem, path, setAclsAndPermissionsOnPath)
       // 3.) extend permissions of parents
-      traverseDirectoryUpToHome(Some(path), modifyAclsOnPath)
+      traverseDirectoryUp(path, Environment.hdfsAclsMinLevelPermissionModify, modifyAclsOnPath)
 
       logger.debug(s"finished setting permissions and ACLs on $path")
     } else {
@@ -130,13 +128,16 @@ private[smartdatalake] object AclUtil extends SmartDataLakeLogger {
     *
     * @param path
     */
-  def checkUserPath(currentUser: String, path: String): Unit = {
-    val user = currentUser.replaceFirst("^fbd_", "").replaceFirst("^t_", "")
-    assert(
-      s"""\\/(fbd_|fbd_t_)?$user\\/""".r
-        .unanchored
-        .findFirstMatchIn(path)
-        .isDefined, s"Permissions can only be set under hadoop Homedir, path=$path")
+  def checkUserPath(currentUser: String, path: Path): Unit = {
+    val userHome = extractPathLevel(path, Environment.hdfsAclsUserHomeLevel)
+    // user home might be prefixed. Check is therefore only if it ends with currentUser.
+    require( userHome.endsWith(currentUser), s"Permissions can only be set under hadoop Homedir if hdfsAclsLimitToUserHome is enabled, path=$path")
+  }
+
+  def extractPathLevel(path: Path, level: Int): String = {
+    val pathLevel = getPathLevel(path)
+    require(level<=pathLevel, s"Path ${path.toUri} is not defined for level $level")
+    path.toUri.getPath.split("/")(level)
   }
 
   /**
@@ -178,42 +179,30 @@ private[smartdatalake] object AclUtil extends SmartDataLakeLogger {
   }
 
   /**
-   * Set permissions and ACL on a specific path
+   * Set (override) permissions and ACL on a specific path
    *
    * @param fileSystem       Hadoop filesystem
    * @param permission permission for the given path
    * @param aclList    ACL for the given path
    * @param path       Path of file or directory in Hadoop filesystem
    */
-  def overridePermissionAndAcl(fileSystem: FileSystem, permission: FsPermission, aclList: Seq[AclEntry],
-                               path: Option[Path]): Unit = {
-    path match {
-      case Some(p) =>
-        logger.debug(s"setting permission and ACLs on files/directories under path: ${path.getOrElse("(none)")}")
-        if (isAclOverwriteAllowed(p.toString)) {
-              logger.debug(s"setting permission: $permission on file/directory: $p")
-              fileSystem.setPermission(p, permission)
-              logger.debug(s"setting ACL: $aclList on file/directory: $p")
-              fileSystem.setAcl(p, aclList.asJava)
-        } else {
-          logger.debug(s"ACLs can't be overwritten on path '$p', Level: ${getPathLevel(p.toString)}")
-        }
-      case _ => logger.warn("ACLs can't be set")
+  def overridePermissionAndAcl(fileSystem: FileSystem, permission: FsPermission, aclList: Seq[AclEntry], path: Path): Unit = {
+    if (isAclOverwriteAllowed(path)) {
+      logger.debug(s"setting permission: $permission on file/directory: $path")
+      fileSystem.setPermission(path, permission)
+      logger.debug(s"setting ACL: $aclList on file/directory: $path")
+      fileSystem.setAcl(path, aclList.asJava)
+    } else {
+      logger.debug(s"ACLs can't be overwritten on path '$path', Level: ${getPathLevel(path)}")
     }
   }
 
-  def modifyAcls(fileSystem: FileSystem, aclList: Seq[AclEntry],
-                 path: Option[Path]): Unit = {
-    path match {
-      case Some(p) => logger.debug(s"modifying ACL: $aclList on path: ${path.getOrElse("(none)")}")
-        if (isAclModifyAllowed(p.toString)) {
-          logger.debug(s"setting ACL: $aclList on file/directory: $p")
-          fileSystem.modifyAclEntries(normalizePath(fileSystem, p), aclList.asJava)
-        }
-        else {
-          logger.debug(s"ACLs can't be extended on path '$p', Level: ${getPathLevel(p.toString)}")
-        }
-      case _ => logger.warn("ACLs can't be set")
+  def modifyAcls(fileSystem: FileSystem, aclList: Seq[AclEntry], path: Path): Unit = {
+    if (isAclModifyAllowed(path)) {
+      logger.debug(s"setting ACL: $aclList on file/directory: $path")
+      fileSystem.modifyAclEntries(normalizePath(fileSystem, path), aclList.asJava)
+    } else {
+      logger.debug(s"ACLs can't be extended on path '$path', Level: ${getPathLevel(path)}")
     }
   }
 
@@ -237,85 +226,57 @@ private[smartdatalake] object AclUtil extends SmartDataLakeLogger {
    * On all files and directories, the given ACLs and permissions will be set.
    *
    * @param fileSystem     Hadoop filesystem
-   * @param filePath Path of files or directories in Hadoop filesystem
+   * @param path Path of files or directories in Hadoop filesystem
    */
-  def traverseDirectory(fileSystem: FileSystem, filePath: Option[Path],
-                        setPermissionsAndAcl: Option[Path] => Unit): Unit = {
-    filePath match {
-      case Some(fp) =>
-        logger.debug(s"traversing: ${fp.toString}")
-          fileSystem.listStatus(normalizePath(fileSystem, fp)).foreach {
-            fileStatus => {
-              // action for dir and files
-              setPermissionsAndAcl(Some(fileStatus.getPath))
-              if (fileStatus.isDirectory) traverseDirectory(fileSystem, Some(fileStatus.getPath), setPermissionsAndAcl)
-            }
-          }
-      case None => logger.debug("Path <None> can not be traversed")
+  def traverseDirectory(fileSystem: FileSystem, path: Path, setPermissionsAndAcl: Path => Unit): Unit = {
+    logger.debug(s"traversing: ${path.toString}")
+    fileSystem.listStatus(normalizePath(fileSystem, path)).foreach {
+      fileStatus => {
+        // action for dir and files
+        setPermissionsAndAcl(fileStatus.getPath)
+        if (fileStatus.isDirectory) traverseDirectory(fileSystem, fileStatus.getPath, setPermissionsAndAcl)
+      }
     }
   }
 
   /**
-   * Traverses a directory hierarchy up until parentDir
-   *
-   * @param parentDir name of target directory
-   * @param path      path of parentDir
-   * @return path
-   */
-  @tailrec
-  def traverseDirectoryUpTo(parentDir: String, path: Option[Path]): Option[Path] = {
-    parent(path) match {
-      case Some(p) if p.getName != parentDir =>
-        logger.debug(s"<${p.getName}> != <$parentDir>")
-        traverseDirectoryUpTo(parentDir, Some(p))
-      case Some(p) if p.getName == parentDir =>
-        logger.debug(s"<${p.getName}> == <$parentDir>")
-        Some(p)
-      case _ => None // for root dir '/' path.getParent will be null!
-    }
-  }
-
-  /**
-    * Traverses a directory structure up until reaching the user home and sets ACLs.
+    * Traverses a directory structure up until reaching min level given and sets ACLs.
     * ACLs are only applied on directories and not on files!
     *
     * @param path                     Path from which the parent is accessed from
+    * @param minLevel minimum path level allowed to set ACLs (inclusive)
     * @param modifiyPermissionsAndAcl Partial function used for setting the ACLs on the current parent directory
+    * @return
     */
   @tailrec
-  def traverseDirectoryUpToHome(path: Option[Path], modifiyPermissionsAndAcl: Option[Path] => Unit): Unit = {
-    path match {
-      case Some(p) =>
-        if (p.toString != "/user" && p.toString != "/tmp") {
-          logger.debug(s"<${p.getName}> != /user && != /tmp")
-          modifiyPermissionsAndAcl(Option(p))
-          traverseDirectoryUpToHome(Option(p.getParent), modifiyPermissionsAndAcl)
-        }
-      case _ => logger.debug(s"No path, traversing stopped")
+  def traverseDirectoryUp(path: Path, minLevel: Int, modifiyPermissionsAndAcl: Path => Unit): Path = {
+    val pathLevel = getPathLevel(path)
+    if (pathLevel >= minLevel) {
+      modifiyPermissionsAndAcl(path)
+    }
+    if (pathLevel > minLevel) {
+      val parentPath = parent(path)
+      if (parentPath.isDefined) traverseDirectoryUp(parentPath.get, minLevel, modifiyPermissionsAndAcl)
+      else path
+    } else {
+      path
     }
   }
 
-  def parent(path: Option[Path]): Option[Path] = {
-    path match {
-      case Some(p) => Option(p.getParent)
-      case _ => None
-    }
-  }
+  def parent(path: Path): Option[Path] = Option(path.getParent)
 
   def isWildcard(fileSystem: FileSystem, p: Path): Boolean = {
     logger.debug(s"isDirectory($p): ${fileSystem.isDirectory(p)}")
-    if (fileSystem.isDirectory(p)) {
-      false
-    } else {
-      logger.debug(s"isFile($p): ${fileSystem.isFile(p)}")
-      if (fileSystem.isFile(p)) {
-        false
-      } else {
-        val parent = new Path(s"$p/..")
-        logger.debug(s"isDirectory($parent): ${fileSystem.isDirectory(parent)}")
-        if (parent.toUri.getPath != "" && fileSystem.isDirectory(parent)) true else false
-      }
-    }
+    if (fileSystem.isDirectory(p)) return false
+    logger.debug(s"isFile($p): ${fileSystem.isFile(p)}")
+    if (fileSystem.isFile(p)) return false
+    val parentPath = parent(p)
+    if (parentPath.isEmpty) return false
+    if (parentPath.get.toUri.getPath.isEmpty) return false
+    logger.debug(s"isDirectory($parentPath): ${fileSystem.isDirectory(parentPath.get)}")
+    if (!fileSystem.isDirectory(parentPath.get)) return false
+    // return
+    true
   }
 
   def exists(fileSystem: FileSystem, path: Option[Path]): Boolean = {
@@ -324,16 +285,9 @@ private[smartdatalake] object AclUtil extends SmartDataLakeLogger {
         if (!isWildcard(fileSystem, p)) {
           fileSystem.exists(p)
         } else {
-          val parent = new Path(s"$p/..")
-          if (fileSystem.isDirectory(parent)) fileSystem.exists(parent) else false
+          val parentPath = parent(p)
+          if (parentPath.isDefined && fileSystem.isDirectory(parentPath.get)) fileSystem.exists(parentPath.get) else false
         }
-      case _ => false
-    }
-  }
-
-  def pathContainsFeed(path: Option[Path], feed: String): Boolean = {
-    path match {
-      case Some(p) => p.toString.contains("/" + feed + "/")
       case _ => false
     }
   }
@@ -347,10 +301,7 @@ private[smartdatalake] object AclUtil extends SmartDataLakeLogger {
     * @param path Path
     * @return level of folder in directory tree as Int
     */
-  def getPathLevel(path: String): Int = {
-    val p = if (path.endsWith("/")) path else path + "/"
-    p.count(c => c == '/')-1
-  }
+  def getPathLevel(path: Path): Int = path.depth
 
   /**
     * Checks if it's allowed to write the ACLs on a given Hadoop path.
@@ -359,19 +310,19 @@ private[smartdatalake] object AclUtil extends SmartDataLakeLogger {
     * @param path Hadoop path to check
     * @return True if it's allowed to overwrite the ACLs on this level, otherwise false
     */
-  def isAclOverwriteAllowed(path: String): Boolean = {
-    getPathLevel(path) >= MinLevelPermissionOverwrite
+  def isAclOverwriteAllowed(path: Path): Boolean = {
+    getPathLevel(path) >= Environment.hdfsAclsMinLevelPermissionOverwrite
   }
 
   /**
     * Checks if it's allowed to execute a modify of the ACLs on a given Hadoop path.
-    * To do that, the current path level is calculated and compared to the constant MinLeveLPermissionModify and MinLevelPermissionOverwrite
+    * To do that, the current path level is calculated and compared to the constant MinLeveLPermissionModify
     *
     * @param path Hadoop path to check
     * @return True if it's allowed to modify the ACLs on this level, otherwise false
     */
-  def isAclModifyAllowed(path: String): Boolean = {
-    getPathLevel(path) >= MinLevelPermissionModify && getPathLevel(path) < MinLevelPermissionOverwrite
+  def isAclModifyAllowed(path: Path): Boolean = {
+    getPathLevel(path) >= Environment.hdfsAclsMinLevelPermissionModify
   }
 
 }
