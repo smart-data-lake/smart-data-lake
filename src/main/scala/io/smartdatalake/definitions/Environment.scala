@@ -37,7 +37,7 @@ object Environment {
   var hdfsAclsMinLevelPermissionModify = 2 // up to user home
 
   /**
-   * Overwriting ACL's is only allowed up to the following level (default=2)
+   * Overwriting ACL's is only allowed up to the following level (default=5)
    * See also [[io.smartdatalake.util.misc.AclUtil]]
    */
   var hdfsAclsMinLevelPermissionOverwrite = 5 // incl. and underneath feed
