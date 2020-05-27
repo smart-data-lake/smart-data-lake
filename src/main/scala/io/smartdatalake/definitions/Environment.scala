@@ -31,13 +31,13 @@ object Environment {
   var hdfsAclsRequired: Boolean = false
 
   /**
-   * Modifying ACL's is only allowed up to the following level (default=2)
+   * Modifying ACL's is only allowed below and including the following level (default=2)
    * See also [[io.smartdatalake.util.misc.AclUtil]]
    */
   var hdfsAclsMinLevelPermissionModify = 2 // up to user home
 
   /**
-   * Overwriting ACL's is only allowed up to the following level (default=5)
+   * Overwriting ACL's is only allowed below and including the following level (default=5)
    * See also [[io.smartdatalake.util.misc.AclUtil]]
    */
   var hdfsAclsMinLevelPermissionOverwrite = 5 // incl. and underneath feed
