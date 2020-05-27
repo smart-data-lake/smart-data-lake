@@ -84,12 +84,12 @@ class AclUtilTest extends FunSuite with BeforeAndAfter {
   }
 
   test("Parent method returns the parent directory of the supplied path with scheme/authority.") {
-    val parentPath = AclUtil.parent(new Path("hdfs://nameservice1/path/to/parent/child"))
-    assert(parentPath.value === new Path("hdfs://nameservice1/path/to/parent/"))
+    val parentPath = AclUtil.parent(new Path("hdfs://dfs.nameservices/path/to/parent/child"))
+    assert(parentPath.value === new Path("hdfs://dfs.nameservices/path/to/parent/"))
   }
 
   test("Parent of root directory with schema/authority") {
-    val rootPath = new Path("hdfs://nameservice1/")
+    val rootPath = new Path("hdfs://dfs.nameservices/")
     val rootParentPath = AclUtil.parent(rootPath)
     assert(rootParentPath.isEmpty)
   }
@@ -109,9 +109,9 @@ class AclUtilTest extends FunSuite with BeforeAndAfter {
   }
 
   test("Traverse directoryUp some existing directory (user home) with scheme/authority") {
-    val path = new Path("hdfs://nameservice1/user/app_dir/integration/someapp")
+    val path = new Path("hdfs://dfs.nameservices/user/app_dir/integration/someapp")
     val upperPath = AclUtil.traverseDirectoryUp(path, Environment.hdfsAclsUserHomeLevel, noOpAclSetter)
-    assert(upperPath == new Path("hdfs://nameservice1/user/app_dir"))
+    assert(upperPath == new Path("hdfs://dfs.nameservices/user/app_dir"))
   }
 
   test("Traverse directoryUp some existing directory (feed)") {
@@ -148,7 +148,7 @@ class AclUtilTest extends FunSuite with BeforeAndAfter {
   }
 
   test("Root dir with scheme/authority has level 0") {
-    val rootPath = new Path("hdfs://nameservice1/")
+    val rootPath = new Path("hdfs://dfs.nameservices/")
     assert(AclUtil.getPathLevel(rootPath) == 0)
   }
 
@@ -169,10 +169,10 @@ class AclUtilTest extends FunSuite with BeforeAndAfter {
   }
 
   test("User home dir with scheme/authority has level 2") {
-    val path1 = new Path("hdfs://nameservice1/user/app_dir")
+    val path1 = new Path("hdfs://dfs.nameservices/user/app_dir")
     assert(AclUtil.getPathLevel(path1) == 2)
 
-    val path2 = new Path("hdfs://nameservice1/user/app_dir/")
+    val path2 = new Path("hdfs://dfs.nameservices/user/app_dir/")
     assert(AclUtil.getPathLevel(path2) == 2)
   }
 
@@ -182,7 +182,7 @@ class AclUtilTest extends FunSuite with BeforeAndAfter {
   }
 
   test("ACL modify on root dir with scheme/authority is NOT allowed") {
-    val path = new Path("hdfs://nameservice1/")
+    val path = new Path("hdfs://dfs.nameservices/")
     assert(!AclUtil.isAclModifyAllowed(path))
   }
 
@@ -192,7 +192,7 @@ class AclUtilTest extends FunSuite with BeforeAndAfter {
   }
 
   test("ACL modify on /user with scheme/authority dir is NOT allowed") {
-    val path = new Path("hdfs://nameservice1/user")
+    val path = new Path("hdfs://dfs.nameservices/user")
     assert(!AclUtil.isAclModifyAllowed(path))
   }
 
@@ -202,7 +202,7 @@ class AclUtilTest extends FunSuite with BeforeAndAfter {
   }
 
   test("ACL modify on user home dir with scheme/authority is allowed") {
-    val path = new Path("hdfs://nameservice1/user/app_dir")
+    val path = new Path("hdfs://dfs.nameservices/user/app_dir")
     assert(AclUtil.isAclModifyAllowed(path))
   }
 
@@ -212,7 +212,7 @@ class AclUtilTest extends FunSuite with BeforeAndAfter {
   }
 
   test("ACL overwrite on user home dir with scheme/authority is NOT allowed") {
-    val path = new Path("hdfs://nameservice1/user/app_dir")
+    val path = new Path("hdfs://dfs.nameservices/user/app_dir")
     assert(!AclUtil.isAclOverwriteAllowed(path))
   }
 
@@ -242,14 +242,14 @@ class AclUtilTest extends FunSuite with BeforeAndAfter {
   }
 
   test("ACL overwrite on feed dir with scheme/authority is allowed") {
-    val path = new Path("hdfs://nameservice1/user/app_dir/stage/somesource/somefeed")
+    val path = new Path("hdfs://dfs.nameservices/user/app_dir/stage/somesource/somefeed")
     assert(AclUtil.isAclOverwriteAllowed(path))
   }
 
   test("extract user home") {
-    assert(AclUtil.extractPathLevel(new Path("hdfs://nameservice1/user/app_dir"),Environment.hdfsAclsUserHomeLevel) == "app_dir")
-    assert(AclUtil.extractPathLevel(new Path("hdfs://nameservice1/user/app_dir/"),Environment.hdfsAclsUserHomeLevel) == "app_dir")
-    assert(AclUtil.extractPathLevel(new Path("hdfs://nameservice1/user/app_dir/test/abc"),Environment.hdfsAclsUserHomeLevel) == "app_dir")
-    intercept[IllegalArgumentException](AclUtil.extractPathLevel(new Path("hdfs://nameservice1/user/"),Environment.hdfsAclsUserHomeLevel) == "app_dir")
+    assert(AclUtil.extractPathLevel(new Path("hdfs://dfs.nameservices/user/app_dir"),Environment.hdfsAclsUserHomeLevel) == "app_dir")
+    assert(AclUtil.extractPathLevel(new Path("hdfs://dfs.nameservices/user/app_dir/"),Environment.hdfsAclsUserHomeLevel) == "app_dir")
+    assert(AclUtil.extractPathLevel(new Path("hdfs://dfs.nameservices/user/app_dir/test/abc"),Environment.hdfsAclsUserHomeLevel) == "app_dir")
+    intercept[IllegalArgumentException](AclUtil.extractPathLevel(new Path("hdfs://dfs.nameservices/user/"),Environment.hdfsAclsUserHomeLevel) == "app_dir")
   }
 }

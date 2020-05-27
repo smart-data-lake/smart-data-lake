@@ -63,15 +63,15 @@ private[smartdatalake] case class AclElement (aclType:String, name:String, permi
  * It checks if path at hdfsAclsUserHomeLevel ends with username.
  *
  * A common structure for directories on HDFS is as follows:
- * hdfs://nameservice1/user/app_dir/<layer>/<source_name>/<feed_name>
+ * hdfs://dfs.nameservices/user/app_dir/<layer>/<source_name>/<feed_name>
  *
  * Levels are counted as follows
- * Root hdfs://nameservice1/ or also "/" -> 0
- * User Dir on Hadoop hdfs://nameservice1/user -> 1
- * User Home hdfs://nameservice1/user/app_dir -> 2
- * Layer hdfs://nameservice1/user/app_dir/<layer> -> 3
- * Source hdfs://nameservice1/user/app_dir/<layer>/<source_name> -> 4
- * Feed hdfs://nameservice1/user/app_dir/<layer>/<source_name>/<feed_name> -> 5
+ * Root hdfs://dfs.nameservices/ or also "/" -> 0
+ * User Dir on Hadoop hdfs://dfs.nameservices/user -> 1
+ * User Home hdfs://dfs.nameservices/user/app_dir -> 2
+ * Layer hdfs://dfs.nameservices/user/app_dir/<layer> -> 3
+ * Source hdfs://dfs.nameservices/user/app_dir/<layer>/<source_name> -> 4
+ * Feed hdfs://dfs.nameservices/user/app_dir/<layer>/<source_name>/<feed_name> -> 5
  * ...
  *
  * In this structure good limitations are: MinLevelPermissionModify=2, MinLevelPermissionOverwrite=5
