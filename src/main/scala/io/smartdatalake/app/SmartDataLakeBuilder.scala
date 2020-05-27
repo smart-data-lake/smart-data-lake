@@ -22,17 +22,12 @@ import java.io.File
 import java.time.LocalDateTime
 
 import com.typesafe.config.Config
-import configs.syntax._
 import io.smartdatalake.config.SdlConfigObject.ActionObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SmartDataLakeLogger}
-import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.util.misc.{LogUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState
-import io.smartdatalake.workflow.action.RuntimeEventState
-import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
 import scopt.OptionParser
 
@@ -97,6 +92,11 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * @return a new, initialized [[SmartDataLakeBuilderConfig]].
    */
   def initConfigFromEnvironment: SmartDataLakeBuilderConfig = SmartDataLakeBuilderConfig()
+
+  /**
+   * InstanceRegistry instance
+   */
+  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
 
   /**
    * The Parser defines how to extract the options from the command line args.
@@ -171,7 +171,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   }
 
   /**
-   * Run the application with the provided configuarion.
+   * Run the application with the provided configuration.
    *
    * @param appConfig Application configuration (parsed from command line).
    */
@@ -244,8 +244,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     val globalConfig = GlobalConfig.from(config)
 
     // parse config objects and select actions by feedSel
-    implicit val registry: InstanceRegistry = ConfigParser.parse(config)
-    val actionsSelected = registry.getActions.filter(_.metadata.flatMap(_.feed).exists(_.matches(appConfig.feedSel)))
+    ConfigParser.parse(config, instanceRegistry)
+    val actionsSelected = instanceRegistry.getActions.filter(_.metadata.flatMap(_.feed).exists(_.matches(appConfig.feedSel)))
     require(actionsSelected.nonEmpty, s"No action matched the given feed selector: ${appConfig.feedSel}. At least one action needs to be selected.")
     logger.info(s"selected actions ${actionsSelected.map(_.id).mkString(", ")}")
 
@@ -268,7 +268,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     // create and execute actions
     logger.info(s"starting application ${appName} runId=$runId attemptId=$attemptId")
-    implicit val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appName, registry, referenceTimestamp = Some(LocalDateTime.now), appConfig)
+    implicit val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appName, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig)
     val actionDAGRun = ActionDAGRun(actionsSelected, runId, attemptId, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, stateStore)
     try {
       actionDAGRun.prepare

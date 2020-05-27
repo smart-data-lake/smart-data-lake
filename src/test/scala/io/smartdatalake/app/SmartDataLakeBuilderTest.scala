@@ -1,0 +1,114 @@
+/*
+ * Smart Data Lake - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package io.smartdatalake.app
+
+import java.nio.file.Files
+
+import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.hive.HiveUtil
+import io.smartdatalake.workflow.TaskFailedException
+import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, CustomDfTransformerConfig}
+import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction, DeduplicateAction}
+import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
+import org.apache.spark.sql.functions.{col, udf}
+import org.apache.spark.sql.types.StringType
+import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.scalatest.{BeforeAndAfter, FunSuite}
+
+class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
+
+  protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+  import session.implicits._
+
+  private val tempDir = Files.createTempDirectory("test")
+  private val tempPath = tempDir.toAbsolutePath.toString
+
+  test("action dag with 2 actions and positive top-level partition values filter, recovery after action 2 failed the first time") {
+
+    // init sdlb
+    val appName = "actionpipeline-recovery"
+    val feedName = "test"
+    val statePath = "stateTest/"
+    val sdlb = new DefaultSmartDataLakeBuilder()
+    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+
+    // setup DataObjects
+    val srcTable = Table(Some("default"), "ap_input")
+    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
+    val srcPath = tempPath+s"/${srcTable.fullName}"
+    // source table has partitions columns dt and type
+    val srcDO = HiveTableDataObject( "src1", srcPath, partitions = Seq("dt","type"), table = srcTable, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(srcDO)
+    val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
+    HiveUtil.dropTable(session, tgt1Table.db.get, tgt1Table.name )
+    val tgt1Path = tempPath+s"/${tgt1Table.fullName}"
+    // first table has partitions columns dt and type (same as source)
+    val tgt1DO = TickTockHiveTableDataObject( "tgt1", tgt1Path, partitions = Seq("dt","type"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(tgt1DO)
+    val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
+    HiveUtil.dropTable(session, tgt2Table.db.get, tgt2Table.name )
+    val tgt2Path = tempPath+s"/${tgt2Table.fullName}"
+    // second table has partition columns dt only (reduced)
+    val tgt2DO = HiveTableDataObject( "tgt2", tgt2Path, partitions = Seq("dt"), table = tgt2Table, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(tgt2DO)
+
+    // prepare data
+    val dfSrc = Seq(("20180101", "person", "doe","john",5) // partition 20180101 is included in partition values filter
+      ,("20190101", "company", "olmo","-",10)) // partition 20190101 is not included
+      .toDF("dt", "type", "lastname", "firstname", "rating")
+    srcDO.writeDataFrame(dfSrc, Seq())
+
+    // start first dag run -> fail
+    val action1 = DeduplicateAction("a", srcDO.id, tgt1DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
+    instanceRegistry.register(action1)
+    val action2fail = CopyAction("b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformer = Some(CustomDfTransformerConfig(className = Some(classOf[FailTransformer].getName))))
+    instanceRegistry.register(action2fail)
+    val configStart = SmartDataLakeBuilderConfig(cmd = "start", feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath)
+      , partitionValues = Some(Seq(PartitionValues(Map("dt"->"20180101")))))
+    intercept[TaskFailedException](sdlb.run(configStart))
+
+    // check failed results
+    assert(tgt1DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(5))
+    assert(!tgt2DO.isTableExisting)
+
+    // exec dag success
+    val action2success = CopyAction("b", tgt1DO.id, tgt2DO.id)
+    instanceRegistry.register(action2success) // this overwrites existing action b in instance registry
+    val configRecover = SmartDataLakeBuilderConfig(cmd = "recover", applicationName = Some(appName), statePath = Some(statePath))
+    intercept[TaskFailedException](sdlb.run(configRecover))
+
+    assert(tgt1DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(5))
+    assert(tgt2DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(5))
+  }
+
+}
+
+class FailTransformer extends CustomDfTransformer {
+  def transform(session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String): DataFrame = {
+    // DataFrame needs at least one string column in schema
+    val firstStringColumn = df.schema.fields.find(_.dataType == StringType).map(_.name).get
+    val udfFail = udf((s: String) => {throw new IllegalStateException("aborted by FailTransformer"); s})
+    // fail at spark runtime
+    df.withColumn(firstStringColumn, udfFail(col(firstStringColumn)))
+  }
+}

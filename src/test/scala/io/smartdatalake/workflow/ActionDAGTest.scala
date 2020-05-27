@@ -496,7 +496,6 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
   }
 }
 
-
 class TestActionDagTransformer extends CustomDfsTransformer {
   override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
     import session.implicits._

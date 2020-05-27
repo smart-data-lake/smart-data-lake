@@ -79,7 +79,7 @@ private[smartdatalake] case class ActionDAGRunStateStore(statePath: String, appN
    */
   def saveState(state: ActionDAGRunState): Unit = synchronized {
     val json = state.toJson
-    val file = new Path(hadoopStatePath, s"${appName}_${state.runId}_${state.attemptId}_${System.currentTimeMillis()}.json")
+    val file = new Path(hadoopStatePath, s"${appName}_${state.runId}_${state.attemptId}.json")
     val os = filesystem.create(file, true) // overwrite if exists
     os.write(json.getBytes("UTF-8"))
     os.close()

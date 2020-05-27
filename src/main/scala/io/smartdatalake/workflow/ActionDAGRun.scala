@@ -91,7 +91,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
       case ex => logger.warn(s"$op: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
     }
     // log dag on error
-    if (dagExceptionsToStop.nonEmpty) ActionDAGRun.logDag(s"$op failed for dag $runId", dag)
+    if (dagExceptionsToStop.nonEmpty) ActionDAGRun.logDag(s"$op failed for ${context.application} runId=$runId attemptId=$attemptId", dag)
     // throw most severe exception
     dagExceptionsToStop.sortBy(_.severity).foreach{ throw _ }
 
