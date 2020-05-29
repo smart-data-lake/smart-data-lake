@@ -98,7 +98,7 @@ private[smartdatalake] object AclUtil extends SmartDataLakeLogger {
 
     // check if modification allowed
     if (Environment.hdfsAclsLimitToUserHome) checkUserPath(currentUser, path)
-    require(getPathLevel(path) > Environment.hdfsAclsMinLevelPermissionOverwrite, s"ACLs can't be overwritten on path '$path', level=${getPathLevel(path)} because hdfsAclsMinLevelPermissionOverwrite=${Environment.hdfsAclsMinLevelPermissionOverwrite}")
+    require(getPathLevel(path) >= Environment.hdfsAclsMinLevelPermissionOverwrite, s"ACLs can't be overwritten on path '$path', level=${getPathLevel(path)} because hdfsAclsMinLevelPermissionOverwrite=${Environment.hdfsAclsMinLevelPermissionOverwrite}")
     require(Environment.hdfsAclsMinLevelPermissionOverwrite >= Environment.hdfsAclsMinLevelPermissionModify, s"hdfsAclsMinLevelPermissionOverwrite (${Environment.hdfsAclsMinLevelPermissionOverwrite}) must be greater than or equal to hdfsAclsMinLevelPermissionModify (${Environment.hdfsAclsMinLevelPermissionModify})")
 
     if (exists(fileSystem, Some(path))) {
