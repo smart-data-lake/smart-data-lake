@@ -36,6 +36,7 @@ import scala.io.Codec
  */
 private[smartdatalake] case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, actionsState: Map[String, RuntimeInfo] ) {
   def toJson: String = ActionDAGRunState.toJson(this)
+  def isFailed: Boolean = actionsState.exists(_._2.state==RuntimeEventState.FAILED)
 }
 private[smartdatalake]object ActionDAGRunState {
   // json4s is used because kxbmap configs supports converting case classes to config only from verion 5.0 which isn't yet stable

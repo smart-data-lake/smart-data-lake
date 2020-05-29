@@ -229,7 +229,7 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
 
     // create dag
     val dag = DAG.create[Action](initAction +: actions, edges)
-    logDag(s"created dag $runId", dag)
+    logDag(s"created dag runId=$runId attemptId=$attemptId", dag)
 
     // enable runtime metrics
     actions.foreach(_.enableRuntimeMetrics())

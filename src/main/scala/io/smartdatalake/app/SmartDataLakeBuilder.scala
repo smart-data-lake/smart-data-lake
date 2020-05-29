@@ -207,7 +207,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       .map { case (id,info) => ActionObjectId(id) }.toSeq
     val initialSubFeeds = actionsToSkip.flatMap(_._2.results.map(_.subFeed)).toSeq
     // start run, increase attempt counter
-    startRun(runState.appConfig, Some(stateFile.runId), Some(stateFile.attemptId+1), actionIdsToSkip, initialSubFeeds, Some(stateStore))
+    startRun(runState.appConfig.copy(cmd = "recover"), Some(stateFile.runId), Some(stateFile.attemptId+1), actionIdsToSkip, initialSubFeeds, Some(stateStore))
   }
 
   /**
@@ -221,6 +221,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * @return
    */
   private def startRun(appConfig: SmartDataLakeBuilderConfig, runIdIn: Option[Int] = None, attemptIdIn: Option[Int] = None, actionIdsToSkip: Seq[ActionObjectId] = Seq(), initialSubFeeds: Seq[SubFeed] = Seq(), stateStoreIn: Option[ActionDAGRunStateStore] = None): String = {
+    assert(appConfig.cmd!="recover" || (runIdIn.isDefined && attemptIdIn.isDefined), "runId and attemptId must be defined in recovery mode")
+    assert(appConfig.cmd!="start" || (runIdIn.isEmpty && attemptIdIn.isEmpty), "runId and attemptId must not be defined in normal mode")
 
     // validate application config
     appConfig.validate()
@@ -255,21 +257,30 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     if (missingActionsToSkip.nonEmpty) logger.warn(s"actions to skip ${missingActionsToSkip.mkString(" ,")} not found in selected actions")
     val actionIdsSkipped = actionIdsSelected.filter( id => actionIdsToSkip.contains(id))
     val actionsToExec = actionsSelected.filterNot( action => actionIdsToSkip.contains(action.id))
+    require(actionsToExec.nonEmpty, s"No actions to execute. All selected actions are skipped (${actionIdsSkipped.mkString(", ")})")
     logger.info(s"actions to execute ${actionsToExec.map(_.id).mkString(", ")}" + (if (actionIdsSkipped.nonEmpty) s", actions skipped ${actionIdsSkipped.mkString(", ")}"))
+
+    // get latest runId
+    val stateStore = stateStoreIn.orElse(appConfig.statePath.map(p => ActionDAGRunStateStore(p, appName)))
+    val stateStoreLatestRunId = stateStore.flatMap(_.getLatestRunId)
+    val runId = runIdIn.orElse(stateStoreLatestRunId.map(_+1)).getOrElse(1)
+    val attemptId = attemptIdIn.getOrElse(1)
+
+    // check that latest run succeeded if not in recovery mode
+    if (appConfig.cmd=="start" && stateStoreLatestRunId.isDefined) {
+      val latestStateFile = stateStore.get.getLatestState(stateStoreLatestRunId)
+      val latestState = stateStore.get.recoverRunState(latestStateFile.path)
+      require(!latestState.isFailed, s"Latest run for $appName with RunId=${latestStateFile.runId}, attemptId=${latestStateFile.attemptId} is failed. Please recover or cleanup state files.")
+    }
 
     // create Spark Session
     implicit val session: SparkSession = globalConfig.createSparkSession(appName, appConfig.master, appConfig.deployMode)
     LogUtil.setLogLevel(session.sparkContext)
 
-    // get latest runId
-    val stateStore = stateStoreIn.orElse(appConfig.statePath.map(p => ActionDAGRunStateStore(p, appName)))
-    val runId = runIdIn.orElse(stateStore.flatMap(_.getLatestRunId)).getOrElse(1)
-    val attemptId = attemptIdIn.getOrElse(1)
-
     // create and execute actions
     logger.info(s"starting application ${appName} runId=$runId attemptId=$attemptId")
     implicit val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appName, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig)
-    val actionDAGRun = ActionDAGRun(actionsSelected, runId, attemptId, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, stateStore)
+    val actionDAGRun = ActionDAGRun(actionsToExec, runId, attemptId, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, stateStore)
     try {
       actionDAGRun.prepare
       actionDAGRun.init
