@@ -39,7 +39,7 @@ trait DataObjectTestSuite extends FunSuite with Matchers with BeforeAndAfter {
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
-  protected lazy val testContext: ActionPipelineContext = ActionPipelineContext("testFeed", "testSource", instanceRegistry, None, SmartDataLakeBuilderConfig())
+  protected lazy val testContext: ActionPipelineContext = ActionPipelineContext("testFeed", "testSource", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
 
   protected def createTempDir = Files.createTempDirectory("test")
 

@@ -26,6 +26,8 @@ import io.smartdatalake.config.InstanceRegistry
 private[smartdatalake] case class ActionPipelineContext(
   feed: String,
   application: String,
+  runId: Int,
+  attemptId: Int,
   instanceRegistry: InstanceRegistry,
   referenceTimestamp: Option[LocalDateTime] = None,
   appConfig: SmartDataLakeBuilderConfig // application config is needed to persist action dag state for recovery

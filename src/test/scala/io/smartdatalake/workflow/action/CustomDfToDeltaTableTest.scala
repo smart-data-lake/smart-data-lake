@@ -56,7 +56,7 @@ class CustomDfToDeltaTableTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start load
     val startTime = LocalDateTime.now()
-    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", instanceRegistry, Some(startTime), SmartDataLakeBuilderConfig())
+    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(startTime), SmartDataLakeBuilderConfig())
     val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id)
     val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
     testAction.exec(Seq(srcSubFeed))
@@ -81,7 +81,7 @@ class CustomDfToDeltaTableTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start load
     val startTime = LocalDateTime.now()
-    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", instanceRegistry, Some(startTime), SmartDataLakeBuilderConfig())
+    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(startTime), SmartDataLakeBuilderConfig())
     val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id)
     val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
     testAction.exec(Seq(srcSubFeed))

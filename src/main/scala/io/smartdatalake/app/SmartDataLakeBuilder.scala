@@ -279,7 +279,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     // create and execute actions
     logger.info(s"starting application ${appName} runId=$runId attemptId=$attemptId")
-    implicit val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appName, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig)
+    implicit val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appName, runId, attemptId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig)
     val actionDAGRun = ActionDAGRun(actionsToExec, runId, attemptId, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, stateStore)
     try {
       actionDAGRun.prepare
