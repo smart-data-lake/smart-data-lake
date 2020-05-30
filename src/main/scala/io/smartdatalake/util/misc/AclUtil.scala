@@ -125,13 +125,12 @@ private[smartdatalake] object AclUtil extends SmartDataLakeLogger {
   }
 
   /**
-    *
-    * @param path
+    * Make sure that path is under user home.
     */
   def checkUserPath(currentUser: String, path: Path): Unit = {
     val userHome = extractPathLevel(path, Environment.hdfsAclsUserHomeLevel)
-    // user home might be prefixed. Check is therefore only if it ends with currentUser.
-    require( userHome.endsWith(currentUser), s"Permissions can only be set under hadoop Homedir if hdfsAclsLimitToUserHome is enabled, path=$path")
+    // userHome or username might be pre/postfixed. Check is therefore if one contains the other and vice versa.
+    require( userHome.contains(currentUser) || currentUser.contains(userHome), s"Permissions can only be set under hadoop Homedir if hdfsAclsLimitToUserHome is enabled, path=$path")
   }
 
   def extractPathLevel(path: Path, level: Int): String = {

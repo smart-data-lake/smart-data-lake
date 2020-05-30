@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.util.util
 
+import java.net.URI
 import java.nio.file.{Files, Paths}
 
 import io.smartdatalake.definitions.Environment

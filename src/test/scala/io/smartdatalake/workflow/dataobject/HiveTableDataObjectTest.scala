@@ -19,7 +19,8 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.ConfigFactory
-import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 
 class HiveTableDataObjectTest extends DataObjectTestSuite {
@@ -236,5 +237,29 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val dataObj = HiveTableDataObject.fromConfig(config, instanceRegistry)
 
     an [Exception] should be thrownBy dataObj.getDataFrame()
+  }
+
+  test("writing not possible without ACLs if authority restricted") {
+
+    // restrict default authority
+    // remove 2 characters from the end to test that a substring is enough for restriction
+    Environment.hadoopAuthoritiesWithAclsRequired = Seq(HdfsUtil.getHadoopDefaultSchemeAuthority().toString.reverse.drop(2).reverse)
+
+    try {
+      // create data object
+      val srcTable = Table(Some("default"), "input")
+      HiveUtil.dropTable(testSession, srcTable.db.get, srcTable.name)
+      val srcPath = tempPath + s"/${srcTable.fullName}"
+      val srcDO = HiveTableDataObject("input", srcPath, table = srcTable, partitions = Seq("p1", "p2"), numInitialHdfsPartitions = 1)
+
+      // write test files
+      val df = Seq(("A", "L2A", 1), ("A", "L2B", 2), ("B", "L2B", 3), ("B", "L2C", 4)).toDF("p1", "p2", "value")
+      intercept[IllegalArgumentException](srcDO.preWrite)
+
+    } finally {
+      // reset restriction
+      Environment.hadoopAuthoritiesWithAclsRequired = Seq()
+    }
+
   }
 }

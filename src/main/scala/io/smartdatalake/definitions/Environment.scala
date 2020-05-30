@@ -20,15 +20,26 @@ package io.smartdatalake.definitions
 
 import java.net.URI
 
+import io.smartdatalake.util.misc.EnvironmentUtil
+
 /**
- * Set this environment dependent configurations at the beginning of the [[io.smartdatalake.app.SmartDataLakeBuilder]] implementation for your environment.
+ * Environment dependent configurations.
+ * They can be set
+ * - by Java system properties (prefixed with "sdl.", e.g. "sdl.hadoopAuthoritiesWithAclsRequired")
+ * - by Environment variables (prefixed with "SDL_" and camelCase converted to uppercase, e.g. "SDL_HADOOP_AUTHORITIES_WITH_ACLS_REQUIRED")
+ * - by a custom [[io.smartdatalake.app.SmartDataLakeBuilder]] implementation for your environment, which sets these variables directly.
  */
 object Environment {
 
   /**
-   * Set to true if configuration of acls for HadoopDataObjects is mandatory
+   * List of hadoop authorities for which acls must be configured
+   * The environment parameter can contain multiple authorities separated by comma.
+   * An authority is compared against the filesystem URI with contains(...)
    */
-  var hdfsAclsRequired: Boolean = false
+  var hadoopAuthoritiesWithAclsRequired: Seq[String] = {
+    EnvironmentUtil.getSdlParameter("hadoopAuthoritiesWithAclsRequired")
+      .toSeq.flatMap(_.split(','))
+  }
 
   /**
    * Modifying ACL's is only allowed below and including the following level (default=2)
@@ -52,20 +63,29 @@ object Environment {
   /**
    * Set default hadoop schema and authority for path
    */
-  var hadoopDefaultSchemeAuthority: Option[URI] = None
+  var hadoopDefaultSchemeAuthority: Option[URI] = {
+    EnvironmentUtil.getSdlParameter("hadoopDefaultSchemeAuthority")
+      .map(new URI(_))
+  }
 
   /**
    * ordering of columns in SchemaEvolution result
    * - true: result schema is ordered according to existing schema, new columns are appended
    * - false: result schema is ordered according to new schema, deleted columns are appended
    */
-  var schemaEvolutionNewColumnsLast: Boolean = true
+  var schemaEvolutionNewColumnsLast: Boolean = {
+    EnvironmentUtil.getSdlParameter("schemaEvolutionNewColumnsLast")
+      .map(_.toBoolean).getOrElse(true)
+  }
 
   /**
    * If `true`, schema validation does not consider nullability of columns/fields when checking for equality.
    * If `false`, schema validation considers two columns/fields different when their nullability property is not equal.
    */
-  var schemaValidationIgnoresNullability: Boolean = true
+  var schemaValidationIgnoresNullability: Boolean = {
+    EnvironmentUtil.getSdlParameter("schemaValidationIgnoresNullability")
+      .map(_.toBoolean).getOrElse(true)
+  }
 
   /**
    * If `true`, schema validation inspects the whole hierarchy of structured data types. This allows partial matches
@@ -76,13 +96,19 @@ object Environment {
    *          val schema = StructType.fromDDL("c1 STRING, c2 STRUCT(c2_1 INT, c2_2 STRING)") validates
    *          against StructType.fromDDL("c1 STRING, c2 STRUCT(c2_1 INT)") only if `schemaValidationDeepComarison == true`.
    */
-  var schemaValidationDeepComarison: Boolean = true
+  var schemaValidationDeepComarison: Boolean = {
+    EnvironmentUtil.getSdlParameter("schemaValidationDeepComarison")
+      .map(_.toBoolean).getOrElse(true)
+  }
 
   /**
    * Set to true if you want table and database names to be case sensitive when loading over JDBC.
    * If your database supports case sensitive table names and you want to use that feature, set this to true.
    */
-  var enableJdbcCaseSensitivity: Boolean = false
+  var enableJdbcCaseSensitivity: Boolean = {
+    EnvironmentUtil.getSdlParameter("enableJdbcCaseSensitivity")
+      .map(_.toBoolean).getOrElse(false)
+  }
 
   // static configurations
   val configPathsForLocalSubstitution: Seq[String] = Seq("path", "table.name", "create-sql", "createSql", "pre-sql", "preSql", "post-sql", "postSql")
