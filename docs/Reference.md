@@ -53,7 +53,6 @@ It can be started with the following command line (details see [YARN](YARN.md))
 spark-submit --master yarn --deploy-mode client --class io.smartdatalake.app.DefaultSmartDataLakeBuilder target/smartdatalake_2.11-1.0.3-jar-with-dependencies.jar [arguments]
 ```
 and takes the following arguments:
-
 ```
 Usage: DefaultSmartDataLakeBuilder [start|recover] [options]
 Command: start [options]
