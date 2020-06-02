@@ -253,4 +253,18 @@ class AclUtilTest extends FunSuite with BeforeAndAfter {
     assert(AclUtil.extractPathLevel(new Path("hdfs://dfs.nameservices/user/app_dir/test/abc"),Environment.hdfsAclsUserHomeLevel) == "app_dir")
     intercept[IllegalArgumentException](AclUtil.extractPathLevel(new Path("hdfs://dfs.nameservices/user/"),Environment.hdfsAclsUserHomeLevel) == "app_dir")
   }
+
+  test("check hdfsAclsLimitToBasedir") {
+
+    // check user home validation
+    AclUtil.checkBasedirPath("app_dir", new Path("hdfs://dfs.nameservices/user/app_dir"))
+    intercept[IllegalArgumentException](AclUtil.checkBasedirPath("app_other_dir", new Path("hdfs://dfs.nameservices/user/app_dir")))
+    val hdfsBaseDirOrg = Environment.hdfsBasedir
+
+    // check basedir valdiation
+    Environment.hdfsBasedir = Some(new Path("hdfs://dfs.nameservices/user/app_other_dir").toUri)
+    AclUtil.checkBasedirPath("app_dir", new Path("hdfs://dfs.nameservices/user/app_other_dir"))
+    intercept[IllegalArgumentException](AclUtil.checkBasedirPath("app_dir", new Path("hdfs://dfs.nameservices/user/app_dir")))
+    Environment.hdfsBasedir = hdfsBaseDirOrg // revert environment config
+  }
 }

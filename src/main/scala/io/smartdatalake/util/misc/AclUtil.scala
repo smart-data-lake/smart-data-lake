@@ -59,7 +59,7 @@ private[smartdatalake] case class AclElement (aclType:String, name:String, permi
  * 2) modify ACLs on the parent directories up to a certain level configured by hdfsAclMinLevelPermissionModify
  * Additional limitations for overwriting ACLs can be configured by hdfsAclMinLevelPermissionOverwrite
  *
- * By default, changing ACLs is also limited to the user home directory. This is configured by hdfsAclsLimitToUserHome and hdfsAclsUserHomeLevel.
+ * By default, changing ACLs is also limited to the base directory. This is configured by hdfsAclsLimitToBasedir and hdfsAclsUserHomeLevel or hdfsBasedir.
  * It checks if path at hdfsAclsUserHomeLevel ends with username.
  *
  * A common structure for directories on HDFS is as follows:
@@ -97,7 +97,7 @@ private[smartdatalake] object AclUtil extends SmartDataLakeLogger {
   def addACLs(aclConfig: AclDef, path: Path)(implicit fileSystem: FileSystem): Unit = {
 
     // check if modification allowed
-    if (Environment.hdfsAclsLimitToUserHome) checkUserPath(currentUser, path)
+    if (Environment.hdfsAclsLimitToBasedir) checkBasedirPath(currentUser, path)
     require(getPathLevel(path) >= Environment.hdfsAclsMinLevelPermissionOverwrite, s"ACLs can't be overwritten on path '$path', level=${getPathLevel(path)} because hdfsAclsMinLevelPermissionOverwrite=${Environment.hdfsAclsMinLevelPermissionOverwrite}")
     require(Environment.hdfsAclsMinLevelPermissionOverwrite >= Environment.hdfsAclsMinLevelPermissionModify, s"hdfsAclsMinLevelPermissionOverwrite (${Environment.hdfsAclsMinLevelPermissionOverwrite}) must be greater than or equal to hdfsAclsMinLevelPermissionModify (${Environment.hdfsAclsMinLevelPermissionModify})")
 
@@ -125,12 +125,16 @@ private[smartdatalake] object AclUtil extends SmartDataLakeLogger {
   }
 
   /**
-    * Make sure that path is under user home.
+    * Make sure that path is under base dir.
     */
-  def checkUserPath(currentUser: String, path: Path): Unit = {
-    val userHome = extractPathLevel(path, Environment.hdfsAclsUserHomeLevel)
-    // userHome or username might be pre/postfixed. Check is therefore if one contains the other and vice versa.
-    require( userHome.contains(currentUser) || currentUser.contains(userHome), s"Permissions can only be set under hadoop Homedir if hdfsAclsLimitToUserHome is enabled, path=$path")
+  def checkBasedirPath(currentUser: String, path: Path): Unit = {
+    if (Environment.hdfsBasedir.isDefined) {
+      require(path.toUri.getPath.startsWith(Environment.hdfsBasedir.get.getPath), s"Permissions can only be set under hadoop basedir if hdfsAclsLimitToBasedir is enabled, path=$path")
+    } else {
+      val userHome = extractPathLevel(path, Environment.hdfsAclsUserHomeLevel)
+      // userHome or username might be pre/postfixed. Check is therefore if one contains the other and vice versa.
+      require(userHome.contains(currentUser) || currentUser.contains(userHome), s"Permissions can only be set under hadoop basedir if hdfsAclsLimitToBasedir is enabled, path=$path")
+    }
   }
 
   def extractPathLevel(path: Path, level: Int): String = {

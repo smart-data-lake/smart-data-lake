@@ -45,20 +45,45 @@ object Environment {
    * Modifying ACL's is only allowed below and including the following level (default=2)
    * See also [[io.smartdatalake.util.misc.AclUtil]]
    */
-  var hdfsAclsMinLevelPermissionModify = 2 // up to user home
+  var hdfsAclsMinLevelPermissionModify: Int = {
+    EnvironmentUtil.getSdlParameter("hdfsAclsMinLevelPermissionModify")
+      .map(_.toInt).getOrElse(2)
+  }
 
   /**
    * Overwriting ACL's is only allowed below and including the following level (default=5)
    * See also [[io.smartdatalake.util.misc.AclUtil]]
    */
-  var hdfsAclsMinLevelPermissionOverwrite = 5 // incl. and underneath feed
+  var hdfsAclsMinLevelPermissionOverwrite: Int = {
+    EnvironmentUtil.getSdlParameter("hdfsAclsMinLevelPermissionOverwrite")
+      .map(_.toInt).getOrElse(5)
+  }
 
   /**
-   * Limit setting ACL's to user home (default=true)
-   Declare on which level in the directory hierarchy your user homes are (usually on level 2)
+   * Limit setting ACL's to Basedir (default=true)
+   * See hdfsAclsUserHomeLevel or hdfsBasedir on how the basedir is determined
    */
-  var hdfsAclsLimitToUserHome = true
-  var hdfsAclsUserHomeLevel = 2
+  var hdfsAclsLimitToBasedir: Boolean = {
+    EnvironmentUtil.getSdlParameter("hdfsAclsLimitToBasedir")
+      .map(_.toBoolean).getOrElse(true)
+  }
+
+  /**
+   * Set path level of user home to determine basedir automatically (Default=2 -> /user/myUserHome)
+   */
+  var hdfsAclsUserHomeLevel: Int = {
+    EnvironmentUtil.getSdlParameter("hdfsAclsUserHomeLevel")
+      .map(_.toInt).getOrElse(2)
+  }
+
+  /**
+   * Set basedir explicitly.
+   * This overrides automatically detected user home for acl constraints by hdfsAclsUserHomeLevel.
+   */
+  var hdfsBasedir: Option[URI] = {
+    EnvironmentUtil.getSdlParameter("hdfsBasedir")
+      .map(new URI(_))
+  }
 
   /**
    * Set default hadoop schema and authority for path
