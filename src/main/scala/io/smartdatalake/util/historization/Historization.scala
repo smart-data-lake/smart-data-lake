@@ -27,7 +27,7 @@ import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.misc.{DataFrameUtil, SmartDataLakeLogger}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.TimestampType
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 
 import scala.util.hashing.MurmurHash3
 
@@ -40,7 +40,7 @@ private[smartdatalake] object Historization extends SmartDataLakeLogger {
 
   private val hashRow = (xs: Seq[Any]) => {
     val fooSeed = MurmurHash3.stringHash("mySpecificSeed")
-    val concatenated = xs.filter(_ != null).mkString(",")
+    val concatenated = xs.head.asInstanceOf[Row].toSeq.filter(_ != null).map(_.toString).mkString(",")
     MurmurHash3.stringHash(concatenated, fooSeed)
   }
 
@@ -138,10 +138,11 @@ private[smartdatalake] object Historization extends SmartDataLakeLogger {
     //val restHist = historyDf.except(lastHistDf)
     val restHist = historyDf.where(col(expiryDateCol) =!= s"$doomsday")
 
+
     val historizeHashCols = (historizeWhitelist, historizeBlacklist) match {
       case (Some(w), None) => w.sorted
       case (None, Some(b)) => newFeedDf.columns.diff(b).sorted.toSeq
-      case (None, None) => newFeedDf.columns.toSeq
+      case (None, None) => newFeedDf.columns.sorted.toSeq
       case (Some(_), Some(_)) => throw new ConfigurationException("historizeWhitelist and historizeBlacklist mustn't be used at the same time.")
     }
     val newFeedHashed = newFeedDf.withColumn("hash", hashFunc(array(struct(historizeHashCols.map(col): _*))))
@@ -156,7 +157,9 @@ private[smartdatalake] object Historization extends SmartDataLakeLogger {
       case (None, Some(b)) =>
         val colsToUse = colsToUseLastHistDf.diff(b).sorted
         lastHistDf.withColumn("hash", hashFunc(array(struct(colsToUse.map(col): _*))))
-      case (None, None) => lastHistDf.withColumn("hash", hashFunc(array(struct(colsToUseLastHistDf.map(col): _*))))
+      case (None, None) =>
+        val colsToUse = colsToUseLastHistDf.sorted
+        lastHistDf.withColumn("hash", hashFunc(array(struct(colsToUse.map(col): _*))))
       case (Some(_), Some(_)) => throw new ConfigurationException("historize-whitelist and historize-blacklist mustn't be used at the same time.")
     }
 
