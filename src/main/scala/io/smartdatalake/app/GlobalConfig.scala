@@ -23,6 +23,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.util.misc.{MemoryUtils, SmartDataLakeLogger}
 import org.apache.spark.sql.SparkSession
 import configs.syntax._
+import io.smartdatalake.definitions.Environment
 import org.apache.spark.{ExecutorPlugin, SparkConf, SparkEnv}
 
 /**
@@ -49,13 +50,16 @@ case class GlobalConfig( kryoClasses: Option[Seq[String]] = None, sparkOptions: 
    * Create a spark session using settings from this global config
    */
   def createSparkSession(appName: String, master: Option[String], deployMode: Option[String] = None): SparkSession = {
+    if (Environment._sparkSession != null) throw new IllegalStateException("SparkSession already initialized. Something is wrong.")
     // prepare additional spark options
     // enable MemoryLoggerExecutorPlugin if memoryLogTimer is enabled
     val executorPlugins = (sparkOptions.flatMap(_.get("spark.executor.plugins")).toSeq ++ (if (memoryLogTimer.isDefined) Seq(classOf[MemoryLoggerExecutorPlugin].getName) else Seq())).mkString(",")
     // config for MemoryLoggerExecutorPlugin can only be transfered to Executor by spark-options
     val memoryLogOptions = memoryLogTimer.map(_.getAsMap).getOrElse(Map())
     val sparkOptionsExtended = sparkOptions.getOrElse(Map()) ++ memoryLogOptions + ("spark.executor.plugins" -> executorPlugins)
-    AppUtil.createSparkSession(appName, master, deployMode, kryoClasses, Some(sparkOptionsExtended), enableHive)
+    Environment._sparkSession = AppUtil.createSparkSession(appName, master, deployMode, kryoClasses, Some(sparkOptionsExtended), enableHive)
+    // return
+    Environment._sparkSession
   }
 }
 object GlobalConfig {
