@@ -21,6 +21,7 @@ package io.smartdatalake.definitions
 import java.net.URI
 
 import io.smartdatalake.util.misc.EnvironmentUtil
+import org.apache.spark.sql.SparkSession
 
 /**
  * Environment dependent configurations.
@@ -138,5 +139,9 @@ object Environment {
   // static configurations
   val configPathsForLocalSubstitution: Seq[String] = Seq("path", "table.name", "create-sql", "createSql", "pre-sql", "preSql", "post-sql", "postSql")
   val defaultPathSeparator: Char = '/'
+
+  // dynamically shared environment for custom code (see also #106)
+  def sparkSession: SparkSession = _sparkSession
+  private [smartdatalake] var _sparkSession: SparkSession = _
 
 }
