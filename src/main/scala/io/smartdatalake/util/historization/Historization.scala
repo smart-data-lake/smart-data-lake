@@ -39,11 +39,7 @@ private[smartdatalake] object Historization extends SmartDataLakeLogger {
   private val ts1: java.time.LocalDateTime => Column = t => lit(t.toString).cast(TimestampType)
 
   private val fooSeed = MurmurHash3.stringHash("mySpecificSeed")
-  private val hashRow = (xs: Row) => {
-    val concatenated = xs.toSeq.filter(_ != null).map(_.toString).mkString(",")
-    MurmurHash3.stringHash(concatenated, fooSeed)
-  }
-
+  private val hashRow = (colsJson: String) => MurmurHash3.stringHash(colsJson, fooSeed)
   private val hashFunc = udf(hashRow)
 
   def historizedForEmptyLoad(history: DataFrame, referenceTimestamp: LocalDateTime, doPersist: Boolean,
@@ -101,8 +97,8 @@ private[smartdatalake] object Historization extends SmartDataLakeLogger {
    * @param historyDf exsisting history of data
    * @param newFeedDf current load of feed
    * @param primaryKeyColumns Primary keys to join history with current load
-   * @param historizeBlacklist optional list of columns to ignore when comparing two records. Can not be used together with [[historizeWhitelist]].
-   * @param historizeWhitelist optional final list of columns to use when comparing two records. Can not be used together with [[historizeBlacklist]].
+   * @param historizeBlacklist optional list of columns to ignore when comparing two records. Can not be used together with historizeWhitelist.
+   * @param historizeWhitelist optional final list of columns to use when comparing two records. Can not be used together with historizeBlacklist.
    * @return current feed merged with history
   */
   def getHistorized(historyDf: DataFrame, newFeedDf: DataFrame, primaryKeyColumns: Seq[String],
@@ -145,7 +141,11 @@ private[smartdatalake] object Historization extends SmartDataLakeLogger {
       case (None, None) => newFeedDf.columns.sorted.toSeq
       case (Some(_), Some(_)) => throw new ConfigurationException("historizeWhitelist and historizeBlacklist mustn't be used at the same time.")
     }
-    val newFeedHashed = newFeedDf.withColumn("hash", hashFunc(struct(historizeHashCols.map(col): _*)))
+
+    // Generic column expression to generate a JSON string of the hash fields
+    def colsToJson(cols: Seq[String]): Column = hashFunc(to_json(struct(cols.map(col): _*)))
+
+    val newFeedHashed = newFeedDf.withColumn("hash", colsToJson(historizeHashCols))
 
     // columns used to build hash according to newFeedDf (lastHistDf contains dl_captured/delimited)
     val colsToUseLastHistDf = lastHistDf.columns.diff(Seq(TechnicalTableColumn.captured.toString, TechnicalTableColumn.delimited.toString, "dl_dt")).sorted
@@ -153,13 +153,13 @@ private[smartdatalake] object Historization extends SmartDataLakeLogger {
       case (Some(w), None) =>
         val w_diff = w.diff(Seq(TechnicalTableColumn.captured.toString, TechnicalTableColumn.delimited.toString, "dl_dt"))
         val colsToUse = colsToUseLastHistDf.intersect(w_diff).sorted // merged columns from whitelist und lastHistDf without technical columns
-        lastHistDf.withColumn("hash", hashFunc(struct(colsToUse.map(col): _*)))
+        lastHistDf.withColumn("hash", colsToJson(colsToUse))
       case (None, Some(b)) =>
         val colsToUse = colsToUseLastHistDf.diff(b).sorted
-        lastHistDf.withColumn("hash", hashFunc(struct(colsToUse.map(col): _*)))
+        lastHistDf.withColumn("hash", colsToJson(colsToUse))
       case (None, None) =>
         val colsToUse = colsToUseLastHistDf.sorted
-        lastHistDf.withColumn("hash", hashFunc(struct(colsToUse.map(col): _*)))
+        lastHistDf.withColumn("hash", colsToJson(colsToUse))
       case (Some(_), Some(_)) => throw new ConfigurationException("historize-whitelist and historize-blacklist mustn't be used at the same time.")
     }
 

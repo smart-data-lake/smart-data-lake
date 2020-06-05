@@ -105,9 +105,7 @@ object TestUtil extends SmartDataLakeLogger {
 
   // compare column name and type of two dataframes
   def isDataFrameDataEqual( df1:DataFrame, df2:DataFrame ) : Boolean = {
-    df1.withColumn("col1", lit(true))
-      .join(df2.withColumn("col2", lit(true)), df1.columns, "full")
-      .where(col("col1").isNull or col("col2").isNull)
+    df1.union(df2).except(df1.intersect(df2))
       .count == 0
   }
 
