@@ -139,7 +139,7 @@ private[smartdatalake] object Historization extends SmartDataLakeLogger {
     }
 
     // Generic column expression to generate a JSON string of the hash fields
-    def colHashExpr(cols: Seq[String]): Column = hash(to_json(struct(cols.map(col): _*)))
+    def colHashExpr(cols: Seq[String]): Column = to_json(struct(cols.map(col): _*))
 
     val newFeedHashed = newFeedDf.withColumn("hash", colHashExpr(historizeHashCols))
 
