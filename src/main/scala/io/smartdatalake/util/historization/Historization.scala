@@ -38,55 +38,6 @@ private[smartdatalake] object Historization extends SmartDataLakeLogger {
 
   private val ts1: java.time.LocalDateTime => Column = t => lit(t.toString).cast(TimestampType)
 
-  def historizedForEmptyLoad(history: DataFrame, referenceTimestamp: LocalDateTime, doPersist: Boolean,
-                             filterClause: Option[String])(implicit session: SparkSession): DataFrame = {
-    session.sparkContext.setJobDescription(s"${getClass.getSimpleName}.historizedForEmptyLoad")
-    val expiryDateCol = TechnicalTableColumn.delimited.toString
-    val offsetNs = 1000000L
-    val doomsday = definitions.HiveConventions.getHistorizationSurrogateTimestamp
-    val timestampNew = referenceTimestamp
-    val timestampOld = timestampNew.minusNanos(offsetNs)
-
-    val (historyFiltered, historyFilteredRemaining): (Option[DataFrame], Option[DataFrame]) =
-      filterClause match {
-      case Some(clause) =>
-        val negatedClause = s"NOT ($clause)"
-        (Some(history.where(clause)), Some(history.where(negatedClause)))
-      case None => (None, None)
-      }
-
-    val historyDf = if (doPersist) {
-      historyFiltered match {
-        case Some(_) => DataFrameUtil.defaultPersistDf(historyFiltered.get)
-        case None => DataFrameUtil.defaultPersistDf(history)
-      }
-    } else {
-      historyFiltered match {
-        case Some(_) => historyFiltered.get
-        case None => history
-      }
-    }
-
-    val lastHist = historyDf.where(s"$expiryDateCol = '$doomsday'")
-    val lastHistDf = if (doPersist) {
-      DataFrameUtil.defaultPersistDf(lastHist)
-    } else {
-      lastHist
-    }
-
-    val restHist = historyDf.where(s"$expiryDateCol <> '$doomsday'")
-
-    // (technical) deletes, that is records are not present in current data load anymore
-    val notInFeedAnymore = lastHistDf.withColumn(s"$expiryDateCol", ts1(timestampOld))
-
-    val all = historyFilteredRemaining match {
-      case Some(_) => notInFeedAnymore.union(restHist).union(historyFilteredRemaining.get)
-      case None => notInFeedAnymore.union(restHist)
-    }
-
-    all
-  }
-
   /**
    * Historizes data by merging the current load with the existing history
    *
