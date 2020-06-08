@@ -21,6 +21,7 @@ package io.smartdatalake.app
 import java.io.File
 
 import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.util.misc.EnvironmentUtil
 
 /**
  * Smart Data Lake Builder application for local mode.
@@ -70,7 +71,7 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
       case Some(config) =>
 
         // checking environment variables for local mode
-        require( System.getenv("HADOOP_HOME")!=null, "Env variable HADOOP_HOME needs to be set in local mode!" )
+        require( !EnvironmentUtil.isWindowsOS || System.getenv("HADOOP_HOME")!=null, "Env variable HADOOP_HOME needs to be set in local mode in Windows!" )
         require( !config.master.contains("yarn") || System.getenv("SPARK_HOME")!=null, "Env variable SPARK_HOME needs to be set in local mode with master=yarn!" )
 
         // authenticate with kerberos if configured

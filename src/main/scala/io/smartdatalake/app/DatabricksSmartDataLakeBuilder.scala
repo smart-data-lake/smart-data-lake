@@ -33,24 +33,29 @@ object DatabricksSmartDataLakeBuilder extends SmartDataLakeBuilder {
    * @param args Command-line arguments.
    */
   def main(args: Array[String]): Unit = {
-    logger.info(s"Start programm ${appType}")
+    logger.info(s"Start programm $appType")
 
     val config = initConfigFromEnvironment.copy (
       overrideJars = Some(Seq("config-1.3.4.jar"))
     )
 
-    val c = parseCommandLineArguments(args, config)
+    parseCommandLineArguments(args, config) match {
+      case Some(c) =>
 
-    val jars = c.flatMap(_.overrideJars)
-      .getOrElse(throw new ConfigurationException("override-jars option must be specified for DatabricksSmartDataLakeBuilder"))
+        val jars = c.overrideJars.getOrElse (throw new ConfigurationException(s"override-jars option must be specified for $appType"))
 
-    // get a DefaultSmartDataLakeBuilder instance from ChildFirstClassLoader
-    // use reflection to avoid ClassCastException because of different ClassLoaders
-    val classLoader = AppUtil.getChildFirstClassLoader(jars)
-    val clazz = classLoader.loadClass(classOf[DefaultSmartDataLakeBuilder].getName)
-    val smartDataLakeBuilder = clazz.newInstance
-    val runMethod = clazz.getDeclaredMethods.find( m => m.getName == "parseAndRun" && m.getParameterCount == 2)
-      .getOrElse( throw new IllegalStateException("'parseAndRun' method not found for class DefaultSmartDataLakeBuilder"))
-    runMethod.invoke(smartDataLakeBuilder, args, Boolean.box(true))
+        // get a DefaultSmartDataLakeBuilder instance from ChildFirstClassLoader
+        // use reflection to avoid ClassCastException because of different ClassLoaders
+        val classLoader = AppUtil.getChildFirstClassLoader(jars)
+        val className = classOf[DefaultSmartDataLakeBuilder].getName
+        val clazz = classLoader.loadClass(className)
+        val smartDataLakeBuilder = clazz.newInstance
+        val runMethodName = "parseAndRun"
+        val runMethod = clazz.getDeclaredMethods.find (m => m.getName == runMethodName && m.getParameterCount == 2)
+        .getOrElse (throw new IllegalStateException(s"'$runMethodName' method not found for class $className") )
+        runMethod.invoke(smartDataLakeBuilder, args, Boolean.box (true) )
+      case None =>
+        logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
+    }
   }
 }
