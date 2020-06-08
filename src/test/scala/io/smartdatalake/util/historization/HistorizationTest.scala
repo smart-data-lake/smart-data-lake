@@ -23,9 +23,9 @@ import java.time.LocalDateTime
 import io.smartdatalake.definitions.{HiveConventions, TechnicalTableColumn}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import org.apache.spark.sql.functions.{lit, when, col}
-import org.apache.spark.sql.types.{StringType, StructField, StructType, TimestampType}
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import org.apache.spark.sql.functions.{col, lit, when, to_timestamp}
+import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType, TimestampType}
+import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
 
@@ -39,11 +39,11 @@ class HistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeL
 
   private object HistorizationPhase extends Enumeration {
     type HistorizationPhase = Value
-    val Existing = Value
-    val UpdatedNew = Value
-    val UpdatedOld = Value
-    val NewlyAdded = Value
-    val TechnicallyDeleted = Value
+    val Existing: HistorizationPhase = Value
+    val UpdatedNew: HistorizationPhase = Value
+    val UpdatedOld: HistorizationPhase = Value
+    val NewlyAdded: HistorizationPhase = Value
+    val TechnicallyDeleted: HistorizationPhase = Value
   }
 
   private val ts1: java.time.LocalDateTime => Column = t => lit(t.toString).cast(TimestampType)
@@ -80,36 +80,31 @@ class HistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeL
     import session.sqlContext.implicits._
     val rddHist = session.sparkContext.parallelize(records)
     phase match {
-      case HistorizationPhase.Existing => {
+      case HistorizationPhase.Existing =>
         val dfHist = rddHist.toDF(colNames: _*)
         .withColumn(s"${TechnicalTableColumn.captured.toString}", ts1(erfasstTimestampOldHist))
         .withColumn(s"${TechnicalTableColumn.delimited.toString}", ts1(ersetztTimestampOldHist))
         setNullableStateOfColumn(dfHist, colNullability)
-      }
-      case HistorizationPhase.UpdatedOld => {
+      case HistorizationPhase.UpdatedOld =>
         val dfHist = rddHist.toDF(colNames: _*)
           .withColumn(s"${TechnicalTableColumn.captured.toString}", ts1(erfasstTimestampOldHist))
           .withColumn(s"${TechnicalTableColumn.delimited.toString}", ts1(referenceTimestampOld))
         setNullableStateOfColumn(dfHist, colNullability)
-      }
-      case HistorizationPhase.UpdatedNew => {
+      case HistorizationPhase.UpdatedNew =>
         val dfHist = rddHist.toDF(colNames: _*)
           .withColumn(s"${TechnicalTableColumn.captured.toString}", ts1(referenceTimestampNew))
           .withColumn(s"${TechnicalTableColumn.delimited.toString}", ts1(doomsday))
         setNullableStateOfColumn(dfHist, colNullability)
-      }
-      case HistorizationPhase.NewlyAdded => {
+      case HistorizationPhase.NewlyAdded =>
         val dfHist = rddHist.toDF(colNames: _*)
           .withColumn(s"${TechnicalTableColumn.captured.toString}", ts1(referenceTimestampNew))
           .withColumn(s"${TechnicalTableColumn.delimited.toString}", ts1(doomsday))
         setNullableStateOfColumn(dfHist, colNullability)
-      }
-      case HistorizationPhase.TechnicallyDeleted => {
+      case HistorizationPhase.TechnicallyDeleted =>
         val dfHist = rddHist.toDF(colNames: _*)
           .withColumn(s"${TechnicalTableColumn.captured.toString}", ts1(erfasstTimestampOldDeletedHist))
           .withColumn(s"${TechnicalTableColumn.delimited.toString}", ts1(ersetztTimestampOldDeletedHist))
         setNullableStateOfColumn(dfHist, colNullability)
-      }
     }
   }
 
@@ -124,7 +119,7 @@ class HistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeL
     val schema = df.schema
     val newSchema = StructType(schema.map {
       case StructField( c, t, _, m) if nullValues.contains(c) => StructField( c, t,
-        nullable = nullValues.get(c).get, m)
+        nullable = nullValues(c), m)
       case y: StructField => y
     })
     df.sqlContext.createDataFrame( df.rdd, newSchema )
@@ -159,7 +154,7 @@ class HistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeL
     val dfExpected = dfUnchangedWithAdditionalCols
     logger.debug(s"Expected result: ${dfExpected.collect.foreach(println)}")
 
-    assert(dfHistorized.collect().size==3)
+    assert(dfHistorized.collect().length==3)
   }
 
   ignore("History unchanged when deleting columns but unchanged data.") {
@@ -433,4 +428,43 @@ class HistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeL
 
     assert(TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfHistorized)))
   }
+
+  test("Exchanging non-null value and null value between columns should create a new history entry") {
+
+    // Arrange
+    val schemaValues = List(StructField("id", IntegerType, nullable = false),
+      StructField("col_A", StringType, nullable = true),
+      StructField("col_B", StringType, nullable = true))
+
+    val schemaHistory = schemaValues ++ List(
+      StructField("captured", StringType, nullable = false),
+      StructField("delimited", StringType, nullable = true))
+
+    val existingData = Seq(Row.fromSeq(Seq(1, null, "value", erfasstTimestampOldHist.toString, doomsday.toString)))
+    val newData = Seq(Row.fromSeq(Seq(1, "value", null)))
+    val expectedResult = Seq(Row.fromSeq(Seq(1, null, "value", erfasstTimestampOldHist.toString, referenceTimestampOld.toString)),
+      Row.fromSeq(Seq(1, "value", null, referenceTimestampNew.toString, doomsday.toString)))
+
+    val parseTimestampColumns : DataFrame => DataFrame = df =>
+      df.withColumn(TechnicalTableColumn.captured.toString, to_timestamp(col("captured")))
+        .withColumn(TechnicalTableColumn.delimited.toString, to_timestamp(col("delimited")))
+        .drop("captured")
+        .drop("delimited")
+
+    val dfHistory = parseTimestampColumns(session.createDataFrame(session.sparkContext.parallelize(existingData), StructType(schemaHistory)))
+    val dfExpected = parseTimestampColumns(session.createDataFrame(session.sparkContext.parallelize(expectedResult), StructType(schemaHistory)))
+    val dfNew = session.createDataFrame(session.sparkContext.parallelize(newData), StructType(schemaValues))
+
+    // Act
+    val dfResult = Historization.getHistorized(dfHistory, dfNew, Seq("id"), referenceTimestampNew, None, None)
+
+    // Assert
+    println(s"Existing history: ${dfHistory.collect.map(_.toString).mkString(",")}")
+    println(s"New Value: ${dfNew.collect.map(_.toString).mkString(",")}")
+    println(s"Expected value: ${sortResults(dfExpected).collect.map(_.toString).mkString(",")}")
+    println(s"Historization result: ${sortResults(dfResult).collect.map(_.toString).mkString(",")}")
+
+    assert(TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfResult)))
+  }
+
 }
