@@ -26,7 +26,7 @@ import io.smartdatalake.definitions.{HiveConventions, TechnicalTableColumn}
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.misc.{DataFrameUtil, SmartDataLakeLogger}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.TimestampType
+import org.apache.spark.sql.types.{StructType, TimestampType}
 import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 
 import scala.util.hashing.MurmurHash3
@@ -37,55 +37,6 @@ import scala.util.hashing.MurmurHash3
 private[smartdatalake] object Historization extends SmartDataLakeLogger {
 
   private val ts1: java.time.LocalDateTime => Column = t => lit(t.toString).cast(TimestampType)
-
-  def historizedForEmptyLoad(history: DataFrame, referenceTimestamp: LocalDateTime, doPersist: Boolean,
-                             filterClause: Option[String])(implicit session: SparkSession): DataFrame = {
-    session.sparkContext.setJobDescription(s"${getClass.getSimpleName}.historizedForEmptyLoad")
-    val expiryDateCol = TechnicalTableColumn.delimited.toString
-    val offsetNs = 1000000L
-    val doomsday = definitions.HiveConventions.getHistorizationSurrogateTimestamp
-    val timestampNew = referenceTimestamp
-    val timestampOld = timestampNew.minusNanos(offsetNs)
-
-    val (historyFiltered, historyFilteredRemaining): (Option[DataFrame], Option[DataFrame]) =
-      filterClause match {
-      case Some(clause) =>
-        val negatedClause = s"NOT ($clause)"
-        (Some(history.where(clause)), Some(history.where(negatedClause)))
-      case None => (None, None)
-      }
-
-    val historyDf = if (doPersist) {
-      historyFiltered match {
-        case Some(_) => DataFrameUtil.defaultPersistDf(historyFiltered.get)
-        case None => DataFrameUtil.defaultPersistDf(history)
-      }
-    } else {
-      historyFiltered match {
-        case Some(_) => historyFiltered.get
-        case None => history
-      }
-    }
-
-    val lastHist = historyDf.where(s"$expiryDateCol = '$doomsday'")
-    val lastHistDf = if (doPersist) {
-      DataFrameUtil.defaultPersistDf(lastHist)
-    } else {
-      lastHist
-    }
-
-    val restHist = historyDf.where(s"$expiryDateCol <> '$doomsday'")
-
-    // (technical) deletes, that is records are not present in current data load anymore
-    val notInFeedAnymore = lastHistDf.withColumn(s"$expiryDateCol", ts1(timestampOld))
-
-    val all = historyFilteredRemaining match {
-      case Some(_) => notInFeedAnymore.union(restHist).union(historyFilteredRemaining.get)
-      case None => notInFeedAnymore.union(restHist)
-    }
-
-    all
-  }
 
   /**
    * Historizes data by merging the current load with the existing history
@@ -122,6 +73,10 @@ private[smartdatalake] object Historization extends SmartDataLakeLogger {
     // Shortly before the current timestamp ("Tick") used for existing, old records
     val timestampOld = timestampNew.minusNanos(offsetNs)
 
+    // make sure history schema is equal to new feed schema
+    val colsToIgnore = Seq(lastUpdateCol, expiryDateCol, "dl_dt")
+    assert(SchemaEvolution.hasSameColNamesAndTypes( StructType(historyDf.schema.filterNot( n => colsToIgnore.contains(n.name))), newFeedDf.schema))
+
     // Records in history that still existed during the last execution
     //val lastHist = historyPersisted.where(s"$expiryDateCol = '$doomsday'")
     val lastHistDf = historyDf.where(col(expiryDateCol) === s"$doomsday")
@@ -130,7 +85,6 @@ private[smartdatalake] object Historization extends SmartDataLakeLogger {
     //val restHist = historyDf.except(lastHistDf)
     val restHist = historyDf.where(col(expiryDateCol) =!= s"$doomsday")
 
-
     val historizeHashCols = (historizeWhitelist, historizeBlacklist) match {
       case (Some(w), None) => w.sorted
       case (None, Some(b)) => newFeedDf.columns.diff(b).sorted.toSeq
@@ -138,29 +92,29 @@ private[smartdatalake] object Historization extends SmartDataLakeLogger {
       case (Some(_), Some(_)) => throw new ConfigurationException("historizeWhitelist and historizeBlacklist mustn't be used at the same time.")
     }
 
-    // Generic column expression to generate a JSON string of the hash fields
-    def colHashExpr(cols: Seq[String]): Column = to_json(struct(cols.map(col): _*))
+    // Generic column expression to compare a list of columns
+    def colsComparisionExpr(cols: Seq[String]): Column = struct(cols.map(col): _*)
 
-    val newFeedHashed = newFeedDf.withColumn("hash", colHashExpr(historizeHashCols))
+    val newFeedHashed = newFeedDf.withColumn("hash", colsComparisionExpr(historizeHashCols))
 
     // columns used to build hash according to newFeedDf (lastHistDf contains dl_captured/delimited)
-    val colsToUseLastHistDf = lastHistDf.columns.diff(Seq(TechnicalTableColumn.captured.toString, TechnicalTableColumn.delimited.toString, "dl_dt")).sorted
+    val colsToUseLastHistDf = lastHistDf.columns.diff(colsToIgnore).sorted
     val lastHistHashed = (historizeWhitelist, historizeBlacklist) match {
       case (Some(w), None) =>
-        val w_diff = w.diff(Seq(TechnicalTableColumn.captured.toString, TechnicalTableColumn.delimited.toString, "dl_dt"))
+        val w_diff = w.diff(colsToIgnore)
         val colsToUse = colsToUseLastHistDf.intersect(w_diff).sorted // merged columns from whitelist und lastHistDf without technical columns
-        lastHistDf.withColumn("hash", colHashExpr(colsToUse))
+        lastHistDf.withColumn("hash", colsComparisionExpr(colsToUse))
       case (None, Some(b)) =>
         val colsToUse = colsToUseLastHistDf.diff(b).sorted
-        lastHistDf.withColumn("hash", colHashExpr(colsToUse))
+        lastHistDf.withColumn("hash", colsComparisionExpr(colsToUse))
       case (None, None) =>
         val colsToUse = colsToUseLastHistDf.sorted
-        lastHistDf.withColumn("hash", colHashExpr(colsToUse))
+        lastHistDf.withColumn("hash", colsComparisionExpr(colsToUse))
       case (Some(_), Some(_)) => throw new ConfigurationException("historize-whitelist and historize-blacklist mustn't be used at the same time.")
     }
 
-    val joined = newFeedHashed.as("newFeed").join(lastHistHashed.as("lastHist"),
-      joinCols(newFeedHashed, lastHistHashed, primaryKeyColumns), "full")
+    val joined = newFeedHashed.as("newFeed")
+      .join(lastHistHashed.as("lastHist"), joinCols(newFeedHashed, lastHistHashed, primaryKeyColumns), "full")
 
     val newRows = joined.where(col(expiryDateCol).isNull)
       .select(newFeedDf("*"))
