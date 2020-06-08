@@ -22,8 +22,10 @@ import java.time.LocalDateTime
 
 import io.smartdatalake.definitions.{HiveConventions, TechnicalTableColumn}
 import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import org.apache.spark.sql.functions.{col, lit, when, to_timestamp}
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.functions.{col, lit, to_timestamp, when}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType, TimestampType}
 import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -130,6 +132,7 @@ class HistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeL
   }
 
   test("History unchanged with new columns but unchanged data..") {
+
     val baseColumnsOldHist = List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy"))
     val dfOldHist = toHistorizedDf(session, baseColumnsOldHist, HistorizationPhase.Existing)
     logger.debug(s"History at beginning: ${dfOldHist.collect.foreach(println)}")
@@ -140,21 +143,49 @@ class HistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeL
     val dfNewFeedWithAdditionalCols = dfNewFeed.withColumn("new_col1", colExprNewcol otherwise lit(null).cast(StringType))
     logger.debug(s"New feed: ${dfNewFeedWithAdditionalCols.collect.foreach(println)}")
 
-    val dfHistorized = Historization.getHistorized(dfOldHist, dfNewFeedWithAdditionalCols, primaryKeyColumns,
+    val (oldEvolvedDf, newEvolvedDf) = SchemaEvolution.process(dfOldHist, dfNewFeedWithAdditionalCols,
+      colsToIgnore = Seq(TechnicalTableColumn.captured.toString, TechnicalTableColumn.delimited.toString))
+
+    val dfHistorized = Historization.getHistorized(oldEvolvedDf, newEvolvedDf, primaryKeyColumns,
       referenceTimestampNew, None, None)
     logger.debug(s"Historization result: ${dfHistorized.collect.foreach(println)}")
 
-    val baseColumnsUnchanged = List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy"))
-    val dfUnchanged = toHistorizedDf(session, baseColumnsUnchanged, HistorizationPhase.Existing)
-    val dfUnchangedWithAdditionalCols = dfUnchanged.withColumn("new_col1", colExprNewcol)
+    //ID 123 has new value and so old record is closed with newcol1=null
+    val dfResultExistingRowNonNull = dfOldHist.filter("id==123")
+      .drop(TechnicalTableColumn.captured.toString,TechnicalTableColumn.captured.toString)
+      .drop(TechnicalTableColumn.captured.toString,TechnicalTableColumn.delimited.toString)
+      .withColumn("new_col1", lit(null).cast(StringType))
+      .withColumn(s"${TechnicalTableColumn.captured.toString}", ts1(erfasstTimestampOldHist))
+      .withColumn(s"${TechnicalTableColumn.delimited.toString}", ts1(referenceTimestampOld))
+
+    //ID 123 has new value and so new record is created with newcol1="Test"
+    val dfResultNewRowNonNull = dfNewFeedWithAdditionalCols.filter("id==123")
+      .withColumn(s"${TechnicalTableColumn.captured.toString}", ts1(referenceTimestampNew))
+      .withColumn(s"${TechnicalTableColumn.delimited.toString}", ts1(doomsday))
+
+    //ID 124 has null new value and so old record is left unchanged but with additional column
+    val dfResultExistingRowNull = dfOldHist
+      .filter("id==124")
+      .drop(TechnicalTableColumn.captured.toString,TechnicalTableColumn.captured.toString)
+      .drop(TechnicalTableColumn.captured.toString,TechnicalTableColumn.delimited.toString)
+      .withColumn("new_col1", lit(null).cast(StringType))
+      .withColumn(s"${TechnicalTableColumn.captured.toString}", ts1(erfasstTimestampOldHist))
+      .withColumn(s"${TechnicalTableColumn.delimited.toString}", ts1(ersetztTimestampOldHist))
+
+
+    val dfExpected = dfResultExistingRowNonNull
+      .union(dfResultNewRowNonNull)
+        .union(dfResultExistingRowNull)
 
     dfHistorized.printSchema()
     dfHistorized.show
 
-    val dfExpected = dfUnchangedWithAdditionalCols
     logger.debug(s"Expected result: ${dfExpected.collect.foreach(println)}")
 
-    assert(dfHistorized.collect().length==3)
+    //assert(dfHistorized.collect().length==3)
+
+    assert(TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfHistorized)))
+
   }
 
   ignore("History unchanged when deleting columns but unchanged data.") {
