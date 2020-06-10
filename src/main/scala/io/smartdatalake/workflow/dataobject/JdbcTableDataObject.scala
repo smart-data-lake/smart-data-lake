@@ -18,16 +18,12 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.sql.ResultSet
-
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.connection.JdbcTableConnection
-import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
@@ -54,11 +50,9 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                jdbcFetchSize: Int = 1000,
                                connectionId: ConnectionId,
                                jdbcOptions: Map[String, String] = Map(),
-                               streamingOptions: Map[String, String] = Map(),
-                               trigger: Trigger = Trigger.Once,
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject with CanWriteDataStream {
+  extends TransactionalSparkTableDataObject {
 
   /**
    * Connection defines driver, url and db in central location
@@ -118,7 +112,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       .save
   }
 
-   override def postWrite(implicit session: SparkSession): Unit = {
+  override def postWrite(implicit session: SparkSession): Unit = {
     super.postWrite
     postSql.foreach{ sql =>
       logger.info(s"($id) postSQL is being executed")
@@ -126,51 +120,17 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def isDbExisting(implicit session: SparkSession): Boolean = {
-    val cntTableInCatalog =
-      if (Environment.enableJdbcCaseSensitivity)
-        s"select count(*) from INFORMATION_SCHEMA.SCHEMATA where TABLE_SCHEMA='${table.db.get}'"
-      else
-        s"select count(*) from INFORMATION_SCHEMA.SCHEMATA where upper(TABLE_SCHEMA)=upper('${table.db.get}')"
-    def evalTableExistsInCatalog( rs:ResultSet ) : Boolean = {
-      rs.next
-      rs.getInt(1) == 1
-    }
-    connection.execJdbcQuery(cntTableInCatalog, evalTableExistsInCatalog)
-  }
-
-
-  override def isTableExisting(implicit session: SparkSession): Boolean = {
-
-    val cntTableInCatalog =
-      if (Environment.enableJdbcCaseSensitivity)
-        s"select count(*) from INFORMATION_SCHEMA.TABLES where TABLE_NAME='${table.name}' and TABLE_SCHEMA='${table.db.get}'"
-      else
-        s"select count(*) from INFORMATION_SCHEMA.TABLES where upper(TABLE_NAME)=upper('${table.name}') and upper(TABLE_SCHEMA)=upper('${table.db.get}')"
-    def evalTableExistsInCatalog( rs:ResultSet ) : Boolean = {
-      rs.next
-      rs.getInt(1)==1
-    }
-    connection.execJdbcQuery( cntTableInCatalog, evalTableExistsInCatalog )
-
-  }
+  override def isDbExisting(implicit session: SparkSession): Boolean = connection.catalog.isDbExisting(table.db.get)
+  override def isTableExisting(implicit session: SparkSession): Boolean = connection.catalog.isTableExisting(table.db.get, table.name)
 
   override def dropTable(implicit session: SparkSession): Unit = {
     connection.execJdbcStatement(s"drop table if exists ${table.fullName}")
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[DataObject] = JdbcTableDataObject
-
 }
 
 object JdbcTableDataObject extends FromConfigFactory[DataObject] {
-
-  /**
-   * @inheritdoc
-   */
   override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): JdbcTableDataObject = {
     import configs.syntax.ConfigOps
     import io.smartdatalake.config._

@@ -105,9 +105,7 @@ object TestUtil extends SmartDataLakeLogger {
 
   // compare column name and type of two dataframes
   def isDataFrameDataEqual( df1:DataFrame, df2:DataFrame ) : Boolean = {
-    df1.withColumn("col1", lit(true))
-      .join(df2.withColumn("col2", lit(true)), df1.columns, "full")
-      .where(col("col1").isNull or col("col2").isNull)
+    df1.union(df2).except(df1.intersect(df2))
       .count == 0
   }
 
@@ -123,14 +121,14 @@ object TestUtil extends SmartDataLakeLogger {
     FileUtils.copyInputStreamToFile(inputStream, tgtFile)
   }
 
-  def setupSSHServer( port: Int, user: String, pwd: String): SshServer = {
+  def setupSSHServer( port: Int, usr: String, pwd: String): SshServer = {
     val sshd = SshServer.setUpDefaultServer()
     sshd.setFileSystemFactory(new NativeFileSystemFactory())
     sshd.setPort(port)
     sshd.setKeyPairProvider(new SimpleGeneratorHostKeyProvider(Files.createTempDirectory("sshd").resolve("hostkey.ser")))
     sshd.setSubsystemFactories(List(new SftpSubsystemFactory().asInstanceOf[NamedFactory[Command]]).asJava)
     sshd.setPasswordAuthenticator(new PasswordAuthenticator() {
-      override def authenticate(user: String, password: String, session: ServerSession): Boolean = user == user && password == pwd
+      override def authenticate(user: String, password: String, session: ServerSession): Boolean = user == usr && password == pwd
     })
     sshd.start()
     //Thread.sleep(1000000)

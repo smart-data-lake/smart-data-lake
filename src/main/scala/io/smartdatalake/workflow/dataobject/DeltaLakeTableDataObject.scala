@@ -93,6 +93,14 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = prepare(session)
 
+  override def preWrite(implicit session: SparkSession): Unit = {
+    super.preWrite
+    // validate if acl's must be / are configured before writing
+    if (Environment.hadoopAuthoritiesWithAclsRequired.exists( a => filesystem.getUri.toString.contains(a))) {
+      require(acl.isDefined, s"($id) ACL definitions are required for writing DataObjects on hadoop authority ${filesystem.getUri} by environment setting hadoopAuthoritiesWithAclsRequired")
+    }
+  }
+
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])
                              (implicit session: SparkSession): Unit = {
     validateSchemaMin(df)

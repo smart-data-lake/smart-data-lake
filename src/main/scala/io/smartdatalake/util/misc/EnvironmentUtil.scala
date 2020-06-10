@@ -20,7 +20,28 @@
 package io.smartdatalake.util.misc
 
 object EnvironmentUtil {
+
+  /**
+   * check if running on windows os
+   */
   def isWindowsOS = {
     sys.env.get("OS").exists(_.toLowerCase.startsWith("windows"))
   }
+
+  /**
+   * get environment parameter value from Java system properties or environment variables.
+   * To lookup java system properties the key is prefixed with "sdl.".
+   * To lookup environment variables the key is prefixed with "SDL_" and camelcase notation is converted to uppercase notation separated by "_".
+   * Java system properties have precedence over environment variables.
+   *
+   * @param key the name of the parameter in camelCase notation, starting with a lowercase letter.
+   */
+  def getSdlParameter(key: String): Option[String] = {
+
+    sys.props.get("sdl."+key)
+      .orElse(sys.env.get("SDL_"+camelCaseToUpper(key)))
+  }
+
+  private[smartdatalake] def camelCaseToUpper(key: String): String = key.replaceAll("([A-Z])", "_$1").toUpperCase
+
 }
