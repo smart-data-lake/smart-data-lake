@@ -24,7 +24,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
 
   import testSession.implicits._
 
-  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:file:JdbcTableDataObjectTest/hsqldb", "org.hsqldb.jdbcDriver")
+  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:file:target/JdbcTableDataObjectTest/hsqldb", "org.hsqldb.jdbcDriver")
 
   test("write and read jdbc table") {
     import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
