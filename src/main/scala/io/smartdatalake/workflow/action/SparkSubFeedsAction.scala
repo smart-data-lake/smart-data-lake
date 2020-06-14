@@ -142,6 +142,14 @@ abstract class SparkSubFeedsAction extends Action {
   def initExecutionMode: Option[ExecutionMode]
 
   /**
+   * Returns the execution mode used on runtime of the action, depending if this Action is a start node of a DAG run
+   */
+  def runtimeExecutionMode(isDAGStart: Boolean): Option[ExecutionMode] = {
+    // override executionMode with initExecutionMode if is start node of a DAG run
+    if (isDAGStart) initExecutionMode else None
+  }
+
+  /**
    * Enriches SparkSubFeeds with DataFrame if not existing
    *
    * @param inputs input data objects.
@@ -151,7 +159,7 @@ abstract class SparkSubFeedsAction extends Action {
     assert(inputs.size==subFeeds.size, s"Number of inputs must match number of subFeeds given for $id")
     inputs.map { input =>
       val subFeed = subFeeds.find(_.dataObjectId == input.id).getOrElse(throw new IllegalStateException(s"subFeed for input ${input.id} not found"))
-      ActionHelper.enrichSubFeedDataFrame(input, subFeed)
+      ActionHelper.enrichSubFeedDataFrame(input, subFeed, runtimeExecutionMode(subFeed.isDAGStart))
     }
   }
 }

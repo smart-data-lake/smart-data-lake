@@ -23,12 +23,12 @@ import java.time.LocalDateTime
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.ActionObjectId
-import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode}
+import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode, SparkStreamingMode}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject, TableDataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanCreateStreamingDataFrame, CanHandlePartitions, DataObject, TableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.TimestampType
@@ -208,7 +208,7 @@ object ActionHelper extends SmartDataLakeLogger {
    * @return SubFeed with updated partition values.
    */
   def validateAndUpdateSubFeedPartitionValues(output: DataObject, subFeed: SparkSubFeed ): SparkSubFeed = {
-    output match {
+    val updatedSubFeed = output match {
       case partitionedDO: CanHandlePartitions =>
         // validate output partition columns exist in DataFrame
         validateDataFrameContainsCols(subFeed.dataFrame.get, partitionedDO.partitions, s"for ${output.id}")
@@ -216,6 +216,7 @@ object ActionHelper extends SmartDataLakeLogger {
         subFeed.updatePartitionValues(partitionedDO.partitions)
       case _ => subFeed.clearPartitionValues()
     }
+    updatedSubFeed.clearDAGStart()
   }
 
   /**
@@ -257,14 +258,21 @@ object ActionHelper extends SmartDataLakeLogger {
    * @param input input data object.
    * @param subFeed input SubFeed.
    */
-  def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed)(implicit session: SparkSession): SparkSubFeed = {
+  def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, executionMode: Option[ExecutionMode])(implicit session: SparkSession): SparkSubFeed = {
+    assert(input.id == subFeed.dataObjectId, s"DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
     if (subFeed.dataFrame.isEmpty) {
-      assert(input.id == subFeed.dataObjectId, s"DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
-      logger.info(s"getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
-      val df = input.getDataFrame(subFeed.partitionValues)
-        .colNamesLowercase // convert to lower case by default
-      val filteredDf = ActionHelper.filterDataFrame(df, subFeed.partitionValues)
-      subFeed.copy(dataFrame = Some(filteredDf))
+      if (executionMode.exists(_.isInstanceOf[SparkStreamingMode])) {
+        assert(input.isInstanceOf[CanCreateStreamingDataFrame], s"DataObject ${input.id} doesn't implement CanCreateStreamingDataFrame. Can not create StreamingDataFrame for executionMode=SparkStreamingMode")
+        val df = input.asInstanceOf[CanCreateStreamingDataFrame].getStreamingDataFrame
+          .colNamesLowercase // convert to lower case by default
+        subFeed.copy(dataFrame = Some(df), partitionValues = Seq()) // remove partition values for streaming mode
+      } else {
+        logger.info(s"getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
+        val df = input.getDataFrame(subFeed.partitionValues)
+          .colNamesLowercase // convert to lower case by default
+        val filteredDf = ActionHelper.filterDataFrame(df, subFeed.partitionValues)
+        subFeed.copy(dataFrame = Some(filteredDf))
+      }
     } else subFeed
   }
 

@@ -140,4 +140,13 @@ abstract class SparkSubFeedAction extends Action {
    */
   def executionMode: Option[ExecutionMode]
 
+  /**
+   * Returns the execution mode used on runtime of the action, depending if this Action is a start node of a DAG run
+   */
+  def runtimeExecutionMode(isDAGStart: Boolean): Option[ExecutionMode] = {
+    // override executionMode with initExecutionMode if is start node of a DAG run
+    val choosenExecutionMode = if (isDAGStart) initExecutionMode else executionMode
+    // if initExecution mode is not defined, use executionMode
+    choosenExecutionMode.orElse(executionMode)
+  }
 }
