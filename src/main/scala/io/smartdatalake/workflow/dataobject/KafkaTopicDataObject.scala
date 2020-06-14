@@ -47,7 +47,6 @@ import scala.collection.JavaConverters._
  * Provides details to an action to read from Kafka Topics using either
   * [[org.apache.spark.sql.DataFrameReader]] or [[org.apache.spark.sql.streaming.DataStreamReader]]
   *
-  * @param stream Use checkpointing to manage own state and read only new records from topic (default = true)
   * @param topicName The name of the topic to read
   * @param keyType    Optional type the key column should be converted to. If none is given it will remain a bytearray / binary.
   * @param valueType  Optional type the value column should be converted to. If none is given it will remain a bytearray / binary.
@@ -63,7 +62,6 @@ import scala.collection.JavaConverters._
   * @param kafkaOptions Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)
   */
 case class KafkaTopicDataObject(override val id: DataObjectId,
-                                stream: String = "true",
                                 topicName: String,
                                 connectionId: ConnectionId,
                                 keyType: KafkaColumnType = KafkaColumnType.Binary,
@@ -77,7 +75,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                                 kafkaOptions: Map[String, String] = Map(),
                                 override val metadata: Option[DataObjectMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateDataFrame with CanHandlePartitions {
+  extends DataObject with CanCreateDataFrame with CanCreateStreamingDataFrame with CanHandlePartitions {
 
   override val partitions: Seq[String] = datePartitionCol.toSeq
 
@@ -115,41 +113,32 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     require(connection.topicExists(topicName), s"($id) topic $topicName doesn't exist")
   }
 
-  val options: Map[String, String] = kafkaOptions
+  override def getStreamingDataFrame(implicit session: SparkSession): DataFrame = {
+    val df = session
+      .readStream
+      .format("kafka")
+      .option("kafka.bootstrap.servers", connection.brokers)
+      .options(kafkaOptions)
+      .option("subscribe", topicName)
+      .load()
+    prepareDataFrame(df)
+  }
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit spark: SparkSession): DataFrame = {
-    import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
-    import spark.implicits._
-
-    //Default behaviour is to stream with checkpointing
-    //as this mirrors default behaviour in non-Spark Kafka applications
-    //with auto-commit = true
-    val df = if(stream.toBoolean) getStreamDataFrame
-    else getBatchDataFrame(partitionValues)
+  private def prepareDataFrame(df: DataFrame): DataFrame = {
+    import io.smartdatalake.util.misc.DataFrameUtil._
 
     // Deserialize key/value to make human readable
     // convert key & value
     val colsToSelect = ((if (selectCols.nonEmpty) selectCols else Seq("kafka.*")) ++ partitions).distinct.map(col)
     df
-      .withColumn("key", convertKafkaType(keyType, $"key"))
-      .withColumn("value", convertKafkaType(valueType, $"value"))
+      .withColumn("key", convertKafkaType(keyType, col("key")))
+      .withColumn("value", convertKafkaType(valueType, col("value")))
       .as("kafka")
-      .withOptionalColumn(datePartitionCol, udfFormatPartition($"timestamp"))
+      .withOptionalColumn(datePartitionCol, udfFormatPartition(col("timestamp")))
       .select(colsToSelect:_*)
-
   }
 
-  private def getStreamDataFrame(implicit session: SparkSession): DataFrame = {
-    session
-      .readStream
-      .format("kafka")
-      .option("kafka.bootstrap.servers", connection.brokers)
-      .options(options)
-      .option("subscribe", topicName)
-      .load()
-  }
-
-  private def getBatchDataFrame(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
     implicit val localDateTimeOrdering: Ordering[LocalDateTime] = Ordering.by(_.toInstant(ZoneOffset.UTC))
 
     // get DataFrame from topic
@@ -202,7 +191,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
               session
                 .read
                 .format("kafka")
-                .options(options)
+                .options(kafkaOptions)
                 .option("kafka.bootstrap.servers", connection.brokers)
                 .option("subscribe", topicName)
                 .option("startingOffsets", s"""{"$topicName":{$startingOffsets}}""")
@@ -216,7 +205,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       logger.info(s"($id) creating data frame for whole topic $topicName, no partition values given")
       session.read
         .format("kafka")
-        .options(options)
+        .options(kafkaOptions)
         .option("kafka.bootstrap.servers", connection.brokers)
         .option("subscribe", topicName)
         .option("startingOffsets", "earliest")
@@ -224,8 +213,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
         .load()
     }
 
-    // return
-    dfRaw
+    prepareDataFrame(dfRaw)
   }
 
   private def getTopicPartitionsAtTstmp(topicPartitions: Seq[TopicPartition], localDateTime: LocalDateTime) = {

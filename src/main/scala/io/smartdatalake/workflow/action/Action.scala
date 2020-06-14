@@ -79,8 +79,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
       dataObj => ActionHelper.replaceSpecialCharactersWithUnderscore(dataObj.id.id)
     }.groupBy(identity).collect { case (x, List(_,_,_*)) => x }.toList
 
-    require(duplicateNames.size==0, s"The names of your DataObjects are not unique when replacing special characters with underscore. Duplicates: ${duplicateNames.mkString(",")}")
-
+    require(duplicateNames.isEmpty, s"The names of your DataObjects are not unique when replacing special characters with underscore. Duplicates: ${duplicateNames.mkString(",")}")
   }
 
   /**

@@ -61,6 +61,7 @@ case class DeduplicateAction(override val id: ActionObjectId,
                              override val breakDataFrameLineage: Boolean = false,
                              override val persist: Boolean = false,
                              override val initExecutionMode: Option[ExecutionMode] = None,
+                             override val executionMode: Option[ExecutionMode] = None,
                              override val metadata: Option[ActionMetadata] = None
 )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedAction {
 

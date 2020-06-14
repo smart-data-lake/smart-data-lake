@@ -54,11 +54,9 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                jdbcFetchSize: Int = 1000,
                                connectionId: ConnectionId,
                                jdbcOptions: Map[String, String] = Map(),
-                               streamingOptions: Map[String, String] = Map(),
-                               trigger: Trigger = Trigger.Once,
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject with CanWriteDataStream {
+  extends TransactionalSparkTableDataObject with CanWriteStreamingDataFrame {
 
   /**
    * Connection defines driver, url and db in central location

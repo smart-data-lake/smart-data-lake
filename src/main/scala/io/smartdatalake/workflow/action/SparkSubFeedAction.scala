@@ -18,9 +18,9 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.definitions.ExecutionMode
+import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode, SparkStreamingMode}
 import io.smartdatalake.util.misc.PerformanceUtils
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, CanWriteDataStream,DataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, CanWriteStreamingDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 
@@ -62,6 +62,10 @@ abstract class SparkSubFeedAction extends Action {
     ActionHelper.validateAndUpdateSubFeedPartitionValues(output, transformedSubFeed).copy(dataObjectId = output.id)
   }
 
+  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.prepare
+  }
+
   /**
    * Action.init implementation
    */
@@ -83,13 +87,17 @@ abstract class SparkSubFeedAction extends Action {
     logger.info(s"($id) start " + msg)
     setSparkJobMetadata(Some(msg))
     val (_,d) = PerformanceUtils.measureDuration {
-      // Write from a streaming input
-      if(transformedSubFeed.dataFrame.get.isStreaming){
-        assert(output.isInstanceOf[CanWriteDataStream], s"Output type ${output.getClass.getSimpleName} does not support streaming inputs")
-        output.asInstanceOf[CanWriteDataStream].writeDataStream(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
-        // Write from a batch input
-      } else {
-        output.writeDataFrame(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
+      executionMode match {
+        case Some(m: SparkStreamingMode) =>
+          // Write in streaming mode
+          assert(transformedSubFeed.dataFrame.get.isStreaming, s"($id) ExecutionMode ${m.getClass} needs streaming DataFrame in SubFeed")
+          assert(output.isInstanceOf[CanWriteStreamingDataFrame], s"($id) Output ${output.id} of type ${output.getClass.getSimpleName} does not support streaming inputs")
+          output.asInstanceOf[CanWriteStreamingDataFrame].writeStreamingDataFrame(transformedSubFeed.dataFrame.get, m.trigger, m.checkpointLocation, s"$id writing ${output.id}")
+        case None | Some(_: PartitionDiffMode) =>
+          // Write in batch mode
+          assert(!transformedSubFeed.dataFrame.get.isStreaming, s"($id) Input from ${transformedSubFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingMode.getClass.getSimpleName}")
+          output.writeDataFrame(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
+        case x => new IllegalStateException( s"($id) ExecutionMode $x is not supported")
       }
     }
     setSparkJobMetadata()
@@ -124,5 +132,12 @@ abstract class SparkSubFeedAction extends Action {
    * Execution mode if this Action is a start node of a DAG run
    */
   def initExecutionMode: Option[ExecutionMode]
+  require(initExecutionMode.isEmpty || initExecutionMode.contains(PartitionDiffMode()), s"($id) $initExecutionMode not supported as initExecutionMode")
+
+  /**
+   * General execution mode for this action.
+   * Note that this is overridden by initExecutionMode if it is defined and this Action is a start node of a DAG run.
+   */
+  def executionMode: Option[ExecutionMode]
 
 }

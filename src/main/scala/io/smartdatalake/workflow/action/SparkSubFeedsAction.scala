@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.definitions.ExecutionMode
+import io.smartdatalake.definitions.{ExecutionMode, ExecutionModeWithMainInput}
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SparkSubFeed, SubFeed}
@@ -30,18 +30,24 @@ abstract class SparkSubFeedsAction extends Action {
   override def inputs: Seq[DataObject with CanCreateDataFrame]
   override def outputs: Seq[DataObject with CanWriteDataFrame]
 
-  lazy protected val mainInput: Option[DataObject with CanCreateDataFrame] = initExecutionMode.flatMap {
+  // prepare main input / output
+  // this must be lazy because inputs / outputs is evaluated later in subclasses
+  val initExecutionModeMainInput: Option[ExecutionModeWithMainInput] = initExecutionMode.collect{ case mode: ExecutionModeWithMainInput => mode }
+  lazy val initMainInput: Option[DataObject with CanCreateDataFrame] = initExecutionModeMainInput.flatMap {
     _.mainInputId.map( inputId => inputs.find(_.id.id == inputId).getOrElse(throw ConfigurationException(s"$id has set an initExecutionMode with inputId $inputId, which was not found in inputs")))
-  }.orElse{
+  }
+  lazy protected val mainInput: Option[DataObject with CanCreateDataFrame] = initMainInput
+  .orElse{
     val paritionedInputs = inputs.collect{ case x: CanHandlePartitions => x }.filter(_.partitions.nonEmpty)
     if (paritionedInputs.size==1) paritionedInputs.headOption else None
   }.orElse{
     if (inputs.size==1) inputs.headOption else None
   }
-
-  lazy protected val mainOutput: Option[DataObject with CanWriteDataFrame] = initExecutionMode.flatMap {
+  lazy protected val initMainOutput: Option[DataObject with CanWriteDataFrame] = initExecutionModeMainInput.flatMap {
     _.mainOutputId.map( outputId => outputs.find(_.id.id == outputId).getOrElse(throw ConfigurationException(s"$id has set an initExecutionMode with outputId $outputId, which was not found in outputs")))
-  }.orElse{
+  }
+  lazy protected val mainOutput: Option[DataObject with CanWriteDataFrame] = initMainOutput
+  .orElse{
     val paritionedOutputs = outputs.collect{ case x: CanHandlePartitions => x }.filter(_.partitions.nonEmpty)
     if (paritionedOutputs.size==1) paritionedOutputs.headOption else None
   }.orElse{

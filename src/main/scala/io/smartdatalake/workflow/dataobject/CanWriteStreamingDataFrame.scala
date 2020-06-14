@@ -18,34 +18,35 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.util.hdfs.PartitionValues
 import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 
-private[smartdatalake] trait CanWriteDataStream extends CanWriteDataFrame {
+//TODO: shouldn't we merge this with CanWriteDataFrame
+private[smartdatalake] trait CanWriteStreamingDataFrame extends CanWriteDataFrame {
 
-  // At minimum a checkpointLocation must be defined and passed to DataStreamWriter
-  def streamingOptions: Map[String, String]
-
-  //Trigger frequency for stream must be set as parameter
-  def trigger: Trigger
+  // additional streaming options which can be overridden by the DataObject, e.g. Kafka topic to write to
+  def streamingOptions: Map[String, String] = Map()
 
   /**
-    * Write input from a DataStreamReader (streaming DataFrame)
-    *
-    * @param df The Streaming DataFrame to write
-    * @param partitionValues See DataFrameWriter
-    */
-  def writeDataStream(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
-
-    require(streamingOptions.contains("checkpointLocation"), s"Checkpoint location must be specified for streaming sources.")
+   * Write Spark structured streaming DataFrame
+   * The default implementation uses foreachBatch and DataObjects writeDataFrame method to write the DataFrame.
+   * Some DataObjects will override this with specific implementations (Kafka).
+   *
+   * @param df      The Streaming DataFrame to write
+   * @param trigger Trigger frequency for stream
+   * @param checkpointLocation location for checkpoints of streaming query
+   */
+  def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, checkpointLocation: String, queryName: String)(implicit session: SparkSession): Unit = {
 
     // lambda function is ambiguous with foreachBatch in scala 2.12... we need to create a real function...
-    def microBatchWriter(df_microbatch: Dataset[Row], batchid: Long): Unit = writeDataFrame(df_microbatch, partitionValues)
+    // Note: no partition values supported when writing streaming target
+    def microBatchWriter(df_microbatch: Dataset[Row], batchid: Long): Unit = writeDataFrame(df_microbatch, Seq())
 
     df
       .writeStream
       .trigger(trigger)
+      .queryName(queryName)
+      .option("checkpointLocation", checkpointLocation)
       .options(streamingOptions)
       .foreachBatch(microBatchWriter _)
       .start()
