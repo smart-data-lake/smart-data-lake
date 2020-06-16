@@ -21,12 +21,14 @@ package io.smartdatalake.workflow
 import java.time.LocalDateTime
 
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 
 private[smartdatalake] case class ActionPipelineContext(
   feed: String,
   application: String,
   instanceRegistry: InstanceRegistry,
-  referenceTimestamp: Option[LocalDateTime] = None
+  referenceTimestamp: Option[LocalDateTime] = None,
+  phase: ExecutionPhase = ExecutionPhase.Prepare
 ) {
   def getReferenceTimestampOrNow: LocalDateTime = referenceTimestamp.getOrElse(LocalDateTime.now)
 }

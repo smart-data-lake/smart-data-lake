@@ -20,8 +20,10 @@ package io.smartdatalake.workflow
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.DataFrameUtil
+import io.smartdatalake.util.streaming.DummyStreamProvider
 import io.smartdatalake.workflow.dataobject.FileRef
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import sun.reflect.generics.reflectiveObjects.NotImplementedException
 
 /**
@@ -39,7 +41,7 @@ trait SubFeed extends DAGResult {
    * This is usable to break long DataFrame Lineages over multiple Actions and instead reread the data from an intermediate table
    * @return
    */
-  def breakLineage(): SubFeed
+  def breakLineage(implicit session: SparkSession): SubFeed
 
   def clearPartitionValues(): SubFeed
 
@@ -60,11 +62,19 @@ trait SubFeed extends DAGResult {
 case class SparkSubFeed(dataFrame: Option[DataFrame],
                         override val dataObjectId: DataObjectId,
                         override val partitionValues: Seq[PartitionValues],
-                        override val isDAGStart: Boolean = false
+                        override val isDAGStart: Boolean = false,
+                        isDummy: Boolean = false
                        )
   extends SubFeed {
-  override def breakLineage(): SparkSubFeed = {
-    this.copy(dataFrame = None)
+  override def breakLineage(implicit session: SparkSession): SparkSubFeed = {
+    // in order to keep the schema but truncate spark logical plan, a dummy DataFrame is created.
+    // dummy DataFrames must be exchanged to real DataFrames before reading in exec-phase.
+    val dummyDf = dataFrame.map{
+      df =>
+        if (df.isStreaming) DummyStreamProvider.getDummyDf(df.schema)
+        else DataFrameUtil.getEmptyDataFrame(df.schema)
+    }
+    this.copy(dataFrame = dummyDf, isDummy = true)
   }
   override def clearPartitionValues(): SparkSubFeed = {
     this.copy(partitionValues = Seq())
@@ -77,8 +87,9 @@ case class SparkSubFeed(dataFrame: Option[DataFrame],
     this.copy(isDAGStart = false)
   }
   def persist: SparkSubFeed = {
-    copy(dataFrame = this.dataFrame.map(_.persist))
+    this.copy(dataFrame = this.dataFrame.map(_.persist))
   }
+  def isStreaming: Option[Boolean] = dataFrame.map(_.isStreaming)
 }
 object SparkSubFeed {
   def fromSubFeed( subFeed: SubFeed ): SparkSubFeed = {
@@ -104,7 +115,7 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
                        processedInputFileRefs: Option[Seq[FileRef]] = None
                       )
   extends SubFeed {
-  override def breakLineage(): FileSubFeed = {
+  override def breakLineage(implicit session: SparkSession): FileSubFeed = {
     this.copy(fileRefs = None)
   }
   override def clearPartitionValues(): FileSubFeed = {
@@ -136,7 +147,7 @@ object FileSubFeed {
 case class InitSubFeed(override val dataObjectId: DataObjectId, override val partitionValues: Seq[PartitionValues])
   extends SubFeed {
   override def isDAGStart: Boolean = true
-  override def breakLineage(): InitSubFeed = this
+  override def breakLineage(implicit session: SparkSession): InitSubFeed = this
   override def clearPartitionValues(): InitSubFeed = {
     this.copy(partitionValues = Seq())
   }

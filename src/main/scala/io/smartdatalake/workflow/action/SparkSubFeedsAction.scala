@@ -78,7 +78,7 @@ abstract class SparkSubFeedsAction extends Action {
       }
     } else preparedSubFeeds
     // break lineage if requested
-    preparedSubFeeds = if (breakDataFrameLineage) preparedSubFeeds.map(_.breakLineage()) else preparedSubFeeds
+    preparedSubFeeds = if (breakDataFrameLineage) preparedSubFeeds.map(_.breakLineage) else preparedSubFeeds
     // persist if requested
     preparedSubFeeds = if (persist) preparedSubFeeds.map(_.persist) else preparedSubFeeds
     // transform
@@ -155,11 +155,11 @@ abstract class SparkSubFeedsAction extends Action {
    * @param inputs input data objects.
    * @param subFeeds input SubFeeds.
    */
-  protected def enrichSubFeedsDataFrame(inputs: Seq[DataObject with CanCreateDataFrame], subFeeds: Seq[SparkSubFeed])(implicit session: SparkSession): Seq[SparkSubFeed] = {
+  protected def enrichSubFeedsDataFrame(inputs: Seq[DataObject with CanCreateDataFrame], subFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
     assert(inputs.size==subFeeds.size, s"Number of inputs must match number of subFeeds given for $id")
     inputs.map { input =>
       val subFeed = subFeeds.find(_.dataObjectId == input.id).getOrElse(throw new IllegalStateException(s"subFeed for input ${input.id} not found"))
-      ActionHelper.enrichSubFeedDataFrame(input, subFeed, runtimeExecutionMode(subFeed.isDAGStart))
+      ActionHelper.enrichSubFeedDataFrame(input, subFeed, runtimeExecutionMode(subFeed.isDAGStart), context.phase)
     }
   }
 }

@@ -54,7 +54,7 @@ abstract class SparkSubFeedAction extends Action {
       preparedSubFeed.copy( partitionValues = ActionHelper.applyExecutionMode(initExecutionMode.get, id, input, output, preparedSubFeed.partitionValues))
     } else preparedSubFeed
     // break lineage if requested
-    preparedSubFeed = if (breakDataFrameLineage) preparedSubFeed.breakLineage() else preparedSubFeed
+    preparedSubFeed = if (breakDataFrameLineage) preparedSubFeed.breakLineage else preparedSubFeed
     // persist if requested
     preparedSubFeed = if (persist) preparedSubFeed.persist else preparedSubFeed
     // transform
@@ -92,7 +92,7 @@ abstract class SparkSubFeedAction extends Action {
         case Some(m: SparkStreamingOnceMode) =>
           // Write in streaming mode - use spark streaming with Trigger.Once and awaitTermination
           assert(transformedSubFeed.dataFrame.get.isStreaming, s"($id) ExecutionMode ${m.getClass} needs streaming DataFrame in SubFeed")
-          val streamingQuery = output.writeStreamingDataFrame(transformedSubFeed.dataFrame.get, Trigger.Once, m.checkpointLocation, s"$id writing ${output.id}")
+          val streamingQuery = output.writeStreamingDataFrame(transformedSubFeed.dataFrame.get, Trigger.Once, m.outputOptions, m.checkpointLocation, s"$id writing ${output.id}")
           streamingQuery.awaitTermination
         case None | Some(_: PartitionDiffMode) =>
           // Write in batch mode

@@ -23,6 +23,7 @@ import java.time.{Duration, LocalDateTime}
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow._
@@ -67,7 +68,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * - directories exists or can be created
    * - connections can be created
    *
-   * This runs during the "prepare" operation of the DAG.
+   * This runs during the "prepare" phase of the DAG.
    */
   def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     inputs.foreach(_.prepare)
@@ -95,7 +96,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
 
   /**
    * Executes operations needed before executing an action.
-   * In this step any operation on Input- or Output-DataObjects needed before the main task is executed,
+   * In this step any phase on Input- or Output-DataObjects needed before the main task is executed,
    * e.g. JdbcTableDataObjects preSql
    */
   def preExec(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
@@ -115,7 +116,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
 
   /**
    * Executes operations needed after executing an action.
-   * In this step any operation on Input- or Output-DataObjects needed after the main task is executed,
+   * In this step any phase on Input- or Output-DataObjects needed after the main task is executed,
    * e.g. JdbcTableDataObjects postSql or CopyActions deleteInputData.
    */
   def postExec(inputSubFeed: Seq[SubFeed], outputSubFeed: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
@@ -135,7 +136,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * We rely on this to match metrics back to Actions and DataObjects.
    * As writing to a DataObject on the Driver happens uninterrupted in the same exclusive thread, this is suitable.
    *
-   * @param operation operation description (be short...)
+   * @param operation phase description (be short...)
    */
   def setSparkJobMetadata(operation: Option[String] = None)(implicit session: SparkSession) : Unit = {
     session.sparkContext.setJobGroup(s"${this.getClass.getSimpleName}.$id", operation.getOrElse("").take(255))
@@ -167,7 +168,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   /**
    * Adds an action event
    */
-  def addRuntimeEvent(phase: String, state: RuntimeEventState, msg: String): Unit = {
+  def addRuntimeEvent(phase: ExecutionPhase, state: RuntimeEventState, msg: String): Unit = {
     runtimeEvents.append(RuntimeEvent(LocalDateTime.now, phase, state, msg))
   }
 
@@ -258,7 +259,7 @@ case class ActionMetadata(
 /**
  * A structure to collect runtime information
  */
-private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: String, state: RuntimeEventState, msg: String)
+private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: ExecutionPhase, state: RuntimeEventState, msg: String)
 private[smartdatalake] object RuntimeEventState extends Enumeration {
   type RuntimeEventState = Value
   val STARTED, SUCCEEDED, FAILED, SKIPPED, NONE = Value
