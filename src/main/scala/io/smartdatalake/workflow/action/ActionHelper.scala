@@ -267,6 +267,7 @@ object ActionHelper extends SmartDataLakeLogger {
         if (subFeed.dataFrame.isEmpty || phase==ExecutionPhase.Exec) { // in exec phase we always needs a fresh streaming DataFrame
           // recreate DataFrame from DataObject
           assert(input.isInstanceOf[CanCreateStreamingDataFrame], s"DataObject ${input.id} doesn't implement CanCreateStreamingDataFrame. Can not create StreamingDataFrame for executionMode=SparkStreamingOnceMode")
+          logger.info(s"getting streaming DataFrame for ${input.id}")
           val df = input.asInstanceOf[CanCreateStreamingDataFrame].getStreamingDataFrame(m.inputOptions)
             .colNamesLowercase // convert to lower case by default
           subFeed.copy(dataFrame = Some(df), partitionValues = Seq()) // remove partition values for streaming mode
