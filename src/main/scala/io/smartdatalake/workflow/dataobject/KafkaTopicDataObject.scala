@@ -59,7 +59,8 @@ import scala.collection.JavaConverters._
   * @param datePartitionTimeUnit time unit for timestamp in datePartitionCol, definition according to java ChronoUnit (e.g. "days").
   * @param batchReadConsecutivePartitionsAsRanges Set to true if consecutive partitions should be combined as one range of offsets when batch reading from topic. This results in less tasks but can be a performance problem when reading many partitions. (default=false)
   * @param batchReadMaxOffsetsPerTask Set number of offsets per Spark task when batch reading from topic.
-  * @param kafkaOptions Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)
+  * @param kafkaOptions Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).
+ *                      These options override connection.kafkaOptions.
   */
 case class KafkaTopicDataObject(override val id: DataObjectId,
                                 topicName: String,
@@ -118,7 +119,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       .readStream
       .format("kafka")
       .option("kafka.bootstrap.servers", connection.brokers)
-      .options(kafkaOptions ++ options) // options override kafkaOptions
+      .options(connection.kafkaOptions ++ kafkaOptions ++ options) // options override kafkaOptions override connection.kafkaOptions
       .option("subscribe", topicName)
       .load()
     prepareDataFrame(df)
