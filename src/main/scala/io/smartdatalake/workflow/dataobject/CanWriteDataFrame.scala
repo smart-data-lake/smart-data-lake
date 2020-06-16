@@ -43,7 +43,7 @@ private[smartdatalake] trait CanWriteDataFrame {
    * @param trigger Trigger frequency for stream
    * @param checkpointLocation location for checkpoints of streaming query
    */
-  def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, checkpointLocation: String, queryName: String)(implicit session: SparkSession): StreamingQuery = {
+  def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String,String], checkpointLocation: String, queryName: String)(implicit session: SparkSession): StreamingQuery = {
 
     // lambda function is ambiguous with foreachBatch in scala 2.12... we need to create a real function...
     // Note: no partition values supported when writing streaming target
@@ -54,7 +54,7 @@ private[smartdatalake] trait CanWriteDataFrame {
       .trigger(trigger)
       .queryName(queryName)
       .option("checkpointLocation", checkpointLocation)
-      .options(streamingOptions)
+      .options(streamingOptions ++ options) // options override streamingOptions
       .foreachBatch(microBatchWriter _)
       .start()
   }

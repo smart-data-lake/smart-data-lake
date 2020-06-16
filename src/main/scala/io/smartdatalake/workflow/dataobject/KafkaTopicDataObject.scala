@@ -113,12 +113,12 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     require(connection.topicExists(topicName), s"($id) topic $topicName doesn't exist")
   }
 
-  override def getStreamingDataFrame(implicit session: SparkSession): DataFrame = {
+  override def getStreamingDataFrame(options: Map[String,String])(implicit session: SparkSession): DataFrame = {
     val df = session
       .readStream
       .format("kafka")
       .option("kafka.bootstrap.servers", connection.brokers)
-      .options(kafkaOptions)
+      .options(kafkaOptions ++ options) // options override kafkaOptions
       .option("subscribe", topicName)
       .load()
     prepareDataFrame(df)

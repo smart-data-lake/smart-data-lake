@@ -23,6 +23,6 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 
 private[smartdatalake] trait CanCreateStreamingDataFrame {
 
-  def getStreamingDataFrame(implicit session: SparkSession) : DataFrame
+  def getStreamingDataFrame(options: Map[String,String])(implicit session: SparkSession) : DataFrame
 
 }

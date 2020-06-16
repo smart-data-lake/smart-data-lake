@@ -261,17 +261,18 @@ object ActionHelper extends SmartDataLakeLogger {
   def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, executionMode: Option[ExecutionMode])(implicit session: SparkSession): SparkSubFeed = {
     assert(input.id == subFeed.dataObjectId, s"DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
     if (subFeed.dataFrame.isEmpty) {
-      if (executionMode.exists(_.isInstanceOf[SparkStreamingOnceMode])) {
-        assert(input.isInstanceOf[CanCreateStreamingDataFrame], s"DataObject ${input.id} doesn't implement CanCreateStreamingDataFrame. Can not create StreamingDataFrame for executionMode=SparkStreamingOnceMode")
-        val df = input.asInstanceOf[CanCreateStreamingDataFrame].getStreamingDataFrame
-          .colNamesLowercase // convert to lower case by default
-        subFeed.copy(dataFrame = Some(df), partitionValues = Seq()) // remove partition values for streaming mode
-      } else {
-        logger.info(s"getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
-        val df = input.getDataFrame(subFeed.partitionValues)
-          .colNamesLowercase // convert to lower case by default
-        val filteredDf = ActionHelper.filterDataFrame(df, subFeed.partitionValues)
-        subFeed.copy(dataFrame = Some(filteredDf))
+      executionMode match {
+        case Some(m: SparkStreamingOnceMode) =>
+          assert(input.isInstanceOf[CanCreateStreamingDataFrame], s"DataObject ${input.id} doesn't implement CanCreateStreamingDataFrame. Can not create StreamingDataFrame for executionMode=SparkStreamingOnceMode")
+          val df = input.asInstanceOf[CanCreateStreamingDataFrame].getStreamingDataFrame(m.inputOptions)
+            .colNamesLowercase // convert to lower case by default
+          subFeed.copy(dataFrame = Some(df), partitionValues = Seq()) // remove partition values for streaming mode
+        case _ =>
+          logger.info(s"getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
+          val df = input.getDataFrame(subFeed.partitionValues)
+            .colNamesLowercase // convert to lower case by default
+          val filteredDf = ActionHelper.filterDataFrame(df, subFeed.partitionValues)
+          subFeed.copy(dataFrame = Some(filteredDf))
       }
     } else subFeed
   }

@@ -41,6 +41,8 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None, override val ma
 /**
  * Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads (trigger=Trigger.Once) and keep track of processed data.
  * @param checkpointLocation location for checkpoints of streaming query to keep state
+ * @param inputOptions additional option to apply when reading streaming source. This overwrites options set by the DataObjects.
+ * @param outputOptions additional option to apply when writing to streaming sink. This overwrites options set by the DataObjects.
  */
-case class SparkStreamingOnceMode(checkpointLocation: String) extends ExecutionMode
+case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[String,String], outputOptions: Map[String,String]) extends ExecutionMode
 
