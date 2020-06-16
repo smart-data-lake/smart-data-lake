@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.PartitionValues
-import org.apache.spark.sql.streaming.{StreamingQuery, Trigger}
+import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 
 private[smartdatalake] trait CanWriteDataFrame {
@@ -43,7 +43,7 @@ private[smartdatalake] trait CanWriteDataFrame {
    * @param trigger Trigger frequency for stream
    * @param checkpointLocation location for checkpoints of streaming query
    */
-  def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String,String], checkpointLocation: String, queryName: String)(implicit session: SparkSession): StreamingQuery = {
+  def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String,String], checkpointLocation: String, queryName: String, outputMode: OutputMode = OutputMode.Append)(implicit session: SparkSession): StreamingQuery = {
 
     // lambda function is ambiguous with foreachBatch in scala 2.12... we need to create a real function...
     // Note: no partition values supported when writing streaming target
@@ -53,6 +53,7 @@ private[smartdatalake] trait CanWriteDataFrame {
       .writeStream
       .trigger(trigger)
       .queryName(queryName)
+      .outputMode(outputMode)
       .option("checkpointLocation", checkpointLocation)
       .options(streamingOptions ++ options) // options override streamingOptions
       .foreachBatch(microBatchWriter _)

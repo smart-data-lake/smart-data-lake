@@ -92,7 +92,7 @@ abstract class SparkSubFeedAction extends Action {
         case Some(m: SparkStreamingOnceMode) =>
           // Write in streaming mode - use spark streaming with Trigger.Once and awaitTermination
           assert(transformedSubFeed.dataFrame.get.isStreaming, s"($id) ExecutionMode ${m.getClass} needs streaming DataFrame in SubFeed")
-          val streamingQuery = output.writeStreamingDataFrame(transformedSubFeed.dataFrame.get, Trigger.Once, m.outputOptions, m.checkpointLocation, s"$id writing ${output.id}")
+          val streamingQuery = output.writeStreamingDataFrame(transformedSubFeed.dataFrame.get, Trigger.Once, m.outputOptions, m.checkpointLocation, s"$id writing ${output.id}", m.outputMode)
           streamingQuery.awaitTermination
         case None | Some(_: PartitionDiffMode) =>
           // Write in batch mode

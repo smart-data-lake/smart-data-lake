@@ -18,6 +18,8 @@
  */
 package io.smartdatalake.definitions
 
+import org.apache.spark.sql.streaming.OutputMode
+
 /**
  * Execution mode's defines how data is selected when running a data pipeline.
  */
@@ -44,5 +46,5 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None, override val ma
  * @param inputOptions additional option to apply when reading streaming source. This overwrites options set by the DataObjects.
  * @param outputOptions additional option to apply when writing to streaming sink. This overwrites options set by the DataObjects.
  */
-case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[String,String], outputOptions: Map[String,String]) extends ExecutionMode
+case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[String,String] = Map(), outputOptions: Map[String,String] = Map(), outputMode: OutputMode = OutputMode.Append) extends ExecutionMode
 
