@@ -18,8 +18,6 @@
  */
 package io.smartdatalake.definitions
 
-import org.apache.spark.sql.streaming.Trigger
-
 /**
  * Execution mode's defines how data is selected when running a data pipeline.
  */
@@ -41,11 +39,8 @@ trait ExecutionModeWithMainInput {
 case class PartitionDiffMode(partitionColNb: Option[Int] = None, override val mainInputId: Option[String] = None, override val mainOutputId: Option[String] = None, nbOfPartitionValuesPerRun: Option[Int] = None) extends ExecutionMode with ExecutionModeWithMainInput
 
 /**
- * Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads and keep track of processed data.
+ * Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads (trigger=Trigger.Once) and keep track of processed data.
  * @param checkpointLocation location for checkpoints of streaming query to keep state
- * @param trigger Trigger frequency for streaming query, default is trigger once. Other modes are currently not supported.
  */
-case class SparkStreamingMode(checkpointLocation: String, trigger: Trigger = Trigger.Once) extends ExecutionMode {
-  assert(trigger == Trigger.Once, s"Unsupported SparkStreamingMode trigger frequency $trigger")
-}
+case class SparkStreamingOnceMode(checkpointLocation: String) extends ExecutionMode
 

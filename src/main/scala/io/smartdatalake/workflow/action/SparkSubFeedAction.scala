@@ -18,11 +18,12 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode, SparkStreamingMode}
+import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode, SparkStreamingOnceMode}
 import io.smartdatalake.util.misc.PerformanceUtils
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, CanWriteStreamingDataFrame, DataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.streaming.Trigger
 
 abstract class SparkSubFeedAction extends Action {
 
@@ -88,14 +89,14 @@ abstract class SparkSubFeedAction extends Action {
     setSparkJobMetadata(Some(msg))
     val (_,d) = PerformanceUtils.measureDuration {
       executionMode match {
-        case Some(m: SparkStreamingMode) =>
-          // Write in streaming mode
+        case Some(m: SparkStreamingOnceMode) =>
+          // Write in streaming mode - use spark streaming with Trigger.Once and awaitTermination
           assert(transformedSubFeed.dataFrame.get.isStreaming, s"($id) ExecutionMode ${m.getClass} needs streaming DataFrame in SubFeed")
-          assert(output.isInstanceOf[CanWriteStreamingDataFrame], s"($id) Output ${output.id} of type ${output.getClass.getSimpleName} does not support streaming inputs")
-          output.asInstanceOf[CanWriteStreamingDataFrame].writeStreamingDataFrame(transformedSubFeed.dataFrame.get, m.trigger, m.checkpointLocation, s"$id writing ${output.id}")
+          val streamingQuery = output.writeStreamingDataFrame(transformedSubFeed.dataFrame.get, Trigger.Once, m.checkpointLocation, s"$id writing ${output.id}")
+          streamingQuery.awaitTermination
         case None | Some(_: PartitionDiffMode) =>
           // Write in batch mode
-          assert(!transformedSubFeed.dataFrame.get.isStreaming, s"($id) Input from ${transformedSubFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingMode.getClass.getSimpleName}")
+          assert(!transformedSubFeed.dataFrame.get.isStreaming, s"($id) Input from ${transformedSubFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingOnceMode.getClass.getSimpleName}")
           output.writeDataFrame(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
         case x => new IllegalStateException( s"($id) ExecutionMode $x is not supported")
       }
@@ -145,8 +146,6 @@ abstract class SparkSubFeedAction extends Action {
    */
   def runtimeExecutionMode(isDAGStart: Boolean): Option[ExecutionMode] = {
     // override executionMode with initExecutionMode if is start node of a DAG run
-    val choosenExecutionMode = if (isDAGStart) initExecutionMode else executionMode
-    // if initExecution mode is not defined, use executionMode
-    choosenExecutionMode.orElse(executionMode)
+    if (isDAGStart) initExecutionMode.orElse(executionMode) else executionMode
   }
 }
