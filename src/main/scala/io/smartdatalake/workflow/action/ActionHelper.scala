@@ -264,7 +264,7 @@ object ActionHelper extends SmartDataLakeLogger {
     assert(input.id == subFeed.dataObjectId, s"DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
     executionMode match {
       case Some(m: SparkStreamingOnceMode) =>
-        if (subFeed.dataFrame.isEmpty || (phase==ExecutionPhase.Exec && (subFeed.isDummy || subFeed.isStreaming.contains(false)))) {
+        if (subFeed.dataFrame.isEmpty || phase==ExecutionPhase.Exec) { // in exec phase we always needs a fresh streaming DataFrame
           // recreate DataFrame from DataObject
           assert(input.isInstanceOf[CanCreateStreamingDataFrame], s"DataObject ${input.id} doesn't implement CanCreateStreamingDataFrame. Can not create StreamingDataFrame for executionMode=SparkStreamingOnceMode")
           val df = input.asInstanceOf[CanCreateStreamingDataFrame].getStreamingDataFrame(m.inputOptions)
