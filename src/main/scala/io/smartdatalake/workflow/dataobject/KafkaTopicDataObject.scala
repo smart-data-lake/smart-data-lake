@@ -35,7 +35,7 @@ import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions.{col, udf}
-import org.apache.spark.sql.types.StringType
+import org.apache.spark.sql.types.{StringType, StructType}
 import za.co.absa.abris.avro.functions.from_confluent_avro
 import za.co.absa.abris.avro.read.confluent.SchemaManager
 
@@ -114,7 +114,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     require(connection.topicExists(topicName), s"($id) topic $topicName doesn't exist")
   }
 
-  override def getStreamingDataFrame(options: Map[String,String])(implicit session: SparkSession): DataFrame = {
+  override def getStreamingDataFrame(options: Map[String,String], schema: Option[StructType])(implicit session: SparkSession): DataFrame = {
     val df = session
       .readStream
       .format("kafka")

@@ -28,7 +28,7 @@ private[smartdatalake] case class ActionPipelineContext(
   application: String,
   instanceRegistry: InstanceRegistry,
   referenceTimestamp: Option[LocalDateTime] = None,
-  phase: ExecutionPhase = ExecutionPhase.Prepare
+  var phase: ExecutionPhase = ExecutionPhase.Prepare
 ) {
   def getReferenceTimestampOrNow: LocalDateTime = referenceTimestamp.getOrElse(LocalDateTime.now)
 }

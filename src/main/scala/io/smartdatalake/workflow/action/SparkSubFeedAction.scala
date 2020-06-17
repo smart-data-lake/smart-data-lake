@@ -53,10 +53,10 @@ abstract class SparkSubFeedAction extends Action {
     preparedSubFeed = if (initExecutionMode.isDefined && subFeed.isInstanceOf[InitSubFeed] && preparedSubFeed.partitionValues.isEmpty) {
       preparedSubFeed.copy( partitionValues = ActionHelper.applyExecutionMode(initExecutionMode.get, id, input, output, preparedSubFeed.partitionValues))
     } else preparedSubFeed
-    // break lineage if requested
-    preparedSubFeed = if (breakDataFrameLineage) preparedSubFeed.breakLineage else preparedSubFeed
     // persist if requested
     preparedSubFeed = if (persist) preparedSubFeed.persist else preparedSubFeed
+    // break lineage if requested or if it's a streaming dataframe.
+    preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true)) preparedSubFeed.breakLineage else preparedSubFeed
     // transform
     val transformedSubFeed = transform(preparedSubFeed)
     // update partition values to output's partition columns and update dataObjectId

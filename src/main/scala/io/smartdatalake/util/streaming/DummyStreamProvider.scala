@@ -21,6 +21,7 @@ package io.smartdatalake.util.streaming
 
 import java.util.Optional
 
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
@@ -40,7 +41,7 @@ import scala.collection.JavaConverters._
 private[smartdatalake] class DummyStreamProvider extends DataSourceV2
   with MicroBatchReadSupport with DataSourceRegister {
   override def createMicroBatchReader( schema: Optional[StructType], checkpointLocation: String, options: DataSourceOptions): MicroBatchReader = {
-    if (!schema.isPresent) throw new IllegalArgumentException("DummyStreamProvider must be initialized with a schema.")
+    assert(schema.isPresent, "DummyStreamProvider must be initialized with a schema.")
     new DummyMicroBatchReader(schema.get)
   }
   override def shortName(): String = "dummy"
@@ -52,16 +53,17 @@ private[smartdatalake] class DummyStreamProvider extends DataSourceV2
     override def getStartOffset(): Offset = LongOffset(0)
     override def getEndOffset(): Offset = LongOffset(0)
     override def deserializeOffset(json: String): Offset = LongOffset(json.toLong)
-    override def planInputPartitions(): java.util.List[InputPartition[InternalRow]] = List().asJava
+    override def planInputPartitions(): java.util.List[InputPartition[InternalRow]] = throw new NotImplementedError("DummyMicroBatchReader cannot deliver data")
     override def commit(end: Offset): Unit = {}
     override def stop(): Unit = {}
     override def toString: String = s"DummyStreamV2"
   }
 }
 
-object DummyStreamProvider {
+object DummyStreamProvider extends SmartDataLakeLogger {
   def getDummyDf(schema: StructType)(implicit session: SparkSession): DataFrame = {
-    session.readStream.format(classOf[DummyStreamProvider].getName).schema(schema).load
+    logger.debug("creating dummy streaming df")
+    session.readStream.schema(schema).format(classOf[DummyStreamProvider].getName).load
   }
 }
 

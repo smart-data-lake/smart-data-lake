@@ -71,9 +71,8 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
 
   private def createScheduler(parallelism: Int = 1) = Scheduler.fixedPool(s"dag-$runId", parallelism)
 
-  private def run[R<:DAGResult](phase: ExecutionPhase, parallelism: Int = 1)(operation: (DAGNode, Seq[R]) => Seq[R])(implicit session: SparkSession, contextOrg: ActionPipelineContext): Seq[R] = {
+  private def run[R<:DAGResult](phase: ExecutionPhase, parallelism: Int = 1)(operation: (DAGNode, Seq[R]) => Seq[R])(implicit session: SparkSession): Seq[R] = {
     implicit val scheduler: SchedulerService = createScheduler(parallelism)
-    implicit val context: ActionPipelineContext = contextOrg.copy( phase = phase ) // update context
     val task = dag.buildTaskGraph[R](new ActionEventListener(phase))(operation)
     val futureResult = task.runToFuture(scheduler)
 
@@ -103,7 +102,8 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
 
   def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     // run prepare for every node
-    run[DummyDAGResult](ExecutionPhase.Prepare, parallelism) {
+    context.phase = ExecutionPhase.Prepare
+    run[DummyDAGResult](context.phase, parallelism) {
       case (node: InitDAGNode, _) =>
         node.edges.map(dataObjectId => DummyDAGResult(dataObjectId))
       case (node: Action, empty) =>
@@ -115,7 +115,8 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
 
   def init(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     // run init for every node
-    run[SubFeed](ExecutionPhase.Init) {
+    context.phase = ExecutionPhase.Init
+    run[SubFeed](context.phase) {
       case (node: InitDAGNode, _) =>
         node.edges.map(dataObjectId => InitSubFeed(dataObjectId, partitionValues))
       case (node: Action, subFeeds) =>
@@ -129,7 +130,8 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
     val stageMetricsListener = new SparkStageMetricsListener(notifyActionMetric)
     session.sparkContext.addSparkListener(stageMetricsListener)
     val result = try {
-      run[SubFeed] (ExecutionPhase.Exec) {
+      context.phase = ExecutionPhase.Exec
+      run[SubFeed](context.phase) {
         case (node: InitDAGNode, _) =>
           node.edges.map(dataObjectId => InitSubFeed(dataObjectId, partitionValues))
         case (node: Action, subFeeds) =>

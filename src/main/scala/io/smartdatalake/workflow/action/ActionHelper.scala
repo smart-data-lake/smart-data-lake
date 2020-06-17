@@ -268,7 +268,7 @@ object ActionHelper extends SmartDataLakeLogger {
           // recreate DataFrame from DataObject
           assert(input.isInstanceOf[CanCreateStreamingDataFrame], s"DataObject ${input.id} doesn't implement CanCreateStreamingDataFrame. Can not create StreamingDataFrame for executionMode=SparkStreamingOnceMode")
           logger.info(s"getting streaming DataFrame for ${input.id}")
-          val df = input.asInstanceOf[CanCreateStreamingDataFrame].getStreamingDataFrame(m.inputOptions)
+          val df = input.asInstanceOf[CanCreateStreamingDataFrame].getStreamingDataFrame(m.inputOptions, subFeed.dataFrame.map(_.schema))
             .colNamesLowercase // convert to lower case by default
           subFeed.copy(dataFrame = Some(df), partitionValues = Seq()) // remove partition values for streaming mode
         } else if (subFeed.isStreaming.contains(false)) {
