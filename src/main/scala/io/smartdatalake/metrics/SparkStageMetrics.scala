@@ -183,15 +183,21 @@ private[smartdatalake] class SparkStageMetricsListener(notifyStageMetricsFunc: (
     val actionIdRegex = "Action~([a-zA-Z0-9_-]+)".r.unanchored
     val actionId = sparkStageMetrics.jobInfo.group match {
       case actionIdRegex(id) => Some(ActionObjectId(id))
-      case _ =>
-        logger.warn(s"Couldn't extract ActionId from sparkJobGroupId (${sparkStageMetrics.jobInfo.group})")
-        None
+      case _ => sparkStageMetrics.jobInfo.description match { // for spark streaming jobs we cant set the jobGroup, but only the description
+        case actionIdRegex(id) => Some(ActionObjectId(id))
+        case _ =>
+          logger.warn(s"Couldn't extract ActionId from sparkJobGroupId (${sparkStageMetrics.jobInfo.group})")
+          None
+      }
     }
     if (actionId.isDefined) {
       val dataObjectIdRegex = "DataObject~([a-zA-Z0-9_-]+)".r.unanchored
       val dataObjectId = sparkStageMetrics.jobInfo.description match {
         case dataObjectIdRegex(id) => Some(DataObjectId(id))
-        case _ => None // there are some stages which are created by Spark DataFrame operations which dont belong to manipulation Actions target DataObject's, e.g. pivot operator
+        case _ => sparkStageMetrics.jobInfo.description match { // for spark streaming jobs we cant set the jobGroup, but only the description
+          case dataObjectIdRegex(id) => Some(DataObjectId(id))
+          case _ => None // there are some stages which are created by Spark DataFrame operations which dont belong to manipulation Actions target DataObject's, e.g. pivot operator
+        }
       }
       notifyStageMetricsFunc(actionId.get, dataObjectId, sparkStageMetrics)
     }

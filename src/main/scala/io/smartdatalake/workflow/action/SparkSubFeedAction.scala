@@ -87,22 +87,28 @@ abstract class SparkSubFeedAction extends Action {
     val msg = s"writing to ${output.id}" + (if (transformedSubFeed.partitionValues.nonEmpty) s", partitionValues ${transformedSubFeed.partitionValues.mkString(" ")}" else "")
     logger.info(s"($id) start " + msg)
     setSparkJobMetadata(Some(msg))
-    val (_,d) = PerformanceUtils.measureDuration {
+    val (noData,d) = PerformanceUtils.measureDuration {
       executionMode match {
         case Some(m: SparkStreamingOnceMode) =>
           // Write in streaming mode - use spark streaming with Trigger.Once and awaitTermination
           assert(transformedSubFeed.dataFrame.get.isStreaming, s"($id) ExecutionMode ${m.getClass} needs streaming DataFrame in SubFeed")
           val streamingQuery = output.writeStreamingDataFrame(transformedSubFeed.dataFrame.get, Trigger.Once, m.outputOptions, m.checkpointLocation, s"$id writing ${output.id}", m.outputMode)
           streamingQuery.awaitTermination
+          val noData = streamingQuery.lastProgress.numInputRows == 0
+          if (noData) logger.info(s"($id) no data to process for ${output.id} in streaming mode")
+          // return
+          noData
         case None | Some(_: PartitionDiffMode) =>
           // Write in batch mode
           assert(!transformedSubFeed.dataFrame.get.isStreaming, s"($id) Input from ${transformedSubFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingOnceMode.getClass.getSimpleName}")
           output.writeDataFrame(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
-        case x => new IllegalStateException( s"($id) ExecutionMode $x is not supported")
+          // return noData
+          false
+        case x => throw new IllegalStateException( s"($id) ExecutionMode $x is not supported")
       }
     }
     setSparkJobMetadata()
-    val finalMetricsInfos = getFinalMetrics(output.id).map(_.getMainInfos)
+    val finalMetricsInfos = if (noData) None else getFinalMetrics(output.id).map(_.getMainInfos)
     logger.info(s"($id) finished writing DataFrame to ${output.id}: duration=$d" + finalMetricsInfos.map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse(""))
     // return
     Seq(transformedSubFeed)

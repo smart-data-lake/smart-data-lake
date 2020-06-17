@@ -158,6 +158,14 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: String, 
       .groupBy(identity).mapValues(_.size).toSeq.sortBy(_._1.getOrElse(RuntimeEventState.NONE))
   }
 
+  /**
+   * Reset runtime state.
+   * This is mainly used for testing.
+   */
+  def reset(): Unit = {
+    dag.sortedNodes.collect { case n: Action => n }.foreach(_.reset)
+  }
+
   def notifyActionMetric(actionId: ActionObjectId, dataObjectId: Option[DataObjectId], metrics: ActionMetrics): Unit = {
     val action = dag.sortedNodes.collect{ case a:Action => a }
       .find(_.nodeId == actionId.id).getOrElse(throw new IllegalStateException(s"Unknown action $actionId"))

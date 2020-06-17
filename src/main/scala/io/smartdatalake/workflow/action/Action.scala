@@ -216,12 +216,22 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
     // return latest metrics
     val metrics = dataObjectRuntimeMetricsMap.get(dataObjectId)
     val latestMetrics = metrics.flatMap( m => Try(m.maxBy(_.getOrder)).toOption)
-    if (metrics.isEmpty)  throw new IllegalStateException(s"($id) Metrics for $dataObjectId not found")
+    if (metrics.isEmpty) throw new IllegalStateException(s"($id) Metrics for $dataObjectId not found")
     latestMetrics
   }
   private var runtimeMetricsEnabled = false
   private val dataObjectRuntimeMetricsMap = mutable.Map[DataObjectId,mutable.Buffer[ActionMetrics]]()
   private val dataObjectRuntimeMetricsDelivered = mutable.Buffer[DataObjectId]()
+
+  /**
+   * Resets the runtime state of this Action
+   * This is mainly used for testing
+   */
+  def reset(): Unit = {
+    runtimeEvents.clear
+    dataObjectRuntimeMetricsDelivered.clear
+    dataObjectRuntimeMetricsMap.clear
+  }
 
   /**
    * This is displayed in ascii graph visualization
