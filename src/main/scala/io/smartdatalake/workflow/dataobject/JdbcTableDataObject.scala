@@ -68,6 +68,15 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   if(table.db.isEmpty) throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
 
   override def prepare(implicit session: SparkSession): Unit = {
+
+    // test connection
+    try {
+      connection.test()
+    } catch {
+      case ex: Throwable => throw ConnectionTestException(s"($id) Can not connect. Error: ${ex.getMessage}", ex)
+    }
+
+    // test table existing
     if (!isTableExisting) {
       createSql.foreach{ sql =>
         logger.info(s"($id) createSQL is being executed")
