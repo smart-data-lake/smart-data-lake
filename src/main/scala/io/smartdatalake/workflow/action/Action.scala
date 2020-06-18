@@ -65,8 +65,8 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   /**
    * Prepare DataObjects prerequisites.
    * In this step preconditions are prepared & tested:
-   * - directories exists or can be created
    * - connections can be created
+   * - needed structures exist, e.g Kafka topic or Jdbc table
    *
    * This runs during the "prepare" phase of the DAG.
    */
