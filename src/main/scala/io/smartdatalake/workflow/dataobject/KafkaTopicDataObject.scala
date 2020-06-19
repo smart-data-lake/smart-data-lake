@@ -35,6 +35,7 @@ import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions.{col, udf}
+import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 import org.apache.spark.sql.types.{StringType, StructType}
 import za.co.absa.abris.avro.functions.from_confluent_avro
 import za.co.absa.abris.avro.read.confluent.SchemaManager
@@ -50,10 +51,11 @@ import scala.collection.JavaConverters._
   * @param topicName The name of the topic to read
   * @param keyType    Optional type the key column should be converted to. If none is given it will remain a bytearray / binary.
   * @param valueType  Optional type the value column should be converted to. If none is given it will remain a bytearray / binary.
+  * @param schemaMin  An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
   * @param selectCols Columns to be selected when reading the DataFrame. Available columns are key, value, topic,
   *                   partition, offset, timestamp timestampType. If key/valueType is AvroSchemaRegistry the key/value column are
-  *                   convert to a complex type according to the avro schema. To expand it select "value.*". If no columns are
-  *                   given all columns will be selected.
+  *                   convert to a complex type according to the avro schema. To expand it select "value.*".
+ *                    Default is to select key and value.
   * @param datePartitionCol partition column name to extract timestamp into on batch read
   * @param datePartitionTimeFormat time format for timestamp in datePartitionCol, definition according to java DateTimeFormatter (e.g. "yyyyMMdd").
   * @param datePartitionTimeUnit time unit for timestamp in datePartitionCol, definition according to java ChronoUnit (e.g. "days").
@@ -65,18 +67,19 @@ import scala.collection.JavaConverters._
 case class KafkaTopicDataObject(override val id: DataObjectId,
                                 topicName: String,
                                 connectionId: ConnectionId,
-                                keyType: KafkaColumnType = KafkaColumnType.Binary,
-                                valueType: KafkaColumnType = KafkaColumnType.Binary,
-                                selectCols: Seq[String] = Seq(),
+                                keyType: KafkaColumnType = KafkaColumnType.String,
+                                valueType: KafkaColumnType = KafkaColumnType.String,
+                                override val schemaMin: Option[StructType] = None,
+                                selectCols: Seq[String] = Seq("key", "value"),
                                 datePartitionCol: Option[String] = None,
-                                datePartitionTimeFormat: Option[String],
-                                datePartitionTimeUnit: Option[String],
+                                datePartitionTimeFormat: Option[String] = None,
+                                datePartitionTimeUnit: Option[String] = None,
                                 batchReadConsecutivePartitionsAsRanges: Boolean = false,
                                 batchReadMaxOffsetsPerTask: Option[Int] = None,
                                 kafkaOptions: Map[String, String] = Map(),
                                 override val metadata: Option[DataObjectMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateDataFrame with CanCreateStreamingDataFrame with CanHandlePartitions {
+  extends DataObject with CanCreateDataFrame with CanCreateStreamingDataFrame with CanWriteDataFrame with CanHandlePartitions with SchemaValidation {
 
   override val partitions: Seq[String] = datePartitionCol.toSeq
 
@@ -121,28 +124,31 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   override def getStreamingDataFrame(options: Map[String,String], schema: Option[StructType])(implicit session: SparkSession): DataFrame = {
-    val df = session
+    val dfRaw = session
       .readStream
       .format("kafka")
       .option("kafka.bootstrap.servers", connection.brokers)
       .options(connection.kafkaOptions ++ kafkaOptions ++ options) // options override kafkaOptions override connection.kafkaOptions
       .option("subscribe", topicName)
       .load()
-    prepareDataFrame(df)
+    prepareDataFrame(dfRaw)
   }
 
-  private def prepareDataFrame(df: DataFrame): DataFrame = {
+  private def prepareDataFrame(dfRaw: DataFrame): DataFrame = {
     import io.smartdatalake.util.misc.DataFrameUtil._
 
     // Deserialize key/value to make human readable
     // convert key & value
     val colsToSelect = ((if (selectCols.nonEmpty) selectCols else Seq("kafka.*")) ++ partitions).distinct.map(col)
-    df
+    val df = dfRaw
       .withColumn("key", convertKafkaType(keyType, col("key")))
       .withColumn("value", convertKafkaType(valueType, col("value")))
       .as("kafka")
       .withOptionalColumn(datePartitionCol, udfFormatPartition(col("timestamp")))
       .select(colsToSelect:_*)
+    validateSchemaMin(df)
+    // return
+    df
   }
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
@@ -198,7 +204,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
               session
                 .read
                 .format("kafka")
-                .options(kafkaOptions)
+                .options(connection.kafkaOptions ++ kafkaOptions)
                 .option("kafka.bootstrap.servers", connection.brokers)
                 .option("subscribe", topicName)
                 .option("startingOffsets", s"""{"$topicName":{$startingOffsets}}""")
@@ -212,7 +218,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       logger.info(s"($id) creating data frame for whole topic $topicName, no partition values given")
       session.read
         .format("kafka")
-        .options(kafkaOptions)
+        .options(connection.kafkaOptions ++ kafkaOptions)
         .option("kafka.bootstrap.servers", connection.brokers)
         .option("subscribe", topicName)
         .option("startingOffsets", "earliest")
@@ -221,6 +227,30 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     }
 
     prepareDataFrame(dfRaw)
+  }
+
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+    validateSchemaMin(df)
+    // TODO: implement using avro schema registry
+    df.write
+      .format("kafka")
+      .options(connection.kafkaOptions ++ kafkaOptions)
+      .option("kafka.bootstrap.servers", connection.brokers)
+      .option("topic", topicName)
+      .save
+  }
+
+  override def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String, String], checkpointLocation: String, queryName: String, outputMode: OutputMode)(implicit session: SparkSession): StreamingQuery = {
+    validateSchemaMin(df)
+    // TODO: implement using avro schema registry
+    df.writeStream
+      .format("kafka")
+      .trigger(trigger)
+      .queryName(queryName)
+      .outputMode(outputMode)
+      .option("checkpointLocation", checkpointLocation)
+      .options(connection.kafkaOptions ++ kafkaOptions ++ options)
+      .start()
   }
 
   private def getTopicPartitionsAtTstmp(topicPartitions: Seq[TopicPartition], localDateTime: LocalDateTime) = {
@@ -281,10 +311,12 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
    * @inheritdoc
    */
   override def factory: FromConfigFactory[DataObject] = KafkaTopicDataObject
+
 }
 
 object KafkaColumnType extends Enumeration {
   type KafkaColumnType = Value
+  // TODO: implement fixed AvroSchema
   val AvroSchemaRegistry, Binary, String = Value
 }
 

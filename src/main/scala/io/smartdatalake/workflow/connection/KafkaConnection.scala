@@ -40,8 +40,8 @@ import scala.collection.JavaConverters._
  */
 case class KafkaConnection(override val id: ConnectionId,
                            brokers: String,
-                           schemaRegistry: Option[String],
-                           kafkaOptions: Map[String,String],
+                           schemaRegistry: Option[String] = None,
+                           kafkaOptions: Map[String,String] = Map(),
                            override val metadata: Option[ConnectionMetadata] = None
                           ) extends Connection {
 

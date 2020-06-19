@@ -18,24 +18,39 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.connection.KafkaConnection
 import net.manub.embeddedkafka.EmbeddedKafka
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.FunSuite
 
-class KafkaTopicDataObjectTest extends FunSuite with EmbeddedKafka with BeforeAndAfter with SmartDataLakeLogger {
+class KafkaTopicDataObjectTest extends FunSuite with EmbeddedKafka with DataObjectTestSuite {
+
+  import testSession.implicits._
+  import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+
+  private val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6000")
 
   test("Can read and write from Kafka") {
-
     withRunningKafka {
       createCustomTopic("topic", Map(), 1, 1)
       publishStringMessageToKafka("topic", "message")
       assert(consumeFirstStringMessageFrom("topic")=="message", "Whoops - couldn't read message")
     }
+  }
 
+  test("DataObject write and read kafka topic") {
+    val topic = "testTopic"
+    withRunningKafka {
+      createCustomTopic(topic, Map(), 1, 1)
+      instanceRegistry.register(kafkaConnection)
+      val dataObject = KafkaTopicDataObject("kafka1", topicName = topic, connectionId = "kafkaCon1")
+      val df = Seq(("john doe", "5"), ("peter smith", "3"), ("emma brown", "7")).toDF("key", "value")
+      dataObject.writeDataFrame(df, Seq())
+      val dfRead = dataObject.getDataFrame(Seq())
+      assert(dfRead.symmetricDifference(df).isEmpty)
+    }
   }
 
   after {
     EmbeddedKafka.stop()
   }
-
 }
