@@ -16,19 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow
 
-import java.time.LocalDateTime
+package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
-
-private[smartdatalake] case class ActionPipelineContext(
-  feed: String,
-  application: String,
-  instanceRegistry: InstanceRegistry,
-  referenceTimestamp: Option[LocalDateTime] = None,
-  var phase: ExecutionPhase = ExecutionPhase.Prepare
-) {
-  def getReferenceTimestampOrNow: LocalDateTime = referenceTimestamp.getOrElse(LocalDateTime.now)
-}
+case class ConnectionTestException(msg: String, ex: Throwable) extends RuntimeException(msg, ex)

@@ -67,6 +67,10 @@ case class SplunkConnection( override val id: ConnectionId,
 
   }
 
+  def test(): Unit = {
+    connectToSplunk.logout()
+  }
+
   /**
    * @inheritdoc
    */

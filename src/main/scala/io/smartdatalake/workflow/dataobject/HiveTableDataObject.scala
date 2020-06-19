@@ -63,11 +63,9 @@ case class HiveTableDataObject(override val id: DataObjectId,
                                saveMode: SaveMode = SaveMode.Overwrite,
                                acl: Option[AclDef] = None,
                                connectionId: Option[ConnectionId] = None,
-                               override val streamingOptions: Map[String, String] = Map(),
-                               override val trigger: Trigger = Trigger.Once,
                                override val metadata: Option[DataObjectMetadata] = None)
                               (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TableDataObject with CanWriteDataFrame with CanWriteDataStream with CanHandlePartitions with SmartDataLakeLogger {
+  extends TableDataObject with CanWriteDataFrame with CanHandlePartitions with SmartDataLakeLogger {
 
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location

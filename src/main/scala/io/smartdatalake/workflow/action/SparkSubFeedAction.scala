@@ -18,11 +18,12 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.definitions.ExecutionMode
+import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode, SparkStreamingOnceMode}
 import io.smartdatalake.util.misc.PerformanceUtils
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, CanWriteDataStream,DataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.streaming.Trigger
 
 abstract class SparkSubFeedAction extends Action {
 
@@ -52,14 +53,18 @@ abstract class SparkSubFeedAction extends Action {
     preparedSubFeed = if (initExecutionMode.isDefined && subFeed.isInstanceOf[InitSubFeed] && preparedSubFeed.partitionValues.isEmpty) {
       preparedSubFeed.copy( partitionValues = ActionHelper.applyExecutionMode(initExecutionMode.get, id, input, output, preparedSubFeed.partitionValues))
     } else preparedSubFeed
-    // break lineage if requested
-    preparedSubFeed = if (breakDataFrameLineage) preparedSubFeed.breakLineage() else preparedSubFeed
     // persist if requested
     preparedSubFeed = if (persist) preparedSubFeed.persist else preparedSubFeed
+    // break lineage if requested or if it's a streaming dataframe.
+    preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true)) preparedSubFeed.breakLineage else preparedSubFeed
     // transform
     val transformedSubFeed = transform(preparedSubFeed)
     // update partition values to output's partition columns and update dataObjectId
     ActionHelper.validateAndUpdateSubFeedPartitionValues(output, transformedSubFeed).copy(dataObjectId = output.id)
+  }
+
+  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.prepare
   }
 
   /**
@@ -82,18 +87,28 @@ abstract class SparkSubFeedAction extends Action {
     val msg = s"writing to ${output.id}" + (if (transformedSubFeed.partitionValues.nonEmpty) s", partitionValues ${transformedSubFeed.partitionValues.mkString(" ")}" else "")
     logger.info(s"($id) start " + msg)
     setSparkJobMetadata(Some(msg))
-    val (_,d) = PerformanceUtils.measureDuration {
-      // Write from a streaming input
-      if(transformedSubFeed.dataFrame.get.isStreaming){
-        assert(output.isInstanceOf[CanWriteDataStream], s"Output type ${output.getClass.getSimpleName} does not support streaming inputs")
-        output.asInstanceOf[CanWriteDataStream].writeDataStream(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
-        // Write from a batch input
-      } else {
-        output.writeDataFrame(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
+    val (noData,d) = PerformanceUtils.measureDuration {
+      executionMode match {
+        case Some(m: SparkStreamingOnceMode) =>
+          // Write in streaming mode - use spark streaming with Trigger.Once and awaitTermination
+          assert(transformedSubFeed.dataFrame.get.isStreaming, s"($id) ExecutionMode ${m.getClass} needs streaming DataFrame in SubFeed")
+          val streamingQuery = output.writeStreamingDataFrame(transformedSubFeed.dataFrame.get, Trigger.Once, m.outputOptions, m.checkpointLocation, s"$id writing ${output.id}", m.outputMode)
+          streamingQuery.awaitTermination
+          val noData = streamingQuery.lastProgress.numInputRows == 0
+          if (noData) logger.info(s"($id) no data to process for ${output.id} in streaming mode")
+          // return
+          noData
+        case None | Some(_: PartitionDiffMode) =>
+          // Write in batch mode
+          assert(!transformedSubFeed.dataFrame.get.isStreaming, s"($id) Input from ${transformedSubFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingOnceMode.getClass.getSimpleName}")
+          output.writeDataFrame(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
+          // return noData
+          false
+        case x => throw new IllegalStateException( s"($id) ExecutionMode $x is not supported")
       }
     }
     setSparkJobMetadata()
-    val finalMetricsInfos = getFinalMetrics(output.id).map(_.getMainInfos)
+    val finalMetricsInfos = if (noData) None else getFinalMetrics(output.id).map(_.getMainInfos)
     logger.info(s"($id) finished writing DataFrame to ${output.id}: duration=$d" + finalMetricsInfos.map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse(""))
     // return
     Seq(transformedSubFeed)
@@ -124,5 +139,19 @@ abstract class SparkSubFeedAction extends Action {
    * Execution mode if this Action is a start node of a DAG run
    */
   def initExecutionMode: Option[ExecutionMode]
+  require(initExecutionMode.isEmpty || initExecutionMode.contains(PartitionDiffMode()), s"($id) $initExecutionMode not supported as initExecutionMode")
 
+  /**
+   * General execution mode for this action.
+   * Note that this is overridden by initExecutionMode if it is defined and this Action is a start node of a DAG run.
+   */
+  def executionMode: Option[ExecutionMode]
+
+  /**
+   * Returns the execution mode used on runtime of the action, depending if this Action is a start node of a DAG run
+   */
+  def runtimeExecutionMode(isDAGStart: Boolean): Option[ExecutionMode] = {
+    // override executionMode with initExecutionMode if is start node of a DAG run
+    if (isDAGStart) initExecutionMode.orElse(executionMode) else executionMode
+  }
 }

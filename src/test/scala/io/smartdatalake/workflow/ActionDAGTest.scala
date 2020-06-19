@@ -22,15 +22,16 @@ import java.nio.file.Files
 import java.time.LocalDateTime
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.PartitionDiffMode
+import io.smartdatalake.definitions.{PartitionDiffMode, SparkStreamingOnceMode}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.customlogic.{CustomDfsTransformer, CustomDfsTransformerConfig}
-import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, HiveTableDataObject, Table, TickTockHiveTableDataObject}
+import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, HiveTableDataObject, JsonFileDataObject, ParquetFileDataObject, Table, TickTockHiveTableDataObject}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.types.{DataType, StructType}
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
 class ActionDAGTest extends FunSuite with BeforeAndAfter {
@@ -484,6 +485,72 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // second dag run - skip action execution because there are no new partitions to process
     dag.prepare
     intercept[NoDataToProcessWarning](dag.init)
+  }
+
+  test("action dag with 2 actions in sequence and executionMode=SparkStreamingOnceMode") {
+    // setup DataObjects
+    val feed = "actionpipeline"
+    val tempDir = Files.createTempDirectory(feed)
+    val schema = DataType.fromDDL("lastname string, firstname string, rating int").asInstanceOf[StructType]
+    val srcDO = JsonFileDataObject( "src1", tempDir.resolve("src1").toString.replace('\\', '/'), schema = Some(schema))
+    instanceRegistry.register(srcDO)
+    val tgt1DO = JsonFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SaveMode.Append)
+    instanceRegistry.register(tgt1DO)
+    val tgt2DO = JsonFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'), saveMode = SaveMode.Append)
+    instanceRegistry.register(tgt2DO)
+
+    // prepare DAG
+    val refTimestamp1 = LocalDateTime.now()
+    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", instanceRegistry, Some(refTimestamp1))
+    val df1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
+    srcDO.writeDataFrame(df1, Seq())
+
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingOnceMode(checkpointLocation = tempDir.resolve("stateA").toUri.toString)))
+    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, executionMode = Some(SparkStreamingOnceMode(checkpointLocation = tempDir.resolve("stateB").toUri.toString)))
+    val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2), "test")
+
+    // first dag run, first file processed
+    dag.prepare
+    dag.init
+    dag.exec
+
+    // check
+    val r1 = tgt2DO.getDataFrame()
+      .select($"rating".cast("int"))
+      .as[Int].collect().toSeq
+    assert(r1.size == 1)
+    assert(r1.head == 5)
+
+    // second dag run - no data to process
+    dag.reset
+    dag.prepare
+    dag.init
+    dag.exec
+
+    // check
+    val r2 = tgt2DO.getDataFrame()
+      .select($"rating".cast("int"))
+      .as[Int].collect().toSeq
+    assert(r2.size == 1)
+    assert(r2.head == 5)
+
+    // third dag run - new data to process
+    val df2 = Seq(("doe","john 2",10)).toDF("lastname", "firstname", "rating")
+    srcDO.writeDataFrame(df2, Seq())
+    dag.reset
+    dag.prepare
+    dag.init
+    dag.exec
+
+    // check
+    val r3 = tgt2DO.getDataFrame()
+      .select($"rating".cast("int"))
+      .as[Int].collect().toSeq
+    assert(r3.size == 2)
+
+    // check metrics
+    val action2MainMetrics = action2.getFinalMetrics(action2.outputId).get.getMainInfos
+    assert(action2MainMetrics("records_written")==1)
   }
 }
 

@@ -58,6 +58,10 @@ case class SftpFileRefConnection( override val id: ConnectionId,
     }
   }
 
+  def test(): Unit = {
+    TryWithResourcePool.exec(pool){ sftp => Unit } // no operation
+  }
+
   // setup connection pool
   val pool = new GenericObjectPool[SFTPClient](new SftpClientPoolFactory)
   pool.setMaxTotal(maxParallelConnections)

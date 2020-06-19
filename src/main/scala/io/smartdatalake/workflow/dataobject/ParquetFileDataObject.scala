@@ -63,11 +63,9 @@ case class ParquetFileDataObject( override val id: DataObjectId,
                                   override val sparkRepartition: Option[SparkRepartitionDef] = None,
                                   override val acl: Option[AclDef] = None,
                                   override val connectionId: Option[ConnectionId] = None,
-                                  override val metadata: Option[DataObjectMetadata] = None,
-                                  override val streamingOptions : Map[String, String] = Map(),
-                                  override val trigger : Trigger = Trigger.Once
+                                  override val metadata: Option[DataObjectMetadata] = None
                                 )(@transient implicit override val instanceRegistry: InstanceRegistry)
-  extends SparkFileDataObjectWithEmbeddedSchema with CanCreateDataFrame with CanWriteDataFrame with CanWriteDataStream{
+  extends SparkFileDataObjectWithEmbeddedSchema with CanCreateDataFrame with CanWriteDataFrame{
 
   override val format = "parquet"
 

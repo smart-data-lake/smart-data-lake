@@ -66,7 +66,7 @@ abstract class FileSubFeedAction extends Action {
       preparedSubFeed.copy( partitionValues = ActionHelper.applyExecutionMode(initExecutionMode.get, id, input, output, preparedSubFeed.partitionValues))
     } else preparedSubFeed
     // break lineage if requested
-    preparedSubFeed = if (breakFileRefLineage) preparedSubFeed.breakLineage() else preparedSubFeed
+    preparedSubFeed = if (breakFileRefLineage) preparedSubFeed.breakLineage else preparedSubFeed
     // transform
     val transformedSubFeed = initSubFeed(preparedSubFeed)
     // update partition values to output's partition columns and update dataObjectId
@@ -86,7 +86,7 @@ abstract class FileSubFeedAction extends Action {
       preparedSubFeed.copy( partitionValues = ActionHelper.applyExecutionMode(initExecutionMode.get, id, input, output, preparedSubFeed.partitionValues))
     } else preparedSubFeed
     // break lineage if requested
-    preparedSubFeed = if (breakFileRefLineage) preparedSubFeed.breakLineage() else preparedSubFeed
+    preparedSubFeed = if (breakFileRefLineage) preparedSubFeed.breakLineage else preparedSubFeed
     // delete existing files on overwrite
     if (output.saveMode == SaveMode.Overwrite) {
       if (output.partitions.nonEmpty)
