@@ -111,7 +111,13 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   override def prepare(implicit session: SparkSession): Unit = {
+    // test kafka connection
     require(connection.topicExists(topicName), s"($id) topic $topicName doesn't exist")
+    // test schema registry connection
+    if (schemaRegistryConfig.isDefined) {
+      SchemaManager.configureSchemaRegistry(schemaRegistryConfig.get)
+      SchemaManager.exists("dummy") // this is just a dummy request to check connection
+    }
   }
 
   override def getStreamingDataFrame(options: Map[String,String], schema: Option[StructType])(implicit session: SparkSession): DataFrame = {
