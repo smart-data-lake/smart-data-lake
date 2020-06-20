@@ -18,11 +18,17 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import java.nio.file.Files
+import java.time.temporal.ChronoUnit
+
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.KafkaConnection
 import net.manub.embeddedkafka.EmbeddedKafka
+import org.apache.kafka.common.serialization.StringSerializer
+import org.apache.spark.sql.streaming.Trigger
 import org.scalatest.FunSuite
 
-class KafkaTopicDataObjectTest extends FunSuite with EmbeddedKafka with DataObjectTestSuite {
+class KafkaTopicDataObjectTest extends FunSuite with EmbeddedKafka with DataObjectTestSuite with SmartDataLakeLogger {
 
   import testSession.implicits._
   import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
@@ -37,7 +43,7 @@ class KafkaTopicDataObjectTest extends FunSuite with EmbeddedKafka with DataObje
     }
   }
 
-  test("DataObject write and read kafka topic") {
+  test("DataObject can write and read kafka topic") {
     val topic = "testTopic"
     withRunningKafka {
       createCustomTopic(topic, Map(), 1, 1)
@@ -47,6 +53,66 @@ class KafkaTopicDataObjectTest extends FunSuite with EmbeddedKafka with DataObje
       dataObject.writeDataFrame(df, Seq())
       val dfRead = dataObject.getDataFrame(Seq())
       assert(dfRead.symmetricDifference(df).isEmpty)
+    }
+  }
+
+  test("DataObject can write and stream once kafka topic") {
+    val topic1 = "testTopic1"
+    val topic2 = "testTopic2"
+    val tempDir = Files.createTempDirectory("streamTest")
+    withRunningKafka {
+      createCustomTopic(topic1, Map(), 1, 1)
+      createCustomTopic(topic2, Map(), 1, 1)
+      instanceRegistry.register(kafkaConnection)
+      val dataObject1 = KafkaTopicDataObject("kafka1", topicName = topic1, connectionId = "kafkaCon1")
+      val dataObject2 = KafkaTopicDataObject("kafka1", topicName = topic2, connectionId = "kafkaCon1")
+
+      // prepare data
+      val df1 = Seq(("john doe", "5"), ("peter smith", "3"), ("emma brown", "7")).toDF("key", "value")
+      dataObject1.writeDataFrame(df1, Seq())
+
+      // stream
+      val dfStream1 = dataObject1.getStreamingDataFrame(Map("startingOffsets"->"earliest"), None)
+      val query = dataObject2.writeStreamingDataFrame(dfStream1, Trigger.Once, Map(), checkpointLocation = tempDir.resolve("state").toString, "test")
+      query.awaitTermination()
+      logger.info(s"streaming query finished, rows processed = ${query.lastProgress.numInputRows}")
+
+      // check
+      val df2 = dataObject2.getDataFrame().cache
+      df2.show
+      assert(df2.symmetricDifference(df1).isEmpty)
+    }
+  }
+
+  test("Can list and query partitions") {
+    withRunningKafka {
+      val topic1 = "testPartitionTopic1"
+      createCustomTopic(topic1, Map(), 1, 1)
+      logger.info("topic created")
+
+      // publish several messages with some delay between to have different timestamps
+      implicit val stringSerializer = new StringSerializer
+      publishToKafka(topic1, "A", "1")
+      Thread.sleep(1000)
+      publishToKafka(topic1, "B", "2")
+      Thread.sleep(2000)
+      publishToKafka(topic1, "C", "3")
+      logger.info("3 test messages written")
+
+      // configure DataObject with partition column defined as seconds
+      instanceRegistry.register(kafkaConnection)
+      val dataObject1 = KafkaTopicDataObject("kafka1", topicName = topic1, connectionId = "kafkaCon1"
+        , datePartitionCol = Some(DatePartitionColumnDef( colName = "sec", timeUnit = ChronoUnit.SECONDS.toString, timeFormat ="yyyyMMddHHmmss")))
+
+      // list and check partitions
+      val partitions = dataObject1.listPartitions
+      assert(partitions.size >= 3) // as we have written messages over a timestamp of 3secs
+
+      // check query first partitions data
+      val dfP1 = dataObject1.getDataFrame(Seq(partitions.minBy( p => p("sec").toString.toLong))).cache
+      assert(dfP1.columns.contains("sec"))
+      val dataP1 = dfP1.select($"key",$"value").as[(String,String)].collect.toSeq
+      assert(dataP1 == Seq(("A","1")))
     }
   }
 
