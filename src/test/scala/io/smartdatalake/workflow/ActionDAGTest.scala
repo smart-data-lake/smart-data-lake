@@ -494,9 +494,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val schema = DataType.fromDDL("lastname string, firstname string, rating int").asInstanceOf[StructType]
     val srcDO = JsonFileDataObject( "src1", tempDir.resolve("src1").toString.replace('\\', '/'), schema = Some(schema))
     instanceRegistry.register(srcDO)
-    val tgt1DO = JsonFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SaveMode.Append)
+    val tgt1DO = JsonFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SaveMode.Append, jsonOptions = Some(Map("multiLine" -> "false")))
     instanceRegistry.register(tgt1DO)
-    val tgt2DO = JsonFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'), saveMode = SaveMode.Append)
+    val tgt2DO = JsonFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'), saveMode = SaveMode.Append, jsonOptions = Some(Map("multiLine" -> "false")))
     instanceRegistry.register(tgt2DO)
 
     // prepare DAG
@@ -551,6 +551,73 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // check metrics
     val action2MainMetrics = action2.getFinalMetrics(action2.outputId).get.getMainInfos
     assert(action2MainMetrics("records_written")==1)
+  }
+
+  test("action dag with 2 actions in sequence, first is executionMode=SparkStreamingOnceMode, second is normal") {
+    // setup DataObjects
+    val feed = "actionpipeline"
+    val tempDir = Files.createTempDirectory(feed)
+    val schema = DataType.fromDDL("lastname string, firstname string, rating int").asInstanceOf[StructType]
+    val srcDO = JsonFileDataObject( "src1", tempDir.resolve("src1").toString.replace('\\', '/'), schema = Some(schema))
+    instanceRegistry.register(srcDO)
+    val tgt1DO = JsonFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SaveMode.Append, jsonOptions = Some(Map("multiLine" -> "false")))
+    instanceRegistry.register(tgt1DO)
+    val tgt2DO = JsonFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'), jsonOptions = Some(Map("multiLine" -> "false")))
+    instanceRegistry.register(tgt2DO)
+
+    // prepare DAG
+    val refTimestamp1 = LocalDateTime.now()
+    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", instanceRegistry, Some(refTimestamp1))
+    val df1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
+    srcDO.writeDataFrame(df1, Seq())
+
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingOnceMode(checkpointLocation = tempDir.resolve("stateA").toUri.toString)))
+    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id)
+    val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2), "test")
+
+    // first dag run, first file processed
+    dag.prepare
+    dag.init
+    dag.exec
+
+    // check
+    val r1 = tgt2DO.getDataFrame()
+      .select($"rating".cast("int"))
+      .as[Int].collect().toSeq
+    assert(r1 == Seq(5))
+
+    // second dag run - no data to process
+    dag.reset
+    dag.prepare
+    dag.init
+    dag.exec
+
+    // check
+    val r2 = tgt2DO.getDataFrame()
+      .select($"rating".cast("int"))
+      .as[Int].collect().toSeq
+    assert(r1 == Seq(5))
+
+    // third dag run - new data to process
+    val df2 = Seq(("doe","john 2",10)).toDF("lastname", "firstname", "rating")
+    srcDO.writeDataFrame(df2, Seq())
+    dag.reset
+    dag.prepare
+    dag.init
+    dag.exec
+
+    // check
+    val r3 = tgt2DO.getDataFrame()
+      .select($"rating".cast("int"))
+      .as[Int].collect().toSeq
+    val (state, dur) = action2.getRuntimeState
+    val metrics = action2.getFinalMetrics(tgt2DO.id.id)
+    tgt2DO.getDataFrame().show
+    assert(r3.size == 2)
+
+    // check metrics
+    val action2MainMetrics = action2.getFinalMetrics(action2.outputId).get.getMainInfos
+    assert(action2MainMetrics("records_written")==2) // without execution mode always the whole table is processed
   }
 }
 
