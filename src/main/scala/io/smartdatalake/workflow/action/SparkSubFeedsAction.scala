@@ -66,17 +66,23 @@ abstract class SparkSubFeedsAction extends Action {
   private def doTransform(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
     // convert subfeeds to SparkSubFeed type or initialize if not yet existing
     var preparedSubFeeds = subFeeds.map( SparkSubFeed.fromSubFeed )
-    // apply init execution mode if there are no partition values given in command line
+    // check preconditions
     require(initExecutionMode.isEmpty || mainInput.isDefined, throw ConfigurationException(s"$id has set an initExecutionMode without inputId but there are ${inputs.size} inputs with partitions. Please specify initExecutionMode.inputId to select input."))
     require(initExecutionMode.isEmpty || mainOutput.isDefined, throw ConfigurationException(s"$id has set an initExecutionMode without outputId but there are ${outputs.size} outputs with partitions. Please specify initExecutionMode.outputId to select output."))
-    val mainInputSubFeed = mainInput.flatMap( input => subFeeds.find(_.dataObjectId==input.id))
-    preparedSubFeeds = if ( initExecutionMode.isDefined && mainInputSubFeed.exists(_.isInstanceOf[InitSubFeed]) && mainInputSubFeed.exists(_.partitionValues.isEmpty)) {
-      preparedSubFeeds.map {
-        subFeed =>
-          if (subFeed.dataObjectId==mainInput.get.id) subFeed.copy(partitionValues = ActionHelper.applyExecutionMode(initExecutionMode.get, id, mainInput.get, mainOutput.get, subFeed.partitionValues))
-          else subFeed
-      }
-    } else preparedSubFeeds
+    // apply execution mode
+    val mainInputSubFeed = mainInput.flatMap( input => preparedSubFeeds.find(_.dataObjectId==input.id))
+    preparedSubFeeds = mainInputSubFeed.flatMap( subFeed => runtimeExecutionMode(subFeed)) match {
+      case Some(mode) =>
+        preparedSubFeeds.map {
+          subFeed =>
+            if (subFeed.dataObjectId == mainInput.get.id) {
+              val (newPartitionValues, newFilter) = ActionHelper.applyExecutionMode(mode, id, mainInput.get, mainOutput.get, context.phase, subFeed.partitionValues, subFeed.filter)
+              subFeed.copy(partitionValues = newPartitionValues, filter = newFilter)
+            }
+            else subFeed
+        }
+      case _ => preparedSubFeeds
+    }
     // break lineage if requested
     preparedSubFeeds = if (breakDataFrameLineage) preparedSubFeeds.map(_.breakLineage) else preparedSubFeeds
     // persist if requested
@@ -142,11 +148,16 @@ abstract class SparkSubFeedsAction extends Action {
   def initExecutionMode: Option[ExecutionMode]
 
   /**
+   * General execution mode for this action.
+   * Note that this is overridden by initExecutionMode if it is defined and this Action is a start node of a DAG run.
+   */
+  def executionMode: Option[ExecutionMode]
+
+  /**
    * Returns the execution mode used on runtime of the action, depending if this Action is a start node of a DAG run
    */
-  def runtimeExecutionMode(isDAGStart: Boolean): Option[ExecutionMode] = {
-    // override executionMode with initExecutionMode if is start node of a DAG run
-    if (isDAGStart) initExecutionMode else None
+  def runtimeExecutionMode(subFeed: SparkSubFeed): Option[ExecutionMode] = {
+    ActionHelper.getRuntimeExecutionMode(subFeed, executionMode, initExecutionMode)
   }
 
   /**
@@ -159,7 +170,7 @@ abstract class SparkSubFeedsAction extends Action {
     assert(inputs.size==subFeeds.size, s"Number of inputs must match number of subFeeds given for $id")
     inputs.map { input =>
       val subFeed = subFeeds.find(_.dataObjectId == input.id).getOrElse(throw new IllegalStateException(s"subFeed for input ${input.id} not found"))
-      ActionHelper.enrichSubFeedDataFrame(input, subFeed, runtimeExecutionMode(subFeed.isDAGStart), context.phase)
+      ActionHelper.enrichSubFeedDataFrame(input, subFeed, runtimeExecutionMode(subFeed), context.phase)
     }
   }
 }

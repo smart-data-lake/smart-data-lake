@@ -88,7 +88,7 @@ case class HistorizeAction(
 
   def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // create input subfeeds if not yet existing
-    var transformedSubFeed = ActionHelper.enrichSubFeedDataFrame(input, subFeed, runtimeExecutionMode(subFeed.isDAGStart), context.phase)
+    var transformedSubFeed = ActionHelper.enrichSubFeedDataFrame(input, subFeed, runtimeExecutionMode(subFeed), context.phase)
 
     // apply transformations
     transformedSubFeed = ActionHelper.applyTransformations(

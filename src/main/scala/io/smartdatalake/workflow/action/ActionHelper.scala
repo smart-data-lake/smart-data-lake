@@ -23,7 +23,7 @@ import java.time.LocalDateTime
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.ActionObjectId
-import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode, SparkStreamingOnceMode}
+import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode, SparkIncrementalMode, SparkStreamingOnceMode}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.{DataFrameUtil, SmartDataLakeLogger}
@@ -33,7 +33,7 @@ import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanCreateStreamingDataFrame, CanHandlePartitions, DataObject, TableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.TimestampType
+import org.apache.spark.sql.types.{StringType, TimestampType}
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
 object ActionHelper extends SmartDataLakeLogger {
@@ -218,7 +218,7 @@ object ActionHelper extends SmartDataLakeLogger {
         subFeed.updatePartitionValues(partitionedDO.partitions)
       case _ => subFeed.clearPartitionValues()
     }
-    updatedSubFeed.clearDAGStart()
+    updatedSubFeed.clearDAGStart().clearFilter()
   }
 
   /**
@@ -240,9 +240,10 @@ object ActionHelper extends SmartDataLakeLogger {
    * @param partitionValues partition values to use as filter condition
    * @return filtered DataFrame
    */
-  def filterDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues]): DataFrame = {
+  def filterDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], genericFilter: Option[Column]): DataFrame = {
+    // apply partition filter
     val partitionValuesColumn = partitionValues.flatMap(_.keys).distinct
-    if (partitionValues.isEmpty) df
+    val dfPartitionFiltered = if (partitionValues.isEmpty) df
     else if (partitionValuesColumn.size == 1) {
       // filter with Sql "isin" expression if only one column
       val filterExpr = col(partitionValuesColumn.head).isin(partitionValues.flatMap(_.elements.values):_*)
@@ -252,6 +253,9 @@ object ActionHelper extends SmartDataLakeLogger {
       val filterExpr = partitionValues.map(_.getSparkExpr).reduce( (a,b) => a or b)
       df.where(filterExpr)
     }
+    // apply generic filter
+    if (genericFilter.isDefined) dfPartitionFiltered.where(genericFilter.get)
+    else dfPartitionFiltered
   }
 
   /**
@@ -263,6 +267,7 @@ object ActionHelper extends SmartDataLakeLogger {
   def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, executionMode: Option[ExecutionMode], phase: ExecutionPhase)(implicit session: SparkSession): SparkSubFeed = {
     assert(input.id == subFeed.dataObjectId, s"DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
     executionMode match {
+
       case Some(m: SparkStreamingOnceMode) =>
         if (subFeed.dataFrame.isEmpty || phase==ExecutionPhase.Exec) { // in exec phase we always needs a fresh streaming DataFrame
           // recreate DataFrame from DataObject
@@ -276,13 +281,14 @@ object ActionHelper extends SmartDataLakeLogger {
           val emptyStreamingDataFrame = subFeed.dataFrame.map(df => DummyStreamProvider.getDummyDf(df.schema))
           subFeed.copy(dataFrame = emptyStreamingDataFrame, partitionValues = Seq()) // remove partition values for streaming mode
         } else subFeed
+
       case _ =>
         if (subFeed.dataFrame.isEmpty || (phase==ExecutionPhase.Exec && (subFeed.isDummy || subFeed.isStreaming.contains(true)))) {
           // recreate DataFrame from DataObject
-          logger.info(s"getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
+          logger.info(s"getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else "") + (if (subFeed.filter.nonEmpty) s" filtered by ${subFeed.filter.get}" else ""))
           val df = input.getDataFrame(subFeed.partitionValues)
             .colNamesLowercase // convert to lower case by default
-          val filteredDf = ActionHelper.filterDataFrame(df, subFeed.partitionValues)
+          val filteredDf = ActionHelper.filterDataFrame(df, subFeed.partitionValues, subFeed.filter)
           subFeed.copy(dataFrame = Some(filteredDf))
         } else if (subFeed.isStreaming.contains(true)) {
           // convert to empty normal DataFrame
@@ -312,7 +318,9 @@ object ActionHelper extends SmartDataLakeLogger {
   /**
    * Apply execution mode to partition values
    */
-  def applyExecutionMode(executionMode: ExecutionMode, actionId: ActionObjectId, input: DataObject, output: DataObject, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[PartitionValues] = {
+  def applyExecutionMode(executionMode: ExecutionMode, actionId: ActionObjectId, input: DataObject, output: DataObject, phase: ExecutionPhase, partitionValues: Seq[PartitionValues], filter: Option[Column])(implicit session: SparkSession): (Seq[PartitionValues], Option[Column]) = {
+    import session.implicits._
+
     executionMode match {
       case mode:PartitionDiffMode =>
         (input,output) match {
@@ -321,7 +329,7 @@ object ActionHelper extends SmartDataLakeLogger {
               if (partitionOutput.partitions.nonEmpty) {
                 // prepare common partition columns
                 val commonInits = searchCommonInits(partitionInput.partitions, partitionOutput.partitions)
-                require(commonInits.nonEmpty, throw ConfigurationException(s"$actionId has set initExecutionMode = 'partitionDiff' but no common init was found in partition columns for $input and $output"))
+                require(commonInits.nonEmpty, s"$actionId has set initExecutionMode = 'partitionDiff' but no common init was found in partition columns for $input and $output")
                 val commonPartitions = if (mode.partitionColNb.isDefined) {
                   commonInits.find(_.size==mode.partitionColNb.get).getOrElse(throw ConfigurationException(s"$actionId has set initExecutionMode = 'partitionDiff' but no common init with ${mode.partitionColNb.get} was found in partition columns of $input and $output from $commonInits!"))
                 } else {
@@ -340,14 +348,49 @@ object ActionHelper extends SmartDataLakeLogger {
                 }
                 logger.info(s"($actionId) $PartitionDiffMode selected partition values ${selectedPartitionValues.mkString(", ")} to process")
                 //return
-                selectedPartitionValues
+                (selectedPartitionValues, None)
               } else throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $output has no partition columns defined!")
             } else throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $input has no partition columns defined!")
           case (_: CanHandlePartitions, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $output does not support partitions!")
           case (_, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $input does not support partitions!")
         }
-      case _ => partitionValues
+
+      case mode:SparkIncrementalMode =>
+        (input,output) match {
+          case (sparkInput: CanCreateDataFrame, sparkOutput: CanCreateDataFrame) =>
+            val dfInput = sparkOutput.getDataFrame()
+            val inputColType = dfInput.schema(mode.compareCol).dataType
+            require(SparkIncrementalMode.allowedDataTypes.contains(inputColType), s"($actionId) Type of compare column ${mode.compareCol} must be one of ${SparkIncrementalMode.allowedDataTypes.mkString(", ")} in ${sparkInput.id}")
+            val dfOutput = sparkOutput.getDataFrame()
+            val outputColType = dfOutput.schema(mode.compareCol).dataType
+            require(SparkIncrementalMode.allowedDataTypes.contains(outputColType), s"($actionId) Type of compare column ${mode.compareCol} must be one of ${SparkIncrementalMode.allowedDataTypes.mkString(", ")} in ${sparkOutput.id}")
+            require(inputColType == outputColType, s"($actionId) Type of compare column ${mode.compareCol} is different between ${sparkInput.id} ($inputColType) and ${sparkOutput.id} ($outputColType)")
+            // get latest values
+            val outputLatestValue = dfInput.agg(max(col(mode.compareCol)).cast(StringType)).as[String].head
+            val inputLatestValue = dfOutput.agg(max(col(mode.compareCol)).cast(StringType)).as[String].head
+            // stop processing if no new data
+            if (outputLatestValue == inputLatestValue) throw NoDataToProcessWarning(actionId.id, s"($actionId) No increment to process found for ${input.id} and column ${mode.compareCol}")
+            // prepare filter
+            val selectedData = col(mode.compareCol) > lit(outputLatestValue).cast(inputColType)
+            (Seq(), Some(selectedData))
+          case _ => throw ConfigurationException(s"$actionId has set executionMode = $SparkIncrementalMode but $input or $output does not support creating Spark DataFrames!")
+        }
+
+      case _ => (partitionValues, filter)
     }
+  }
+
+  /**
+   *
+   */
+  def getRuntimeExecutionMode(subFeed: SparkSubFeed, executionMode: Option[ExecutionMode], initExecutionMode: Option[ExecutionMode]): Option[ExecutionMode] = {
+    // dont apply execution mode if partition values are given on the command line and this is a start node of the dag
+    if (subFeed.isDAGStart && subFeed.partitionValues.nonEmpty) {
+      None
+    } else if (subFeed.isDAGStart) {
+      // override executionMode with initExecutionMode if is start node of a DAG run
+      initExecutionMode.orElse(executionMode)
+    } else executionMode
   }
 
   /**

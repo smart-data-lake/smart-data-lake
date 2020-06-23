@@ -23,7 +23,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.util.streaming.DummyStreamProvider
 import io.smartdatalake.workflow.dataobject.FileRef
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import sun.reflect.generics.reflectiveObjects.NotImplementedException
 
 /**
@@ -63,7 +63,8 @@ case class SparkSubFeed(dataFrame: Option[DataFrame],
                         override val dataObjectId: DataObjectId,
                         override val partitionValues: Seq[PartitionValues],
                         override val isDAGStart: Boolean = false,
-                        isDummy: Boolean = false
+                        isDummy: Boolean = false,
+                        filter: Option[Column] = None
                        )
   extends SubFeed {
   override def breakLineage(implicit session: SparkSession): SparkSubFeed = {
@@ -85,6 +86,9 @@ case class SparkSubFeed(dataFrame: Option[DataFrame],
   }
   override def clearDAGStart(): SparkSubFeed = {
     this.copy(isDAGStart = false)
+  }
+  def clearFilter(): SparkSubFeed = {
+    this.copy(filter = None)
   }
   def persist: SparkSubFeed = {
     this.copy(dataFrame = this.dataFrame.map(_.persist))

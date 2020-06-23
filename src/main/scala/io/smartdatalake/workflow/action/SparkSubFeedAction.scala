@@ -49,14 +49,17 @@ abstract class SparkSubFeedAction extends Action {
   private def doTransform(subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // convert subfeed to SparkSubFeed type or initialize if not yet existing
     var preparedSubFeed = SparkSubFeed.fromSubFeed(subFeed)
-    // apply init execution mode if there are no partition values given in command line
-    preparedSubFeed = if (initExecutionMode.isDefined && subFeed.isInstanceOf[InitSubFeed] && preparedSubFeed.partitionValues.isEmpty) {
-      preparedSubFeed.copy( partitionValues = ActionHelper.applyExecutionMode(initExecutionMode.get, id, input, output, preparedSubFeed.partitionValues))
-    } else preparedSubFeed
+    // apply execution mode
+    preparedSubFeed = runtimeExecutionMode(preparedSubFeed) match {
+      case Some(mode) =>
+        val (newPartitionValues, newFilter) = ActionHelper.applyExecutionMode(mode, id, input, output, context.phase, preparedSubFeed.partitionValues, preparedSubFeed.filter)
+        preparedSubFeed.copy(partitionValues = newPartitionValues, filter = newFilter)
+      case _ => preparedSubFeed
+    }
     // persist if requested
     preparedSubFeed = if (persist) preparedSubFeed.persist else preparedSubFeed
-    // break lineage if requested or if it's a streaming dataframe.
-    preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true)) preparedSubFeed.breakLineage else preparedSubFeed
+    // break lineage if requested or if it's a streaming dataframe or if there is a filter set
+    preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined) preparedSubFeed.breakLineage else preparedSubFeed
     // transform
     val transformedSubFeed = transform(preparedSubFeed)
     // update partition values to output's partition columns and update dataObjectId
@@ -102,7 +105,7 @@ abstract class SparkSubFeedAction extends Action {
           // Write in batch mode
           assert(!transformedSubFeed.dataFrame.get.isStreaming, s"($id) Input from ${transformedSubFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingOnceMode.getClass.getSimpleName}")
           output.writeDataFrame(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
-          // return noData
+          // return noData=false
           false
         case x => throw new IllegalStateException( s"($id) ExecutionMode $x is not supported")
       }
@@ -150,8 +153,7 @@ abstract class SparkSubFeedAction extends Action {
   /**
    * Returns the execution mode used on runtime of the action, depending if this Action is a start node of a DAG run
    */
-  def runtimeExecutionMode(isDAGStart: Boolean): Option[ExecutionMode] = {
-    // override executionMode with initExecutionMode if is start node of a DAG run
-    if (isDAGStart) initExecutionMode.orElse(executionMode) else executionMode
+  def runtimeExecutionMode(subFeed: SparkSubFeed): Option[ExecutionMode] = {
+    ActionHelper.getRuntimeExecutionMode(subFeed, executionMode, initExecutionMode)
   }
 }
