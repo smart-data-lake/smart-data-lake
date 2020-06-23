@@ -45,8 +45,7 @@ import scopt.OptionParser
  * @param kerberosDomain  Kerberos domain (`username`@`kerberosDomain`) for local mode.
  * @param keytabPath      Path to Kerberos keytab file for local mode.
  */
-case class SmartDataLakeBuilderConfig(cmd: String = null,
-                                      feedSel: String = null,
+case class SmartDataLakeBuilderConfig(feedSel: String = null,
                                       applicationName: Option[String] = None,
                                       configuration: Option[String] = None,
                                       master: Option[String] = None,
@@ -58,19 +57,13 @@ case class SmartDataLakeBuilderConfig(cmd: String = null,
                                       multiPartitionValues: Option[Seq[PartitionValues]] = None,
                                       parallelism: Int = 1,
                                       statePath: Option[String] = None,
-                                      runId: Option[Int] = None,
                                       overrideJars: Option[Seq[String]] = None
                                 ) {
   def validate(): Unit = {
     assert(!applicationName.exists(_.contains("_")), s"Application name must not contain character '_' ($applicationName)")
-    cmd match {
-      case "start" =>
-        assert(!master.contains("yarn") || deployMode.nonEmpty, "spark deploy-mode must be set if spark master=yarn")
-        assert(partitionValues.isEmpty || multiPartitionValues.isEmpty, "partitionValues and multiPartitionValues cannot be defined at the same time")
-        assert(statePath.isEmpty || applicationName.isDefined, "application name must be defined if state path is set")
-      case "recover" =>
-        assert(statePath.nonEmpty, "state path must be defined for recovery")
-    }
+    assert(!master.contains("yarn") || deployMode.nonEmpty, "spark deploy-mode must be set if spark master=yarn")
+    assert(partitionValues.isEmpty || multiPartitionValues.isEmpty, "partitionValues and multiPartitionValues cannot be defined at the same time")
+    assert(statePath.isEmpty || applicationName.isDefined, "application name must be defined if state path is set")
   }
   def getPartitionValues: Option[Seq[PartitionValues]] = partitionValues.orElse(multiPartitionValues)
 }
@@ -106,54 +99,33 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     override def showUsageOnError = true
 
     head(appType, appVersion)
-    cmd("start")
-      .action( (_, config) => config.copy(cmd = "start"))
-      .text("Start a SmartDataLakeBuilder run")
-      .children(
-        opt[String]('f', "feed-sel")
-          .required
-          .action( (arg, config) => config.copy(feedSel = arg) )
-          .text("Regex pattern to select the feed to execute."),
-        opt[String]('n', "name")
-          .action( (arg, config) => config.copy(applicationName = Some(arg)) )
-          .text("Optional name of the application. If not specified feed-sel is used."),
-        opt[String]('c', "config")
-          .action( (arg, config) => config.copy(configuration = Some(arg)) )
-          .text("One or multiple configuration files or directories containing configuration files, separated by comma."),
-        opt[String]("partition-values")
-          .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseSingleColArg(arg))))
-          .text(s"Partition values to process in format ${PartitionValues.singleColFormat}."),
-        opt[String]("multi-partition-values")
-          .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseMultiColArg(arg))))
-          .text(s"Multi partition values to process in format ${PartitionValues.multiColFormat}."),
-        opt[Int]("parallelism")
-          .action((arg, config) => config.copy(parallelism = arg))
-          .text(s"Parallelism for DAG run.")
-      )
-    note("")
-    cmd("recover")
-      .action( (_, config) => config.copy(cmd = "recover"))
-      .text("Recover a SmartDataLakeBuilder run")
-      .children(
-        opt[String]('n', "name")
-          .required()
-          .action( (arg, config) => config.copy(applicationName = Some(arg)) )
-          .text("Name of the application to recover."),
-        opt[String]('n', "runId")
-          .action( (arg, config) => config.copy(runId = Some(arg.toInt)) )
-          .text("Optional runId of the application run to recover. If not specified latest is used.")
-      )
-    note("")
-    note("General options:")
+    opt[String]('f', "feed-sel")
+      .required
+      .action( (arg, config) => config.copy(feedSel = arg) )
+      .text("Regex pattern to select the feed to execute.")
+    opt[String]('n', "name")
+      .action( (arg, config) => config.copy(applicationName = Some(arg)) )
+      .text("Optional name of the application. If not specified feed-sel is used.")
+    opt[String]('c', "config")
+      .action( (arg, config) => config.copy(configuration = Some(arg)) )
+      .text("One or multiple configuration files or directories containing configuration files, separated by comma.")
+    opt[String]("partition-values")
+      .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseSingleColArg(arg))))
+      .text(s"Partition values to process in format ${PartitionValues.singleColFormat}.")
+    opt[String]("multi-partition-values")
+      .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseMultiColArg(arg))))
+      .text(s"Multi partition values to process in format ${PartitionValues.multiColFormat}.")
+    opt[Int]("parallelism")
+      .action((arg, config) => config.copy(parallelism = arg))
+      .text(s"Parallelism for DAG run.")
     opt[String]("state-path")
       .action((arg, config) => config.copy(statePath = Some(arg)))
-      .text(s"Path to save run state files.")
+      .text(s"Path to save run state files. Must be set to enable recovery in case of failures.")
     opt[String]("override-jars")
       .action((arg, config) => config.copy(overrideJars = Some(arg.split(','))))
       .text("Comma separated list of jars for child-first class loader. The jars must be present in classpath.")
     help("help").text("Display the help text.")
     version("version").text("Display version information.")
-    checkConfig( c => if (Option(c.cmd).isEmpty) failure("no command given") else success )
   }
 
 
@@ -176,10 +148,19 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * @param appConfig Application configuration (parsed from command line).
    */
   def run(appConfig: SmartDataLakeBuilderConfig): String = try {
-    appConfig.cmd match {
-      case "start" => startRun(appConfig)
-      case "recover" => recoverRun(appConfig)
-    }
+    if (appConfig.statePath.isDefined) {
+      assert(appConfig.applicationName.nonEmpty, "Application name must be defined if statePath is set")
+      // check if latest run succeeded
+      val appName = appConfig.applicationName.get
+      val stateStore = ActionDAGRunStateStore(appConfig.statePath.get, appName)
+      val latestStateFile = stateStore.getLatestState()
+      val latestRunState = stateStore.recoverRunState(latestStateFile.path)
+      if (latestRunState.isFailed) {
+        recoverRun(appConfig, stateStore, latestRunState)
+      } else {
+        startRun(appConfig, runId = latestRunState.runId+1, stateStore = Some(stateStore))
+      }
+    } else startRun(appConfig)
   } finally {
     // make sure memory logger timer task is stopped
     MemoryUtils.stopMemoryLogger()
@@ -187,19 +168,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
   /**
    * Recover previous failed run.
-   *
-   * @param appConfig: this app config only contains informations about the run to recover. It is used to search for the failed run and get's replaced with the appConfig of that run to call startRun.
    */
-  private def recoverRun(appConfig: SmartDataLakeBuilderConfig): String = {
-    assert(appConfig.applicationName.nonEmpty, "Application name must be defined for recovery")
-    val appName = appConfig.applicationName.get
-
-    // search latest state file
-    assert(appConfig.statePath.nonEmpty, "State path must be defined for recovery")
-    val stateStore = ActionDAGRunStateStore(appConfig.statePath.get, appName)
-    val stateFile = stateStore.getLatestState(appConfig.runId)
-    val runState = stateStore.recoverRunState(stateFile.path)
-    logger.info(s"recovering application ${appName} runId=${runState.runId} lastAttemptId=${runState.attemptId}")
+  private def recoverRun(appConfig: SmartDataLakeBuilderConfig, stateStore: ActionDAGRunStateStore, runState: ActionDAGRunState): String = {
+    logger.info(s"recovering application ${appConfig.applicationName.get} runId=${runState.runId} lastAttemptId=${runState.attemptId}")
     // skip all succeeded actions
     val actionsToSkip = runState.actionsState
       .filter { case (id,info) => info.state==RuntimeEventState.SUCCEEDED }
@@ -207,22 +178,13 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       .map { case (id,info) => ActionObjectId(id) }.toSeq
     val initialSubFeeds = actionsToSkip.flatMap(_._2.results.map(_.subFeed)).toSeq
     // start run, increase attempt counter
-    startRun(runState.appConfig.copy(cmd = "recover"), Some(stateFile.runId), Some(stateFile.attemptId+1), actionIdsToSkip, initialSubFeeds, Some(stateStore))
+    startRun(runState.appConfig, runState.runId, runState.attemptId+1, actionIdsToSkip, initialSubFeeds, Some(stateStore))
   }
 
   /**
    * Start run.
-   *
-   * @param appConfig
-   * @param runIdIn
-   * @param attemptIdIn
-   * @param actionIdsToSkip
-   * @param stateStoreIn
-   * @return
    */
-  private def startRun(appConfig: SmartDataLakeBuilderConfig, runIdIn: Option[Int] = None, attemptIdIn: Option[Int] = None, actionIdsToSkip: Seq[ActionObjectId] = Seq(), initialSubFeeds: Seq[SubFeed] = Seq(), stateStoreIn: Option[ActionDAGRunStateStore] = None): String = {
-    assert(appConfig.cmd!="recover" || (runIdIn.isDefined && attemptIdIn.isDefined), "runId and attemptId must be defined in recovery mode")
-    assert(appConfig.cmd!="start" || (runIdIn.isEmpty && attemptIdIn.isEmpty), "runId and attemptId must not be defined in normal mode")
+  private def startRun(appConfig: SmartDataLakeBuilderConfig, runId: Int = 1, attemptId: Int = 1, actionIdsToSkip: Seq[ActionObjectId] = Seq(), initialSubFeeds: Seq[SubFeed] = Seq(), stateStore: Option[ActionDAGRunStateStore] = None): String = {
 
     // validate application config
     appConfig.validate()
@@ -259,19 +221,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     val actionsToExec = actionsSelected.filterNot( action => actionIdsToSkip.contains(action.id))
     require(actionsToExec.nonEmpty, s"No actions to execute. All selected actions are skipped (${actionIdsSkipped.mkString(", ")})")
     logger.info(s"actions to execute ${actionsToExec.map(_.id).mkString(", ")}" + (if (actionIdsSkipped.nonEmpty) s", actions skipped ${actionIdsSkipped.mkString(", ")}"))
-
-    // get latest runId
-    val stateStore = stateStoreIn.orElse(appConfig.statePath.map(p => ActionDAGRunStateStore(p, appName)))
-    val stateStoreLatestRunId = stateStore.flatMap(_.getLatestRunId)
-    val runId = runIdIn.orElse(stateStoreLatestRunId.map(_+1)).getOrElse(1)
-    val attemptId = attemptIdIn.getOrElse(1)
-
-    // check that latest run succeeded if not in recovery mode
-    if (appConfig.cmd=="start" && stateStoreLatestRunId.isDefined) {
-      val latestStateFile = stateStore.get.getLatestState(stateStoreLatestRunId)
-      val latestState = stateStore.get.recoverRunState(latestStateFile.path)
-      require(!latestState.isFailed, s"Latest run for $appName with RunId=${latestStateFile.runId}, attemptId=${latestStateFile.attemptId} is failed. Please recover or cleanup state files.")
-    }
 
     // create Spark Session
     implicit val session: SparkSession = globalConfig.createSparkSession(appName, appConfig.master, appConfig.deployMode)

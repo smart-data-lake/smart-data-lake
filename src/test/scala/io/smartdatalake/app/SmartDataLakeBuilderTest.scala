@@ -90,7 +90,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       , transformer = Some(CustomDfTransformerConfig(className = Some(classOf[FailTransformer].getName))))
     instanceRegistry.register(action2fail.copy())
     val selectedPartitions = Seq(PartitionValues(Map("dt"->"20180101")))
-    val configStart = SmartDataLakeBuilderConfig(cmd = "start", feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath)
+    val configStart = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath)
       , partitionValues = Some(selectedPartitions))
     intercept[TaskFailedException](sdlb.run(configStart))
 
@@ -121,7 +121,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // this should execute action b with partition 20180101 only!
     val action2success = CopyAction("b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action2success.copy())
-    val configRecover = SmartDataLakeBuilderConfig(cmd = "recover", applicationName = Some(appName), statePath = Some(statePath))
+    val configRecover = SmartDataLakeBuilderConfig(applicationName = Some(appName), statePath = Some(statePath))
     sdlb.run(configRecover)
 
     // check results
@@ -171,7 +171,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // use only first partition col (dt) for partition diff mode
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, initExecutionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action1.copy())
-    val configStart = SmartDataLakeBuilderConfig(cmd = "start", feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
+    val configStart = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
     sdlb.run(configStart)
 
     // check results
