@@ -150,10 +150,6 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     session.catalog.tableExists(table.db.get, table.name)
   }
 
-  def existingTablePath(table: Table)(implicit session: SparkSession): String = {
-    session.sharedState.externalCatalog.getTable(table.db.get,table.name).location.toString
-  }
-
   /**
    * list hive table partitions
    */
