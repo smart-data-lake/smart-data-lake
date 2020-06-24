@@ -54,9 +54,7 @@ spark-submit --master yarn --deploy-mode client --class io.smartdatalake.app.Def
 ```
 and takes the following arguments:
 ```
-Usage: DefaultSmartDataLakeBuilder [start|recover] [options]
-Command: start [options]
-Start a SmartDataLakeBuilder run
+Usage: DefaultSmartDataLakeBuilder [options]
   -f, --feed-sel <value>   Regex pattern to select the feed to execute.
   -n, --name <value>       Optional name of the application. If not specified feed-sel is used.
   -c, --config <value>     One or multiple configuration files or directories containing configuration files, separated by comma.
@@ -65,14 +63,7 @@ Start a SmartDataLakeBuilder run
   --multi-partition-values <value>
                            Multi partition values to process in format <partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>[;(<partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>;...].
   --parallelism <value>    Parallelism for DAG run.
-
-Command: recover [options]
-Recover a SmartDataLakeBuilder run
-  -n, --name <value>       Name of the application to recover.
-  -n, --runId <value>      Optional runId of the application run to recover. If not specified latest is used.
-
-General options:
-  --state-path <value>     Path to save run state files.
+  --state-path <value>     Path to save run state files. Must be set to enable recovery in case of failures.
   --override-jars <value>  Comma separated list of jars for child-first class loader. The jars must be present in classpath.
   --help                   Display the help text.
   --version                Display version information.
