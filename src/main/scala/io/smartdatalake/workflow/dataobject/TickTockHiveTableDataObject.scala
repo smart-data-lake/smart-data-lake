@@ -35,7 +35,7 @@ import scala.collection.JavaConverters._
 
 //FIXME: there's significant code duplication from HiveTableDataObject here.
 case class TickTockHiveTableDataObject(override val id: DataObjectId,
-                                       path: String,
+                                       path: Option[String] = None,
                                        override val partitions: Seq[String] = Seq(),
                                        analyzeTableAfterWrite: Boolean = false,
                                        dateColumnType: DateColumnType = DateColumnType.Date,
@@ -55,7 +55,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   private val connection = connectionId.map(c => getConnection[HiveTableConnection](c))
 
   // prepare final path and table
-  @transient private[workflow] lazy val hadoopPath = HdfsUtil.prefixHadoopPath(path, connection.map(_.pathPrefix))
+  @transient private[workflow] lazy val hadoopPath = HdfsUtil.prefixHadoopPath(path.getOrElse("."), connection.map(_.pathPrefix))
   @transient private var filesystemHolder: FileSystem = _
   def filesystem(implicit session: SparkSession): FileSystem = {
     if (filesystemHolder == null) {
@@ -83,6 +83,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     require(isDbExisting, s"Hive DB ${table.db.get} doesn't exist (needs to be created manually).")
     if (!isTableExisting) {
       logger.info(s"($id) Creating table ${table.fullName}.")
+      require(path.isDefined, "If Hive table does not exist yet, the path must be set.")
       writeDataFrame(df, createTableOnly = true, partitionValues)
     }
   }
@@ -124,8 +125,12 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
       } else df.repartition(numInitialHdfsPartitions)
     }
 
+    // use existing path if table exists already and not overwritten
+    val writePath = if(isTableExisting) HiveUtil.existingTableLocation(table) else hadoopPath.toString
+    require(!path.isDefined || path.get == writePath, s"Table ${table.fullName} exists already but with different path. Either delete it or use the same path (${writePath}).")
+
     // write table and fix acls
-    HiveUtil.writeDfToHiveWithTickTock(session, dfPrepared, hadoopPath.toString, table.name, table.db.get, partitions, saveMode)
+    HiveUtil.writeDfToHiveWithTickTock(session, dfPrepared, writePath, table.name, table.db.get, partitions, saveMode)
     if (acl.isDefined) {
       AclUtil.addACLs(acl.get, hadoopPath)(filesystem)
     }
@@ -141,6 +146,10 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
 
   override def isTableExisting(implicit session: SparkSession): Boolean = {
     session.catalog.tableExists(table.db.get, table.name)
+  }
+
+  def existingTablePath(table: Table)(implicit session: SparkSession): String = {
+    session.sharedState.externalCatalog.getTable(table.db.get,table.name).location.toString
   }
 
   /**

@@ -216,6 +216,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
                     hiveDb: String, partitions: Seq[String], saveMode: SaveMode,
                     hdfsOutputType: OutputType = OutputType.Parquet, numInitialHdfsPartitions: Int = -1): Unit = {
     implicit val sss = session
+    require(!outputDir.equals(""), s"Can not write HiveTable ${hiveDb}.${hiveTable} because path was not set.")
     logger.info(s"writeDfToHive: starting for table $hiveDb.$hiveTable, outputDir: $outputDir, partitions:$partitions")
 
     // check if all partition cols are present in DataFrame
@@ -572,6 +573,10 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     }
 
     location22.orElse(location21).getOrElse( throw new TableInformationException( s"Location for table $dbName.$tableName not found"))
+  }
+
+  def existingTableLocation(table: Table)(implicit session: SparkSession): String = {
+    session.sharedState.externalCatalog.getTable(table.db.get,table.name).location.toString
   }
 
   def existingTickTockLocation(dbName: String, session: SparkSession, tableName: String): String = {
