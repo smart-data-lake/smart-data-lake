@@ -20,8 +20,8 @@ package io.smartdatalake.workflow.dataobject
 
 import java.sql.Timestamp
 import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
-import java.time.{Duration, LocalDate, LocalDateTime, ZoneId, ZoneOffset}
+import java.time.temporal.{ChronoUnit, TemporalAccessor, TemporalField, TemporalQuery}
+import java.time.{Duration, LocalDate, LocalDateTime, LocalTime, YearMonth, ZoneId, ZoneOffset}
 import java.util.Properties
 
 import com.typesafe.config.Config
@@ -37,11 +37,49 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.functions.{col, udf}
 import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 import org.apache.spark.sql.types.{StringType, StructType}
+import org.joda.time.DateTime
 import za.co.absa.abris.avro.functions.from_confluent_avro
 import za.co.absa.abris.avro.read.confluent.SchemaManager
 
 import scala.util.Try
 import scala.collection.JavaConverters._
+
+/**
+ * Definition of date partition column to extract formatted timestamp into column.
+ *
+ * @param colName date partition column name to extract timestamp into column on batch read
+ * @param timeFormat time format for timestamp in date partition column, definition according to java DateTimeFormatter. Default is "yyyyMMdd".
+ * @param timeUnit time unit for timestamp in date partition column, definition according to java ChronoUnit. Default is "days".
+ * @param timeZone time zone used for date logic. If not specified, java system default is used.
+ */
+case class DatePartitionColumnDef(colName: String, timeFormat: String = "yyyyMMdd", timeUnit: String = "days", timeZone: Option[String] = None ) {
+  @transient lazy private[smartdatalake] val formatter = DateTimeFormatter.ofPattern(timeFormat) // not serializable -> transient lazy to use in udf
+  private[smartdatalake] val chronoUnit = ChronoUnit.valueOf(timeUnit.toUpperCase)
+  private[smartdatalake] val zoneId = timeZone.map(ZoneId.of).getOrElse(ZoneId.systemDefault)
+  private[smartdatalake] def parse(value: String ): LocalDateTime = {
+    formatter.parseBest(value, TemporalQueries.LocalDateTimeQuery, TemporalQueries.LocalDateQuery, TemporalQueries.LocalYearMonthQuery ) match {
+      case d: LocalDateTime => d
+      case d: LocalDate => d.atStartOfDay()
+      case d: YearMonth => d.atDay(1).atStartOfDay()
+    }
+  }
+  private[smartdatalake] def format( dateTime: LocalDateTime ) = dateTime.format(formatter)
+  private[smartdatalake] def next(dateTime: LocalDateTime, units: Int = 1) = dateTime.plus(units, chronoUnit)
+  private[smartdatalake] def previous(dateTime: LocalDateTime, units: Int = 1) = dateTime.minus(units, chronoUnit)
+  private[smartdatalake] def current = LocalDateTime.now().truncatedTo(chronoUnit)
+}
+
+object TemporalQueries {
+  val LocalDateTimeQuery: TemporalQuery[LocalDateTime] = new TemporalQuery[LocalDateTime] {
+    override def queryFrom(temporal: TemporalAccessor): LocalDateTime = LocalDateTime.from(temporal)
+  }
+  val LocalDateQuery: TemporalQuery[LocalDate] = new TemporalQuery[LocalDate] {
+    override def queryFrom(temporal: TemporalAccessor): LocalDate = LocalDate.from(temporal)
+  }
+  val LocalYearMonthQuery: TemporalQuery[YearMonth] = new TemporalQuery[YearMonth] {
+    override def queryFrom(temporal: TemporalAccessor): YearMonth = YearMonth.from(temporal)
+  }
+}
 
 /**
  * [[DataObject]] of type KafkaTopic.
@@ -55,14 +93,13 @@ import scala.collection.JavaConverters._
   * @param selectCols Columns to be selected when reading the DataFrame. Available columns are key, value, topic,
   *                   partition, offset, timestamp timestampType. If key/valueType is AvroSchemaRegistry the key/value column are
   *                   convert to a complex type according to the avro schema. To expand it select "value.*".
- *                    Default is to select key and value.
-  * @param datePartitionCol partition column name to extract timestamp into on batch read
-  * @param datePartitionTimeFormat time format for timestamp in datePartitionCol, definition according to java DateTimeFormatter (e.g. "yyyyMMdd").
-  * @param datePartitionTimeUnit time unit for timestamp in datePartitionCol, definition according to java ChronoUnit (e.g. "days").
+  *                   Default is to select key and value.
+  * @param datePartitionCol definition of date partition column to extract formatted timestamp into column.
+ *                    This is used to list existing partition and is added as additional column on batch read.
   * @param batchReadConsecutivePartitionsAsRanges Set to true if consecutive partitions should be combined as one range of offsets when batch reading from topic. This results in less tasks but can be a performance problem when reading many partitions. (default=false)
   * @param batchReadMaxOffsetsPerTask Set number of offsets per Spark task when batch reading from topic.
   * @param kafkaOptions Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).
- *                      These options override connection.kafkaOptions.
+  *                      These options override connection.kafkaOptions.
   */
 case class KafkaTopicDataObject(override val id: DataObjectId,
                                 topicName: String,
@@ -71,9 +108,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                                 valueType: KafkaColumnType = KafkaColumnType.String,
                                 override val schemaMin: Option[StructType] = None,
                                 selectCols: Seq[String] = Seq("key", "value"),
-                                datePartitionCol: Option[String] = None,
-                                datePartitionTimeFormat: Option[String] = None,
-                                datePartitionTimeUnit: Option[String] = None,
+                                datePartitionCol: Option[DatePartitionColumnDef] = None,
                                 batchReadConsecutivePartitionsAsRanges: Boolean = false,
                                 batchReadMaxOffsetsPerTask: Option[Int] = None,
                                 kafkaOptions: Map[String, String] = Map(),
@@ -81,18 +116,14 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                            )(implicit instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with CanCreateStreamingDataFrame with CanWriteDataFrame with CanHandlePartitions with SchemaValidation {
 
-  override val partitions: Seq[String] = datePartitionCol.toSeq
+  override val partitions: Seq[String] = datePartitionCol.map(_.colName).toSeq
+  private val udfFormatPartition = udf((ts:Timestamp) => ts.toLocalDateTime.truncatedTo(datePartitionCol.get.chronoUnit).format(datePartitionCol.get.formatter))
 
   private val connection = getConnection[KafkaConnection](connectionId)
 
-  require(datePartitionCol.isEmpty || datePartitionTimeFormat.nonEmpty, s"($id) If a datePartitionCol column is defined, also a datePartitionTimeFormat must be given to build this column from the kafka topics timestamp")
-  require(datePartitionCol.isEmpty || datePartitionTimeUnit.nonEmpty, s"($id) If a datePartitionCol column is defined, also a datePartitionTimeUnit must be given to build this column from the kafka topics timestamp")
   require((keyType!=KafkaColumnType.AvroSchemaRegistry && valueType!=KafkaColumnType.AvroSchemaRegistry) || connection.schemaRegistry.nonEmpty, s"($id) If key or value is of type AvroSchemaRegistry, the schemaRegistry must be defined in the connection")
   require(batchReadMaxOffsetsPerTask.isEmpty || batchReadMaxOffsetsPerTask.exists(_>0), s"($id) batchReadMaxOffsetsPerTask must be greater than 0")
 
-  @transient lazy private val datePartitionFormatter = datePartitionTimeFormat.map(DateTimeFormatter.ofPattern) // not serializable -> transient lazy to use in udf
-  private val datePartitionChronoUnit = datePartitionTimeUnit.map( unit => ChronoUnit.valueOf(unit.toUpperCase))
-  private val udfFormatPartition = udf((ts:Timestamp) => ts.toLocalDateTime.truncatedTo(datePartitionChronoUnit.get).format(datePartitionFormatter.get))
   private val schemaRegistryConfig = connection.schemaRegistry.map (
     schemaRegistry => Map(
       SchemaManager.PARAM_SCHEMA_REGISTRY_URL -> schemaRegistry,
@@ -101,8 +132,8 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       SchemaManager.PARAM_VALUE_SCHEMA_ID -> "latest"
     )
   )
-  private val zoneUTC = ZoneId.of("UTC")
 
+  // consumer for reading topic metadata
   @transient private lazy val consumer = {
     val props = new Properties()
     props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, connection.brokers)
@@ -127,8 +158,8 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     val dfRaw = session
       .readStream
       .format("kafka")
-      .option("kafka.bootstrap.servers", connection.brokers)
       .options(connection.kafkaOptions ++ kafkaOptions ++ options) // options override kafkaOptions override connection.kafkaOptions
+      .option("kafka.bootstrap.servers", connection.brokers)
       .option("subscribe", topicName)
       .load()
     prepareDataFrame(dfRaw)
@@ -144,7 +175,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       .withColumn("key", convertKafkaType(keyType, col("key")))
       .withColumn("value", convertKafkaType(valueType, col("value")))
       .as("kafka")
-      .withOptionalColumn(datePartitionCol, udfFormatPartition(col("timestamp")))
+      .withOptionalColumn(datePartitionCol.map(_.colName), udfFormatPartition(col("timestamp")))
       .select(colsToSelect:_*)
     validateSchemaMin(df)
     // return
@@ -152,18 +183,21 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
-    implicit val localDateTimeOrdering: Ordering[LocalDateTime] = Ordering.by(_.toInstant(ZoneOffset.UTC))
 
     // get DataFrame from topic
     val dfRaw = if (partitionValues.nonEmpty) {
+      assert(datePartitionCol.nonEmpty, s"($id) Can not process partition values when datePartitionCol is not configured!")
+      assert(partitionValues.flatMap(_.keys).distinct == datePartitionCol.map(_.colName).toSeq, s"($id) partition value keys (${partitionValues.flatMap(_.keys).distinct}) must match datePartitionCol.colName (${datePartitionCol.map(_.colName)})!")
+      implicit val localDateTimeOrdering: Ordering[LocalDateTime] = Ordering.by(_.atZone(datePartitionCol.get.zoneId).toInstant)
       // create date for partition values
       val dateRanges = partitionValues.map {
         partitionValue =>
-          val startTimeIncl = Try(LocalDateTime.parse(partitionValue(datePartitionCol.get).toString, datePartitionFormatter.get))
-            .recover { case ex => LocalDate.parse(partitionValue(datePartitionCol.get).toString, datePartitionFormatter.get).atStartOfDay() }
-            .recover { case ex => throw new IllegalStateException(s"($id) Can not parse startTime from partition value $partitionValues with $datePartitionFormatter", ex) }
-            .get
-          val endTimeExcl = startTimeIncl.plus(1, datePartitionChronoUnit.get)
+          val startTimeIncl = try {
+            datePartitionCol.get.parse(partitionValue(datePartitionCol.get.colName).toString)
+          } catch {
+            case ex: Exception => throw new IllegalStateException(s"($id) Can not parse startTime from partition value $partitionValue with ${datePartitionCol.get.formatter}", ex)
+          }
+          val endTimeExcl = datePartitionCol.get.next(startTimeIncl)
           (startTimeIncl, endTimeExcl)
       }
       // combine consecutive partition values for performance reasons
@@ -248,13 +282,15 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       .trigger(trigger)
       .queryName(queryName)
       .outputMode(outputMode)
-      .option("checkpointLocation", checkpointLocation)
       .options(connection.kafkaOptions ++ kafkaOptions ++ options)
+      .option("checkpointLocation", checkpointLocation)
+      .option("kafka.bootstrap.servers", connection.brokers)
+      .option("topic", topicName)
       .start()
   }
 
   private def getTopicPartitionsAtTstmp(topicPartitions: Seq[TopicPartition], localDateTime: LocalDateTime) = {
-    val topicPartitionsStart = topicPartitions.map( p => (p, new java.lang.Long(localDateTime.toInstant(ZoneOffset.UTC).toEpochMilli))).toMap.asJava
+    val topicPartitionsStart = topicPartitions.map( p => (p, new java.lang.Long(localDateTime.atZone(datePartitionCol.get.zoneId).toInstant.toEpochMilli))).toMap.asJava
     consumer.offsetsForTimes(topicPartitionsStart).asScala.toSeq.sortBy(_._1.partition)
   }
 
@@ -275,24 +311,24 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     logger.debug(s"($id) got kafka partitions ${partitions.asScala.map(_.partition)} for topic $topicName")
     val topicPartitions = partitions.asScala.map( p => new TopicPartition(topicName, p.partition))
     // determine last completed partition - we need to wait some time after considering a partition to be complete because of late data
-    val currentPartitionStartTime = LocalDateTime.now().truncatedTo(datePartitionChronoUnit.get)
-    val minDurationWaitToComplete = Duration.ofMillis((datePartitionChronoUnit.get.getDuration.toMillis * pctChronoUnitWaitToComplete).toLong)
+    val currentPartitionStartTime = datePartitionCol.get.current
+    val minDurationWaitToComplete = Duration.ofMillis((datePartitionCol.get.chronoUnit.getDuration.toMillis * pctChronoUnitWaitToComplete).toLong)
     val lastCompletedPartitionStartTime = if (currentPartitionStartTime.isBefore(LocalDateTime.now().minus(minDurationWaitToComplete))) {
-      currentPartitionStartTime.minus(1, datePartitionChronoUnit.get)
+      datePartitionCol.get.previous(currentPartitionStartTime)
     } else {
-      currentPartitionStartTime.minus(2, datePartitionChronoUnit.get)
+      datePartitionCol.get.previous(currentPartitionStartTime, 2)
     }
 
     // search how many partitions / chrono units back of data we have
     var cntEmptyConsecutive = 0
     val detectedPartitions = Stream.from(0).map {
       unitsBack =>
-        val startTimeIncl = lastCompletedPartitionStartTime.minus(unitsBack, datePartitionChronoUnit.get)
-        val endTimeExcl = startTimeIncl.plus(1, datePartitionChronoUnit.get)
-        val topicPartitionsStart = getTopicPartitionsAtTstmp(topicPartitions, startTimeIncl)
-          .map{ case (topicPartition, start) => (topicPartition, Option(start).map(_.timestamp))}
+        val startTimeIncl = datePartitionCol.get.previous(lastCompletedPartitionStartTime, unitsBack)
+        val endTimeExcl = datePartitionCol.get.next(startTimeIncl)
+        val topicPartitionsStartRaw = getTopicPartitionsAtTstmp(topicPartitions, startTimeIncl)
+        val topicPartitionsStart = topicPartitionsStartRaw.map{ case (topicPartition, start) => (topicPartition, Option(start).map(_.timestamp))}
         val minStartTime = topicPartitionsStart.flatMap(_._2).sorted.headOption
-        val isEmpty = minStartTime.isEmpty || minStartTime.exists(_ >= endTimeExcl.toInstant(ZoneOffset.UTC).toEpochMilli)
+        val isEmpty = minStartTime.isEmpty || minStartTime.exists(_ >= endTimeExcl.atZone(datePartitionCol.get.zoneId).toInstant.toEpochMilli)
         (startTimeIncl, isEmpty, minStartTime)
     }.takeWhile {
       case (startTimeIncl, isEmpty, minStartTime) =>
@@ -304,7 +340,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
 
     // convert to partition values
     detectedPartitions.reverse.dropWhile(_._2).map(_._1)
-      .map( startTime => PartitionValues(Map(datePartitionCol.get->startTime.format(datePartitionFormatter.get))))
+      .map( startTime => PartitionValues(Map(datePartitionCol.get.colName -> datePartitionCol.get.format(startTime))))
   }
 
   /**
