@@ -53,26 +53,26 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val srcTable1 = Table(Some("default"), "copy_input1")
     HiveUtil.dropTable(session, srcTable1.db.get, srcTable1.name)
     val srcPath1 = tempPath + s"/${srcTable1.fullName}"
-    val srcDO1 = HiveTableDataObject("src1", srcPath1, table = srcTable1, numInitialHdfsPartitions = 1)
+    val srcDO1 = HiveTableDataObject("src1", Some(srcPath1), table = srcTable1, numInitialHdfsPartitions = 1)
     instanceRegistry.register(srcDO1)
 
     val srcTable2 = Table(Some("default"), "copy_input2")
     HiveUtil.dropTable(session, srcTable2.db.get, srcTable2.name)
     val srcPath2 = tempPath + s"/${srcTable2.fullName}"
-    val srcDO2 = HiveTableDataObject("src2", srcPath2, table = srcTable2, numInitialHdfsPartitions = 1)
+    val srcDO2 = HiveTableDataObject("src2", Some(srcPath2), table = srcTable2, numInitialHdfsPartitions = 1)
     instanceRegistry.register(srcDO2)
 
     val tgtTable1 = Table(Some("default"), "copy_output1", None, Some(Seq("lastname", "firstname")))
     HiveUtil.dropTable(session, tgtTable1.db.get, tgtTable1.name)
     val tgtPath1 = tempPath + s"/${tgtTable1.fullName}"
-    val tgtDO1 = HiveTableDataObject("tgt1", tgtPath1, table = tgtTable1, numInitialHdfsPartitions = 1)
+    val tgtDO1 = HiveTableDataObject("tgt1", Some(tgtPath1), table = tgtTable1, numInitialHdfsPartitions = 1)
     instanceRegistry.register(tgtDO1)
 
 
     val tgtTable2 = Table(Some("default"), "copy_output2", None, Some(Seq("lastname", "firstname")))
     HiveUtil.dropTable(session, tgtTable2.db.get, tgtTable2.name)
     val tgtPath2 = tempPath + s"/${tgtTable2.fullName}"
-    val tgtDO2 = HiveTableDataObject("tgt2", tgtPath2, table = tgtTable2, numInitialHdfsPartitions = 1)
+    val tgtDO2 = HiveTableDataObject("tgt2", Some(tgtPath2), table = tgtTable2, numInitialHdfsPartitions = 1)
     instanceRegistry.register(tgtDO2)
 
     // prepare & start load
@@ -111,12 +111,12 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val srcTable = Table(Some("default"), "copy_input")
     HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
     val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "src1", srcPath, table = srcTable, partitions = Seq("type"), numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, partitions = Seq("type"), numInitialHdfsPartitions = 1)
     instanceRegistry.register(srcDO)
     val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("type","lastname","firstname")))
     HiveUtil.dropTable(session, tgtTable.db.get, tgtTable.name )
     val tgtPath = tempPath+s"/${tgtTable.fullName}"
-    val tgtDO = HiveTableDataObject( "tgt1", tgtPath, table = tgtTable, partitions = Seq("type"), numInitialHdfsPartitions = 1)
+    val tgtDO = HiveTableDataObject( "tgt1", Some(tgtPath), table = tgtTable, partitions = Seq("type"), numInitialHdfsPartitions = 1)
     instanceRegistry.register(tgtDO)
 
     // prepare action
@@ -159,22 +159,22 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val srcTable = Table(Some("default"), "copy_input")
     HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
     val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "src1", srcPath, table = srcTable, partitions = Seq("type"), numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, partitions = Seq("type"), numInitialHdfsPartitions = 1)
     instanceRegistry.register(srcDO)
     val srcTable2 = Table(Some("default"), "dummy")
     HiveUtil.dropTable(session, srcTable2.db.get, srcTable2.name )
     val srcPath2 = tempPath+s"/${srcTable2.fullName}"
-    val srcDO2 = HiveTableDataObject( "src2", srcPath2, table = srcTable2, partitions = Seq("type"), numInitialHdfsPartitions = 1)
+    val srcDO2 = HiveTableDataObject( "src2", Some(srcPath2), table = srcTable2, partitions = Seq("type"), numInitialHdfsPartitions = 1)
     instanceRegistry.register(srcDO2)
     val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("type","lastname","firstname")))
     HiveUtil.dropTable(session, tgtTable.db.get, tgtTable.name )
     val tgtPath = tempPath+s"/${tgtTable.fullName}"
-    val tgtDO = HiveTableDataObject( "tgt1", tgtPath, table = tgtTable, partitions = Seq("type"), numInitialHdfsPartitions = 1)
+    val tgtDO = HiveTableDataObject( "tgt1", Some(tgtPath), table = tgtTable, partitions = Seq("type"), numInitialHdfsPartitions = 1)
     instanceRegistry.register(tgtDO)
     val tgtTable2 = Table(Some("default"), "copy_output", None, Some(Seq("type","lastname","firstname")))
     HiveUtil.dropTable(session, tgtTable2.db.get, tgtTable2.name )
     val tgtPath2 = tempPath+s"/${tgtTable2.fullName}"
-    val tgtDO2 = HiveTableDataObject( "tgt2", tgtPath2, table = tgtTable2, partitions = Seq("type"), numInitialHdfsPartitions = 1)
+    val tgtDO2 = HiveTableDataObject( "tgt2", Some(tgtPath2), table = tgtTable2, partitions = Seq("type"), numInitialHdfsPartitions = 1)
     instanceRegistry.register(tgtDO2)
 
     // prepare action
@@ -207,19 +207,19 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val srcTable = Table(Some("default"), "copy_input")
     HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
     val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "src1", srcPath, table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
     instanceRegistry.register(srcDO)
 
     val tgtTable1 = Table(Some("default"), "copy_output_1", None, Some(Seq("lastname","firstname")))
     HiveUtil.dropTable(session, tgtTable1.db.get, tgtTable1.name )
     val tgtPath1 = tempPath+s"/${tgtTable1.fullName}"
-    val tgtDO1 = HiveTableDataObject( "tgt1", tgtPath1, Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable1, numInitialHdfsPartitions = 1)
+    val tgtDO1 = HiveTableDataObject( "tgt1", Some(tgtPath1), Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable1, numInitialHdfsPartitions = 1)
     instanceRegistry.register(tgtDO1)
 
     val tgtTable2 = Table(Some("default"), "copy_output_2", None, Some(Seq("lastname","firstname")))
     HiveUtil.dropTable(session, tgtTable2.db.get, tgtTable2.name )
     val tgtPath2 = tempPath+s"/${tgtTable2.fullName}"
-    val tgtDO2 = HiveTableDataObject( "tgt2", tgtPath2, Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable2, numInitialHdfsPartitions = 1)
+    val tgtDO2 = HiveTableDataObject( "tgt2", Some(tgtPath2), Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable2, numInitialHdfsPartitions = 1)
     instanceRegistry.register(tgtDO2)
 
     // prepare & start load

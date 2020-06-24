@@ -34,7 +34,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val srcTable = Table(Some("default"), "input")
     HiveUtil.dropTable(testSession, srcTable.db.get, srcTable.name )
     val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "input", srcPath, table = srcTable, numInitialHdfsPartitions = 1, analyzeTableAfterWrite = true)
+    val srcDO = HiveTableDataObject( "input", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1, analyzeTableAfterWrite = true)
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
     srcDO.writeDataFrame(df, Seq())
     // check table statistics
@@ -49,7 +49,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val srcTable = Table(Some("default"), "input")
     HiveUtil.dropTable(testSession, srcTable.db.get, srcTable.name )
     val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "input", srcPath, table = srcTable, partitions = Seq("type"), numInitialHdfsPartitions = 1, analyzeTableAfterWrite = true)
+    val srcDO = HiveTableDataObject( "input", Some(srcPath), table = srcTable, partitions = Seq("type"), numInitialHdfsPartitions = 1, analyzeTableAfterWrite = true)
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
     srcDO.writeDataFrame(df, Seq(PartitionValues(Map("type"->"ext")),PartitionValues(Map("type"->"int"))))
     // check table statistics
@@ -71,7 +71,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val srcTable = Table(Some("default"), "input")
     HiveUtil.dropTable(testSession, srcTable.db.get, srcTable.name )
     val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "input", srcPath, table = srcTable, partitions = Seq("type"), numInitialHdfsPartitions = 1, analyzeTableAfterWrite = true)
+    val srcDO = HiveTableDataObject( "input", Some(srcPath), table = srcTable, partitions = Seq("type"), numInitialHdfsPartitions = 1, analyzeTableAfterWrite = true)
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
     srcDO.writeDataFrame(df, Seq())
     // check table statistics
@@ -93,7 +93,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val srcTable = Table(Some("default"), "input")
     HiveUtil.dropTable(testSession, srcTable.db.get, srcTable.name )
     val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "input", srcPath, table = srcTable, partitions = Seq("type","lastname"), numInitialHdfsPartitions = 1, analyzeTableAfterWrite = true)
+    val srcDO = HiveTableDataObject( "input", Some(srcPath), table = srcTable, partitions = Seq("type","lastname"), numInitialHdfsPartitions = 1, analyzeTableAfterWrite = true)
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
     srcDO.writeDataFrame(df, Seq(PartitionValues(Map("type"->"ext"))))
     // check table statistics
@@ -119,7 +119,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val srcTable = Table(Some("default"), "input")
     HiveUtil.dropTable(testSession, srcTable.db.get, srcTable.name )
     val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "input", srcPath, table = srcTable, partitions = Seq("type","lastname"), numInitialHdfsPartitions = 1, analyzeTableAfterWrite = true)
+    val srcDO = HiveTableDataObject( "input", Some(srcPath), table = srcTable, partitions = Seq("type","lastname"), numInitialHdfsPartitions = 1, analyzeTableAfterWrite = true)
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
     srcDO.writeDataFrame(df, Seq(PartitionValues(Map("type"->"ext", "lastname"->"doe")),PartitionValues(Map("type"->"ext", "lastname"->"smith"))))
     // check table statistics
@@ -147,7 +147,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val srcTable = Table(Some("default"), "input")
     HiveUtil.dropTable(testSession, srcTable.db.get, srcTable.name )
     val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "input", srcPath, table = srcTable, partitions = Seq("p"), numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "input", Some(srcPath), table = srcTable, partitions = Seq("p"), numInitialHdfsPartitions = 1)
 
     // write test data 1 - create partition A and B
     val partitionValuesCreated = Seq( PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
@@ -173,7 +173,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val srcTable = Table(Some("default"), "input")
     HiveUtil.dropTable(testSession, srcTable.db.get, srcTable.name )
     val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "input", srcPath, table = srcTable, partitions = Seq("p"), numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "input", Some(srcPath), table = srcTable, partitions = Seq("p"), numInitialHdfsPartitions = 1)
 
     // write test files
     val partitionValuesCreated = Seq(PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
@@ -190,7 +190,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val srcTable = Table(Some("default"), "input")
     HiveUtil.dropTable(testSession, srcTable.db.get, srcTable.name )
     val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "input", srcPath, table = srcTable, partitions = Seq("p1","p2"), numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "input", Some(srcPath), table = srcTable, partitions = Seq("p1","p2"), numInitialHdfsPartitions = 1)
 
     // write test files
     val partitionValuesCreated = Seq( PartitionValues(Map("p1"->"A","p2"->"L2A")), PartitionValues(Map("p1"->"A","p2"->"L2B"))
@@ -208,7 +208,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val srcTable = Table(Some("default"), "input")
     HiveUtil.dropTable(testSession, srcTable.db.get, srcTable.name )
     val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "input", srcPath, table = srcTable, partitions = Seq("p1","p2"), numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "input", Some(srcPath), table = srcTable, partitions = Seq("p1","p2"), numInitialHdfsPartitions = 1)
 
     // write test files
     val partitionValuesCreated = Seq( PartitionValues(Map("p1"->"A","p2"->"L2A")), PartitionValues(Map("p1"->"X","p2"->"L2X")))
@@ -250,7 +250,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
       val srcTable = Table(Some("default"), "input")
       HiveUtil.dropTable(testSession, srcTable.db.get, srcTable.name)
       val srcPath = tempPath + s"/${srcTable.fullName}"
-      val srcDO = HiveTableDataObject("input", srcPath, table = srcTable, partitions = Seq("p1", "p2"), numInitialHdfsPartitions = 1)
+      val srcDO = HiveTableDataObject("input", Some(srcPath), table = srcTable, partitions = Seq("p1", "p2"), numInitialHdfsPartitions = 1)
 
       // write test files
       val df = Seq(("A", "L2A", 1), ("A", "L2B", 2), ("B", "L2B", 3), ("B", "L2C", 4)).toDF("p1", "p2", "value")
