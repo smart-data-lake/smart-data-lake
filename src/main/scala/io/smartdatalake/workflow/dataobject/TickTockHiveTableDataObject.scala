@@ -70,6 +70,8 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
 
   override def prepare(implicit session: SparkSession): Unit = {
     require(isDbExisting, s"($id) Hive DB ${table.db.get} doesn't exist (needs to be created manually).")
+    if (!isTableExisting)
+      require(path.isDefined, "If Hive table does not exist yet, the path must be set.")
   }
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
