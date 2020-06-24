@@ -153,12 +153,18 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       // check if latest run succeeded
       val appName = appConfig.applicationName.get
       val stateStore = ActionDAGRunStateStore(appConfig.statePath.get, appName)
-      val latestStateFile = stateStore.getLatestState()
-      val latestRunState = stateStore.recoverRunState(latestStateFile.path)
-      if (latestRunState.isFailed) {
-        recoverRun(appConfig, stateStore, latestRunState)
+      val latestRunId = stateStore.getLatestRunId
+      if (latestRunId.isDefined) {
+        val latestStateFile = stateStore.getLatestState(latestRunId)
+        val latestRunState = stateStore.recoverRunState(latestStateFile.path)
+        if (latestRunState.isFailed) {
+          // start recovery
+          recoverRun(appConfig, stateStore, latestRunState)
+        } else {
+          startRun(appConfig, runId = latestRunState.runId+1, stateStore = Some(stateStore))
+        }
       } else {
-        startRun(appConfig, runId = latestRunState.runId+1, stateStore = Some(stateStore))
+        startRun(appConfig, stateStore = Some(stateStore))
       }
     } else startRun(appConfig)
   } finally {
