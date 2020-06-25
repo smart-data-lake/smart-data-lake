@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.DateColumnType
+import io.smartdatalake.definitions.{DateColumnType, Environment}
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
@@ -93,6 +93,14 @@ case class HiveTableDataObject(override val id: DataObjectId,
     df
   }
 
+  override def preWrite(implicit session: SparkSession): Unit = {
+    super.preWrite
+    // validate if acl's must be / are configured before writing
+    if (Environment.hadoopAuthoritiesWithAclsRequired.exists( a => filesystem.getUri.toString.contains(a))) {
+      require(acl.isDefined, s"($id) ACL definitions are required for writing DataObjects on hadoop authority ${filesystem.getUri} by environment setting hadoopAuthoritiesWithAclsRequired")
+    }
+  }
+
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])
                              (implicit session: SparkSession): Unit = {
     validateSchemaMin(df)
@@ -147,6 +155,10 @@ case class HiveTableDataObject(override val id: DataObjectId,
   override def createEmptyPartition(partitionValues: PartitionValues)(implicit session: SparkSession): Unit = {
     if (partitionValues.keys == partitions.toSet) HiveUtil.createEmptyPartition(table, partitionValues)
     else logger.warn(s"($id) No empty partition was created for $partitionValues because there are not all partition columns defined")
+  }
+
+  override def dropTable(implicit session: SparkSession): Unit = {
+    HiveUtil.dropTable(session, table.db.get, table.name)
   }
 
   /**

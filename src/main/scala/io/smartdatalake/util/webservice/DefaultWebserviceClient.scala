@@ -20,7 +20,7 @@ package io.smartdatalake.util.webservice
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import scalaj.http.{Http, HttpRequest, HttpResponse}
+import scalaj.http.{Http, HttpOptions, HttpRequest, HttpResponse}
 
 import scala.util.{Failure, Success, Try}
 
@@ -145,6 +145,7 @@ private[smartdatalake] object DefaultWebserviceClient extends SmartDataLakeLogge
   def buildRequest(url: String): HttpRequest = {
     logger.debug(s"Building HttpRequest with url: <$url>")
     Http(url)
+      .option(HttpOptions.followRedirects(true))
   }
 
   /**

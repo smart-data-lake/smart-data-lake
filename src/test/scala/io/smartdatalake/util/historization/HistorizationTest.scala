@@ -22,10 +22,12 @@ import java.time.LocalDateTime
 
 import io.smartdatalake.definitions.{HiveConventions, TechnicalTableColumn}
 import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import org.apache.spark.sql.functions.lit
-import org.apache.spark.sql.types.{StringType, StructField, StructType, TimestampType}
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.functions.{col, lit, to_timestamp, when}
+import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType, TimestampType}
+import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
 
@@ -39,11 +41,11 @@ class HistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeL
 
   private object HistorizationPhase extends Enumeration {
     type HistorizationPhase = Value
-    val Existing = Value
-    val UpdatedNew = Value
-    val UpdatedOld = Value
-    val NewlyAdded = Value
-    val TechnicallyDeleted = Value
+    val Existing: HistorizationPhase = Value
+    val UpdatedNew: HistorizationPhase = Value
+    val UpdatedOld: HistorizationPhase = Value
+    val NewlyAdded: HistorizationPhase = Value
+    val TechnicallyDeleted: HistorizationPhase = Value
   }
 
   private val ts1: java.time.LocalDateTime => Column = t => lit(t.toString).cast(TimestampType)
@@ -80,36 +82,31 @@ class HistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeL
     import session.sqlContext.implicits._
     val rddHist = session.sparkContext.parallelize(records)
     phase match {
-      case HistorizationPhase.Existing => {
+      case HistorizationPhase.Existing =>
         val dfHist = rddHist.toDF(colNames: _*)
         .withColumn(s"${TechnicalTableColumn.captured.toString}", ts1(erfasstTimestampOldHist))
         .withColumn(s"${TechnicalTableColumn.delimited.toString}", ts1(ersetztTimestampOldHist))
         setNullableStateOfColumn(dfHist, colNullability)
-      }
-      case HistorizationPhase.UpdatedOld => {
+      case HistorizationPhase.UpdatedOld =>
         val dfHist = rddHist.toDF(colNames: _*)
           .withColumn(s"${TechnicalTableColumn.captured.toString}", ts1(erfasstTimestampOldHist))
           .withColumn(s"${TechnicalTableColumn.delimited.toString}", ts1(referenceTimestampOld))
         setNullableStateOfColumn(dfHist, colNullability)
-      }
-      case HistorizationPhase.UpdatedNew => {
+      case HistorizationPhase.UpdatedNew =>
         val dfHist = rddHist.toDF(colNames: _*)
           .withColumn(s"${TechnicalTableColumn.captured.toString}", ts1(referenceTimestampNew))
           .withColumn(s"${TechnicalTableColumn.delimited.toString}", ts1(doomsday))
         setNullableStateOfColumn(dfHist, colNullability)
-      }
-      case HistorizationPhase.NewlyAdded => {
+      case HistorizationPhase.NewlyAdded =>
         val dfHist = rddHist.toDF(colNames: _*)
           .withColumn(s"${TechnicalTableColumn.captured.toString}", ts1(referenceTimestampNew))
           .withColumn(s"${TechnicalTableColumn.delimited.toString}", ts1(doomsday))
         setNullableStateOfColumn(dfHist, colNullability)
-      }
-      case HistorizationPhase.TechnicallyDeleted => {
+      case HistorizationPhase.TechnicallyDeleted =>
         val dfHist = rddHist.toDF(colNames: _*)
           .withColumn(s"${TechnicalTableColumn.captured.toString}", ts1(erfasstTimestampOldDeletedHist))
           .withColumn(s"${TechnicalTableColumn.delimited.toString}", ts1(ersetztTimestampOldDeletedHist))
         setNullableStateOfColumn(dfHist, colNullability)
-      }
     }
   }
 
@@ -124,7 +121,7 @@ class HistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeL
     val schema = df.schema
     val newSchema = StructType(schema.map {
       case StructField( c, t, _, m) if nullValues.contains(c) => StructField( c, t,
-        nullable = nullValues.get(c).get, m)
+        nullable = nullValues(c), m)
       case y: StructField => y
     })
     df.sqlContext.createDataFrame( df.rdd, newSchema )
@@ -135,69 +132,59 @@ class HistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeL
   }
 
   test("History unchanged with new columns but unchanged data..") {
+
     val baseColumnsOldHist = List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy"))
     val dfOldHist = toHistorizedDf(session, baseColumnsOldHist, HistorizationPhase.Existing)
     logger.debug(s"History at beginning: ${dfOldHist.collect.foreach(println)}")
 
     val baseColumnsNewFeed = List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy"))
     val dfNewFeed = toNewFeedDf(session, baseColumnsNewFeed)
-    val dfNewFeedWithAdditionalCols = dfNewFeed.withColumn("new_col1", lit(null).cast(StringType))
+    val colExprNewcol = when(col("id")===123,"Test")
+    val dfNewFeedWithAdditionalCols = dfNewFeed.withColumn("new_col1", colExprNewcol otherwise lit(null).cast(StringType))
     logger.debug(s"New feed: ${dfNewFeedWithAdditionalCols.collect.foreach(println)}")
 
-    val dfHistorized = Historization.getHistorized(dfOldHist, dfNewFeedWithAdditionalCols, primaryKeyColumns,
+    val (oldEvolvedDf, newEvolvedDf) = SchemaEvolution.process(dfOldHist, dfNewFeedWithAdditionalCols,
+      colsToIgnore = Seq(TechnicalTableColumn.captured.toString, TechnicalTableColumn.delimited.toString))
+
+    val dfHistorized = Historization.getHistorized(oldEvolvedDf, newEvolvedDf, primaryKeyColumns,
       referenceTimestampNew, None, None)
     logger.debug(s"Historization result: ${dfHistorized.collect.foreach(println)}")
 
-    val baseColumnsUnchanged = List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy"))
-    val dfUnchanged = toHistorizedDf(session, baseColumnsUnchanged, HistorizationPhase.Existing)
-    val dfUnchangedWithAdditionalCols = dfUnchanged.withColumn("new_col1", lit(null).cast(StringType))
-
-    dfHistorized.printSchema()
-    dfHistorized.show
-
-    val dfExpected = dfUnchangedWithAdditionalCols
-    logger.debug(s"Expected result: ${dfExpected.collect.foreach(println)}")
-    TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfHistorized))
-
-  }
-
-  test("History should change with new not-null columns.") {
-    val baseColumnsOldHist = List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy"))
-    val dfOldHist = toHistorizedDf(session, baseColumnsOldHist, HistorizationPhase.Existing)
-    logger.debug(s"History at beginning: ${dfOldHist.collect.foreach(println)}")
-
-    val baseColumnsNewFeed = List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy"))
-    val dfNewFeed = toNewFeedDf(session, baseColumnsNewFeed)
-    val dfNewFeedWithAdditionalCols = dfNewFeed.withColumn("new_col1", lit("Test").cast(StringType))
-    logger.debug(s"New feed: ${dfNewFeedWithAdditionalCols.collect.foreach(println)}")
-
-    val dfHistorized = Historization.getHistorized(dfOldHist, dfNewFeedWithAdditionalCols, primaryKeyColumns,
-      referenceTimestampNew, None, None)
-    logger.debug(s"Historization result: ${dfHistorized.collect.foreach(println)}")
-
-
-    val baseColumnsUpdatedOld = List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy"))
-    val dfUpdatedOld = toHistorizedDf(session, baseColumnsUpdatedOld, HistorizationPhase.UpdatedOld)
+    //ID 123 has new value and so old record is closed with newcol1=null
+    val dfResultExistingRowNonNull = dfOldHist.filter("id==123")
+      .drop(TechnicalTableColumn.captured.toString,TechnicalTableColumn.captured.toString)
+      .drop(TechnicalTableColumn.captured.toString,TechnicalTableColumn.delimited.toString)
       .withColumn("new_col1", lit(null).cast(StringType))
+      .withColumn(s"${TechnicalTableColumn.captured.toString}", ts1(erfasstTimestampOldHist))
+      .withColumn(s"${TechnicalTableColumn.delimited.toString}", ts1(referenceTimestampOld))
 
-    val baseColumnsUpdatedNew = List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy"))
-    val dfUpdatedNew = toHistorizedDf(session, baseColumnsUpdatedNew, HistorizationPhase.UpdatedNew)
-      .withColumn("new_col1", lit("Test").cast(StringType))
+    //ID 123 has new value and so new record is created with newcol1="Test"
+    val dfResultNewRowNonNull = dfNewFeedWithAdditionalCols.filter("id==123")
+      .withColumn(s"${TechnicalTableColumn.captured.toString}", ts1(referenceTimestampNew))
+      .withColumn(s"${TechnicalTableColumn.delimited.toString}", ts1(doomsday))
 
-    val dfExpected = dfUpdatedNew.union(dfUpdatedOld)
+    //ID 124 has null new value and so old record is left unchanged but with additional column
+    val dfResultExistingRowNull = dfOldHist
+      .filter("id==124")
+      .drop(TechnicalTableColumn.captured.toString,TechnicalTableColumn.captured.toString)
+      .drop(TechnicalTableColumn.captured.toString,TechnicalTableColumn.delimited.toString)
+      .withColumn("new_col1", lit(null).cast(StringType))
+      .withColumn(s"${TechnicalTableColumn.captured.toString}", ts1(erfasstTimestampOldHist))
+      .withColumn(s"${TechnicalTableColumn.delimited.toString}", ts1(ersetztTimestampOldHist))
 
-    dfOldHist.show(10, truncate = false)
-    dfNewFeed.show(10, truncate = false)
 
-    dfHistorized.show(10, truncate = false)
-    dfExpected.show(10, truncate = false)
+    val dfExpected = dfResultExistingRowNonNull
+      .union(dfResultNewRowNonNull)
+        .union(dfResultExistingRowNull)
 
-    logger.debug("dfHistorized:")
     dfHistorized.printSchema()
     dfHistorized.show
 
     logger.debug(s"Expected result: ${dfExpected.collect.foreach(println)}")
-    TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfHistorized))
+
+    //assert(dfHistorized.collect().length==3)
+
+    assert(TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfHistorized)))
 
   }
 
@@ -220,7 +207,7 @@ class HistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeL
     val dfExpected = toHistorizedDf(session, baseColumnsUpdatedOld, HistorizationPhase.Existing)
 
     logger.debug(s"Expected result: ${dfExpected.collect.foreach(println)}")
-    TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfHistorized))
+    assert(TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfHistorized)))
 
   }
 
@@ -261,7 +248,7 @@ class HistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeL
     dfExpected.show(10, truncate = false)
     dfHistorized.show(10, truncate = false)
 
-    TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfHistorized))
+    assert(TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfHistorized)))
   }
 
 
@@ -304,7 +291,7 @@ class HistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeL
     dfExpected.show(10, truncate = false)
     dfHistorized.show(10, truncate = false)
 
-    TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfHistorized))
+    assert(TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfHistorized)))
   }
 
 
@@ -345,7 +332,7 @@ class HistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeL
       dfExpected.collect.foreach(println)
     }
 
-    TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfHistorized))
+    assert(TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfHistorized)))
   }
 
   test("When deleting 1 record (technical deletion) the dl_ts_delimited column should be updated.") {
@@ -382,7 +369,7 @@ class HistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeL
       dfExpected.collect.foreach(println)
     }
 
-    TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfHistorized))
+    assert(TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfHistorized)))
   }
 
   test("When adding 1 record, the history should contain the new record.") {
@@ -422,7 +409,7 @@ class HistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeL
 
     dfHistorized.show()
 
-    TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfHistorized))
+    assert(TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfHistorized)))
   }
 
   test("When adding 1 record that was technically deleted in the past already, the history should contain the new version.") {
@@ -470,6 +457,45 @@ class HistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeL
       dfExpected.collect.foreach(println)
     }
 
-    TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfHistorized))
+    assert(TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfHistorized)))
   }
+
+  test("Exchanging non-null value and null value between columns should create a new history entry") {
+
+    // Arrange
+    val schemaValues = List(StructField("id", IntegerType, nullable = false),
+      StructField("col_A", StringType, nullable = true),
+      StructField("col_B", StringType, nullable = true))
+
+    val schemaHistory = schemaValues ++ List(
+      StructField("captured", StringType, nullable = false),
+      StructField("delimited", StringType, nullable = true))
+
+    val existingData = Seq(Row.fromSeq(Seq(1, null, "value", erfasstTimestampOldHist.toString, doomsday.toString)))
+    val newData = Seq(Row.fromSeq(Seq(1, "value", null)))
+    val expectedResult = Seq(Row.fromSeq(Seq(1, null, "value", erfasstTimestampOldHist.toString, referenceTimestampOld.toString)),
+      Row.fromSeq(Seq(1, "value", null, referenceTimestampNew.toString, doomsday.toString)))
+
+    val parseTimestampColumns : DataFrame => DataFrame = df =>
+      df.withColumn(TechnicalTableColumn.captured.toString, to_timestamp(col("captured")))
+        .withColumn(TechnicalTableColumn.delimited.toString, to_timestamp(col("delimited")))
+        .drop("captured")
+        .drop("delimited")
+
+    val dfHistory = parseTimestampColumns(session.createDataFrame(session.sparkContext.parallelize(existingData), StructType(schemaHistory)))
+    val dfExpected = parseTimestampColumns(session.createDataFrame(session.sparkContext.parallelize(expectedResult), StructType(schemaHistory)))
+    val dfNew = session.createDataFrame(session.sparkContext.parallelize(newData), StructType(schemaValues))
+
+    // Act
+    val dfResult = Historization.getHistorized(dfHistory, dfNew, Seq("id"), referenceTimestampNew, None, None)
+
+    // Assert
+    println(s"Existing history: ${dfHistory.collect.map(_.toString).mkString(",")}")
+    println(s"New Value: ${dfNew.collect.map(_.toString).mkString(",")}")
+    println(s"Expected value: ${sortResults(dfExpected).collect.map(_.toString).mkString(",")}")
+    println(s"Historization result: ${sortResults(dfResult).collect.map(_.toString).mkString(",")}")
+
+    assert(TestUtil.isDataFrameEqual(sortResults(dfExpected), sortResults(dfResult)))
+  }
+
 }

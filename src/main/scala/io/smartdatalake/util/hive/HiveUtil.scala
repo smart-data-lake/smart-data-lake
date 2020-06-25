@@ -62,7 +62,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
                 existingOnly: Boolean = true): Unit = {
     val existsClause = if (existingOnly) "if exists " else ""
     val purgeClause = if (doPurge) " purge" else ""
-    val stmt = s"drop table $existsClause $hiveDb.$tableName$purgeClause"
+    val stmt = s"drop table $existsClause$hiveDb.$tableName$purgeClause"
     execSqlStmt(session, stmt)
   }
 

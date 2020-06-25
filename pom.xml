@@ -21,7 +21,7 @@
 
 	<groupId>io.smartdatalake</groupId>
 	<artifactId>smartdatalake_${scala.minor.version}</artifactId>
-	<version>1.0.4-SNAPSHOT</version>
+	<version>1.0.5-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
 	<licenses>
