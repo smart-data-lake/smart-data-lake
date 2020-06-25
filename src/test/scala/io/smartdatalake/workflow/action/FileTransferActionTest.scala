@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.action
 
 import java.nio.file.Files
 
+import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.BasicAuthMode
 import io.smartdatalake.testutils.TestUtil
@@ -77,7 +78,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
 
 
     // prepare & start load
-    implicit val context1 = ActionPipelineContext(feed, "test", instanceRegistry)
+    implicit val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
     val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id)
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
     action1.exec(Seq(srcSubFeed))
@@ -113,7 +114,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    implicit val context1 = ActionPipelineContext(feed, "test", instanceRegistry)
+    implicit val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
     val action1 = FileTransferAction("fta1", srcDO.id, tgtDO.id)
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
     action1.exec(Seq(srcSubFeed))
@@ -150,7 +151,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    implicit val context1 = ActionPipelineContext(feed, "test", instanceRegistry)
+    implicit val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
     val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id)
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq(PartitionValues(Map("date"->"00010101"))))
     action1.exec(Seq(srcSubFeed))
@@ -185,7 +186,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    implicit val context1 = ActionPipelineContext(feed, "test", instanceRegistry)
+    implicit val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
     val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id)
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq(PartitionValues(Map("date"->datePartitionVal))))
     action1.exec(Seq(srcSubFeed))
@@ -222,7 +223,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    implicit val context1 = ActionPipelineContext(feed, "test", instanceRegistry)
+    implicit val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
     val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id)
     val partitionValuesFilter = PartitionValues(Map("date"->datePartitionVal, "town"->"NYC", "year"->2019))
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq(partitionValuesFilter))
@@ -260,7 +261,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    implicit val context1 = ActionPipelineContext(feed, "test", instanceRegistry)
+    implicit val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
     val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id)
     val partitionValuesFilter = PartitionValues(Map("date"->datePartitionVal, "town"->"NYC", "year"->"0001"))
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq(partitionValuesFilter))
@@ -288,7 +289,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    implicit val context1 = ActionPipelineContext(feed, "test", instanceRegistry)
+    implicit val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
     val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id)
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
@@ -317,7 +318,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     instanceRegistry.register(tgtDO)
 
     // prepare & start load 1
-    implicit val context1 = ActionPipelineContext(feed, "test", instanceRegistry)
+    implicit val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
     val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id, deleteDataAfterRead = true)
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
     action1.preExec
@@ -362,7 +363,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     instanceRegistry.register(tgtDO)
 
     // prepare & start load 1
-    implicit val context1 = ActionPipelineContext(feed, "test", instanceRegistry)
+    implicit val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
     val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id, deleteDataAfterRead = true)
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
@@ -398,7 +399,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    implicit val context1 = ActionPipelineContext(feed, "test", instanceRegistry)
+    implicit val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
     val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id)
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
@@ -423,7 +424,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    implicit val context1 = ActionPipelineContext(feed, "test", instanceRegistry)
+    implicit val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
     val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id)
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head

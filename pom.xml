@@ -98,6 +98,8 @@
 
 		<!-- hadoop version must match the hadoop version included by spark-core -->
 		<hadoop.version>2.6.5</hadoop.version>
+		<!-- could be better to use cloudera version of hadoop because they backported many bugfixes from later versions -->
+		<!--hadoop.version>2.6.0-cdh5.16.1</hadoop.version-->
 		<spark.version>2.4.4</spark.version>
 
 		<databricks.spark-xml.version>0.9.0</databricks.spark-xml.version>
