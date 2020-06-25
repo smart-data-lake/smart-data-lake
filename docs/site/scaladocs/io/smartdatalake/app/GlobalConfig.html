@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>GlobalConfig - Smart Data Lake 1.0.0-SNAPSHOT API - io.smartdatalake.app.GlobalConfig</title>
-          <meta name="description" content="GlobalConfig - Smart Data Lake 1.0.0 - SNAPSHOT API - io.smartdatalake.app.GlobalConfig" />
-          <meta name="keywords" content="GlobalConfig Smart Data Lake 1.0.0 SNAPSHOT API io.smartdatalake.app.GlobalConfig" />
+          <title>GlobalConfig - Smart Data Lake 1.0.5 API - io.smartdatalake.app.GlobalConfig</title>
+          <meta name="description" content="GlobalConfig - Smart Data Lake 1.0.5 API - io.smartdatalake.app.GlobalConfig" />
+          <meta name="keywords" content="GlobalConfig Smart Data Lake 1.0.5 API io.smartdatalake.app.GlobalConfig" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -28,10 +28,12 @@
         </head>
         <body class="type">
       <div id="definition">
-        <img alt="Class" src="../../../lib/class_big.png" />
+        <a href="GlobalConfig$.html" title="See companion object"><img alt="Class/Object" src="../../../lib/class_to_object_big.png" /></a>
         <p id="owner"><a href="../../package.html" class="extype" name="io">io</a>.<a href="../package.html" class="extype" name="io.smartdatalake">smartdatalake</a>.<a href="package.html" class="extype" name="io.smartdatalake.app">app</a></p>
-        <h1>GlobalConfig</h1><h3><span class="morelinks"><div>Related Doc:
-            <a href="package.html" class="extype" name="io.smartdatalake.app">package app</a>
+        <h1><a href="GlobalConfig$.html" title="See companion object">GlobalConfig</a></h1><h3><span class="morelinks"><div>
+            Related Docs:
+            <a href="GlobalConfig$.html" title="See companion object">object GlobalConfig</a>
+            | <a href="package.html" class="extype" name="io.smartdatalake.app">package app</a>
           </div></span></h3><span class="permalink">
       <a href="../../../index.html#io.smartdatalake.app.GlobalConfig" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
@@ -45,13 +47,14 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <span class="name">GlobalConfig</span><span class="params">(<span name="kryoClasses">kryoClasses: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="sparkOptions">sparkOptions: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <span class="name">GlobalConfig</span><span class="params">(<span name="kryoClasses">kryoClasses: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="sparkOptions">sparkOptions: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="enableHive">enableHive: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">true</span></span>, <span name="memoryLogTimer">memoryLogTimer: <span class="extype" name="scala.Option">Option</span>[<a href="MemoryLogTimerConfig.html" class="extype" name="io.smartdatalake.app.MemoryLogTimerConfig">MemoryLogTimerConfig</a>] = <span class="symbol">None</span></span>, <span name="shutdownHookLogger">shutdownHookLogger: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4>
       
-          <div id="comment" class="fullcommenttop"><div class="toggleContainer block">
+          <div id="comment" class="fullcommenttop"><div class="comment cmt"><p>Global configuration options
+</p></div><dl class="paramcmts block"><dt class="param">kryoClasses</dt><dd class="cmt"><p>classes to register for spark kryo serialization</p></dd><dt class="param">sparkOptions</dt><dd class="cmt"><p>spark options</p></dd><dt class="param">enableHive</dt><dd class="cmt"><p>enable hive for spark session</p></dd><dt class="param">memoryLogTimer</dt><dd class="cmt"><p>enable periodic memory usage logging, see detailled configuration <a href="MemoryLogTimerConfig.html" class="extype" name="io.smartdatalake.app.MemoryLogTimerConfig">MemoryLogTimerConfig</a></p></dd><dt class="param">shutdownHookLogger</dt><dd class="cmt"><p>enable shutdown hook logger to trace shutdown cause</p></dd></dl><div class="toggleContainer block">
           <span class="toggle">Linear Supertypes</span>
-          <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.Product">Product</span>, <span class="extype" name="scala.Equals">Equals</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
+          <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.Product">Product</span>, <span class="extype" name="scala.Equals">Equals</span>, <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
         </div></div>
         
 
@@ -69,7 +72,7 @@
                 <span class="filtertype">Inherited<br />
                 </span>
                 <ol id="linearization">
-                  <li class="in" name="io.smartdatalake.app.GlobalConfig"><span>GlobalConfig</span></li><li class="in" name="scala.Serializable"><span>Serializable</span></li><li class="in" name="java.io.Serializable"><span>Serializable</span></li><li class="in" name="scala.Product"><span>Product</span></li><li class="in" name="scala.Equals"><span>Equals</span></li><li class="in" name="scala.AnyRef"><span>AnyRef</span></li><li class="in" name="scala.Any"><span>Any</span></li>
+                  <li class="in" name="io.smartdatalake.app.GlobalConfig"><span>GlobalConfig</span></li><li class="in" name="scala.Serializable"><span>Serializable</span></li><li class="in" name="java.io.Serializable"><span>Serializable</span></li><li class="in" name="scala.Product"><span>Product</span></li><li class="in" name="scala.Equals"><span>Equals</span></li><li class="in" name="io.smartdatalake.util.misc.SmartDataLakeLogger"><span>SmartDataLakeLogger</span></li><li class="in" name="scala.AnyRef"><span>AnyRef</span></li><li class="in" name="scala.Any"><span>Any</span></li>
                 </ol>
               </div><div id="ancestors">
             <span class="filtertype"></span>
@@ -88,8 +91,8 @@
         <div id="allMembers">
         <div id="constructors" class="members">
               <h3>Instance Constructors</h3>
-              <ol><li name="io.smartdatalake.app.GlobalConfig#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
-      <a id="&lt;init&gt;(kryoClasses:Option[Seq[String]],sparkOptions:Option[Map[String,String]]):io.smartdatalake.app.GlobalConfig"></a>
+              <ol><li name="io.smartdatalake.app.GlobalConfig#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="&lt;init&gt;(kryoClasses:Option[Seq[String]],sparkOptions:Option[Map[String,String]],enableHive:Boolean,memoryLogTimer:Option[io.smartdatalake.app.MemoryLogTimerConfig],shutdownHookLogger:Boolean):io.smartdatalake.app.GlobalConfig"></a>
       <a id="&lt;init&gt;:GlobalConfig"></a>
       <h4 class="signature">
       <span class="modifier_kind">
@@ -97,14 +100,14 @@
         <span class="kind">new</span>
       </span>
       <span class="symbol">
-        <span class="name">GlobalConfig</span><span class="params">(<span name="kryoClasses">kryoClasses: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="sparkOptions">sparkOptions: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>)</span>
+        <span class="name">GlobalConfig</span><span class="params">(<span name="kryoClasses">kryoClasses: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="sparkOptions">sparkOptions: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="enableHive">enableHive: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">true</span></span>, <span name="memoryLogTimer">memoryLogTimer: <span class="extype" name="scala.Option">Option</span>[<a href="MemoryLogTimerConfig.html" class="extype" name="io.smartdatalake.app.MemoryLogTimerConfig">MemoryLogTimerConfig</a>] = <span class="symbol">None</span></span>, <span name="shutdownHookLogger">shutdownHookLogger: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>)</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.app.GlobalConfig@&lt;init&gt;(kryoClasses:Option[Seq[String]],sparkOptions:Option[Map[String,String]]):io.smartdatalake.app.GlobalConfig" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.app.GlobalConfig@&lt;init&gt;(kryoClasses:Option[Seq[String]],sparkOptions:Option[Map[String,String]],enableHive:Boolean,memoryLogTimer:Option[io.smartdatalake.app.MemoryLogTimerConfig],shutdownHookLogger:Boolean):io.smartdatalake.app.GlobalConfig" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
+      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">kryoClasses</dt><dd class="cmt"><p>classes to register for spark kryo serialization</p></dd><dt class="param">sparkOptions</dt><dd class="cmt"><p>spark options</p></dd><dt class="param">enableHive</dt><dd class="cmt"><p>enable hive for spark session</p></dd><dt class="param">memoryLogTimer</dt><dd class="cmt"><p>enable periodic memory usage logging, see detailled configuration <a href="MemoryLogTimerConfig.html" class="extype" name="io.smartdatalake.app.MemoryLogTimerConfig">MemoryLogTimerConfig</a></p></dd><dt class="param">shutdownHookLogger</dt><dd class="cmt"><p>enable shutdown hook logger to trace shutdown cause</p></dd></dl></div>
     </li></ol>
             </div>
 
@@ -205,6 +208,41 @@
     </span>)</span>
               
         </dd></dl></div>
+    </li><li name="io.smartdatalake.app.GlobalConfig#createSparkSession" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="createSparkSession(appName:String,master:Option[String],deployMode:Option[String]):org.apache.spark.sql.SparkSession"></a>
+      <a id="createSparkSession(String,Option[String],Option[String]):SparkSession"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">createSparkSession</span><span class="params">(<span name="appName">appName: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="master">master: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>, <span name="deployMode">deployMode: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>)</span><span class="result">: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.app.GlobalConfig@createSparkSession(appName:String,master:Option[String],deployMode:Option[String]):org.apache.spark.sql.SparkSession" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Create a spark session using settings from this global config
+</p>
+    </li><li name="io.smartdatalake.app.GlobalConfig#enableHive" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="enableHive:Boolean"></a>
+      <a id="enableHive:Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">enableHive</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.app.GlobalConfig@enableHive:Boolean" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">enable hive for spark session</p>
     </li><li name="scala.AnyRef#eq" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="eq(x$1:AnyRef):Boolean"></a>
       <a id="eq(AnyRef):Boolean"></a>
@@ -295,7 +333,41 @@
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
+      <p class="shortcomment cmt">classes to register for spark kryo serialization</p>
+    </li><li name="io.smartdatalake.util.misc.SmartDataLakeLogger#logger" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="logger:org.slf4j.Logger"></a>
+      <a id="logger:Logger"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">lazy val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">logger</span><span class="result">: <span class="extype" name="org.slf4j.Logger">Logger</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.app.GlobalConfig@logger:org.slf4j.Logger" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Attributes</dt><dd>protected </dd><dt>Definition Classes</dt><dd>SmartDataLakeLogger</dd></dl></div>
+    </li><li name="io.smartdatalake.app.GlobalConfig#memoryLogTimer" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="memoryLogTimer:Option[io.smartdatalake.app.MemoryLogTimerConfig]"></a>
+      <a id="memoryLogTimer:Option[MemoryLogTimerConfig]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">memoryLogTimer</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<a href="MemoryLogTimerConfig.html" class="extype" name="io.smartdatalake.app.MemoryLogTimerConfig">MemoryLogTimerConfig</a>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.app.GlobalConfig@memoryLogTimer:Option[io.smartdatalake.app.MemoryLogTimerConfig]" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">enable periodic memory usage logging, see detailled configuration <a href="MemoryLogTimerConfig.html" class="extype" name="io.smartdatalake.app.MemoryLogTimerConfig">MemoryLogTimerConfig</a></p>
     </li><li name="scala.AnyRef#ne" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="ne(x$1:AnyRef):Boolean"></a>
       <a id="ne(AnyRef):Boolean"></a>
@@ -347,6 +419,23 @@
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li name="io.smartdatalake.app.GlobalConfig#shutdownHookLogger" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="shutdownHookLogger:Boolean"></a>
+      <a id="shutdownHookLogger:Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">shutdownHookLogger</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.app.GlobalConfig@shutdownHookLogger:Boolean" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">enable shutdown hook logger to trace shutdown cause</p>
     </li><li name="io.smartdatalake.app.GlobalConfig#sparkOptions" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="sparkOptions:Option[Map[String,String]]"></a>
       <a id="sparkOptions:Option[Map[String,String]]"></a>
@@ -363,7 +452,7 @@
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
+      <p class="shortcomment cmt">spark options</p>
     </li><li name="scala.AnyRef#synchronized" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="synchronized[T0](x$1:=&gt;T0):T0"></a>
       <a id="synchronized[T0](⇒T0):T0"></a>
@@ -467,6 +556,8 @@
               <h3>Inherited from <span class="extype" name="scala.Product">Product</span></h3>
             </div><div class="parent" name="scala.Equals">
               <h3>Inherited from <span class="extype" name="scala.Equals">Equals</span></h3>
+            </div><div class="parent" name="io.smartdatalake.util.misc.SmartDataLakeLogger">
+              <h3>Inherited from <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span></h3>
             </div><div class="parent" name="scala.AnyRef">
               <h3>Inherited from <span class="extype" name="scala.AnyRef">AnyRef</span></h3>
             </div><div class="parent" name="scala.Any">

@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>DAG - Smart Data Lake 1.0.0-SNAPSHOT API - io.smartdatalake.workflow.DAG</title>
-          <meta name="description" content="DAG - Smart Data Lake 1.0.0 - SNAPSHOT API - io.smartdatalake.workflow.DAG" />
-          <meta name="keywords" content="DAG Smart Data Lake 1.0.0 SNAPSHOT API io.smartdatalake.workflow.DAG" />
+          <title>DAG - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.DAG</title>
+          <meta name="description" content="DAG - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.DAG" />
+          <meta name="keywords" content="DAG Smart Data Lake 1.0.5 API io.smartdatalake.workflow.DAG" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -188,22 +188,23 @@
               
         </dd></dl></div>
     </li><li name="io.smartdatalake.workflow.DAG#create" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
-      <a id="create(nodes:Seq[io.smartdatalake.workflow.DAGNode],edges:Seq[io.smartdatalake.workflow.DAGEdge]):io.smartdatalake.workflow.DAG"></a>
-      <a id="create(Seq[DAGNode],Seq[DAGEdge]):DAG"></a>
+      <a id="create[N&lt;:io.smartdatalake.workflow.DAGNode](nodes:Seq[io.smartdatalake.workflow.DAGNode],edges:Seq[io.smartdatalake.workflow.DAGEdge])(implicitevidence$2:scala.reflect.ClassTag[N]):io.smartdatalake.workflow.DAG[N]"></a>
+      <a id="create[N&lt;:DAGNode](Seq[DAGNode],Seq[DAGEdge])(ClassTag[N]):DAG[N]"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">create</span><span class="params">(<span name="nodes">nodes: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.DAGNode">DAGNode</span>]</span>, <span name="edges">edges: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.DAGEdge">DAGEdge</span>]</span>)</span><span class="result">: <a href="DAG.html" class="extype" name="io.smartdatalake.workflow.DAG">DAG</a></span>
+        <span class="name">create</span><span class="tparams">[<span name="N">N &lt;: <span class="extype" name="io.smartdatalake.workflow.DAGNode">DAGNode</span></span>]</span><span class="params">(<span name="nodes">nodes: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.DAGNode">DAGNode</span>]</span>, <span name="edges">edges: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.DAGEdge">DAGEdge</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="arg0">arg0: <span class="extype" name="scala.reflect.ClassTag">ClassTag</span>[<span class="extype" name="io.smartdatalake.workflow.DAG.create.N">N</span>]</span>)</span><span class="result">: <a href="DAG.html" class="extype" name="io.smartdatalake.workflow.DAG">DAG</a>[<span class="extype" name="io.smartdatalake.workflow.DAG.create.N">N</span>]</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.workflow.DAG$@create(nodes:Seq[io.smartdatalake.workflow.DAGNode],edges:Seq[io.smartdatalake.workflow.DAGEdge]):io.smartdatalake.workflow.DAG" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.workflow.DAG$@create[N&lt;:io.smartdatalake.workflow.DAGNode](nodes:Seq[io.smartdatalake.workflow.DAGNode],edges:Seq[io.smartdatalake.workflow.DAGEdge])(implicitevidence$2:scala.reflect.ClassTag[N]):io.smartdatalake.workflow.DAG[N]" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
+      <p class="shortcomment cmt">Create a DAG object from DAGNodes and DAGEdges
+</p>
     </li><li name="scala.AnyRef#eq" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="eq(x$1:AnyRef):Boolean"></a>
       <a id="eq(AnyRef):Boolean"></a>
@@ -380,24 +381,6 @@
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
-    </li><li name="io.smartdatalake.workflow.DAG#sortStep" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="sortStep(incomingIds:Map[io.smartdatalake.workflow.DAGHelper.NodeId,Seq[io.smartdatalake.workflow.DAGHelper.NodeId]]):Seq[io.smartdatalake.workflow.DAGHelper.NodeId]"></a>
-      <a id="sortStep(Map[NodeId,Seq[NodeId]]):Seq[NodeId]"></a>
-      <h4 class="signature">
-      <span class="modifier_kind">
-        <span class="modifier"></span>
-        <span class="kind">def</span>
-      </span>
-      <span class="symbol">
-        <span class="name">sortStep</span><span class="params">(<span name="incomingIds">incomingIds: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="io.smartdatalake.workflow.DAGHelper.NodeId">NodeId</span>, <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.DAGHelper.NodeId">NodeId</span>]]</span>)</span><span class="result">: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.DAGHelper.NodeId">NodeId</span>]</span>
-      </span>
-      </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.workflow.DAG$@sortStep(incomingIds:Map[io.smartdatalake.workflow.DAGHelper.NodeId,Seq[io.smartdatalake.workflow.DAGHelper.NodeId]]):Seq[io.smartdatalake.workflow.DAGHelper.NodeId]" title="Permalink" target="_top">
-        <img src="../../../lib/permalink.png" alt="Permalink" />
-      </a>
-    </span>
-      <p class="shortcomment cmt">Sort Graph in topological order.</p><div class="fullcomment"><div class="comment cmt"><p>Sort Graph in topological order.</p><p>Sort by recursively searching the start nodes and removing them for the next call.
-</p></div></div>
     </li><li name="scala.AnyRef#synchronized" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="synchronized[T0](x$1:=&gt;T0):T0"></a>
       <a id="synchronized[T0](⇒T0):T0"></a>

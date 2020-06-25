@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>definitions - Smart Data Lake 1.0.0-SNAPSHOT API - io.smartdatalake.definitions</title>
-          <meta name="description" content="definitions - Smart Data Lake 1.0.0 - SNAPSHOT API - io.smartdatalake.definitions" />
-          <meta name="keywords" content="definitions Smart Data Lake 1.0.0 SNAPSHOT API io.smartdatalake.definitions" />
+          <title>definitions - Smart Data Lake 1.0.5 API - io.smartdatalake.definitions</title>
+          <meta name="description" content="definitions - Smart Data Lake 1.0.5 API - io.smartdatalake.definitions" />
+          <meta name="keywords" content="definitions Smart Data Lake 1.0.5 API io.smartdatalake.definitions" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -64,7 +64,118 @@
         <div id="allMembers">
         
 
-        
+        <div id="types" class="types members">
+              <h3>Type Members</h3>
+              <ol><li name="io.smartdatalake.definitions.AuthMode" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
+      <a id="AuthModeextendsAnyRef"></a>
+      <a id="AuthMode:AuthMode"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">sealed </span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="AuthMode.html"><span class="name">AuthMode</span></a><span class="result"> extends <span class="extype" name="scala.AnyRef">AnyRef</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.package@AuthModeextendsAnyRef" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Authentication modes define how an application authenticates itself
+to a given data object/connection</p>
+    </li><li name="io.smartdatalake.definitions.BasicAuthMode" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="BasicAuthModeextendsAuthModewithProductwithSerializable"></a>
+      <a id="BasicAuthMode:BasicAuthMode"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="BasicAuthMode.html"><span class="name">BasicAuthMode</span></a><span class="params">(<span name="userVariable">userVariable: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="passwordVariable">passwordVariable: <span class="extype" name="scala.Predef.String">String</span></span>)</span><span class="result"> extends <a href="AuthMode.html" class="extype" name="io.smartdatalake.definitions.AuthMode">AuthMode</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.package@BasicAuthModeextendsAuthModewithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Derive options for various connection types to connect by basic authentication
+</p>
+    </li><li name="io.smartdatalake.definitions.ExecutionMode" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
+      <a id="ExecutionModeextendsAnyRef"></a>
+      <a id="ExecutionMode:ExecutionMode"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">sealed </span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="ExecutionMode.html"><span class="name">ExecutionMode</span></a><span class="result"> extends <span class="extype" name="scala.AnyRef">AnyRef</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.package@ExecutionModeextendsAnyRef" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Execution mode's defines how data is selected when running a data pipeline.</p>
+    </li><li name="io.smartdatalake.definitions.PartitionDiffMode" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="PartitionDiffModeextendsExecutionModewithProductwithSerializable"></a>
+      <a id="PartitionDiffMode:PartitionDiffMode"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="PartitionDiffMode.html"><span class="name">PartitionDiffMode</span></a><span class="params">(<span name="partitionColNb">partitionColNb: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="mainInputId">mainInputId: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="mainOutputId">mainOutputId: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="nbOfPartitionValuesPerRun">nbOfPartitionValuesPerRun: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.package@PartitionDiffModeextendsExecutionModewithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Partition difference execution mode lists partitions on input &amp; output DataObject and starts loading all missing partitions.</p><div class="fullcomment"><div class="comment cmt"><p>Partition difference execution mode lists partitions on input &amp; output DataObject and starts loading all missing partitions.
+Partition columns to be used for comparision need to be a common 'init' of input and output partition columns.</p></div><dl class="paramcmts block"><dt class="param">partitionColNb</dt><dd class="cmt"><p>optional number of partition columns to use as a common 'init'.</p></dd><dt class="param">mainInputId</dt><dd class="cmt"><p>optional selection of inputId to be used for partition comparision. Only needed if there are multiple input DataObject's.</p></dd><dt class="param">mainOutputId</dt><dd class="cmt"><p>optional selection of outputId to be used for partition comparision. Only needed if there are multiple output DataObject's.</p></dd><dt class="param">nbOfPartitionValuesPerRun</dt><dd class="cmt"><p>optional restriction of the number of partition values per run.</p></dd></dl></div>
+    </li><li name="io.smartdatalake.definitions.PublicKeyAuthMode" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="PublicKeyAuthModeextendsAuthModewithProductwithSerializable"></a>
+      <a id="PublicKeyAuthMode:PublicKeyAuthMode"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="PublicKeyAuthMode.html"><span class="name">PublicKeyAuthMode</span></a><span class="params">(<span name="userVariable">userVariable: <span class="extype" name="scala.Predef.String">String</span></span>)</span><span class="result"> extends <a href="AuthMode.html" class="extype" name="io.smartdatalake.definitions.AuthMode">AuthMode</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.package@PublicKeyAuthModeextendsAuthModewithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Validate by user and private/public key
+Private key is read from .ssh
+</p>
+    </li><li name="io.smartdatalake.definitions.TokenAuthMode" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="TokenAuthModeextendsAuthModewithProductwithSerializable"></a>
+      <a id="TokenAuthMode:TokenAuthMode"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="TokenAuthMode.html"><span class="name">TokenAuthMode</span></a><span class="params">(<span name="tokenVariable">tokenVariable: <span class="extype" name="scala.Predef.String">String</span></span>)</span><span class="result"> extends <a href="AuthMode.html" class="extype" name="io.smartdatalake.definitions.AuthMode">AuthMode</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.package@TokenAuthModeextendsAuthModewithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Derive options for various connection types to connect by token
+</p>
+    </li></ol>
+            </div>
 
         
 
@@ -88,7 +199,7 @@
     </span>
       <p class="shortcomment cmt">Datatype for date columns in Hive
 </p>
-    </li><li name="io.smartdatalake.definitions.Environment" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+    </li><li name="io.smartdatalake.definitions.Environment" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="Environment"></a>
       <a id="Environment:Environment"></a>
       <h4 class="signature">
@@ -104,7 +215,12 @@
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt">Set this environment dependent configurations at the beginning of the <a href="../app/SmartDataLakeBuilder.html" class="extype" name="io.smartdatalake.app.SmartDataLakeBuilder">io.smartdatalake.app.SmartDataLakeBuilder</a> implementation for your environment.</p>
+      <p class="shortcomment cmt">Environment dependent configurations.</p><div class="fullcomment"><div class="comment cmt"><p>Environment dependent configurations.
+They can be set
+- by Java system properties (prefixed with &quot;sdl.&quot;, e.g. &quot;sdl.hadoopAuthoritiesWithAclsRequired&quot;)
+- by Environment variables (prefixed with &quot;SDL_&quot; and camelCase converted to uppercase, e.g. &quot;SDL_HADOOP_AUTHORITIES_WITH_ACLS_REQUIRED&quot;)
+- by a custom <a href="../app/SmartDataLakeBuilder.html" class="extype" name="io.smartdatalake.app.SmartDataLakeBuilder">io.smartdatalake.app.SmartDataLakeBuilder</a> implementation for your environment, which sets these variables directly.
+</p></div></div>
     </li><li name="io.smartdatalake.definitions.HiveConventions" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="HiveConventions"></a>
       <a id="HiveConventions:HiveConventions"></a>

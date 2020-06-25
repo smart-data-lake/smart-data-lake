@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>DAG - Smart Data Lake 1.0.0-SNAPSHOT API - io.smartdatalake.workflow.DAG</title>
-          <meta name="description" content="DAG - Smart Data Lake 1.0.0 - SNAPSHOT API - io.smartdatalake.workflow.DAG" />
-          <meta name="keywords" content="DAG Smart Data Lake 1.0.0 SNAPSHOT API io.smartdatalake.workflow.DAG" />
+          <title>DAG - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.DAG</title>
+          <meta name="description" content="DAG - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.DAG" />
+          <meta name="keywords" content="DAG Smart Data Lake 1.0.5 API io.smartdatalake.workflow.DAG" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -47,7 +47,7 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <span class="name">DAG</span><span class="result"> extends <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <span class="name">DAG</span><span class="tparams">[<span name="N">N &lt;: <span class="extype" name="io.smartdatalake.workflow.DAGNode">DAGNode</span></span>]</span><span class="result"> extends <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4>
       
@@ -166,25 +166,25 @@
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Any</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.DAG#buildTaskGraph" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="buildTaskGraph[A&lt;:io.smartdatalake.workflow.DAGResult](operation:(io.smartdatalake.workflow.DAGNode,Seq[A])=&gt;Seq[A])(implicitscheduler:monix.execution.Scheduler):monix.eval.Task[Seq[scala.util.Try[A]]]"></a>
-      <a id="buildTaskGraph[A&lt;:DAGResult]((DAGNode,Seq[A])⇒Seq[A])(Scheduler):Task[Seq[Try[A]]]"></a>
+      <a id="buildTaskGraph[A&lt;:io.smartdatalake.workflow.DAGResult](eventListener:io.smartdatalake.workflow.DAGEventListener[N])(operation:(io.smartdatalake.workflow.DAGNode,Seq[A])=&gt;Seq[A])(implicitscheduler:monix.execution.Scheduler):monix.eval.Task[Seq[scala.util.Try[A]]]"></a>
+      <a id="buildTaskGraph[A&lt;:DAGResult](DAGEventListener[N])((DAGNode,Seq[A])⇒Seq[A])(Scheduler):Task[Seq[Try[A]]]"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">buildTaskGraph</span><span class="tparams">[<span name="A">A &lt;: <span class="extype" name="io.smartdatalake.workflow.DAGResult">DAGResult</span></span>]</span><span class="params">(<span name="operation">operation: (<span class="extype" name="io.smartdatalake.workflow.DAGNode">DAGNode</span>, <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.DAG.buildTaskGraph.A">A</span>]) ⇒ <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.DAG.buildTaskGraph.A">A</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="scheduler">scheduler: <span class="extype" name="monix.execution.Scheduler">Scheduler</span></span>)</span><span class="result">: <span class="extype" name="monix.eval.Task">Task</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.util.Try">Try</span>[<span class="extype" name="io.smartdatalake.workflow.DAG.buildTaskGraph.A">A</span>]]]</span>
+        <span class="name">buildTaskGraph</span><span class="tparams">[<span name="A">A &lt;: <span class="extype" name="io.smartdatalake.workflow.DAGResult">DAGResult</span></span>]</span><span class="params">(<span name="eventListener">eventListener: <span class="extype" name="io.smartdatalake.workflow.DAGEventListener">DAGEventListener</span>[<span class="extype" name="io.smartdatalake.workflow.DAG.N">N</span>]</span>)</span><span class="params">(<span name="operation">operation: (<span class="extype" name="io.smartdatalake.workflow.DAGNode">DAGNode</span>, <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.DAG.buildTaskGraph.A">A</span>]) ⇒ <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.DAG.buildTaskGraph.A">A</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="scheduler">scheduler: <span class="extype" name="monix.execution.Scheduler">Scheduler</span></span>)</span><span class="result">: <span class="extype" name="monix.eval.Task">Task</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.util.Try">Try</span>[<span class="extype" name="io.smartdatalake.workflow.DAG.buildTaskGraph.A">A</span>]]]</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.workflow.DAG@buildTaskGraph[A&lt;:io.smartdatalake.workflow.DAGResult](operation:(io.smartdatalake.workflow.DAGNode,Seq[A])=&gt;Seq[A])(implicitscheduler:monix.execution.Scheduler):monix.eval.Task[Seq[scala.util.Try[A]]]" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.workflow.DAG@buildTaskGraph[A&lt;:io.smartdatalake.workflow.DAGResult](eventListener:io.smartdatalake.workflow.DAGEventListener[N])(operation:(io.smartdatalake.workflow.DAGNode,Seq[A])=&gt;Seq[A])(implicitscheduler:monix.execution.Scheduler):monix.eval.Task[Seq[scala.util.Try[A]]]" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
       <p class="shortcomment cmt">Build a single task that is a combination of node computations (node tasks) executed in the topological order
 defined by the DAG.</p><div class="fullcomment"><div class="comment cmt"><p>Build a single task that is a combination of node computations (node tasks) executed in the topological order
 defined by the DAG.</p><p>Monix tasks is a library for lazy cancelable futures
-</p></div><dl class="paramcmts block"><dt class="param">operation</dt><dd class="cmt"><p>A function that computes the result (<span class="extype" name="DAGResult">DAGResult</span>) for the current node,
+</p></div><dl class="paramcmts block"><dt class="param">eventListener</dt><dd class="cmt"><p>A instance of <span class="extype" name="DAGEventListener">DAGEventListener</span> to be notified about progress of DAG execution</p></dd><dt class="param">operation</dt><dd class="cmt"><p>A function that computes the result (<span class="extype" name="DAGResult">DAGResult</span>) for the current node,
                  given the result of its predecessors given.</p></dd><dt class="param">scheduler</dt><dd class="cmt"><p>The <span class="extype" name="Scheduler">Scheduler</span> to use for Tasks.</p></dd></dl><dl class="attributes block"> <dt>Note</dt><dd><span class="cmt"><p>This method does not trigger any execution but builds a complex collection of tasks and synchronization
       boundaries that specify a correct order of execution as defined by the DAG.
       The computation only runs when the returning task is scheduled for execution.</p></span></dd><dt>See also</dt><dd><span class="cmt"><p>https://medium.com/@sderosiaux/are-scala-futures-the-past-69bd62b9c001</p></span></dd></dl></div>
@@ -285,6 +285,26 @@ defined by the DAG.</p><p>Monix tasks is a library for lazy cancelable futures
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.DAG#getNodes" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="getNodes:Seq[N]"></a>
+      <a id="getNodes:Seq[N]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">getNodes</span><span class="result">: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.DAG.N">N</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.workflow.DAG@getNodes:Seq[N]" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Get the nodes of this DAG
+Note: we must filter nodes which are not of the preliminary node type of this DAG, e.g.</p><div class="fullcomment"><div class="comment cmt"><p>Get the nodes of this DAG
+Note: we must filter nodes which are not of the preliminary node type of this DAG, e.g. InitDAGNode
+</p></div><dl class="paramcmts block"><dt>returns</dt><dd class="cmt"><p>list of nodes of the preliminary node type of this DAG</p></dd></dl></div>
     </li><li name="io.smartdatalake.workflow.DAG#getResultTask" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="getResultTask[A&lt;:io.smartdatalake.workflow.DAGResult](tasks:Map[io.smartdatalake.workflow.DAGHelper.NodeId,monix.eval.Task[scala.util.Try[Seq[A]]]],nodeId:io.smartdatalake.workflow.DAGHelper.NodeId,resultId:String):monix.eval.Task[scala.util.Try[A]]"></a>
       <a id="getResultTask[A&lt;:DAGResult](Map[NodeId,Task[Try[Seq[A]]]],NodeId,String):Task[Try[A]]"></a>
@@ -472,7 +492,9 @@ defined by the DAG.</p><p>Monix tasks is a library for lazy cancelable futures
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.DAG">DAG</a> → AnyRef → Any</dd></dl></div>
+      <p class="shortcomment cmt">Create text representation of the graph by using an ASCII graph layout library
+</p><div class="fullcomment"><div class="comment cmt"><p>Create text representation of the graph by using an ASCII graph layout library
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.DAG">DAG</a> → AnyRef → Any</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.DAG#trySeqToSeqTry" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="trySeqToSeqTry[A](trySeq:scala.util.Try[Seq[A]]):Seq[scala.util.Try[A]]"></a>
       <a id="trySeqToSeqTry[A](Try[Seq[A]]):Seq[Try[A]]"></a>

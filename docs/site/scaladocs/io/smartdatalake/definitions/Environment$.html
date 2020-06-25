@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>Environment - Smart Data Lake 1.0.0-SNAPSHOT API - io.smartdatalake.definitions.Environment</title>
-          <meta name="description" content="Environment - Smart Data Lake 1.0.0 - SNAPSHOT API - io.smartdatalake.definitions.Environment" />
-          <meta name="keywords" content="Environment Smart Data Lake 1.0.0 SNAPSHOT API io.smartdatalake.definitions.Environment" />
+          <title>Environment - Smart Data Lake 1.0.5 API - io.smartdatalake.definitions.Environment</title>
+          <meta name="description" content="Environment - Smart Data Lake 1.0.5 API - io.smartdatalake.definitions.Environment" />
+          <meta name="keywords" content="Environment Smart Data Lake 1.0.5 API io.smartdatalake.definitions.Environment" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -49,7 +49,11 @@
       </span>
       </h4>
       
-          <div id="comment" class="fullcommenttop"><div class="comment cmt"><p>Set this environment dependent configurations at the beginning of the <a href="../app/SmartDataLakeBuilder.html" class="extype" name="io.smartdatalake.app.SmartDataLakeBuilder">io.smartdatalake.app.SmartDataLakeBuilder</a> implementation for your environment.
+          <div id="comment" class="fullcommenttop"><div class="comment cmt"><p>Environment dependent configurations.
+They can be set
+- by Java system properties (prefixed with &quot;sdl.&quot;, e.g. &quot;sdl.hadoopAuthoritiesWithAclsRequired&quot;)
+- by Environment variables (prefixed with &quot;SDL_&quot; and camelCase converted to uppercase, e.g. &quot;SDL_HADOOP_AUTHORITIES_WITH_ACLS_REQUIRED&quot;)
+- by a custom <a href="../app/SmartDataLakeBuilder.html" class="extype" name="io.smartdatalake.app.SmartDataLakeBuilder">io.smartdatalake.app.SmartDataLakeBuilder</a> implementation for your environment, which sets these variables directly.
 </p></div><div class="toggleContainer block">
           <span class="toggle">Linear Supertypes</span>
           <div class="superTypes hiddenContent"><span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
@@ -195,7 +199,7 @@
         <span class="kind">val</span>
       </span>
       <span class="symbol">
-        <span class="name">configPathsForLocalSubstitution</span><span class="result">: <span class="extype" name="scala.collection.Seq">Seq</span>[<span class="extype" name="java.lang.String">String</span>]</span>
+        <span class="name">configPathsForLocalSubstitution</span><span class="result">: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
       </span>
       </h4><span class="permalink">
       <a href="../../../index.html#io.smartdatalake.definitions.Environment$@configPathsForLocalSubstitution:Seq[String]" title="Permalink" target="_top">
@@ -220,6 +224,25 @@
       </a>
     </span>
       
+    </li><li name="io.smartdatalake.definitions.Environment#enableJdbcCaseSensitivity" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="enableJdbcCaseSensitivity:Boolean"></a>
+      <a id="enableJdbcCaseSensitivity:Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">var</span>
+      </span>
+      <span class="symbol">
+        <span class="name">enableJdbcCaseSensitivity</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.Environment$@enableJdbcCaseSensitivity:Boolean" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Set to true if you want table and database names to be case sensitive when loading over JDBC.</p><div class="fullcomment"><div class="comment cmt"><p>Set to true if you want table and database names to be case sensitive when loading over JDBC.
+If your database supports case sensitive table names and you want to use that feature, set this to true.
+</p></div></div>
     </li><li name="scala.AnyRef#eq" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="eq(x$1:AnyRef):Boolean"></a>
       <a id="eq(AnyRef):Boolean"></a>
@@ -294,6 +317,27 @@
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
+    </li><li name="io.smartdatalake.definitions.Environment#hadoopAuthoritiesWithAclsRequired" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="hadoopAuthoritiesWithAclsRequired:Seq[String]"></a>
+      <a id="hadoopAuthoritiesWithAclsRequired:Seq[String]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">var</span>
+      </span>
+      <span class="symbol">
+        <span class="name">hadoopAuthoritiesWithAclsRequired</span><span class="result">: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.Environment$@hadoopAuthoritiesWithAclsRequired:Seq[String]" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">List of hadoop authorities for which acls must be configured
+The environment parameter can contain multiple authorities separated by comma.</p><div class="fullcomment"><div class="comment cmt"><p>List of hadoop authorities for which acls must be configured
+The environment parameter can contain multiple authorities separated by comma.
+An authority is compared against the filesystem URI with contains(...)
+</p></div></div>
     </li><li name="io.smartdatalake.definitions.Environment#hadoopDefaultSchemeAuthority" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="hadoopDefaultSchemeAuthority:Option[java.net.URI]"></a>
       <a id="hadoopDefaultSchemeAuthority:Option[URI]"></a>
@@ -329,24 +373,100 @@
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
-    </li><li name="io.smartdatalake.definitions.Environment#hdfsAclsRequired" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
-      <a id="hdfsAclsRequired:Boolean"></a>
-      <a id="hdfsAclsRequired:Boolean"></a>
+    </li><li name="io.smartdatalake.definitions.Environment#hdfsAclsLimitToBasedir" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="hdfsAclsLimitToBasedir:Boolean"></a>
+      <a id="hdfsAclsLimitToBasedir:Boolean"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">var</span>
       </span>
       <span class="symbol">
-        <span class="name">hdfsAclsRequired</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+        <span class="name">hdfsAclsLimitToBasedir</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.definitions.Environment$@hdfsAclsRequired:Boolean" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.definitions.Environment$@hdfsAclsLimitToBasedir:Boolean" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt">Set to true if configuration of acls for HadoopDataObjects is mandatory
+      <p class="shortcomment cmt">Limit setting ACL's to Basedir (default=true)
+See hdfsAclsUserHomeLevel or hdfsBasedir on how the basedir is determined
 </p>
+    </li><li name="io.smartdatalake.definitions.Environment#hdfsAclsMinLevelPermissionModify" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="hdfsAclsMinLevelPermissionModify:Int"></a>
+      <a id="hdfsAclsMinLevelPermissionModify:Int"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">var</span>
+      </span>
+      <span class="symbol">
+        <span class="name">hdfsAclsMinLevelPermissionModify</span><span class="result">: <span class="extype" name="scala.Int">Int</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.Environment$@hdfsAclsMinLevelPermissionModify:Int" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Modifying ACL's is only allowed below and including the following level (default=2)
+See also <span class="extype" name="io.smartdatalake.util.misc.AclUtil">io.smartdatalake.util.misc.AclUtil</span>
+</p>
+    </li><li name="io.smartdatalake.definitions.Environment#hdfsAclsMinLevelPermissionOverwrite" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="hdfsAclsMinLevelPermissionOverwrite:Int"></a>
+      <a id="hdfsAclsMinLevelPermissionOverwrite:Int"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">var</span>
+      </span>
+      <span class="symbol">
+        <span class="name">hdfsAclsMinLevelPermissionOverwrite</span><span class="result">: <span class="extype" name="scala.Int">Int</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.Environment$@hdfsAclsMinLevelPermissionOverwrite:Int" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Overwriting ACL's is only allowed below and including the following level (default=5)
+See also <span class="extype" name="io.smartdatalake.util.misc.AclUtil">io.smartdatalake.util.misc.AclUtil</span>
+</p>
+    </li><li name="io.smartdatalake.definitions.Environment#hdfsAclsUserHomeLevel" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="hdfsAclsUserHomeLevel:Int"></a>
+      <a id="hdfsAclsUserHomeLevel:Int"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">var</span>
+      </span>
+      <span class="symbol">
+        <span class="name">hdfsAclsUserHomeLevel</span><span class="result">: <span class="extype" name="scala.Int">Int</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.Environment$@hdfsAclsUserHomeLevel:Int" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Set path level of user home to determine basedir automatically (Default=2 -&gt; /user/myUserHome)
+</p>
+    </li><li name="io.smartdatalake.definitions.Environment#hdfsBasedir" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="hdfsBasedir:Option[java.net.URI]"></a>
+      <a id="hdfsBasedir:Option[URI]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">var</span>
+      </span>
+      <span class="symbol">
+        <span class="name">hdfsBasedir</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="java.net.URI">URI</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.Environment$@hdfsBasedir:Option[java.net.URI]" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Set basedir explicitly.</p><div class="fullcomment"><div class="comment cmt"><p>Set basedir explicitly.
+This overrides automatically detected user home for acl constraints by hdfsAclsUserHomeLevel.
+</p></div></div>
     </li><li name="scala.Any#isInstanceOf" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="isInstanceOf[T0]:Boolean"></a>
       <a id="isInstanceOf[T0]:Boolean"></a>
@@ -435,6 +555,66 @@
 - true: result schema is ordered according to existing schema, new columns are appended
 - false: result schema is ordered according to new schema, deleted columns are appended
 </p>
+    </li><li name="io.smartdatalake.definitions.Environment#schemaValidationDeepComarison" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="schemaValidationDeepComarison:Boolean"></a>
+      <a id="schemaValidationDeepComarison:Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">var</span>
+      </span>
+      <span class="symbol">
+        <span class="name">schemaValidationDeepComarison</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.Environment$@schemaValidationDeepComarison:Boolean" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">If <code>true</code>, schema validation inspects the whole hierarchy of structured data types.</p><div class="fullcomment"><div class="comment cmt"><p>If <code>true</code>, schema validation inspects the whole hierarchy of structured data types. This allows partial matches
+for <code>schemaMin</code> validation.
+If <code>false</code>, structural data types must match exactly to validate.
+</p></div><dl class="attributes block"> <div class="block">Example:
+               <ol><li class="cmt"><p>Using <span class="extype" name="io.smartdatalake.workflow.dataobject.SchemaValidation.validateSchemaMin">io.smartdatalake.workflow.dataobject.SchemaValidation.validateSchemaMin</span>:
+         val schema = StructType.fromDDL(&quot;c1 STRING, c2 STRUCT(c2_1 INT, c2_2 STRING)&quot;) validates
+         against StructType.fromDDL(&quot;c1 STRING, c2 STRUCT(c2_1 INT)&quot;) only if <code>schemaValidationDeepComarison == true</code>.</p></li></ol>
+            </div></dl></div>
+    </li><li name="io.smartdatalake.definitions.Environment#schemaValidationIgnoresNullability" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="schemaValidationIgnoresNullability:Boolean"></a>
+      <a id="schemaValidationIgnoresNullability:Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">var</span>
+      </span>
+      <span class="symbol">
+        <span class="name">schemaValidationIgnoresNullability</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.Environment$@schemaValidationIgnoresNullability:Boolean" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">If <code>true</code>, schema validation does not consider nullability of columns/fields when checking for equality.</p><div class="fullcomment"><div class="comment cmt"><p>If <code>true</code>, schema validation does not consider nullability of columns/fields when checking for equality.
+If <code>false</code>, schema validation considers two columns/fields different when their nullability property is not equal.
+</p></div></div>
+    </li><li name="io.smartdatalake.definitions.Environment#sparkSession" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="sparkSession:org.apache.spark.sql.SparkSession"></a>
+      <a id="sparkSession:SparkSession"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">sparkSession</span><span class="result">: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.Environment$@sparkSession:org.apache.spark.sql.SparkSession" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
     </li><li name="scala.AnyRef#synchronized" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="synchronized[T0](x$1:=&gt;T0):T0"></a>
       <a id="synchronized[T0](⇒T0):T0"></a>

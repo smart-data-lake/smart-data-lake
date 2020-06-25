@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>SFtpFileRefDataObject - Smart Data Lake 1.0.0-SNAPSHOT API - io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject</title>
-          <meta name="description" content="SFtpFileRefDataObject - Smart Data Lake 1.0.0 - SNAPSHOT API - io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject" />
-          <meta name="keywords" content="SFtpFileRefDataObject Smart Data Lake 1.0.0 SNAPSHOT API io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject" />
+          <title>SFtpFileRefDataObject - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject</title>
+          <meta name="description" content="SFtpFileRefDataObject - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject" />
+          <meta name="keywords" content="SFtpFileRefDataObject Smart Data Lake 1.0.5 API io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -47,7 +47,7 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <span class="name">SFtpFileRefDataObject</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="connectionId">connectionId: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="partitionLayout">partitionLayout: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.FileRefDataObject">FileRefDataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateInputStream">CanCreateInputStream</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateOutputStream">CanCreateOutputStream</span> with <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <span class="name">SFtpFileRefDataObject</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="connectionId">connectionId: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="partitionLayout">partitionLayout: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="saveMode">saveMode: <span class="extype" name="org.apache.spark.sql.SaveMode">SaveMode</span> = <span class="symbol">SaveMode.Overwrite</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="DataObjectMetadata.html" class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.FileRefDataObject">FileRefDataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateInputStream">CanCreateInputStream</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateOutputStream">CanCreateOutputStream</span> with <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4>
       
@@ -58,10 +58,10 @@ The following authentication mechanisms are supported
 -&gt; user/pwd authentication: user and password is taken from two variables set as parameters.
                             These variables could come from clear text (CLEAR), a file (FILE) or an environment variable (ENV)
 </p></div><dl class="paramcmts block"><dt class="param">partitionLayout</dt><dd class="cmt"><p>partition layout defines how partition values can be extracted from the path.
-                        Use &quot;%&lt;colname&gt;%&quot; as token to extract the value for a partition column.
-                        With &quot;%&lt;colname:regex&gt;%&quot; a regex can be given to limit search. This is especially useful
-                        if there is no char to delimit the last token from the rest of the path or also between
-                        two tokens.</p></dd></dl><div class="toggleContainer block">
+                       Use &quot;%&lt;colname&gt;%&quot; as token to extract the value for a partition column.
+                       With &quot;%&lt;colname:regex&gt;%&quot; a regex can be given to limit search. This is especially useful
+                       if there is no char to delimit the last token from the rest of the path or also between
+                       two tokens.</p></dd><dt class="param">saveMode</dt><dd class="cmt"><p>Overwrite or Append new data.</p></dd></dl><div class="toggleContainer block">
           <span class="toggle">Linear Supertypes</span>
           <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.Product">Product</span>, <span class="extype" name="scala.Equals">Equals</span>, <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateOutputStream">CanCreateOutputStream</span>, <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateInputStream">CanCreateInputStream</span>, <span class="extype" name="io.smartdatalake.workflow.dataobject.FileRefDataObject">FileRefDataObject</span>, <span class="extype" name="io.smartdatalake.workflow.dataobject.FileDataObject">FileDataObject</span>, <span class="extype" name="io.smartdatalake.workflow.dataobject.CanHandlePartitions">CanHandlePartitions</span>, <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>, <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span>, <span class="extype" name="io.smartdatalake.config.ParsableFromConfig">ParsableFromConfig</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>], <span class="extype" name="io.smartdatalake.config.SdlConfigObject">SdlConfigObject</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
         </div></div>
@@ -101,7 +101,7 @@ The following authentication mechanisms are supported
         <div id="constructors" class="members">
               <h3>Instance Constructors</h3>
               <ol><li name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.DataObjectId,path:String,connectionId:io.smartdatalake.config.SdlConfigObject.ConnectionId,partitions:Seq[String],partitionLayout:Option[String],metadata:Option[io.smartdatalake.workflow.dataobject.DataObjectMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject"></a>
+      <a id="&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.DataObjectId,path:String,connectionId:io.smartdatalake.config.SdlConfigObject.ConnectionId,partitions:Seq[String],partitionLayout:Option[String],saveMode:org.apache.spark.sql.SaveMode,metadata:Option[io.smartdatalake.workflow.dataobject.DataObjectMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject"></a>
       <a id="&lt;init&gt;:SFtpFileRefDataObject"></a>
       <h4 class="signature">
       <span class="modifier_kind">
@@ -109,18 +109,18 @@ The following authentication mechanisms are supported
         <span class="kind">new</span>
       </span>
       <span class="symbol">
-        <span class="name">SFtpFileRefDataObject</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="connectionId">connectionId: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="partitionLayout">partitionLayout: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span>
+        <span class="name">SFtpFileRefDataObject</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="connectionId">connectionId: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="partitionLayout">partitionLayout: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="saveMode">saveMode: <span class="extype" name="org.apache.spark.sql.SaveMode">SaveMode</span> = <span class="symbol">SaveMode.Overwrite</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="DataObjectMetadata.html" class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject@&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.DataObjectId,path:String,connectionId:io.smartdatalake.config.SdlConfigObject.ConnectionId,partitions:Seq[String],partitionLayout:Option[String],metadata:Option[io.smartdatalake.workflow.dataobject.DataObjectMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject@&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.DataObjectId,path:String,connectionId:io.smartdatalake.config.SdlConfigObject.ConnectionId,partitions:Seq[String],partitionLayout:Option[String],saveMode:org.apache.spark.sql.SaveMode,metadata:Option[io.smartdatalake.workflow.dataobject.DataObjectMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
       <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">partitionLayout</dt><dd class="cmt"><p>partition layout defines how partition values can be extracted from the path.
-                        Use &quot;%&lt;colname&gt;%&quot; as token to extract the value for a partition column.
-                        With &quot;%&lt;colname:regex&gt;%&quot; a regex can be given to limit search. This is especially useful
-                        if there is no char to delimit the last token from the rest of the path or also between
-                        two tokens.</p></dd></dl></div>
+                       Use &quot;%&lt;colname&gt;%&quot; as token to extract the value for a partition column.
+                       With &quot;%&lt;colname:regex&gt;%&quot; a regex can be given to limit search. This is especially useful
+                       if there is no char to delimit the last token from the rest of the path or also between
+                       two tokens.</p></dd><dt class="param">saveMode</dt><dd class="cmt"><p>Overwrite or Append new data.</p></dd></dl></div>
     </li></ol>
             </div>
 
@@ -238,6 +238,25 @@ The following authentication mechanisms are supported
       </a>
     </span>
       
+    </li><li name="io.smartdatalake.workflow.dataobject.CanHandlePartitions#createEmptyPartition" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="createEmptyPartition(partitionValues:io.smartdatalake.util.hdfs.PartitionValues)(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
+      <a id="createEmptyPartition(PartitionValues)(SparkSession):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">createEmptyPartition</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject@createEmptyPartition(partitionValues:io.smartdatalake.util.hdfs.PartitionValues)(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">create empty partition
+</p><div class="fullcomment"><div class="comment cmt"><p>create empty partition
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>CanHandlePartitions</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject#createInputStream" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="createInputStream(path:String)(implicitsession:org.apache.spark.sql.SparkSession):java.io.InputStream"></a>
       <a id="createInputStream(String)(SparkSession):InputStream"></a>
@@ -255,6 +274,25 @@ The following authentication mechanisms are supported
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject">SFtpFileRefDataObject</a> → CanCreateInputStream</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.CanHandlePartitions#createMissingPartitions" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="createMissingPartitions(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
+      <a id="createMissingPartitions(Seq[PartitionValues])(SparkSession):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">createMissingPartitions</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject@createMissingPartitions(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Create empty partitions for partition values not yet existing
+</p><div class="fullcomment"><div class="comment cmt"><p>Create empty partitions for partition values not yet existing
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>CanHandlePartitions</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject#createOutputStream" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="createOutputStream(path:String,overwrite:Boolean)(implicitsession:org.apache.spark.sql.SparkSession):java.io.OutputStream"></a>
       <a id="createOutputStream(String,Boolean)(SparkSession):OutputStream"></a>
@@ -272,6 +310,24 @@ The following authentication mechanisms are supported
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject">SFtpFileRefDataObject</a> → CanCreateOutputStream</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.FileRefDataObject#deleteAll" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="deleteAll(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
+      <a id="deleteAll(SparkSession):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">deleteAll</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject@deleteAll(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Delete all data.</p><div class="fullcomment"><div class="comment cmt"><p>Delete all data. This is used to implement SaveMode.Overwrite.
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>FileRefDataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject#deleteFileRefs" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="deleteFileRefs(fileRefs:Seq[io.smartdatalake.workflow.dataobject.FileRef])(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
       <a id="deleteFileRefs(Seq[FileRef])(SparkSession):Unit"></a>
@@ -583,6 +639,25 @@ This is concatenated with the partition layout to search for files.
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Any</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject#listPartitions" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="listPartitions(implicitsession:org.apache.spark.sql.SparkSession):Seq[io.smartdatalake.util.hdfs.PartitionValues]"></a>
+      <a id="listPartitions(SparkSession):Seq[PartitionValues]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">listPartitions</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject@listPartitions(implicitsession:org.apache.spark.sql.SparkSession):Seq[io.smartdatalake.util.hdfs.PartitionValues]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">List partitions on data object's root path
+</p><div class="fullcomment"><div class="comment cmt"><p>List partitions on data object's root path
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject">SFtpFileRefDataObject</a> → CanHandlePartitions</dd></dl></div>
     </li><li name="io.smartdatalake.util.misc.SmartDataLakeLogger#logger" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="logger:org.slf4j.Logger"></a>
       <a id="logger:Logger"></a>
@@ -609,7 +684,7 @@ This is concatenated with the partition layout to search for files.
         <span class="kind">val</span>
       </span>
       <span class="symbol">
-        <span class="name">metadata</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</span>]</span>
+        <span class="name">metadata</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<a href="DataObjectMetadata.html" class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</a>]</span>
       </span>
       </h4><span class="permalink">
       <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject@metadata:Option[io.smartdatalake.workflow.dataobject.DataObjectMetadata]" title="Permalink" target="_top">
@@ -687,10 +762,10 @@ This is concatenated with the partition layout to search for files.
       </a>
     </span>
       <p class="shortcomment cmt">partition layout defines how partition values can be extracted from the path.</p><div class="fullcomment"><div class="comment cmt"><p>partition layout defines how partition values can be extracted from the path.
-                        Use &quot;%&lt;colname&gt;%&quot; as token to extract the value for a partition column.
-                        With &quot;%&lt;colname:regex&gt;%&quot; a regex can be given to limit search. This is especially useful
-                        if there is no char to delimit the last token from the rest of the path or also between
-                        two tokens.</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject">SFtpFileRefDataObject</a> → FileRefDataObject</dd></dl></div>
+                       Use &quot;%&lt;colname&gt;%&quot; as token to extract the value for a partition column.
+                       With &quot;%&lt;colname:regex&gt;%&quot; a regex can be given to limit search. This is especially useful
+                       if there is no char to delimit the last token from the rest of the path or also between
+                       two tokens.</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject">SFtpFileRefDataObject</a> → FileRefDataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject#partitions" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="partitions:Seq[String]"></a>
       <a id="partitions:Seq[String]"></a>
@@ -820,9 +895,25 @@ This is concatenated with the partition layout to search for files.
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt">Prepare &amp; test <span class="extype" name="DataObject">DataObject</span>'s prerequisits
-</p><div class="fullcomment"><div class="comment cmt"><p>Prepare &amp; test <span class="extype" name="DataObject">DataObject</span>'s prerequisits
+      <p class="shortcomment cmt">Prepare &amp; test <span class="extype" name="DataObject">DataObject</span>'s prerequisits</p><div class="fullcomment"><div class="comment cmt"><p>Prepare &amp; test <span class="extype" name="DataObject">DataObject</span>'s prerequisits</p><p>This runs during the &quot;prepare&quot; operation of the DAG.
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>DataObject</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject#saveMode" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="saveMode:org.apache.spark.sql.SaveMode"></a>
+      <a id="saveMode:SaveMode"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">saveMode</span><span class="result">: <span class="extype" name="org.apache.spark.sql.SaveMode">SaveMode</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject@saveMode:org.apache.spark.sql.SaveMode" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Overwrite or Append new data.</p><div class="fullcomment"><div class="comment cmt"><p>Overwrite or Append new data.</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject">SFtpFileRefDataObject</a> → FileRefDataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.FileDataObject#separator" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="separator:Char"></a>
       <a id="separator:Char"></a>

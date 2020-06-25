@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>ExcelOptions - Smart Data Lake 1.0.0-SNAPSHOT API - io.smartdatalake.workflow.dataobject.ExcelOptions</title>
-          <meta name="description" content="ExcelOptions - Smart Data Lake 1.0.0 - SNAPSHOT API - io.smartdatalake.workflow.dataobject.ExcelOptions" />
-          <meta name="keywords" content="ExcelOptions Smart Data Lake 1.0.0 SNAPSHOT API io.smartdatalake.workflow.dataobject.ExcelOptions" />
+          <title>ExcelOptions - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.dataobject.ExcelOptions</title>
+          <meta name="description" content="ExcelOptions - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.dataobject.ExcelOptions" />
+          <meta name="keywords" content="ExcelOptions Smart Data Lake 1.0.5 API io.smartdatalake.workflow.dataobject.ExcelOptions" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -45,11 +45,19 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <span class="name">ExcelOptions</span><span class="params">(<span name="sheetName">sheetName: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="numLinesToSkip">numLinesToSkip: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="startColumn">startColumn: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="endColumn">endColumn: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="rowLimit">rowLimit: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="useHeader">useHeader: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Boolean">Boolean</span>] = <span class="symbol">Some(true)</span></span>, <span name="treatEmptyValuesAsNulls">treatEmptyValuesAsNulls: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Boolean">Boolean</span>] = <span class="symbol">Some(true)</span></span>, <span name="inferSchema">inferSchema: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Boolean">Boolean</span>] = <span class="symbol">Some(true)</span></span>, <span name="timestampFormat">timestampFormat: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Some(&quot;dd-MM-yyyy HH:mm:ss&quot;)</span></span>, <span name="maxRowsInMemory">maxRowsInMemory: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="excerptSize">excerptSize: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <span class="name">ExcelOptions</span><span class="params">(<span name="sheetName">sheetName: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="numLinesToSkip">numLinesToSkip: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="startColumn">startColumn: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="endColumn">endColumn: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="rowLimit">rowLimit: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="useHeader">useHeader: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">true</span></span>, <span name="treatEmptyValuesAsNulls">treatEmptyValuesAsNulls: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Boolean">Boolean</span>] = <span class="symbol">Some(true)</span></span>, <span name="inferSchema">inferSchema: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Boolean">Boolean</span>] = <span class="symbol">Some(true)</span></span>, <span name="timestampFormat">timestampFormat: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Some(&quot;dd-MM-yyyy HH:mm:ss&quot;)</span></span>, <span name="dateFormat">dateFormat: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="maxRowsInMemory">maxRowsInMemory: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="excerptSize">excerptSize: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4>
       
-          <div id="comment" class="fullcommenttop"><div class="toggleContainer block">
+          <div id="comment" class="fullcommenttop"><div class="comment cmt"><p>Options passed to <span class="extype" name="org.apache.spark.sql.DataFrameReader">org.apache.spark.sql.DataFrameReader</span> and <span class="extype" name="org.apache.spark.sql.DataFrameWriter">org.apache.spark.sql.DataFrameWriter</span> for
+reading and writing Microsoft Excel files. Excel support is provided by the spark-excel project (see link below).
+</p></div><dl class="paramcmts block"><dt class="param">sheetName</dt><dd class="cmt"><p>the name of the Excel Sheet to read from/write to.
+                 This option is required.</p></dd><dt class="param">numLinesToSkip</dt><dd class="cmt"><p>the number of rows in the excel spreadsheet to skip before any data is read.
+                      This option must not be set for writing.</p></dd><dt class="param">startColumn</dt><dd class="cmt"><p>the first column in the specified Excel Sheet to read from (1-based indexing).
+                   This option must not be set for writing.</p></dd><dt class="param">endColumn</dt><dd class="cmt"><p>TODO: this is not used anymore as far as I can tell --&gt; crealytics now uses dataAddress.</p></dd><dt class="param">rowLimit</dt><dd class="cmt"><p>Limit the number of rows being returned on read to the first <code>rowLimit</code> rows.
+                This is applied after <code>numLinesToSkip</code>.</p></dd><dt class="param">useHeader</dt><dd class="cmt"><p>If <code>true</code>, the first row of the excel sheet specifies the column names.
+                 This option is required (default: true).</p></dd><dt class="param">treatEmptyValuesAsNulls</dt><dd class="cmt"><p>Empty cells are parsed as <code>null</code> values (default: true).</p></dd><dt class="param">inferSchema</dt><dd class="cmt"><p>Infer the schema of the excel sheet automatically (default: true).</p></dd><dt class="param">timestampFormat</dt><dd class="cmt"><p>A format string specifying the format to use when writing timestamps (default: dd-MM-yyyy HH:mm:ss).</p></dd><dt class="param">dateFormat</dt><dd class="cmt"><p>A format string specifying the format to use when writing dates.</p></dd><dt class="param">maxRowsInMemory</dt><dd class="cmt"><p>The number of rows that are stored in memory.
+                       If set, a streaming reader is used which can help with big files.</p></dd><dt class="param">excerptSize</dt><dd class="cmt"><p>Sample size for schema inference.</p></dd></dl><dl class="attributes block"> <dt>See also</dt><dd><span class="cmt"><p><a href="https://github.com/crealytics/spark-excel" target="_blank">https://github.com/crealytics/spark-excel</a></p></span></dd></dl><div class="toggleContainer block">
           <span class="toggle">Linear Supertypes</span>
           <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.Product">Product</span>, <span class="extype" name="scala.Equals">Equals</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
         </div></div>
@@ -88,8 +96,8 @@
         <div id="allMembers">
         <div id="constructors" class="members">
               <h3>Instance Constructors</h3>
-              <ol><li name="io.smartdatalake.workflow.dataobject.ExcelOptions#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
-      <a id="&lt;init&gt;(sheetName:String,numLinesToSkip:Option[Int],startColumn:Option[Int],endColumn:Option[Int],rowLimit:Option[Int],useHeader:Option[Boolean],treatEmptyValuesAsNulls:Option[Boolean],inferSchema:Option[Boolean],timestampFormat:Option[String],maxRowsInMemory:Option[Int],excerptSize:Option[Int]):io.smartdatalake.workflow.dataobject.ExcelOptions"></a>
+              <ol><li name="io.smartdatalake.workflow.dataobject.ExcelOptions#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="&lt;init&gt;(sheetName:String,numLinesToSkip:Option[Int],startColumn:Option[Int],endColumn:Option[Int],rowLimit:Option[Int],useHeader:Boolean,treatEmptyValuesAsNulls:Option[Boolean],inferSchema:Option[Boolean],timestampFormat:Option[String],dateFormat:Option[String],maxRowsInMemory:Option[Int],excerptSize:Option[Int]):io.smartdatalake.workflow.dataobject.ExcelOptions"></a>
       <a id="&lt;init&gt;:ExcelOptions"></a>
       <h4 class="signature">
       <span class="modifier_kind">
@@ -97,14 +105,20 @@
         <span class="kind">new</span>
       </span>
       <span class="symbol">
-        <span class="name">ExcelOptions</span><span class="params">(<span name="sheetName">sheetName: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="numLinesToSkip">numLinesToSkip: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="startColumn">startColumn: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="endColumn">endColumn: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="rowLimit">rowLimit: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="useHeader">useHeader: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Boolean">Boolean</span>] = <span class="symbol">Some(true)</span></span>, <span name="treatEmptyValuesAsNulls">treatEmptyValuesAsNulls: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Boolean">Boolean</span>] = <span class="symbol">Some(true)</span></span>, <span name="inferSchema">inferSchema: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Boolean">Boolean</span>] = <span class="symbol">Some(true)</span></span>, <span name="timestampFormat">timestampFormat: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Some(&quot;dd-MM-yyyy HH:mm:ss&quot;)</span></span>, <span name="maxRowsInMemory">maxRowsInMemory: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="excerptSize">excerptSize: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>)</span>
+        <span class="name">ExcelOptions</span><span class="params">(<span name="sheetName">sheetName: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="numLinesToSkip">numLinesToSkip: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="startColumn">startColumn: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="endColumn">endColumn: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="rowLimit">rowLimit: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="useHeader">useHeader: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">true</span></span>, <span name="treatEmptyValuesAsNulls">treatEmptyValuesAsNulls: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Boolean">Boolean</span>] = <span class="symbol">Some(true)</span></span>, <span name="inferSchema">inferSchema: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Boolean">Boolean</span>] = <span class="symbol">Some(true)</span></span>, <span name="timestampFormat">timestampFormat: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Some(&quot;dd-MM-yyyy HH:mm:ss&quot;)</span></span>, <span name="dateFormat">dateFormat: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="maxRowsInMemory">maxRowsInMemory: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="excerptSize">excerptSize: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>)</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.ExcelOptions@&lt;init&gt;(sheetName:String,numLinesToSkip:Option[Int],startColumn:Option[Int],endColumn:Option[Int],rowLimit:Option[Int],useHeader:Option[Boolean],treatEmptyValuesAsNulls:Option[Boolean],inferSchema:Option[Boolean],timestampFormat:Option[String],maxRowsInMemory:Option[Int],excerptSize:Option[Int]):io.smartdatalake.workflow.dataobject.ExcelOptions" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.ExcelOptions@&lt;init&gt;(sheetName:String,numLinesToSkip:Option[Int],startColumn:Option[Int],endColumn:Option[Int],rowLimit:Option[Int],useHeader:Boolean,treatEmptyValuesAsNulls:Option[Boolean],inferSchema:Option[Boolean],timestampFormat:Option[String],dateFormat:Option[String],maxRowsInMemory:Option[Int],excerptSize:Option[Int]):io.smartdatalake.workflow.dataobject.ExcelOptions" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
+      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">sheetName</dt><dd class="cmt"><p>the name of the Excel Sheet to read from/write to.
+                 This option is required.</p></dd><dt class="param">numLinesToSkip</dt><dd class="cmt"><p>the number of rows in the excel spreadsheet to skip before any data is read.
+                      This option must not be set for writing.</p></dd><dt class="param">startColumn</dt><dd class="cmt"><p>the first column in the specified Excel Sheet to read from (1-based indexing).
+                   This option must not be set for writing.</p></dd><dt class="param">endColumn</dt><dd class="cmt"><p>TODO: this is not used anymore as far as I can tell --&gt; crealytics now uses dataAddress.</p></dd><dt class="param">rowLimit</dt><dd class="cmt"><p>Limit the number of rows being returned on read to the first <code>rowLimit</code> rows.
+                This is applied after <code>numLinesToSkip</code>.</p></dd><dt class="param">useHeader</dt><dd class="cmt"><p>If <code>true</code>, the first row of the excel sheet specifies the column names.
+                 This option is required (default: true).</p></dd><dt class="param">treatEmptyValuesAsNulls</dt><dd class="cmt"><p>Empty cells are parsed as <code>null</code> values (default: true).</p></dd><dt class="param">inferSchema</dt><dd class="cmt"><p>Infer the schema of the excel sheet automatically (default: true).</p></dd><dt class="param">timestampFormat</dt><dd class="cmt"><p>A format string specifying the format to use when writing timestamps (default: dd-MM-yyyy HH:mm:ss).</p></dd><dt class="param">dateFormat</dt><dd class="cmt"><p>A format string specifying the format to use when writing dates.</p></dd><dt class="param">maxRowsInMemory</dt><dd class="cmt"><p>The number of rows that are stored in memory.
+                       If set, a streaming reader is used which can help with big files.</p></dd><dt class="param">excerptSize</dt><dd class="cmt"><p>Sample size for schema inference.</p></dd></dl></div>
     </li></ol>
             </div>
 
@@ -205,6 +219,23 @@
     </span>)</span>
               
         </dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.ExcelOptions#dateFormat" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="dateFormat:Option[String]"></a>
+      <a id="dateFormat:Option[String]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">dateFormat</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.ExcelOptions@dateFormat:Option[String]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">A format string specifying the format to use when writing dates.</p>
     </li><li name="io.smartdatalake.workflow.dataobject.ExcelOptions#endColumn" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="endColumn:Option[Int]"></a>
       <a id="endColumn:Option[Int]"></a>
@@ -221,7 +252,7 @@
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
+      <p class="shortcomment cmt">TODO: this is not used anymore as far as I can tell --&gt; crealytics now uses dataAddress.</p>
     </li><li name="scala.AnyRef#eq" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="eq(x$1:AnyRef):Boolean"></a>
       <a id="eq(AnyRef):Boolean"></a>
@@ -255,7 +286,7 @@
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
+      <p class="shortcomment cmt">Sample size for schema inference.</p>
     </li><li name="scala.AnyRef#finalize" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="finalize():Unit"></a>
       <a id="finalize():Unit"></a>
@@ -312,7 +343,7 @@
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
+      <p class="shortcomment cmt">Infer the schema of the excel sheet automatically (default: true).</p>
     </li><li name="scala.Any#isInstanceOf" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="isInstanceOf[T0]:Boolean"></a>
       <a id="isInstanceOf[T0]:Boolean"></a>
@@ -330,7 +361,7 @@
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Any</dd></dl></div>
-    </li><li name="io.smartdatalake.workflow.dataobject.ExcelOptions#maxRowsInMemory" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+    </li><li name="io.smartdatalake.workflow.dataobject.ExcelOptions#maxRowsInMemory" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="maxRowsInMemory:Option[Int]"></a>
       <a id="maxRowsInMemory:Option[Int]"></a>
       <h4 class="signature">
@@ -346,7 +377,8 @@
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
+      <p class="shortcomment cmt">The number of rows that are stored in memory.</p><div class="fullcomment"><div class="comment cmt"><p>The number of rows that are stored in memory.
+                       If set, a streaming reader is used which can help with big files.</p></div></div>
     </li><li name="scala.AnyRef#ne" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="ne(x$1:AnyRef):Boolean"></a>
       <a id="ne(AnyRef):Boolean"></a>
@@ -398,7 +430,7 @@
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
-    </li><li name="io.smartdatalake.workflow.dataobject.ExcelOptions#numLinesToSkip" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+    </li><li name="io.smartdatalake.workflow.dataobject.ExcelOptions#numLinesToSkip" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="numLinesToSkip:Option[Int]"></a>
       <a id="numLinesToSkip:Option[Int]"></a>
       <h4 class="signature">
@@ -414,8 +446,9 @@
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
-    </li><li name="io.smartdatalake.workflow.dataobject.ExcelOptions#rowLimit" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <p class="shortcomment cmt">the number of rows in the excel spreadsheet to skip before any data is read.</p><div class="fullcomment"><div class="comment cmt"><p>the number of rows in the excel spreadsheet to skip before any data is read.
+                      This option must not be set for writing.</p></div></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.ExcelOptions#rowLimit" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="rowLimit:Option[Int]"></a>
       <a id="rowLimit:Option[Int]"></a>
       <h4 class="signature">
@@ -431,8 +464,9 @@
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
-    </li><li name="io.smartdatalake.workflow.dataobject.ExcelOptions#sheetName" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <p class="shortcomment cmt">Limit the number of rows being returned on read to the first <code>rowLimit</code> rows.</p><div class="fullcomment"><div class="comment cmt"><p>Limit the number of rows being returned on read to the first <code>rowLimit</code> rows.
+                This is applied after <code>numLinesToSkip</code>.</p></div></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.ExcelOptions#sheetName" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="sheetName:String"></a>
       <a id="sheetName:String"></a>
       <h4 class="signature">
@@ -448,8 +482,9 @@
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
-    </li><li name="io.smartdatalake.workflow.dataobject.ExcelOptions#startColumn" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <p class="shortcomment cmt">the name of the Excel Sheet to read from/write to.</p><div class="fullcomment"><div class="comment cmt"><p>the name of the Excel Sheet to read from/write to.
+                 This option is required.</p></div></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.ExcelOptions#startColumn" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="startColumn:Option[Int]"></a>
       <a id="startColumn:Option[Int]"></a>
       <h4 class="signature">
@@ -465,7 +500,8 @@
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
+      <p class="shortcomment cmt">the first column in the specified Excel Sheet to read from (1-based indexing).</p><div class="fullcomment"><div class="comment cmt"><p>the first column in the specified Excel Sheet to read from (1-based indexing).
+                   This option must not be set for writing.</p></div></div>
     </li><li name="scala.AnyRef#synchronized" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="synchronized[T0](x$1:=&gt;T0):T0"></a>
       <a id="synchronized[T0](⇒T0):T0"></a>
@@ -499,7 +535,7 @@
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
+      <p class="shortcomment cmt">A format string specifying the format to use when writing timestamps (default: dd-MM-yyyy HH:mm:ss).</p>
     </li><li name="io.smartdatalake.workflow.dataobject.ExcelOptions#toMap" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="toMap(schema:Option[org.apache.spark.sql.types.StructType]):Map[String,Option[Any]]"></a>
       <a id="toMap(Option[StructType]):Map[String,Option[Any]]"></a>
@@ -533,20 +569,38 @@
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
-    </li><li name="io.smartdatalake.workflow.dataobject.ExcelOptions#useHeader" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
-      <a id="useHeader:Option[Boolean]"></a>
-      <a id="useHeader:Option[Boolean]"></a>
+      <p class="shortcomment cmt">Empty cells are parsed as <code>null</code> values (default: true).</p>
+    </li><li name="io.smartdatalake.workflow.dataobject.ExcelOptions#useHeader" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="useHeader:Boolean"></a>
+      <a id="useHeader:Boolean"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">val</span>
       </span>
       <span class="symbol">
-        <span class="name">useHeader</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Boolean">Boolean</span>]</span>
+        <span class="name">useHeader</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.ExcelOptions@useHeader:Option[Boolean]" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.ExcelOptions@useHeader:Boolean" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">If <code>true</code>, the first row of the excel sheet specifies the column names.</p><div class="fullcomment"><div class="comment cmt"><p>If <code>true</code>, the first row of the excel sheet specifies the column names.
+                 This option is required (default: true).</p></div></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.ExcelOptions#validate" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="validate(id:io.smartdatalake.config.SdlConfigObject.DataObjectId):Unit"></a>
+      <a id="validate(DataObjectId):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">validate</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.ExcelOptions@validate(id:io.smartdatalake.config.SdlConfigObject.DataObjectId):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>

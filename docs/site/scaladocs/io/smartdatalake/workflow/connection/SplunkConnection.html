@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>SplunkConnection - Smart Data Lake 1.0.0-SNAPSHOT API - io.smartdatalake.workflow.connection.SplunkConnection</title>
-          <meta name="description" content="SplunkConnection - Smart Data Lake 1.0.0 - SNAPSHOT API - io.smartdatalake.workflow.connection.SplunkConnection" />
-          <meta name="keywords" content="SplunkConnection Smart Data Lake 1.0.0 SNAPSHOT API io.smartdatalake.workflow.connection.SplunkConnection" />
+          <title>SplunkConnection - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.connection.SplunkConnection</title>
+          <meta name="description" content="SplunkConnection - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.connection.SplunkConnection" />
+          <meta name="keywords" content="SplunkConnection Smart Data Lake 1.0.5 API io.smartdatalake.workflow.connection.SplunkConnection" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -47,7 +47,7 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <span class="name">SplunkConnection</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="host">host: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="port">port: <span class="extype" name="scala.Int">Int</span></span>, <span name="userVariable">userVariable: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="passwordVariable">passwordVariable: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.connection.Connection">Connection</span> with <a href="SplunkConnectionService.html" class="extype" name="io.smartdatalake.workflow.connection.SplunkConnectionService">SplunkConnectionService</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <span class="name">SplunkConnection</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="host">host: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="port">port: <span class="extype" name="scala.Int">Int</span></span>, <span name="authMode">authMode: <a href="../../definitions/AuthMode.html" class="extype" name="io.smartdatalake.definitions.AuthMode">AuthMode</a></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="ConnectionMetadata.html" class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.connection.Connection">Connection</span> with <a href="SplunkConnectionService.html" class="extype" name="io.smartdatalake.workflow.connection.SplunkConnectionService">SplunkConnectionService</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4>
       
@@ -92,7 +92,7 @@
         <div id="constructors" class="members">
               <h3>Instance Constructors</h3>
               <ol><li name="io.smartdatalake.workflow.connection.SplunkConnection#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ConnectionId,host:String,port:Int,userVariable:String,passwordVariable:String,metadata:Option[io.smartdatalake.workflow.connection.ConnectionMetadata]):io.smartdatalake.workflow.connection.SplunkConnection"></a>
+      <a id="&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ConnectionId,host:String,port:Int,authMode:io.smartdatalake.definitions.AuthMode,metadata:Option[io.smartdatalake.workflow.connection.ConnectionMetadata]):io.smartdatalake.workflow.connection.SplunkConnection"></a>
       <a id="&lt;init&gt;:SplunkConnection"></a>
       <h4 class="signature">
       <span class="modifier_kind">
@@ -100,10 +100,10 @@
         <span class="kind">new</span>
       </span>
       <span class="symbol">
-        <span class="name">SplunkConnection</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="host">host: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="port">port: <span class="extype" name="scala.Int">Int</span></span>, <span name="userVariable">userVariable: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="passwordVariable">passwordVariable: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</span>] = <span class="symbol">None</span></span>)</span>
+        <span class="name">SplunkConnection</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="host">host: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="port">port: <span class="extype" name="scala.Int">Int</span></span>, <span name="authMode">authMode: <a href="../../definitions/AuthMode.html" class="extype" name="io.smartdatalake.definitions.AuthMode">AuthMode</a></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="ConnectionMetadata.html" class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</a>] = <span class="symbol">None</span></span>)</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.connection.SplunkConnection@&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ConnectionId,host:String,port:Int,userVariable:String,passwordVariable:String,metadata:Option[io.smartdatalake.workflow.connection.ConnectionMetadata]):io.smartdatalake.workflow.connection.SplunkConnection" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.connection.SplunkConnection@&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ConnectionId,host:String,port:Int,authMode:io.smartdatalake.definitions.AuthMode,metadata:Option[io.smartdatalake.workflow.connection.ConnectionMetadata]):io.smartdatalake.workflow.connection.SplunkConnection" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -185,6 +185,23 @@
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Any</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.connection.SplunkConnection#authMode" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="authMode:io.smartdatalake.definitions.AuthMode"></a>
+      <a id="authMode:AuthMode"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">authMode</span><span class="result">: <a href="../../definitions/AuthMode.html" class="extype" name="io.smartdatalake.definitions.AuthMode">AuthMode</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.connection.SplunkConnection@authMode:io.smartdatalake.definitions.AuthMode" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
     </li><li name="scala.AnyRef#clone" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="clone():Object"></a>
       <a id="clone():AnyRef"></a>
@@ -360,7 +377,7 @@ The companion object in turn should implement <span class="extype" name="FromCon
         <span class="kind">val</span>
       </span>
       <span class="symbol">
-        <span class="name">metadata</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</span>]</span>
+        <span class="name">metadata</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<a href="ConnectionMetadata.html" class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</a>]</span>
       </span>
       </h4><span class="permalink">
       <a href="../../../../index.html#io.smartdatalake.workflow.connection.SplunkConnection@metadata:Option[io.smartdatalake.workflow.connection.ConnectionMetadata]" title="Permalink" target="_top">
@@ -421,23 +438,6 @@ The companion object in turn should implement <span class="extype" name="FromCon
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
-    </li><li name="io.smartdatalake.workflow.connection.SplunkConnection#passwordVariable" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
-      <a id="passwordVariable:String"></a>
-      <a id="passwordVariable:String"></a>
-      <h4 class="signature">
-      <span class="modifier_kind">
-        <span class="modifier"></span>
-        <span class="kind">val</span>
-      </span>
-      <span class="symbol">
-        <span class="name">passwordVariable</span><span class="result">: <span class="extype" name="scala.Predef.String">String</span></span>
-      </span>
-      </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.connection.SplunkConnection@passwordVariable:String" title="Permalink" target="_top">
-        <img src="../../../../lib/permalink.png" alt="Permalink" />
-      </a>
-    </span>
-      
     </li><li name="io.smartdatalake.workflow.connection.SplunkConnection#port" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="port:Int"></a>
       <a id="port:Int"></a>
@@ -489,23 +489,6 @@ The companion object in turn should implement <span class="extype" name="FromCon
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Connection</dd></dl></div>
-    </li><li name="io.smartdatalake.workflow.connection.SplunkConnection#userVariable" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
-      <a id="userVariable:String"></a>
-      <a id="userVariable:String"></a>
-      <h4 class="signature">
-      <span class="modifier_kind">
-        <span class="modifier"></span>
-        <span class="kind">val</span>
-      </span>
-      <span class="symbol">
-        <span class="name">userVariable</span><span class="result">: <span class="extype" name="scala.Predef.String">String</span></span>
-      </span>
-      </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.connection.SplunkConnection@userVariable:String" title="Permalink" target="_top">
-        <img src="../../../../lib/permalink.png" alt="Permalink" />
-      </a>
-    </span>
-      
     </li><li name="scala.AnyRef#wait" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="wait():Unit"></a>
       <a id="wait():Unit"></a>

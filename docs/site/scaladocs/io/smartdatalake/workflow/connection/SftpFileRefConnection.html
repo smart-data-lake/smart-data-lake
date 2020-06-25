@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>SftpFileRefConnection - Smart Data Lake 1.0.0-SNAPSHOT API - io.smartdatalake.workflow.connection.SftpFileRefConnection</title>
-          <meta name="description" content="SftpFileRefConnection - Smart Data Lake 1.0.0 - SNAPSHOT API - io.smartdatalake.workflow.connection.SftpFileRefConnection" />
-          <meta name="keywords" content="SftpFileRefConnection Smart Data Lake 1.0.0 SNAPSHOT API io.smartdatalake.workflow.connection.SftpFileRefConnection" />
+          <title>SftpFileRefConnection - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.connection.SftpFileRefConnection</title>
+          <meta name="description" content="SftpFileRefConnection - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.connection.SftpFileRefConnection" />
+          <meta name="keywords" content="SftpFileRefConnection Smart Data Lake 1.0.5 API io.smartdatalake.workflow.connection.SftpFileRefConnection" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -47,12 +47,12 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <span class="name">SftpFileRefConnection</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="host">host: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="port">port: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">22</span></span>, <span name="userVariable">userVariable: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="passwordVariable">passwordVariable: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="ignoreHostKeyVerification">ignoreHostKeyVerification: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="maxParallelConnections">maxParallelConnections: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">1</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.connection.Connection">Connection</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <span class="name">SftpFileRefConnection</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="host">host: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="port">port: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">22</span></span>, <span name="authMode">authMode: <a href="../../definitions/AuthMode.html" class="extype" name="io.smartdatalake.definitions.AuthMode">AuthMode</a></span>, <span name="ignoreHostKeyVerification">ignoreHostKeyVerification: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="maxParallelConnections">maxParallelConnections: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">1</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="ConnectionMetadata.html" class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.connection.Connection">Connection</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4>
       
           <div id="comment" class="fullcommenttop"><div class="comment cmt"><p>SFTP Connection information
-</p></div><dl class="paramcmts block"><dt class="param">id</dt><dd class="cmt"><p>unique id of this connection</p></dd><dt class="param">host</dt><dd class="cmt"><p>sftp host</p></dd><dt class="param">port</dt><dd class="cmt"><p>port of sftp service, default is 22</p></dd><dt class="param">userVariable</dt><dd class="cmt"><p>user variable to use for connection</p></dd><dt class="param">passwordVariable</dt><dd class="cmt"><p>optional password variable to use for connection. If password is given, authentication is done by user/password, otherwise public key authentication is used</p></dd><dt class="param">ignoreHostKeyVerification</dt><dd class="cmt"><p>do not validate host key if true, default is false</p></dd><dt class="param">maxParallelConnections</dt><dd class="cmt"><p>number of parallel sftp connections created by an instance of this connection</p></dd></dl><div class="toggleContainer block">
+</p></div><dl class="paramcmts block"><dt class="param">id</dt><dd class="cmt"><p>unique id of this connection</p></dd><dt class="param">host</dt><dd class="cmt"><p>sftp host</p></dd><dt class="param">port</dt><dd class="cmt"><p>port of sftp service, default is 22</p></dd><dt class="param">authMode</dt><dd class="cmt"><p>authentication information: for now BasicAuthMode and PublicKeyAuthMode are supported.</p></dd><dt class="param">ignoreHostKeyVerification</dt><dd class="cmt"><p>do not validate host key if true, default is false</p></dd><dt class="param">maxParallelConnections</dt><dd class="cmt"><p>number of parallel sftp connections created by an instance of this connection</p></dd></dl><div class="toggleContainer block">
           <span class="toggle">Linear Supertypes</span>
           <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.Product">Product</span>, <span class="extype" name="scala.Equals">Equals</span>, <span class="extype" name="io.smartdatalake.workflow.connection.Connection">Connection</span>, <span class="extype" name="io.smartdatalake.config.ParsableFromConfig">ParsableFromConfig</span>[<span class="extype" name="io.smartdatalake.workflow.connection.Connection">Connection</span>], <span class="extype" name="io.smartdatalake.config.SdlConfigObject">SdlConfigObject</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
         </div></div>
@@ -92,7 +92,7 @@
         <div id="constructors" class="members">
               <h3>Instance Constructors</h3>
               <ol><li name="io.smartdatalake.workflow.connection.SftpFileRefConnection#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ConnectionId,host:String,port:Int,userVariable:String,passwordVariable:Option[String],ignoreHostKeyVerification:Boolean,maxParallelConnections:Int,metadata:Option[io.smartdatalake.workflow.connection.ConnectionMetadata]):io.smartdatalake.workflow.connection.SftpFileRefConnection"></a>
+      <a id="&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ConnectionId,host:String,port:Int,authMode:io.smartdatalake.definitions.AuthMode,ignoreHostKeyVerification:Boolean,maxParallelConnections:Int,metadata:Option[io.smartdatalake.workflow.connection.ConnectionMetadata]):io.smartdatalake.workflow.connection.SftpFileRefConnection"></a>
       <a id="&lt;init&gt;:SftpFileRefConnection"></a>
       <h4 class="signature">
       <span class="modifier_kind">
@@ -100,14 +100,14 @@
         <span class="kind">new</span>
       </span>
       <span class="symbol">
-        <span class="name">SftpFileRefConnection</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="host">host: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="port">port: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">22</span></span>, <span name="userVariable">userVariable: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="passwordVariable">passwordVariable: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="ignoreHostKeyVerification">ignoreHostKeyVerification: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="maxParallelConnections">maxParallelConnections: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">1</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</span>] = <span class="symbol">None</span></span>)</span>
+        <span class="name">SftpFileRefConnection</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="host">host: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="port">port: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">22</span></span>, <span name="authMode">authMode: <a href="../../definitions/AuthMode.html" class="extype" name="io.smartdatalake.definitions.AuthMode">AuthMode</a></span>, <span name="ignoreHostKeyVerification">ignoreHostKeyVerification: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="maxParallelConnections">maxParallelConnections: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">1</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="ConnectionMetadata.html" class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</a>] = <span class="symbol">None</span></span>)</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.connection.SftpFileRefConnection@&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ConnectionId,host:String,port:Int,userVariable:String,passwordVariable:Option[String],ignoreHostKeyVerification:Boolean,maxParallelConnections:Int,metadata:Option[io.smartdatalake.workflow.connection.ConnectionMetadata]):io.smartdatalake.workflow.connection.SftpFileRefConnection" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.connection.SftpFileRefConnection@&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ConnectionId,host:String,port:Int,authMode:io.smartdatalake.definitions.AuthMode,ignoreHostKeyVerification:Boolean,maxParallelConnections:Int,metadata:Option[io.smartdatalake.workflow.connection.ConnectionMetadata]):io.smartdatalake.workflow.connection.SftpFileRefConnection" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">id</dt><dd class="cmt"><p>unique id of this connection</p></dd><dt class="param">host</dt><dd class="cmt"><p>sftp host</p></dd><dt class="param">port</dt><dd class="cmt"><p>port of sftp service, default is 22</p></dd><dt class="param">userVariable</dt><dd class="cmt"><p>user variable to use for connection</p></dd><dt class="param">passwordVariable</dt><dd class="cmt"><p>optional password variable to use for connection. If password is given, authentication is done by user/password, otherwise public key authentication is used</p></dd><dt class="param">ignoreHostKeyVerification</dt><dd class="cmt"><p>do not validate host key if true, default is false</p></dd><dt class="param">maxParallelConnections</dt><dd class="cmt"><p>number of parallel sftp connections created by an instance of this connection</p></dd></dl></div>
+      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">id</dt><dd class="cmt"><p>unique id of this connection</p></dd><dt class="param">host</dt><dd class="cmt"><p>sftp host</p></dd><dt class="param">port</dt><dd class="cmt"><p>port of sftp service, default is 22</p></dd><dt class="param">authMode</dt><dd class="cmt"><p>authentication information: for now BasicAuthMode and PublicKeyAuthMode are supported.</p></dd><dt class="param">ignoreHostKeyVerification</dt><dd class="cmt"><p>do not validate host key if true, default is false</p></dd><dt class="param">maxParallelConnections</dt><dd class="cmt"><p>number of parallel sftp connections created by an instance of this connection</p></dd></dl></div>
     </li></ol>
             </div>
 
@@ -185,6 +185,23 @@
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Any</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.connection.SftpFileRefConnection#authMode" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="authMode:io.smartdatalake.definitions.AuthMode"></a>
+      <a id="authMode:AuthMode"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">authMode</span><span class="result">: <a href="../../definitions/AuthMode.html" class="extype" name="io.smartdatalake.definitions.AuthMode">AuthMode</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.connection.SftpFileRefConnection@authMode:io.smartdatalake.definitions.AuthMode" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">authentication information: for now BasicAuthMode and PublicKeyAuthMode are supported.</p>
     </li><li name="scala.AnyRef#clone" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="clone():Object"></a>
       <a id="clone():AnyRef"></a>
@@ -394,7 +411,7 @@ The companion object in turn should implement <span class="extype" name="FromCon
         <span class="kind">val</span>
       </span>
       <span class="symbol">
-        <span class="name">metadata</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</span>]</span>
+        <span class="name">metadata</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<a href="ConnectionMetadata.html" class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</a>]</span>
       </span>
       </h4><span class="permalink">
       <a href="../../../../index.html#io.smartdatalake.workflow.connection.SftpFileRefConnection@metadata:Option[io.smartdatalake.workflow.connection.ConnectionMetadata]" title="Permalink" target="_top">
@@ -455,23 +472,6 @@ The companion object in turn should implement <span class="extype" name="FromCon
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
-    </li><li name="io.smartdatalake.workflow.connection.SftpFileRefConnection#passwordVariable" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="passwordVariable:Option[String]"></a>
-      <a id="passwordVariable:Option[String]"></a>
-      <h4 class="signature">
-      <span class="modifier_kind">
-        <span class="modifier"></span>
-        <span class="kind">val</span>
-      </span>
-      <span class="symbol">
-        <span class="name">passwordVariable</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
-      </span>
-      </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.connection.SftpFileRefConnection@passwordVariable:Option[String]" title="Permalink" target="_top">
-        <img src="../../../../lib/permalink.png" alt="Permalink" />
-      </a>
-    </span>
-      <p class="shortcomment cmt">optional password variable to use for connection.</p><div class="fullcomment"><div class="comment cmt"><p>optional password variable to use for connection. If password is given, authentication is done by user/password, otherwise public key authentication is used</p></div></div>
     </li><li name="io.smartdatalake.workflow.connection.SftpFileRefConnection#pool" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="pool:org.apache.commons.pool2.impl.GenericObjectPool[net.schmizz.sshj.sftp.SFTPClient]"></a>
       <a id="pool:GenericObjectPool[SFTPClient]"></a>
@@ -540,23 +540,6 @@ The companion object in turn should implement <span class="extype" name="FromCon
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Connection</dd></dl></div>
-    </li><li name="io.smartdatalake.workflow.connection.SftpFileRefConnection#userVariable" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
-      <a id="userVariable:String"></a>
-      <a id="userVariable:String"></a>
-      <h4 class="signature">
-      <span class="modifier_kind">
-        <span class="modifier"></span>
-        <span class="kind">val</span>
-      </span>
-      <span class="symbol">
-        <span class="name">userVariable</span><span class="result">: <span class="extype" name="scala.Predef.String">String</span></span>
-      </span>
-      </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.connection.SftpFileRefConnection@userVariable:String" title="Permalink" target="_top">
-        <img src="../../../../lib/permalink.png" alt="Permalink" />
-      </a>
-    </span>
-      <p class="shortcomment cmt">user variable to use for connection</p>
     </li><li name="scala.AnyRef#wait" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="wait():Unit"></a>
       <a id="wait():Unit"></a>

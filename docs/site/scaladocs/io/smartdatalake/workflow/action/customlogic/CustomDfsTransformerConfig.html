@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>CustomDfsTransformerConfig - Smart Data Lake 1.0.0-SNAPSHOT API - io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig</title>
-          <meta name="description" content="CustomDfsTransformerConfig - Smart Data Lake 1.0.0 - SNAPSHOT API - io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig" />
-          <meta name="keywords" content="CustomDfsTransformerConfig Smart Data Lake 1.0.0 SNAPSHOT API io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig" />
+          <title>CustomDfsTransformerConfig - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig</title>
+          <meta name="description" content="CustomDfsTransformerConfig - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig" />
+          <meta name="keywords" content="CustomDfsTransformerConfig Smart Data Lake 1.0.5 API io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -45,11 +45,11 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <span class="name">CustomDfsTransformerConfig</span><span class="params">(<span name="className">className: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="scalaFile">scalaFile: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="scalaCode">scalaCode: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="options">options: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Map()</span></span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <span class="name">CustomDfsTransformerConfig</span><span class="params">(<span name="className">className: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="scalaFile">scalaFile: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="scalaCode">scalaCode: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="sqlCode">sqlCode: <span class="extype" name="scala.Predef.Map">Map</span>[<a href="../../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a>, <span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Map()</span></span>, <span name="options">options: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Map()</span></span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4>
       
-          <div id="comment" class="fullcommenttop"><div class="toggleContainer block">
+          <div id="comment" class="fullcommenttop"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">className</dt><dd class="cmt"><p>Optional class name to load transformer code from</p></dd><dt class="param">scalaFile</dt><dd class="cmt"><p>Optional file where scala code for transformation is loaded from</p></dd><dt class="param">scalaCode</dt><dd class="cmt"><p>Optional scala code for transformation</p></dd><dt class="param">sqlCode</dt><dd class="cmt"><p>Optional map of DataObjectId and corresponding SQL Code</p></dd></dl><div class="toggleContainer block">
           <span class="toggle">Linear Supertypes</span>
           <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.Product">Product</span>, <span class="extype" name="scala.Equals">Equals</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
         </div></div>
@@ -88,8 +88,8 @@
         <div id="allMembers">
         <div id="constructors" class="members">
               <h3>Instance Constructors</h3>
-              <ol><li name="io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
-      <a id="&lt;init&gt;(className:Option[String],scalaFile:Option[String],scalaCode:Option[String],options:Map[String,String]):io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig"></a>
+              <ol><li name="io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="&lt;init&gt;(className:Option[String],scalaFile:Option[String],scalaCode:Option[String],sqlCode:Map[io.smartdatalake.config.SdlConfigObject.DataObjectId,String],options:Map[String,String]):io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig"></a>
       <a id="&lt;init&gt;:CustomDfsTransformerConfig"></a>
       <h4 class="signature">
       <span class="modifier_kind">
@@ -97,14 +97,14 @@
         <span class="kind">new</span>
       </span>
       <span class="symbol">
-        <span class="name">CustomDfsTransformerConfig</span><span class="params">(<span name="className">className: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="scalaFile">scalaFile: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="scalaCode">scalaCode: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="options">options: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Map()</span></span>)</span>
+        <span class="name">CustomDfsTransformerConfig</span><span class="params">(<span name="className">className: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="scalaFile">scalaFile: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="scalaCode">scalaCode: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="sqlCode">sqlCode: <span class="extype" name="scala.Predef.Map">Map</span>[<a href="../../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a>, <span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Map()</span></span>, <span name="options">options: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Map()</span></span>)</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../../index.html#io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig@&lt;init&gt;(className:Option[String],scalaFile:Option[String],scalaCode:Option[String],options:Map[String,String]):io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig" title="Permalink" target="_top">
+      <a href="../../../../../index.html#io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig@&lt;init&gt;(className:Option[String],scalaFile:Option[String],scalaCode:Option[String],sqlCode:Map[io.smartdatalake.config.SdlConfigObject.DataObjectId,String],options:Map[String,String]):io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig" title="Permalink" target="_top">
         <img src="../../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
+      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">className</dt><dd class="cmt"><p>Optional class name to load transformer code from</p></dd><dt class="param">scalaFile</dt><dd class="cmt"><p>Optional file where scala code for transformation is loaded from</p></dd><dt class="param">scalaCode</dt><dd class="cmt"><p>Optional scala code for transformation</p></dd><dt class="param">sqlCode</dt><dd class="cmt"><p>Optional map of DataObjectId and corresponding SQL Code</p></dd></dl></div>
     </li></ol>
             </div>
 
@@ -198,7 +198,7 @@
         <img src="../../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
+      <p class="shortcomment cmt">Optional class name to load transformer code from</p>
     </li><li name="scala.AnyRef#clone" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="clone():Object"></a>
       <a id="clone():AnyRef"></a>
@@ -280,18 +280,18 @@
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig#impl" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
-      <a id="impl:io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer"></a>
-      <a id="impl:CustomDfsTransformer"></a>
+      <a id="impl:Option[io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer]"></a>
+      <a id="impl:Option[CustomDfsTransformer]"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">val</span>
       </span>
       <span class="symbol">
-        <span class="name">impl</span><span class="result">: <a href="CustomDfsTransformer.html" class="extype" name="io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer">CustomDfsTransformer</a></span>
+        <span class="name">impl</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<a href="CustomDfsTransformer.html" class="extype" name="io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer">CustomDfsTransformer</a>]</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../../index.html#io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig@impl:io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer" title="Permalink" target="_top">
+      <a href="../../../../../index.html#io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig@impl:Option[io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer]" title="Permalink" target="_top">
         <img src="../../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -397,7 +397,7 @@
         <img src="../../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
+      <p class="shortcomment cmt">Optional scala code for transformation</p>
     </li><li name="io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig#scalaFile" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="scalaFile:Option[String]"></a>
       <a id="scalaFile:Option[String]"></a>
@@ -414,7 +414,24 @@
         <img src="../../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
+      <p class="shortcomment cmt">Optional file where scala code for transformation is loaded from</p>
+    </li><li name="io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig#sqlCode" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="sqlCode:Map[io.smartdatalake.config.SdlConfigObject.DataObjectId,String]"></a>
+      <a id="sqlCode:Map[DataObjectId,String]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">sqlCode</span><span class="result">: <span class="extype" name="scala.Predef.Map">Map</span>[<a href="../../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a>, <span class="extype" name="scala.Predef.String">String</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../../index.html#io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig@sqlCode:Map[io.smartdatalake.config.SdlConfigObject.DataObjectId,String]" title="Permalink" target="_top">
+        <img src="../../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Optional map of DataObjectId and corresponding SQL Code</p>
     </li><li name="scala.AnyRef#synchronized" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="synchronized[T0](x$1:=&gt;T0):T0"></a>
       <a id="synchronized[T0](⇒T0):T0"></a>

@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>LocalSmartDataLakeBuilder - Smart Data Lake 1.0.0-SNAPSHOT API - io.smartdatalake.app.LocalSmartDataLakeBuilder</title>
-          <meta name="description" content="LocalSmartDataLakeBuilder - Smart Data Lake 1.0.0 - SNAPSHOT API - io.smartdatalake.app.LocalSmartDataLakeBuilder" />
-          <meta name="keywords" content="LocalSmartDataLakeBuilder Smart Data Lake 1.0.0 SNAPSHOT API io.smartdatalake.app.LocalSmartDataLakeBuilder" />
+          <title>LocalSmartDataLakeBuilder - Smart Data Lake 1.0.5 API - io.smartdatalake.app.LocalSmartDataLakeBuilder</title>
+          <meta name="description" content="LocalSmartDataLakeBuilder - Smart Data Lake 1.0.5 API - io.smartdatalake.app.LocalSmartDataLakeBuilder" />
+          <meta name="keywords" content="LocalSmartDataLakeBuilder Smart Data Lake 1.0.5 API io.smartdatalake.app.LocalSmartDataLakeBuilder" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -146,19 +146,19 @@
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
-    </li><li name="io.smartdatalake.app.SmartDataLakeBuilder#appName" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="appName:String"></a>
-      <a id="appName:String"></a>
+    </li><li name="io.smartdatalake.app.SmartDataLakeBuilder#appType" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="appType:String"></a>
+      <a id="appType:String"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">val</span>
       </span>
       <span class="symbol">
-        <span class="name">appName</span><span class="result">: <span class="extype" name="java.lang.String">String</span></span>
+        <span class="name">appType</span><span class="result">: <span class="extype" name="scala.Predef.String">String</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.app.LocalSmartDataLakeBuilder$@appName:String" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.app.LocalSmartDataLakeBuilder$@appType:String" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -172,7 +172,7 @@
         <span class="kind">val</span>
       </span>
       <span class="symbol">
-        <span class="name">appVersion</span><span class="result">: <span class="extype" name="java.lang.String">String</span></span>
+        <span class="name">appVersion</span><span class="result">: <span class="extype" name="scala.Predef.String">String</span></span>
       </span>
       </h4><span class="permalink">
       <a href="../../../index.html#io.smartdatalake.app.LocalSmartDataLakeBuilder$@appVersion:String" title="Permalink" target="_top">
@@ -327,8 +327,27 @@
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt">Create a new SDL configuration and initialize it with environment variables if they are set.</p><div class="fullcomment"><div class="comment cmt"><p>Create a new SDL configuration and initialize it with environment variables if they are set.</p><p>This method also sets default values if environment variables are not set.
+      <p class="shortcomment cmt">Create a new SDL configuration.</p><div class="fullcomment"><div class="comment cmt"><p>Create a new SDL configuration.</p><p>Could be used in the future to set default values.
 </p></div><dl class="paramcmts block"><dt>returns</dt><dd class="cmt"><p>a new, initialized <a href="SmartDataLakeBuilderConfig.html" class="extype" name="io.smartdatalake.app.SmartDataLakeBuilderConfig">SmartDataLakeBuilderConfig</a>.</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="SmartDataLakeBuilder.html" class="extype" name="io.smartdatalake.app.SmartDataLakeBuilder">SmartDataLakeBuilder</a></dd></dl></div>
+    </li><li name="io.smartdatalake.app.SmartDataLakeBuilder#instanceRegistry" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="instanceRegistry:io.smartdatalake.config.InstanceRegistry"></a>
+      <a id="instanceRegistry:InstanceRegistry"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">implicit </span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">instanceRegistry</span><span class="result">: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.app.LocalSmartDataLakeBuilder$@instanceRegistry:io.smartdatalake.config.InstanceRegistry" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">InstanceRegistry instance
+</p><div class="fullcomment"><div class="comment cmt"><p>InstanceRegistry instance
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="SmartDataLakeBuilder.html" class="extype" name="io.smartdatalake.app.SmartDataLakeBuilder">SmartDataLakeBuilder</a></dd></dl></div>
     </li><li name="scala.Any#isInstanceOf" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="isInstanceOf[T0]:Boolean"></a>
       <a id="isInstanceOf[T0]:Boolean"></a>
@@ -470,22 +489,22 @@
 Subclasses SmartDataLakeBuilder can define additional options to be extracted.
 </p></div><dl class="attributes block"> <dt>Attributes</dt><dd>protected </dd><dt>Definition Classes</dt><dd><a href="SmartDataLakeBuilder.html" class="extype" name="io.smartdatalake.app.SmartDataLakeBuilder">SmartDataLakeBuilder</a></dd></dl></div>
     </li><li name="io.smartdatalake.app.SmartDataLakeBuilder#run" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="run(appConfig:io.smartdatalake.app.SmartDataLakeBuilderConfig):Unit"></a>
-      <a id="run(SmartDataLakeBuilderConfig):Unit"></a>
+      <a id="run(appConfig:io.smartdatalake.app.SmartDataLakeBuilderConfig):String"></a>
+      <a id="run(SmartDataLakeBuilderConfig):String"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">run</span><span class="params">(<span name="appConfig">appConfig: <a href="SmartDataLakeBuilderConfig.html" class="extype" name="io.smartdatalake.app.SmartDataLakeBuilderConfig">SmartDataLakeBuilderConfig</a></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">run</span><span class="params">(<span name="appConfig">appConfig: <a href="SmartDataLakeBuilderConfig.html" class="extype" name="io.smartdatalake.app.SmartDataLakeBuilderConfig">SmartDataLakeBuilderConfig</a></span>)</span><span class="result">: <span class="extype" name="scala.Predef.String">String</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.app.LocalSmartDataLakeBuilder$@run(appConfig:io.smartdatalake.app.SmartDataLakeBuilderConfig):Unit" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.app.LocalSmartDataLakeBuilder$@run(appConfig:io.smartdatalake.app.SmartDataLakeBuilderConfig):String" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt">Run the application with the provided configuarion.</p><div class="fullcomment"><div class="comment cmt"><p>Run the application with the provided configuarion.
+      <p class="shortcomment cmt">Run the application with the provided configuration.</p><div class="fullcomment"><div class="comment cmt"><p>Run the application with the provided configuration.
 </p></div><dl class="paramcmts block"><dt class="param">appConfig</dt><dd class="cmt"><p>Application configuration (parsed from command line).</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="SmartDataLakeBuilder.html" class="extype" name="io.smartdatalake.app.SmartDataLakeBuilder">SmartDataLakeBuilder</a></dd></dl></div>
     </li><li name="scala.AnyRef#synchronized" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="synchronized[T0](x$1:=&gt;T0):T0"></a>

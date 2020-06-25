@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>SplunkService - Smart Data Lake 1.0.0-SNAPSHOT API - io.smartdatalake.workflow.dataobject.SplunkService</title>
-          <meta name="description" content="SplunkService - Smart Data Lake 1.0.0 - SNAPSHOT API - io.smartdatalake.workflow.dataobject.SplunkService" />
-          <meta name="keywords" content="SplunkService Smart Data Lake 1.0.0 SNAPSHOT API io.smartdatalake.workflow.dataobject.SplunkService" />
+          <title>SparkRepartitionDef - Smart Data Lake 1.0.5 API - io.smartdatalake.util.hdfs.SparkRepartitionDef</title>
+          <meta name="description" content="SparkRepartitionDef - Smart Data Lake 1.0.5 API - io.smartdatalake.util.hdfs.SparkRepartitionDef" />
+          <meta name="keywords" content="SparkRepartitionDef Smart Data Lake 1.0.5 API io.smartdatalake.util.hdfs.SparkRepartitionDef" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -16,7 +16,7 @@
       <script type="text/javascript">
          if(top === self) {
             var url = '../../../../index.html';
-            var hash = 'io.smartdatalake.workflow.dataobject.SplunkService';
+            var hash = 'io.smartdatalake.util.hdfs.SparkRepartitionDef';
             var anchor = window.location.hash;
             var anchor_opt = '';
             if (anchor.length >= 1)
@@ -28,12 +28,12 @@
         </head>
         <body class="type">
       <div id="definition">
-        <img alt="Trait" src="../../../../lib/trait_big.png" />
-        <p id="owner"><a href="../../../package.html" class="extype" name="io">io</a>.<a href="../../package.html" class="extype" name="io.smartdatalake">smartdatalake</a>.<a href="../package.html" class="extype" name="io.smartdatalake.workflow">workflow</a>.<a href="package.html" class="extype" name="io.smartdatalake.workflow.dataobject">dataobject</a></p>
-        <h1>SplunkService</h1><h3><span class="morelinks"><div>Related Doc:
-            <a href="package.html" class="extype" name="io.smartdatalake.workflow.dataobject">package dataobject</a>
+        <img alt="Class" src="../../../../lib/class_big.png" />
+        <p id="owner"><a href="../../../package.html" class="extype" name="io">io</a>.<a href="../../package.html" class="extype" name="io.smartdatalake">smartdatalake</a>.<a href="../package.html" class="extype" name="io.smartdatalake.util">util</a>.<a href="package.html" class="extype" name="io.smartdatalake.util.hdfs">hdfs</a></p>
+        <h1>SparkRepartitionDef</h1><h3><span class="morelinks"><div>Related Doc:
+            <a href="package.html" class="extype" name="io.smartdatalake.util.hdfs">package hdfs</a>
           </div></span></h3><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -42,20 +42,21 @@
       <h4 id="signature" class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
-        <span class="kind">trait</span>
+        <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <span class="name">SplunkService</span><span class="result"> extends <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span></span>
+        <span class="name">SparkRepartitionDef</span><span class="params">(<span name="numberOfTasksPerPartition">numberOfTasksPerPartition: <span class="extype" name="scala.Int">Int</span></span>, <span name="keyCols">keyCols: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="sortCols">sortCols: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="filename">filename: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4>
       
-          <div id="comment" class="fullcommenttop"><div class="toggleContainer block">
+          <div id="comment" class="fullcommenttop"><div class="comment cmt"><p>This controls repartitioning of the DataFrame before writing with Spark to Hadoop.</p><p>When writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition
+multiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,
+keyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).</p><p>When writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal
+to numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.
+</p></div><dl class="paramcmts block"><dt class="param">numberOfTasksPerPartition</dt><dd class="cmt"><p>Number of Spark tasks to create per partition before writing to DataObject by repartitioning the DataFrame. This controls how many files are created in each Hadoop partition.</p></dd><dt class="param">keyCols</dt><dd class="cmt"><p>Optional key columns to distribute records over Spark tasks inside a Hadoop partition. If numberOfTasksPerPArtition is 1 this setting has no effect. If DataObject has Hadoop partitions defined, keyCols must be defined.</p></dd><dt class="param">sortCols</dt><dd class="cmt"><p>Optional columns to sort records inside files created.</p></dd><dt class="param">filename</dt><dd class="cmt"><p>Option filename to rename target file if numberOfTasksPerPartition is 1</p></dd></dl><div class="toggleContainer block">
           <span class="toggle">Linear Supertypes</span>
-          <div class="superTypes hiddenContent"><span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
-        </div><div class="toggleContainer block">
-            <span class="toggle">Known Subclasses</span>
-            <div class="subClasses hiddenContent"><a href="SplunkDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.SplunkDataObject">SplunkDataObject</a></div>
-          </div></div>
+          <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.Product">Product</span>, <span class="extype" name="scala.Equals">Equals</span>, <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
+        </div></div>
         
 
       <div id="mbrsel">
@@ -72,7 +73,7 @@
                 <span class="filtertype">Inherited<br />
                 </span>
                 <ol id="linearization">
-                  <li class="in" name="io.smartdatalake.workflow.dataobject.SplunkService"><span>SplunkService</span></li><li class="in" name="io.smartdatalake.util.misc.SmartDataLakeLogger"><span>SmartDataLakeLogger</span></li><li class="in" name="scala.AnyRef"><span>AnyRef</span></li><li class="in" name="scala.Any"><span>Any</span></li>
+                  <li class="in" name="io.smartdatalake.util.hdfs.SparkRepartitionDef"><span>SparkRepartitionDef</span></li><li class="in" name="scala.Serializable"><span>Serializable</span></li><li class="in" name="java.io.Serializable"><span>Serializable</span></li><li class="in" name="scala.Product"><span>Product</span></li><li class="in" name="scala.Equals"><span>Equals</span></li><li class="in" name="io.smartdatalake.util.misc.SmartDataLakeLogger"><span>SmartDataLakeLogger</span></li><li class="in" name="scala.AnyRef"><span>AnyRef</span></li><li class="in" name="scala.Any"><span>Any</span></li>
                 </ol>
               </div><div id="ancestors">
             <span class="filtertype"></span>
@@ -89,7 +90,27 @@
 
       <div id="template">
         <div id="allMembers">
-        
+        <div id="constructors" class="members">
+              <h3>Instance Constructors</h3>
+              <ol><li name="io.smartdatalake.util.hdfs.SparkRepartitionDef#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="&lt;init&gt;(numberOfTasksPerPartition:Int,keyCols:Seq[String],sortCols:Seq[String],filename:Option[String]):io.smartdatalake.util.hdfs.SparkRepartitionDef"></a>
+      <a id="&lt;init&gt;:SparkRepartitionDef"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">new</span>
+      </span>
+      <span class="symbol">
+        <span class="name">SparkRepartitionDef</span><span class="params">(<span name="numberOfTasksPerPartition">numberOfTasksPerPartition: <span class="extype" name="scala.Int">Int</span></span>, <span name="keyCols">keyCols: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="sortCols">sortCols: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="filename">filename: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>)</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@&lt;init&gt;(numberOfTasksPerPartition:Int,keyCols:Seq[String],sortCols:Seq[String],filename:Option[String]):io.smartdatalake.util.hdfs.SparkRepartitionDef" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">numberOfTasksPerPartition</dt><dd class="cmt"><p>Number of Spark tasks to create per partition before writing to DataObject by repartitioning the DataFrame. This controls how many files are created in each Hadoop partition.</p></dd><dt class="param">keyCols</dt><dd class="cmt"><p>Optional key columns to distribute records over Spark tasks inside a Hadoop partition. If numberOfTasksPerPArtition is 1 this setting has no effect. If DataObject has Hadoop partitions defined, keyCols must be defined.</p></dd><dt class="param">sortCols</dt><dd class="cmt"><p>Optional columns to sort records inside files created.</p></dd><dt class="param">filename</dt><dd class="cmt"><p>Option filename to rename target file if numberOfTasksPerPartition is 1</p></dd></dl></div>
+    </li></ol>
+            </div>
 
         
 
@@ -109,7 +130,7 @@
         <span title="gt4s: $bang$eq" class="name">!=</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.Any">Any</span></span>)</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@!=(x$1:Any):Boolean" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@!=(x$1:Any):Boolean" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -126,7 +147,7 @@
         <span title="gt4s: $hash$hash" class="name">##</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.Int">Int</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@##():Int" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@##():Int" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -143,7 +164,7 @@
         <span title="gt4s: $eq$eq" class="name">==</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.Any">Any</span></span>)</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@==(x$1:Any):Boolean" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@==(x$1:Any):Boolean" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -160,7 +181,7 @@
         <span class="name">asInstanceOf</span><span class="tparams">[<span name="T0">T0</span>]</span><span class="result">: <span class="extype" name="scala.Any.asInstanceOf.T0">T0</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@asInstanceOf[T0]:T0" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@asInstanceOf[T0]:T0" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -177,7 +198,7 @@
         <span class="name">clone</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.AnyRef">AnyRef</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@clone():Object" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@clone():Object" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -188,23 +209,6 @@
     </span>)</span>
               
         </dd></dl></div>
-    </li><li name="io.smartdatalake.workflow.dataobject.SplunkService#createJobExportArgs" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
-      <a id="createJobExportArgs(queryFrom:java.time.LocalDateTime,queryTo:java.time.LocalDateTime):com.splunk.JobExportArgs"></a>
-      <a id="createJobExportArgs(LocalDateTime,LocalDateTime):JobExportArgs"></a>
-      <h4 class="signature">
-      <span class="modifier_kind">
-        <span class="modifier"></span>
-        <span class="kind">def</span>
-      </span>
-      <span class="symbol">
-        <span class="name">createJobExportArgs</span><span class="params">(<span name="queryFrom">queryFrom: <span class="extype" name="java.time.LocalDateTime">LocalDateTime</span></span>, <span name="queryTo">queryTo: <span class="extype" name="java.time.LocalDateTime">LocalDateTime</span></span>)</span><span class="result">: <span class="extype" name="com.splunk.JobExportArgs">JobExportArgs</span></span>
-      </span>
-      </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@createJobExportArgs(queryFrom:java.time.LocalDateTime,queryTo:java.time.LocalDateTime):com.splunk.JobExportArgs" title="Permalink" target="_top">
-        <img src="../../../../lib/permalink.png" alt="Permalink" />
-      </a>
-    </span>
-      
     </li><li name="scala.AnyRef#eq" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="eq(x$1:AnyRef):Boolean"></a>
       <a id="eq(AnyRef):Boolean"></a>
@@ -217,28 +221,28 @@
         <span class="name">eq</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.AnyRef">AnyRef</span></span>)</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@eq(x$1:AnyRef):Boolean" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@eq(x$1:AnyRef):Boolean" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
-    </li><li name="scala.AnyRef#equals" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="equals(x$1:Any):Boolean"></a>
-      <a id="equals(Any):Boolean"></a>
+    </li><li name="io.smartdatalake.util.hdfs.SparkRepartitionDef#filename" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="filename:Option[String]"></a>
+      <a id="filename:Option[String]"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
-        <span class="kind">def</span>
+        <span class="kind">val</span>
       </span>
       <span class="symbol">
-        <span class="name">equals</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.Any">Any</span></span>)</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+        <span class="name">filename</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@equals(x$1:Any):Boolean" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@filename:Option[String]" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
+      <p class="shortcomment cmt">Option filename to rename target file if numberOfTasksPerPartition is 1</p>
     </li><li name="scala.AnyRef#finalize" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="finalize():Unit"></a>
       <a id="finalize():Unit"></a>
@@ -251,7 +255,7 @@
         <span class="name">finalize</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@finalize():Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@finalize():Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -274,24 +278,7 @@
         <span class="name">getClass</span><span class="params">()</span><span class="result">: <span class="extype" name="java.lang.Class">Class</span>[_]</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@getClass():Class[_]" title="Permalink" target="_top">
-        <img src="../../../../lib/permalink.png" alt="Permalink" />
-      </a>
-    </span>
-      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
-    </li><li name="scala.AnyRef#hashCode" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="hashCode():Int"></a>
-      <a id="hashCode():Int"></a>
-      <h4 class="signature">
-      <span class="modifier_kind">
-        <span class="modifier"></span>
-        <span class="kind">def</span>
-      </span>
-      <span class="symbol">
-        <span class="name">hashCode</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.Int">Int</span></span>
-      </span>
-      </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@hashCode():Int" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@getClass():Class[_]" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -308,11 +295,28 @@
         <span class="name">isInstanceOf</span><span class="tparams">[<span name="T0">T0</span>]</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@isInstanceOf[T0]:Boolean" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@isInstanceOf[T0]:Boolean" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Any</dd></dl></div>
+    </li><li name="io.smartdatalake.util.hdfs.SparkRepartitionDef#keyCols" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="keyCols:Seq[String]"></a>
+      <a id="keyCols:Seq[String]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">keyCols</span><span class="result">: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@keyCols:Seq[String]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Optional key columns to distribute records over Spark tasks inside a Hadoop partition.</p><div class="fullcomment"><div class="comment cmt"><p>Optional key columns to distribute records over Spark tasks inside a Hadoop partition. If numberOfTasksPerPArtition is 1 this setting has no effect. If DataObject has Hadoop partitions defined, keyCols must be defined.</p></div></div>
     </li><li name="io.smartdatalake.util.misc.SmartDataLakeLogger#logger" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="logger:org.slf4j.Logger"></a>
       <a id="logger:Logger"></a>
@@ -325,7 +329,7 @@
         <span class="name">logger</span><span class="result">: <span class="extype" name="org.slf4j.Logger">Logger</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@logger:org.slf4j.Logger" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@logger:org.slf4j.Logger" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -342,7 +346,7 @@
         <span class="name">ne</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.AnyRef">AnyRef</span></span>)</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@ne(x$1:AnyRef):Boolean" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@ne(x$1:AnyRef):Boolean" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -359,7 +363,7 @@
         <span class="name">notify</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@notify():Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@notify():Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -376,28 +380,62 @@
         <span class="name">notifyAll</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@notifyAll():Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@notifyAll():Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
-    </li><li name="io.smartdatalake.workflow.dataobject.SplunkService#readFromSplunk" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
-      <a id="readFromSplunk(query:String,searchArgs:com.splunk.JobExportArgs,splunk:com.splunk.Service):Seq[Map[String,String]]"></a>
-      <a id="readFromSplunk(String,JobExportArgs,Service):Seq[Map[String,String]]"></a>
+    </li><li name="io.smartdatalake.util.hdfs.SparkRepartitionDef#numberOfTasksPerPartition" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="numberOfTasksPerPartition:Int"></a>
+      <a id="numberOfTasksPerPartition:Int"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">numberOfTasksPerPartition</span><span class="result">: <span class="extype" name="scala.Int">Int</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@numberOfTasksPerPartition:Int" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Number of Spark tasks to create per partition before writing to DataObject by repartitioning the DataFrame.</p><div class="fullcomment"><div class="comment cmt"><p>Number of Spark tasks to create per partition before writing to DataObject by repartitioning the DataFrame. This controls how many files are created in each Hadoop partition.</p></div></div>
+    </li><li name="io.smartdatalake.util.hdfs.SparkRepartitionDef#prepareDataFrame" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="prepareDataFrame(df:org.apache.spark.sql.DataFrame,partitions:Seq[String],nbOfPartitionValues:Int,dataObjectId:io.smartdatalake.config.SdlConfigObject.DataObjectId):org.apache.spark.sql.DataFrame"></a>
+      <a id="prepareDataFrame(DataFrame,Seq[String],Int,DataObjectId):DataFrame"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">readFromSplunk</span><span class="params">(<span name="query">query: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="searchArgs">searchArgs: <span class="extype" name="com.splunk.JobExportArgs">JobExportArgs</span></span>, <span name="splunk">splunk: <span class="extype" name="com.splunk.Service">Service</span></span>)</span><span class="result">: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]]</span>
+        <span class="name">prepareDataFrame</span><span class="params">(<span name="df">df: <span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>, <span name="nbOfPartitionValues">nbOfPartitionValues: <span class="extype" name="scala.Int">Int</span></span>, <span name="dataObjectId">dataObjectId: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>)</span><span class="result">: <span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@readFromSplunk(query:String,searchArgs:com.splunk.JobExportArgs,splunk:com.splunk.Service):Seq[Map[String,String]]" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@prepareDataFrame(df:org.apache.spark.sql.DataFrame,partitions:Seq[String],nbOfPartitionValues:Int,dataObjectId:io.smartdatalake.config.SdlConfigObject.DataObjectId):org.apache.spark.sql.DataFrame" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
+      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">df</dt><dd class="cmt"><p>DataFrame to repartition</p></dd><dt class="param">partitions</dt><dd class="cmt"><p>DataObjects partition columns</p></dd><dt class="param">nbOfPartitionValues</dt><dd class="cmt"><p>Number fo PartitionsValues to be written with this DataFrame</p></dd><dt class="param">dataObjectId</dt><dd class="cmt"><p>id of DataObject for logging</p></dd></dl></div>
+    </li><li name="io.smartdatalake.util.hdfs.SparkRepartitionDef#sortCols" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="sortCols:Seq[String]"></a>
+      <a id="sortCols:Seq[String]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">sortCols</span><span class="result">: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@sortCols:Seq[String]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Optional columns to sort records inside files created.</p>
     </li><li name="scala.AnyRef#synchronized" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="synchronized[T0](x$1:=&gt;T0):T0"></a>
       <a id="synchronized[T0](⇒T0):T0"></a>
@@ -410,28 +448,11 @@
         <span class="name">synchronized</span><span class="tparams">[<span name="T0">T0</span>]</span><span class="params">(<span name="arg0">arg0: ⇒ <span class="extype" name="java.lang.AnyRef.synchronized.T0">T0</span></span>)</span><span class="result">: <span class="extype" name="java.lang.AnyRef.synchronized.T0">T0</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@synchronized[T0](x$1:=&gt;T0):T0" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@synchronized[T0](x$1:=&gt;T0):T0" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
-    </li><li name="scala.AnyRef#toString" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="toString():String"></a>
-      <a id="toString():String"></a>
-      <h4 class="signature">
-      <span class="modifier_kind">
-        <span class="modifier"></span>
-        <span class="kind">def</span>
-      </span>
-      <span class="symbol">
-        <span class="name">toString</span><span class="params">()</span><span class="result">: <span class="extype" name="java.lang.String">String</span></span>
-      </span>
-      </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@toString():String" title="Permalink" target="_top">
-        <img src="../../../../lib/permalink.png" alt="Permalink" />
-      </a>
-    </span>
-      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
     </li><li name="scala.AnyRef#wait" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="wait():Unit"></a>
       <a id="wait():Unit"></a>
@@ -444,7 +465,7 @@
         <span class="name">wait</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@wait():Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@wait():Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -467,7 +488,7 @@
         <span class="name">wait</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.Long">Long</span></span>, <span name="arg1">arg1: <span class="extype" name="scala.Int">Int</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@wait(x$1:Long,x$2:Int):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@wait(x$1:Long,x$2:Int):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -490,7 +511,7 @@
         <span class="name">wait</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.Long">Long</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkService@wait(x$1:Long):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.util.hdfs.SparkRepartitionDef@wait(x$1:Long):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -510,7 +531,15 @@
         </div>
 
         <div id="inheritedMembers">
-        <div class="parent" name="io.smartdatalake.util.misc.SmartDataLakeLogger">
+        <div class="parent" name="scala.Serializable">
+              <h3>Inherited from <span class="extype" name="scala.Serializable">Serializable</span></h3>
+            </div><div class="parent" name="java.io.Serializable">
+              <h3>Inherited from <span class="extype" name="java.io.Serializable">Serializable</span></h3>
+            </div><div class="parent" name="scala.Product">
+              <h3>Inherited from <span class="extype" name="scala.Product">Product</span></h3>
+            </div><div class="parent" name="scala.Equals">
+              <h3>Inherited from <span class="extype" name="scala.Equals">Equals</span></h3>
+            </div><div class="parent" name="io.smartdatalake.util.misc.SmartDataLakeLogger">
               <h3>Inherited from <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span></h3>
             </div><div class="parent" name="scala.AnyRef">
               <h3>Inherited from <span class="extype" name="scala.AnyRef">AnyRef</span></h3>

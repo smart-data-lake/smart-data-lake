@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>ConfigLoader - Smart Data Lake 1.0.0-SNAPSHOT API - io.smartdatalake.config.ConfigLoader</title>
-          <meta name="description" content="ConfigLoader - Smart Data Lake 1.0.0 - SNAPSHOT API - io.smartdatalake.config.ConfigLoader" />
-          <meta name="keywords" content="ConfigLoader Smart Data Lake 1.0.0 SNAPSHOT API io.smartdatalake.config.ConfigLoader" />
+          <title>ConfigLoader - Smart Data Lake 1.0.5 API - io.smartdatalake.config.ConfigLoader</title>
+          <meta name="description" content="ConfigLoader - Smart Data Lake 1.0.5 API - io.smartdatalake.config.ConfigLoader" />
+          <meta name="keywords" content="ConfigLoader Smart Data Lake 1.0.5 API io.smartdatalake.config.ConfigLoader" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -333,30 +333,31 @@
 5. all reference.conf files on the classpath.</p><p>Configuration values take precedence in that order.
 </p></div><dl class="paramcmts block"><dt>returns</dt><dd class="cmt"><p>the parsed, combined, and resolved configuration.</p></dd></dl><dl class="attributes block"> <dt>See also</dt><dd><span class="cmt"><p><a href="https://github.com/lightbend/config#standard-behavior" target="_blank">https://github.com/lightbend/config#standard-behavior</a> for more details.</p></span></dd></dl></div>
     </li><li name="io.smartdatalake.config.ConfigLoader#loadConfigFromFilesystem" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="loadConfigFromFilesystem(configLocation:String):com.typesafe.config.Config"></a>
-      <a id="loadConfigFromFilesystem(String):Config"></a>
+      <a id="loadConfigFromFilesystem(configLocations:Seq[String]):com.typesafe.config.Config"></a>
+      <a id="loadConfigFromFilesystem(Seq[String]):Config"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">loadConfigFromFilesystem</span><span class="params">(<span name="configLocation">configLocation: <span class="extype" name="scala.Predef.String">String</span></span>)</span><span class="result">: <span class="extype" name="com.typesafe.config.Config">Config</span></span>
+        <span class="name">loadConfigFromFilesystem</span><span class="params">(<span name="configLocations">configLocations: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>)</span><span class="result">: <span class="extype" name="com.typesafe.config.Config">Config</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.config.ConfigLoader$@loadConfigFromFilesystem(configLocation:String):com.typesafe.config.Config" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.config.ConfigLoader$@loadConfigFromFilesystem(configLocations:Seq[String]):com.typesafe.config.Config" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt">Load the configuration from the file system location <code>configLocation</code>.</p><div class="fullcomment"><div class="comment cmt"><p>Load the configuration from the file system location <code>configLocation</code>.</p><p>If <code>configLocation</code> is a directory, it is traversed in breadth-first search (BFS) order provided by HDFS file system.
+      <p class="shortcomment cmt">Load the configuration from the file system location <code>configLocation</code>.</p><div class="fullcomment"><div class="comment cmt"><p>Load the configuration from the file system location <code>configLocation</code>.</p><p>If <code>configLocation</code> is a directory, it is traversed in breadth-first search (BFS) order provided by hadoop file system.
 Only file names ending in '.conf', '.json', or '.properties' are processed.
+If multiple entries are given, all entries must be on the same file system.
 All processed config files are merged and files encountered later overwrite settings in files processed earlier.</p><p>The order of loading is:</p><p>1. system properties
-2. all application.conf files in BFS order
-3. all application.json files in BFS order
-4. all application.properties files in BFS order</p><p>Configuration values take precedence in that order.</p><p>The file extension of any encountered file forces a corresponding config syntax:</p><p>- '.conf' forces HOCON syntax
+2. all '.conf' files in BFS order
+3. all '.json' files in BFS order
+4. all '.properties' files in BFS order</p><p>Configuration values take precedence in that order.</p><p>The file extension of any encountered file forces a corresponding config syntax:</p><p>- '.conf' forces HOCON syntax
 - '.json' forces JSON syntax
 - '.properties' forces Java properties syntax
-</p></div><dl class="paramcmts block"><dt class="param">configLocation</dt><dd class="cmt"><p>a configuration file or directory containing configuration files.</p></dd><dt>returns</dt><dd class="cmt"><p>a resolved <span class="extype" name="Config">Config</span> merged from all found configuration files.</p></dd></dl><dl class="attributes block"> <dt>See also</dt><dd><span class="cmt"><p><span class="extype" name="com.typesafe.config.ConfigSyntax">com.typesafe.config.ConfigSyntax</span></p></span></dd></dl></div>
+</p></div><dl class="paramcmts block"><dt class="param">configLocations</dt><dd class="cmt"><p>configuration files or directories containing configuration files.</p></dd><dt>returns</dt><dd class="cmt"><p>a resolved <span class="extype" name="Config">Config</span> merged from all found configuration files.</p></dd></dl><dl class="attributes block"> <dt>See also</dt><dd><span class="cmt"><p><span class="extype" name="com.typesafe.config.ConfigSyntax">com.typesafe.config.ConfigSyntax</span></p></span></dd></dl></div>
     </li><li name="io.smartdatalake.util.misc.SmartDataLakeLogger#logger" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="logger:org.slf4j.Logger"></a>
       <a id="logger:Logger"></a>

@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>FileSubFeed - Smart Data Lake 1.0.0-SNAPSHOT API - io.smartdatalake.workflow.FileSubFeed</title>
-          <meta name="description" content="FileSubFeed - Smart Data Lake 1.0.0 - SNAPSHOT API - io.smartdatalake.workflow.FileSubFeed" />
-          <meta name="keywords" content="FileSubFeed Smart Data Lake 1.0.0 SNAPSHOT API io.smartdatalake.workflow.FileSubFeed" />
+          <title>FileSubFeed - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.FileSubFeed</title>
+          <meta name="description" content="FileSubFeed - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.FileSubFeed" />
+          <meta name="keywords" content="FileSubFeed Smart Data Lake 1.0.5 API io.smartdatalake.workflow.FileSubFeed" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -47,12 +47,12 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <span class="name">FileSubFeed</span><span class="params">(<span name="fileRefs">fileRefs: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.FileRef">FileRef</span>]]</span>, <span name="dataObjectId">dataObjectId: <a href="../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span><span class="result"> extends <a href="SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <span class="name">FileSubFeed</span><span class="params">(<span name="fileRefs">fileRefs: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.FileRef">FileRef</span>]]</span>, <span name="dataObjectId">dataObjectId: <a href="../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>, <span name="processedInputFileRefs">processedInputFileRefs: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.FileRef">FileRef</span>]] = <span class="symbol">None</span></span>)</span><span class="result"> extends <a href="SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4>
       
           <div id="comment" class="fullcommenttop"><div class="comment cmt"><p>A FileSubFeed is used to transport references to files between Actions.
-</p></div><dl class="paramcmts block"><dt class="param">fileRefs</dt><dd class="cmt"><p>path to files to be processed</p></dd><dt class="param">dataObjectId</dt><dd class="cmt"><p>id of the DataObject this SubFeed corresponds to</p></dd><dt class="param">partitionValues</dt><dd class="cmt"><p>Values of Partitions transported by this SubFeed</p></dd></dl><div class="toggleContainer block">
+</p></div><dl class="paramcmts block"><dt class="param">fileRefs</dt><dd class="cmt"><p>path to files to be processed</p></dd><dt class="param">dataObjectId</dt><dd class="cmt"><p>id of the DataObject this SubFeed corresponds to</p></dd><dt class="param">partitionValues</dt><dd class="cmt"><p>Values of Partitions transported by this SubFeed</p></dd><dt class="param">processedInputFileRefs</dt><dd class="cmt"><p>used to remember processed input FileRef's for post processing (e.g. delete after read)</p></dd></dl><div class="toggleContainer block">
           <span class="toggle">Linear Supertypes</span>
           <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.Product">Product</span>, <span class="extype" name="scala.Equals">Equals</span>, <a href="SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a>, <span class="extype" name="io.smartdatalake.workflow.DAGResult">DAGResult</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
         </div></div>
@@ -92,7 +92,7 @@
         <div id="constructors" class="members">
               <h3>Instance Constructors</h3>
               <ol><li name="io.smartdatalake.workflow.FileSubFeed#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="&lt;init&gt;(fileRefs:Option[Seq[io.smartdatalake.workflow.dataobject.FileRef]],dataObjectId:io.smartdatalake.config.SdlConfigObject.DataObjectId,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues]):io.smartdatalake.workflow.FileSubFeed"></a>
+      <a id="&lt;init&gt;(fileRefs:Option[Seq[io.smartdatalake.workflow.dataobject.FileRef]],dataObjectId:io.smartdatalake.config.SdlConfigObject.DataObjectId,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues],processedInputFileRefs:Option[Seq[io.smartdatalake.workflow.dataobject.FileRef]]):io.smartdatalake.workflow.FileSubFeed"></a>
       <a id="&lt;init&gt;:FileSubFeed"></a>
       <h4 class="signature">
       <span class="modifier_kind">
@@ -100,14 +100,14 @@
         <span class="kind">new</span>
       </span>
       <span class="symbol">
-        <span class="name">FileSubFeed</span><span class="params">(<span name="fileRefs">fileRefs: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.FileRef">FileRef</span>]]</span>, <span name="dataObjectId">dataObjectId: <a href="../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span>
+        <span class="name">FileSubFeed</span><span class="params">(<span name="fileRefs">fileRefs: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.FileRef">FileRef</span>]]</span>, <span name="dataObjectId">dataObjectId: <a href="../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>, <span name="processedInputFileRefs">processedInputFileRefs: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.FileRef">FileRef</span>]] = <span class="symbol">None</span></span>)</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.workflow.FileSubFeed@&lt;init&gt;(fileRefs:Option[Seq[io.smartdatalake.workflow.dataobject.FileRef]],dataObjectId:io.smartdatalake.config.SdlConfigObject.DataObjectId,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues]):io.smartdatalake.workflow.FileSubFeed" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.workflow.FileSubFeed@&lt;init&gt;(fileRefs:Option[Seq[io.smartdatalake.workflow.dataobject.FileRef]],dataObjectId:io.smartdatalake.config.SdlConfigObject.DataObjectId,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues],processedInputFileRefs:Option[Seq[io.smartdatalake.workflow.dataobject.FileRef]]):io.smartdatalake.workflow.FileSubFeed" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">fileRefs</dt><dd class="cmt"><p>path to files to be processed</p></dd><dt class="param">dataObjectId</dt><dd class="cmt"><p>id of the DataObject this SubFeed corresponds to</p></dd><dt class="param">partitionValues</dt><dd class="cmt"><p>Values of Partitions transported by this SubFeed</p></dd></dl></div>
+      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">fileRefs</dt><dd class="cmt"><p>path to files to be processed</p></dd><dt class="param">dataObjectId</dt><dd class="cmt"><p>id of the DataObject this SubFeed corresponds to</p></dd><dt class="param">partitionValues</dt><dd class="cmt"><p>Values of Partitions transported by this SubFeed</p></dd><dt class="param">processedInputFileRefs</dt><dd class="cmt"><p>used to remember processed input FileRef's for post processing (e.g. delete after read)</p></dd></dl></div>
     </li></ol>
             </div>
 
@@ -420,6 +420,23 @@ This is usable to break long DataFrame Lineages over multiple Actions and instea
       </a>
     </span>
       <p class="shortcomment cmt">Values of Partitions transported by this SubFeed</p><div class="fullcomment"><div class="comment cmt"><p>Values of Partitions transported by this SubFeed</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.FileSubFeed">FileSubFeed</a> → <a href="SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a></dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.FileSubFeed#processedInputFileRefs" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="processedInputFileRefs:Option[Seq[io.smartdatalake.workflow.dataobject.FileRef]]"></a>
+      <a id="processedInputFileRefs:Option[Seq[FileRef]]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">processedInputFileRefs</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.FileRef">FileRef</span>]]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.workflow.FileSubFeed@processedInputFileRefs:Option[Seq[io.smartdatalake.workflow.dataobject.FileRef]]" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">used to remember processed input FileRef's for post processing (e.g.</p><div class="fullcomment"><div class="comment cmt"><p>used to remember processed input FileRef's for post processing (e.g. delete after read)</p></div></div>
     </li><li name="io.smartdatalake.workflow.SubFeed#resultId" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="resultId:String"></a>
       <a id="resultId:String"></a>
@@ -454,6 +471,23 @@ This is usable to break long DataFrame Lineages over multiple Actions and instea
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.FileSubFeed#updatePartitionValues" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="updatePartitionValues(partitions:Seq[String]):io.smartdatalake.workflow.FileSubFeed"></a>
+      <a id="updatePartitionValues(Seq[String]):FileSubFeed"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">updatePartitionValues</span><span class="params">(<span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>)</span><span class="result">: <a href="" class="extype" name="io.smartdatalake.workflow.FileSubFeed">FileSubFeed</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.workflow.FileSubFeed@updatePartitionValues(partitions:Seq[String]):io.smartdatalake.workflow.FileSubFeed" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.FileSubFeed">FileSubFeed</a> → <a href="SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a></dd></dl></div>
     </li><li name="scala.AnyRef#wait" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="wait():Unit"></a>
       <a id="wait():Unit"></a>

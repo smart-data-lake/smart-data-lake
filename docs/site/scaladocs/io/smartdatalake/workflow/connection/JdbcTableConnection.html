@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>JdbcTableConnection - Smart Data Lake 1.0.0-SNAPSHOT API - io.smartdatalake.workflow.connection.JdbcTableConnection</title>
-          <meta name="description" content="JdbcTableConnection - Smart Data Lake 1.0.0 - SNAPSHOT API - io.smartdatalake.workflow.connection.JdbcTableConnection" />
-          <meta name="keywords" content="JdbcTableConnection Smart Data Lake 1.0.0 SNAPSHOT API io.smartdatalake.workflow.connection.JdbcTableConnection" />
+          <title>JdbcTableConnection - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.connection.JdbcTableConnection</title>
+          <meta name="description" content="JdbcTableConnection - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.connection.JdbcTableConnection" />
+          <meta name="keywords" content="JdbcTableConnection Smart Data Lake 1.0.5 API io.smartdatalake.workflow.connection.JdbcTableConnection" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -47,13 +47,13 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <span class="name">JdbcTableConnection</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="url">url: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="driver">driver: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="userVariable">userVariable: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="passwordVariable">passwordVariable: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="db">db: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</span>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.connection.Connection">Connection</span> with <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <span class="name">JdbcTableConnection</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="url">url: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="driver">driver: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="authMode">authMode: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/AuthMode.html" class="extype" name="io.smartdatalake.definitions.AuthMode">AuthMode</a>] = <span class="symbol">None</span></span>, <span name="db">db: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="ConnectionMetadata.html" class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.connection.Connection">Connection</span> with <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4>
       
           <div id="comment" class="fullcommenttop"><div class="comment cmt"><p>Connection information for jdbc tables.
 If authentication is needed, user and password must be provided.
-</p></div><dl class="paramcmts block"><dt class="param">id</dt><dd class="cmt"><p>unique id of this connection</p></dd><dt class="param">url</dt><dd class="cmt"><p>jdbc connection url</p></dd><dt class="param">driver</dt><dd class="cmt"><p>class name of jdbc driver</p></dd><dt class="param">userVariable</dt><dd class="cmt"><p>variable used to get the user</p></dd><dt class="param">passwordVariable</dt><dd class="cmt"><p>variable used to get the password</p></dd><dt class="param">db</dt><dd class="cmt"><p>jdbc database</p></dd></dl><div class="toggleContainer block">
+</p></div><dl class="paramcmts block"><dt class="param">id</dt><dd class="cmt"><p>unique id of this connection</p></dd><dt class="param">url</dt><dd class="cmt"><p>jdbc connection url</p></dd><dt class="param">driver</dt><dd class="cmt"><p>class name of jdbc driver</p></dd><dt class="param">authMode</dt><dd class="cmt"><p>optional authentication information: for now BasicAuthMode is supported.</p></dd><dt class="param">db</dt><dd class="cmt"><p>jdbc database</p></dd></dl><div class="toggleContainer block">
           <span class="toggle">Linear Supertypes</span>
           <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.Product">Product</span>, <span class="extype" name="scala.Equals">Equals</span>, <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span>, <span class="extype" name="io.smartdatalake.workflow.connection.Connection">Connection</span>, <span class="extype" name="io.smartdatalake.config.ParsableFromConfig">ParsableFromConfig</span>[<span class="extype" name="io.smartdatalake.workflow.connection.Connection">Connection</span>], <span class="extype" name="io.smartdatalake.config.SdlConfigObject">SdlConfigObject</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
         </div></div>
@@ -93,7 +93,7 @@ If authentication is needed, user and password must be provided.
         <div id="constructors" class="members">
               <h3>Instance Constructors</h3>
               <ol><li name="io.smartdatalake.workflow.connection.JdbcTableConnection#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ConnectionId,url:String,driver:String,userVariable:Option[String],passwordVariable:Option[String],db:Option[String],metadata:Option[io.smartdatalake.workflow.connection.ConnectionMetadata]):io.smartdatalake.workflow.connection.JdbcTableConnection"></a>
+      <a id="&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ConnectionId,url:String,driver:String,authMode:Option[io.smartdatalake.definitions.AuthMode],db:Option[String],metadata:Option[io.smartdatalake.workflow.connection.ConnectionMetadata]):io.smartdatalake.workflow.connection.JdbcTableConnection"></a>
       <a id="&lt;init&gt;:JdbcTableConnection"></a>
       <h4 class="signature">
       <span class="modifier_kind">
@@ -101,14 +101,14 @@ If authentication is needed, user and password must be provided.
         <span class="kind">new</span>
       </span>
       <span class="symbol">
-        <span class="name">JdbcTableConnection</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="url">url: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="driver">driver: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="userVariable">userVariable: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="passwordVariable">passwordVariable: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="db">db: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</span>] = <span class="symbol">None</span></span>)</span>
+        <span class="name">JdbcTableConnection</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="url">url: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="driver">driver: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="authMode">authMode: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/AuthMode.html" class="extype" name="io.smartdatalake.definitions.AuthMode">AuthMode</a>] = <span class="symbol">None</span></span>, <span name="db">db: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="ConnectionMetadata.html" class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</a>] = <span class="symbol">None</span></span>)</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.connection.JdbcTableConnection@&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ConnectionId,url:String,driver:String,userVariable:Option[String],passwordVariable:Option[String],db:Option[String],metadata:Option[io.smartdatalake.workflow.connection.ConnectionMetadata]):io.smartdatalake.workflow.connection.JdbcTableConnection" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.connection.JdbcTableConnection@&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ConnectionId,url:String,driver:String,authMode:Option[io.smartdatalake.definitions.AuthMode],db:Option[String],metadata:Option[io.smartdatalake.workflow.connection.ConnectionMetadata]):io.smartdatalake.workflow.connection.JdbcTableConnection" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">id</dt><dd class="cmt"><p>unique id of this connection</p></dd><dt class="param">url</dt><dd class="cmt"><p>jdbc connection url</p></dd><dt class="param">driver</dt><dd class="cmt"><p>class name of jdbc driver</p></dd><dt class="param">userVariable</dt><dd class="cmt"><p>variable used to get the user</p></dd><dt class="param">passwordVariable</dt><dd class="cmt"><p>variable used to get the password</p></dd><dt class="param">db</dt><dd class="cmt"><p>jdbc database</p></dd></dl></div>
+      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">id</dt><dd class="cmt"><p>unique id of this connection</p></dd><dt class="param">url</dt><dd class="cmt"><p>jdbc connection url</p></dd><dt class="param">driver</dt><dd class="cmt"><p>class name of jdbc driver</p></dd><dt class="param">authMode</dt><dd class="cmt"><p>optional authentication information: for now BasicAuthMode is supported.</p></dd><dt class="param">db</dt><dd class="cmt"><p>jdbc database</p></dd></dl></div>
     </li></ol>
             </div>
 
@@ -186,6 +186,40 @@ If authentication is needed, user and password must be provided.
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Any</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.connection.JdbcTableConnection#authMode" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="authMode:Option[io.smartdatalake.definitions.AuthMode]"></a>
+      <a id="authMode:Option[AuthMode]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">authMode</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/AuthMode.html" class="extype" name="io.smartdatalake.definitions.AuthMode">AuthMode</a>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.connection.JdbcTableConnection@authMode:Option[io.smartdatalake.definitions.AuthMode]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">optional authentication information: for now BasicAuthMode is supported.</p>
+    </li><li name="io.smartdatalake.workflow.connection.JdbcTableConnection#catalog" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="catalog:io.smartdatalake.workflow.connection.SQLCatalog"></a>
+      <a id="catalog:SQLCatalog"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">catalog</span><span class="result">: <span class="extype" name="io.smartdatalake.workflow.connection.SQLCatalog">SQLCatalog</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.connection.JdbcTableConnection@catalog:io.smartdatalake.workflow.connection.SQLCatalog" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
     </li><li name="scala.AnyRef#clone" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="clone():Object"></a>
       <a id="clone():AnyRef"></a>
@@ -311,7 +345,8 @@ If authentication is needed, user and password must be provided.
       </a>
     </span>
       <p class="shortcomment cmt">Returns the factory that can parse this type (that is, type <code>CO</code>).</p><div class="fullcomment"><div class="comment cmt"><p>Returns the factory that can parse this type (that is, type <code>CO</code>).</p><p>Typically, implementations of this method should return the companion object of the implementing class.
-The companion object in turn should implement <span class="extype" name="FromConfigFactory">FromConfigFactory</span>.</p></div><dl class="paramcmts block"><dt>returns</dt><dd class="cmt"><p>the factory (object) for this class.</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.connection.JdbcTableConnection">JdbcTableConnection</a> → ParsableFromConfig</dd></dl></div>
+The companion object in turn should implement <span class="extype" name="FromConfigFactory">FromConfigFactory</span>.
+</p></div><dl class="paramcmts block"><dt>returns</dt><dd class="cmt"><p>the factory (object) for this class.</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.connection.JdbcTableConnection">JdbcTableConnection</a> → ParsableFromConfig</dd></dl></div>
     </li><li name="scala.AnyRef#finalize" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="finalize():Unit"></a>
       <a id="finalize():Unit"></a>
@@ -335,6 +370,23 @@ The companion object in turn should implement <span class="extype" name="FromCon
     </span>)</span>
               
         </dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.connection.JdbcTableConnection#getAuthModeSparkOptions" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="getAuthModeSparkOptions:Map[String,String]"></a>
+      <a id="getAuthModeSparkOptions:Map[String,String]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">getAuthModeSparkOptions</span><span class="result">: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.connection.JdbcTableConnection@getAuthModeSparkOptions:Map[String,String]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
     </li><li name="scala.AnyRef#getClass" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="getClass():Class[_]"></a>
       <a id="getClass():Class[_]"></a>
@@ -412,7 +464,7 @@ The companion object in turn should implement <span class="extype" name="FromCon
         <span class="kind">val</span>
       </span>
       <span class="symbol">
-        <span class="name">metadata</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</span>]</span>
+        <span class="name">metadata</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<a href="ConnectionMetadata.html" class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</a>]</span>
       </span>
       </h4><span class="permalink">
       <a href="../../../../index.html#io.smartdatalake.workflow.connection.JdbcTableConnection@metadata:Option[io.smartdatalake.workflow.connection.ConnectionMetadata]" title="Permalink" target="_top">
@@ -473,40 +525,6 @@ The companion object in turn should implement <span class="extype" name="FromCon
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
-    </li><li name="io.smartdatalake.workflow.connection.JdbcTableConnection#password" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
-      <a id="password:Option[String]"></a>
-      <a id="password:Option[String]"></a>
-      <h4 class="signature">
-      <span class="modifier_kind">
-        <span class="modifier"></span>
-        <span class="kind">val</span>
-      </span>
-      <span class="symbol">
-        <span class="name">password</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
-      </span>
-      </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.connection.JdbcTableConnection@password:Option[String]" title="Permalink" target="_top">
-        <img src="../../../../lib/permalink.png" alt="Permalink" />
-      </a>
-    </span>
-      
-    </li><li name="io.smartdatalake.workflow.connection.JdbcTableConnection#passwordVariable" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
-      <a id="passwordVariable:Option[String]"></a>
-      <a id="passwordVariable:Option[String]"></a>
-      <h4 class="signature">
-      <span class="modifier_kind">
-        <span class="modifier"></span>
-        <span class="kind">val</span>
-      </span>
-      <span class="symbol">
-        <span class="name">passwordVariable</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
-      </span>
-      </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.connection.JdbcTableConnection@passwordVariable:Option[String]" title="Permalink" target="_top">
-        <img src="../../../../lib/permalink.png" alt="Permalink" />
-      </a>
-    </span>
-      <p class="shortcomment cmt">variable used to get the password</p>
     </li><li name="scala.AnyRef#synchronized" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="synchronized[T0](x$1:=&gt;T0):T0"></a>
       <a id="synchronized[T0](⇒T0):T0"></a>
@@ -558,40 +576,6 @@ The companion object in turn should implement <span class="extype" name="FromCon
       </a>
     </span>
       <p class="shortcomment cmt">jdbc connection url</p>
-    </li><li name="io.smartdatalake.workflow.connection.JdbcTableConnection#user" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
-      <a id="user:Option[String]"></a>
-      <a id="user:Option[String]"></a>
-      <h4 class="signature">
-      <span class="modifier_kind">
-        <span class="modifier"></span>
-        <span class="kind">val</span>
-      </span>
-      <span class="symbol">
-        <span class="name">user</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
-      </span>
-      </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.connection.JdbcTableConnection@user:Option[String]" title="Permalink" target="_top">
-        <img src="../../../../lib/permalink.png" alt="Permalink" />
-      </a>
-    </span>
-      
-    </li><li name="io.smartdatalake.workflow.connection.JdbcTableConnection#userVariable" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
-      <a id="userVariable:Option[String]"></a>
-      <a id="userVariable:Option[String]"></a>
-      <h4 class="signature">
-      <span class="modifier_kind">
-        <span class="modifier"></span>
-        <span class="kind">val</span>
-      </span>
-      <span class="symbol">
-        <span class="name">userVariable</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
-      </span>
-      </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.connection.JdbcTableConnection@userVariable:Option[String]" title="Permalink" target="_top">
-        <img src="../../../../lib/permalink.png" alt="Permalink" />
-      </a>
-    </span>
-      <p class="shortcomment cmt">variable used to get the user</p>
     </li><li name="scala.AnyRef#wait" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="wait():Unit"></a>
       <a id="wait():Unit"></a>
