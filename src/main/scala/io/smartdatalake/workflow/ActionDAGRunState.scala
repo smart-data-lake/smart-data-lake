@@ -75,7 +75,6 @@ private[smartdatalake] case class ActionDAGRunStateStore(statePath: String, appN
   private val hadoopStatePath = HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(statePath))
   private val currentStatePath = new Path(hadoopStatePath, "current")
   private val succeededStatePath = new Path(hadoopStatePath, "succeeded")
-  private val fileNamePartSeparator = "_"
   implicit private val filesystem: FileSystem = HdfsUtil.getHadoopFs(hadoopStatePath)
   if (!filesystem.exists(hadoopStatePath)) filesystem.mkdirs(hadoopStatePath)
   filesystem.setWriteChecksum(false) // disable writing CRC files
@@ -87,7 +86,7 @@ private[smartdatalake] case class ActionDAGRunStateStore(statePath: String, appN
     val path = if (state.isSucceeded) succeededStatePath else currentStatePath
     // write state file
     val json = state.toJson
-    val fileName = s"$appName$fileNamePartSeparator${state.runId}$fileNamePartSeparator${state.attemptId}.json"
+    val fileName = s"$appName${ActionDAGRunStateStore.fileNamePartSeparator}${state.runId}${ActionDAGRunStateStore.fileNamePartSeparator}${state.attemptId}.json"
     val file = new Path(path, fileName)
     val os = filesystem.create(file, true) // overwrite if exists
     os.write(json.getBytes("UTF-8"))
@@ -132,9 +131,9 @@ private[smartdatalake] case class ActionDAGRunStateStore(statePath: String, appN
    * Search state directory for state files of this app
    */
   private def getFiles(path: Option[Path] = None): Seq[StateFile] = {
-    val filenameMatcher = s"([^_]+)$fileNamePartSeparator([0-9]+)$fileNamePartSeparator([0-9]+).json".r
+    val filenameMatcher = s"([^_]+)\\${ActionDAGRunStateStore.fileNamePartSeparator}([0-9]+)\\${ActionDAGRunStateStore.fileNamePartSeparator}([0-9]+)\\.json".r
     val pathFilter = new PathFilter {
-      override def accept(path: Path): Boolean = path.getName.startsWith(appName+"_")
+      override def accept(path: Path): Boolean = path.getName.startsWith(appName + ActionDAGRunStateStore.fileNamePartSeparator)
     }
     val searchPath = path.getOrElse( new Path(hadoopStatePath, "*"))
     filesystem.globStatus(new Path(searchPath, "*.json"), pathFilter )
@@ -160,4 +159,8 @@ private[smartdatalake] case class ActionDAGRunStateStore(statePath: String, appN
   case class StateFile(path: Path, appName: String, runId: Int, attemptId: Int) {
     def getSortAttrs: (Int, Int) = (runId, attemptId)
   }
+}
+
+private[smartdatalake] object ActionDAGRunStateStore {
+  val fileNamePartSeparator = "."
 }

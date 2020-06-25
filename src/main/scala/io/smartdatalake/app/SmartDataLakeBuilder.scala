@@ -60,7 +60,7 @@ case class SmartDataLakeBuilderConfig(feedSel: String = null,
                                       overrideJars: Option[Seq[String]] = None
                                 ) {
   def validate(): Unit = {
-    assert(!applicationName.exists(_.contains("_")), s"Application name must not contain character '_' ($applicationName)")
+    assert(!applicationName.exists(_.contains({ActionDAGRunStateStore.fileNamePartSeparator})), s"Application name must not contain character '${ActionDAGRunStateStore.fileNamePartSeparator}' ($applicationName)")
     assert(!master.contains("yarn") || deployMode.nonEmpty, "spark deploy-mode must be set if spark master=yarn")
     assert(partitionValues.isEmpty || multiPartitionValues.isEmpty, "partitionValues and multiPartitionValues cannot be defined at the same time")
     assert(statePath.isEmpty || applicationName.isDefined, "application name must be defined if state path is set")
