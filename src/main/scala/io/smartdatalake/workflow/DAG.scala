@@ -47,7 +47,7 @@ private[smartdatalake] trait DAGResult {
 
 private[smartdatalake] trait DAGEventListener[T <: DAGNode] {
   def onNodeStart(node: T)
-  def onNodeSuccess(node: T)
+  def onNodeSuccess(results: Seq[DAGResult])(node: T)
   def onNodeFailure(exception: Throwable)(node: T)
   def onNodeSkipped(exception: Throwable)(node: T)
 }
@@ -150,8 +150,8 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
     notify(node, eventListener.onNodeStart)
     val resultRaw = Try(operation(node, incomingResults.map(_.get))) // or should we use "Try( blocking { operation(node, v) })"
     val result = resultRaw match {
-      case Success(_) =>
-        notify(node, eventListener.onNodeSuccess)
+      case Success(r) =>
+        notify(node, eventListener.onNodeSuccess(r))
         resultRaw
       case Failure(ex: TaskSkippedWarning) =>
         notify(node, eventListener.onNodeSkipped(ex))
@@ -229,6 +229,14 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
       }
     }
   }
+
+  /**
+   * Get the nodes of this DAG
+   * Note: we must filter nodes which are not of the preliminary node type of this DAG, e.g. InitDAGNode
+   *
+   * @return list of nodes of the preliminary node type of this DAG
+   */
+  def getNodes: Seq[N] = sortedNodes.collect { case n: N => n }
 }
 
 object DAG extends SmartDataLakeLogger {

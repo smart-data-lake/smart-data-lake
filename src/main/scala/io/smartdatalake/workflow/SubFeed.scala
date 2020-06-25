@@ -49,11 +49,11 @@ trait SubFeed extends DAGResult {
 /**
  * A SparkSubFeed is used to transport [[DataFrame]]'s between Actions.
  *
- * @param dataFrame Spark [[DataFrame]] to be processed
+ * @param dataFrame Spark [[DataFrame]] to be processed. DataFrame should not be saved to state (@transient).
  * @param dataObjectId id of the DataObject this SubFeed corresponds to
  * @param partitionValues Values of Partitions transported by this SubFeed
  */
-case class SparkSubFeed(dataFrame: Option[DataFrame], override val dataObjectId: DataObjectId, override val partitionValues: Seq[PartitionValues])
+case class SparkSubFeed(@transient dataFrame: Option[DataFrame], override val dataObjectId: DataObjectId, override val partitionValues: Seq[PartitionValues])
   extends SubFeed {
   override def breakLineage(): SparkSubFeed = {
     this.copy(dataFrame = None)
@@ -113,7 +113,7 @@ object FileSubFeed {
 }
 
 /**
- * A InitSubFeed is used to initialize first Nodes of an [[DAG]].
+ * A InitSubFeed is used to initialize first Nodes of a [[DAG]].
  *
  * @param dataObjectId id of the DataObject this SubFeed corresponds to
  * @param partitionValues Values of Partitions transported by this SubFeed
