@@ -162,8 +162,8 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
   /**
    * Save state of dag to file
    */
-  def saveState(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    stateStore.foreach(_.saveState(ActionDAGRunState(context.appConfig, runId, attemptId, getRuntimeInfos)))
+  def saveState(isFinal: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    stateStore.foreach(_.saveState(ActionDAGRunState(context.appConfig, runId, attemptId, getRuntimeInfos, isFinal)))
   }
 
   private class ActionEventListener(operation: String)(implicit session: SparkSession, context: ActionPipelineContext) extends DAGEventListener[Action] with SmartDataLakeLogger {
@@ -174,17 +174,17 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
     override def onNodeSuccess(results: Seq[DAGResult])(node: Action): Unit = {
       node.addRuntimeEvent(operation, RuntimeEventState.SUCCEEDED, results = results.collect{ case x: SubFeed => x })
       logger.info(s"${node.toStringShort}: $operation: succeeded")
-      if (operation=="exec") saveState
+      if (operation=="exec") saveState()
     }
     override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
       node.addRuntimeEvent(operation, RuntimeEventState.FAILED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
       logger.error(s"${node.toStringShort}: $operation failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
-      if (operation=="exec") saveState
+      if (operation=="exec") saveState()
     }
     override def onNodeSkipped(exception: Throwable)(node: Action): Unit = {
       node.addRuntimeEvent(operation, RuntimeEventState.SKIPPED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
       logger.warn(s"${node.toStringShort}: $operation: skipped because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
-      if (operation=="exec") saveState
+      if (operation=="exec") saveState()
     }
   }
 

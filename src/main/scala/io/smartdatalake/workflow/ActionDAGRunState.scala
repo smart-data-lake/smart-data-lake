@@ -27,16 +27,17 @@ import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{RuntimeEventState, RuntimeInfo}
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.{FileSystem, FileUtil, Path, PathFilter}
 
 import scala.io.Codec
 
 /**
  * ActionDAGRunState contains all configuration and state of an ActionDAGRun needed to start a recovery run in case of failure.
  */
-private[smartdatalake] case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, actionsState: Map[String, RuntimeInfo] ) {
+private[smartdatalake] case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, actionsState: Map[String, RuntimeInfo], isFinal: Boolean) {
   def toJson: String = ActionDAGRunState.toJson(this)
   def isFailed: Boolean = actionsState.exists(_._2.state==RuntimeEventState.FAILED)
+  def isSucceeded: Boolean = isFinal && !isFailed
 }
 private[smartdatalake]object ActionDAGRunState {
   // json4s is used because kxbmap configs supports converting case classes to config only from verion 5.0 which isn't yet stable
@@ -72,19 +73,38 @@ private[smartdatalake]object ActionDAGRunState {
 private[smartdatalake] case class ActionDAGRunStateStore(statePath: String, appName: String) extends SmartDataLakeLogger {
 
   private val hadoopStatePath = HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(statePath))
+  private val currentStatePath = new Path(hadoopStatePath, "current")
+  private val succeededStatePath = new Path(hadoopStatePath, "succeeded")
+  private val fileNamePartSeparator = "_"
   implicit private val filesystem: FileSystem = HdfsUtil.getHadoopFs(hadoopStatePath)
   if (!filesystem.exists(hadoopStatePath)) filesystem.mkdirs(hadoopStatePath)
+  filesystem.setWriteChecksum(false) // disable writing CRC files
 
   /**
    * Save state to file
    */
   def saveState(state: ActionDAGRunState): Unit = synchronized {
+    val path = if (state.isSucceeded) succeededStatePath else currentStatePath
+    // write state file
     val json = state.toJson
-    val file = new Path(hadoopStatePath, s"${appName}_${state.runId}_${state.attemptId}.json")
+    val fileName = s"$appName$fileNamePartSeparator${state.runId}$fileNamePartSeparator${state.attemptId}.json"
+    val file = new Path(path, fileName)
     val os = filesystem.create(file, true) // overwrite if exists
     os.write(json.getBytes("UTF-8"))
     os.close()
     logger.info(s"updated state into ${file.toUri}")
+    // if succeeded:
+    // - delete temporary state file from current directory
+    // - move previous failed attempt files from current to succeeded directory
+    if (state.isSucceeded) {
+      filesystem.delete(new Path(currentStatePath, fileName), /*recursive*/ false)
+      getFiles(Some(currentStatePath))
+        .filter( stateFile => stateFile.runId==state.runId && stateFile.attemptId<state.attemptId)
+        .foreach { stateFile =>
+          logger.info(s"renamed ${stateFile.path}")
+          FileUtil.copy(filesystem, stateFile.path, filesystem, succeededStatePath, /*deleteSource*/ true, filesystem.getConf)
+        }
+    }
   }
 
   /**
@@ -92,7 +112,7 @@ private[smartdatalake] case class ActionDAGRunStateStore(statePath: String, appN
    * @param runId optional runId to search for latest state
    */
   def getLatestState(runId: Option[Int] = None): StateFile = {
-    val latestStateFile = getFiles
+    val latestStateFile = getFiles()
       .filter(x => runId.isEmpty || runId.contains(x.runId))
       .sortBy(_.getSortAttrs).lastOption
     require(latestStateFile.nonEmpty, s"No state file for application $appName and runId ${runId.getOrElse("latest")} found.")
@@ -103,7 +123,7 @@ private[smartdatalake] case class ActionDAGRunStateStore(statePath: String, appN
    * Get latest runId
    */
   def getLatestRunId: Option[Int] = {
-    val latestStateFile = getFiles
+    val latestStateFile = getFiles()
       .sortBy(_.getSortAttrs).lastOption
     latestStateFile.map(_.runId)
   }
@@ -111,10 +131,14 @@ private[smartdatalake] case class ActionDAGRunStateStore(statePath: String, appN
   /**
    * Search state directory for state files of this app
    */
-  private def getFiles: Seq[StateFile] = {
-    val filenameMatcher = "([^_]+)_([0-9]+)_([0-9]+).json".r
-    filesystem.listStatus(hadoopStatePath)
-      .filter( x => x.isFile && x.getPath.getName.startsWith(appName))
+  private def getFiles(path: Option[Path] = None): Seq[StateFile] = {
+    val filenameMatcher = s"([^_]+)$fileNamePartSeparator([0-9]+)$fileNamePartSeparator([0-9]+).json".r
+    val pathFilter = new PathFilter {
+      override def accept(path: Path): Boolean = path.getName.startsWith(appName+"_")
+    }
+    val searchPath = path.getOrElse( new Path(hadoopStatePath, "*"))
+    filesystem.globStatus(new Path(searchPath, "*.json"), pathFilter )
+      .filter( x => x.isFile)
       .flatMap( x => x.getPath.getName match {
         case filenameMatcher(appName, runId, attemptId) =>
           Some(StateFile(x.getPath, appName, runId.toInt, attemptId.toInt))

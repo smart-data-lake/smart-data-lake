@@ -26,6 +26,7 @@ import io.smartdatalake.definitions.PartitionDiffMode
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
+import io.smartdatalake.util.misc.EnvironmentUtil
 import io.smartdatalake.workflow.{ActionDAGRunStateStore, TaskFailedException}
 import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, CustomDfTransformerConfig}
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction, DeduplicateAction, RuntimeEventState}
@@ -45,6 +46,8 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
   private val tempPath = tempDir.toAbsolutePath.toString
 
   val statePath = "target/stateTest/"
+  val filesystem = HdfsUtil.getHadoopFs(new Path(statePath))
+
 
   test("sdlb run with 2 actions and positive top-level partition values filter, recovery after action 2 failed the first time") {
 
@@ -52,7 +55,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val appName = "sdlb-recovery"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(s"$statePath${appName}*", HdfsUtil.getHadoopFs(new Path(statePath)), false)
+    HdfsUtil.deleteFiles(statePath, filesystem, false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
 
@@ -103,6 +106,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val stateStore = ActionDAGRunStateStore(statePath, appName)
       val stateFile = stateStore.getLatestState()
       val runState = stateStore.recoverRunState(stateFile.path)
+      assert(runState.runId == 1)
       assert(runState.attemptId == 1)
       assert(runState.actionsState.mapValues(_.state) == Map(action1.id.id -> RuntimeEventState.SUCCEEDED, action2fail.id.id -> RuntimeEventState.FAILED))
     }
@@ -132,9 +136,11 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val stateStore = ActionDAGRunStateStore(statePath, appName)
       val stateFile = stateStore.getLatestState()
       val runState = stateStore.recoverRunState(stateFile.path)
+      assert(runState.runId == 1)
       assert(runState.attemptId == 2)
       assert(runState.actionsState.mapValues(_.state) == Map(action2success.id.id -> RuntimeEventState.SUCCEEDED))
       assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == selectedPartitions)
+      if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
     }
   }
 
@@ -144,7 +150,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val appName = "sdlb-runId"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(s"$statePath${appName}*", HdfsUtil.getHadoopFs(new Path(statePath)), false)
+    HdfsUtil.deleteFiles(s"$statePath", filesystem, false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
 
@@ -214,6 +220,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       assert(runState.attemptId == 1)
       assert(runState.actionsState.mapValues(_.state) == Map(action1.id.id -> RuntimeEventState.SUCCEEDED))
       assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == Seq(PartitionValues(Map("dt"->"20190101"))))
+      if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty) // doesnt work on windows
     }
   }
 

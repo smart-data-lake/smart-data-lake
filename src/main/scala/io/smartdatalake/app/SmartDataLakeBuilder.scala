@@ -240,6 +240,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       actionDAGRun.prepare
       actionDAGRun.init
       actionDAGRun.exec
+      actionDAGRun.saveState(true)
     } catch {
       // don't fail an not severe exceptions like having no data to process
       case ex: DAGException if (ex.severity == ExceptionSeverity.SKIPPED) => logger.warn(s"dag run is skipped because of ${ex.getClass.getSimpleName}: ${ex.getMessage}")
