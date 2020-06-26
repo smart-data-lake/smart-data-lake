@@ -55,13 +55,13 @@ case class PublicKeyAuthMode(userVariable: String) extends AuthMode {
  * supplied via options map
  */
 case class SSLCertsAuthMode (
-                            keyStorePath: String,
-                            keyStoreType: Option[String],
-                            keyStorePassVariable: String,
-                            trustStorePath: String,
-                            trustStoreType: Option[String],
-                            trustStorePassVariable: String
+                            keystorePath: String,
+                            keystoreType: Option[String],
+                            keystorePassVariable: String,
+                            truststorePath: String,
+                            truststoreType: Option[String],
+                            truststorePassVariable: String
                            ) extends AuthMode {
-  val trustStorePass: String = CredentialsUtil.getCredentials(trustStorePassVariable)
-  val keyStorePass: String = CredentialsUtil.getCredentials(keyStorePassVariable)
+  val truststorePass: String = CredentialsUtil.getCredentials(truststorePassVariable)
+  val keystorePass: String = CredentialsUtil.getCredentials(keystorePassVariable)
 }

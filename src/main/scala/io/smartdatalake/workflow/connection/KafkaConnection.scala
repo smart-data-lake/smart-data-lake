@@ -69,12 +69,12 @@ case class KafkaConnection(override val id: ConnectionId,
     authMode match {
       case Some(m: SSLCertsAuthMode) => {
         props.put(AdminClientConfig.SECURITY_PROTOCOL_CONFIG, KafkaSSLSecurityProtocol)
-        props.put(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG, m.keyStorePath)
-        props.put(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG, m.keyStorePass)
-        props.put(SslConfigs.SSL_KEYSTORE_TYPE_CONFIG, m.keyStoreType.getOrElse(SslConfigs.DEFAULT_SSL_KEYSTORE_TYPE))
-        props.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, m.trustStorePath)
-        props.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, m.trustStorePass)
-        props.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, m.trustStoreType.getOrElse(SslConfigs.DEFAULT_SSL_TRUSTSTORE_TYPE))
+        props.put(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG, m.keystorePath)
+        props.put(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG, m.keystorePass)
+        props.put(SslConfigs.SSL_KEYSTORE_TYPE_CONFIG, m.keystoreType.getOrElse(SslConfigs.DEFAULT_SSL_KEYSTORE_TYPE))
+        props.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, m.truststorePath)
+        props.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, m.truststorePass)
+        props.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, m.truststoreType.getOrElse(SslConfigs.DEFAULT_SSL_TRUSTSTORE_TYPE))
       }
       case _ => {}
     }
