@@ -139,7 +139,7 @@ abstract class SparkSubFeedAction extends Action {
    * Execution mode if this Action is a start node of a DAG run
    */
   def initExecutionMode: Option[ExecutionMode]
-  require(initExecutionMode.isEmpty || initExecutionMode.contains(PartitionDiffMode()), s"($id) $initExecutionMode not supported as initExecutionMode")
+  require(initExecutionMode.isEmpty || initExecutionMode.exists(_.isInstanceOf[PartitionDiffMode]), s"($id) $initExecutionMode not supported as initExecutionMode")
 
   /**
    * General execution mode for this action.

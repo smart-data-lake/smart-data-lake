@@ -510,13 +510,13 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // prepare DAG
     val refTimestamp1 = LocalDateTime.now()
-    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", instanceRegistry, Some(refTimestamp1))
+    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val df1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(df1, Seq())
 
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingOnceMode(checkpointLocation = tempDir.resolve("stateA").toUri.toString)))
     val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, executionMode = Some(SparkStreamingOnceMode(checkpointLocation = tempDir.resolve("stateB").toUri.toString)))
-    val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2), "test")
+    val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2), 1, 1)
 
     // first dag run, first file processed
     dag.prepare
@@ -576,13 +576,13 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // prepare DAG
     val refTimestamp1 = LocalDateTime.now()
-    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", instanceRegistry, Some(refTimestamp1))
+    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val df1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(df1, Seq())
 
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingOnceMode(checkpointLocation = tempDir.resolve("stateA").toUri.toString)))
     val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id)
-    val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2), "test")
+    val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2), 1, 1)
 
     // first dag run, first file processed
     dag.prepare
@@ -619,8 +619,6 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val r3 = tgt2DO.getDataFrame()
       .select($"rating".cast("int"))
       .as[Int].collect().toSeq
-    val (state, dur) = action2.getRuntimeState
-    val metrics = action2.getFinalMetrics(tgt2DO.id.id)
     tgt2DO.getDataFrame().show
     assert(r3.size == 2)
 

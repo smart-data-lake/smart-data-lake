@@ -71,7 +71,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
 
   private def createScheduler(parallelism: Int = 1) = Scheduler.fixedPool(s"dag-$runId", parallelism)
 
-  private def run[R<:DAGResult](phase: ExecutionPhase, parallelism: Int = 1)(operation: (DAGNode, Seq[R]) => Seq[R])(implicit session: SparkSession): Seq[R] = {
+  private def run[R<:DAGResult](phase: ExecutionPhase, parallelism: Int = 1)(operation: (DAGNode, Seq[R]) => Seq[R])(implicit session: SparkSession, context: ActionPipelineContext): Seq[R] = {
     implicit val scheduler: SchedulerService = createScheduler(parallelism)
     val task = dag.buildTaskGraph[R](new ActionEventListener(phase))(operation)
     val futureResult = task.runToFuture(scheduler)
@@ -170,25 +170,25 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
     stateStore.foreach(_.saveState(ActionDAGRunState(context.appConfig, runId, attemptId, getRuntimeInfos, isFinal)))
   }
 
-  private class ActionEventListener(operation: String)(implicit session: SparkSession, context: ActionPipelineContext) extends DAGEventListener[Action] with SmartDataLakeLogger {
+  private class ActionEventListener(phase: ExecutionPhase)(implicit session: SparkSession, context: ActionPipelineContext) extends DAGEventListener[Action] with SmartDataLakeLogger {
     override def onNodeStart(node: Action): Unit = {
-      node.addRuntimeEvent(operation, RuntimeEventState.STARTED)
-      logger.info(s"${node.toStringShort}: $operation started")
+      node.addRuntimeEvent(phase, RuntimeEventState.STARTED)
+      logger.info(s"${node.toStringShort}: $phase started")
     }
     override def onNodeSuccess(results: Seq[DAGResult])(node: Action): Unit = {
-      node.addRuntimeEvent(operation, RuntimeEventState.SUCCEEDED, results = results.collect{ case x: SubFeed => x })
-      logger.info(s"${node.toStringShort}: $operation: succeeded")
-      if (operation=="exec") saveState()
+      node.addRuntimeEvent(phase, RuntimeEventState.SUCCEEDED, results = results.collect{ case x: SubFeed => x })
+      logger.info(s"${node.toStringShort}: $phase: succeeded")
+      if (phase==ExecutionPhase.Exec) saveState()
     }
     override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
-      node.addRuntimeEvent(operation, RuntimeEventState.FAILED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
-      logger.error(s"${node.toStringShort}: $operation failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
-      if (operation=="exec") saveState()
+      node.addRuntimeEvent(phase, RuntimeEventState.FAILED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
+      logger.error(s"${node.toStringShort}: $phase failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
+      if (phase==ExecutionPhase.Exec) saveState()
     }
     override def onNodeSkipped(exception: Throwable)(node: Action): Unit = {
-      node.addRuntimeEvent(operation, RuntimeEventState.SKIPPED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
-      logger.warn(s"${node.toStringShort}: $operation: skipped because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
-      if (operation=="exec") saveState()
+      node.addRuntimeEvent(phase, RuntimeEventState.SKIPPED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
+      logger.warn(s"${node.toStringShort}: $phase: skipped because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
+      if (phase==ExecutionPhase.Exec) saveState()
     }
   }
 
