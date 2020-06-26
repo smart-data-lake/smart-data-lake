@@ -98,7 +98,7 @@ object TemporalQueries {
  *                    This is used to list existing partition and is added as additional column on batch read.
   * @param batchReadConsecutivePartitionsAsRanges Set to true if consecutive partitions should be combined as one range of offsets when batch reading from topic. This results in less tasks but can be a performance problem when reading many partitions. (default=false)
   * @param batchReadMaxOffsetsPerTask Set number of offsets per Spark task when batch reading from topic.
-  * @param kafkaOptions Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).
+  * @param dataSourceOptions Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).
   *                      These options override connection.kafkaOptions.
   */
 case class KafkaTopicDataObject(override val id: DataObjectId,
@@ -111,7 +111,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                                 datePartitionCol: Option[DatePartitionColumnDef] = None,
                                 batchReadConsecutivePartitionsAsRanges: Boolean = false,
                                 batchReadMaxOffsetsPerTask: Option[Int] = None,
-                                kafkaOptions: Map[String, String] = Map(),
+                                dataSourceOptions: Map[String, String] = Map(),
                                 override val metadata: Option[DataObjectMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with CanCreateStreamingDataFrame with CanWriteDataFrame with CanHandlePartitions with SchemaValidation {
@@ -123,6 +123,8 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
 
   require((keyType!=KafkaColumnType.AvroSchemaRegistry && valueType!=KafkaColumnType.AvroSchemaRegistry) || connection.schemaRegistry.nonEmpty, s"($id) If key or value is of type AvroSchemaRegistry, the schemaRegistry must be defined in the connection")
   require(batchReadMaxOffsetsPerTask.isEmpty || batchReadMaxOffsetsPerTask.exists(_>0), s"($id) batchReadMaxOffsetsPerTask must be greater than 0")
+
+  val instanceOptions = connection.authOptions ++ connection.dataSourceOptions ++ dataSourceOptions
 
   private val schemaRegistryConfig = connection.schemaRegistry.map (
     schemaRegistry => Map(
@@ -141,6 +143,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false")
     props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, classOf[ByteArrayDeserializer].getName)
     props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, classOf[ByteArrayDeserializer].getName)
+    props.putAll(connection.authProps)
     new KafkaConsumer(props)
   }
 
@@ -158,7 +161,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     val dfRaw = session
       .readStream
       .format("kafka")
-      .options(connection.kafkaOptions ++ kafkaOptions ++ options) // options override kafkaOptions override connection.kafkaOptions
+      .options(instanceOptions ++ options) // options override kafkaOptions override connection.kafkaOptions
       .option("kafka.bootstrap.servers", connection.brokers)
       .option("subscribe", topicName)
       .load()
@@ -238,7 +241,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
               session
                 .read
                 .format("kafka")
-                .options(connection.kafkaOptions ++ kafkaOptions)
+                .options(instanceOptions)
                 .option("kafka.bootstrap.servers", connection.brokers)
                 .option("subscribe", topicName)
                 .option("startingOffsets", s"""{"$topicName":{$startingOffsets}}""")
@@ -252,7 +255,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       logger.info(s"($id) creating data frame for whole topic $topicName, no partition values given")
       session.read
         .format("kafka")
-        .options(connection.kafkaOptions ++ kafkaOptions)
+        .options(instanceOptions)
         .option("kafka.bootstrap.servers", connection.brokers)
         .option("subscribe", topicName)
         .option("startingOffsets", "earliest")
@@ -268,7 +271,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     // TODO: implement using avro schema registry
     df.write
       .format("kafka")
-      .options(connection.kafkaOptions ++ kafkaOptions)
+      .options(instanceOptions)
       .option("kafka.bootstrap.servers", connection.brokers)
       .option("topic", topicName)
       .save
@@ -282,7 +285,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       .trigger(trigger)
       .queryName(queryName)
       .outputMode(outputMode)
-      .options(connection.kafkaOptions ++ kafkaOptions ++ options)
+      .options(instanceOptions ++ options)
       .option("checkpointLocation", checkpointLocation)
       .option("kafka.bootstrap.servers", connection.brokers)
       .option("topic", topicName)

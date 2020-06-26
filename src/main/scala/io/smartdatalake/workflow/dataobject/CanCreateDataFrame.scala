@@ -19,10 +19,17 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.PartitionValues
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
 private[smartdatalake] trait CanCreateDataFrame {
 
   def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession) : DataFrame
+
+  // Default implementation just filters the input dataframe in spark
+  // Concrete implementations should implement pushdown logic for their
+  // respective data sources.
+  def getDeltaDataFrame(filterExpr: Column)(implicit session: SparkSession) : DataFrame = {
+    getDataFrame(Seq()).filter(filterExpr)
+  }
 
 }

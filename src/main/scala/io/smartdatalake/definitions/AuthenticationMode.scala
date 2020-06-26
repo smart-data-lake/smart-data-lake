@@ -50,3 +50,18 @@ case class PublicKeyAuthMode(userVariable: String) extends AuthMode {
   val user: String = CredentialsUtil.getCredentials(userVariable)
 }
 
+/**
+ * Validate by SSL Certificates : Only location an credentials. Additional attributes should be
+ * supplied via options map
+ */
+case class SSLCertsAuthMode(
+                            keyStorePath: String,
+                            keyStoreType: Option[String],
+                            keyStorePassVariable: String,
+                            trustStorePath: String,
+                            trustStoreType: Option[String],
+                            trustStorePassVariable: String
+                           ){
+  val trustStorePass: String = CredentialsUtil.getCredentials(trustStorePassVariable)
+  val keyStorePass: String = CredentialsUtil.getCredentials(keyStorePassVariable)
+}
