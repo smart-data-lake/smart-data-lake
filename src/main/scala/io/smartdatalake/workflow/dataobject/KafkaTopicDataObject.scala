@@ -98,7 +98,7 @@ object TemporalQueries {
  *                    This is used to list existing partition and is added as additional column on batch read.
   * @param batchReadConsecutivePartitionsAsRanges Set to true if consecutive partitions should be combined as one range of offsets when batch reading from topic. This results in less tasks but can be a performance problem when reading many partitions. (default=false)
   * @param batchReadMaxOffsetsPerTask Set number of offsets per Spark task when batch reading from topic.
-  * @param dataSourceOptions Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).
+  * @param datasourceOptions Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).
   *                      These options override connection.kafkaOptions.
   */
 case class KafkaTopicDataObject(override val id: DataObjectId,
@@ -111,7 +111,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                                 datePartitionCol: Option[DatePartitionColumnDef] = None,
                                 batchReadConsecutivePartitionsAsRanges: Boolean = false,
                                 batchReadMaxOffsetsPerTask: Option[Int] = None,
-                                dataSourceOptions: Map[String, String] = Map(),
+                                datasourceOptions: Map[String, String] = Map(),
                                 override val metadata: Option[DataObjectMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with CanCreateStreamingDataFrame with CanWriteDataFrame with CanHandlePartitions with SchemaValidation {
@@ -124,7 +124,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   require((keyType!=KafkaColumnType.AvroSchemaRegistry && valueType!=KafkaColumnType.AvroSchemaRegistry) || connection.schemaRegistry.nonEmpty, s"($id) If key or value is of type AvroSchemaRegistry, the schemaRegistry must be defined in the connection")
   require(batchReadMaxOffsetsPerTask.isEmpty || batchReadMaxOffsetsPerTask.exists(_>0), s"($id) batchReadMaxOffsetsPerTask must be greater than 0")
 
-  val instanceOptions = connection.authOptions ++ connection.dataSourceOptions ++ dataSourceOptions
+  val instanceOptions = connection.authOptions ++ connection.datasourceOptions ++ datasourceOptions
 
   private val schemaRegistryConfig = connection.schemaRegistry.map (
     schemaRegistry => Map(

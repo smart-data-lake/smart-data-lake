@@ -40,13 +40,13 @@ import scala.collection.JavaConverters._
  * @param id unique id of this connection
  * @param brokers comma separated list of kafka bootstrap server incl. port, e.g. "host1:9092,host2:9092:
  * @param schemaRegistry url of schema registry service, e.g. "https://host2"
- * @param dataSourceOptions Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)
+ * @param datasourceOptions Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)
  * @param metadata
  */
 case class KafkaConnection(override val id: ConnectionId,
                            brokers: String,
                            schemaRegistry: Option[String] = None,
-                           dataSourceOptions: Map[String,String] = Map(),
+                           datasourceOptions: Map[String,String] = Map(),
                            authMode: Option[AuthMode] = None,
                            override val metadata: Option[ConnectionMetadata] = None
                           ) extends Connection {
