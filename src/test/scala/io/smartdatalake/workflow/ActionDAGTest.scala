@@ -105,6 +105,61 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(previousRunState.actionsState.mapValues(_.state) == actions.map( a => (a.id.id, RuntimeEventState.SUCCEEDED)).toMap)
   }
 
+  test("action dag with 2 actions in sequence and breakDataframeLineage=true") {
+    // Note: if you set breakDataframeLineage=true, SDL doesn't pass the DataFrame to the next action.
+    // Nevertheless the schema should be passed on for early validation in init phase, otherwise SDL reads the DataObject which might not yet have been created.
+    // To support this SDL creates and passes on an empty dummy-DataFrame in init phase, just containing the schema, which is replaced in exec phase by the real fresh DataFrame read from the DataObject which now should be existing.
+    // see also #119
+
+    // setup DataObjects
+    val feed = "actionpipeline"
+    val srcTable = Table(Some("default"), "ap_input")
+    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
+    val srcPath = tempPath+s"/${srcTable.fullName}"
+    val srcDO = HiveTableDataObject( "src1", srcPath, table = srcTable, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(srcDO)
+    val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
+    HiveUtil.dropTable(session, tgt1Table.db.get, tgt1Table.name )
+    val tgt1Path = tempPath+s"/${tgt1Table.fullName}"
+    val tgt1DO = TickTockHiveTableDataObject("tgt1", tgt1Path, table = tgt1Table, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(tgt1DO)
+    val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
+    HiveUtil.dropTable(session, tgt2Table.db.get, tgt2Table.name )
+    val tgt2Path = tempPath+s"/${tgt2Table.fullName}"
+    val tgt2DO = HiveTableDataObject( "tgt2", tgt2Path, table = tgt2Table, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(tgt2DO)
+
+    // prepare DAG
+    val refTimestamp1 = LocalDateTime.now()
+    val statePath = "stateTest/"
+    val appName = "test"
+    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, appName, 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+    val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
+    TestUtil.prepareHiveTable(srcTable, srcPath, l1)
+    val action1 = DeduplicateAction("a", srcDO.id, tgt1DO.id)
+    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, breakDataFrameLineage = true)
+    val actions: Seq[SparkSubFeedAction] = Seq(action1, action2)
+    val dag: ActionDAGRun = ActionDAGRun(actions, 1, 1)
+
+    // exec dag
+    dag.prepare
+    dag.init
+    dag.exec
+
+    // check result
+    val r1 = session.table(s"${tgt2Table.fullName}")
+      .select($"rating")
+      .as[Int].collect().toSeq
+    assert(r1.size == 1)
+    assert(r1.head == 5)
+
+    // check metrics for HiveTableDataObject
+    val action2MainMetrics = action2.getFinalMetrics(action2.outputId).get.getMainInfos
+    assert(action2MainMetrics("records_written")==1)
+    assert(action2MainMetrics.isDefinedAt("bytes_written"))
+    assert(action2MainMetrics("num_tasks")==1)
+  }
+
   test("action dag with 2 dependent actions from same predecessor") {
     // Action B and C depend on Action A
 
