@@ -72,9 +72,9 @@ case class KafkaConnection(override val id: ConnectionId,
         props.put(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG, m.keyStorePath)
         props.put(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG, m.keyStorePass)
         props.put(SslConfigs.SSL_KEYSTORE_TYPE_CONFIG, m.keyStoreType.getOrElse(SslConfigs.DEFAULT_SSL_KEYSTORE_TYPE))
-        props.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, m.trustStorePath)
+        props.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, m.trustStorePath)
         props.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, m.trustStorePass)
-        props.put(SslConfigs.SSL_KEYSTORE_TYPE_CONFIG, m.trustStoreType.getOrElse(SslConfigs.DEFAULT_SSL_TRUSTSTORE_TYPE))
+        props.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, m.trustStoreType.getOrElse(SslConfigs.DEFAULT_SSL_TRUSTSTORE_TYPE))
       }
       case _ => {}
     }
