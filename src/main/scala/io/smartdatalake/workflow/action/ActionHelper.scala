@@ -162,33 +162,5 @@ object ActionHelper extends SmartDataLakeLogger {
     invalidCharacters.replaceAllIn(str, "_")
   }
 
-
-
-  //  /**
-  //   * Checks a historized hive table to verify that there is only one active record for any given primary key
-  //   *
-  //   * @param pks Bestandteile des (Composite) Primary Key einer Tabelle
-  //   * @param historizedDf Historisierter [[DataFrame]]
-  //   * @throws PrimaryKeyConstraintViolationException when the primary key is not unique.
-  //   */
-  //  @throws[PrimaryKeyConstraintViolationException]
-  //  private def checkPrimaryKeyConstraint(pks: Seq[String], historizedDf: DataFrame): Unit = {
-  //    val cols = pks.map(pk => col(pk)) ++ List(col(s"${TechnicalTableColumn.delimited}"))
-  //    val surrogateTimestamp = HiveConventions.getHistorizationSurrogateTimestamp
-  //
-  //    val res = historizedDf.select(cols: _*)
-  //      .where(s"${TechnicalTableColumn.delimited} = '${Timestamp.valueOf(surrogateTimestamp)}'")
-  //      .groupBy(cols: _*).agg(count("*") as "countActiveKeys")
-  //      .where("countActiveKeys > 1")
-  //
-  //    if (res.count > 0) {
-  //      val msg =
-  //        s"""
-  //           |Primary Keys mit > 1 aktiven Datensätzen:
-  //           |${res.collect.mkString("\n")}
-  //                """.stripMargin
-  //      throw new PrimaryKeyConstraintViolationException(msg)
-  //    }
-  //  }
 }
 

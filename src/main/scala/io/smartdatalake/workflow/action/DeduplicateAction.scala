@@ -47,6 +47,7 @@ import scala.util.{Failure, Success, Try}
  *                                      Keeping deleted columns in complex data types has performance impact as all new data
  *                                      in the future has to be converted by a complex function.
  * @param initExecutionMode optional execution mode if this Action is a start node of a DAG run
+ * @param executionMode optional execution mode for this Action
  */
 case class DeduplicateAction(override val id: ActionObjectId,
                              inputId: DataObjectId,

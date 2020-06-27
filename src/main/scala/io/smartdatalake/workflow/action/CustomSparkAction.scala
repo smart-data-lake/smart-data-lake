@@ -35,6 +35,8 @@ import org.apache.spark.sql.SparkSession
  * @param inputIds input DataObject's
  * @param outputIds output DataObject's
  * @param transformer Custom Transformer to transform Seq[DataFrames]
+ * @param initExecutionMode optional execution mode if this Action is a start node of a DAG run
+ * @param executionMode optional execution mode for this Action
  */
 case class CustomSparkAction ( override val id: ActionObjectId,
                                inputIds: Seq[DataObjectId],
