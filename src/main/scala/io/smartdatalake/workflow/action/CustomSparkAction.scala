@@ -59,7 +59,7 @@ case class CustomSparkAction ( override val id: ActionObjectId,
 
     // create input subfeeds if they don't exist yet
     val enrichedSubfeeds: Seq[SparkSubFeed] = enrichSubFeedsDataFrame(inputs, subFeeds)
-    val mainInputEnrichedSubFeed = mainInput.flatMap( input => enrichedSubfeeds.find(_.dataObjectId==input.id))
+    val mainInputEnrichedSubFeed = enrichedSubfeeds.find(_.dataObjectId==mainInput.id)
 
     // Apply custom transformation to all subfeeds
     transformer.transform(enrichedSubfeeds.map( subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap)
@@ -69,7 +69,7 @@ case class CustomSparkAction ( override val id: ActionObjectId,
           val output = outputs.find(_.id.id == dataObjectId)
             .getOrElse(throw ConfigurationException(s"No output found for result ${dataObjectId} in $id. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
           // if main output, get partition values from main input
-          val partitionValues = if (mainInput.isDefined && mainOutput.exists(_.id.id == dataObjectId)) {
+          val partitionValues = if (mainOutput.id.id == dataObjectId) {
             mainInputEnrichedSubFeed.map(_.partitionValues).getOrElse(Seq())
           } else Seq()
           SparkSubFeed(Some(dataFrame),dataObjectId, partitionValues)

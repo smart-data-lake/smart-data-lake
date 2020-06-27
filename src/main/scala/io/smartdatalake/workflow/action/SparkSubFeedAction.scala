@@ -45,13 +45,16 @@ abstract class SparkSubFeedAction extends SparkAction {
    */
   def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed
 
-  private def doTransform(subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  private def doTransform(subFeed: SubFeed, thisExecutionMode: Option[ExecutionMode])(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // convert subfeed to SparkSubFeed type or initialize if not yet existing
     var preparedSubFeed = SparkSubFeed.fromSubFeed(subFeed)
-    // apply init execution mode if there are no partition values given in command line
-    preparedSubFeed = if (initExecutionMode.isDefined && subFeed.isInstanceOf[InitSubFeed] && preparedSubFeed.partitionValues.isEmpty) {
-      preparedSubFeed.copy( partitionValues = ActionHelper.applyExecutionMode(initExecutionMode.get, id, input, output, preparedSubFeed.partitionValues))
-    } else preparedSubFeed
+    // apply execution mode
+    preparedSubFeed = thisExecutionMode match {
+      case Some(mode) =>
+        val newPartitionValues = ActionHelper.applyExecutionMode(mode, id, input, output, preparedSubFeed.partitionValues)
+        preparedSubFeed.copy(partitionValues = newPartitionValues)
+      case _ => preparedSubFeed
+    }
     // persist if requested
     preparedSubFeed = if (persist) preparedSubFeed.persist else preparedSubFeed
     // break lineage if requested or if it's a streaming dataframe.
@@ -71,7 +74,9 @@ abstract class SparkSubFeedAction extends SparkAction {
    */
   override final def init(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == 1, s"Only one subfeed allowed for SparkSubFeedActions (Action $id, inputSubfeed's ${subFeeds.map(_.dataObjectId).mkString(",")})")
-    Seq(doTransform(subFeeds.head))
+    val subFeed = subFeeds.head
+    val thisExecutionMode = runtimeExecutionMode(subFeed.isDAGStart)
+    Seq(doTransform(subFeed, thisExecutionMode))
   }
 
   /**
@@ -80,14 +85,15 @@ abstract class SparkSubFeedAction extends SparkAction {
   override final def exec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == 1, s"Only one subfeed allowed for SparkSubFeedActions (Action $id, inputSubfeed's ${subFeeds.map(_.dataObjectId).mkString(",")})")
     val subFeed = subFeeds.head
+    val thisExecutionMode = runtimeExecutionMode(subFeed.isDAGStart)
     // transform
-    val transformedSubFeed = doTransform(subFeed)
+    val transformedSubFeed = doTransform(subFeed, thisExecutionMode)
     // write output
     val msg = s"writing to ${output.id}" + (if (transformedSubFeed.partitionValues.nonEmpty) s", partitionValues ${transformedSubFeed.partitionValues.mkString(" ")}" else "")
     logger.info(s"($id) start " + msg)
     setSparkJobMetadata(Some(msg))
     val (noData,d) = PerformanceUtils.measureDuration {
-      writeSubFeed(executionMode, transformedSubFeed, output)
+      writeSubFeed(thisExecutionMode, transformedSubFeed, output)
     }
     setSparkJobMetadata()
     val finalMetricsInfos = if (noData) None else getFinalMetrics(output.id).map(_.getMainInfos)

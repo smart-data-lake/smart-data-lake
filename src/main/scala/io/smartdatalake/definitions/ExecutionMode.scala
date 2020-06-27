@@ -25,7 +25,7 @@ import org.apache.spark.sql.streaming.OutputMode
  */
 sealed trait ExecutionMode
 
-trait ExecutionModeWithMainInput {
+trait ExecutionModeWithMainInputOutput {
   def mainInputId: Option[String]
   def mainOutputId: Option[String]
 }
@@ -38,7 +38,7 @@ trait ExecutionModeWithMainInput {
  * @param mainOutputId optional selection of outputId to be used for partition comparision. Only needed if there are multiple output DataObject's.
  * @param nbOfPartitionValuesPerRun optional restriction of the number of partition values per run.
  */
-case class PartitionDiffMode(partitionColNb: Option[Int] = None, override val mainInputId: Option[String] = None, override val mainOutputId: Option[String] = None, nbOfPartitionValuesPerRun: Option[Int] = None) extends ExecutionMode with ExecutionModeWithMainInput
+case class PartitionDiffMode(partitionColNb: Option[Int] = None, override val mainInputId: Option[String] = None, override val mainOutputId: Option[String] = None, nbOfPartitionValuesPerRun: Option[Int] = None) extends ExecutionMode with ExecutionModeWithMainInputOutput
 
 /**
  * Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads (trigger=Trigger.Once) and keep track of processed data.
