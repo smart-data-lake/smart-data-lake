@@ -25,7 +25,7 @@ import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartit
 import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 
-abstract class SparkSubFeedsAction extends Action {
+abstract class SparkSubFeedsAction extends SparkAction {
 
   override def inputs: Seq[DataObject with CanCreateDataFrame]
   override def outputs: Seq[DataObject with CanWriteDataFrame]
@@ -88,7 +88,7 @@ abstract class SparkSubFeedsAction extends Action {
       subFeed =>
         val output = outputs.find(_.id == subFeed.dataObjectId)
           .getOrElse(throw ConfigurationException(s"No output found for result ${subFeed.dataObjectId} in $id. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
-        ActionHelper.validateAndUpdateSubFeedPartitionValues(output, subFeed)
+        validateAndUpdateSubFeedPartitionValues(output, subFeed)
     }
   }
 
@@ -105,6 +105,7 @@ abstract class SparkSubFeedsAction extends Action {
    */
   override final def exec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == inputs.size, s"Number of subFeed's must match number of inputs for SparkSubFeedActions (Action $id, subfeed's ${subFeeds.map(_.dataObjectId).mkString(",")}, inputs ${inputs.map(_.id).mkString(",")})")
+    val mainInputSubFeed = subFeeds.find(_.dataObjectId == mainInput.get.id).getOrElse(throw new IllegalStateException(s"subFeed for main input ${mainInput.get.id} not found"))
     //transform
     val transformedSubFeeds = doTransform(subFeeds)
     // write output
@@ -114,7 +115,7 @@ abstract class SparkSubFeedsAction extends Action {
       logger.info(s"($id) start " + msg)
       setSparkJobMetadata(Some(msg))
       val (_,d) = PerformanceUtils.measureDuration {
-        output.writeDataFrame(subFeed.dataFrame.get, subFeed.partitionValues)
+        writeSubFeed(runtimeExecutionMode(mainInputSubFeed.isDAGStart), subFeed, output)
       }
       setSparkJobMetadata()
       val finalMetricsInfos = getFinalMetrics(output.id).map(_.getMainInfos)
@@ -122,31 +123,6 @@ abstract class SparkSubFeedsAction extends Action {
     }
     // return
     transformedSubFeeds
-  }
-
-  /**
-   * Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject
-   * This is needed if the input DataFrame includes many transformations from previous Actions.
-   */
-  def breakDataFrameLineage: Boolean = false
-
-  /**
-   * Force persisting DataFrame on Disk.
-   * This helps to reduce memory needed for caching the DataFrame content and can serve as a recovery point in case an task get's lost.
-   */
-  def persist: Boolean = false
-
-  /**
-   * Execution mode if this Action is a start node of a DAG run
-   */
-  def initExecutionMode: Option[ExecutionMode]
-
-  /**
-   * Returns the execution mode used on runtime of the action, depending if this Action is a start node of a DAG run
-   */
-  def runtimeExecutionMode(isDAGStart: Boolean): Option[ExecutionMode] = {
-    // override executionMode with initExecutionMode if is start node of a DAG run
-    if (isDAGStart) initExecutionMode else None
   }
 
   /**
@@ -159,7 +135,7 @@ abstract class SparkSubFeedsAction extends Action {
     assert(inputs.size==subFeeds.size, s"Number of inputs must match number of subFeeds given for $id")
     inputs.map { input =>
       val subFeed = subFeeds.find(_.dataObjectId == input.id).getOrElse(throw new IllegalStateException(s"subFeed for input ${input.id} not found"))
-      ActionHelper.enrichSubFeedDataFrame(input, subFeed, runtimeExecutionMode(subFeed.isDAGStart), context.phase)
+      enrichSubFeedDataFrame(input, subFeed, runtimeExecutionMode(subFeed.isDAGStart), context.phase)
     }
   }
 }

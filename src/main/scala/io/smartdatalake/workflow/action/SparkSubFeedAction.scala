@@ -18,14 +18,13 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode, SparkStreamingOnceMode}
+import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode}
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.streaming.Trigger
 
-abstract class SparkSubFeedAction extends Action {
+abstract class SparkSubFeedAction extends SparkAction {
 
   /**
    * Input [[DataObject]] which can CanCreateDataFrame
@@ -60,7 +59,7 @@ abstract class SparkSubFeedAction extends Action {
     // transform
     val transformedSubFeed = transform(preparedSubFeed)
     // update partition values to output's partition columns and update dataObjectId
-    ActionHelper.validateAndUpdateSubFeedPartitionValues(output, transformedSubFeed).copy(dataObjectId = output.id)
+    validateAndUpdateSubFeedPartitionValues(output, transformedSubFeed).copy(dataObjectId = output.id)
   }
 
   override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
@@ -88,24 +87,7 @@ abstract class SparkSubFeedAction extends Action {
     logger.info(s"($id) start " + msg)
     setSparkJobMetadata(Some(msg))
     val (noData,d) = PerformanceUtils.measureDuration {
-      executionMode match {
-        case Some(m: SparkStreamingOnceMode) =>
-          // Write in streaming mode - use spark streaming with Trigger.Once and awaitTermination
-          assert(transformedSubFeed.dataFrame.get.isStreaming, s"($id) ExecutionMode ${m.getClass} needs streaming DataFrame in SubFeed")
-          val streamingQuery = output.writeStreamingDataFrame(transformedSubFeed.dataFrame.get, Trigger.Once, m.outputOptions, m.checkpointLocation, s"$id writing ${output.id}", m.outputMode)
-          streamingQuery.awaitTermination
-          val noData = streamingQuery.lastProgress.numInputRows == 0
-          if (noData) logger.info(s"($id) no data to process for ${output.id} in streaming mode")
-          // return
-          noData
-        case None | Some(_: PartitionDiffMode) =>
-          // Write in batch mode
-          assert(!transformedSubFeed.dataFrame.get.isStreaming, s"($id) Input from ${transformedSubFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingOnceMode.getClass.getSimpleName}")
-          output.writeDataFrame(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
-          // return noData
-          false
-        case x => throw new IllegalStateException( s"($id) ExecutionMode $x is not supported")
-      }
+      writeSubFeed(executionMode, transformedSubFeed, output)
     }
     setSparkJobMetadata()
     val finalMetricsInfos = if (noData) None else getFinalMetrics(output.id).map(_.getMainInfos)
@@ -122,36 +104,4 @@ abstract class SparkSubFeedAction extends Action {
 
   def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit /* NOP */
 
-  /**
-   * Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject.
-   * This can help to save memory and performance if the input DataFrame includes many transformations from previous Actions.
-   * The new DataFrame will be initialized according to the SubFeed's partitionValues.
-   */
-  def breakDataFrameLineage: Boolean
-
-  /**
-   * Force persisting DataFrame on Disk.
-   * This helps to reduce memory needed for caching the DataFrame content and can serve as a recovery point in case an task get's lost.
-   */
-  def persist: Boolean
-
-  /**
-   * Execution mode if this Action is a start node of a DAG run
-   */
-  def initExecutionMode: Option[ExecutionMode]
-  require(initExecutionMode.isEmpty || initExecutionMode.exists(_.isInstanceOf[PartitionDiffMode]), s"($id) $initExecutionMode not supported as initExecutionMode")
-
-  /**
-   * General execution mode for this action.
-   * Note that this is overridden by initExecutionMode if it is defined and this Action is a start node of a DAG run.
-   */
-  def executionMode: Option[ExecutionMode]
-
-  /**
-   * Returns the execution mode used on runtime of the action, depending if this Action is a start node of a DAG run
-   */
-  def runtimeExecutionMode(isDAGStart: Boolean): Option[ExecutionMode] = {
-    // override executionMode with initExecutionMode if is start node of a DAG run
-    if (isDAGStart) initExecutionMode.orElse(executionMode) else executionMode
-  }
 }

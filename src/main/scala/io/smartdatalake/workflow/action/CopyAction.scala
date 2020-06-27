@@ -69,10 +69,10 @@ case class CopyAction(override val id: ActionObjectId,
   override def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
 
     // enrich DataFrames if not yet existing
-    var transformedSubFeed = ActionHelper.enrichSubFeedDataFrame(input, subFeed, runtimeExecutionMode(subFeed.isDAGStart), context.phase)
+    var transformedSubFeed = enrichSubFeedDataFrame(input, subFeed, runtimeExecutionMode(subFeed.isDAGStart), context.phase)
 
     // apply transformations
-    transformedSubFeed = ActionHelper.applyTransformations(
+    transformedSubFeed = applyTransformations(
       transformedSubFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, None, filterClauseExpr)
 
     // return transformed subfeed
