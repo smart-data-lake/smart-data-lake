@@ -70,7 +70,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // prepare DAG
     val refTimestamp1 = LocalDateTime.now()
-    val statePath = "stateTest/"
+    val statePath = tempPath+"stateTest/"
     val appName = "test"
     implicit val context: ActionPipelineContext = ActionPipelineContext(feed, appName, 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
@@ -131,7 +131,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // prepare DAG
     val refTimestamp1 = LocalDateTime.now()
-    val statePath = "stateTest/"
+    val statePath = tempPath+"stateTest/"
     val appName = "test"
     implicit val context: ActionPipelineContext = ActionPipelineContext(feed, appName, 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
