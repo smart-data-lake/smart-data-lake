@@ -54,8 +54,8 @@ private[smartdatalake] class DummyStreamProvider extends DataSourceV2
     override def getEndOffset(): Offset = LongOffset(0)
     override def deserializeOffset(json: String): Offset = LongOffset(json.toLong)
     override def planInputPartitions(): java.util.List[InputPartition[InternalRow]] = throw new NotImplementedError("DummyMicroBatchReader cannot deliver data")
-    override def commit(end: Offset): Unit = {}
-    override def stop(): Unit = {}
+    override def commit(end: Offset): Unit = Unit
+    override def stop(): Unit = Unit
     override def toString: String = s"DummyStreamV2"
   }
 }

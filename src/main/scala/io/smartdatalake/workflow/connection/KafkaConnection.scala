@@ -22,15 +22,13 @@ package io.smartdatalake.workflow.connection
 import java.util.Properties
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.definitions.{AuthMode, SSLCertsAuthMode}
 import org.apache.kafka.clients.admin.AdminClient
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.admin.AdminClientConfig
 import org.apache.kafka.common.config.SslConfigs
-
-
 
 import scala.collection.JavaConverters._
 
@@ -58,12 +56,12 @@ case class KafkaConnection(override val id: ConnectionId,
     AdminClient.create(props)
   }
 
-  val KafkaConfigOptionPrefix = "kafka."
-  val KafkaSSLSecurityProtocol = "SSL"
+  private val KafkaConfigOptionPrefix = "kafka."
+  private val KafkaSSLSecurityProtocol = "SSL"
 
   // Early validation and partition init use kafka clients directly and need
   // to authenticate to broker
-  val authProps = {
+  private[workflow] val authProps = {
     val props = new Properties()
     authMode match {
       case Some(m: SSLCertsAuthMode) => {
@@ -75,13 +73,15 @@ case class KafkaConnection(override val id: ConnectionId,
         props.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, m.truststorePass)
         props.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, m.truststoreType.getOrElse(SslConfigs.DEFAULT_SSL_TRUSTSTORE_TYPE))
       }
-      case _ => {}
+      case Some(m) => throw ConfigurationException(s"${m.getClass.getSimpleName} is not supported for ${getClass.getSimpleName}")
+      case None => Unit
     }
     props
   }
 
   // Kafka Configs are prepended with "kafka." in data source option map
-  val authOptions = authProps.asScala.map(c => (s"${KafkaConfigOptionPrefix}${c._1}", c._2))
+  private val authOptions = authProps.asScala.map(c => (s"${KafkaConfigOptionPrefix}${c._1}", c._2))
+  private[workflow] val sparkOptions = authOptions ++ dataSourceOptions + (KafkaConfigOptionPrefix+ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> brokers)
 
   def topicExists(topic: String): Boolean = {
     adminClient.listTopics.names.get.asScala.contains(topic)

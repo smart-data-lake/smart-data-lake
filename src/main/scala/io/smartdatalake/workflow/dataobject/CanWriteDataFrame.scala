@@ -47,7 +47,7 @@ private[smartdatalake] trait CanWriteDataFrame {
 
     // lambda function is ambiguous with foreachBatch in scala 2.12... we need to create a real function...
     // Note: no partition values supported when writing streaming target
-    def microBatchWriter(df_microbatch: Dataset[Row], batchid: Long): Unit = writeDataFrame(df_microbatch, Seq())
+    def microBatchWriter(dfMicrobatch: Dataset[Row], batchid: Long): Unit = writeDataFrame(dfMicrobatch, Seq())
 
     df
       .writeStream

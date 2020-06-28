@@ -69,7 +69,7 @@ case class DatePartitionColumnDef(colName: String, timeFormat: String = "yyyyMMd
   private[smartdatalake] def current = LocalDateTime.now().truncatedTo(chronoUnit)
 }
 
-object TemporalQueries {
+private object TemporalQueries {
   val LocalDateTimeQuery: TemporalQuery[LocalDateTime] = new TemporalQuery[LocalDateTime] {
     override def queryFrom(temporal: TemporalAccessor): LocalDateTime = LocalDateTime.from(temporal)
   }
@@ -124,7 +124,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   require((keyType!=KafkaColumnType.AvroSchemaRegistry && valueType!=KafkaColumnType.AvroSchemaRegistry) || connection.schemaRegistry.nonEmpty, s"($id) If key or value is of type AvroSchemaRegistry, the schemaRegistry must be defined in the connection")
   require(batchReadMaxOffsetsPerTask.isEmpty || batchReadMaxOffsetsPerTask.exists(_>0), s"($id) batchReadMaxOffsetsPerTask must be greater than 0")
 
-  val instanceOptions = connection.authOptions ++ connection.dataSourceOptions ++ dataSourceOptions
+  private val instanceOptions = connection.sparkOptions ++ dataSourceOptions
 
   private val schemaRegistryConfig = connection.schemaRegistry.map (
     schemaRegistry => Map(
@@ -162,7 +162,6 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       .readStream
       .format("kafka")
       .options(instanceOptions ++ options) // options override kafkaOptions override connection.kafkaOptions
-      .option("kafka.bootstrap.servers", connection.brokers)
       .option("subscribe", topicName)
       .load()
     prepareDataFrame(dfRaw)
@@ -242,7 +241,6 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                 .read
                 .format("kafka")
                 .options(instanceOptions)
-                .option("kafka.bootstrap.servers", connection.brokers)
                 .option("subscribe", topicName)
                 .option("startingOffsets", s"""{"$topicName":{$startingOffsets}}""")
                 .option("endingOffsets", s"""{"$topicName":{$endingOffsets}}""") // endingOffsets are exclusive
@@ -256,7 +254,6 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       session.read
         .format("kafka")
         .options(instanceOptions)
-        .option("kafka.bootstrap.servers", connection.brokers)
         .option("subscribe", topicName)
         .option("startingOffsets", "earliest")
         .option("endingOffsets", "latest")
@@ -272,7 +269,6 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     df.write
       .format("kafka")
       .options(instanceOptions)
-      .option("kafka.bootstrap.servers", connection.brokers)
       .option("topic", topicName)
       .save
   }
@@ -287,7 +283,6 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       .outputMode(outputMode)
       .options(instanceOptions ++ options)
       .option("checkpointLocation", checkpointLocation)
-      .option("kafka.bootstrap.servers", connection.brokers)
       .option("topic", topicName)
       .start()
   }
@@ -363,7 +358,7 @@ object KafkaColumnType extends Enumeration {
  * Offsets to process per topic partition
  * Note: endOffset is exclusive
  */
-case class TopicPartitionOffsets(topicPartition: TopicPartition, startOffset: Option[Long], endOffset: Option[Long]) {
+private case class TopicPartitionOffsets(topicPartition: TopicPartition, startOffset: Option[Long], endOffset: Option[Long]) {
 
   // default offset definitions according to spark
   private val defaultOffsetEarliest = -2
