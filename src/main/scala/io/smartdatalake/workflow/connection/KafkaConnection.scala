@@ -51,13 +51,12 @@ case class KafkaConnection(override val id: ConnectionId,
                            override val metadata: Option[ConnectionMetadata] = None
                           ) extends Connection {
 
-
-      @transient private lazy val adminClient = {
-        val props = new Properties()
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, brokers)
-        props.putAll(authProps)
-        AdminClient.create(props)
-      }
+  @transient private lazy val adminClient = {
+    val props = new Properties()
+    props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, brokers)
+    props.putAll(authProps)
+    AdminClient.create(props)
+  }
 
   val KafkaConfigOptionPrefix = "kafka."
   val KafkaSSLSecurityProtocol = "SSL"
@@ -78,22 +77,22 @@ case class KafkaConnection(override val id: ConnectionId,
       }
       case _ => {}
     }
-        props
-    }
+    props
+  }
 
   // Kafka Configs are prepended with "kafka." in data source option map
   val authOptions = authProps.asScala.map(c => (s"${KafkaConfigOptionPrefix}${c._1}", c._2))
 
-      def topicExists(topic: String): Boolean = {
-        adminClient.listTopics.names.get.asScala.contains(topic)
-      }
+  def topicExists(topic: String): Boolean = {
+    adminClient.listTopics.names.get.asScala.contains(topic)
+  }
 
-      override def factory: FromConfigFactory[Connection] = KafkaConnection
-    }
+  override def factory: FromConfigFactory[Connection] = KafkaConnection
+}
 
-      object KafkaConnection extends FromConfigFactory[Connection] {
-        override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): KafkaConnection = {
-          import configs.syntax.ConfigOps
-          config.extract[KafkaConnection].value
-        }
-      }
+object KafkaConnection extends FromConfigFactory[Connection] {
+  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): KafkaConnection = {
+    import configs.syntax.ConfigOps
+    config.extract[KafkaConnection].value
+  }
+}

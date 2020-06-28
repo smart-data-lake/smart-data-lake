@@ -32,11 +32,16 @@ abstract class SparkSubFeedsAction extends SparkAction {
 
   // prepare main input / output
   // this must be lazy because inputs / outputs is evaluated later in subclasses
-  val initExecutionModeMainInput: Option[ExecutionModeWithMainInputOutput] = initExecutionMode.collect{ case mode: ExecutionModeWithMainInputOutput => mode }
-  lazy val initMainInput: Option[DataObject with CanCreateDataFrame] = initExecutionModeMainInput.flatMap {
+  val initExecutionModeMainInputOutput: Option[ExecutionModeWithMainInputOutput] = initExecutionMode.collect{ case mode: ExecutionModeWithMainInputOutput => mode }
+  lazy val initMainInput: Option[DataObject with CanCreateDataFrame] = initExecutionModeMainInputOutput.flatMap {
+    _.mainInputId.map( inputId => inputs.find(_.id.id == inputId).getOrElse(throw ConfigurationException(s"$id has set an initExecutionMode with inputId $inputId, which was not found in inputs")))
+  }
+  val normalExecutionModeMainInputOutput: Option[ExecutionModeWithMainInputOutput] = executionMode.collect{ case mode: ExecutionModeWithMainInputOutput => mode }
+  lazy val normalMainInput: Option[DataObject with CanCreateDataFrame] = normalExecutionModeMainInputOutput.flatMap {
     _.mainInputId.map( inputId => inputs.find(_.id.id == inputId).getOrElse(throw ConfigurationException(s"$id has set an initExecutionMode with inputId $inputId, which was not found in inputs")))
   }
   lazy protected val mainInput: DataObject with CanCreateDataFrame = initMainInput
+  .orElse(normalMainInput)
   .orElse {
     val paritionedInputs = inputs.collect{ case x: CanHandlePartitions => x }.filter(_.partitions.nonEmpty)
     if (paritionedInputs.size==1) paritionedInputs.headOption
@@ -47,10 +52,14 @@ abstract class SparkSubFeedsAction extends SparkAction {
     if (executionModeNeedsMainInputOutput) logger.warn(s"($id) Could not determine unique main input but execution mode might need it. Decided for ${inputs.head.id}.")
     inputs.head
   }
-  lazy protected val initMainOutput: Option[DataObject with CanWriteDataFrame] = initExecutionModeMainInput.flatMap {
+  lazy protected val initMainOutput: Option[DataObject with CanWriteDataFrame] = initExecutionModeMainInputOutput.flatMap {
+    _.mainOutputId.map( outputId => outputs.find(_.id.id == outputId).getOrElse(throw ConfigurationException(s"$id has set an initExecutionMode with outputId $outputId, which was not found in outputs")))
+  }
+  lazy protected val normalMainOutput: Option[DataObject with CanWriteDataFrame] = normalExecutionModeMainInputOutput.flatMap {
     _.mainOutputId.map( outputId => outputs.find(_.id.id == outputId).getOrElse(throw ConfigurationException(s"$id has set an initExecutionMode with outputId $outputId, which was not found in outputs")))
   }
   lazy protected val mainOutput: DataObject with CanWriteDataFrame = initMainOutput
+  .orElse(normalMainOutput)
   .orElse{
     val paritionedOutputs = outputs.collect{ case x: CanHandlePartitions => x }.filter(_.partitions.nonEmpty)
     if (paritionedOutputs.size==1) paritionedOutputs.headOption else None
@@ -123,12 +132,13 @@ abstract class SparkSubFeedsAction extends SparkAction {
       val msg = s"writing DataFrame to ${output.id}" + (if (subFeed.partitionValues.nonEmpty) s", partitionValues ${subFeed.partitionValues.mkString(" ")}" else "")
       logger.info(s"($id) start " + msg)
       setSparkJobMetadata(Some(msg))
-      val (_,d) = PerformanceUtils.measureDuration {
+      val (noData,d) = PerformanceUtils.measureDuration {
         writeSubFeed(thisExecutionMode, subFeed, output)
       }
       setSparkJobMetadata()
-      val finalMetricsInfos = getFinalMetrics(output.id).map(_.getMainInfos)
-      logger.info(s"($id) finished writing DataFrame to ${output.id}: duration=$d" + finalMetricsInfos.map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse(""))
+      val metricsLog = if (noData) ", no data found"
+      else getFinalMetrics(output.id).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
+      logger.info(s"($id) finished writing DataFrame to ${output.id}: duration=$d" + metricsLog)
     }
     // return
     transformedSubFeeds

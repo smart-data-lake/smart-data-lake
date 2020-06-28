@@ -95,7 +95,7 @@ object TemporalQueries {
   *                   convert to a complex type according to the avro schema. To expand it select "value.*".
   *                   Default is to select key and value.
   * @param datePartitionCol definition of date partition column to extract formatted timestamp into column.
- *                    This is used to list existing partition and is added as additional column on batch read.
+  *                   This is used to list existing partition and is added as additional column on batch read.
   * @param batchReadConsecutivePartitionsAsRanges Set to true if consecutive partitions should be combined as one range of offsets when batch reading from topic. This results in less tasks but can be a performance problem when reading many partitions. (default=false)
   * @param batchReadMaxOffsetsPerTask Set number of offsets per Spark task when batch reading from topic.
   * @param dataSourceOptions Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).

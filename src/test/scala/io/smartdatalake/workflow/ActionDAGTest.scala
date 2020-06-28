@@ -29,7 +29,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.customlogic.{CustomDfsTransformer, CustomDfsTransformerConfig}
-import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, HiveTableDataObject, JsonFileDataObject, ParquetFileDataObject, Table, TickTockHiveTableDataObject}
+import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
@@ -681,6 +681,69 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val action2MainMetrics = action2.getFinalMetrics(action2.outputId).get.getMainInfos
     assert(action2MainMetrics("records_written")==2) // without execution mode always the whole table is processed
   }
+
+  test("action dag union 2 streams with executionMode=SparkStreamingOnceMode") {
+    // setup DataObjects
+    val feed = "actionpipeline"
+    val tempDir = Files.createTempDirectory(feed)
+    val schema = DataType.fromDDL("lastname string, firstname string, rating int").asInstanceOf[StructType]
+    val src1DO = JsonFileDataObject( "src1", tempDir.resolve("src1").toString.replace('\\', '/'), schema = Some(schema))
+    instanceRegistry.register(src1DO)
+    val src2DO = JsonFileDataObject( "src2", tempDir.resolve("src2").toString.replace('\\', '/'), schema = Some(schema))
+    instanceRegistry.register(src2DO)
+    val tgt1DO = JsonFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SaveMode.Append, jsonOptions = Some(Map("multiLine" -> "false")))
+    instanceRegistry.register(tgt1DO)
+
+    // prepare DAG
+    val refTimestamp1 = LocalDateTime.now()
+    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+    val data1src1 = Seq(("doe","john",5))
+    val data1src2 = Seq(("einstein","albert",2))
+    src1DO.writeDataFrame(data1src1.toDF("lastname", "firstname", "rating"), Seq())
+    src2DO.writeDataFrame(data1src2.toDF("lastname", "firstname", "rating"), Seq())
+
+    val action1 = CustomSparkAction( "a", Seq(src1DO.id,src2DO.id), Seq(tgt1DO.id)
+                                   , executionMode = Some(SparkStreamingOnceMode(checkpointLocation = tempDir.resolve("stateA").toUri.toString))
+                                   , transformer = CustomDfsTransformerConfig(className = Some(classOf[TestStreamingTransformer].getName))
+                                   )
+    val dag: ActionDAGRun = ActionDAGRun(Seq(action1), 1, 1)
+
+    // first dag run, first file processed
+    dag.prepare
+    dag.init
+    dag.exec
+
+    // check
+    val dfTgt1 = tgt1DO.getDataFrame()
+    val r1 = tgt1DO.getDataFrame().select($"lastname",$"firstname",$"rating".cast("int")).as[(String,String,Int)].collect().toSet
+    assert(r1 == (data1src1 ++ data1src2).toSet)
+
+    // second dag run - no data to process
+    dag.reset
+    dag.prepare
+    dag.init
+    dag.exec
+
+    // check
+    val r2 = tgt1DO.getDataFrame().select($"lastname",$"firstname",$"rating".cast("int")).as[(String,String,Int)].collect().toSet
+    assert(r2 == (data1src1 ++ data1src2).toSet)
+
+    // third dag run - new data to process in src 2
+    val data2 = Seq(("doe","john 2",10))
+    src2DO.writeDataFrame(data2.toDF("lastname", "firstname", "rating"), Seq())
+    dag.reset
+    dag.prepare
+    dag.init
+    dag.exec
+
+    // check
+    val r3 = tgt1DO.getDataFrame().select($"lastname",$"firstname",$"rating".cast("int")).as[(String,String,Int)].collect().toSet
+    assert(r3 == (data1src1 ++ data1src2 ++ data2).toSet)
+
+    // check metrics
+    val action1MainMetrics = action1.getFinalMetrics(action1.outputIds.head).get.getMainInfos
+    assert(action1MainMetrics("records_written")==1)
+  }
 }
 
 class TestActionDagTransformer extends CustomDfsTransformer {
@@ -695,3 +758,9 @@ class TestActionDagTransformer extends CustomDfsTransformer {
   }
 }
 
+class TestStreamingTransformer extends CustomDfsTransformer {
+  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame]): Map[String, DataFrame] = {
+    val dfTgt1 = dfs("src1").unionByName(dfs("src2"))
+    Map("tgt1" -> dfTgt1)
+  }
+}
