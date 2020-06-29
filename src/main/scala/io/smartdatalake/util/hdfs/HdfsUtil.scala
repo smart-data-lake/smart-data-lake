@@ -148,6 +148,19 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   }
 
   /**
+   * In contrast to deletePath this supports "globs"
+   */
+  def deleteFiles( path:String, fs:FileSystem, doWarn:Boolean ) : Unit = {
+    try {
+      val deletePaths = fs.globStatus(new Path(path)).map(_.getPath)
+      deletePaths.foreach{ path => fs.delete(path, true) }
+      logger.info(s"${deletePaths.size} files delete for hadoop path ${path}.")
+    } catch {
+      case e: Exception => if (doWarn) logger.warn(s"Hadoop path ${path} couldn't be deleted (${e.getMessage})")
+    }
+  }
+
+  /**
    * Create default Hadoop Filesystem Authority
    *
    * @return

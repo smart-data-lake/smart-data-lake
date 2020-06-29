@@ -62,6 +62,32 @@ For a list of all available actions, please consult the [API docs](site/scaladoc
 
 In the package overview, you can also see the parameters available to each type of action and which parameters are optional.
 
+# Command Line
+SmartDataLakeBuilder is a java application. To run on a cluster with spark-submit use **DefaultSmartDataLakeBuilder** application.
+It can be started with the following command line (details see [YARN](YARN.md))
+```bash
+spark-submit --master yarn --deploy-mode client --class io.smartdatalake.app.DefaultSmartDataLakeBuilder target/smartdatalake_2.11-1.0.3-jar-with-dependencies.jar [arguments]
+```
+and takes the following arguments:
+```
+Usage: DefaultSmartDataLakeBuilder [options]
+  -f, --feed-sel <value>   Regex pattern to select the feed to execute.
+  -n, --name <value>       Optional name of the application. If not specified feed-sel is used.
+  -c, --config <value>     One or multiple configuration files or directories containing configuration files, separated by comma.
+  --partition-values <value>
+                           Partition values to process in format <partitionColName>=<partitionValue>[,<partitionValue>,...].
+  --multi-partition-values <value>
+                           Multi partition values to process in format <partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>[;(<partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>;...].
+  --parallelism <value>    Parallelism for DAG run.
+  --state-path <value>     Path to save run state files. Must be set to enable recovery in case of failures.
+  --override-jars <value>  Comma separated list of jars for child-first class loader. The jars must be present in classpath.
+  --help                   Display the help text.
+  --version                Display version information.
+```
+There exists the following adapted applications versions:
+- **LocalSmartDataLakeBuilder**:<br>default for Spark master is `local[*]` and it has additional properties to configure Kerberos authentication. Use this application to run in a local environment (e.g. IntelliJ) without cluster deployment.  
+- **DatabricksSmartDataLakeBuilder**:<br>see [MicrosoftAzure](MicrosoftAzure.md)
+
 # Concepts
 
 ## DAG
@@ -81,6 +107,16 @@ Execution modes select the data to be processed. By default, if you start SmartD
 You can apply a filter manually by specifying parameter --partition-values or --multi-partition-values on the command line. The partition values specified are passed to all start-Actions of a DAG and filtered for every input DataObject by its defined partition columns.
 On execution every Action takes the partition values of the input and filters them again for every output DataObject by its defined partition columns, which serve again as partition values for the input of the next Action. 
 Note that during execution of the dag, no new partition values are added, they are only filtered.
+
+### Dynamic partition values filter - PartitionDiffMode
+Alternatively you can let SmartDataLakeBuilder find missing partitions and set partition values automatically by specifying execution mode PartitionDiffMode.
+
+Often this should only happen on the start-Actions of a DAG, so it's clear what partitions are processed through a specific DAG run.
+But its also possible to let every Action in the DAG decide again dynamically, what partitions are missing and should be processed.
+You can configure this by the following attributes of an Action:
+- initExecutionMode: define the execution mode if this Action is a start-Actions of the DAG
+- executionMode: define the execution mode independently of its position is the DAG.
+If both attributes are set, initExecutionMode overrides executionMode if the Action is a a start-Action of the DAG.
 
 ### Dynamic partition values filter - PartitionDiffMode
 Alternatively you can let SmartDataLakeBuilder find missing partitions and set partition values automatically by specifying execution mode PartitionDiffMode.

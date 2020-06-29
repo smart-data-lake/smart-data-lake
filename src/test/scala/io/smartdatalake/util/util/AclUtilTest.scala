@@ -18,8 +18,10 @@
  */
 package io.smartdatalake.util.util
 
+import java.net.URI
 import java.nio.file.{Files, Paths}
 
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.AclUtil
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.conf.Configuration
@@ -42,31 +44,31 @@ class AclUtilTest extends FunSuite with BeforeAndAfter {
   }
 
   test("Parent method returns None when there is no parent.") {
-    assert(AclUtil.parent(Some(new Path("/"))) === None)
+    assert(AclUtil.parent(new Path("/")) === None)
   }
 
-  test("Parent method returns the root directory of a root subsirectory.") {
-    val parentPath = AclUtil.parent(Some(new Path("/child")))
+  test("Parent method returns the root directory of a root subdirectory.") {
+    val parentPath = AclUtil.parent(new Path("/child"))
     assert(parentPath.value === new Path("/"))
   }
 
   test("Parent method returns the parent directory of the supplied path.") {
-    val parentPath = AclUtil.parent(Some(new Path("/path/to/parent/child")))
+    val parentPath = AclUtil.parent(new Path("/path/to/parent/child"))
     assert(parentPath.value === new Path("/path/to/parent/"))
   }
 
   test("Parent method works when child path contains a wildcard inside the last path element.") {
-    val parentPath = AclUtil.parent(Some(new Path("/path/to/parent/child_*_suffix")))
+    val parentPath = AclUtil.parent(new Path("/path/to/parent/child_*_suffix"))
     assert(parentPath.value === new Path("/path/to/parent"))
   }
 
   test("Parent method works when child path contains a wildcard at the beginning of the last path element.") {
-    val parentPath = AclUtil.parent(Some(new Path("/path/to/parent/*_middle_suffix")))
+    val parentPath = AclUtil.parent(new Path("/path/to/parent/*_middle_suffix"))
     assert(parentPath.value === new Path("/path/to/parent"))
   }
 
   test("Parent method works when child path contains a wildcard at the end of the last path element.") {
-    val parentPath = AclUtil.parent(Some(new Path("/path/to/parent/child_middle_*")))
+    val parentPath = AclUtil.parent(new Path("/path/to/parent/child_middle_*"))
     assert(parentPath.value === new Path("/path/to/parent"))
   }
 
@@ -82,38 +84,41 @@ class AclUtilTest extends FunSuite with BeforeAndAfter {
     assert(exists === true)
   }
 
-  test("Parent of root direcory") {
-    val rootPath = Some(new Path("/"))
+  test("Parent method returns the parent directory of the supplied path with scheme/authority.") {
+    val parentPath = AclUtil.parent(new Path("hdfs://dfs.nameservices/path/to/parent/child"))
+    assert(parentPath.value === new Path("hdfs://dfs.nameservices/path/to/parent/"))
+  }
+
+  test("Parent of root directory with schema/authority") {
+    val rootPath = new Path("hdfs://dfs.nameservices/")
     val rootParentPath = AclUtil.parent(rootPath)
     assert(rootParentPath.isEmpty)
   }
 
-  test("Traverse directoryUpTo some existing directory (user home)") {
-    val path = Some(new Path("/user/app_datalake/integration/someapp"))
-    val upperPath = AclUtil.traverseDirectoryUpTo("app_datalake", path)
-    assert(upperPath.get == new Path("/user/app_datalake"))
+  test("Parent of root directory") {
+    val rootPath = new Path("/")
+    val rootParentPath = AclUtil.parent(rootPath)
+    assert(rootParentPath.isEmpty)
   }
 
-  test("Traverse directoryUpTo some existing directory (feed)") {
-    val path = Some(new Path("/user/app_datalake/integration/someapp/somefeed/data"))
-    val upperPath = AclUtil.traverseDirectoryUpTo("somefeed", path)
-    assert(upperPath.get == new Path("/user/app_datalake/integration/someapp/somefeed"))
+  def noOpAclSetter(p:Path): Unit = Unit
+
+  test("Traverse directoryUp some existing directory (user home)") {
+    val path = new Path("/user/app_dir/integration/someapp")
+    val upperPath = AclUtil.traverseDirectoryUp(path, Environment.hdfsAclsUserHomeLevel, noOpAclSetter)
+    assert(upperPath == new Path("/user/app_dir"))
   }
 
-  test("Traverse directoryUpTo some non existent directory") {
-    val path = Some(new Path("/user/app_datalake/integration/someapp"))
-    val upperPath = AclUtil.traverseDirectoryUpTo("non_existing", path)
-    assert(upperPath.isEmpty)
+  test("Traverse directoryUp some existing directory (user home) with scheme/authority") {
+    val path = new Path("hdfs://dfs.nameservices/user/app_dir/integration/someapp")
+    val upperPath = AclUtil.traverseDirectoryUp(path, Environment.hdfsAclsUserHomeLevel, noOpAclSetter)
+    assert(upperPath == new Path("hdfs://dfs.nameservices/user/app_dir"))
   }
 
-  test("Path contains Feed") {
-    val path = Some(new Path("/user/app_datalake/integration/someapp/somefeed/data"))
-    assert(AclUtil.pathContainsFeed(path, "somefeed"))
-  }
-
-  test("Path does not contain Feed") {
-    val path = Some(new Path("/tmp/u123456/someapp"))
-    assert(!AclUtil.pathContainsFeed(path, "randomfeed"))
+  test("Traverse directoryUp some existing directory (feed)") {
+    val path = new Path("/user/app_dir/integration/someapp/somefeed/data")
+    val upperPath = AclUtil.traverseDirectoryUp(path, Environment.hdfsAclsUserHomeLevel, noOpAclSetter)
+    assert(upperPath == new Path("/user/app_dir"))
   }
 
   test("Path to file exists") {
@@ -139,73 +144,127 @@ class AclUtilTest extends FunSuite with BeforeAndAfter {
   }
 
   test("Root dir has level 0") {
-    val rootPath = "/"
+    val rootPath = new Path("/")
+    assert(AclUtil.getPathLevel(rootPath) == 0)
+  }
+
+  test("Root dir with scheme/authority has level 0") {
+    val rootPath = new Path("hdfs://dfs.nameservices/")
     assert(AclUtil.getPathLevel(rootPath) == 0)
   }
 
   test("User dir has level 1") {
-    val path1 = "/user"
+    val path1 = new Path("/user")
     assert(AclUtil.getPathLevel(path1) == 1)
 
-    val path2 = "/user/"
+    val path2 = new Path("/user/")
     assert(AclUtil.getPathLevel(path2) == 1)
   }
 
   test("User home dir has level 2") {
-    val path1 = "/user/app_dir"
+    val path1 = new Path("/user/app_dir")
     assert(AclUtil.getPathLevel(path1) == 2)
 
-    val path2 = "/user/app_dir/"
+    val path2 = new Path("/user/app_dir/")
     assert(AclUtil.getPathLevel(path2) == 2)
   }
 
-  test("ACL modify on  root dir is NOT allowed") {
-    val path = "/user"
+  test("User home dir with scheme/authority has level 2") {
+    val path1 = new Path("hdfs://dfs.nameservices/user/app_dir")
+    assert(AclUtil.getPathLevel(path1) == 2)
+
+    val path2 = new Path("hdfs://dfs.nameservices/user/app_dir/")
+    assert(AclUtil.getPathLevel(path2) == 2)
+  }
+
+  test("ACL modify on root dir is NOT allowed") {
+    val path = new Path("/")
+    assert(!AclUtil.isAclModifyAllowed(path))
+  }
+
+  test("ACL modify on root dir with scheme/authority is NOT allowed") {
+    val path = new Path("hdfs://dfs.nameservices/")
     assert(!AclUtil.isAclModifyAllowed(path))
   }
 
   test("ACL modify on /user dir is NOT allowed") {
-    val path = "/user"
+    val path = new Path("/user")
+    assert(!AclUtil.isAclModifyAllowed(path))
+  }
+
+  test("ACL modify on /user with scheme/authority dir is NOT allowed") {
+    val path = new Path("hdfs://dfs.nameservices/user")
     assert(!AclUtil.isAclModifyAllowed(path))
   }
 
   test("ACL modify on user home dir is allowed") {
-    val path = "/user/app_dir"
+    val path = new Path("/user/app_dir")
+    assert(AclUtil.isAclModifyAllowed(path))
+  }
+
+  test("ACL modify on user home dir with scheme/authority is allowed") {
+    val path = new Path("hdfs://dfs.nameservices/user/app_dir")
     assert(AclUtil.isAclModifyAllowed(path))
   }
 
   test("ACL overwrite on user home dir is NOT allowed") {
-    val path = "/user/app_dir"
+    val path = new Path("/user/app_dir")
+    assert(!AclUtil.isAclOverwriteAllowed(path))
+  }
+
+  test("ACL overwrite on user home dir with scheme/authority is NOT allowed") {
+    val path = new Path("hdfs://dfs.nameservices/user/app_dir")
     assert(!AclUtil.isAclOverwriteAllowed(path))
   }
 
   test("ACL modify on stage dir is allowed") {
-    val path = "/user/app_dir/stage"
+    val path = new Path("/user/app_dir/stage")
     assert(AclUtil.isAclModifyAllowed(path))
   }
 
   test("ACL overwrite on stage dir is NOT allowed") {
-    val path = "/user/app_dir/stage"
+    val path = new Path("/user/app_dir/stage")
     assert(!AclUtil.isAclOverwriteAllowed(path))
   }
 
   test("ACL modify on source dir is allowed") {
-    val path = "/user/app_dir/stage/somesource"
+    val path = new Path("/user/app_dir/stage/somesource")
     assert(AclUtil.isAclModifyAllowed(path))
   }
 
   test("ACL overwrite on source dir is NOT allowed") {
-    val path = "/user/app_dir/stage/somesource"
+    val path = new Path("/user/app_dir/stage/somesource")
     assert(!AclUtil.isAclOverwriteAllowed(path))
   }
 
-  test("ACL modify on feed dir is NOT allowed") {
-    val path = "/user/app_dir/stage/somesource/somefeed"
-    assert(!AclUtil.isAclModifyAllowed(path))
+  test("ACL overwrite on feed dir is allowed") {
+    val path = new Path("/user/app_dir/stage/somesource/somefeed")
+    assert(AclUtil.isAclOverwriteAllowed(path))
   }
 
-  test("ACL overwrite on feed dir is allowed") {
-    val path = "/user/app_dir/stage/somesource/somefeed"
+  test("ACL overwrite on feed dir with scheme/authority is allowed") {
+    val path = new Path("hdfs://dfs.nameservices/user/app_dir/stage/somesource/somefeed")
     assert(AclUtil.isAclOverwriteAllowed(path))
+  }
+
+  test("extract user home") {
+    assert(AclUtil.extractPathLevel(new Path("hdfs://dfs.nameservices/user/app_dir"),Environment.hdfsAclsUserHomeLevel) == "app_dir")
+    assert(AclUtil.extractPathLevel(new Path("hdfs://dfs.nameservices/user/app_dir/"),Environment.hdfsAclsUserHomeLevel) == "app_dir")
+    assert(AclUtil.extractPathLevel(new Path("hdfs://dfs.nameservices/user/app_dir/test/abc"),Environment.hdfsAclsUserHomeLevel) == "app_dir")
+    intercept[IllegalArgumentException](AclUtil.extractPathLevel(new Path("hdfs://dfs.nameservices/user/"),Environment.hdfsAclsUserHomeLevel) == "app_dir")
+  }
+
+  test("check hdfsAclsLimitToBasedir") {
+
+    // check user home validation
+    AclUtil.checkBasedirPath("app_dir", new Path("hdfs://dfs.nameservices/user/app_dir"))
+    intercept[IllegalArgumentException](AclUtil.checkBasedirPath("app_other_dir", new Path("hdfs://dfs.nameservices/user/app_dir")))
+    val hdfsBaseDirOrg = Environment.hdfsBasedir
+
+    // check basedir valdiation
+    Environment.hdfsBasedir = Some(new Path("hdfs://dfs.nameservices/user/app_other_dir").toUri)
+    AclUtil.checkBasedirPath("app_dir", new Path("hdfs://dfs.nameservices/user/app_other_dir"))
+    intercept[IllegalArgumentException](AclUtil.checkBasedirPath("app_dir", new Path("hdfs://dfs.nameservices/user/app_dir")))
+    Environment.hdfsBasedir = hdfsBaseDirOrg // revert environment config
   }
 }

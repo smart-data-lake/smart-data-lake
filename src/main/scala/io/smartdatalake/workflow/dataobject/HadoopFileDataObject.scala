@@ -22,6 +22,7 @@ import java.io.{InputStream, OutputStream}
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.util.misc.DataFrameUtil.arrayToSeq
@@ -193,6 +194,14 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
           else v
           FileRef(f.getPath.toString, f.getPath.getName, pVs)
         }
+    }
+  }
+
+  override def preWrite(implicit session: SparkSession): Unit = {
+    super.preWrite
+    // validate if acl's must be / are configured before writing
+    if (Environment.hadoopAuthoritiesWithAclsRequired.exists( a => filesystem.getUri.toString.contains(a))) {
+      require(acl.isDefined, s"($id) ACL definitions are required for writing DataObjects on hadoop authority ${filesystem.getUri} by environment setting hadoopAuthoritiesWithAclsRequired")
     }
   }
 

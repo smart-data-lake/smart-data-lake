@@ -23,8 +23,9 @@ import java.sql.{DriverManager, ResultSet, Statement, Connection => SqlConnectio
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{AuthMode, BasicAuthMode}
+import io.smartdatalake.definitions.{AuthMode, BasicAuthMode, Environment}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import org.apache.spark.sql.SparkSession
 
 /**
  * Connection information for jdbc tables.
@@ -48,6 +49,9 @@ case class JdbcTableConnection( override val id: ConnectionId,
   // Allow only supported authentication modes
   private val supportedAuths = Seq(classOf[BasicAuthMode])
   require(authMode.isEmpty || supportedAuths.contains(authMode.get.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
+
+  // prepare catalog implementation
+  val catalog: SQLCatalog = SQLCatalog.fromJdbcDriver(driver, this)
 
   def execJdbcStatement(sql:String ) : Boolean = {
     var conn: SqlConnection = null
@@ -104,17 +108,10 @@ case class JdbcTableConnection( override val id: ConnectionId,
     } else Map()
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[Connection] = JdbcTableConnection
 }
 
 object JdbcTableConnection extends FromConfigFactory[Connection] {
-
-  /**
-   * @inheritdoc
-   */
   override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): JdbcTableConnection = {
     import configs.syntax.ConfigOps
     import io.smartdatalake.config._
@@ -125,3 +122,67 @@ object JdbcTableConnection extends FromConfigFactory[Connection] {
 }
 
 
+/**
+ * SQL JDBC Catalog query method definition.
+ * Implementations may vary depending on the concrete DB system.
+ */
+private[smartdatalake] abstract class SQLCatalog(connection: JdbcTableConnection) {
+  def isDbExisting(db: String)(implicit session: SparkSession): Boolean
+  def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean
+  protected def evalRecordExists( rs:ResultSet ) : Boolean = {
+    rs.next
+    rs.getInt(1) == 1
+  }
+}
+private[smartdatalake] object SQLCatalog {
+  def fromJdbcDriver(driver: String, connection: JdbcTableConnection): SQLCatalog = {
+    driver match {
+      case d if d.toLowerCase.contains("oracle") => new OracleSQLCatalog(connection)
+      case _ => new DefaultSQLCatalog(connection)
+    }
+  }
+}
+
+/**
+ * Default SQL JDBC Catalog query implementation using INFORMATION_SCHEMA
+ */
+private[smartdatalake] class DefaultSQLCatalog(connection: JdbcTableConnection) extends SQLCatalog(connection) {
+  override def isDbExisting(db: String)(implicit session: SparkSession): Boolean = {
+    val cntTableInCatalog =
+      if (Environment.enableJdbcCaseSensitivity)
+        s"select count(*) from INFORMATION_SCHEMA.SCHEMATA where TABLE_SCHEMA='$db'"
+      else
+        s"select count(*) from INFORMATION_SCHEMA.SCHEMATA where upper(TABLE_SCHEMA)=upper('$db')"
+    connection.execJdbcQuery(cntTableInCatalog, evalRecordExists )
+  }
+  override def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean = {
+    val cntTableInCatalog =
+      if (Environment.enableJdbcCaseSensitivity)
+        s"select count(*) from INFORMATION_SCHEMA.TABLES where TABLE_NAME='$table' and TABLE_SCHEMA='$db'"
+      else
+        s"select count(*) from INFORMATION_SCHEMA.TABLES where upper(TABLE_NAME)=upper('$table') and upper(TABLE_SCHEMA)=upper('$db')"
+    connection.execJdbcQuery( cntTableInCatalog, evalRecordExists )
+  }
+}
+
+/**
+ * Oracle SQL JDBC Catalog query implementation
+ */
+private[smartdatalake] class OracleSQLCatalog(connection: JdbcTableConnection) extends SQLCatalog(connection) {
+  override def isDbExisting(db: String)(implicit session: SparkSession): Boolean = {
+    val cntTableInCatalog =
+      if (Environment.enableJdbcCaseSensitivity)
+        s"select count(*) from ALL_USERS where USERNAME='$db'"
+      else
+        s"select count(*) from ALL_USERS where upper(USERNAME)=upper('$db')"
+    connection.execJdbcQuery(cntTableInCatalog, evalRecordExists)
+  }
+  override def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean = {
+    val cntTableInCatalog =
+      if (Environment.enableJdbcCaseSensitivity)
+        s"select count(*) from ALL_TABLES where TABLE_NAME='$table' and OWNER='$db'"
+      else
+        s"select count(*) from ALL_TABLES where upper(TABLE_NAME)=upper('$table') and upper(OWNER)=upper('$db')"
+    connection.execJdbcQuery( cntTableInCatalog, evalRecordExists )
+  }
+}

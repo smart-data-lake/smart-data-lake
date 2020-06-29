@@ -16,20 +16,15 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.util.hdfs.PartitionValues
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+package io.smartdatalake.util.misc
 
-private[smartdatalake] trait CanCreateDataFrame {
+import org.scalatest.FunSuite
 
-  def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession) : DataFrame
+class EnvironmentUtilTest extends FunSuite {
 
-  // Default implementation just filters the input dataframe in spark
-  // Concrete implementations should implement pushdown logic for their
-  // respective data sources.
-  def getDeltaDataFrame(filterExpr: Column)(implicit session: SparkSession) : DataFrame = {
-    getDataFrame(Seq()).filter(filterExpr)
+  test("camelCaseToUpper") {
+    assert(EnvironmentUtil.camelCaseToUpper("camelCaseToUpper") == "CAMEL_CASE_TO_UPPER")
   }
 
 }
