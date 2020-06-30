@@ -38,6 +38,7 @@ import scala.util.{Failure, Success, Try}
  * @param deleteDataAfterRead a flag to enable deletion of input partitions after copying.
  * @param transformer a custom transformation that is applied to each SubFeed separately
  * @param initExecutionMode optional execution mode if this Action is a start node of a DAG run
+ * @param executionMode optional execution mode for this Action
  */
 case class CopyAction(override val id: ActionObjectId,
                       inputId: DataObjectId,
@@ -69,10 +70,10 @@ case class CopyAction(override val id: ActionObjectId,
   override def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
 
     // enrich DataFrames if not yet existing
-    var transformedSubFeed = ActionHelper.enrichSubFeedDataFrame(input, subFeed, runtimeExecutionMode(subFeed.isDAGStart), context.phase)
+    var transformedSubFeed = enrichSubFeedDataFrame(input, subFeed, runtimeExecutionMode(subFeed.isDAGStart), context.phase)
 
     // apply transformations
-    transformedSubFeed = ActionHelper.applyTransformations(
+    transformedSubFeed = applyTransformations(
       transformedSubFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, None, filterClauseExpr)
 
     // return transformed subfeed

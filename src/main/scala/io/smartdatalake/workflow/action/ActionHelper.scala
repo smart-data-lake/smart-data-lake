@@ -23,15 +23,10 @@ import java.time.LocalDateTime
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.ActionObjectId
-import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode, SparkStreamingOnceMode}
+import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
-import io.smartdatalake.util.misc.{DataFrameUtil, SmartDataLakeLogger}
-import io.smartdatalake.util.streaming.DummyStreamProvider
-import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
-import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanCreateStreamingDataFrame, CanHandlePartitions, DataObject, TableDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.TimestampType
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
@@ -65,112 +60,9 @@ object ActionHelper extends SmartDataLakeLogger {
    */
   def ts1(t: java.time.LocalDateTime): Column = lit(t.toString).cast(TimestampType)
 
-  /**
-   * transform sequence of subfeeds
-   */
-  def transformSubfeeds(subFeeds: Seq[SparkSubFeed], transformer: DataFrame => DataFrame): Seq[SparkSubFeed] = {
-    subFeeds.map( subFeed => subFeed.copy( dataFrame = Some(transformer(subFeed.dataFrame.get))))
-  }
 
   def dropDuplicates(pks: Seq[String])(df: DataFrame): DataFrame = {
     df.dropDuplicates(pks)
-  }
-
-  /**
-   * applies multiple transformations to a sequence of subfeeds
-   */
-  def multiTransformSubfeeds( subFeeds: Seq[SparkSubFeed], transformers: Seq[DataFrame => DataFrame]): Seq[SparkSubFeed] = {
-    transformers.foldLeft( subFeeds ){
-      case (subFeed, transform) => transformSubfeeds( subFeed, transform )
-    }
-  }
-
-  /**
-   * applies multiple transformations to a sequence of subfeeds
-   */
-  def multiTransformSubfeed( subFeed: SparkSubFeed, transformers: Seq[DataFrame => DataFrame]): SparkSubFeed = {
-    transformers.foldLeft( subFeed ){
-      case (subFeed, transform) => subFeed.copy( dataFrame = Some(transform(subFeed.dataFrame.get )))
-    }
-  }
-
-  /**
-   * applies the transformers
-   */
-  def applyCustomTransformation(inputSubFeed: SparkSubFeed, transformer: Option[CustomDfTransformerConfig])(implicit session: SparkSession): SparkSubFeed = transformer.map {
-    transformer =>
-      val transformedDf = transformer.transform(inputSubFeed.dataFrame.get, inputSubFeed.dataObjectId)
-      inputSubFeed.copy(dataFrame = Some(transformedDf))
-  }.getOrElse( inputSubFeed )
-
-  /**
-   * applies columnBlackList and columnWhitelist
-   */
-  def applyBlackWhitelists(subFeed: SparkSubFeed, columnBlacklist: Option[Seq[String]], columnWhitelist: Option[Seq[String]]): SparkSubFeed = {
-    val blackWhiteDfTransforms: Seq[DataFrame => DataFrame] = Seq(
-      columnBlacklist.map(l => filterBlacklist(l) _),
-      columnWhitelist.map(l => filterWhitelist(l) _)
-    ).flatten
-    multiTransformSubfeed(subFeed, blackWhiteDfTransforms)
-  }
-
-  /**
-    * applies filterClauseExpr
-    */
-  def applyFilter(subFeed: SparkSubFeed, filterClauseExpr: Option[Column]): SparkSubFeed = {
-    val filterDfTransform = filterClauseExpr.map( expr => (df: DataFrame) => df.where(expr))
-    ActionHelper.multiTransformSubfeed(subFeed, filterDfTransform.toSeq)
-  }
-
-  /**
-   * applies type casting decimal -> integral/float
-   */
-  def applyCastDecimal2IntegralFloat(subFeed: SparkSubFeed): SparkSubFeed = ActionHelper.multiTransformSubfeed(subFeed, Seq(_.castAllDecimal2IntegralFloat))
-
-  /**
-   * applies an optional additional transformation
-   */
-  def applyAdditional(subFeed: SparkSubFeed,
-                      additional: (SparkSubFeed,Option[DataFrame],Seq[String],LocalDateTime) => SparkSubFeed,
-                      output: TableDataObject)(implicit session: SparkSession,
-                                               context: ActionPipelineContext): SparkSubFeed = {
-    val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
-    val table = output.table
-    val pks = table.primaryKey
-      .getOrElse( throw new ConfigurationException(s"There is no <primary-keys> defined for table ${table.name}."))
-    val existingDf = if (output.isTableExisting) {
-      Some(output.getDataFrame())
-    } else None
-    additional(subFeed, existingDf, pks, timestamp)
-  }
-
-  /**
-   * applies all the transformations above
-   */
-  def applyTransformations(inputSubFeed: SparkSubFeed,
-                           transformer: Option[CustomDfTransformerConfig],
-                           columnBlacklist: Option[Seq[String]],
-                           columnWhitelist: Option[Seq[String]],
-                           standardizeDatatypes: Boolean,
-                           output: DataObject,
-                           additional: Option[(SparkSubFeed,Option[DataFrame],Seq[String],LocalDateTime) => SparkSubFeed],
-                           filterClauseExpr: Option[Column] = None)(
-                            implicit session: SparkSession,
-                            context: ActionPipelineContext): SparkSubFeed = {
-
-    var transformedSubFeed : SparkSubFeed = applyBlackWhitelists(applyCustomTransformation(inputSubFeed, transformer)(session),
-      columnBlacklist: Option[Seq[String]],
-      columnWhitelist: Option[Seq[String]]
-    )
-
-    if (filterClauseExpr.isDefined) transformedSubFeed = applyFilter(inputSubFeed, filterClauseExpr)
-
-    if (standardizeDatatypes) transformedSubFeed = applyCastDecimal2IntegralFloat(transformedSubFeed) // currently we cast decimals away only but later we may add further type casts
-    if (additional.isDefined && output.isInstanceOf[TableDataObject]) {
-      transformedSubFeed = applyAdditional(transformedSubFeed, additional.get, output.asInstanceOf[TableDataObject])(session,context)
-    }
-    // return
-    transformedSubFeed
   }
 
   /**
@@ -198,97 +90,6 @@ object ActionHelper extends SmartDataLakeLogger {
           """.
             stripMargin)
       }
-    }
-  }
-
-  /**
-   * Updates the partition values of a SubFeed to the partition columns of an output, removing not existing columns from the partition values.
-   * Further the transformed DataFrame is validated to have the output's partition columns included.
-   *
-   * @param output output DataObject
-   * @param subFeed SubFeed with transformed DataFrame
-   * @return SubFeed with updated partition values.
-   */
-  def validateAndUpdateSubFeedPartitionValues(output: DataObject, subFeed: SparkSubFeed ): SparkSubFeed = {
-    val updatedSubFeed = output match {
-      case partitionedDO: CanHandlePartitions =>
-        // validate output partition columns exist in DataFrame
-        validateDataFrameContainsCols(subFeed.dataFrame.get, partitionedDO.partitions, s"for ${output.id}")
-        // adapt subfeed
-        subFeed.updatePartitionValues(partitionedDO.partitions)
-      case _ => subFeed.clearPartitionValues()
-    }
-    updatedSubFeed.clearDAGStart()
-  }
-
-  /**
-   * Validate that DataFrame contains a given list of columns, throwing an exception otherwise.
-   *
-   * @param df DataFrame to validate
-   * @param columns Columns that must exist in DataFrame
-   * @param debugName name to mention in exception
-   */
-  def validateDataFrameContainsCols(df: DataFrame, columns: Seq[String], debugName: String): Unit = {
-    val missingColumns = columns.diff(df.columns)
-    assert(missingColumns.isEmpty, s"DataFrame $debugName doesn't include columns $missingColumns")
-  }
-
-  /**
-   * Filter DataFrame with given partition values
-   *
-   * @param df DataFrame to filter
-   * @param partitionValues partition values to use as filter condition
-   * @return filtered DataFrame
-   */
-  def filterDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues]): DataFrame = {
-    val partitionValuesColumn = partitionValues.flatMap(_.keys).distinct
-    if (partitionValues.isEmpty) df
-    else if (partitionValuesColumn.size == 1) {
-      // filter with Sql "isin" expression if only one column
-      val filterExpr = col(partitionValuesColumn.head).isin(partitionValues.flatMap(_.elements.values):_*)
-      df.where(filterExpr)
-    } else {
-      // filter with and/or expression if multiple partition columns
-      val filterExpr = partitionValues.map(_.getSparkExpr).reduce( (a,b) => a or b)
-      df.where(filterExpr)
-    }
-  }
-
-  /**
-   * Enriches SparkSubFeed with DataFrame if not existing
-   *
-   * @param input input data object.
-   * @param subFeed input SubFeed.
-   */
-  def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, executionMode: Option[ExecutionMode], phase: ExecutionPhase)(implicit session: SparkSession): SparkSubFeed = {
-    assert(input.id == subFeed.dataObjectId, s"DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
-    executionMode match {
-      case Some(m: SparkStreamingOnceMode) =>
-        if (subFeed.dataFrame.isEmpty || phase==ExecutionPhase.Exec) { // in exec phase we always needs a fresh streaming DataFrame
-          // recreate DataFrame from DataObject
-          assert(input.isInstanceOf[CanCreateStreamingDataFrame], s"DataObject ${input.id} doesn't implement CanCreateStreamingDataFrame. Can not create StreamingDataFrame for executionMode=SparkStreamingOnceMode")
-          logger.info(s"getting streaming DataFrame for ${input.id}")
-          val df = input.asInstanceOf[CanCreateStreamingDataFrame].getStreamingDataFrame(m.inputOptions, subFeed.dataFrame.map(_.schema))
-            .colNamesLowercase // convert to lower case by default
-          subFeed.copy(dataFrame = Some(df), partitionValues = Seq()) // remove partition values for streaming mode
-        } else if (subFeed.isStreaming.contains(false)) {
-          // convert to dummy streaming DataFrame
-          val emptyStreamingDataFrame = subFeed.dataFrame.map(df => DummyStreamProvider.getDummyDf(df.schema))
-          subFeed.copy(dataFrame = emptyStreamingDataFrame, partitionValues = Seq()) // remove partition values for streaming mode
-        } else subFeed
-      case _ =>
-        if (subFeed.dataFrame.isEmpty || (phase==ExecutionPhase.Exec && (subFeed.isDummy || subFeed.isStreaming.contains(true)))) {
-          // recreate DataFrame from DataObject
-          logger.info(s"getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
-          val df = input.getDataFrame(subFeed.partitionValues)
-            .colNamesLowercase // convert to lower case by default
-          val filteredDf = ActionHelper.filterDataFrame(df, subFeed.partitionValues)
-          subFeed.copy(dataFrame = Some(filteredDf))
-        } else if (subFeed.isStreaming.contains(true)) {
-          // convert to empty normal DataFrame
-          val emptyNormalDataFrame = subFeed.dataFrame.map(df => DataFrameUtil.getEmptyDataFrame(df.schema))
-          subFeed.copy(dataFrame = emptyNormalDataFrame)
-        } else subFeed
     }
   }
 
@@ -361,33 +162,5 @@ object ActionHelper extends SmartDataLakeLogger {
     invalidCharacters.replaceAllIn(str, "_")
   }
 
-
-
-  //  /**
-  //   * Checks a historized hive table to verify that there is only one active record for any given primary key
-  //   *
-  //   * @param pks Bestandteile des (Composite) Primary Key einer Tabelle
-  //   * @param historizedDf Historisierter [[DataFrame]]
-  //   * @throws PrimaryKeyConstraintViolationException when the primary key is not unique.
-  //   */
-  //  @throws[PrimaryKeyConstraintViolationException]
-  //  private def checkPrimaryKeyConstraint(pks: Seq[String], historizedDf: DataFrame): Unit = {
-  //    val cols = pks.map(pk => col(pk)) ++ List(col(s"${TechnicalTableColumn.delimited}"))
-  //    val surrogateTimestamp = HiveConventions.getHistorizationSurrogateTimestamp
-  //
-  //    val res = historizedDf.select(cols: _*)
-  //      .where(s"${TechnicalTableColumn.delimited} = '${Timestamp.valueOf(surrogateTimestamp)}'")
-  //      .groupBy(cols: _*).agg(count("*") as "countActiveKeys")
-  //      .where("countActiveKeys > 1")
-  //
-  //    if (res.count > 0) {
-  //      val msg =
-  //        s"""
-  //           |Primary Keys mit > 1 aktiven Datensätzen:
-  //           |${res.collect.mkString("\n")}
-  //                """.stripMargin
-  //      throw new PrimaryKeyConstraintViolationException(msg)
-  //    }
-  //  }
 }
 

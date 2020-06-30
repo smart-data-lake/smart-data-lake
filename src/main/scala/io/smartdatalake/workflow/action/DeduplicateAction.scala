@@ -47,6 +47,7 @@ import scala.util.{Failure, Success, Try}
  *                                      Keeping deleted columns in complex data types has performance impact as all new data
  *                                      in the future has to be converted by a complex function.
  * @param initExecutionMode optional execution mode if this Action is a start node of a DAG run
+ * @param executionMode optional execution mode for this Action
  */
 case class DeduplicateAction(override val id: ActionObjectId,
                              inputId: DataObjectId,
@@ -80,10 +81,10 @@ case class DeduplicateAction(override val id: ActionObjectId,
 
   override def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // create input subfeeds if not yet existing
-    var transformedSubFeed = ActionHelper.enrichSubFeedDataFrame(input, subFeed, runtimeExecutionMode(subFeed.isDAGStart), context.phase)
+    var transformedSubFeed = enrichSubFeedDataFrame(input, subFeed, runtimeExecutionMode(subFeed.isDAGStart), context.phase)
 
     // apply transformations
-    transformedSubFeed = ActionHelper.applyTransformations(
+    transformedSubFeed = applyTransformations(
       transformedSubFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, Some(deduplicateDataFrame(_: SparkSubFeed,_: Option[DataFrame],_:Seq[String],_: LocalDateTime)), filterClauseExpr)
 
     // return

@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.ExecutionMode
+import io.smartdatalake.definitions.{ExecutionMode, SparkStreamingOnceMode}
 import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
@@ -35,6 +35,8 @@ import org.apache.spark.sql.SparkSession
  * @param inputIds input DataObject's
  * @param outputIds output DataObject's
  * @param transformer Custom Transformer to transform Seq[DataFrames]
+ * @param initExecutionMode optional execution mode if this Action is a start node of a DAG run
+ * @param executionMode optional execution mode for this Action
  */
 case class CustomSparkAction ( override val id: ActionObjectId,
                                inputIds: Seq[DataObjectId],
@@ -43,11 +45,15 @@ case class CustomSparkAction ( override val id: ActionObjectId,
                                override val breakDataFrameLineage: Boolean = false,
                                override val persist: Boolean = false,
                                override val initExecutionMode: Option[ExecutionMode] = None,
+                               override val executionMode: Option[ExecutionMode] = None,
                                override val metadata: Option[ActionMetadata] = None
 )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedsAction {
 
   override val inputs: Seq[DataObject with CanCreateDataFrame] = inputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
   override val outputs: Seq[DataObject with CanWriteDataFrame] = outputIds.map(getOutputDataObject[DataObject with CanWriteDataFrame])
+
+  if (executionMode.exists(_.isInstanceOf[SparkStreamingOnceMode]) && transformer.sqlCode.nonEmpty)
+    logger.warn("Defining custom stateful streaming operations with sqlCode is not well supported by Spark and can create strange errors or effects. Use scalaCode to be safe.")
 
   /**
    * @inheritdoc
@@ -56,7 +62,7 @@ case class CustomSparkAction ( override val id: ActionObjectId,
 
     // create input subfeeds if they don't exist yet
     val enrichedSubfeeds: Seq[SparkSubFeed] = enrichSubFeedsDataFrame(inputs, subFeeds)
-    val mainInputEnrichedSubFeed = mainInput.flatMap( input => enrichedSubfeeds.find(_.dataObjectId==input.id))
+    val mainInputEnrichedSubFeed = enrichedSubfeeds.find(_.dataObjectId==mainInput.id)
 
     // Apply custom transformation to all subfeeds
     transformer.transform(enrichedSubfeeds.map( subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap)
@@ -66,7 +72,7 @@ case class CustomSparkAction ( override val id: ActionObjectId,
           val output = outputs.find(_.id.id == dataObjectId)
             .getOrElse(throw ConfigurationException(s"No output found for result ${dataObjectId} in $id. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
           // if main output, get partition values from main input
-          val partitionValues = if (mainInput.isDefined && mainOutput.exists(_.id.id == dataObjectId)) {
+          val partitionValues = if (mainOutput.id.id == dataObjectId) {
             mainInputEnrichedSubFeed.map(_.partitionValues).getOrElse(Seq())
           } else Seq()
           SparkSubFeed(Some(dataFrame),dataObjectId, partitionValues)
