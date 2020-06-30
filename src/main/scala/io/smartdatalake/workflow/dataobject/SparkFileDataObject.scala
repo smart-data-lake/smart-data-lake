@@ -23,6 +23,7 @@ import io.smartdatalake.util.misc.DataFrameUtil.{DataFrameReaderUtils, DataFrame
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.functions.input_file_name
 
 /**
  * A [[DataObject]] backed by a file in HDFS. Can load file contents into an Apache Spark [[DataFrame]]s.
@@ -44,6 +45,11 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * @see [[DataFrameWriter]]
    */
   def options: Map[String, String] = Map()
+
+  /**
+   * The name of the (optional) additional column containing the source filename
+   */
+  def filenameColumn: Option[String]
 
   /**
    * Definition of repartition operation before writing DataFrame with Spark to Hadoop.
@@ -106,7 +112,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
       filesystem.mkdirs(hadoopPath)
     }
 
-    val df = if (partitions.isEmpty || partitionValues.isEmpty) {
+    val dfContent = if (partitions.isEmpty || partitionValues.isEmpty) {
       session.read
         .format(format)
         .options(options)
@@ -121,6 +127,11 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
       // create data frame for every partition value and then build union
       val pathsToRead = partitionValues.map( pv => new Path(hadoopPath, getPartitionString(pv).get).toString)
       pathsToRead.map(reader.load).reduce(_ union _)
+    }
+
+    val df = filenameColumn match {
+      case None => dfContent
+      case Some(name) => dfContent.withColumn(name, input_file_name)
     }
 
     // finalize & return DataFrame
