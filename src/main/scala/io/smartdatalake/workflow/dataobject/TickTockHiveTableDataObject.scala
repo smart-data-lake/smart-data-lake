@@ -129,8 +129,14 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
 
     // use existing path if table exists already and not overwritten
     val writePath = if(isTableExisting) HiveUtil.existingTableLocation(table) else hadoopPath.toString
+    // To check if we are writing to the same existing path, we first normalize both paths before comparing them (remove tick / tock folder and trailing slash)
     val writePathNormalized = writePath.replaceAll("file:/","").replaceAll("\\\\","/")
-    require(!path.isDefined || path.get.replaceAll("\\\\","/") == writePathNormalized, s"Table ${table.fullName} already exists but with a different path. Either delete it or use the same path (${writePathNormalized}).")
+      .replaceAll("tick","").replaceAll("tock","")
+      .replaceAll("/+$","")
+    val definedPathNormalized = path.get.replaceAll("\\\\","/")
+      .replaceAll("tick","").replaceAll("tock","")
+      .replaceAll("/+$","")
+    require(!path.isDefined || definedPathNormalized  == writePathNormalized, s"Table ${table.fullName} already exists but with a different path. Either delete it or use the same path (${writePathNormalized}).")
 
     // write table and fix acls
     HiveUtil.writeDfToHiveWithTickTock(session, dfPrepared, writePath, table.name, table.db.get, partitions, saveMode)
