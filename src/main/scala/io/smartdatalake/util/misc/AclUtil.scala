@@ -39,8 +39,25 @@ import scala.collection.JavaConverters._
  *     }
  * ...
  */
-private[smartdatalake] case class AclDef (permission: String, acls: Seq[AclElement])
-private[smartdatalake] case class AclElement (aclType:String, name:String, permission: String) {
+
+/**
+ * Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)
+ * to be applied to a Data Object on writing
+ *
+ * @param permission : File system permission string in symbolic notation form (e.g. rwxr-xr-x)
+ * @param acls : a sequence of [[AclElement]]s
+ */
+case class AclDef (permission: String, acls: Seq[AclElement])
+
+/**
+ * Describes a single extended ACL to be applied to a Data Object
+ * in addition to the basic file system permissions
+ *
+ * @param aclType : type of ACL to be added "group", "user"
+ * @param name : the name of the user/group for which an ACL definition is being added
+ * @param permission : the permission (rwx syntax) to be granted
+ */
+case class AclElement (aclType:String, name:String, permission: String) {
   /**
    * @return ACL specification as string, i.e. "group:t_datalake_application:r-x"
    */
