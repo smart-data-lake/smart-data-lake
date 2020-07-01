@@ -87,6 +87,8 @@ case class HiveTableDataObject(override val id: DataObjectId,
 
   override def prepare(implicit session: SparkSession): Unit = {
     require(isDbExisting, s"($id) Hive DB ${table.db.get} doesn't exist (needs to be created manually).")
+    if (!isTableExisting)
+      require(path.isDefined, "If Hive table does not exist yet, the path must be set.")
   }
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
@@ -119,7 +121,10 @@ case class HiveTableDataObject(override val id: DataObjectId,
 
     // use existing path if table exists already and not overwritten
     val writePath = if(isTableExisting) HiveUtil.existingTableLocation(table) else hadoopPath.toString
-    require(!path.isDefined || path.get == writePath, s"Table ${table.fullName} exists already but with different path. Either delete it or use the same path (${writePath}).")
+    val writePathNormalized = writePath.replaceAll("file:/","").replaceAll("\\\\","/")
+    if(path.isDefined && path.get.replaceAll("\\\\","/") != writePathNormalized)
+      logger.warn(s"Table ${table.fullName} exists already with different path. The table will be written with path ${writePath}")
+
     // write table and fix acls
     HiveUtil.writeDfToHive( session, dfPrepared, writePath, table.name, table.db.get, partitions, saveMode, numInitialHdfsPartitions=numInitialHdfsPartitions )
     if (acl.isDefined) AclUtil.addACLs(acl.get, hadoopPath)(filesystem)
@@ -137,7 +142,6 @@ case class HiveTableDataObject(override val id: DataObjectId,
     require(isDbExisting, s"Hive DB ${table.db.get} doesn't exist (needs to be created manually).")
     if (!isTableExisting) {
       logger.info(s"Creating table ${table.fullName}.")
-      require(path.isDefined, "If Hive table does not exist yet, the path must be set.")
       writeDataFrame(df, createTableOnly = true, partitionValues)
     }
   }

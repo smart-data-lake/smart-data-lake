@@ -168,26 +168,22 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   /**
    * Adds an action event
    */
-  def addRuntimeEvent(phase: String, state: RuntimeEventState, msg: String): Unit = {
-    runtimeEvents.append(RuntimeEvent(LocalDateTime.now, phase, state, msg))
+  def addRuntimeEvent(phase: String, state: RuntimeEventState, msg: Option[String] = None, results: Seq[SubFeed] = Seq()): Unit = {
+    runtimeEvents.append(RuntimeEvent(LocalDateTime.now, phase, state, msg, results))
   }
 
   /**
-   * get latest runtime state and duration if successfully finished.
+   * get latest runtime information for this action
    */
-  def getRuntimeState: (Option[RuntimeEventState], Option[Duration]) = {
+  def getRuntimeInfo: Option[RuntimeInfo] = {
     if (runtimeEvents.nonEmpty) {
       val lastEvent = runtimeEvents.last
-      lastEvent.state match {
-        case RuntimeEventState.SUCCEEDED =>
-          val duration = runtimeEvents.reverse
-            .find( event => event.state == RuntimeEventState.STARTED && event.phase == lastEvent.phase )
-            .map( start => Duration.between(start.tstmp, lastEvent.tstmp))
-          duration.map( d => (Some(lastEvent.state), Some(d)))
-            .getOrElse((Some(lastEvent.state),None))
-        case _ => (Some(lastEvent.state),None)
-      }
-    } else (None,None)
+      val startEvent = runtimeEvents.reverse.find( event => event.state == RuntimeEventState.STARTED && event.phase == lastEvent.phase )
+      val duration = startEvent.map( start => Duration.between(start.tstmp, lastEvent.tstmp))
+      val mainMetrics = getAllLatestMetrics.map{ case (id, metrics) => (id, metrics.map(_.getMainInfos).getOrElse(Map()))}
+      val results = lastEvent.results.map( subFeed => ResultRuntimeInfo(subFeed, mainMetrics(subFeed.dataObjectId)))
+      Some(RuntimeInfo(lastEvent.state, startTstmp = startEvent.map(_.tstmp), duration = duration, msg = lastEvent.msg, results = results))
+    } else None
   }
 
   /**
@@ -209,26 +205,30 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
     } else logger.debug(s"($id) Metrics received for unspecified DataObject (${metrics.getId})")
     if (logger.isDebugEnabled) logger.debug(s"($id) Metrics received:\n" + metrics.getAsText)
   }
+  def getLatestMetrics(dataObjectId: DataObjectId): Option[ActionMetrics] = {
+    if (!runtimeMetricsEnabled) return None
+    // return latest metrics
+    val metrics = dataObjectRuntimeMetricsMap.get(dataObjectId)
+    metrics.flatMap( m => Try(m.maxBy(_.getOrder)).toOption)
+  }
   def getFinalMetrics(dataObjectId: DataObjectId): Option[ActionMetrics] = {
     if (!runtimeMetricsEnabled) return None
     // remember for which data object final metrics has been delivered, so that we can warn on late arriving metrics!
-    dataObjectRuntimeMetricsDelivered.append(dataObjectId)
-    // return latest metrics
-    val metrics = dataObjectRuntimeMetricsMap.get(dataObjectId)
-    val latestMetrics = metrics.flatMap( m => Try(m.maxBy(_.getOrder)).toOption)
-    if (metrics.isEmpty)  throw new IllegalStateException(s"($id) Metrics for $dataObjectId not found")
+    dataObjectRuntimeMetricsDelivered += dataObjectId
+    val latestMetrics = getLatestMetrics(dataObjectId)
+    if (latestMetrics.isEmpty) throw new IllegalStateException(s"($id) Metrics for $dataObjectId not found")
     latestMetrics
   }
+  def getAllLatestMetrics: Map[DataObjectId, Option[ActionMetrics]] = outputs.map(dataObject => (dataObject.id, getLatestMetrics(dataObject.id))).toMap
   private var runtimeMetricsEnabled = false
   private val dataObjectRuntimeMetricsMap = mutable.Map[DataObjectId,mutable.Buffer[ActionMetrics]]()
-  private val dataObjectRuntimeMetricsDelivered = mutable.Buffer[DataObjectId]()
+  private val dataObjectRuntimeMetricsDelivered = mutable.Set[DataObjectId]()
 
   /**
    * This is displayed in ascii graph visualization
    */
   final override def toString: String = {
-    val (state,duration) = getRuntimeState
-    nodeId + state.map(" "+_).getOrElse("") + duration.map(" "+_).getOrElse("")
+   nodeId + getRuntimeInfo.map(" "+_).getOrElse("")
   }
 
   def toStringShort: String = {
@@ -259,8 +259,16 @@ case class ActionMetadata(
 /**
  * A structure to collect runtime information
  */
-private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: String, state: RuntimeEventState, msg: String)
+private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: String, state: RuntimeEventState, msg: Option[String], results: Seq[SubFeed])
 private[smartdatalake] object RuntimeEventState extends Enumeration {
   type RuntimeEventState = Value
-  val STARTED, SUCCEEDED, FAILED, SKIPPED, NONE = Value
+  val STARTED, SUCCEEDED, FAILED, SKIPPED, PENDING = Value
 }
+private[smartdatalake] case class RuntimeInfo(state: RuntimeEventState, startTstmp: Option[LocalDateTime] = None, duration: Option[Duration] = None, msg: Option[String] = None, results: Seq[ResultRuntimeInfo] = Seq()) {
+  override def toString: String = {
+    duration.map(d => s"$state $d")
+      .getOrElse(state.toString)
+  }
+}
+private[smartdatalake] case class ResultRuntimeInfo(subFeed: SubFeed, mainMetrics: Map[String, Any])
+

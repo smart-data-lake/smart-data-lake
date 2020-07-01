@@ -32,7 +32,7 @@ object MemoryUtils extends SmartDataLakeLogger {
 
   private class MemoryLogTimerTask(logLinuxMem: Boolean, logLinuxCgroupMem: Boolean, logBuffers: Boolean) extends TimerTask {
     override def run(): Unit = {
-      logHeapInfo( !isWindowsOS && logLinuxMem, !isWindowsOS && logLinuxCgroupMem, logBuffers)
+      logHeapInfo( !EnvironmentUtil.isWindowsOS && logLinuxMem, !EnvironmentUtil.isWindowsOS && logLinuxCgroupMem, logBuffers)
     }
   }
 
@@ -178,9 +178,5 @@ object MemoryUtils extends SmartDataLakeLogger {
   def formatBytesMB(bytes:Long): String = {
     val megaBytes = BigDecimal.decimal(bytes.toFloat / 1024 / 1024).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
     s"${megaBytes}MB"
-  }
-
-  def isWindowsOS: Boolean = {
-    sys.env.get("OS").exists(_.toLowerCase.startsWith("windows"))
   }
 }

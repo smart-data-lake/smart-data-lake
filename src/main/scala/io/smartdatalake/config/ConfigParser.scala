@@ -41,12 +41,11 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
    * Parses the supplied config and returns a populated [[InstanceRegistry]].
    *
    * @param config  the configuration to parse.
-   * @return  a new instance registry populated with all [[Action]]s and [[DataObject]]s defined in the configuration.
+   * @param instanceRegistry instance registry to use, default is to create a new instance.
+   * @return  instance registry populated with all [[Action]]s and [[DataObject]]s defined in the configuration.
    */
-  def parse(config: Config): InstanceRegistry = {
-    implicit val registry: InstanceRegistry = new InstanceRegistry
-
-    //val actions1 = config.get[Map[ConfigObjectId, Config]]("actions")
+  def parse(config: Config, instanceRegistry: InstanceRegistry = new InstanceRegistry): InstanceRegistry = {
+    implicit val registry: InstanceRegistry = instanceRegistry
 
     val connections: Map[ConnectionId, Connection] = config.get[Map[String, Config]]("connections")
       .valueOrElse(Map.empty)

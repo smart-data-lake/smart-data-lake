@@ -70,6 +70,8 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
 
   override def prepare(implicit session: SparkSession): Unit = {
     require(isDbExisting, s"($id) Hive DB ${table.db.get} doesn't exist (needs to be created manually).")
+    if (!isTableExisting)
+      require(path.isDefined, "If Hive table does not exist yet, the path must be set.")
   }
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
@@ -127,7 +129,15 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
 
     // use existing path if table exists already and not overwritten
     val writePath = if(isTableExisting) HiveUtil.existingTableLocation(table) else hadoopPath.toString
-    require(!path.isDefined || path.get == writePath, s"Table ${table.fullName} exists already but with different path. Either delete it or use the same path (${writePath}).")
+    // To check if we are writing to the same existing path, we first normalize both paths before comparing them (remove tick / tock folder and trailing slash)
+    val writePathNormalized = writePath.replaceAll("file:/","").replaceAll("\\\\","/")
+      .replaceAll("tick","").replaceAll("tock","")
+      .replaceAll("/+$","")
+    val definedPathNormalized = path.get.replaceAll("\\\\","/")
+      .replaceAll("tick","").replaceAll("tock","")
+      .replaceAll("/+$","")
+    if(path.isDefined && definedPathNormalized != writePathNormalized)
+      logger.warn(s"Table ${table.fullName} exists already with different path. The table will be written with path ${writePath}")
 
     // write table and fix acls
     HiveUtil.writeDfToHiveWithTickTock(session, dfPrepared, writePath, table.name, table.db.get, partitions, saveMode)
@@ -146,10 +156,6 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
 
   override def isTableExisting(implicit session: SparkSession): Boolean = {
     session.catalog.tableExists(table.db.get, table.name)
-  }
-
-  def existingTablePath(table: Table)(implicit session: SparkSession): String = {
-    session.sharedState.externalCatalog.getTable(table.db.get,table.name).location.toString
   }
 
   /**
