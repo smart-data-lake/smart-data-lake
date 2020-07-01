@@ -133,7 +133,7 @@ Some DataObjects are not partitioned, but nevertheless you dont want to read all
 This can be accomplished by specifying execution mode SparkStreamingOnceMode. Under the hood it uses "Spark Structured Streaming" and triggers a single microbatch (Trigger.Once).
 "Spark Structured Streaming" helps keeping state information about processed data. It needs a checkpointLocation configured which can be given as parameter to SparkStreamingOnceMode.
 
-Note that "Spark Structured Streaming" needs a input DataObjects supporting the creation of streaming DataFrames. 
+Note that "Spark Structured Streaming" needs an input DataObject supporting the creation of streaming DataFrames. 
 For the time only the input sources delivered with Spark Streaming are supported. 
 This is KafkaTopicDataObject and all SparkFileDataObjects, see also [Spark StructuredStreaming](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html#creating-streaming-dataframes-and-streaming-datasets).
 
