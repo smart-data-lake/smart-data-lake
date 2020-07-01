@@ -131,7 +131,7 @@ If both attributes are set, initExecutionMode overrides executionMode if the Act
 ### Incremental load - SparkStreamingOnceMode
 Some DataObjects are not partitioned, but nevertheless you dont want to read all data from the input on every run. You want to load it incrementally.
 This can be accomplished by specifying execution mode SparkStreamingOnceMode. Under the hood it uses "Spark Structured Streaming" and triggers a single microbatch (Trigger.Once).
-"Spark Structured Streaming" helps keeps state about processed data. It needs a checkpointLocation configured which can be given as parameter to SparkStreamingOnceMode.
+"Spark Structured Streaming" helps keeping state information about processed data. It needs a checkpointLocation configured which can be given as parameter to SparkStreamingOnceMode.
 
 Note that "Spark Structured Streaming" needs a input DataObjects supporting the creation of streaming DataFrames. 
 For the time only the input sources delivered with Spark Streaming are supported. 
