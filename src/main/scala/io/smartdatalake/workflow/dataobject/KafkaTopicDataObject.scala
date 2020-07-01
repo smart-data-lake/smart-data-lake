@@ -20,8 +20,8 @@ package io.smartdatalake.workflow.dataobject
 
 import java.sql.Timestamp
 import java.time.format.DateTimeFormatter
-import java.time.temporal.{ChronoUnit, TemporalAccessor, TemporalField, TemporalQuery}
-import java.time.{Duration, LocalDate, LocalDateTime, LocalTime, YearMonth, ZoneId, ZoneOffset}
+import java.time.temporal.{ChronoUnit, TemporalAccessor, TemporalQuery}
+import java.time._
 import java.util.Properties
 
 import com.typesafe.config.Config
@@ -37,11 +37,9 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.functions.{col, udf}
 import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 import org.apache.spark.sql.types.{StringType, StructType}
-import org.joda.time.DateTime
-import za.co.absa.abris.avro.functions.from_confluent_avro
+import za.co.absa.abris.avro.functions.{from_confluent_avro, to_confluent_avro}
 import za.co.absa.abris.avro.read.confluent.SchemaManager
 
-import scala.util.Try
 import scala.collection.JavaConverters._
 
 /**
@@ -174,8 +172,8 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     // convert key & value
     val colsToSelect = ((if (selectCols.nonEmpty) selectCols else Seq("kafka.*")) ++ partitions).distinct.map(col)
     val df = dfRaw
-      .withColumn("key", convertKafkaType(keyType, col("key")))
-      .withColumn("value", convertKafkaType(valueType, col("value")))
+      .withColumn("key", convertFromKafka(keyType, col("key")))
+      .withColumn("value", convertFromKafka(valueType, col("value")))
       .as("kafka")
       .withOptionalColumn(datePartitionCol.map(_.colName), udfFormatPartition(col("timestamp")))
       .select(colsToSelect:_*)
@@ -264,9 +262,10 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
-    validateSchemaMin(df)
-    // TODO: implement using avro schema registry
-    df.write
+    import session.implicits._
+    require(df.columns.toSet == Set("key","value"), s"(${id}) Expects columns Set(key, value) in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
+    df.select(convertToKafka(keyType,$"key").as("key"), convertToKafka(valueType,$"value").as("value"))
+      .write
       .format("kafka")
       .options(instanceOptions)
       .option("topic", topicName)
@@ -274,9 +273,10 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   override def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String, String], checkpointLocation: String, queryName: String, outputMode: OutputMode)(implicit session: SparkSession): StreamingQuery = {
-    validateSchemaMin(df)
-    // TODO: implement using avro schema registry
-    df.writeStream
+    import session.implicits._
+    require(df.columns.toSet == Set("key","value"), s"(${id}) Expects columns Set(key, value) in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
+    df.select(convertToKafka(keyType,$"key").as("key"), convertToKafka(valueType,$"value").as("value"))
+      .writeStream
       .format("kafka")
       .trigger(trigger)
       .queryName(queryName)
@@ -292,10 +292,18 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     consumer.offsetsForTimes(topicPartitionsStart).asScala.toSeq.sortBy(_._1.partition)
   }
 
-  private def convertKafkaType(colType: KafkaColumnType, col: Column ): Column = {
+  private def convertFromKafka(colType: KafkaColumnType, col: Column ): Column = {
     colType match {
       case KafkaColumnType.Binary => col // default is that we get a byte array -> binary from kafka
       case KafkaColumnType.AvroSchemaRegistry => from_confluent_avro(col, schemaRegistryConfig.get)
+      case KafkaColumnType.String => col.cast(StringType)
+    }
+  }
+
+  private def convertToKafka(colType: KafkaColumnType, col: Column ): Column = {
+    colType match {
+      case KafkaColumnType.Binary => col // we let spark/kafka convert the column to binary
+      case KafkaColumnType.AvroSchemaRegistry => to_confluent_avro(col, schemaRegistryConfig.get)
       case KafkaColumnType.String => col.cast(StringType)
     }
   }
