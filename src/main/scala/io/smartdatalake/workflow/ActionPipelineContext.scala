@@ -20,13 +20,17 @@ package io.smartdatalake.workflow
 
 import java.time.LocalDateTime
 
+import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 
 private[smartdatalake] case class ActionPipelineContext(
   feed: String,
   application: String,
+  runId: Int,
+  attemptId: Int,
   instanceRegistry: InstanceRegistry,
-  referenceTimestamp: Option[LocalDateTime] = None
+  referenceTimestamp: Option[LocalDateTime] = None,
+  appConfig: SmartDataLakeBuilderConfig // application config is needed to persist action dag state for recovery
 ) {
   def getReferenceTimestampOrNow: LocalDateTime = referenceTimestamp.getOrElse(LocalDateTime.now)
 }
