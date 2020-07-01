@@ -136,7 +136,8 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     val definedPathNormalized = path.get.replaceAll("\\\\","/")
       .replaceAll("tick","").replaceAll("tock","")
       .replaceAll("/+$","")
-    require(!path.isDefined || definedPathNormalized  == writePathNormalized, s"Table ${table.fullName} already exists but with a different path. Either delete it or use the same path (${writePathNormalized}).")
+    if(path.isDefined && definedPathNormalized != writePathNormalized)
+      logger.warn(s"Table ${table.fullName} exists already with different path. The table will be written with path ${writePath}")
 
     // write table and fix acls
     HiveUtil.writeDfToHiveWithTickTock(session, dfPrepared, writePath, table.name, table.db.get, partitions, saveMode)

@@ -122,7 +122,9 @@ case class HiveTableDataObject(override val id: DataObjectId,
     // use existing path if table exists already and not overwritten
     val writePath = if(isTableExisting) HiveUtil.existingTableLocation(table) else hadoopPath.toString
     val writePathNormalized = writePath.replaceAll("file:/","").replaceAll("\\\\","/")
-    require(!path.isDefined || path.get.replaceAll("\\\\","/") == writePathNormalized, s"Table ${table.fullName} already exists but with a different path. Either delete it or use the same path (${writePathNormalized}).")
+    if(path.isDefined && path.get.replaceAll("\\\\","/") != writePathNormalized)
+      logger.warn(s"Table ${table.fullName} exists already with different path. The table will be written with path ${writePath}")
+
     // write table and fix acls
     HiveUtil.writeDfToHive( session, dfPrepared, writePath, table.name, table.db.get, partitions, saveMode, numInitialHdfsPartitions=numInitialHdfsPartitions )
     if (acl.isDefined) AclUtil.addACLs(acl.get, hadoopPath)(filesystem)
