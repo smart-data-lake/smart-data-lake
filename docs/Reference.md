@@ -125,7 +125,7 @@ Often this should only happen on the start-Actions of a DAG, so it's clear what 
 But its also possible to let every Action in the DAG decide again dynamically, what partitions are missing and should be processed.
 You can configure this by the following attributes of an Action:
 - initExecutionMode: define the execution mode if this Action is a start-Actions of the DAG
-- executionMode: define the execution mode independently of its position is the DAG.
+- executionMode: define the execution mode independently of its position in the DAG.
 If both attributes are set, initExecutionMode overrides executionMode if the Action is a a start-Action of the DAG.
 
 ### Incremental load - SparkStreamingOnceMode
