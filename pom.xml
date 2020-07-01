@@ -117,8 +117,6 @@
 		<license-maven-plugin.version>3.0</license-maven-plugin.version>
 
 		<deltaTable.version>0.5.0</deltaTable.version>
-
-		<scoverage.plugin.version>1.4.0</scoverage.plugin.version>
 	</properties>
 
 	<distributionManagement>
@@ -392,31 +390,11 @@
 				</executions>
 			</plugin>
 
-			<plugin>
-				<groupId>org.scoverage</groupId>
-				<artifactId>scoverage-maven-plugin</artifactId>
-				<version>${scoverage.plugin.version}</version>
-				<configuration>
-					<scalacPluginVersion>${scoverage.plugin.version}</scalacPluginVersion>
-					<!-- other parameters -->
-				</configuration>
-			</plugin>
-
 		</plugins>
 
 	</build>
 
 	<dependencies>
-		<dependency>
-			<groupId>org.datasyslab</groupId>
-			<artifactId>geospark-sql_2.3</artifactId>
-			<version>1.3.1</version>
-		</dependency>
-		<dependency>
-			<groupId>org.datasyslab</groupId>
-			<artifactId>geospark</artifactId>
-			<version>1.3.1</version>
-		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
