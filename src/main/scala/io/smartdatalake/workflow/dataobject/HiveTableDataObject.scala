@@ -101,7 +101,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
     super.preWrite
     // validate if acl's must be / are configured before writing
     if (Environment.hadoopAuthoritiesWithAclsRequired.exists( a => filesystem.getUri.toString.contains(a))) {
-      require(acl.isDefined, s"($id) ACL definitions are required for writing DataObjects on hadoop authority ${filesystem.getUri} by environment setting hadoopAuthoritiesWithAclsRequired")
+      require(acl.isDefined || (connection.isDefined && connection.get.acl.isDefined), s"($id) ACL definitions are required for writing DataObjects on hadoop authority ${filesystem.getUri} by environment setting hadoopAuthoritiesWithAclsRequired")
     }
   }
 
@@ -127,7 +127,8 @@ case class HiveTableDataObject(override val id: DataObjectId,
 
     // write table and fix acls
     HiveUtil.writeDfToHive( session, dfPrepared, writePath, table.name, table.db.get, partitions, saveMode, numInitialHdfsPartitions=numInitialHdfsPartitions )
-    if (acl.isDefined) AclUtil.addACLs(acl.get, hadoopPath)(filesystem)
+    val aclToApply = acl.orElse(connection.flatMap(_.acl))
+    if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
     if (analyzeTableAfterWrite && !createTableOnly) {
       logger.info(s"Analyze table ${table.fullName}.")
       HiveUtil.analyze(session, table.db.get, table.name, partitions, partitionValues)
