@@ -21,7 +21,9 @@ package io.smartdatalake.workflow.dataobject
 
 import java.nio.file.Files
 
+import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.CustomFileActionTest
 import org.apache.commons.io.FileUtils
 
 class SparkFileDataObjectTest extends DataObjectTestSuite {
@@ -42,6 +44,30 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
     dataObject.getDataFrame().count shouldEqual 4 // four records in total, 2 from partition A and 2 from partition B
     dataObject.getDataFrame(Seq(PartitionValues(Map("p"->"B")))).count shouldEqual 2 // two records in partition B
     dataObject.getDataFrame(Seq(PartitionValues(Map("p"->"A")),PartitionValues(Map("p"->"A","p"->"B")))).count shouldEqual 4
+
+    FileUtils.deleteDirectory(tempDir.toFile)
+  }
+
+  test("append filename") {
+    import testSession.implicits._
+
+    // create data object
+
+    val feed = "filenametest"
+    val srcDir = "testSrc"
+    val resourceFile = "AB_NYC_2019.csv"
+    val tempDir = Files.createTempDirectory(feed)
+    val sourceFileColName = "sourcefile"
+
+    // copy data file to test directory
+    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile).toFile)
+    // setup DataObject
+    val dataObject = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> CustomFileActionTest.delimiter), filenameColumn = Some(sourceFileColName))
+
+    // test
+    val df = dataObject.getDataFrame()
+    df.columns.contains(sourceFileColName) //retrieved Dataframe has sourcefile column appended
+    df.select(sourceFileColName).collect().head.getAs[String](0).endsWith(resourceFile) //content of sourcefile column corresponds to sourcefile
 
     FileUtils.deleteDirectory(tempDir.toFile)
   }

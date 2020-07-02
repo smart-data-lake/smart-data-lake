@@ -56,6 +56,7 @@ case class XmlFileDataObject(override val id: DataObjectId,
                              flatten: Boolean = false,
                              override val acl: Option[AclDef] = None,
                              override val connectionId: Option[ConnectionId] = None,
+                             override val filenameColumn: Option[String] = None,
                              override val metadata: Option[DataObjectMetadata] = None)
                             (@transient implicit override val instanceRegistry: InstanceRegistry)
   extends SparkFileDataObject with CanCreateDataFrame with CanWriteDataFrame {
