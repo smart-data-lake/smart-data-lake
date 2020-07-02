@@ -27,7 +27,7 @@ import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.connection.HiveTableConnection
-import org.apache.hadoop.fs.FileSystem
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 
@@ -42,7 +42,7 @@ import scala.collection.JavaConverters._
  * @param path hadoop directory for this table. If it doesn't contain scheme and authority, the connections pathPrefix is applied.
  *             If pathPrefix is not defined or doesn't define scheme and authority, default schema and authority is applied.
  *             If DataObject is only used for reading or if the HiveTable already exist, the path can be omitted.
- *             If the HiveTable already exists but with a different path, execution is stopped (unexpected behavior)
+ *             If the HiveTable already exists but with a different path, a warning issued
  * @param partitions partition columns for this data object
  * @param acl override connections permissions for files created tables hadoop directory with this connection
  * @param analyzeTableAfterWrite enable compute statistics after writing data (default=false)
@@ -74,7 +74,40 @@ case class HiveTableDataObject(override val id: DataObjectId,
   private val connection = connectionId.map(c => getConnection[HiveTableConnection](c))
 
   // prepare final path and table
-  @transient private[workflow] lazy val hadoopPath = HdfsUtil.prefixHadoopPath(path.getOrElse("."), connection.map(_.pathPrefix))
+  @transient private var hadoopPathHolder: Path = _
+  def hadoopPath(implicit session: SparkSession): Path = {
+    require(isTableExisting || path.isDefined, s"HiveTable ${table.fullName} does not exist, so path must be set.")
+
+    if (hadoopPathHolder == null) {
+      hadoopPathHolder = {
+        if (isTableExisting) new Path(HiveUtil.existingTableLocation(table))
+        else HdfsUtil.prefixHadoopPath(path.get, connection.map(_.pathPrefix))
+      }
+
+      // For existing tables, check to see if we write to the same directory. If not, issue a warning.
+      if(isTableExisting && path.isDefined) {
+        // Normalize both paths before comparing them (remove tick / tock folder and trailing slash)
+        val hadoopPathNormalized = hadoopPathHolder.toString
+          .replaceAll("file:/", "")
+          .replaceAll("\\\\", "/")
+          .replaceAll("tick", "")
+          .replaceAll("tock", "")
+          .replaceAll("/+$", "")
+
+        val definedPathNormalized = path.get
+          .replaceAll("\\\\", "/")
+          .replaceAll("tick", "")
+          .replaceAll("tock", "")
+          .replaceAll("/+$", "")
+
+        if (definedPathNormalized != hadoopPathNormalized)
+          logger.warn(s"Table ${table.fullName} exists already with different path. The table will be written with new path definition ${hadoopPathHolder}!")
+      }
+    }
+
+    hadoopPathHolder
+  }
+
   @transient private var filesystemHolder: FileSystem = _
   def filesystem(implicit session: SparkSession): FileSystem = {
     if (filesystemHolder==null) {
@@ -119,14 +152,8 @@ case class HiveTableDataObject(override val id: DataObjectId,
   private def writeDataFrame(df: DataFrame, createTableOnly:Boolean, partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): Unit = {
     val dfPrepared = if (createTableOnly) session.createDataFrame(List[Row]().asJava, df.schema) else df
 
-    // use existing path if table exists already and not overwritten
-    val writePath = if(isTableExisting) HiveUtil.existingTableLocation(table) else hadoopPath.toString
-    val writePathNormalized = writePath.replaceAll("file:/","").replaceAll("\\\\","/")
-    if(path.isDefined && path.get.replaceAll("\\\\","/") != writePathNormalized)
-      logger.warn(s"Table ${table.fullName} exists already with different path. The table will be written with path ${writePath}")
-
     // write table and fix acls
-    HiveUtil.writeDfToHive( session, dfPrepared, writePath, table.name, table.db.get, partitions, saveMode, numInitialHdfsPartitions=numInitialHdfsPartitions )
+    HiveUtil.writeDfToHive( session, dfPrepared, hadoopPath.toString, table.name, table.db.get, partitions, saveMode, numInitialHdfsPartitions=numInitialHdfsPartitions )
     val aclToApply = acl.orElse(connection.flatMap(_.acl))
     if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
     if (analyzeTableAfterWrite && !createTableOnly) {

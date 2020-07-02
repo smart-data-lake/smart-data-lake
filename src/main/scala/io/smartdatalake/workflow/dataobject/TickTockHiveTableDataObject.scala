@@ -27,7 +27,7 @@ import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil}
 import io.smartdatalake.workflow.connection.HiveTableConnection
-import org.apache.hadoop.fs.FileSystem
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 
@@ -55,7 +55,40 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   private val connection = connectionId.map(c => getConnection[HiveTableConnection](c))
 
   // prepare final path and table
-  @transient private[workflow] lazy val hadoopPath = HdfsUtil.prefixHadoopPath(path.getOrElse("."), connection.map(_.pathPrefix))
+  @transient private var hadoopPathHolder: Path = _
+  def hadoopPath(implicit session: SparkSession): Path = {
+    require(isTableExisting || path.isDefined, s"TickTockHiveTable ${table.fullName} does not exist, so path must be set.")
+
+    if (hadoopPathHolder == null) {
+      hadoopPathHolder = {
+        if (isTableExisting) new Path(HiveUtil.existingTableLocation(table))
+        else HdfsUtil.prefixHadoopPath(path.get, connection.map(_.pathPrefix))
+      }
+
+      // For existing tables, check to see if we write to the same directory. If not, issue a warning.
+      if(isTableExisting && path.isDefined) {
+        // Normalize both paths before comparing them (remove tick / tock folder and trailing slash)
+        val hadoopPathNormalized = hadoopPathHolder.toString
+          .replaceAll("file:/", "")
+          .replaceAll("\\\\", "/")
+          .replaceAll("tick", "")
+          .replaceAll("tock", "")
+          .replaceAll("/+$", "")
+
+        val definedPathNormalized = path.get
+          .replaceAll("\\\\", "/")
+          .replaceAll("tick", "")
+          .replaceAll("tock", "")
+          .replaceAll("/+$", "")
+
+        if (definedPathNormalized != hadoopPathNormalized)
+          logger.warn(s"Table ${table.fullName} exists already with different path. The table will be written with new path definition ${hadoopPathHolder}!")
+      }
+    }
+
+    hadoopPathHolder
+  }
+
   @transient private var filesystemHolder: FileSystem = _
   def filesystem(implicit session: SparkSession): FileSystem = {
     if (filesystemHolder == null) {
@@ -127,20 +160,8 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
       } else df.repartition(numInitialHdfsPartitions)
     }
 
-    // use existing path if table exists already and not overwritten
-    val writePath = if(isTableExisting) HiveUtil.existingTableLocation(table) else hadoopPath.toString
-    // To check if we are writing to the same existing path, we first normalize both paths before comparing them (remove tick / tock folder and trailing slash)
-    val writePathNormalized = writePath.replaceAll("file:/","").replaceAll("\\\\","/")
-      .replaceAll("tick","").replaceAll("tock","")
-      .replaceAll("/+$","")
-    val definedPathNormalized = path.get.replaceAll("\\\\","/")
-      .replaceAll("tick","").replaceAll("tock","")
-      .replaceAll("/+$","")
-    if(path.isDefined && definedPathNormalized != writePathNormalized)
-      logger.warn(s"Table ${table.fullName} exists already with different path. The table will be written with path ${writePath}")
-
     // write table and fix acls
-    HiveUtil.writeDfToHiveWithTickTock(session, dfPrepared, writePath, table.name, table.db.get, partitions, saveMode)
+    HiveUtil.writeDfToHiveWithTickTock(session, dfPrepared, hadoopPath.toString, table.name, table.db.get, partitions, saveMode)
     val aclToApply = acl.orElse(connection.flatMap(_.acl))
     if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
     if (analyzeTableAfterWrite && !createTableOnly) {

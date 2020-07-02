@@ -262,4 +262,11 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     }
 
   }
+
+  test("Path must be specified if table does not exist yet") {
+    val df = Seq(("A", "2", 1), ("B", "1", 2), ("C", "X", 3)).toDF("p1", "p2", "value")
+    val tgtTable = Table(Some("default"), "nonexistenttgttable")
+    val tgtDO = HiveTableDataObject("tgtthatsurelydoesnotexistyet", path=None, table = tgtTable)
+    an [Exception] should be thrownBy tgtDO.writeDataFrame(df, partitionValues = Seq())
+  }
 }
