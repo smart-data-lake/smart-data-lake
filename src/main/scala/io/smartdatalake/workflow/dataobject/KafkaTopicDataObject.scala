@@ -264,7 +264,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
     import session.implicits._
-    require(df.columns.toSet == Set("key","value"), s"(${id}) Expects columns Set(key, value) in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
+    require(df.columns.toSet == Set("key","value"), s"(${id}) Expects columns key, value in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
     df.select(convertToKafka(keyType,$"key").as("key"), convertToKafka(valueType,$"value").as("value"))
       .write
       .format("kafka")

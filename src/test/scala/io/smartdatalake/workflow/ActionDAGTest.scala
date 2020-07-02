@@ -28,7 +28,7 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.workflow.action._
-import io.smartdatalake.workflow.action.customlogic.{CustomDfsTransformer, CustomDfsTransformerConfig}
+import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformerConfig, CustomDfsTransformer, CustomDfsTransformerConfig}
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataobject._
 import net.manub.embeddedkafka.EmbeddedKafka
@@ -161,7 +161,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     assert(action2MainMetrics("num_tasks")==1)
   }
 
-  test("action dag with 2 actions in sequence and where 2nd action reads different schema than produced by last action") {
+  test("action dag with 2 actions in sequence where 2nd action reads different schema than produced by last action") {
     // Note: Some DataObjects remove & add columns on read (e.g. KafkaTopicDataObject, SparkFileDataObject)
     // In this cases we have to break the lineage und create a dummy DataFrame in init phase.
 
@@ -190,7 +190,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
       val l1 = Seq(("doe-john", 5)).toDF("key", "value")
       TestUtil.prepareHiveTable(srcTable, srcPath, l1)
       val action1 = CopyAction("a", srcDO.id, tgt1DO.id)
-      val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id)
+      val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, transformer = Some(CustomDfTransformerConfig(sqlCode = Some("select 'test' as key, value from kafka1"))))
       val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2), 1, 1)
 
       // exec dag
