@@ -114,7 +114,7 @@ object ActionHelper extends SmartDataLakeLogger {
   /**
    * Apply execution mode to partition values
    */
-  def applyExecutionMode(executionMode: ExecutionMode, actionId: ActionObjectId, input: DataObject, output: DataObject, phase: ExecutionPhase)(implicit session: SparkSession): Option[(Seq[PartitionValues], Option[Column])] = {
+  def applyExecutionMode(executionMode: ExecutionMode, actionId: ActionObjectId, input: DataObject, output: DataObject, phase: ExecutionPhase)(implicit session: SparkSession): Option[(Seq[PartitionValues], Option[String])] = {
     import session.implicits._
 
     executionMode match {
@@ -167,7 +167,7 @@ object ActionHelper extends SmartDataLakeLogger {
             // stop processing if no new data
             if (outputLatestValue == inputLatestValue) throw NoDataToProcessWarning(actionId.id, s"($actionId) No increment to process found for ${input.id} and column ${mode.compareCol}")
             // prepare filter
-            val selectedData = col(mode.compareCol) > lit(outputLatestValue).cast(inputColType)
+            val selectedData = s"${mode.compareCol} > cast($outputLatestValue as ${inputColType.sql}"
             Some((Seq(), Some(selectedData)))
           case _ => throw ConfigurationException(s"$actionId has set executionMode = $SparkIncrementalMode but $input or $output does not support creating Spark DataFrames!")
         }

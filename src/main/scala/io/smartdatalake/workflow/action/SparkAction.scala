@@ -99,7 +99,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
           logger.info(s"($id) getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
           val df = input.getDataFrame(subFeed.partitionValues)
             .colNamesLowercase // convert to lower case by default
-          val filteredDf = filterDataFrame(df, subFeed.partitionValues, subFeed.filter)
+          val filteredDf = filterDataFrame(df, subFeed.partitionValues, subFeed.getFilterCol)
           subFeed.copy(dataFrame = Some(filteredDf))
         } else if (subFeed.isStreaming.contains(true)) {
           // convert to empty normal DataFrame

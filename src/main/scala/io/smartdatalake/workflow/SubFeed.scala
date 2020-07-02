@@ -23,7 +23,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.util.streaming.DummyStreamProvider
 import io.smartdatalake.workflow.dataobject.FileRef
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, SparkSession, functions}
 import sun.reflect.generics.reflectiveObjects.NotImplementedException
 
 /**
@@ -58,13 +58,16 @@ trait SubFeed extends DAGResult {
  * @param dataFrame Spark [[DataFrame]] to be processed. DataFrame should not be saved to state (@transient).
  * @param dataObjectId id of the DataObject this SubFeed corresponds to
  * @param partitionValues Values of Partitions transported by this SubFeed
+ * @param isDAGStart true if this subfeed is a start node of the dag
+ * @param isDummy true if this subfeed only contains a dummy DataFrame. Dummy DataFrames can be used for validating the lineage in init phase, but not for the exec phase.
+ * @param filter a spark sql filter expression. This is used by SparkIncrementalMode.
  */
 case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
                         override val dataObjectId: DataObjectId,
                         override val partitionValues: Seq[PartitionValues],
                         override val isDAGStart: Boolean = false,
                         isDummy: Boolean = false,
-                        filter: Option[Column] = None
+                        filter: Option[String] = None
                        )
   extends SubFeed {
   override def breakLineage(implicit session: SparkSession): SparkSubFeed = {
@@ -94,6 +97,9 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
     this.copy(dataFrame = this.dataFrame.map(_.persist))
   }
   def isStreaming: Option[Boolean] = dataFrame.map(_.isStreaming)
+  def getFilterCol: Option[Column] = {
+    filter.map(functions.expr)
+  }
 }
 object SparkSubFeed {
   def fromSubFeed( subFeed: SubFeed ): SparkSubFeed = {
