@@ -54,19 +54,24 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
    */
   private val connection = connectionId.map(c => getConnection[HiveTableConnection](c))
 
-  // prepare final path and table
+  // prepare table
+  table = table.overrideDb(connection.map(_.db))
+  if (table.db.isEmpty) throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
+
+  // prepare final path
   @transient private var hadoopPathHolder: Path = _
   def hadoopPath(implicit session: SparkSession): Path = {
-    require(isTableExisting || path.isDefined, s"TickTockHiveTable ${table.fullName} does not exist, so path must be set.")
+    val thisIsTableExisting = isTableExisting
+    require(thisIsTableExisting || path.isDefined, s"TickTockHiveTable ${table.fullName} does not exist, so path must be set.")
 
     if (hadoopPathHolder == null) {
       hadoopPathHolder = {
-        if (isTableExisting) new Path(HiveUtil.existingTableLocation(table))
+        if (thisIsTableExisting) new Path(HiveUtil.existingTableLocation(table))
         else HdfsUtil.prefixHadoopPath(path.get, connection.map(_.pathPrefix))
       }
 
       // For existing tables, check to see if we write to the same directory. If not, issue a warning.
-      if(isTableExisting && path.isDefined) {
+      if(thisIsTableExisting && path.isDefined) {
         // Normalize both paths before comparing them (remove tick / tock folder and trailing slash)
         val hadoopPathNormalized = hadoopPathHolder.toString
           .replaceAll("file:/", "")
@@ -85,7 +90,6 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
           logger.warn(s"Table ${table.fullName} exists already with different path. The table will be written with new path definition ${hadoopPathHolder}!")
       }
     }
-
     hadoopPathHolder
   }
 
@@ -95,10 +99,6 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
       filesystemHolder = HdfsUtil.getHadoopFsFromSpark(hadoopPath)
     }
     filesystemHolder
-  }
-  table = table.overrideDb(connection.map(_.db))
-  if (table.db.isEmpty) {
-    throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
   }
 
   override def prepare(implicit session: SparkSession): Unit = {
