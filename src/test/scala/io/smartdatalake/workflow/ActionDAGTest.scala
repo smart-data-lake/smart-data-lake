@@ -29,13 +29,15 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.customlogic.{CustomDfsTransformer, CustomDfsTransformerConfig}
+import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataobject._
+import net.manub.embeddedkafka.EmbeddedKafka
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{DataType, StructType}
+import org.apache.spark.sql.types.{DataType, StructField, StructType, TimestampType}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
-class ActionDAGTest extends FunSuite with BeforeAndAfter {
+class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
 
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
   import session.implicits._
@@ -131,7 +133,6 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // prepare DAG
     val refTimestamp1 = LocalDateTime.now()
-    val statePath = tempPath+"stateTest/"
     val appName = "test"
     implicit val context: ActionPipelineContext = ActionPipelineContext(feed, appName, 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
@@ -158,6 +159,57 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(action2MainMetrics("records_written")==1)
     assert(action2MainMetrics.isDefinedAt("bytes_written"))
     assert(action2MainMetrics("num_tasks")==1)
+  }
+
+  test("action dag with 2 actions in sequence and where 2nd action reads different schema than produced by last action") {
+    // Note: Some DataObjects remove & add columns on read (e.g. KafkaTopicDataObject, SparkFileDataObject)
+    // In this cases we have to break the lineage und create a dummy DataFrame in init phase.
+
+    withRunningKafka {
+
+      // setup DataObjects
+      val feed = "actionpipeline"
+      val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6000")
+      instanceRegistry.register(kafkaConnection)
+      val srcTable = Table(Some("default"), "ap_input")
+      HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
+      val srcPath = tempPath+s"/${srcTable.fullName}"
+      val srcDO = HiveTableDataObject( "src1", srcPath, table = srcTable, numInitialHdfsPartitions = 1)
+      instanceRegistry.register(srcDO)
+      createCustomTopic("topic1", Map(), 1, 1)
+      val tgt1DO = KafkaTopicDataObject("kafka1", topicName = "topic1", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"), schemaMin = Some(StructType(Seq(StructField("timestamp", TimestampType)))))
+      instanceRegistry.register(tgt1DO)
+      createCustomTopic("topic2", Map(), 1, 1)
+      val tgt2DO = KafkaTopicDataObject("kafka2", topicName = "topic2", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"), schemaMin = Some(StructType(Seq(StructField("timestamp", TimestampType)))))
+      instanceRegistry.register(tgt2DO)
+
+      // prepare DAG
+      val refTimestamp1 = LocalDateTime.now()
+      val appName = "test"
+      implicit val context: ActionPipelineContext = ActionPipelineContext(feed, appName, 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+      val l1 = Seq(("doe-john", 5)).toDF("key", "value")
+      TestUtil.prepareHiveTable(srcTable, srcPath, l1)
+      val action1 = CopyAction("a", srcDO.id, tgt1DO.id)
+      val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id)
+      val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2), 1, 1)
+
+      // exec dag
+      dag.prepare
+      dag.init
+      dag.exec
+
+      // check result
+      val dfR1 = tgt2DO.getDataFrame(Seq())
+      assert(dfR1.columns.toSet == Set("value","timestamp"))
+      val r1 = dfR1
+        .select($"value")
+        .as[String].collect().toSeq
+      assert(r1 == Seq("5"))
+
+      // check metrics
+      val action2MainMetrics = action2.getFinalMetrics(action2.outputId).get.getMainInfos
+      assert(action2MainMetrics("records_written") == 1)
+    }
   }
 
   test("action dag with 2 dependent actions from same predecessor") {
