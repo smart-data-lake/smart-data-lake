@@ -126,8 +126,8 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
 
     // write table and fix acls
     HiveUtil.writeDfToHiveWithTickTock(session, dfPrepared, hadoopPath.toString, table.name, table.db.get, partitions, saveMode)
-    if (acl.isDefined) AclUtil.addACLs(acl.get, hadoopPath)(filesystem)
-    else if (connection.isDefined && connection.get.acl.isDefined) AclUtil.addACLs(connection.get.acl.get, hadoopPath)(filesystem)
+    val aclToApply = acl.orElse(connection.flatMap(_.acl))
+    if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
     if (analyzeTableAfterWrite && !createTableOnly) {
       logger.info(s"($id) Analyze table ${table.fullName}.")
       HiveUtil.analyze(session, table.db.get, table.name, partitions, partitionValues)
