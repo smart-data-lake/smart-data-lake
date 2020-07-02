@@ -98,6 +98,8 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * @return a new [[DataFrame]] containing the data stored in the file at `path`
    */
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession) : DataFrame = {
+    import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+
     val wrongPartitionValues = PartitionValues.checkWrongPartitionValues(partitionValues, partitions)
     assert(wrongPartitionValues.isEmpty, s"getDataFrame got request with PartitionValues keys ${wrongPartitionValues.mkString(",")} not included in $id partition columns ${partitions.mkString(", ")}")
 
@@ -129,10 +131,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
       pathsToRead.map(reader.load).reduce(_ union _)
     }
 
-    val df = filenameColumn match {
-      case None => dfContent
-      case Some(name) => dfContent.withColumn(name, input_file_name)
-    }
+    val df = dfContent.withOptionalColumn(filenameColumn, input_file_name)
 
     // finalize & return DataFrame
     afterRead(df)
