@@ -52,12 +52,12 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
     val srcTable = Table(Some("default"), "historize_input")
     HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
     val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "src1", srcPath, table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
     instanceRegistry.register(srcDO)
     val tgtTable = Table(Some("default"), "historize_output", None, Some(Seq("lastname","firstname")))
     HiveUtil.dropTable(session, tgtTable.db.get, tgtTable.name )
     val tgtPath = tempPath+s"/${tgtTable.fullName}"
-    val tgtDO = TickTockHiveTableDataObject("tgt1", tgtPath, table = tgtTable, numInitialHdfsPartitions = 1)
+    val tgtDO = TickTockHiveTableDataObject("tgt1", Some(tgtPath), table = tgtTable, numInitialHdfsPartitions = 1)
     instanceRegistry.register(tgtDO)
 
     // prepare & start 1st load
@@ -99,11 +99,11 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
     // setup DataObjects
     val srcTable = Table(Some("default"), "historize_input")
     val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "src1", srcPath, table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
     instanceRegistry.register(srcDO)
     val tgtTable = Table(Some("default"), "historize_output")
     val tgtPath = tempPath+s"/${tgtTable.fullName}"
-    val tgtDO = TickTockHiveTableDataObject( "tgt1", tgtPath, table = tgtTable, numInitialHdfsPartitions = 1)
+    val tgtDO = TickTockHiveTableDataObject( "tgt1", Some(tgtPath), table = tgtTable, numInitialHdfsPartitions = 1)
     instanceRegistry.register(tgtDO)
 
     // prepare & start 1st load
