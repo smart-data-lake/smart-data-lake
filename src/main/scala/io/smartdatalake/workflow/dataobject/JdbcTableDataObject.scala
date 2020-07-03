@@ -52,7 +52,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                jdbcOptions: Map[String, String] = Map(),
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject with CanWriteDataFrame {
+  extends TransactionalSparkTableDataObject {
 
   /**
    * Connection defines driver, url and db in central location
