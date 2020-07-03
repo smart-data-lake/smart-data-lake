@@ -159,15 +159,11 @@ private[smartdatalake] class SparkStageMetricsListener(notifyStageMetricsFunc: (
     }
   }
 
-  override def onTaskEnd(taskEnd: SparkListenerTaskEnd) {
-    logger.info("Got Task metrics: "+taskEnd.taskInfo.accumulables)
-  }
   /**
    * On stage complete notify spark metrics
    */
   override def onStageCompleted(stageCompleted: SparkListenerStageCompleted): Unit = {
     // extract useful informations/metrics
-    logger.info("Got Stage metrics: "+stageCompleted.stageInfo.accumulables)
     val stageId = stageCompleted.stageInfo.stageId
     val taskMetrics = stageCompleted.stageInfo.taskMetrics
     val shuffleReadMetrics = taskMetrics.shuffleReadMetrics
