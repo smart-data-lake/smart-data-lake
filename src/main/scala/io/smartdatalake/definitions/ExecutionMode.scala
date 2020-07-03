@@ -32,8 +32,10 @@ trait ExecutionModeWithMainInputOutput {
 }
 
 /**
- * Partition difference execution mode lists partitions on input & output DataObject and starts loading all missing partitions.
+ * Partition difference execution mode lists partitions on mainInput & mainOutput DataObject and starts loading all missing partitions.
  * Partition columns to be used for comparision need to be a common 'init' of input and output partition columns.
+ * This mode needs mainInput/Output DataObjects which CanHandlePartitions to list partitions.
+ * Partition values are passed to following actions, if for partition columns which they have in common.
  * @param partitionColNb optional number of partition columns to use as a common 'init'.
  * @param mainInputId optional selection of inputId to be used for partition comparision. Only needed if there are multiple input DataObject's.
  * @param mainOutputId optional selection of outputId to be used for partition comparision. Only needed if there are multiple output DataObject's.
@@ -52,7 +54,7 @@ case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[
 
 /**
  * Compares max entry in "compare column" between mainOutput and mainInput and incrementally loads the delta.
- * This mode works only with SparkSubFeeds.
+ * This mode works only with SparkSubFeeds. The filter is not propagated to following actions.
  * @param compareCol a comparable column name existing in mainInput and mainOutput used to identify the delta. Column content should be bigger vor newer records.
  * @param mainInputId optional selection of inputId to be used for comparision. Only needed if there are multiple input DataObject's.
  * @param mainOutputId optional selection of outputId to be used for comparision. Only needed if there are multiple output DataObject's.
