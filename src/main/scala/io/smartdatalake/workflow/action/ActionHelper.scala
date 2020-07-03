@@ -125,9 +125,9 @@ object ActionHelper extends SmartDataLakeLogger {
               if (partitionOutput.partitions.nonEmpty) {
                 // prepare common partition columns
                 val commonInits = searchCommonInits(partitionInput.partitions, partitionOutput.partitions)
-                require(commonInits.nonEmpty, s"$actionId has set initExecutionMode = 'partitionDiff' but no common init was found in partition columns for $input and $output")
+                require(commonInits.nonEmpty, s"$actionId has set initExecutionMode = 'PartitionDiffMode' but no common init was found in partition columns for $input and $output")
                 val commonPartitions = if (mode.partitionColNb.isDefined) {
-                  commonInits.find(_.size==mode.partitionColNb.get).getOrElse(throw ConfigurationException(s"$actionId has set initExecutionMode = 'partitionDiff' but no common init with ${mode.partitionColNb.get} was found in partition columns of $input and $output from $commonInits!"))
+                  commonInits.find(_.size==mode.partitionColNb.get).getOrElse(throw ConfigurationException(s"$actionId has set initExecutionMode = 'PartitionDiffMode' but no common init with ${mode.partitionColNb.get} was found in partition columns of $input and $output from $commonInits!"))
                 } else {
                   commonInits.maxBy(_.size)
                 }
@@ -142,19 +142,19 @@ object ActionHelper extends SmartDataLakeLogger {
                   case Some(n) => partitionValuesToBeProcessed.sorted(ordering).take(n)
                   case None => partitionValuesToBeProcessed.sorted(ordering)
                 }
-                logger.info(s"($actionId) $PartitionDiffMode selected partition values ${selectedPartitionValues.mkString(", ")} to process")
+                logger.info(s"($actionId) PartitionDiffMode selected partition values ${selectedPartitionValues.mkString(", ")} to process")
                 //return
                 Some((selectedPartitionValues, None))
-              } else throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $output has no partition columns defined!")
-            } else throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $input has no partition columns defined!")
-          case (_: CanHandlePartitions, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $output does not support partitions!")
-          case (_, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $input does not support partitions!")
+              } else throw ConfigurationException(s"$actionId has set initExecutionMode = PartitionDiffMode but $output has no partition columns defined!")
+            } else throw ConfigurationException(s"$actionId has set initExecutionMode = PartitionDiffMode but $input has no partition columns defined!")
+          case (_: CanHandlePartitions, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = PartitionDiffMode but $output does not support partitions!")
+          case (_, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = PartitionDiffMode but $input does not support partitions!")
         }
 
       case mode:SparkIncrementalMode =>
         (input,output) match {
           case (sparkInput: CanCreateDataFrame, sparkOutput: CanCreateDataFrame) =>
-            val dfInput = sparkOutput.getDataFrame()
+            val dfInput = sparkInput.getDataFrame()
             val inputColType = dfInput.schema(mode.compareCol).dataType
             require(SparkIncrementalMode.allowedDataTypes.contains(inputColType), s"($actionId) Type of compare column ${mode.compareCol} must be one of ${SparkIncrementalMode.allowedDataTypes.mkString(", ")} in ${sparkInput.id}")
             val dfOutput = sparkOutput.getDataFrame()
@@ -162,12 +162,13 @@ object ActionHelper extends SmartDataLakeLogger {
             require(SparkIncrementalMode.allowedDataTypes.contains(outputColType), s"($actionId) Type of compare column ${mode.compareCol} must be one of ${SparkIncrementalMode.allowedDataTypes.mkString(", ")} in ${sparkOutput.id}")
             require(inputColType == outputColType, s"($actionId) Type of compare column ${mode.compareCol} is different between ${sparkInput.id} ($inputColType) and ${sparkOutput.id} ($outputColType)")
             // get latest values
-            val outputLatestValue = dfInput.agg(max(col(mode.compareCol)).cast(StringType)).as[String].head
-            val inputLatestValue = dfOutput.agg(max(col(mode.compareCol)).cast(StringType)).as[String].head
+            val inputLatestValue = dfInput.agg(max(col(mode.compareCol)).cast(StringType)).as[String].head
+            val outputLatestValue = dfOutput.agg(max(col(mode.compareCol)).cast(StringType)).as[String].head
             // stop processing if no new data
-            if (outputLatestValue == inputLatestValue) throw NoDataToProcessWarning(actionId.id, s"($actionId) No increment to process found for ${input.id} and column ${mode.compareCol}")
+            if (outputLatestValue == inputLatestValue) throw NoDataToProcessWarning(actionId.id, s"($actionId) No increment to process found for ${output.id} column ${mode.compareCol} (lastestValue=$outputLatestValue)")
+            logger.info(s"($actionId) SparkIncrementalMode selected increment for ${output.id} column ${mode.compareCol} from $outputLatestValue to $inputLatestValue to process")
             // prepare filter
-            val selectedData = s"${mode.compareCol} > cast($outputLatestValue as ${inputColType.sql}"
+            val selectedData = s"${mode.compareCol} > cast('$outputLatestValue' as ${inputColType.sql})"
             Some((Seq(), Some(selectedData)))
           case _ => throw ConfigurationException(s"$actionId has set executionMode = $SparkIncrementalMode but $input or $output does not support creating Spark DataFrames!")
         }

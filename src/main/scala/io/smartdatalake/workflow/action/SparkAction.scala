@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.action
 import java.time.LocalDateTime
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode, SparkStreamingOnceMode}
+import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode, SparkIncrementalMode, SparkStreamingOnceMode}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
@@ -125,7 +125,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
         if (noData) logger.info(s"($id) no data to process for ${output.id} in streaming mode")
         // return
         noData
-      case None | Some(_: PartitionDiffMode) =>
+      case None | Some(_: PartitionDiffMode) | Some(_: SparkIncrementalMode) =>
         // Write in batch mode
         assert(!subFeed.dataFrame.get.isStreaming, s"($id) Input from ${subFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingOnceMode.getClass.getSimpleName}")
         output.writeDataFrame(subFeed.dataFrame.get, subFeed.partitionValues)
@@ -308,8 +308,8 @@ private[smartdatalake] abstract class SparkAction extends Action {
     val readSchema = preparedSubFeed.dataFrame.map(df => input.createReadSchema(df.schema))
     val schemaChanges = writeSchema != readSchema
     preparedSubFeed = if (schemaChanges) preparedSubFeed.convertToDummy(readSchema.get) else preparedSubFeed
-    // break lineage if requested or if it's a streaming DataFrame
-    preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true)) preparedSubFeed.breakLineage else preparedSubFeed
+    // break lineage if requested or if it's a streaming DataFrame or if a filter expression is set
+    preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined) preparedSubFeed.breakLineage else preparedSubFeed
     // return
     preparedSubFeed
   }

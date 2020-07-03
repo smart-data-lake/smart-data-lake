@@ -319,14 +319,6 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     }
   }
 
-  private def convertToKafka(colType: KafkaColumnType, col: Column ): Column = {
-    colType match {
-      case KafkaColumnType.Binary => col // we let spark/kafka convert the column to binary
-      case KafkaColumnType.AvroSchemaRegistry => to_confluent_avro(col, schemaRegistryConfig.get)
-      case KafkaColumnType.String => col.cast(StringType)
-    }
-  }
-
   override def listPartitions(implicit session: SparkSession): Seq[PartitionValues] = {
     require(datePartitionCol.isDefined, s"(${id}) datePartitionCol column must be defined for listing partition values")
     val maxEmptyConsecutive: Int = 10 // number of empty partitions to stop searching for partitions
