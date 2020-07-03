@@ -42,7 +42,7 @@ import scala.collection.JavaConverters._
  * @param path hadoop directory for this table. If it doesn't contain scheme and authority, the connections pathPrefix is applied.
  *             If pathPrefix is not defined or doesn't define scheme and authority, default schema and authority is applied.
  *             If DataObject is only used for reading or if the HiveTable already exist, the path can be omitted.
- *             If the HiveTable already exists but with a different path, a warning issued
+ *             If the HiveTable already exists but with a different path, a warning is issued
  * @param partitions partition columns for this data object
  * @param acl override connections permissions for files created tables hadoop directory with this connection
  * @param analyzeTableAfterWrite enable compute statistics after writing data (default=false)
