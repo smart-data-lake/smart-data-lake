@@ -1,0 +1,1125 @@
+<!DOCTYPE html >
+<html>
+        <head>
+          <title>KafkaTopicDataObject - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.dataobject.KafkaTopicDataObject</title>
+          <meta name="description" content="KafkaTopicDataObject - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.dataobject.KafkaTopicDataObject" />
+          <meta name="keywords" content="KafkaTopicDataObject Smart Data Lake 1.0.6 API io.smartdatalake.workflow.dataobject.KafkaTopicDataObject" />
+          <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+          
+      <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
+      <link href="../../../../lib/diagrams.css" media="screen" type="text/css" rel="stylesheet" id="diagrams-css" />
+      <script type="text/javascript" src="../../../../lib/jquery.js" id="jquery-js"></script>
+      <script type="text/javascript" src="../../../../lib/jquery-ui.js"></script>
+      <script type="text/javascript" src="../../../../lib/template.js"></script>
+      <script type="text/javascript" src="../../../../lib/tools.tooltip.js"></script>
+      
+      <script type="text/javascript">
+         if(top === self) {
+            var url = '../../../../index.html';
+            var hash = 'io.smartdatalake.workflow.dataobject.KafkaTopicDataObject';
+            var anchor = window.location.hash;
+            var anchor_opt = '';
+            if (anchor.length >= 1)
+              anchor_opt = '@' + anchor.substring(1);
+            window.location.href = url + '#' + hash + anchor_opt;
+         }
+   	  </script>
+    
+        </head>
+        <body class="type">
+      <div id="definition">
+        <a href="KafkaTopicDataObject$.html" title="See companion object"><img alt="Class/Object" src="../../../../lib/class_to_object_big.png" /></a>
+        <p id="owner"><a href="../../../package.html" class="extype" name="io">io</a>.<a href="../../package.html" class="extype" name="io.smartdatalake">smartdatalake</a>.<a href="../package.html" class="extype" name="io.smartdatalake.workflow">workflow</a>.<a href="package.html" class="extype" name="io.smartdatalake.workflow.dataobject">dataobject</a></p>
+        <h1><a href="KafkaTopicDataObject$.html" title="See companion object">KafkaTopicDataObject</a></h1><h3><span class="morelinks"><div>
+            Related Docs:
+            <a href="KafkaTopicDataObject$.html" title="See companion object">object KafkaTopicDataObject</a>
+            | <a href="package.html" class="extype" name="io.smartdatalake.workflow.dataobject">package dataobject</a>
+          </div></span></h3><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      </div>
+
+      <h4 id="signature" class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <span class="name">KafkaTopicDataObject</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="topicName">topicName: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="connectionId">connectionId: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="keyType">keyType: <a href="KafkaColumnType$.html#KafkaColumnType=io.smartdatalake.workflow.dataobject.KafkaColumnType.Value" class="extmbr" name="io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType">KafkaColumnType</a> = <span class="symbol"><span class="name"><a href="KafkaColumnType$.html">KafkaColumnType.String</a></span></span></span>, <span name="valueType">valueType: <a href="KafkaColumnType$.html#KafkaColumnType=io.smartdatalake.workflow.dataobject.KafkaColumnType.Value" class="extmbr" name="io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType">KafkaColumnType</a> = <span class="symbol"><span class="name"><a href="KafkaColumnType$.html">KafkaColumnType.String</a></span></span></span>, <span name="schemaMin">schemaMin: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="org.apache.spark.sql.types.StructType">StructType</span>] = <span class="symbol">None</span></span>, <span name="selectCols">selectCols: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq(&quot;key&quot;, &quot;value&quot;)</span></span>, <span name="datePartitionCol">datePartitionCol: <span class="extype" name="scala.Option">Option</span>[<a href="DatePartitionColumnDef.html" class="extype" name="io.smartdatalake.workflow.dataobject.DatePartitionColumnDef">DatePartitionColumnDef</a>] = <span class="symbol">None</span></span>, <span name="batchReadConsecutivePartitionsAsRanges">batchReadConsecutivePartitionsAsRanges: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="batchReadMaxOffsetsPerTask">batchReadMaxOffsetsPerTask: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="dataSourceOptions">dataSourceOptions: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Map()</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="DataObjectMetadata.html" class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame">CanCreateDataFrame</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateStreamingDataFrame">CanCreateStreamingDataFrame</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame">CanWriteDataFrame</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanHandlePartitions">CanHandlePartitions</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.SchemaValidation">SchemaValidation</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4>
+      
+          <div id="comment" class="fullcommenttop"><div class="comment cmt"><p><span class="extype" name="DataObject">DataObject</span> of type KafkaTopic.
+Provides details to an action to read from Kafka Topics using either
+<span class="extype" name="org.apache.spark.sql.DataFrameReader">org.apache.spark.sql.DataFrameReader</span> or <span class="extype" name="org.apache.spark.sql.streaming.DataStreamReader">org.apache.spark.sql.streaming.DataStreamReader</span>
+</p></div><dl class="paramcmts block"><dt class="param">topicName</dt><dd class="cmt"><p>The name of the topic to read</p></dd><dt class="param">keyType</dt><dd class="cmt"><p>Optional type the key column should be converted to. If none is given it will remain a bytearray / binary.</p></dd><dt class="param">valueType</dt><dd class="cmt"><p>Optional type the value column should be converted to. If none is given it will remain a bytearray / binary.</p></dd><dt class="param">schemaMin</dt><dd class="cmt"><p>An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.</p></dd><dt class="param">selectCols</dt><dd class="cmt"><p>Columns to be selected when reading the DataFrame. Available columns are key, value, topic,
+                  partition, offset, timestamp, timestampType. If key/valueType is AvroSchemaRegistry the key/value column are
+                  convert to a complex type according to the avro schema. To expand it select &quot;value.*&quot;.
+                  Default is to select key and value.</p></dd><dt class="param">datePartitionCol</dt><dd class="cmt"><p>definition of date partition column to extract formatted timestamp into column.
+                  This is used to list existing partition and is added as additional column on batch read.</p></dd><dt class="param">batchReadConsecutivePartitionsAsRanges</dt><dd class="cmt"><p>Set to true if consecutive partitions should be combined as one range of offsets when batch reading from topic. This results in less tasks but can be a performance problem when reading many partitions. (default=false)</p></dd><dt class="param">batchReadMaxOffsetsPerTask</dt><dd class="cmt"><p>Set number of offsets per Spark task when batch reading from topic.</p></dd><dt class="param">dataSourceOptions</dt><dd class="cmt"><p>Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).
+                     These options override connection.kafkaOptions.</p></dd></dl><div class="toggleContainer block">
+          <span class="toggle">Linear Supertypes</span>
+          <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.Product">Product</span>, <span class="extype" name="scala.Equals">Equals</span>, <span class="extype" name="io.smartdatalake.workflow.dataobject.SchemaValidation">SchemaValidation</span>, <span class="extype" name="io.smartdatalake.workflow.dataobject.CanHandlePartitions">CanHandlePartitions</span>, <span class="extype" name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame">CanWriteDataFrame</span>, <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateStreamingDataFrame">CanCreateStreamingDataFrame</span>, <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame">CanCreateDataFrame</span>, <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>, <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span>, <span class="extype" name="io.smartdatalake.config.ParsableFromConfig">ParsableFromConfig</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>], <span class="extype" name="io.smartdatalake.config.SdlConfigObject">SdlConfigObject</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
+        </div></div>
+        
+
+      <div id="mbrsel">
+        <div id="textfilter"><span class="pre"></span><span class="input"><input id="mbrsel-input" type="text" accesskey="/" /></span><span class="post"></span></div>
+        <div id="order">
+              <span class="filtertype">Ordering</span>
+              <ol>
+                
+                <li class="alpha in"><span>Alphabetic</span></li>
+                <li class="inherit out"><span>By Inheritance</span></li>
+              </ol>
+            </div>
+        <div id="ancestors">
+                <span class="filtertype">Inherited<br />
+                </span>
+                <ol id="linearization">
+                  <li class="in" name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject"><span>KafkaTopicDataObject</span></li><li class="in" name="scala.Serializable"><span>Serializable</span></li><li class="in" name="java.io.Serializable"><span>Serializable</span></li><li class="in" name="scala.Product"><span>Product</span></li><li class="in" name="scala.Equals"><span>Equals</span></li><li class="in" name="io.smartdatalake.workflow.dataobject.SchemaValidation"><span>SchemaValidation</span></li><li class="in" name="io.smartdatalake.workflow.dataobject.CanHandlePartitions"><span>CanHandlePartitions</span></li><li class="in" name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame"><span>CanWriteDataFrame</span></li><li class="in" name="io.smartdatalake.workflow.dataobject.CanCreateStreamingDataFrame"><span>CanCreateStreamingDataFrame</span></li><li class="in" name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame"><span>CanCreateDataFrame</span></li><li class="in" name="io.smartdatalake.workflow.dataobject.DataObject"><span>DataObject</span></li><li class="in" name="io.smartdatalake.util.misc.SmartDataLakeLogger"><span>SmartDataLakeLogger</span></li><li class="in" name="io.smartdatalake.config.ParsableFromConfig"><span>ParsableFromConfig</span></li><li class="in" name="io.smartdatalake.config.SdlConfigObject"><span>SdlConfigObject</span></li><li class="in" name="scala.AnyRef"><span>AnyRef</span></li><li class="in" name="scala.Any"><span>Any</span></li>
+                </ol>
+              </div><div id="ancestors">
+            <span class="filtertype"></span>
+            <ol>
+              <li class="hideall out"><span>Hide All</span></li>
+              <li class="showall in"><span>Show All</span></li>
+            </ol>
+          </div>
+        <div id="visbl">
+            <span class="filtertype">Visibility</span>
+            <ol><li class="public in"><span>Public</span></li><li class="all out"><span>All</span></li></ol>
+          </div>
+      </div>
+
+      <div id="template">
+        <div id="allMembers">
+        <div id="constructors" class="members">
+              <h3>Instance Constructors</h3>
+              <ol><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.DataObjectId,topicName:String,connectionId:io.smartdatalake.config.SdlConfigObject.ConnectionId,keyType:io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType,valueType:io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType,schemaMin:Option[org.apache.spark.sql.types.StructType],selectCols:Seq[String],datePartitionCol:Option[io.smartdatalake.workflow.dataobject.DatePartitionColumnDef],batchReadConsecutivePartitionsAsRanges:Boolean,batchReadMaxOffsetsPerTask:Option[Int],dataSourceOptions:Map[String,String],metadata:Option[io.smartdatalake.workflow.dataobject.DataObjectMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.dataobject.KafkaTopicDataObject"></a>
+      <a id="&lt;init&gt;:KafkaTopicDataObject"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">new</span>
+      </span>
+      <span class="symbol">
+        <span class="name">KafkaTopicDataObject</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="topicName">topicName: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="connectionId">connectionId: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="keyType">keyType: <a href="KafkaColumnType$.html#KafkaColumnType=io.smartdatalake.workflow.dataobject.KafkaColumnType.Value" class="extmbr" name="io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType">KafkaColumnType</a> = <span class="symbol"><span class="name"><a href="KafkaColumnType$.html">KafkaColumnType.String</a></span></span></span>, <span name="valueType">valueType: <a href="KafkaColumnType$.html#KafkaColumnType=io.smartdatalake.workflow.dataobject.KafkaColumnType.Value" class="extmbr" name="io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType">KafkaColumnType</a> = <span class="symbol"><span class="name"><a href="KafkaColumnType$.html">KafkaColumnType.String</a></span></span></span>, <span name="schemaMin">schemaMin: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="org.apache.spark.sql.types.StructType">StructType</span>] = <span class="symbol">None</span></span>, <span name="selectCols">selectCols: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq(&quot;key&quot;, &quot;value&quot;)</span></span>, <span name="datePartitionCol">datePartitionCol: <span class="extype" name="scala.Option">Option</span>[<a href="DatePartitionColumnDef.html" class="extype" name="io.smartdatalake.workflow.dataobject.DatePartitionColumnDef">DatePartitionColumnDef</a>] = <span class="symbol">None</span></span>, <span name="batchReadConsecutivePartitionsAsRanges">batchReadConsecutivePartitionsAsRanges: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="batchReadMaxOffsetsPerTask">batchReadMaxOffsetsPerTask: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="dataSourceOptions">dataSourceOptions: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Map()</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="DataObjectMetadata.html" class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.DataObjectId,topicName:String,connectionId:io.smartdatalake.config.SdlConfigObject.ConnectionId,keyType:io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType,valueType:io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType,schemaMin:Option[org.apache.spark.sql.types.StructType],selectCols:Seq[String],datePartitionCol:Option[io.smartdatalake.workflow.dataobject.DatePartitionColumnDef],batchReadConsecutivePartitionsAsRanges:Boolean,batchReadMaxOffsetsPerTask:Option[Int],dataSourceOptions:Map[String,String],metadata:Option[io.smartdatalake.workflow.dataobject.DataObjectMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.dataobject.KafkaTopicDataObject" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">topicName</dt><dd class="cmt"><p>The name of the topic to read</p></dd><dt class="param">keyType</dt><dd class="cmt"><p>Optional type the key column should be converted to. If none is given it will remain a bytearray / binary.</p></dd><dt class="param">valueType</dt><dd class="cmt"><p>Optional type the value column should be converted to. If none is given it will remain a bytearray / binary.</p></dd><dt class="param">schemaMin</dt><dd class="cmt"><p>An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.</p></dd><dt class="param">selectCols</dt><dd class="cmt"><p>Columns to be selected when reading the DataFrame. Available columns are key, value, topic,
+                  partition, offset, timestamp, timestampType. If key/valueType is AvroSchemaRegistry the key/value column are
+                  convert to a complex type according to the avro schema. To expand it select &quot;value.*&quot;.
+                  Default is to select key and value.</p></dd><dt class="param">datePartitionCol</dt><dd class="cmt"><p>definition of date partition column to extract formatted timestamp into column.
+                  This is used to list existing partition and is added as additional column on batch read.</p></dd><dt class="param">batchReadConsecutivePartitionsAsRanges</dt><dd class="cmt"><p>Set to true if consecutive partitions should be combined as one range of offsets when batch reading from topic. This results in less tasks but can be a performance problem when reading many partitions. (default=false)</p></dd><dt class="param">batchReadMaxOffsetsPerTask</dt><dd class="cmt"><p>Set number of offsets per Spark task when batch reading from topic.</p></dd><dt class="param">dataSourceOptions</dt><dd class="cmt"><p>Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).
+                     These options override connection.kafkaOptions.</p></dd></dl></div>
+    </li></ol>
+            </div>
+
+        
+
+        
+
+        <div id="values" class="values members">
+              <h3>Value Members</h3>
+              <ol><li name="scala.AnyRef#!=" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="!=(x$1:Any):Boolean"></a>
+      <a id="!=(Any):Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span title="gt4s: $bang$eq" class="name">!=</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.Any">Any</span></span>)</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@!=(x$1:Any):Boolean" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
+    </li><li name="scala.AnyRef###" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="##():Int"></a>
+      <a id="##():Int"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span title="gt4s: $hash$hash" class="name">##</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.Int">Int</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@##():Int" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
+    </li><li name="scala.AnyRef#==" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="==(x$1:Any):Boolean"></a>
+      <a id="==(Any):Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span title="gt4s: $eq$eq" class="name">==</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.Any">Any</span></span>)</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@==(x$1:Any):Boolean" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
+    </li><li name="scala.Any#asInstanceOf" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="asInstanceOf[T0]:T0"></a>
+      <a id="asInstanceOf[T0]:T0"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">asInstanceOf</span><span class="tparams">[<span name="T0">T0</span>]</span><span class="result">: <span class="extype" name="scala.Any.asInstanceOf.T0">T0</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@asInstanceOf[T0]:T0" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Any</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#batchReadConsecutivePartitionsAsRanges" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="batchReadConsecutivePartitionsAsRanges:Boolean"></a>
+      <a id="batchReadConsecutivePartitionsAsRanges:Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">batchReadConsecutivePartitionsAsRanges</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@batchReadConsecutivePartitionsAsRanges:Boolean" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Set to true if consecutive partitions should be combined as one range of offsets when batch reading from topic.</p><div class="fullcomment"><div class="comment cmt"><p>Set to true if consecutive partitions should be combined as one range of offsets when batch reading from topic. This results in less tasks but can be a performance problem when reading many partitions. (default=false)</p></div></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#batchReadMaxOffsetsPerTask" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="batchReadMaxOffsetsPerTask:Option[Int]"></a>
+      <a id="batchReadMaxOffsetsPerTask:Option[Int]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">batchReadMaxOffsetsPerTask</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@batchReadMaxOffsetsPerTask:Option[Int]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Set number of offsets per Spark task when batch reading from topic.</p>
+    </li><li name="scala.AnyRef#clone" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="clone():Object"></a>
+      <a id="clone():AnyRef"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">clone</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.AnyRef">AnyRef</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@clone():Object" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Attributes</dt><dd>protected[<a href="../../../../java$lang.html" class="extype" name="java.lang">java.lang</a>] </dd><dt>Definition Classes</dt><dd>AnyRef</dd><dt>Annotations</dt><dd>
+                <span class="name">@throws</span><span class="args">(<span>
+      
+      <span class="defval" name="classOf[java.lang.CloneNotSupportedException]">...</span>
+    </span>)</span>
+              
+        </dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#connectionId" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="connectionId:io.smartdatalake.config.SdlConfigObject.ConnectionId"></a>
+      <a id="connectionId:ConnectionId"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">connectionId</span><span class="result">: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@connectionId:io.smartdatalake.config.SdlConfigObject.ConnectionId" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.dataobject.CanHandlePartitions#createEmptyPartition" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="createEmptyPartition(partitionValues:io.smartdatalake.util.hdfs.PartitionValues)(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
+      <a id="createEmptyPartition(PartitionValues)(SparkSession):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">createEmptyPartition</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@createEmptyPartition(partitionValues:io.smartdatalake.util.hdfs.PartitionValues)(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">create empty partition
+</p><div class="fullcomment"><div class="comment cmt"><p>create empty partition
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>CanHandlePartitions</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.CanHandlePartitions#createMissingPartitions" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="createMissingPartitions(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
+      <a id="createMissingPartitions(Seq[PartitionValues])(SparkSession):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">createMissingPartitions</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@createMissingPartitions(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Create empty partitions for partition values not yet existing
+</p><div class="fullcomment"><div class="comment cmt"><p>Create empty partitions for partition values not yet existing
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>CanHandlePartitions</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#createReadSchema" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="createReadSchema(writeSchema:org.apache.spark.sql.types.StructType)(implicitsession:org.apache.spark.sql.SparkSession):org.apache.spark.sql.types.StructType"></a>
+      <a id="createReadSchema(StructType)(SparkSession):StructType"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">createReadSchema</span><span class="params">(<span name="writeSchema">writeSchema: <span class="extype" name="org.apache.spark.sql.types.StructType">StructType</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="org.apache.spark.sql.types.StructType">StructType</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@createReadSchema(writeSchema:org.apache.spark.sql.types.StructType)(implicitsession:org.apache.spark.sql.SparkSession):org.apache.spark.sql.types.StructType" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Creates the read schema based on a given write schema.</p><div class="fullcomment"><div class="comment cmt"><p>Creates the read schema based on a given write schema.
+Normally this is the same, but some DataObjects can remove &amp; add columns on read (e.g. KafkaTopicDataObject, SparkFileDataObject)
+In this cases we have to break the DataFrame lineage und create a dummy DataFrame in init phase.
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject">KafkaTopicDataObject</a> → CanCreateDataFrame</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#dataSourceOptions" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="dataSourceOptions:Map[String,String]"></a>
+      <a id="dataSourceOptions:Map[String,String]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">dataSourceOptions</span><span class="result">: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@dataSourceOptions:Map[String,String]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).</p><div class="fullcomment"><div class="comment cmt"><p>Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).
+                     These options override connection.kafkaOptions.</p></div></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#datePartitionCol" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="datePartitionCol:Option[io.smartdatalake.workflow.dataobject.DatePartitionColumnDef]"></a>
+      <a id="datePartitionCol:Option[DatePartitionColumnDef]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">datePartitionCol</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<a href="DatePartitionColumnDef.html" class="extype" name="io.smartdatalake.workflow.dataobject.DatePartitionColumnDef">DatePartitionColumnDef</a>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@datePartitionCol:Option[io.smartdatalake.workflow.dataobject.DatePartitionColumnDef]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">definition of date partition column to extract formatted timestamp into column.</p><div class="fullcomment"><div class="comment cmt"><p>definition of date partition column to extract formatted timestamp into column.
+                  This is used to list existing partition and is added as additional column on batch read.</p></div></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.CanHandlePartitions#deletePartitions" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="deletePartitions(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
+      <a id="deletePartitions(Seq[PartitionValues])(SparkSession):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">deletePartitions</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@deletePartitions(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Delete given partitions.</p><div class="fullcomment"><div class="comment cmt"><p>Delete given partitions. This is used to cleanup partitions after they are processed.
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>CanHandlePartitions</dd></dl></div>
+    </li><li name="scala.AnyRef#eq" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="eq(x$1:AnyRef):Boolean"></a>
+      <a id="eq(AnyRef):Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">eq</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.AnyRef">AnyRef</span></span>)</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@eq(x$1:AnyRef):Boolean" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#factory" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="factory:io.smartdatalake.config.FromConfigFactory[io.smartdatalake.workflow.dataobject.DataObject]"></a>
+      <a id="factory:FromConfigFactory[DataObject]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">factory</span><span class="result">: <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@factory:io.smartdatalake.config.FromConfigFactory[io.smartdatalake.workflow.dataobject.DataObject]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Returns the factory that can parse this type (that is, type <code>CO</code>).</p><div class="fullcomment"><div class="comment cmt"><p>Returns the factory that can parse this type (that is, type <code>CO</code>).</p><p>Typically, implementations of this method should return the companion object of the implementing class.
+The companion object in turn should implement <span class="extype" name="FromConfigFactory">FromConfigFactory</span>.</p></div><dl class="paramcmts block"><dt>returns</dt><dd class="cmt"><p>the factory (object) for this class.</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject">KafkaTopicDataObject</a> → ParsableFromConfig</dd></dl></div>
+    </li><li name="scala.AnyRef#finalize" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="finalize():Unit"></a>
+      <a id="finalize():Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">finalize</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@finalize():Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Attributes</dt><dd>protected[<a href="../../../../java$lang.html" class="extype" name="java.lang">java.lang</a>] </dd><dt>Definition Classes</dt><dd>AnyRef</dd><dt>Annotations</dt><dd>
+                <span class="name">@throws</span><span class="args">(<span>
+      
+      <span class="symbol">classOf[java.lang.Throwable]</span>
+    </span>)</span>
+              
+        </dd></dl></div>
+    </li><li name="scala.AnyRef#getClass" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="getClass():Class[_]"></a>
+      <a id="getClass():Class[_]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">getClass</span><span class="params">()</span><span class="result">: <span class="extype" name="java.lang.Class">Class</span>[_]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@getClass():Class[_]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.DataObject#getConnection" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="getConnection[T&lt;:io.smartdatalake.workflow.connection.Connection](connectionId:io.smartdatalake.config.SdlConfigObject.ConnectionId)(implicitregistry:io.smartdatalake.config.InstanceRegistry,implicitct:scala.reflect.ClassTag[T],implicittt:reflect.runtime.universe.TypeTag[T]):T"></a>
+      <a id="getConnection[T&lt;:Connection](ConnectionId)(InstanceRegistry,ClassTag[T],scala.reflect.api.JavaUniverse.TypeTag[T]):T"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">getConnection</span><span class="tparams">[<span name="T">T &lt;: <span class="extype" name="io.smartdatalake.workflow.connection.Connection">Connection</span></span>]</span><span class="params">(<span name="connectionId">connectionId: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="registry">registry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>, <span name="ct">ct: <span class="extype" name="scala.reflect.ClassTag">ClassTag</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject.getConnection.T">T</span>]</span>, <span name="tt">tt: <span class="extype" name="scala.reflect.api.TypeTags.TypeTag">scala.reflect.api.JavaUniverse.TypeTag</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject.getConnection.T">T</span>]</span>)</span><span class="result">: <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject.getConnection.T">T</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@getConnection[T&lt;:io.smartdatalake.workflow.connection.Connection](connectionId:io.smartdatalake.config.SdlConfigObject.ConnectionId)(implicitregistry:io.smartdatalake.config.InstanceRegistry,implicitct:scala.reflect.ClassTag[T],implicittt:reflect.runtime.universe.TypeTag[T]):T" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Handle class cast exception when getting objects from instance registry
+</p><div class="fullcomment"><div class="comment cmt"><p>Handle class cast exception when getting objects from instance registry
+</p></div><dl class="attributes block"> <dt>Attributes</dt><dd>protected </dd><dt>Definition Classes</dt><dd>DataObject</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.DataObject#getConnectionReg" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="getConnectionReg[T&lt;:io.smartdatalake.workflow.connection.Connection](connectionId:io.smartdatalake.config.SdlConfigObject.ConnectionId,registry:io.smartdatalake.config.InstanceRegistry)(implicitct:scala.reflect.ClassTag[T],implicittt:reflect.runtime.universe.TypeTag[T]):T"></a>
+      <a id="getConnectionReg[T&lt;:Connection](ConnectionId,InstanceRegistry)(ClassTag[T],scala.reflect.api.JavaUniverse.TypeTag[T]):T"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">getConnectionReg</span><span class="tparams">[<span name="T">T &lt;: <span class="extype" name="io.smartdatalake.workflow.connection.Connection">Connection</span></span>]</span><span class="params">(<span name="connectionId">connectionId: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="registry">registry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="ct">ct: <span class="extype" name="scala.reflect.ClassTag">ClassTag</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject.getConnectionReg.T">T</span>]</span>, <span name="tt">tt: <span class="extype" name="scala.reflect.api.TypeTags.TypeTag">scala.reflect.api.JavaUniverse.TypeTag</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject.getConnectionReg.T">T</span>]</span>)</span><span class="result">: <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject.getConnectionReg.T">T</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@getConnectionReg[T&lt;:io.smartdatalake.workflow.connection.Connection](connectionId:io.smartdatalake.config.SdlConfigObject.ConnectionId,registry:io.smartdatalake.config.InstanceRegistry)(implicitct:scala.reflect.ClassTag[T],implicittt:reflect.runtime.universe.TypeTag[T]):T" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Attributes</dt><dd>protected </dd><dt>Definition Classes</dt><dd>DataObject</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#getDataFrame" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="getDataFrame(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):org.apache.spark.sql.DataFrame"></a>
+      <a id="getDataFrame(Seq[PartitionValues])(SparkSession):DataFrame"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">getDataFrame</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>] = <span class="symbol">Seq()</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@getDataFrame(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):org.apache.spark.sql.DataFrame" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject">KafkaTopicDataObject</a> → CanCreateDataFrame</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#getStreamingDataFrame" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="getStreamingDataFrame(options:Map[String,String],schema:Option[org.apache.spark.sql.types.StructType])(implicitsession:org.apache.spark.sql.SparkSession):org.apache.spark.sql.DataFrame"></a>
+      <a id="getStreamingDataFrame(Map[String,String],Option[StructType])(SparkSession):DataFrame"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">getStreamingDataFrame</span><span class="params">(<span name="options">options: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]</span>, <span name="schema">schema: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="org.apache.spark.sql.types.StructType">StructType</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@getStreamingDataFrame(options:Map[String,String],schema:Option[org.apache.spark.sql.types.StructType])(implicitsession:org.apache.spark.sql.SparkSession):org.apache.spark.sql.DataFrame" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject">KafkaTopicDataObject</a> → CanCreateStreamingDataFrame</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#id" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="id:io.smartdatalake.config.SdlConfigObject.DataObjectId"></a>
+      <a id="id:DataObjectId"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">id</span><span class="result">: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@id:io.smartdatalake.config.SdlConfigObject.DataObjectId" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">A unique identifier for this instance.</p><div class="fullcomment"><div class="comment cmt"><p>A unique identifier for this instance.
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject">KafkaTopicDataObject</a> → DataObject → SdlConfigObject</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame#init" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="init(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
+      <a id="init(Seq[PartitionValues])(SparkSession):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">init</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>] = <span class="symbol">Seq()</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@init(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Initialize callback before writing data out to disk/sinks.</p><div class="fullcomment"><div class="comment cmt"><p>Initialize callback before writing data out to disk/sinks.
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>CanWriteDataFrame</dd></dl></div>
+    </li><li name="scala.Any#isInstanceOf" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="isInstanceOf[T0]:Boolean"></a>
+      <a id="isInstanceOf[T0]:Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">isInstanceOf</span><span class="tparams">[<span name="T0">T0</span>]</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@isInstanceOf[T0]:Boolean" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Any</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#keyType" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="keyType:io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType"></a>
+      <a id="keyType:KafkaColumnType"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">keyType</span><span class="result">: <a href="KafkaColumnType$.html#KafkaColumnType=io.smartdatalake.workflow.dataobject.KafkaColumnType.Value" class="extmbr" name="io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType">KafkaColumnType</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@keyType:io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Optional type the key column should be converted to.</p><div class="fullcomment"><div class="comment cmt"><p>Optional type the key column should be converted to. If none is given it will remain a bytearray / binary.</p></div></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#listPartitions" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="listPartitions(implicitsession:org.apache.spark.sql.SparkSession):Seq[io.smartdatalake.util.hdfs.PartitionValues]"></a>
+      <a id="listPartitions(SparkSession):Seq[PartitionValues]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">listPartitions</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@listPartitions(implicitsession:org.apache.spark.sql.SparkSession):Seq[io.smartdatalake.util.hdfs.PartitionValues]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">list partition values
+</p><div class="fullcomment"><div class="comment cmt"><p>list partition values
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject">KafkaTopicDataObject</a> → CanHandlePartitions</dd></dl></div>
+    </li><li name="io.smartdatalake.util.misc.SmartDataLakeLogger#logger" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="logger:org.slf4j.Logger"></a>
+      <a id="logger:Logger"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">lazy val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">logger</span><span class="result">: <span class="extype" name="org.slf4j.Logger">Logger</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@logger:org.slf4j.Logger" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Attributes</dt><dd>protected </dd><dt>Definition Classes</dt><dd>SmartDataLakeLogger</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#metadata" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="metadata:Option[io.smartdatalake.workflow.dataobject.DataObjectMetadata]"></a>
+      <a id="metadata:Option[DataObjectMetadata]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">metadata</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<a href="DataObjectMetadata.html" class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</a>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@metadata:Option[io.smartdatalake.workflow.dataobject.DataObjectMetadata]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Additional metadata for the DataObject
+</p><div class="fullcomment"><div class="comment cmt"><p>Additional metadata for the DataObject
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject">KafkaTopicDataObject</a> → DataObject</dd></dl></div>
+    </li><li name="scala.AnyRef#ne" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="ne(x$1:AnyRef):Boolean"></a>
+      <a id="ne(AnyRef):Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">ne</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.AnyRef">AnyRef</span></span>)</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@ne(x$1:AnyRef):Boolean" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li name="scala.AnyRef#notify" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="notify():Unit"></a>
+      <a id="notify():Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">notify</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@notify():Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li name="scala.AnyRef#notifyAll" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="notifyAll():Unit"></a>
+      <a id="notifyAll():Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">notifyAll</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@notifyAll():Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#partitions" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="partitions:Seq[String]"></a>
+      <a id="partitions:Seq[String]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">partitions</span><span class="result">: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@partitions:Seq[String]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Definition of partition columns
+</p><div class="fullcomment"><div class="comment cmt"><p>Definition of partition columns
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject">KafkaTopicDataObject</a> → CanHandlePartitions</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.DataObject#postRead" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="postRead(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
+      <a id="postRead(SparkSession):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">postRead</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@postRead(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Runs operations after reading from <span class="extype" name="DataObject">DataObject</span>
+</p><div class="fullcomment"><div class="comment cmt"><p>Runs operations after reading from <span class="extype" name="DataObject">DataObject</span>
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>DataObject</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.DataObject#postWrite" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="postWrite(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
+      <a id="postWrite(SparkSession):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">postWrite</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@postWrite(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Runs operations after writing to <span class="extype" name="DataObject">DataObject</span>
+</p><div class="fullcomment"><div class="comment cmt"><p>Runs operations after writing to <span class="extype" name="DataObject">DataObject</span>
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>DataObject</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.DataObject#preRead" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="preRead(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
+      <a id="preRead(SparkSession):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">preRead</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@preRead(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Runs operations before reading from <span class="extype" name="DataObject">DataObject</span>
+</p><div class="fullcomment"><div class="comment cmt"><p>Runs operations before reading from <span class="extype" name="DataObject">DataObject</span>
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>DataObject</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.DataObject#preWrite" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="preWrite(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
+      <a id="preWrite(SparkSession):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">preWrite</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@preWrite(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Runs operations before writing to <span class="extype" name="DataObject">DataObject</span>
+</p><div class="fullcomment"><div class="comment cmt"><p>Runs operations before writing to <span class="extype" name="DataObject">DataObject</span>
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>DataObject</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#prepare" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="prepare(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
+      <a id="prepare(SparkSession):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">prepare</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@prepare(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Prepare &amp; test <span class="extype" name="DataObject">DataObject</span>'s prerequisits</p><div class="fullcomment"><div class="comment cmt"><p>Prepare &amp; test <span class="extype" name="DataObject">DataObject</span>'s prerequisits</p><p>This runs during the &quot;prepare&quot; operation of the DAG.
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject">KafkaTopicDataObject</a> → DataObject</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#schemaMin" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="schemaMin:Option[org.apache.spark.sql.types.StructType]"></a>
+      <a id="schemaMin:Option[StructType]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">schemaMin</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="org.apache.spark.sql.types.StructType">StructType</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@schemaMin:Option[org.apache.spark.sql.types.StructType]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.</p><div class="fullcomment"><div class="comment cmt"><p>An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject">KafkaTopicDataObject</a> → SchemaValidation</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#selectCols" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="selectCols:Seq[String]"></a>
+      <a id="selectCols:Seq[String]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">selectCols</span><span class="result">: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@selectCols:Seq[String]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Columns to be selected when reading the DataFrame.</p><div class="fullcomment"><div class="comment cmt"><p>Columns to be selected when reading the DataFrame. Available columns are key, value, topic,
+                  partition, offset, timestamp, timestampType. If key/valueType is AvroSchemaRegistry the key/value column are
+                  convert to a complex type according to the avro schema. To expand it select &quot;value.*&quot;.
+                  Default is to select key and value.</p></div></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame#streamingOptions" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="streamingOptions:Map[String,String]"></a>
+      <a id="streamingOptions:Map[String,String]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">streamingOptions</span><span class="result">: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@streamingOptions:Map[String,String]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>CanWriteDataFrame</dd></dl></div>
+    </li><li name="scala.AnyRef#synchronized" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="synchronized[T0](x$1:=&gt;T0):T0"></a>
+      <a id="synchronized[T0](⇒T0):T0"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">synchronized</span><span class="tparams">[<span name="T0">T0</span>]</span><span class="params">(<span name="arg0">arg0: ⇒ <span class="extype" name="java.lang.AnyRef.synchronized.T0">T0</span></span>)</span><span class="result">: <span class="extype" name="java.lang.AnyRef.synchronized.T0">T0</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@synchronized[T0](x$1:=&gt;T0):T0" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.DataObject#toStringShort" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="toStringShort:String"></a>
+      <a id="toStringShort:String"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">toStringShort</span><span class="result">: <span class="extype" name="scala.Predef.String">String</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@toStringShort:String" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>DataObject</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#topicName" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="topicName:String"></a>
+      <a id="topicName:String"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">topicName</span><span class="result">: <span class="extype" name="scala.Predef.String">String</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@topicName:String" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">The name of the topic to read</p>
+    </li><li name="io.smartdatalake.workflow.dataobject.SchemaValidation#validateSchemaMin" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="validateSchemaMin(df:org.apache.spark.sql.DataFrame):Unit"></a>
+      <a id="validateSchemaMin(DataFrame):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">validateSchemaMin</span><span class="params">(<span name="df">df: <span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@validateSchemaMin(df:org.apache.spark.sql.DataFrame):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Validate the schema of a given Spark Data Frame <code>df</code> against <code>schemaMin</code>.</p><div class="fullcomment"><div class="comment cmt"><p>Validate the schema of a given Spark Data Frame <code>df</code> against <code>schemaMin</code>.
+</p></div><dl class="paramcmts block"><dt class="param">df</dt><dd class="cmt"><p>The data frame to validate.</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd>SchemaValidation</dd><dt>Exceptions thrown</dt><dd><span class="cmt"><p><span class="extype" name="SchemaViolationException"><code>SchemaViolationException</code></span> is the <code>schemaMin</code> does not validate.</p></span></dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#valueType" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="valueType:io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType"></a>
+      <a id="valueType:KafkaColumnType"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">valueType</span><span class="result">: <a href="KafkaColumnType$.html#KafkaColumnType=io.smartdatalake.workflow.dataobject.KafkaColumnType.Value" class="extmbr" name="io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType">KafkaColumnType</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@valueType:io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Optional type the value column should be converted to.</p><div class="fullcomment"><div class="comment cmt"><p>Optional type the value column should be converted to. If none is given it will remain a bytearray / binary.</p></div></div>
+    </li><li name="scala.AnyRef#wait" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="wait():Unit"></a>
+      <a id="wait():Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">wait</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@wait():Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd><dt>Annotations</dt><dd>
+                <span class="name">@throws</span><span class="args">(<span>
+      
+      <span class="defval" name="classOf[java.lang.InterruptedException]">...</span>
+    </span>)</span>
+              
+        </dd></dl></div>
+    </li><li name="scala.AnyRef#wait" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="wait(x$1:Long,x$2:Int):Unit"></a>
+      <a id="wait(Long,Int):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">wait</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.Long">Long</span></span>, <span name="arg1">arg1: <span class="extype" name="scala.Int">Int</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@wait(x$1:Long,x$2:Int):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd><dt>Annotations</dt><dd>
+                <span class="name">@throws</span><span class="args">(<span>
+      
+      <span class="defval" name="classOf[java.lang.InterruptedException]">...</span>
+    </span>)</span>
+              
+        </dd></dl></div>
+    </li><li name="scala.AnyRef#wait" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="wait(x$1:Long):Unit"></a>
+      <a id="wait(Long):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">wait</span><span class="params">(<span name="arg0">arg0: <span class="extype" name="scala.Long">Long</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@wait(x$1:Long):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd><dt>Annotations</dt><dd>
+                <span class="name">@throws</span><span class="args">(<span>
+      
+      <span class="defval" name="classOf[java.lang.InterruptedException]">...</span>
+    </span>)</span>
+              
+        </dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#writeDataFrame" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="writeDataFrame(df:org.apache.spark.sql.DataFrame,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
+      <a id="writeDataFrame(DataFrame,Seq[PartitionValues])(SparkSession):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">writeDataFrame</span><span class="params">(<span name="df">df: <span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@writeDataFrame(df:org.apache.spark.sql.DataFrame,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject">KafkaTopicDataObject</a> → CanWriteDataFrame</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject#writeStreamingDataFrame" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="writeStreamingDataFrame(df:org.apache.spark.sql.DataFrame,trigger:org.apache.spark.sql.streaming.Trigger,options:Map[String,String],checkpointLocation:String,queryName:String,outputMode:org.apache.spark.sql.streaming.OutputMode)(implicitsession:org.apache.spark.sql.SparkSession):org.apache.spark.sql.streaming.StreamingQuery"></a>
+      <a id="writeStreamingDataFrame(DataFrame,Trigger,Map[String,String],String,String,OutputMode)(SparkSession):StreamingQuery"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">writeStreamingDataFrame</span><span class="params">(<span name="df">df: <span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span></span>, <span name="trigger">trigger: <span class="extype" name="org.apache.spark.sql.streaming.Trigger">Trigger</span></span>, <span name="options">options: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]</span>, <span name="checkpointLocation">checkpointLocation: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="queryName">queryName: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="outputMode">outputMode: <span class="extype" name="org.apache.spark.sql.streaming.OutputMode">OutputMode</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="org.apache.spark.sql.streaming.StreamingQuery">StreamingQuery</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.KafkaTopicDataObject@writeStreamingDataFrame(df:org.apache.spark.sql.DataFrame,trigger:org.apache.spark.sql.streaming.Trigger,options:Map[String,String],checkpointLocation:String,queryName:String,outputMode:org.apache.spark.sql.streaming.OutputMode)(implicitsession:org.apache.spark.sql.SparkSession):org.apache.spark.sql.streaming.StreamingQuery" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Write Spark structured streaming DataFrame
+The default implementation uses foreachBatch and this traits writeDataFrame method to write the DataFrame.</p><div class="fullcomment"><div class="comment cmt"><p>Write Spark structured streaming DataFrame
+The default implementation uses foreachBatch and this traits writeDataFrame method to write the DataFrame.
+Some DataObjects will override this with specific implementations (Kafka).
+</p></div><dl class="paramcmts block"><dt class="param">df</dt><dd class="cmt"><p>The Streaming DataFrame to write</p></dd><dt class="param">trigger</dt><dd class="cmt"><p>Trigger frequency for stream</p></dd><dt class="param">checkpointLocation</dt><dd class="cmt"><p>location for checkpoints of streaming query</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject">KafkaTopicDataObject</a> → CanWriteDataFrame</dd></dl></div>
+    </li></ol>
+            </div>
+
+        
+
+        
+        </div>
+
+        <div id="inheritedMembers">
+        <div class="parent" name="scala.Serializable">
+              <h3>Inherited from <span class="extype" name="scala.Serializable">Serializable</span></h3>
+            </div><div class="parent" name="java.io.Serializable">
+              <h3>Inherited from <span class="extype" name="java.io.Serializable">Serializable</span></h3>
+            </div><div class="parent" name="scala.Product">
+              <h3>Inherited from <span class="extype" name="scala.Product">Product</span></h3>
+            </div><div class="parent" name="scala.Equals">
+              <h3>Inherited from <span class="extype" name="scala.Equals">Equals</span></h3>
+            </div><div class="parent" name="io.smartdatalake.workflow.dataobject.SchemaValidation">
+              <h3>Inherited from <span class="extype" name="io.smartdatalake.workflow.dataobject.SchemaValidation">SchemaValidation</span></h3>
+            </div><div class="parent" name="io.smartdatalake.workflow.dataobject.CanHandlePartitions">
+              <h3>Inherited from <span class="extype" name="io.smartdatalake.workflow.dataobject.CanHandlePartitions">CanHandlePartitions</span></h3>
+            </div><div class="parent" name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame">
+              <h3>Inherited from <span class="extype" name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame">CanWriteDataFrame</span></h3>
+            </div><div class="parent" name="io.smartdatalake.workflow.dataobject.CanCreateStreamingDataFrame">
+              <h3>Inherited from <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateStreamingDataFrame">CanCreateStreamingDataFrame</span></h3>
+            </div><div class="parent" name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame">
+              <h3>Inherited from <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame">CanCreateDataFrame</span></h3>
+            </div><div class="parent" name="io.smartdatalake.workflow.dataobject.DataObject">
+              <h3>Inherited from <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span></h3>
+            </div><div class="parent" name="io.smartdatalake.util.misc.SmartDataLakeLogger">
+              <h3>Inherited from <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span></h3>
+            </div><div class="parent" name="io.smartdatalake.config.ParsableFromConfig">
+              <h3>Inherited from <span class="extype" name="io.smartdatalake.config.ParsableFromConfig">ParsableFromConfig</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>]</h3>
+            </div><div class="parent" name="io.smartdatalake.config.SdlConfigObject">
+              <h3>Inherited from <span class="extype" name="io.smartdatalake.config.SdlConfigObject">SdlConfigObject</span></h3>
+            </div><div class="parent" name="scala.AnyRef">
+              <h3>Inherited from <span class="extype" name="scala.AnyRef">AnyRef</span></h3>
+            </div><div class="parent" name="scala.Any">
+              <h3>Inherited from <span class="extype" name="scala.Any">Any</span></h3>
+            </div>
+        
+        </div>
+
+        <div id="groupedMembers">
+        <div class="group" name="Ungrouped">
+              <h3>Ungrouped</h3>
+              
+            </div>
+        </div>
+
+      </div>
+
+      <div id="tooltip"></div>
+
+      <div id="footer">  </div>
+
+
+    </body>
+      </html>

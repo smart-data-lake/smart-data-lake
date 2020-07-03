@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>definitions - Smart Data Lake 1.0.5 API - io.smartdatalake.definitions</title>
-          <meta name="description" content="definitions - Smart Data Lake 1.0.5 API - io.smartdatalake.definitions" />
-          <meta name="keywords" content="definitions Smart Data Lake 1.0.5 API io.smartdatalake.definitions" />
+          <title>definitions - Smart Data Lake 1.0.6 API - io.smartdatalake.definitions</title>
+          <meta name="description" content="definitions - Smart Data Lake 1.0.6 API - io.smartdatalake.definitions" />
+          <meta name="keywords" content="definitions Smart Data Lake 1.0.6 API io.smartdatalake.definitions" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -119,8 +119,25 @@ to a given data object/connection</p>
       </a>
     </span>
       <p class="shortcomment cmt">Execution mode's defines how data is selected when running a data pipeline.</p>
+    </li><li name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
+      <a id="ExecutionModeWithMainInputOutputextendsAnyRef"></a>
+      <a id="ExecutionModeWithMainInputOutput:ExecutionModeWithMainInputOutput"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="ExecutionModeWithMainInputOutput.html"><span class="name">ExecutionModeWithMainInputOutput</span></a><span class="result"> extends <span class="extype" name="scala.AnyRef">AnyRef</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.package@ExecutionModeWithMainInputOutputextendsAnyRef" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
     </li><li name="io.smartdatalake.definitions.PartitionDiffMode" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="PartitionDiffModeextendsExecutionModewithProductwithSerializable"></a>
+      <a id="PartitionDiffModeextendsExecutionModewithExecutionModeWithMainInputOutputwithProductwithSerializable"></a>
       <a id="PartitionDiffMode:PartitionDiffMode"></a>
       <h4 class="signature">
       <span class="modifier_kind">
@@ -128,10 +145,10 @@ to a given data object/connection</p>
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <a href="PartitionDiffMode.html"><span class="name">PartitionDiffMode</span></a><span class="params">(<span name="partitionColNb">partitionColNb: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="mainInputId">mainInputId: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="mainOutputId">mainOutputId: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="nbOfPartitionValuesPerRun">nbOfPartitionValuesPerRun: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <a href="PartitionDiffMode.html"><span class="name">PartitionDiffMode</span></a><span class="params">(<span name="partitionColNb">partitionColNb: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="mainInputId">mainInputId: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="mainOutputId">mainOutputId: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="nbOfPartitionValuesPerRun">nbOfPartitionValuesPerRun: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a> with <a href="ExecutionModeWithMainInputOutput.html" class="extype" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput">ExecutionModeWithMainInputOutput</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.definitions.package@PartitionDiffModeextendsExecutionModewithProductwithSerializable" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.definitions.package@PartitionDiffModeextendsExecutionModewithExecutionModeWithMainInputOutputwithProductwithSerializable" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -156,6 +173,42 @@ Partition columns to be used for comparision need to be a common 'init' of input
       <p class="shortcomment cmt">Validate by user and private/public key
 Private key is read from .ssh
 </p>
+    </li><li name="io.smartdatalake.definitions.SSLCertsAuthMode" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="SSLCertsAuthModeextendsAuthModewithProductwithSerializable"></a>
+      <a id="SSLCertsAuthMode:SSLCertsAuthMode"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="SSLCertsAuthMode.html"><span class="name">SSLCertsAuthMode</span></a><span class="params">(<span name="keystorePath">keystorePath: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="keystoreType">keystoreType: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>, <span name="keystorePassVariable">keystorePassVariable: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="truststorePath">truststorePath: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="truststoreType">truststoreType: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>, <span name="truststorePassVariable">truststorePassVariable: <span class="extype" name="scala.Predef.String">String</span></span>)</span><span class="result"> extends <a href="AuthMode.html" class="extype" name="io.smartdatalake.definitions.AuthMode">AuthMode</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.package@SSLCertsAuthModeextendsAuthModewithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Validate by SSL Certificates : Only location an credentials.</p><div class="fullcomment"><div class="comment cmt"><p>Validate by SSL Certificates : Only location an credentials. Additional attributes should be
+supplied via options map
+</p></div></div>
+    </li><li name="io.smartdatalake.definitions.SparkStreamingOnceMode" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="SparkStreamingOnceModeextendsExecutionModewithProductwithSerializable"></a>
+      <a id="SparkStreamingOnceMode:SparkStreamingOnceMode"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="SparkStreamingOnceMode.html"><span class="name">SparkStreamingOnceMode</span></a><span class="params">(<span name="checkpointLocation">checkpointLocation: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="inputOptions">inputOptions: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Map()</span></span>, <span name="outputOptions">outputOptions: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Map()</span></span>, <span name="outputMode">outputMode: <span class="extype" name="org.apache.spark.sql.streaming.OutputMode">OutputMode</span> = <span class="symbol">OutputMode.Append</span></span>)</span><span class="result"> extends <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.package@SparkStreamingOnceModeextendsExecutionModewithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads (trigger=Trigger.Once) and keep track of processed data.</p><div class="fullcomment"><div class="comment cmt"><p>Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads (trigger=Trigger.Once) and keep track of processed data.</p></div><dl class="paramcmts block"><dt class="param">checkpointLocation</dt><dd class="cmt"><p>location for checkpoints of streaming query to keep state</p></dd><dt class="param">inputOptions</dt><dd class="cmt"><p>additional option to apply when reading streaming source. This overwrites options set by the DataObjects.</p></dd><dt class="param">outputOptions</dt><dd class="cmt"><p>additional option to apply when writing to streaming sink. This overwrites options set by the DataObjects.</p></dd></dl></div>
     </li><li name="io.smartdatalake.definitions.TokenAuthMode" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="TokenAuthModeextendsAuthModewithProductwithSerializable"></a>
       <a id="TokenAuthMode:TokenAuthMode"></a>

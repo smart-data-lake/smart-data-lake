@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>JdbcTableDataObject - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.dataobject.JdbcTableDataObject</title>
-          <meta name="description" content="JdbcTableDataObject - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.dataobject.JdbcTableDataObject" />
-          <meta name="keywords" content="JdbcTableDataObject Smart Data Lake 1.0.5 API io.smartdatalake.workflow.dataobject.JdbcTableDataObject" />
+          <title>JdbcTableDataObject - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.dataobject.JdbcTableDataObject</title>
+          <meta name="description" content="JdbcTableDataObject - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.dataobject.JdbcTableDataObject" />
+          <meta name="keywords" content="JdbcTableDataObject Smart Data Lake 1.0.6 API io.smartdatalake.workflow.dataobject.JdbcTableDataObject" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -227,6 +227,26 @@ Provides details for an action to access tables in a database through JDBC.</p><
       </a>
     </span>
       <p class="shortcomment cmt">Id of JdbcConnection configuration</p>
+    </li><li name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame#createReadSchema" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="createReadSchema(writeSchema:org.apache.spark.sql.types.StructType)(implicitsession:org.apache.spark.sql.SparkSession):org.apache.spark.sql.types.StructType"></a>
+      <a id="createReadSchema(StructType)(SparkSession):StructType"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">createReadSchema</span><span class="params">(<span name="writeSchema">writeSchema: <span class="extype" name="org.apache.spark.sql.types.StructType">StructType</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="org.apache.spark.sql.types.StructType">StructType</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.JdbcTableDataObject@createReadSchema(writeSchema:org.apache.spark.sql.types.StructType)(implicitsession:org.apache.spark.sql.SparkSession):org.apache.spark.sql.types.StructType" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Creates the read schema based on a given write schema.</p><div class="fullcomment"><div class="comment cmt"><p>Creates the read schema based on a given write schema.
+Normally this is the same, but some DataObjects can remove &amp; add columns on read (e.g. KafkaTopicDataObject, SparkFileDataObject)
+In this cases we have to break the DataFrame lineage und create a dummy DataFrame in init phase.
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>CanCreateDataFrame</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.JdbcTableDataObject#createSql" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="createSql:Option[String]"></a>
       <a id="createSql:Option[String]"></a>
@@ -459,18 +479,18 @@ The companion object in turn should implement <span class="extype" name="FromCon
     </span>
       <p class="shortcomment cmt">unique name of this data object</p><div class="fullcomment"><div class="comment cmt"><p>unique name of this data object</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.JdbcTableDataObject">JdbcTableDataObject</a> → DataObject → SdlConfigObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame#init" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="init(df:org.apache.spark.sql.DataFrame,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
-      <a id="init(DataFrame,Seq[PartitionValues])(SparkSession):Unit"></a>
+      <a id="init(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
+      <a id="init(Seq[PartitionValues])(SparkSession):Unit"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">init</span><span class="params">(<span name="df">df: <span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">init</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>] = <span class="symbol">Seq()</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.JdbcTableDataObject@init(df:org.apache.spark.sql.DataFrame,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.JdbcTableDataObject@init(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -828,6 +848,23 @@ The companion object in turn should implement <span class="extype" name="FromCon
       </a>
     </span>
       <p class="shortcomment cmt">An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.</p><div class="fullcomment"><div class="comment cmt"><p>An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.JdbcTableDataObject">JdbcTableDataObject</a> → SchemaValidation</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame#streamingOptions" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="streamingOptions:Map[String,String]"></a>
+      <a id="streamingOptions:Map[String,String]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">streamingOptions</span><span class="result">: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.JdbcTableDataObject@streamingOptions:Map[String,String]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>CanWriteDataFrame</dd></dl></div>
     </li><li name="scala.AnyRef#synchronized" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="synchronized[T0](x$1:=&gt;T0):T0"></a>
       <a id="synchronized[T0](⇒T0):T0"></a>
@@ -1000,6 +1037,27 @@ The companion object in turn should implement <span class="extype" name="FromCon
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.JdbcTableDataObject">JdbcTableDataObject</a> → CanWriteDataFrame</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame#writeStreamingDataFrame" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="writeStreamingDataFrame(df:org.apache.spark.sql.DataFrame,trigger:org.apache.spark.sql.streaming.Trigger,options:Map[String,String],checkpointLocation:String,queryName:String,outputMode:org.apache.spark.sql.streaming.OutputMode)(implicitsession:org.apache.spark.sql.SparkSession):org.apache.spark.sql.streaming.StreamingQuery"></a>
+      <a id="writeStreamingDataFrame(DataFrame,Trigger,Map[String,String],String,String,OutputMode)(SparkSession):StreamingQuery"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">writeStreamingDataFrame</span><span class="params">(<span name="df">df: <span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span></span>, <span name="trigger">trigger: <span class="extype" name="org.apache.spark.sql.streaming.Trigger">Trigger</span></span>, <span name="options">options: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]</span>, <span name="checkpointLocation">checkpointLocation: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="queryName">queryName: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="outputMode">outputMode: <span class="extype" name="org.apache.spark.sql.streaming.OutputMode">OutputMode</span> = <span class="symbol">OutputMode.Append</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="org.apache.spark.sql.streaming.StreamingQuery">StreamingQuery</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.JdbcTableDataObject@writeStreamingDataFrame(df:org.apache.spark.sql.DataFrame,trigger:org.apache.spark.sql.streaming.Trigger,options:Map[String,String],checkpointLocation:String,queryName:String,outputMode:org.apache.spark.sql.streaming.OutputMode)(implicitsession:org.apache.spark.sql.SparkSession):org.apache.spark.sql.streaming.StreamingQuery" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Write Spark structured streaming DataFrame
+The default implementation uses foreachBatch and this traits writeDataFrame method to write the DataFrame.</p><div class="fullcomment"><div class="comment cmt"><p>Write Spark structured streaming DataFrame
+The default implementation uses foreachBatch and this traits writeDataFrame method to write the DataFrame.
+Some DataObjects will override this with specific implementations (Kafka).
+</p></div><dl class="paramcmts block"><dt class="param">df</dt><dd class="cmt"><p>The Streaming DataFrame to write</p></dd><dt class="param">trigger</dt><dd class="cmt"><p>Trigger frequency for stream</p></dd><dt class="param">checkpointLocation</dt><dd class="cmt"><p>location for checkpoints of streaming query</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd>CanWriteDataFrame</dd></dl></div>
     </li></ol>
             </div>
 

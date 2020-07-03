@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>PartitionDiffMode - Smart Data Lake 1.0.5 API - io.smartdatalake.definitions.PartitionDiffMode</title>
-          <meta name="description" content="PartitionDiffMode - Smart Data Lake 1.0.5 API - io.smartdatalake.definitions.PartitionDiffMode" />
-          <meta name="keywords" content="PartitionDiffMode Smart Data Lake 1.0.5 API io.smartdatalake.definitions.PartitionDiffMode" />
+          <title>PartitionDiffMode - Smart Data Lake 1.0.6 API - io.smartdatalake.definitions.PartitionDiffMode</title>
+          <meta name="description" content="PartitionDiffMode - Smart Data Lake 1.0.6 API - io.smartdatalake.definitions.PartitionDiffMode" />
+          <meta name="keywords" content="PartitionDiffMode Smart Data Lake 1.0.6 API io.smartdatalake.definitions.PartitionDiffMode" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -45,14 +45,14 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <span class="name">PartitionDiffMode</span><span class="params">(<span name="partitionColNb">partitionColNb: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="mainInputId">mainInputId: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="mainOutputId">mainOutputId: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="nbOfPartitionValuesPerRun">nbOfPartitionValuesPerRun: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <span class="name">PartitionDiffMode</span><span class="params">(<span name="partitionColNb">partitionColNb: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="mainInputId">mainInputId: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="mainOutputId">mainOutputId: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="nbOfPartitionValuesPerRun">nbOfPartitionValuesPerRun: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a> with <a href="ExecutionModeWithMainInputOutput.html" class="extype" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput">ExecutionModeWithMainInputOutput</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4>
       
           <div id="comment" class="fullcommenttop"><div class="comment cmt"><p>Partition difference execution mode lists partitions on input &amp; output DataObject and starts loading all missing partitions.
 Partition columns to be used for comparision need to be a common 'init' of input and output partition columns.</p></div><dl class="paramcmts block"><dt class="param">partitionColNb</dt><dd class="cmt"><p>optional number of partition columns to use as a common 'init'.</p></dd><dt class="param">mainInputId</dt><dd class="cmt"><p>optional selection of inputId to be used for partition comparision. Only needed if there are multiple input DataObject's.</p></dd><dt class="param">mainOutputId</dt><dd class="cmt"><p>optional selection of outputId to be used for partition comparision. Only needed if there are multiple output DataObject's.</p></dd><dt class="param">nbOfPartitionValuesPerRun</dt><dd class="cmt"><p>optional restriction of the number of partition values per run.</p></dd></dl><div class="toggleContainer block">
           <span class="toggle">Linear Supertypes</span>
-          <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.Product">Product</span>, <span class="extype" name="scala.Equals">Equals</span>, <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
+          <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.Product">Product</span>, <span class="extype" name="scala.Equals">Equals</span>, <a href="ExecutionModeWithMainInputOutput.html" class="extype" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput">ExecutionModeWithMainInputOutput</a>, <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
         </div></div>
         
 
@@ -70,7 +70,7 @@ Partition columns to be used for comparision need to be a common 'init' of input
                 <span class="filtertype">Inherited<br />
                 </span>
                 <ol id="linearization">
-                  <li class="in" name="io.smartdatalake.definitions.PartitionDiffMode"><span>PartitionDiffMode</span></li><li class="in" name="scala.Serializable"><span>Serializable</span></li><li class="in" name="java.io.Serializable"><span>Serializable</span></li><li class="in" name="scala.Product"><span>Product</span></li><li class="in" name="scala.Equals"><span>Equals</span></li><li class="in" name="io.smartdatalake.definitions.ExecutionMode"><span>ExecutionMode</span></li><li class="in" name="scala.AnyRef"><span>AnyRef</span></li><li class="in" name="scala.Any"><span>Any</span></li>
+                  <li class="in" name="io.smartdatalake.definitions.PartitionDiffMode"><span>PartitionDiffMode</span></li><li class="in" name="scala.Serializable"><span>Serializable</span></li><li class="in" name="java.io.Serializable"><span>Serializable</span></li><li class="in" name="scala.Product"><span>Product</span></li><li class="in" name="scala.Equals"><span>Equals</span></li><li class="in" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput"><span>ExecutionModeWithMainInputOutput</span></li><li class="in" name="io.smartdatalake.definitions.ExecutionMode"><span>ExecutionMode</span></li><li class="in" name="scala.AnyRef"><span>AnyRef</span></li><li class="in" name="scala.Any"><span>Any</span></li>
                 </ol>
               </div><div id="ancestors">
             <span class="filtertype"></span>
@@ -296,7 +296,7 @@ Partition columns to be used for comparision need to be a common 'init' of input
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt">optional selection of inputId to be used for partition comparision.</p><div class="fullcomment"><div class="comment cmt"><p>optional selection of inputId to be used for partition comparision. Only needed if there are multiple input DataObject's.</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.definitions.PartitionDiffMode">PartitionDiffMode</a> → <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a></dd></dl></div>
+      <p class="shortcomment cmt">optional selection of inputId to be used for partition comparision.</p><div class="fullcomment"><div class="comment cmt"><p>optional selection of inputId to be used for partition comparision. Only needed if there are multiple input DataObject's.</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.definitions.PartitionDiffMode">PartitionDiffMode</a> → <a href="ExecutionModeWithMainInputOutput.html" class="extype" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput">ExecutionModeWithMainInputOutput</a></dd></dl></div>
     </li><li name="io.smartdatalake.definitions.PartitionDiffMode#mainOutputId" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="mainOutputId:Option[String]"></a>
       <a id="mainOutputId:Option[String]"></a>
@@ -313,7 +313,7 @@ Partition columns to be used for comparision need to be a common 'init' of input
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt">optional selection of outputId to be used for partition comparision.</p><div class="fullcomment"><div class="comment cmt"><p>optional selection of outputId to be used for partition comparision. Only needed if there are multiple output DataObject's.</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.definitions.PartitionDiffMode">PartitionDiffMode</a> → <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a></dd></dl></div>
+      <p class="shortcomment cmt">optional selection of outputId to be used for partition comparision.</p><div class="fullcomment"><div class="comment cmt"><p>optional selection of outputId to be used for partition comparision. Only needed if there are multiple output DataObject's.</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.definitions.PartitionDiffMode">PartitionDiffMode</a> → <a href="ExecutionModeWithMainInputOutput.html" class="extype" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput">ExecutionModeWithMainInputOutput</a></dd></dl></div>
     </li><li name="io.smartdatalake.definitions.PartitionDiffMode#nbOfPartitionValuesPerRun" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="nbOfPartitionValuesPerRun:Option[Int]"></a>
       <a id="nbOfPartitionValuesPerRun:Option[Int]"></a>
@@ -502,6 +502,8 @@ Partition columns to be used for comparision need to be a common 'init' of input
               <h3>Inherited from <span class="extype" name="scala.Product">Product</span></h3>
             </div><div class="parent" name="scala.Equals">
               <h3>Inherited from <span class="extype" name="scala.Equals">Equals</span></h3>
+            </div><div class="parent" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput">
+              <h3>Inherited from <a href="ExecutionModeWithMainInputOutput.html" class="extype" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput">ExecutionModeWithMainInputOutput</a></h3>
             </div><div class="parent" name="io.smartdatalake.definitions.ExecutionMode">
               <h3>Inherited from <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a></h3>
             </div><div class="parent" name="scala.AnyRef">

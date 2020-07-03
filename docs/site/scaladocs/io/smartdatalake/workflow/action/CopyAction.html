@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>CopyAction - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.action.CopyAction</title>
-          <meta name="description" content="CopyAction - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.action.CopyAction" />
-          <meta name="keywords" content="CopyAction Smart Data Lake 1.0.5 API io.smartdatalake.workflow.action.CopyAction" />
+          <title>CopyAction - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.action.CopyAction</title>
+          <meta name="description" content="CopyAction - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.action.CopyAction" />
+          <meta name="keywords" content="CopyAction Smart Data Lake 1.0.6 API io.smartdatalake.workflow.action.CopyAction" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -47,14 +47,14 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <span class="name">CopyAction</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ActionObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ActionObjectId">ActionObjectId</a></span>, <span name="inputId">inputId: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="outputId">outputId: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="deleteDataAfterRead">deleteDataAfterRead: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="transformer">transformer: <span class="extype" name="scala.Option">Option</span>[<a href="customlogic/CustomDfTransformerConfig.html" class="extype" name="io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig">CustomDfTransformerConfig</a>] = <span class="symbol">None</span></span>, <span name="columnBlacklist">columnBlacklist: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="columnWhitelist">columnWhitelist: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="filterClause">filterClause: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="standardizeDatatypes">standardizeDatatypes: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="breakDataFrameLineage">breakDataFrameLineage: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="persist">persist: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="initExecutionMode">initExecutionMode: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="ActionMetadata.html" class="extype" name="io.smartdatalake.workflow.action.ActionMetadata">ActionMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <a href="SparkSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.SparkSubFeedAction">SparkSubFeedAction</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <span class="name">CopyAction</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ActionObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ActionObjectId">ActionObjectId</a></span>, <span name="inputId">inputId: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="outputId">outputId: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="deleteDataAfterRead">deleteDataAfterRead: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="transformer">transformer: <span class="extype" name="scala.Option">Option</span>[<a href="customlogic/CustomDfTransformerConfig.html" class="extype" name="io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig">CustomDfTransformerConfig</a>] = <span class="symbol">None</span></span>, <span name="columnBlacklist">columnBlacklist: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="columnWhitelist">columnWhitelist: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="filterClause">filterClause: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="standardizeDatatypes">standardizeDatatypes: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="breakDataFrameLineage">breakDataFrameLineage: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="persist">persist: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="initExecutionMode">initExecutionMode: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>] = <span class="symbol">None</span></span>, <span name="executionMode">executionMode: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="ActionMetadata.html" class="extype" name="io.smartdatalake.workflow.action.ActionMetadata">ActionMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <a href="SparkSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.SparkSubFeedAction">SparkSubFeedAction</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4>
       
           <div id="comment" class="fullcommenttop"><div class="comment cmt"><p><span class="extype" name="Action">Action</span> to copy files (i.e. from stage to integration)
-</p></div><dl class="paramcmts block"><dt class="param">inputId</dt><dd class="cmt"><p>inputs DataObject</p></dd><dt class="param">outputId</dt><dd class="cmt"><p>output DataObject</p></dd><dt class="param">deleteDataAfterRead</dt><dd class="cmt"><p>a flag to enable deletion of input partitions after copying.</p></dd><dt class="param">transformer</dt><dd class="cmt"><p>a custom transformation that is applied to each SubFeed separately</p></dd><dt class="param">initExecutionMode</dt><dd class="cmt"><p>optional execution mode if this Action is a start node of a DAG run</p></dd></dl><div class="toggleContainer block">
+</p></div><dl class="paramcmts block"><dt class="param">inputId</dt><dd class="cmt"><p>inputs DataObject</p></dd><dt class="param">outputId</dt><dd class="cmt"><p>output DataObject</p></dd><dt class="param">deleteDataAfterRead</dt><dd class="cmt"><p>a flag to enable deletion of input partitions after copying.</p></dd><dt class="param">transformer</dt><dd class="cmt"><p>a custom transformation that is applied to each SubFeed separately</p></dd><dt class="param">initExecutionMode</dt><dd class="cmt"><p>optional execution mode if this Action is a start node of a DAG run</p></dd><dt class="param">executionMode</dt><dd class="cmt"><p>optional execution mode for this Action</p></dd></dl><div class="toggleContainer block">
           <span class="toggle">Linear Supertypes</span>
-          <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.Product">Product</span>, <span class="extype" name="scala.Equals">Equals</span>, <a href="SparkSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.SparkSubFeedAction">SparkSubFeedAction</a>, <span class="extype" name="io.smartdatalake.workflow.action.Action">Action</span>, <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span>, <span class="extype" name="io.smartdatalake.workflow.DAGNode">DAGNode</span>, <span class="extype" name="io.smartdatalake.config.ParsableFromConfig">ParsableFromConfig</span>[<span class="extype" name="io.smartdatalake.workflow.action.Action">Action</span>], <span class="extype" name="io.smartdatalake.config.SdlConfigObject">SdlConfigObject</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
+          <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.Product">Product</span>, <span class="extype" name="scala.Equals">Equals</span>, <a href="SparkSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.SparkSubFeedAction">SparkSubFeedAction</a>, <span class="extype" name="io.smartdatalake.workflow.action.SparkAction">SparkAction</span>, <span class="extype" name="io.smartdatalake.workflow.action.Action">Action</span>, <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span>, <span class="extype" name="io.smartdatalake.workflow.DAGNode">DAGNode</span>, <span class="extype" name="io.smartdatalake.config.ParsableFromConfig">ParsableFromConfig</span>[<span class="extype" name="io.smartdatalake.workflow.action.Action">Action</span>], <span class="extype" name="io.smartdatalake.config.SdlConfigObject">SdlConfigObject</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
         </div></div>
         
 
@@ -72,7 +72,7 @@
                 <span class="filtertype">Inherited<br />
                 </span>
                 <ol id="linearization">
-                  <li class="in" name="io.smartdatalake.workflow.action.CopyAction"><span>CopyAction</span></li><li class="in" name="scala.Serializable"><span>Serializable</span></li><li class="in" name="java.io.Serializable"><span>Serializable</span></li><li class="in" name="scala.Product"><span>Product</span></li><li class="in" name="scala.Equals"><span>Equals</span></li><li class="in" name="io.smartdatalake.workflow.action.SparkSubFeedAction"><span>SparkSubFeedAction</span></li><li class="in" name="io.smartdatalake.workflow.action.Action"><span>Action</span></li><li class="in" name="io.smartdatalake.util.misc.SmartDataLakeLogger"><span>SmartDataLakeLogger</span></li><li class="in" name="io.smartdatalake.workflow.DAGNode"><span>DAGNode</span></li><li class="in" name="io.smartdatalake.config.ParsableFromConfig"><span>ParsableFromConfig</span></li><li class="in" name="io.smartdatalake.config.SdlConfigObject"><span>SdlConfigObject</span></li><li class="in" name="scala.AnyRef"><span>AnyRef</span></li><li class="in" name="scala.Any"><span>Any</span></li>
+                  <li class="in" name="io.smartdatalake.workflow.action.CopyAction"><span>CopyAction</span></li><li class="in" name="scala.Serializable"><span>Serializable</span></li><li class="in" name="java.io.Serializable"><span>Serializable</span></li><li class="in" name="scala.Product"><span>Product</span></li><li class="in" name="scala.Equals"><span>Equals</span></li><li class="in" name="io.smartdatalake.workflow.action.SparkSubFeedAction"><span>SparkSubFeedAction</span></li><li class="in" name="io.smartdatalake.workflow.action.SparkAction"><span>SparkAction</span></li><li class="in" name="io.smartdatalake.workflow.action.Action"><span>Action</span></li><li class="in" name="io.smartdatalake.util.misc.SmartDataLakeLogger"><span>SmartDataLakeLogger</span></li><li class="in" name="io.smartdatalake.workflow.DAGNode"><span>DAGNode</span></li><li class="in" name="io.smartdatalake.config.ParsableFromConfig"><span>ParsableFromConfig</span></li><li class="in" name="io.smartdatalake.config.SdlConfigObject"><span>SdlConfigObject</span></li><li class="in" name="scala.AnyRef"><span>AnyRef</span></li><li class="in" name="scala.Any"><span>Any</span></li>
                 </ol>
               </div><div id="ancestors">
             <span class="filtertype"></span>
@@ -92,7 +92,7 @@
         <div id="constructors" class="members">
               <h3>Instance Constructors</h3>
               <ol><li name="io.smartdatalake.workflow.action.CopyAction#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ActionObjectId,inputId:io.smartdatalake.config.SdlConfigObject.DataObjectId,outputId:io.smartdatalake.config.SdlConfigObject.DataObjectId,deleteDataAfterRead:Boolean,transformer:Option[io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig],columnBlacklist:Option[Seq[String]],columnWhitelist:Option[Seq[String]],filterClause:Option[String],standardizeDatatypes:Boolean,breakDataFrameLineage:Boolean,persist:Boolean,initExecutionMode:Option[io.smartdatalake.definitions.ExecutionMode],metadata:Option[io.smartdatalake.workflow.action.ActionMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.action.CopyAction"></a>
+      <a id="&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ActionObjectId,inputId:io.smartdatalake.config.SdlConfigObject.DataObjectId,outputId:io.smartdatalake.config.SdlConfigObject.DataObjectId,deleteDataAfterRead:Boolean,transformer:Option[io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig],columnBlacklist:Option[Seq[String]],columnWhitelist:Option[Seq[String]],filterClause:Option[String],standardizeDatatypes:Boolean,breakDataFrameLineage:Boolean,persist:Boolean,initExecutionMode:Option[io.smartdatalake.definitions.ExecutionMode],executionMode:Option[io.smartdatalake.definitions.ExecutionMode],metadata:Option[io.smartdatalake.workflow.action.ActionMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.action.CopyAction"></a>
       <a id="&lt;init&gt;:CopyAction"></a>
       <h4 class="signature">
       <span class="modifier_kind">
@@ -100,14 +100,14 @@
         <span class="kind">new</span>
       </span>
       <span class="symbol">
-        <span class="name">CopyAction</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ActionObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ActionObjectId">ActionObjectId</a></span>, <span name="inputId">inputId: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="outputId">outputId: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="deleteDataAfterRead">deleteDataAfterRead: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="transformer">transformer: <span class="extype" name="scala.Option">Option</span>[<a href="customlogic/CustomDfTransformerConfig.html" class="extype" name="io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig">CustomDfTransformerConfig</a>] = <span class="symbol">None</span></span>, <span name="columnBlacklist">columnBlacklist: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="columnWhitelist">columnWhitelist: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="filterClause">filterClause: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="standardizeDatatypes">standardizeDatatypes: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="breakDataFrameLineage">breakDataFrameLineage: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="persist">persist: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="initExecutionMode">initExecutionMode: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="ActionMetadata.html" class="extype" name="io.smartdatalake.workflow.action.ActionMetadata">ActionMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span>
+        <span class="name">CopyAction</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ActionObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ActionObjectId">ActionObjectId</a></span>, <span name="inputId">inputId: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="outputId">outputId: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="deleteDataAfterRead">deleteDataAfterRead: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="transformer">transformer: <span class="extype" name="scala.Option">Option</span>[<a href="customlogic/CustomDfTransformerConfig.html" class="extype" name="io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig">CustomDfTransformerConfig</a>] = <span class="symbol">None</span></span>, <span name="columnBlacklist">columnBlacklist: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="columnWhitelist">columnWhitelist: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="filterClause">filterClause: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="standardizeDatatypes">standardizeDatatypes: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="breakDataFrameLineage">breakDataFrameLineage: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="persist">persist: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="initExecutionMode">initExecutionMode: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>] = <span class="symbol">None</span></span>, <span name="executionMode">executionMode: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="ActionMetadata.html" class="extype" name="io.smartdatalake.workflow.action.ActionMetadata">ActionMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ActionObjectId,inputId:io.smartdatalake.config.SdlConfigObject.DataObjectId,outputId:io.smartdatalake.config.SdlConfigObject.DataObjectId,deleteDataAfterRead:Boolean,transformer:Option[io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig],columnBlacklist:Option[Seq[String]],columnWhitelist:Option[Seq[String]],filterClause:Option[String],standardizeDatatypes:Boolean,breakDataFrameLineage:Boolean,persist:Boolean,initExecutionMode:Option[io.smartdatalake.definitions.ExecutionMode],metadata:Option[io.smartdatalake.workflow.action.ActionMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.action.CopyAction" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ActionObjectId,inputId:io.smartdatalake.config.SdlConfigObject.DataObjectId,outputId:io.smartdatalake.config.SdlConfigObject.DataObjectId,deleteDataAfterRead:Boolean,transformer:Option[io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig],columnBlacklist:Option[Seq[String]],columnWhitelist:Option[Seq[String]],filterClause:Option[String],standardizeDatatypes:Boolean,breakDataFrameLineage:Boolean,persist:Boolean,initExecutionMode:Option[io.smartdatalake.definitions.ExecutionMode],executionMode:Option[io.smartdatalake.definitions.ExecutionMode],metadata:Option[io.smartdatalake.workflow.action.ActionMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.action.CopyAction" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">inputId</dt><dd class="cmt"><p>inputs DataObject</p></dd><dt class="param">outputId</dt><dd class="cmt"><p>output DataObject</p></dd><dt class="param">deleteDataAfterRead</dt><dd class="cmt"><p>a flag to enable deletion of input partitions after copying.</p></dd><dt class="param">transformer</dt><dd class="cmt"><p>a custom transformation that is applied to each SubFeed separately</p></dd><dt class="param">initExecutionMode</dt><dd class="cmt"><p>optional execution mode if this Action is a start node of a DAG run</p></dd></dl></div>
+      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">inputId</dt><dd class="cmt"><p>inputs DataObject</p></dd><dt class="param">outputId</dt><dd class="cmt"><p>output DataObject</p></dd><dt class="param">deleteDataAfterRead</dt><dd class="cmt"><p>a flag to enable deletion of input partitions after copying.</p></dd><dt class="param">transformer</dt><dd class="cmt"><p>a custom transformation that is applied to each SubFeed separately</p></dd><dt class="param">initExecutionMode</dt><dd class="cmt"><p>optional execution mode if this Action is a start node of a DAG run</p></dd><dt class="param">executionMode</dt><dd class="cmt"><p>optional execution mode for this Action</p></dd></dl></div>
     </li></ol>
             </div>
 
@@ -169,24 +169,138 @@
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.action.Action#addRuntimeEvent" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="addRuntimeEvent(phase:String,state:io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState,msg:Option[String],results:Seq[io.smartdatalake.workflow.SubFeed]):Unit"></a>
-      <a id="addRuntimeEvent(String,RuntimeEventState,Option[String],Seq[SubFeed]):Unit"></a>
+      <a id="addRuntimeEvent(phase:io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase,state:io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState,msg:Option[String],results:Seq[io.smartdatalake.workflow.SubFeed]):Unit"></a>
+      <a id="addRuntimeEvent(ExecutionPhase,RuntimeEventState,Option[String],Seq[SubFeed]):Unit"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">addRuntimeEvent</span><span class="params">(<span name="phase">phase: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="state">state: <span class="extype" name="io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState">RuntimeEventState</span></span>, <span name="msg">msg: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="results">results: <span class="extype" name="scala.Seq">Seq</span>[<a href="../SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a>] = <span class="symbol">Seq()</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">addRuntimeEvent</span><span class="params">(<span name="phase">phase: <a href="../ExecutionPhase$.html#ExecutionPhase=io.smartdatalake.workflow.ExecutionPhase.Value" class="extmbr" name="io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase">ExecutionPhase</a></span>, <span name="state">state: <span class="extype" name="io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState">RuntimeEventState</span></span>, <span name="msg">msg: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="results">results: <span class="extype" name="scala.Seq">Seq</span>[<a href="../SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a>] = <span class="symbol">Seq()</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@addRuntimeEvent(phase:String,state:io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState,msg:Option[String],results:Seq[io.smartdatalake.workflow.SubFeed]):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@addRuntimeEvent(phase:io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase,state:io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState,msg:Option[String],results:Seq[io.smartdatalake.workflow.SubFeed]):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
       <p class="shortcomment cmt">Adds an action event
 </p><div class="fullcomment"><div class="comment cmt"><p>Adds an action event
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.SparkAction#applyAdditional" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="applyAdditional(subFeed:io.smartdatalake.workflow.SparkSubFeed,additional:(io.smartdatalake.workflow.SparkSubFeed,Option[org.apache.spark.sql.DataFrame],Seq[String],java.time.LocalDateTime)=&gt;io.smartdatalake.workflow.SparkSubFeed,output:io.smartdatalake.workflow.dataobject.TableDataObject)(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):io.smartdatalake.workflow.SparkSubFeed"></a>
+      <a id="applyAdditional(SparkSubFeed,(SparkSubFeed,Option[DataFrame],Seq[String],LocalDateTime)⇒SparkSubFeed,TableDataObject)(SparkSession,ActionPipelineContext):SparkSubFeed"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">applyAdditional</span><span class="params">(<span name="subFeed">subFeed: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>, <span name="additional">additional: (<a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a>, <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span>], <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>], <span class="extype" name="java.time.LocalDateTime">LocalDateTime</span>) ⇒ <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>, <span name="output">output: <span class="extype" name="io.smartdatalake.workflow.dataobject.TableDataObject">TableDataObject</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@applyAdditional(subFeed:io.smartdatalake.workflow.SparkSubFeed,additional:(io.smartdatalake.workflow.SparkSubFeed,Option[org.apache.spark.sql.DataFrame],Seq[String],java.time.LocalDateTime)=&gt;io.smartdatalake.workflow.SparkSubFeed,output:io.smartdatalake.workflow.dataobject.TableDataObject)(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):io.smartdatalake.workflow.SparkSubFeed" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">applies an optional additional transformation
+</p><div class="fullcomment"><div class="comment cmt"><p>applies an optional additional transformation
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>SparkAction</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.SparkAction#applyBlackWhitelists" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="applyBlackWhitelists(subFeed:io.smartdatalake.workflow.SparkSubFeed,columnBlacklist:Option[Seq[String]],columnWhitelist:Option[Seq[String]]):io.smartdatalake.workflow.SparkSubFeed"></a>
+      <a id="applyBlackWhitelists(SparkSubFeed,Option[Seq[String]],Option[Seq[String]]):SparkSubFeed"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">applyBlackWhitelists</span><span class="params">(<span name="subFeed">subFeed: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>, <span name="columnBlacklist">columnBlacklist: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]]</span>, <span name="columnWhitelist">columnWhitelist: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]]</span>)</span><span class="result">: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@applyBlackWhitelists(subFeed:io.smartdatalake.workflow.SparkSubFeed,columnBlacklist:Option[Seq[String]],columnWhitelist:Option[Seq[String]]):io.smartdatalake.workflow.SparkSubFeed" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">applies columnBlackList and columnWhitelist
+</p><div class="fullcomment"><div class="comment cmt"><p>applies columnBlackList and columnWhitelist
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>SparkAction</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.SparkAction#applyCastDecimal2IntegralFloat" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="applyCastDecimal2IntegralFloat(subFeed:io.smartdatalake.workflow.SparkSubFeed):io.smartdatalake.workflow.SparkSubFeed"></a>
+      <a id="applyCastDecimal2IntegralFloat(SparkSubFeed):SparkSubFeed"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">applyCastDecimal2IntegralFloat</span><span class="params">(<span name="subFeed">subFeed: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>)</span><span class="result">: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@applyCastDecimal2IntegralFloat(subFeed:io.smartdatalake.workflow.SparkSubFeed):io.smartdatalake.workflow.SparkSubFeed" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">applies type casting decimal -&gt; integral/float
+</p><div class="fullcomment"><div class="comment cmt"><p>applies type casting decimal -&gt; integral/float
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>SparkAction</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.SparkAction#applyCustomTransformation" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="applyCustomTransformation(inputSubFeed:io.smartdatalake.workflow.SparkSubFeed,transformer:Option[io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig])(implicitsession:org.apache.spark.sql.SparkSession):io.smartdatalake.workflow.SparkSubFeed"></a>
+      <a id="applyCustomTransformation(SparkSubFeed,Option[CustomDfTransformerConfig])(SparkSession):SparkSubFeed"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">applyCustomTransformation</span><span class="params">(<span name="inputSubFeed">inputSubFeed: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>, <span name="transformer">transformer: <span class="extype" name="scala.Option">Option</span>[<a href="customlogic/CustomDfTransformerConfig.html" class="extype" name="io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig">CustomDfTransformerConfig</a>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@applyCustomTransformation(inputSubFeed:io.smartdatalake.workflow.SparkSubFeed,transformer:Option[io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig])(implicitsession:org.apache.spark.sql.SparkSession):io.smartdatalake.workflow.SparkSubFeed" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">applies the transformers
+</p><div class="fullcomment"><div class="comment cmt"><p>applies the transformers
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>SparkAction</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.SparkAction#applyFilter" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="applyFilter(subFeed:io.smartdatalake.workflow.SparkSubFeed,filterClauseExpr:Option[org.apache.spark.sql.Column]):io.smartdatalake.workflow.SparkSubFeed"></a>
+      <a id="applyFilter(SparkSubFeed,Option[Column]):SparkSubFeed"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">applyFilter</span><span class="params">(<span name="subFeed">subFeed: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>, <span name="filterClauseExpr">filterClauseExpr: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="org.apache.spark.sql.Column">Column</span>]</span>)</span><span class="result">: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@applyFilter(subFeed:io.smartdatalake.workflow.SparkSubFeed,filterClauseExpr:Option[org.apache.spark.sql.Column]):io.smartdatalake.workflow.SparkSubFeed" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">applies filterClauseExpr
+</p><div class="fullcomment"><div class="comment cmt"><p>applies filterClauseExpr
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>SparkAction</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.SparkAction#applyTransformations" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="applyTransformations(inputSubFeed:io.smartdatalake.workflow.SparkSubFeed,transformer:Option[io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig],columnBlacklist:Option[Seq[String]],columnWhitelist:Option[Seq[String]],standardizeDatatypes:Boolean,output:io.smartdatalake.workflow.dataobject.DataObject,additional:Option[(io.smartdatalake.workflow.SparkSubFeed,Option[org.apache.spark.sql.DataFrame],Seq[String],java.time.LocalDateTime)=&gt;io.smartdatalake.workflow.SparkSubFeed],filterClauseExpr:Option[org.apache.spark.sql.Column])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):io.smartdatalake.workflow.SparkSubFeed"></a>
+      <a id="applyTransformations(SparkSubFeed,Option[CustomDfTransformerConfig],Option[Seq[String]],Option[Seq[String]],Boolean,DataObject,Option[(SparkSubFeed,Option[DataFrame],Seq[String],LocalDateTime)⇒SparkSubFeed],Option[Column])(SparkSession,ActionPipelineContext):SparkSubFeed"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">applyTransformations</span><span class="params">(<span name="inputSubFeed">inputSubFeed: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>, <span name="transformer">transformer: <span class="extype" name="scala.Option">Option</span>[<a href="customlogic/CustomDfTransformerConfig.html" class="extype" name="io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig">CustomDfTransformerConfig</a>]</span>, <span name="columnBlacklist">columnBlacklist: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]]</span>, <span name="columnWhitelist">columnWhitelist: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]]</span>, <span name="standardizeDatatypes">standardizeDatatypes: <span class="extype" name="scala.Boolean">Boolean</span></span>, <span name="output">output: <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span></span>, <span name="additional">additional: <span class="extype" name="scala.Option">Option</span>[(<a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a>, <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span>], <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>], <span class="extype" name="java.time.LocalDateTime">LocalDateTime</span>) ⇒ <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a>]</span>, <span name="filterClauseExpr">filterClauseExpr: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="org.apache.spark.sql.Column">Column</span>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@applyTransformations(inputSubFeed:io.smartdatalake.workflow.SparkSubFeed,transformer:Option[io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig],columnBlacklist:Option[Seq[String]],columnWhitelist:Option[Seq[String]],standardizeDatatypes:Boolean,output:io.smartdatalake.workflow.dataobject.DataObject,additional:Option[(io.smartdatalake.workflow.SparkSubFeed,Option[org.apache.spark.sql.DataFrame],Seq[String],java.time.LocalDateTime)=&gt;io.smartdatalake.workflow.SparkSubFeed],filterClauseExpr:Option[org.apache.spark.sql.Column])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):io.smartdatalake.workflow.SparkSubFeed" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">applies all the transformations above
+</p><div class="fullcomment"><div class="comment cmt"><p>applies all the transformations above
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>SparkAction</dd></dl></div>
     </li><li name="scala.Any#asInstanceOf" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="asInstanceOf[T0]:T0"></a>
       <a id="asInstanceOf[T0]:T0"></a>
@@ -223,7 +337,7 @@
       <p class="shortcomment cmt">Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject.</p><div class="fullcomment"><div class="comment cmt"><p>Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject.
 This can help to save memory and performance if the input DataFrame includes many transformations from previous Actions.
 The new DataFrame will be initialized according to the SubFeed's partitionValues.
-</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.action.CopyAction">CopyAction</a> → <a href="SparkSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.SparkSubFeedAction">SparkSubFeedAction</a></dd></dl></div>
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.action.CopyAction">CopyAction</a> → SparkAction</dd></dl></div>
     </li><li name="scala.AnyRef#clone" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="clone():Object"></a>
       <a id="clone():AnyRef"></a>
@@ -317,6 +431,25 @@ The new DataFrame will be initialized according to the SubFeed's partitionValues
       <p class="shortcomment cmt">Runtime metrics</p><div class="fullcomment"><div class="comment cmt"><p>Runtime metrics</p><p>Note: runtime metrics are disabled by default, because they are only collected when running Actions from an ActionDAG.
 This is not the case for Tests other use cases. If enabled exceptions are thrown if metrics are not found.
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.SparkAction#enrichSubFeedDataFrame" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="enrichSubFeedDataFrame(input:io.smartdatalake.workflow.dataobject.DataObjectwithio.smartdatalake.workflow.dataobject.CanCreateDataFrame,subFeed:io.smartdatalake.workflow.SparkSubFeed,executionMode:Option[io.smartdatalake.definitions.ExecutionMode],phase:io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase)(implicitsession:org.apache.spark.sql.SparkSession):io.smartdatalake.workflow.SparkSubFeed"></a>
+      <a id="enrichSubFeedDataFrame(DataObjectwithCanCreateDataFrame,SparkSubFeed,Option[ExecutionMode],ExecutionPhase)(SparkSession):SparkSubFeed"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">enrichSubFeedDataFrame</span><span class="params">(<span name="input">input: <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame">CanCreateDataFrame</span></span>, <span name="subFeed">subFeed: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>, <span name="executionMode">executionMode: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>]</span>, <span name="phase">phase: <a href="../ExecutionPhase$.html#ExecutionPhase=io.smartdatalake.workflow.ExecutionPhase.Value" class="extmbr" name="io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase">ExecutionPhase</a></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@enrichSubFeedDataFrame(input:io.smartdatalake.workflow.dataobject.DataObjectwithio.smartdatalake.workflow.dataobject.CanCreateDataFrame,subFeed:io.smartdatalake.workflow.SparkSubFeed,executionMode:Option[io.smartdatalake.definitions.ExecutionMode],phase:io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase)(implicitsession:org.apache.spark.sql.SparkSession):io.smartdatalake.workflow.SparkSubFeed" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Enriches SparkSubFeed with DataFrame if not existing
+</p><div class="fullcomment"><div class="comment cmt"><p>Enriches SparkSubFeed with DataFrame if not existing
+</p></div><dl class="paramcmts block"><dt class="param">input</dt><dd class="cmt"><p>input data object.</p></dd><dt class="param">subFeed</dt><dd class="cmt"><p>input SubFeed.</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd>SparkAction</dd></dl></div>
     </li><li name="scala.AnyRef#eq" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="eq(x$1:AnyRef):Boolean"></a>
       <a id="eq(AnyRef):Boolean"></a>
@@ -351,6 +484,23 @@ This is not the case for Tests other use cases. If enabled exceptions are thrown
       </a>
     </span>
       <p class="shortcomment cmt">Action.exec implementation</p><div class="fullcomment"><div class="comment cmt"><p>Action.exec implementation</p></div><dl class="paramcmts block"><dt class="param">subFeeds</dt><dd class="cmt"><p><a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a>'s to be processed</p></dd><dt>returns</dt><dd class="cmt"><p>processed <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a>'s</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="SparkSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.SparkSubFeedAction">SparkSubFeedAction</a> → Action</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.CopyAction#executionMode" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="executionMode:Option[io.smartdatalake.definitions.ExecutionMode]"></a>
+      <a id="executionMode:Option[ExecutionMode]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">executionMode</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@executionMode:Option[io.smartdatalake.definitions.ExecutionMode]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">optional execution mode for this Action</p><div class="fullcomment"><div class="comment cmt"><p>optional execution mode for this Action</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.action.CopyAction">CopyAction</a> → SparkAction</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.action.CopyAction#factory" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="factory:io.smartdatalake.config.FromConfigFactory[io.smartdatalake.workflow.action.Action]"></a>
       <a id="factory:FromConfigFactory[Action]"></a>
@@ -386,6 +536,25 @@ The companion object in turn should implement <span class="extype" name="FromCon
       </a>
     </span>
       
+    </li><li name="io.smartdatalake.workflow.action.SparkAction#filterDataFrame" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="filterDataFrame(df:org.apache.spark.sql.DataFrame,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues]):org.apache.spark.sql.DataFrame"></a>
+      <a id="filterDataFrame(DataFrame,Seq[PartitionValues]):DataFrame"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">filterDataFrame</span><span class="params">(<span name="df">df: <span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span><span class="result">: <span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@filterDataFrame(df:org.apache.spark.sql.DataFrame,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues]):org.apache.spark.sql.DataFrame" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Filter DataFrame with given partition values
+</p><div class="fullcomment"><div class="comment cmt"><p>Filter DataFrame with given partition values
+</p></div><dl class="paramcmts block"><dt class="param">df</dt><dd class="cmt"><p>DataFrame to filter</p></dd><dt class="param">partitionValues</dt><dd class="cmt"><p>partition values to use as filter condition</p></dd><dt>returns</dt><dd class="cmt"><p>filtered DataFrame</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd>SparkAction</dd></dl></div>
     </li><li name="scala.AnyRef#finalize" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="finalize():Unit"></a>
       <a id="finalize():Unit"></a>
@@ -581,7 +750,7 @@ The companion object in turn should implement <span class="extype" name="FromCon
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt">optional execution mode if this Action is a start node of a DAG run</p><div class="fullcomment"><div class="comment cmt"><p>optional execution mode if this Action is a start node of a DAG run</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.action.CopyAction">CopyAction</a> → <a href="SparkSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.SparkSubFeedAction">SparkSubFeedAction</a></dd></dl></div>
+      <p class="shortcomment cmt">optional execution mode if this Action is a start node of a DAG run</p><div class="fullcomment"><div class="comment cmt"><p>optional execution mode if this Action is a start node of a DAG run</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.action.CopyAction">CopyAction</a> → SparkAction</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.action.CopyAction#input" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="input:io.smartdatalake.workflow.dataobject.DataObjectwithio.smartdatalake.workflow.dataobject.CanCreateDataFrame"></a>
       <a id="input:DataObjectwithCanCreateDataFrame"></a>
@@ -692,6 +861,44 @@ To be implemented by subclasses
       <p class="shortcomment cmt">Additional metadata for the Action
 </p><div class="fullcomment"><div class="comment cmt"><p>Additional metadata for the Action
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.action.CopyAction">CopyAction</a> → Action</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.SparkAction#multiTransformSubfeed" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="multiTransformSubfeed(subFeed:io.smartdatalake.workflow.SparkSubFeed,transformers:Seq[org.apache.spark.sql.DataFrame=&gt;org.apache.spark.sql.DataFrame]):io.smartdatalake.workflow.SparkSubFeed"></a>
+      <a id="multiTransformSubfeed(SparkSubFeed,Seq[(DataFrame)⇒DataFrame]):SparkSubFeed"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">multiTransformSubfeed</span><span class="params">(<span name="subFeed">subFeed: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>, <span name="transformers">transformers: <span class="extype" name="scala.Seq">Seq</span>[(<span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span>) ⇒ <span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span>]</span>)</span><span class="result">: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@multiTransformSubfeed(subFeed:io.smartdatalake.workflow.SparkSubFeed,transformers:Seq[org.apache.spark.sql.DataFrame=&gt;org.apache.spark.sql.DataFrame]):io.smartdatalake.workflow.SparkSubFeed" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">applies multiple transformations to a sequence of subfeeds
+</p><div class="fullcomment"><div class="comment cmt"><p>applies multiple transformations to a sequence of subfeeds
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>SparkAction</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.SparkAction#multiTransformSubfeeds" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="multiTransformSubfeeds(subFeeds:Seq[io.smartdatalake.workflow.SparkSubFeed],transformers:Seq[org.apache.spark.sql.DataFrame=&gt;org.apache.spark.sql.DataFrame]):Seq[io.smartdatalake.workflow.SparkSubFeed]"></a>
+      <a id="multiTransformSubfeeds(Seq[SparkSubFeed],Seq[(DataFrame)⇒DataFrame]):Seq[SparkSubFeed]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">multiTransformSubfeeds</span><span class="params">(<span name="subFeeds">subFeeds: <span class="extype" name="scala.Seq">Seq</span>[<a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a>]</span>, <span name="transformers">transformers: <span class="extype" name="scala.Seq">Seq</span>[(<span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span>) ⇒ <span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span>]</span>)</span><span class="result">: <span class="extype" name="scala.Seq">Seq</span>[<a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@multiTransformSubfeeds(subFeeds:Seq[io.smartdatalake.workflow.SparkSubFeed],transformers:Seq[org.apache.spark.sql.DataFrame=&gt;org.apache.spark.sql.DataFrame]):Seq[io.smartdatalake.workflow.SparkSubFeed]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">applies multiple transformations to a sequence of subfeeds
+</p><div class="fullcomment"><div class="comment cmt"><p>applies multiple transformations to a sequence of subfeeds
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>SparkAction</dd></dl></div>
     </li><li name="scala.AnyRef#ne" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="ne(x$1:AnyRef):Boolean"></a>
       <a id="ne(AnyRef):Boolean"></a>
@@ -854,7 +1061,7 @@ To be implemented by subclasses
     </span>
       <p class="shortcomment cmt">Force persisting DataFrame on Disk.</p><div class="fullcomment"><div class="comment cmt"><p>Force persisting DataFrame on Disk.
 This helps to reduce memory needed for caching the DataFrame content and can serve as a recovery point in case an task get's lost.
-</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.action.CopyAction">CopyAction</a> → <a href="SparkSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.SparkSubFeedAction">SparkSubFeedAction</a></dd></dl></div>
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.action.CopyAction">CopyAction</a> → SparkAction</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.action.SparkSubFeedAction#postExec" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="postExec(inputSubFeeds:Seq[io.smartdatalake.workflow.SubFeed],outputSubFeeds:Seq[io.smartdatalake.workflow.SubFeed])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
       <a id="postExec(Seq[SubFeed],Seq[SubFeed])(SparkSession,ActionPipelineContext):Unit"></a>
@@ -872,7 +1079,7 @@ This helps to reduce memory needed for caching the DataFrame content and can ser
       </a>
     </span>
       <p class="shortcomment cmt">Executes operations needed after executing an action.</p><div class="fullcomment"><div class="comment cmt"><p>Executes operations needed after executing an action.
-In this step any operation on Input- or Output-DataObjects needed after the main task is executed,
+In this step any phase on Input- or Output-DataObjects needed after the main task is executed,
 e.g. JdbcTableDataObjects postSql or CopyActions deleteInputData.
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="SparkSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.SparkSubFeedAction">SparkSubFeedAction</a> → Action</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.action.CopyAction#postExecSubFeed" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
@@ -909,10 +1116,10 @@ e.g. JdbcTableDataObjects postSql or CopyActions deleteInputData.
       </a>
     </span>
       <p class="shortcomment cmt">Executes operations needed before executing an action.</p><div class="fullcomment"><div class="comment cmt"><p>Executes operations needed before executing an action.
-In this step any operation on Input- or Output-DataObjects needed before the main task is executed,
+In this step any phase on Input- or Output-DataObjects needed before the main task is executed,
 e.g. JdbcTableDataObjects preSql
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
-    </li><li name="io.smartdatalake.workflow.action.Action#prepare" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+    </li><li name="io.smartdatalake.workflow.action.SparkSubFeedAction#prepare" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="prepare(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
       <a id="prepare(SparkSession,ActionPipelineContext):Unit"></a>
       <h4 class="signature">
@@ -930,9 +1137,67 @@ e.g. JdbcTableDataObjects preSql
     </span>
       <p class="shortcomment cmt">Prepare DataObjects prerequisites.</p><div class="fullcomment"><div class="comment cmt"><p>Prepare DataObjects prerequisites.
 In this step preconditions are prepared &amp; tested:
-- directories exists or can be created
-- connections can be created</p><p>This runs during the &quot;prepare&quot; operation of the DAG.
+- connections can be created
+- needed structures exist, e.g Kafka topic or Jdbc table</p><p>This runs during the &quot;prepare&quot; phase of the DAG.
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="SparkSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.SparkSubFeedAction">SparkSubFeedAction</a> → Action</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.SparkAction#prepareInputSubFeed" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="prepareInputSubFeed(subFeed:io.smartdatalake.workflow.SparkSubFeed,input:io.smartdatalake.workflow.dataobject.DataObjectwithio.smartdatalake.workflow.dataobject.CanCreateDataFrame)(implicitsession:org.apache.spark.sql.SparkSession):io.smartdatalake.workflow.SparkSubFeed"></a>
+      <a id="prepareInputSubFeed(SparkSubFeed,DataObjectwithCanCreateDataFrame)(SparkSession):SparkSubFeed"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">prepareInputSubFeed</span><span class="params">(<span name="subFeed">subFeed: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>, <span name="input">input: <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame">CanCreateDataFrame</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@prepareInputSubFeed(subFeed:io.smartdatalake.workflow.SparkSubFeed,input:io.smartdatalake.workflow.dataobject.DataObjectwithio.smartdatalake.workflow.dataobject.CanCreateDataFrame)(implicitsession:org.apache.spark.sql.SparkSession):io.smartdatalake.workflow.SparkSubFeed" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Applies changes to a SubFeed from a previous action in order to be used as input for this actions transformation.</p><div class="fullcomment"><div class="comment cmt"><p>Applies changes to a SubFeed from a previous action in order to be used as input for this actions transformation.
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>SparkAction</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.Action#reset" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="reset():Unit"></a>
+      <a id="reset():Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">reset</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@reset():Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Resets the runtime state of this Action
+This is mainly used for testing
+</p><div class="fullcomment"><div class="comment cmt"><p>Resets the runtime state of this Action
+This is mainly used for testing
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.SparkAction#runtimeExecutionMode" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="runtimeExecutionMode(isDAGStart:Boolean):Option[io.smartdatalake.definitions.ExecutionMode]"></a>
+      <a id="runtimeExecutionMode(Boolean):Option[ExecutionMode]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">runtimeExecutionMode</span><span class="params">(<span name="isDAGStart">isDAGStart: <span class="extype" name="scala.Boolean">Boolean</span></span>)</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@runtimeExecutionMode(isDAGStart:Boolean):Option[io.smartdatalake.definitions.ExecutionMode]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Returns the execution mode used on runtime of the action, depending if this Action is a start node of a DAG run
+</p><div class="fullcomment"><div class="comment cmt"><p>Returns the execution mode used on runtime of the action, depending if this Action is a start node of a DAG run
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>SparkAction</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.action.Action#setSparkJobMetadata" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="setSparkJobMetadata(operation:Option[String])(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
       <a id="setSparkJobMetadata(Option[String])(SparkSession):Unit"></a>
@@ -952,7 +1217,7 @@ In this step preconditions are prepared &amp; tested:
       <p class="shortcomment cmt">Sets the util job description for better traceability in the Spark UI</p><div class="fullcomment"><div class="comment cmt"><p>Sets the util job description for better traceability in the Spark UI</p><p>Note: This sets Spark local properties, which are propagated to the respective executor tasks.
 We rely on this to match metrics back to Actions and DataObjects.
 As writing to a DataObject on the Driver happens uninterrupted in the same exclusive thread, this is suitable.
-</p></div><dl class="paramcmts block"><dt class="param">operation</dt><dd class="cmt"><p>operation description (be short...)</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
+</p></div><dl class="paramcmts block"><dt class="param">operation</dt><dd class="cmt"><p>phase description (be short...)</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.action.CopyAction#standardizeDatatypes" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="standardizeDatatypes:Boolean"></a>
       <a id="standardizeDatatypes:Boolean"></a>
@@ -1059,6 +1324,25 @@ As writing to a DataObject on the Driver happens uninterrupted in the same exclu
       <p class="shortcomment cmt">Transform a <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a>.</p><div class="fullcomment"><div class="comment cmt"><p>Transform a <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a>.
 To be implemented by subclasses.
 </p></div><dl class="paramcmts block"><dt class="param">subFeed</dt><dd class="cmt"><p><a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a> to be transformed</p></dd><dt>returns</dt><dd class="cmt"><p>transformed <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.action.CopyAction">CopyAction</a> → <a href="SparkSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.SparkSubFeedAction">SparkSubFeedAction</a></dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.SparkAction#transformSubfeeds" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="transformSubfeeds(subFeeds:Seq[io.smartdatalake.workflow.SparkSubFeed],transformer:org.apache.spark.sql.DataFrame=&gt;org.apache.spark.sql.DataFrame):Seq[io.smartdatalake.workflow.SparkSubFeed]"></a>
+      <a id="transformSubfeeds(Seq[SparkSubFeed],(DataFrame)⇒DataFrame):Seq[SparkSubFeed]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">transformSubfeeds</span><span class="params">(<span name="subFeeds">subFeeds: <span class="extype" name="scala.Seq">Seq</span>[<a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a>]</span>, <span name="transformer">transformer: (<span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span>) ⇒ <span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span></span>)</span><span class="result">: <span class="extype" name="scala.Seq">Seq</span>[<a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@transformSubfeeds(subFeeds:Seq[io.smartdatalake.workflow.SparkSubFeed],transformer:org.apache.spark.sql.DataFrame=&gt;org.apache.spark.sql.DataFrame):Seq[io.smartdatalake.workflow.SparkSubFeed]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">transform sequence of subfeeds
+</p><div class="fullcomment"><div class="comment cmt"><p>transform sequence of subfeeds
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>SparkAction</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.action.CopyAction#transformer" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="transformer:Option[io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig]"></a>
       <a id="transformer:Option[CustomDfTransformerConfig]"></a>
@@ -1076,6 +1360,43 @@ To be implemented by subclasses.
       </a>
     </span>
       <p class="shortcomment cmt">a custom transformation that is applied to each SubFeed separately</p>
+    </li><li name="io.smartdatalake.workflow.action.SparkAction#validateAndUpdateSubFeedPartitionValues" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="validateAndUpdateSubFeedPartitionValues(output:io.smartdatalake.workflow.dataobject.DataObject,subFeed:io.smartdatalake.workflow.SparkSubFeed):io.smartdatalake.workflow.SparkSubFeed"></a>
+      <a id="validateAndUpdateSubFeedPartitionValues(DataObject,SparkSubFeed):SparkSubFeed"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">validateAndUpdateSubFeedPartitionValues</span><span class="params">(<span name="output">output: <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span></span>, <span name="subFeed">subFeed: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>)</span><span class="result">: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@validateAndUpdateSubFeedPartitionValues(output:io.smartdatalake.workflow.dataobject.DataObject,subFeed:io.smartdatalake.workflow.SparkSubFeed):io.smartdatalake.workflow.SparkSubFeed" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Updates the partition values of a SubFeed to the partition columns of an output, removing not existing columns from the partition values.</p><div class="fullcomment"><div class="comment cmt"><p>Updates the partition values of a SubFeed to the partition columns of an output, removing not existing columns from the partition values.
+Further the transformed DataFrame is validated to have the output's partition columns included.
+</p></div><dl class="paramcmts block"><dt class="param">output</dt><dd class="cmt"><p>output DataObject</p></dd><dt class="param">subFeed</dt><dd class="cmt"><p>SubFeed with transformed DataFrame</p></dd><dt>returns</dt><dd class="cmt"><p>SubFeed with updated partition values.</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd>SparkAction</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.SparkAction#validateDataFrameContainsCols" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="validateDataFrameContainsCols(df:org.apache.spark.sql.DataFrame,columns:Seq[String],debugName:String):Unit"></a>
+      <a id="validateDataFrameContainsCols(DataFrame,Seq[String],String):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">validateDataFrameContainsCols</span><span class="params">(<span name="df">df: <span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span></span>, <span name="columns">columns: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>, <span name="debugName">debugName: <span class="extype" name="scala.Predef.String">String</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@validateDataFrameContainsCols(df:org.apache.spark.sql.DataFrame,columns:Seq[String],debugName:String):Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Validate that DataFrame contains a given list of columns, throwing an exception otherwise.</p><div class="fullcomment"><div class="comment cmt"><p>Validate that DataFrame contains a given list of columns, throwing an exception otherwise.
+</p></div><dl class="paramcmts block"><dt class="param">df</dt><dd class="cmt"><p>DataFrame to validate</p></dd><dt class="param">columns</dt><dd class="cmt"><p>Columns that must exist in DataFrame</p></dd><dt class="param">debugName</dt><dd class="cmt"><p>name to mention in exception</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd>SparkAction</dd></dl></div>
     </li><li name="scala.AnyRef#wait" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="wait():Unit"></a>
       <a id="wait():Unit"></a>
@@ -1145,6 +1466,23 @@ To be implemented by subclasses.
     </span>)</span>
               
         </dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.SparkAction#writeSubFeed" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="writeSubFeed(executionMode:Option[io.smartdatalake.definitions.ExecutionMode],subFeed:io.smartdatalake.workflow.SparkSubFeed,output:io.smartdatalake.workflow.dataobject.DataObjectwithio.smartdatalake.workflow.dataobject.CanWriteDataFrame)(implicitsession:org.apache.spark.sql.SparkSession):Boolean"></a>
+      <a id="writeSubFeed(Option[ExecutionMode],SparkSubFeed,DataObjectwithCanWriteDataFrame)(SparkSession):Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">writeSubFeed</span><span class="params">(<span name="executionMode">executionMode: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>]</span>, <span name="subFeed">subFeed: <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>, <span name="output">output: <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame">CanWriteDataFrame</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.CopyAction@writeSubFeed(executionMode:Option[io.smartdatalake.definitions.ExecutionMode],subFeed:io.smartdatalake.workflow.SparkSubFeed,output:io.smartdatalake.workflow.dataobject.DataObjectwithio.smartdatalake.workflow.dataobject.CanWriteDataFrame)(implicitsession:org.apache.spark.sql.SparkSession):Boolean" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">writes subfeed to output respecting given execution mode</p><div class="fullcomment"><div class="comment cmt"><p>writes subfeed to output respecting given execution mode</p></div><dl class="paramcmts block"><dt>returns</dt><dd class="cmt"><p>true if no data was transfered, otherwise false</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd>SparkAction</dd></dl></div>
     </li></ol>
             </div>
 
@@ -1164,6 +1502,8 @@ To be implemented by subclasses.
               <h3>Inherited from <span class="extype" name="scala.Equals">Equals</span></h3>
             </div><div class="parent" name="io.smartdatalake.workflow.action.SparkSubFeedAction">
               <h3>Inherited from <a href="SparkSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.SparkSubFeedAction">SparkSubFeedAction</a></h3>
+            </div><div class="parent" name="io.smartdatalake.workflow.action.SparkAction">
+              <h3>Inherited from <span class="extype" name="io.smartdatalake.workflow.action.SparkAction">SparkAction</span></h3>
             </div><div class="parent" name="io.smartdatalake.workflow.action.Action">
               <h3>Inherited from <span class="extype" name="io.smartdatalake.workflow.action.Action">Action</span></h3>
             </div><div class="parent" name="io.smartdatalake.util.misc.SmartDataLakeLogger">

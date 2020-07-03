@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>SubFeed - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.SubFeed</title>
-          <meta name="description" content="SubFeed - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.SubFeed" />
-          <meta name="keywords" content="SubFeed Smart Data Lake 1.0.5 API io.smartdatalake.workflow.SubFeed" />
+          <title>SubFeed - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.SubFeed</title>
+          <meta name="description" content="SubFeed - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.SubFeed" />
+          <meta name="keywords" content="SubFeed Smart Data Lake 1.0.6 API io.smartdatalake.workflow.SubFeed" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -98,24 +98,41 @@ Data can be represented by different technologies like Files or DataFrame.
         <div id="values" class="values members">
               <h3>Abstract Value Members</h3>
               <ol><li name="io.smartdatalake.workflow.SubFeed#breakLineage" visbl="pub" data-isabs="true" fullComment="yes" group="Ungrouped">
-      <a id="breakLineage():io.smartdatalake.workflow.SubFeed"></a>
-      <a id="breakLineage():SubFeed"></a>
+      <a id="breakLineage(implicitsession:org.apache.spark.sql.SparkSession):io.smartdatalake.workflow.SubFeed"></a>
+      <a id="breakLineage(SparkSession):SubFeed"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier">abstract </span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">breakLineage</span><span class="params">()</span><span class="result">: <a href="" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a></span>
+        <span class="name">breakLineage</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <a href="" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.workflow.SubFeed@breakLineage():io.smartdatalake.workflow.SubFeed" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.workflow.SubFeed@breakLineage(implicitsession:org.apache.spark.sql.SparkSession):io.smartdatalake.workflow.SubFeed" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
       <p class="shortcomment cmt">Break lineage.</p><div class="fullcomment"><div class="comment cmt"><p>Break lineage.
 This means to discard an existing DataFrame or List of FileRefs, so that it is requested again from the DataObject.
 This is usable to break long DataFrame Lineages over multiple Actions and instead reread the data from an intermediate table</p></div></div>
+    </li><li name="io.smartdatalake.workflow.SubFeed#clearDAGStart" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
+      <a id="clearDAGStart():io.smartdatalake.workflow.SubFeed"></a>
+      <a id="clearDAGStart():SubFeed"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">abstract </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">clearDAGStart</span><span class="params">()</span><span class="result">: <a href="" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.workflow.SubFeed@clearDAGStart():io.smartdatalake.workflow.SubFeed" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
     </li><li name="io.smartdatalake.workflow.SubFeed#clearPartitionValues" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
       <a id="clearPartitionValues():io.smartdatalake.workflow.SubFeed"></a>
       <a id="clearPartitionValues():SubFeed"></a>
@@ -146,6 +163,23 @@ This is usable to break long DataFrame Lineages over multiple Actions and instea
       </span>
       </h4><span class="permalink">
       <a href="../../../index.html#io.smartdatalake.workflow.SubFeed@dataObjectId:io.smartdatalake.config.SdlConfigObject.DataObjectId" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.SubFeed#isDAGStart" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
+      <a id="isDAGStart:Boolean"></a>
+      <a id="isDAGStart:Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">abstract </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">isDAGStart</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.workflow.SubFeed@isDAGStart:Boolean" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>

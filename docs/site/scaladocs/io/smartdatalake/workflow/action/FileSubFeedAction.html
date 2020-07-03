@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>FileSubFeedAction - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.action.FileSubFeedAction</title>
-          <meta name="description" content="FileSubFeedAction - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.action.FileSubFeedAction" />
-          <meta name="keywords" content="FileSubFeedAction Smart Data Lake 1.0.5 API io.smartdatalake.workflow.action.FileSubFeedAction" />
+          <title>FileSubFeedAction - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.action.FileSubFeedAction</title>
+          <meta name="description" content="FileSubFeedAction - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.action.FileSubFeedAction" />
+          <meta name="keywords" content="FileSubFeedAction Smart Data Lake 1.0.6 API io.smartdatalake.workflow.action.FileSubFeedAction" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -399,18 +399,18 @@ To be implemented by subclasses
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.action.Action#addRuntimeEvent" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="addRuntimeEvent(phase:String,state:io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState,msg:Option[String],results:Seq[io.smartdatalake.workflow.SubFeed]):Unit"></a>
-      <a id="addRuntimeEvent(String,RuntimeEventState,Option[String],Seq[SubFeed]):Unit"></a>
+      <a id="addRuntimeEvent(phase:io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase,state:io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState,msg:Option[String],results:Seq[io.smartdatalake.workflow.SubFeed]):Unit"></a>
+      <a id="addRuntimeEvent(ExecutionPhase,RuntimeEventState,Option[String],Seq[SubFeed]):Unit"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">addRuntimeEvent</span><span class="params">(<span name="phase">phase: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="state">state: <span class="extype" name="io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState">RuntimeEventState</span></span>, <span name="msg">msg: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="results">results: <span class="extype" name="scala.Seq">Seq</span>[<a href="../SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a>] = <span class="symbol">Seq()</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">addRuntimeEvent</span><span class="params">(<span name="phase">phase: <a href="../ExecutionPhase$.html#ExecutionPhase=io.smartdatalake.workflow.ExecutionPhase.Value" class="extmbr" name="io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase">ExecutionPhase</a></span>, <span name="state">state: <span class="extype" name="io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState">RuntimeEventState</span></span>, <span name="msg">msg: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="results">results: <span class="extype" name="scala.Seq">Seq</span>[<a href="../SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a>] = <span class="symbol">Seq()</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@addRuntimeEvent(phase:String,state:io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState,msg:Option[String],results:Seq[io.smartdatalake.workflow.SubFeed]):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@addRuntimeEvent(phase:io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase,state:io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState,msg:Option[String],results:Seq[io.smartdatalake.workflow.SubFeed]):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -843,7 +843,7 @@ This is not the case for Tests other use cases. If enabled exceptions are thrown
       </a>
     </span>
       <p class="shortcomment cmt">Executes operations needed after executing an action.</p><div class="fullcomment"><div class="comment cmt"><p>Executes operations needed after executing an action.
-In this step any operation on Input- or Output-DataObjects needed after the main task is executed,
+In this step any phase on Input- or Output-DataObjects needed after the main task is executed,
 e.g. JdbcTableDataObjects postSql or CopyActions deleteInputData.
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.action.FileSubFeedAction">FileSubFeedAction</a> → Action</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.action.FileSubFeedAction#postExecSubFeed" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
@@ -880,7 +880,7 @@ e.g. JdbcTableDataObjects postSql or CopyActions deleteInputData.
       </a>
     </span>
       <p class="shortcomment cmt">Executes operations needed before executing an action.</p><div class="fullcomment"><div class="comment cmt"><p>Executes operations needed before executing an action.
-In this step any operation on Input- or Output-DataObjects needed before the main task is executed,
+In this step any phase on Input- or Output-DataObjects needed before the main task is executed,
 e.g. JdbcTableDataObjects preSql
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.action.Action#prepare" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
@@ -901,8 +901,29 @@ e.g. JdbcTableDataObjects preSql
     </span>
       <p class="shortcomment cmt">Prepare DataObjects prerequisites.</p><div class="fullcomment"><div class="comment cmt"><p>Prepare DataObjects prerequisites.
 In this step preconditions are prepared &amp; tested:
-- directories exists or can be created
-- connections can be created</p><p>This runs during the &quot;prepare&quot; operation of the DAG.
+- connections can be created
+- needed structures exist, e.g Kafka topic or Jdbc table</p><p>This runs during the &quot;prepare&quot; phase of the DAG.
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.Action#reset" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="reset():Unit"></a>
+      <a id="reset():Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">reset</span><span class="params">()</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileSubFeedAction@reset():Unit" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Resets the runtime state of this Action
+This is mainly used for testing
+</p><div class="fullcomment"><div class="comment cmt"><p>Resets the runtime state of this Action
+This is mainly used for testing
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.action.Action#setSparkJobMetadata" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="setSparkJobMetadata(operation:Option[String])(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
@@ -923,7 +944,7 @@ In this step preconditions are prepared &amp; tested:
       <p class="shortcomment cmt">Sets the util job description for better traceability in the Spark UI</p><div class="fullcomment"><div class="comment cmt"><p>Sets the util job description for better traceability in the Spark UI</p><p>Note: This sets Spark local properties, which are propagated to the respective executor tasks.
 We rely on this to match metrics back to Actions and DataObjects.
 As writing to a DataObject on the Driver happens uninterrupted in the same exclusive thread, this is suitable.
-</p></div><dl class="paramcmts block"><dt class="param">operation</dt><dd class="cmt"><p>operation description (be short...)</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
+</p></div><dl class="paramcmts block"><dt class="param">operation</dt><dd class="cmt"><p>phase description (be short...)</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
     </li><li name="scala.AnyRef#synchronized" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="synchronized[T0](x$1:=&gt;T0):T0"></a>
       <a id="synchronized[T0](⇒T0):T0"></a>

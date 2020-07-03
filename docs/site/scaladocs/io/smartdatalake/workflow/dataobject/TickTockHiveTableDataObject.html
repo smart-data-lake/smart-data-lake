@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>TickTockHiveTableDataObject - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject</title>
-          <meta name="description" content="TickTockHiveTableDataObject - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject" />
-          <meta name="keywords" content="TickTockHiveTableDataObject Smart Data Lake 1.0.5 API io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject" />
+          <title>TickTockHiveTableDataObject - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject</title>
+          <meta name="description" content="TickTockHiveTableDataObject - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject" />
+          <meta name="keywords" content="TickTockHiveTableDataObject Smart Data Lake 1.0.6 API io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -47,7 +47,7 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <span class="name">TickTockHiveTableDataObject</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="analyzeTableAfterWrite">analyzeTableAfterWrite: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="dateColumnType">dateColumnType: <a href="../../definitions/DateColumnType$.html#DateColumnType=io.smartdatalake.definitions.DateColumnType.Value" class="extmbr" name="io.smartdatalake.definitions.DateColumnType.DateColumnType">DateColumnType</a> = <span class="symbol"><span class="name"><a href="../../../package.html">DateColumnType.Date</a></span></span></span>, <span name="schemaMin">schemaMin: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="org.apache.spark.sql.types.StructType">StructType</span>] = <span class="symbol">None</span></span>, <span name="table">table: <a href="Table.html" class="extype" name="io.smartdatalake.workflow.dataobject.Table">Table</a></span>, <span name="numInitialHdfsPartitions">numInitialHdfsPartitions: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">16</span></span>, <span name="saveMode">saveMode: <span class="extype" name="org.apache.spark.sql.SaveMode">SaveMode</span> = <span class="symbol">SaveMode.Overwrite</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</span>] = <span class="symbol">None</span></span>, <span name="connectionId">connectionId: <span class="extype" name="scala.Option">Option</span>[<a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="DataObjectMetadata.html" class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.TransactionalSparkTableDataObject">TransactionalSparkTableDataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanHandlePartitions">CanHandlePartitions</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <span class="name">TickTockHiveTableDataObject</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="analyzeTableAfterWrite">analyzeTableAfterWrite: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="dateColumnType">dateColumnType: <a href="../../definitions/DateColumnType$.html#DateColumnType=io.smartdatalake.definitions.DateColumnType.Value" class="extmbr" name="io.smartdatalake.definitions.DateColumnType.DateColumnType">DateColumnType</a> = <span class="symbol"><span class="name"><a href="../../../package.html">DateColumnType.Date</a></span></span></span>, <span name="schemaMin">schemaMin: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="org.apache.spark.sql.types.StructType">StructType</span>] = <span class="symbol">None</span></span>, <span name="table">table: <a href="Table.html" class="extype" name="io.smartdatalake.workflow.dataobject.Table">Table</a></span>, <span name="numInitialHdfsPartitions">numInitialHdfsPartitions: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">16</span></span>, <span name="saveMode">saveMode: <span class="extype" name="org.apache.spark.sql.SaveMode">SaveMode</span> = <span class="symbol">SaveMode.Overwrite</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<a href="../../util/misc/AclDef.html" class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</a>] = <span class="symbol">None</span></span>, <span name="connectionId">connectionId: <span class="extype" name="scala.Option">Option</span>[<a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="DataObjectMetadata.html" class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.TransactionalSparkTableDataObject">TransactionalSparkTableDataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanHandlePartitions">CanHandlePartitions</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4>
       
@@ -91,7 +91,7 @@
         <div id="constructors" class="members">
               <h3>Instance Constructors</h3>
               <ol><li name="io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
-      <a id="&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.DataObjectId,path:String,partitions:Seq[String],analyzeTableAfterWrite:Boolean,dateColumnType:io.smartdatalake.definitions.DateColumnType.DateColumnType,schemaMin:Option[org.apache.spark.sql.types.StructType],table:io.smartdatalake.workflow.dataobject.Table,numInitialHdfsPartitions:Int,saveMode:org.apache.spark.sql.SaveMode,acl:Option[io.smartdatalake.util.misc.AclDef],connectionId:Option[io.smartdatalake.config.SdlConfigObject.ConnectionId],metadata:Option[io.smartdatalake.workflow.dataobject.DataObjectMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject"></a>
+      <a id="&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.DataObjectId,path:Option[String],partitions:Seq[String],analyzeTableAfterWrite:Boolean,dateColumnType:io.smartdatalake.definitions.DateColumnType.DateColumnType,schemaMin:Option[org.apache.spark.sql.types.StructType],table:io.smartdatalake.workflow.dataobject.Table,numInitialHdfsPartitions:Int,saveMode:org.apache.spark.sql.SaveMode,acl:Option[io.smartdatalake.util.misc.AclDef],connectionId:Option[io.smartdatalake.config.SdlConfigObject.ConnectionId],metadata:Option[io.smartdatalake.workflow.dataobject.DataObjectMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject"></a>
       <a id="&lt;init&gt;:TickTockHiveTableDataObject"></a>
       <h4 class="signature">
       <span class="modifier_kind">
@@ -99,10 +99,10 @@
         <span class="kind">new</span>
       </span>
       <span class="symbol">
-        <span class="name">TickTockHiveTableDataObject</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="analyzeTableAfterWrite">analyzeTableAfterWrite: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="dateColumnType">dateColumnType: <a href="../../definitions/DateColumnType$.html#DateColumnType=io.smartdatalake.definitions.DateColumnType.Value" class="extmbr" name="io.smartdatalake.definitions.DateColumnType.DateColumnType">DateColumnType</a> = <span class="symbol"><span class="name"><a href="../../../package.html">DateColumnType.Date</a></span></span></span>, <span name="schemaMin">schemaMin: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="org.apache.spark.sql.types.StructType">StructType</span>] = <span class="symbol">None</span></span>, <span name="table">table: <a href="Table.html" class="extype" name="io.smartdatalake.workflow.dataobject.Table">Table</a></span>, <span name="numInitialHdfsPartitions">numInitialHdfsPartitions: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">16</span></span>, <span name="saveMode">saveMode: <span class="extype" name="org.apache.spark.sql.SaveMode">SaveMode</span> = <span class="symbol">SaveMode.Overwrite</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</span>] = <span class="symbol">None</span></span>, <span name="connectionId">connectionId: <span class="extype" name="scala.Option">Option</span>[<a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="DataObjectMetadata.html" class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span>
+        <span class="name">TickTockHiveTableDataObject</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="analyzeTableAfterWrite">analyzeTableAfterWrite: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="dateColumnType">dateColumnType: <a href="../../definitions/DateColumnType$.html#DateColumnType=io.smartdatalake.definitions.DateColumnType.Value" class="extmbr" name="io.smartdatalake.definitions.DateColumnType.DateColumnType">DateColumnType</a> = <span class="symbol"><span class="name"><a href="../../../package.html">DateColumnType.Date</a></span></span></span>, <span name="schemaMin">schemaMin: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="org.apache.spark.sql.types.StructType">StructType</span>] = <span class="symbol">None</span></span>, <span name="table">table: <a href="Table.html" class="extype" name="io.smartdatalake.workflow.dataobject.Table">Table</a></span>, <span name="numInitialHdfsPartitions">numInitialHdfsPartitions: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">16</span></span>, <span name="saveMode">saveMode: <span class="extype" name="org.apache.spark.sql.SaveMode">SaveMode</span> = <span class="symbol">SaveMode.Overwrite</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<a href="../../util/misc/AclDef.html" class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</a>] = <span class="symbol">None</span></span>, <span name="connectionId">connectionId: <span class="extype" name="scala.Option">Option</span>[<a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="DataObjectMetadata.html" class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject@&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.DataObjectId,path:String,partitions:Seq[String],analyzeTableAfterWrite:Boolean,dateColumnType:io.smartdatalake.definitions.DateColumnType.DateColumnType,schemaMin:Option[org.apache.spark.sql.types.StructType],table:io.smartdatalake.workflow.dataobject.Table,numInitialHdfsPartitions:Int,saveMode:org.apache.spark.sql.SaveMode,acl:Option[io.smartdatalake.util.misc.AclDef],connectionId:Option[io.smartdatalake.config.SdlConfigObject.ConnectionId],metadata:Option[io.smartdatalake.workflow.dataobject.DataObjectMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject@&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.DataObjectId,path:Option[String],partitions:Seq[String],analyzeTableAfterWrite:Boolean,dateColumnType:io.smartdatalake.definitions.DateColumnType.DateColumnType,schemaMin:Option[org.apache.spark.sql.types.StructType],table:io.smartdatalake.workflow.dataobject.Table,numInitialHdfsPartitions:Int,saveMode:org.apache.spark.sql.SaveMode,acl:Option[io.smartdatalake.util.misc.AclDef],connectionId:Option[io.smartdatalake.config.SdlConfigObject.ConnectionId],metadata:Option[io.smartdatalake.workflow.dataobject.DataObjectMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -176,7 +176,7 @@
         <span class="kind">val</span>
       </span>
       <span class="symbol">
-        <span class="name">acl</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</span>]</span>
+        <span class="name">acl</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<a href="../../util/misc/AclDef.html" class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</a>]</span>
       </span>
       </h4><span class="permalink">
       <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject@acl:Option[io.smartdatalake.util.misc.AclDef]" title="Permalink" target="_top">
@@ -296,6 +296,26 @@
       <p class="shortcomment cmt">Create empty partitions for partition values not yet existing
 </p><div class="fullcomment"><div class="comment cmt"><p>Create empty partitions for partition values not yet existing
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>CanHandlePartitions</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame#createReadSchema" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="createReadSchema(writeSchema:org.apache.spark.sql.types.StructType)(implicitsession:org.apache.spark.sql.SparkSession):org.apache.spark.sql.types.StructType"></a>
+      <a id="createReadSchema(StructType)(SparkSession):StructType"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">createReadSchema</span><span class="params">(<span name="writeSchema">writeSchema: <span class="extype" name="org.apache.spark.sql.types.StructType">StructType</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="org.apache.spark.sql.types.StructType">StructType</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject@createReadSchema(writeSchema:org.apache.spark.sql.types.StructType)(implicitsession:org.apache.spark.sql.SparkSession):org.apache.spark.sql.types.StructType" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Creates the read schema based on a given write schema.</p><div class="fullcomment"><div class="comment cmt"><p>Creates the read schema based on a given write schema.
+Normally this is the same, but some DataObjects can remove &amp; add columns on read (e.g. KafkaTopicDataObject, SparkFileDataObject)
+In this cases we have to break the DataFrame lineage und create a dummy DataFrame in init phase.
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>CanCreateDataFrame</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject#dateColumnType" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="dateColumnType:io.smartdatalake.definitions.DateColumnType.DateColumnType"></a>
       <a id="dateColumnType:DateColumnType"></a>
@@ -544,6 +564,23 @@ The companion object in turn should implement <span class="extype" name="FromCon
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>TableDataObject</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject#hadoopPath" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="hadoopPath(implicitsession:org.apache.spark.sql.SparkSession):org.apache.hadoop.fs.Path"></a>
+      <a id="hadoopPath(SparkSession):Path"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">hadoopPath</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="org.apache.hadoop.fs.Path">Path</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject@hadoopPath(implicitsession:org.apache.spark.sql.SparkSession):org.apache.hadoop.fs.Path" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
     </li><li name="io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject#id" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="id:io.smartdatalake.config.SdlConfigObject.DataObjectId"></a>
       <a id="id:DataObjectId"></a>
@@ -562,24 +599,24 @@ The companion object in turn should implement <span class="extype" name="FromCon
     </span>
       <p class="shortcomment cmt">A unique identifier for this instance.</p><div class="fullcomment"><div class="comment cmt"><p>A unique identifier for this instance.
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject">TickTockHiveTableDataObject</a> → DataObject → SdlConfigObject</dd></dl></div>
-    </li><li name="io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject#init" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="init(df:org.apache.spark.sql.DataFrame,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
-      <a id="init(DataFrame,Seq[PartitionValues])(SparkSession):Unit"></a>
+    </li><li name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame#init" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="init(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
+      <a id="init(Seq[PartitionValues])(SparkSession):Unit"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">init</span><span class="params">(<span name="df">df: <span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">init</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>] = <span class="symbol">Seq()</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject@init(df:org.apache.spark.sql.DataFrame,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject@init(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
       <p class="shortcomment cmt">Initialize callback before writing data out to disk/sinks.</p><div class="fullcomment"><div class="comment cmt"><p>Initialize callback before writing data out to disk/sinks.
-</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject">TickTockHiveTableDataObject</a> → CanWriteDataFrame</dd></dl></div>
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>CanWriteDataFrame</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject#instanceRegistry" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="instanceRegistry:io.smartdatalake.config.InstanceRegistry"></a>
       <a id="instanceRegistry:InstanceRegistry"></a>
@@ -808,18 +845,18 @@ The companion object in turn should implement <span class="extype" name="FromCon
 </p><div class="fullcomment"><div class="comment cmt"><p>Definition of partition columns
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject">TickTockHiveTableDataObject</a> → CanHandlePartitions</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject#path" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
-      <a id="path:String"></a>
-      <a id="path:String"></a>
+      <a id="path:Option[String]"></a>
+      <a id="path:Option[String]"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">val</span>
       </span>
       <span class="symbol">
-        <span class="name">path</span><span class="result">: <span class="extype" name="scala.Predef.String">String</span></span>
+        <span class="name">path</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject@path:String" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject@path:Option[String]" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -957,6 +994,23 @@ when reading or writing Spark data frames from/to the underlying data container.
 <span class="extype" name="io.smartdatalake.workflow.action.Action">io.smartdatalake.workflow.action.Action</span>s that bypass Spark data frames ignore the <code>schemaMin</code> attribute
 if it is defined.
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject">TickTockHiveTableDataObject</a> → SchemaValidation</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame#streamingOptions" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="streamingOptions:Map[String,String]"></a>
+      <a id="streamingOptions:Map[String,String]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">streamingOptions</span><span class="result">: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject@streamingOptions:Map[String,String]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>CanWriteDataFrame</dd></dl></div>
     </li><li name="scala.AnyRef#synchronized" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="synchronized[T0](x$1:=&gt;T0):T0"></a>
       <a id="synchronized[T0](⇒T0):T0"></a>
@@ -1149,6 +1203,27 @@ or only a few HDFS files that are too large.
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject">TickTockHiveTableDataObject</a> → CanWriteDataFrame</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame#writeStreamingDataFrame" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="writeStreamingDataFrame(df:org.apache.spark.sql.DataFrame,trigger:org.apache.spark.sql.streaming.Trigger,options:Map[String,String],checkpointLocation:String,queryName:String,outputMode:org.apache.spark.sql.streaming.OutputMode)(implicitsession:org.apache.spark.sql.SparkSession):org.apache.spark.sql.streaming.StreamingQuery"></a>
+      <a id="writeStreamingDataFrame(DataFrame,Trigger,Map[String,String],String,String,OutputMode)(SparkSession):StreamingQuery"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">writeStreamingDataFrame</span><span class="params">(<span name="df">df: <span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span></span>, <span name="trigger">trigger: <span class="extype" name="org.apache.spark.sql.streaming.Trigger">Trigger</span></span>, <span name="options">options: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]</span>, <span name="checkpointLocation">checkpointLocation: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="queryName">queryName: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="outputMode">outputMode: <span class="extype" name="org.apache.spark.sql.streaming.OutputMode">OutputMode</span> = <span class="symbol">OutputMode.Append</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="org.apache.spark.sql.streaming.StreamingQuery">StreamingQuery</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject@writeStreamingDataFrame(df:org.apache.spark.sql.DataFrame,trigger:org.apache.spark.sql.streaming.Trigger,options:Map[String,String],checkpointLocation:String,queryName:String,outputMode:org.apache.spark.sql.streaming.OutputMode)(implicitsession:org.apache.spark.sql.SparkSession):org.apache.spark.sql.streaming.StreamingQuery" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Write Spark structured streaming DataFrame
+The default implementation uses foreachBatch and this traits writeDataFrame method to write the DataFrame.</p><div class="fullcomment"><div class="comment cmt"><p>Write Spark structured streaming DataFrame
+The default implementation uses foreachBatch and this traits writeDataFrame method to write the DataFrame.
+Some DataObjects will override this with specific implementations (Kafka).
+</p></div><dl class="paramcmts block"><dt class="param">df</dt><dd class="cmt"><p>The Streaming DataFrame to write</p></dd><dt class="param">trigger</dt><dd class="cmt"><p>Trigger frequency for stream</p></dd><dt class="param">checkpointLocation</dt><dd class="cmt"><p>location for checkpoints of streaming query</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd>CanWriteDataFrame</dd></dl></div>
     </li></ol>
             </div>
 

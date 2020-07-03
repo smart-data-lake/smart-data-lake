@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>connection - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.connection</title>
-          <meta name="description" content="connection - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.connection" />
-          <meta name="keywords" content="connection Smart Data Lake 1.0.5 API io.smartdatalake.workflow.connection" />
+          <title>connection - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.connection</title>
+          <meta name="description" content="connection - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.connection" />
+          <meta name="keywords" content="connection Smart Data Lake 1.0.6 API io.smartdatalake.workflow.connection" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -92,7 +92,7 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <a href="HadoopFileConnection.html"><span class="name">HadoopFileConnection</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="pathPrefix">pathPrefix: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</span>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="ConnectionMetadata.html" class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.connection.Connection">Connection</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <a href="HadoopFileConnection.html"><span class="name">HadoopFileConnection</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="pathPrefix">pathPrefix: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<a href="../../util/misc/AclDef.html" class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="ConnectionMetadata.html" class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.connection.Connection">Connection</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4><span class="permalink">
       <a href="../../../../index.html#io.smartdatalake.workflow.connection.package@HadoopFileConnectionextendsConnectionwithProductwithSerializable" title="Permalink" target="_top">
@@ -111,7 +111,7 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <a href="HiveTableConnection.html"><span class="name">HiveTableConnection</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="db">db: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="pathPrefix">pathPrefix: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</span>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="ConnectionMetadata.html" class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.connection.Connection">Connection</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <a href="HiveTableConnection.html"><span class="name">HiveTableConnection</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="db">db: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="pathPrefix">pathPrefix: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<a href="../../util/misc/AclDef.html" class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="ConnectionMetadata.html" class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.connection.Connection">Connection</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4><span class="permalink">
       <a href="../../../../index.html#io.smartdatalake.workflow.connection.package@HiveTableConnectionextendsConnectionwithProductwithSerializable" title="Permalink" target="_top">
@@ -140,6 +140,25 @@
       <p class="shortcomment cmt">Connection information for jdbc tables.</p><div class="fullcomment"><div class="comment cmt"><p>Connection information for jdbc tables.
 If authentication is needed, user and password must be provided.
 </p></div><dl class="paramcmts block"><dt class="param">id</dt><dd class="cmt"><p>unique id of this connection</p></dd><dt class="param">url</dt><dd class="cmt"><p>jdbc connection url</p></dd><dt class="param">driver</dt><dd class="cmt"><p>class name of jdbc driver</p></dd><dt class="param">authMode</dt><dd class="cmt"><p>optional authentication information: for now BasicAuthMode is supported.</p></dd><dt class="param">db</dt><dd class="cmt"><p>jdbc database</p></dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.connection.KafkaConnection" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="KafkaConnectionextendsConnectionwithProductwithSerializable"></a>
+      <a id="KafkaConnection:KafkaConnection"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="KafkaConnection.html"><span class="name">KafkaConnection</span></a><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a></span>, <span name="brokers">brokers: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="schemaRegistry">schemaRegistry: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="datasourceOptions">datasourceOptions: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Map()</span></span>, <span name="authMode">authMode: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/AuthMode.html" class="extype" name="io.smartdatalake.definitions.AuthMode">AuthMode</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="ConnectionMetadata.html" class="extype" name="io.smartdatalake.workflow.connection.ConnectionMetadata">ConnectionMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.connection.Connection">Connection</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.connection.package@KafkaConnectionextendsConnectionwithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Connection information for kafka
+</p><div class="fullcomment"><div class="comment cmt"><p>Connection information for kafka
+</p></div><dl class="paramcmts block"><dt class="param">id</dt><dd class="cmt"><p>unique id of this connection</p></dd><dt class="param">brokers</dt><dd class="cmt"><p>comma separated list of kafka bootstrap server incl. port, e.g. &quot;host1:9092,host2:9092:</p></dd><dt class="param">schemaRegistry</dt><dd class="cmt"><p>url of schema registry service, e.g. &quot;https://host2&quot;</p></dd><dt class="param">datasourceOptions</dt><dd class="cmt"><p>Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)</p></dd></dl></div>
     </li><li name="io.smartdatalake.workflow.connection.SftpFileRefConnection" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="SftpFileRefConnectionextendsConnectionwithProductwithSerializable"></a>
       <a id="SftpFileRefConnection:SftpFileRefConnection"></a>
@@ -249,6 +268,23 @@ If authentication is needed, user and password must be provided.
       </span>
       </h4><span class="permalink">
       <a href="../../../../index.html#io.smartdatalake.workflow.connection.package@JdbcTableConnection" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.workflow.connection.KafkaConnection" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="KafkaConnection"></a>
+      <a id="KafkaConnection:KafkaConnection"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="KafkaConnection$.html"><span class="name">KafkaConnection</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.config.FromConfigFactory">FromConfigFactory</span>[<span class="extype" name="io.smartdatalake.workflow.connection.Connection">Connection</span>] with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.connection.package@KafkaConnection" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>

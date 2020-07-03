@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>Smart Data Lake 1.0.5 API</title>
-          <meta name="description" content="Smart Data Lake 1.0.5 API" />
-          <meta name="keywords" content="Smart Data Lake 1.0.5 API" />
+          <title>Smart Data Lake 1.0.6 API</title>
+          <meta name="description" content="Smart Data Lake 1.0.6 API" />
+          <meta name="keywords" content="Smart Data Lake 1.0.6 API" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../lib/ref-index.css" media="screen" type="text/css" rel="stylesheet" />
@@ -16,6 +16,9 @@
     </div><div class="entry">
       <div class="name">SPLUNK_DATETIME_FORMATTER</div>
       <div class="occurrences"><a href="../io/smartdatalake/workflow/dataobject/SplunkFormatter$.html" class="extype" name="io.smartdatalake.workflow.dataobject.SplunkFormatter">SplunkFormatter</a> </div>
+    </div><div class="entry">
+      <div class="name">SSLCertsAuthMode</div>
+      <div class="occurrences"><a href="../io/smartdatalake/definitions/package.html" class="extype" name="io.smartdatalake.definitions">definitions</a> </div>
     </div><div class="entry">
       <div class="name">Schema</div>
       <div class="occurrences"><a href="../io/smartdatalake/definitions/OutputType$.html" class="extype" name="io.smartdatalake.definitions.OutputType">OutputType</a> </div>
@@ -34,6 +37,9 @@
     </div><div class="entry">
       <div class="name">SparkRepartitionDef</div>
       <div class="occurrences"><a href="../io/smartdatalake/util/hdfs/package.html" class="extype" name="io.smartdatalake.util.hdfs">hdfs</a> </div>
+    </div><div class="entry">
+      <div class="name">SparkStreamingOnceMode</div>
+      <div class="occurrences"><a href="../io/smartdatalake/definitions/package.html" class="extype" name="io.smartdatalake.definitions">definitions</a> </div>
     </div><div class="entry">
       <div class="name">SparkSubFeed</div>
       <div class="occurrences"><a href="../io/smartdatalake/workflow/package.html" class="extype" name="io.smartdatalake.workflow">workflow</a> </div>
@@ -60,7 +66,7 @@
       <div class="occurrences"><a href="../io/smartdatalake/workflow/dataobject/package.html" class="extype" name="io.smartdatalake.workflow.dataobject">dataobject</a> </div>
     </div><div class="entry">
       <div class="name">String</div>
-      <div class="occurrences"><a href="../io/smartdatalake/definitions/DateColumnType$.html" class="extype" name="io.smartdatalake.definitions.DateColumnType">DateColumnType</a> </div>
+      <div class="occurrences"><a href="../io/smartdatalake/definitions/DateColumnType$.html" class="extype" name="io.smartdatalake.definitions.DateColumnType">DateColumnType</a> <a href="../io/smartdatalake/workflow/dataobject/KafkaColumnType$.html" class="extype" name="io.smartdatalake.workflow.dataobject.KafkaColumnType">KafkaColumnType</a> </div>
     </div><div class="entry">
       <div class="name">SubFeed</div>
       <div class="occurrences"><a href="../io/smartdatalake/workflow/package.html" class="extype" name="io.smartdatalake.workflow">workflow</a> </div>
@@ -81,7 +87,10 @@
       <div class="occurrences"><a href="../io/smartdatalake/definitions/Environment$.html" class="extype" name="io.smartdatalake.definitions.Environment">Environment</a> </div>
     </div><div class="entry">
       <div class="name">schemaMin</div>
-      <div class="occurrences"><a href="../io/smartdatalake/workflow/dataobject/AccessTableDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.AccessTableDataObject">AccessTableDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/AvroFileDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.AvroFileDataObject">AvroFileDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/CsvFileDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.CsvFileDataObject">CsvFileDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/CustomDfDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.CustomDfDataObject">CustomDfDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/DeltaLakeTableDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.DeltaLakeTableDataObject">DeltaLakeTableDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/ExcelFileDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.ExcelFileDataObject">ExcelFileDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/HiveTableDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.HiveTableDataObject">HiveTableDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/JdbcTableDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.JdbcTableDataObject">JdbcTableDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/JmsDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.JmsDataObject">JmsDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/JsonFileDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.JsonFileDataObject">JsonFileDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/ParquetFileDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.ParquetFileDataObject">ParquetFileDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/TickTockHiveTableDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject">TickTockHiveTableDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/XmlFileDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.XmlFileDataObject">XmlFileDataObject</a> </div>
+      <div class="occurrences"><a href="../io/smartdatalake/workflow/dataobject/AccessTableDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.AccessTableDataObject">AccessTableDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/AvroFileDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.AvroFileDataObject">AvroFileDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/CsvFileDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.CsvFileDataObject">CsvFileDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/CustomDfDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.CustomDfDataObject">CustomDfDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/DeltaLakeTableDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.DeltaLakeTableDataObject">DeltaLakeTableDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/ExcelFileDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.ExcelFileDataObject">ExcelFileDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/HiveTableDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.HiveTableDataObject">HiveTableDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/JdbcTableDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.JdbcTableDataObject">JdbcTableDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/JmsDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.JmsDataObject">JmsDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/JsonFileDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.JsonFileDataObject">JsonFileDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/KafkaTopicDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject">KafkaTopicDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/ParquetFileDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.ParquetFileDataObject">ParquetFileDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/TickTockHiveTableDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject">TickTockHiveTableDataObject</a> <a href="../io/smartdatalake/workflow/dataobject/XmlFileDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.XmlFileDataObject">XmlFileDataObject</a> </div>
+    </div><div class="entry">
+      <div class="name">schemaRegistry</div>
+      <div class="occurrences"><a href="../io/smartdatalake/workflow/connection/KafkaConnection.html" class="extype" name="io.smartdatalake.workflow.connection.KafkaConnection">KafkaConnection</a> </div>
     </div><div class="entry">
       <div class="name">schemaValidationDeepComarison</div>
       <div class="occurrences"><a href="../io/smartdatalake/definitions/Environment$.html" class="extype" name="io.smartdatalake.definitions.Environment">Environment</a> </div>
@@ -94,6 +103,9 @@
     </div><div class="entry">
       <div class="name">searchGreatestCommonInit</div>
       <div class="occurrences"><a href="../io/smartdatalake/workflow/action/ActionHelper$.html" class="extype" name="io.smartdatalake.workflow.action.ActionHelper">ActionHelper</a> </div>
+    </div><div class="entry">
+      <div class="name">selectCols</div>
+      <div class="occurrences"><a href="../io/smartdatalake/workflow/dataobject/KafkaTopicDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject">KafkaTopicDataObject</a> </div>
     </div><div class="entry">
       <div class="name">separator</div>
       <div class="occurrences"><a href="../io/smartdatalake/workflow/dataobject/DeltaLakeTableDataObject.html" class="extype" name="io.smartdatalake.workflow.dataobject.DeltaLakeTableDataObject">DeltaLakeTableDataObject</a> </div>
@@ -148,6 +160,9 @@
     </div><div class="entry">
       <div class="name">stopMemoryLogger</div>
       <div class="occurrences"><a href="../io/smartdatalake/util/misc/MemoryUtils$.html" class="extype" name="io.smartdatalake.util.misc.MemoryUtils">MemoryUtils</a> </div>
+    </div><div class="entry">
+      <div class="name">streaming</div>
+      <div class="occurrences"><a href="../io/smartdatalake/util/package.html" class="extype" name="io.smartdatalake.util">util</a> </div>
     </div><div class="entry">
       <div class="name">stringToActionObjectId</div>
       <div class="occurrences"><a href="../io/smartdatalake/config/SdlConfigObject$.html" class="extype" name="io.smartdatalake.config.SdlConfigObject">SdlConfigObject</a> </div>

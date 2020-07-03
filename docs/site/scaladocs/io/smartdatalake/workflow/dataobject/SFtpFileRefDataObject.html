@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>SFtpFileRefDataObject - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject</title>
-          <meta name="description" content="SFtpFileRefDataObject - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject" />
-          <meta name="keywords" content="SFtpFileRefDataObject Smart Data Lake 1.0.5 API io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject" />
+          <title>SFtpFileRefDataObject - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject</title>
+          <meta name="description" content="SFtpFileRefDataObject - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject" />
+          <meta name="keywords" content="SFtpFileRefDataObject Smart Data Lake 1.0.6 API io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -381,23 +381,6 @@ The following authentication mechanisms are supported
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
-    </li><li name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject#execWithSFtpClient" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
-      <a id="execWithSFtpClient[A](func:net.schmizz.sshj.sftp.SFTPClient=&gt;A):A"></a>
-      <a id="execWithSFtpClient[A]((SFTPClient)⇒A):A"></a>
-      <h4 class="signature">
-      <span class="modifier_kind">
-        <span class="modifier"></span>
-        <span class="kind">def</span>
-      </span>
-      <span class="symbol">
-        <span class="name">execWithSFtpClient</span><span class="tparams">[<span name="A">A</span>]</span><span class="params">(<span name="func">func: (<span class="extype" name="net.schmizz.sshj.sftp.SFTPClient">SFTPClient</span>) ⇒ <span class="extype" name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject.execWithSFtpClient.A">A</span></span>)</span><span class="result">: <span class="extype" name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject.execWithSFtpClient.A">A</span></span>
-      </span>
-      </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject@execWithSFtpClient[A](func:net.schmizz.sshj.sftp.SFTPClient=&gt;A):A" title="Permalink" target="_top">
-        <img src="../../../../lib/permalink.png" alt="Permalink" />
-      </a>
-    </span>
-      
     </li><li name="io.smartdatalake.workflow.dataobject.FileRefDataObject#extractPartitionValuesFromPath" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="extractPartitionValuesFromPath(filePath:String):io.smartdatalake.util.hdfs.PartitionValues"></a>
       <a id="extractPartitionValuesFromPath(String):PartitionValues"></a>
@@ -879,7 +862,7 @@ This is concatenated with the partition layout to search for files.
       <p class="shortcomment cmt">Runs operations before writing to <span class="extype" name="DataObject">DataObject</span>
 </p><div class="fullcomment"><div class="comment cmt"><p>Runs operations before writing to <span class="extype" name="DataObject">DataObject</span>
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>DataObject</dd></dl></div>
-    </li><li name="io.smartdatalake.workflow.dataobject.DataObject#prepare" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+    </li><li name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject#prepare" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="prepare(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
       <a id="prepare(SparkSession):Unit"></a>
       <h4 class="signature">
@@ -896,7 +879,7 @@ This is concatenated with the partition layout to search for files.
       </a>
     </span>
       <p class="shortcomment cmt">Prepare &amp; test <span class="extype" name="DataObject">DataObject</span>'s prerequisits</p><div class="fullcomment"><div class="comment cmt"><p>Prepare &amp; test <span class="extype" name="DataObject">DataObject</span>'s prerequisits</p><p>This runs during the &quot;prepare&quot; operation of the DAG.
-</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>DataObject</dd></dl></div>
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject">SFtpFileRefDataObject</a> → DataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject#saveMode" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="saveMode:org.apache.spark.sql.SaveMode"></a>
       <a id="saveMode:SaveMode"></a>

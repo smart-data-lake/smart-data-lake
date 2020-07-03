@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>FileSubFeed - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.FileSubFeed</title>
-          <meta name="description" content="FileSubFeed - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.FileSubFeed" />
-          <meta name="keywords" content="FileSubFeed Smart Data Lake 1.0.5 API io.smartdatalake.workflow.FileSubFeed" />
+          <title>FileSubFeed - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.FileSubFeed</title>
+          <meta name="description" content="FileSubFeed - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.FileSubFeed" />
+          <meta name="keywords" content="FileSubFeed Smart Data Lake 1.0.6 API io.smartdatalake.workflow.FileSubFeed" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -47,7 +47,7 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <span class="name">FileSubFeed</span><span class="params">(<span name="fileRefs">fileRefs: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.FileRef">FileRef</span>]]</span>, <span name="dataObjectId">dataObjectId: <a href="../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>, <span name="processedInputFileRefs">processedInputFileRefs: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.FileRef">FileRef</span>]] = <span class="symbol">None</span></span>)</span><span class="result"> extends <a href="SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <span class="name">FileSubFeed</span><span class="params">(<span name="fileRefs">fileRefs: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.FileRef">FileRef</span>]]</span>, <span name="dataObjectId">dataObjectId: <a href="../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>, <span name="isDAGStart">isDAGStart: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="processedInputFileRefs">processedInputFileRefs: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.FileRef">FileRef</span>]] = <span class="symbol">None</span></span>)</span><span class="result"> extends <a href="SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4>
       
@@ -92,7 +92,7 @@
         <div id="constructors" class="members">
               <h3>Instance Constructors</h3>
               <ol><li name="io.smartdatalake.workflow.FileSubFeed#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="&lt;init&gt;(fileRefs:Option[Seq[io.smartdatalake.workflow.dataobject.FileRef]],dataObjectId:io.smartdatalake.config.SdlConfigObject.DataObjectId,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues],processedInputFileRefs:Option[Seq[io.smartdatalake.workflow.dataobject.FileRef]]):io.smartdatalake.workflow.FileSubFeed"></a>
+      <a id="&lt;init&gt;(fileRefs:Option[Seq[io.smartdatalake.workflow.dataobject.FileRef]],dataObjectId:io.smartdatalake.config.SdlConfigObject.DataObjectId,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues],isDAGStart:Boolean,processedInputFileRefs:Option[Seq[io.smartdatalake.workflow.dataobject.FileRef]]):io.smartdatalake.workflow.FileSubFeed"></a>
       <a id="&lt;init&gt;:FileSubFeed"></a>
       <h4 class="signature">
       <span class="modifier_kind">
@@ -100,10 +100,10 @@
         <span class="kind">new</span>
       </span>
       <span class="symbol">
-        <span class="name">FileSubFeed</span><span class="params">(<span name="fileRefs">fileRefs: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.FileRef">FileRef</span>]]</span>, <span name="dataObjectId">dataObjectId: <a href="../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>, <span name="processedInputFileRefs">processedInputFileRefs: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.FileRef">FileRef</span>]] = <span class="symbol">None</span></span>)</span>
+        <span class="name">FileSubFeed</span><span class="params">(<span name="fileRefs">fileRefs: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.FileRef">FileRef</span>]]</span>, <span name="dataObjectId">dataObjectId: <a href="../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>, <span name="isDAGStart">isDAGStart: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="processedInputFileRefs">processedInputFileRefs: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.FileRef">FileRef</span>]] = <span class="symbol">None</span></span>)</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.workflow.FileSubFeed@&lt;init&gt;(fileRefs:Option[Seq[io.smartdatalake.workflow.dataobject.FileRef]],dataObjectId:io.smartdatalake.config.SdlConfigObject.DataObjectId,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues],processedInputFileRefs:Option[Seq[io.smartdatalake.workflow.dataobject.FileRef]]):io.smartdatalake.workflow.FileSubFeed" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.workflow.FileSubFeed@&lt;init&gt;(fileRefs:Option[Seq[io.smartdatalake.workflow.dataobject.FileRef]],dataObjectId:io.smartdatalake.config.SdlConfigObject.DataObjectId,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues],isDAGStart:Boolean,processedInputFileRefs:Option[Seq[io.smartdatalake.workflow.dataobject.FileRef]]):io.smartdatalake.workflow.FileSubFeed" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -186,24 +186,41 @@
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Any</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.FileSubFeed#breakLineage" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="breakLineage():io.smartdatalake.workflow.FileSubFeed"></a>
-      <a id="breakLineage():FileSubFeed"></a>
+      <a id="breakLineage(implicitsession:org.apache.spark.sql.SparkSession):io.smartdatalake.workflow.FileSubFeed"></a>
+      <a id="breakLineage(SparkSession):FileSubFeed"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">breakLineage</span><span class="params">()</span><span class="result">: <a href="" class="extype" name="io.smartdatalake.workflow.FileSubFeed">FileSubFeed</a></span>
+        <span class="name">breakLineage</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <a href="" class="extype" name="io.smartdatalake.workflow.FileSubFeed">FileSubFeed</a></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.workflow.FileSubFeed@breakLineage():io.smartdatalake.workflow.FileSubFeed" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.workflow.FileSubFeed@breakLineage(implicitsession:org.apache.spark.sql.SparkSession):io.smartdatalake.workflow.FileSubFeed" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
       <p class="shortcomment cmt">Break lineage.</p><div class="fullcomment"><div class="comment cmt"><p>Break lineage.
 This means to discard an existing DataFrame or List of FileRefs, so that it is requested again from the DataObject.
 This is usable to break long DataFrame Lineages over multiple Actions and instead reread the data from an intermediate table</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.FileSubFeed">FileSubFeed</a> → <a href="SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a></dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.FileSubFeed#clearDAGStart" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="clearDAGStart():io.smartdatalake.workflow.FileSubFeed"></a>
+      <a id="clearDAGStart():FileSubFeed"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">clearDAGStart</span><span class="params">()</span><span class="result">: <a href="" class="extype" name="io.smartdatalake.workflow.FileSubFeed">FileSubFeed</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.workflow.FileSubFeed@clearDAGStart():io.smartdatalake.workflow.FileSubFeed" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.FileSubFeed">FileSubFeed</a> → <a href="SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a></dd></dl></div>
     </li><li name="io.smartdatalake.workflow.FileSubFeed#clearPartitionValues" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="clearPartitionValues():io.smartdatalake.workflow.FileSubFeed"></a>
       <a id="clearPartitionValues():FileSubFeed"></a>
@@ -335,6 +352,23 @@ This is usable to break long DataFrame Lineages over multiple Actions and instea
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.FileSubFeed#isDAGStart" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="isDAGStart:Boolean"></a>
+      <a id="isDAGStart:Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">isDAGStart</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.workflow.FileSubFeed@isDAGStart:Boolean" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.FileSubFeed">FileSubFeed</a> → <a href="SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a></dd></dl></div>
     </li><li name="scala.Any#isInstanceOf" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="isInstanceOf[T0]:Boolean"></a>
       <a id="isInstanceOf[T0]:Boolean"></a>

@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>SplunkDataObject - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.dataobject.SplunkDataObject</title>
-          <meta name="description" content="SplunkDataObject - Smart Data Lake 1.0.5 API - io.smartdatalake.workflow.dataobject.SplunkDataObject" />
-          <meta name="keywords" content="SplunkDataObject Smart Data Lake 1.0.5 API io.smartdatalake.workflow.dataobject.SplunkDataObject" />
+          <title>SplunkDataObject - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.dataobject.SplunkDataObject</title>
+          <meta name="description" content="SplunkDataObject - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.dataobject.SplunkDataObject" />
+          <meta name="keywords" content="SplunkDataObject Smart Data Lake 1.0.6 API io.smartdatalake.workflow.dataobject.SplunkDataObject" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -243,6 +243,26 @@ Provides details to an action to access Splunk logs.
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>SplunkService</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.CanCreateDataFrame#createReadSchema" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="createReadSchema(writeSchema:org.apache.spark.sql.types.StructType)(implicitsession:org.apache.spark.sql.SparkSession):org.apache.spark.sql.types.StructType"></a>
+      <a id="createReadSchema(StructType)(SparkSession):StructType"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">createReadSchema</span><span class="params">(<span name="writeSchema">writeSchema: <span class="extype" name="org.apache.spark.sql.types.StructType">StructType</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="org.apache.spark.sql.types.StructType">StructType</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.SplunkDataObject@createReadSchema(writeSchema:org.apache.spark.sql.types.StructType)(implicitsession:org.apache.spark.sql.SparkSession):org.apache.spark.sql.types.StructType" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Creates the read schema based on a given write schema.</p><div class="fullcomment"><div class="comment cmt"><p>Creates the read schema based on a given write schema.
+Normally this is the same, but some DataObjects can remove &amp; add columns on read (e.g. KafkaTopicDataObject, SparkFileDataObject)
+In this cases we have to break the DataFrame lineage und create a dummy DataFrame in init phase.
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>CanCreateDataFrame</dd></dl></div>
     </li><li name="scala.AnyRef#eq" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="eq(x$1:AnyRef):Boolean"></a>
       <a id="eq(AnyRef):Boolean"></a>
@@ -586,7 +606,7 @@ The companion object in turn should implement <span class="extype" name="FromCon
       <p class="shortcomment cmt">Runs operations before writing to <span class="extype" name="DataObject">DataObject</span>
 </p><div class="fullcomment"><div class="comment cmt"><p>Runs operations before writing to <span class="extype" name="DataObject">DataObject</span>
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>DataObject</dd></dl></div>
-    </li><li name="io.smartdatalake.workflow.dataobject.DataObject#prepare" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+    </li><li name="io.smartdatalake.workflow.dataobject.SplunkDataObject#prepare" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="prepare(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
       <a id="prepare(SparkSession):Unit"></a>
       <h4 class="signature">
@@ -603,7 +623,7 @@ The companion object in turn should implement <span class="extype" name="FromCon
       </a>
     </span>
       <p class="shortcomment cmt">Prepare &amp; test <span class="extype" name="DataObject">DataObject</span>'s prerequisits</p><div class="fullcomment"><div class="comment cmt"><p>Prepare &amp; test <span class="extype" name="DataObject">DataObject</span>'s prerequisits</p><p>This runs during the &quot;prepare&quot; operation of the DAG.
-</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>DataObject</dd></dl></div>
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.SplunkDataObject">SplunkDataObject</a> → DataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.SplunkService#readFromSplunk" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="readFromSplunk(query:String,searchArgs:com.splunk.JobExportArgs,splunk:com.splunk.Service):Seq[Map[String,String]]"></a>
       <a id="readFromSplunk(String,JobExportArgs,Service):Seq[Map[String,String]]"></a>
