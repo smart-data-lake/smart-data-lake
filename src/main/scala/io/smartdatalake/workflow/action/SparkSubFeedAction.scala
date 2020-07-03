@@ -67,6 +67,7 @@ abstract class SparkSubFeedAction extends Action {
    */
   override final def init(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == 1, s"Only one subfeed allowed for SparkSubFeedActions (Action $id, inputSubfeed's ${subFeeds.map(_.dataObjectId).mkString(",")})")
+    outputs.collect{ case x: CanWriteDataFrame => x }.foreach(_.init())
     Seq(doTransform(subFeeds.head))
   }
 
