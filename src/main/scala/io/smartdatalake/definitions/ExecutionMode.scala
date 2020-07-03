@@ -18,10 +18,14 @@
  */
 package io.smartdatalake.definitions
 
+import org.apache.spark.sql.streaming.OutputMode
+
 /**
  * Execution mode's defines how data is selected when running a data pipeline.
  */
-sealed trait ExecutionMode {
+sealed trait ExecutionMode
+
+trait ExecutionModeWithMainInputOutput {
   def mainInputId: Option[String]
   def mainOutputId: Option[String]
 }
@@ -34,4 +38,13 @@ sealed trait ExecutionMode {
  * @param mainOutputId optional selection of outputId to be used for partition comparision. Only needed if there are multiple output DataObject's.
  * @param nbOfPartitionValuesPerRun optional restriction of the number of partition values per run.
  */
-case class PartitionDiffMode(partitionColNb: Option[Int] = None, override val mainInputId: Option[String] = None, override val mainOutputId: Option[String] = None, nbOfPartitionValuesPerRun: Option[Int] = None) extends ExecutionMode
+case class PartitionDiffMode(partitionColNb: Option[Int] = None, override val mainInputId: Option[String] = None, override val mainOutputId: Option[String] = None, nbOfPartitionValuesPerRun: Option[Int] = None) extends ExecutionMode with ExecutionModeWithMainInputOutput
+
+/**
+ * Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads (trigger=Trigger.Once) and keep track of processed data.
+ * @param checkpointLocation location for checkpoints of streaming query to keep state
+ * @param inputOptions additional option to apply when reading streaming source. This overwrites options set by the DataObjects.
+ * @param outputOptions additional option to apply when writing to streaming sink. This overwrites options set by the DataObjects.
+ */
+case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[String,String] = Map(), outputOptions: Map[String,String] = Map(), outputMode: OutputMode = OutputMode.Append) extends ExecutionMode
+

@@ -49,6 +49,7 @@ import scala.util.{Failure, Success, Try}
  *                                      Keeping deleted columns in complex data types has performance impact as all new data
  *                                      in the future has to be converted by a complex function.
  * @param initExecutionMode optional execution mode if this Action is a start node of a DAG run
+ * @param executionMode optional execution mode for this Action
  */
 case class HistorizeAction(
                             override val id: ActionObjectId,
@@ -66,6 +67,7 @@ case class HistorizeAction(
                             override val breakDataFrameLineage: Boolean = false,
                             override val persist: Boolean = false,
                             override val initExecutionMode: Option[ExecutionMode] = None,
+                            override val executionMode: Option[ExecutionMode] = None,
                             override val metadata: Option[ActionMetadata] = None
                           )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedAction {
 
@@ -85,16 +87,8 @@ case class HistorizeAction(
     case Failure(e) => throw new ConfigurationException(s"(${id}) Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
   }
 
-  def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
-    // create input subfeeds if not yet existing
-    var transformedSubFeed = ActionHelper.enrichSubFeedDataFrame(input, subFeed)
-
-    // apply transformations
-    transformedSubFeed = ActionHelper.applyTransformations(
-      transformedSubFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, Some(historizeDataFrame(_: SparkSubFeed,_: Option[DataFrame],_:Seq[String],_: LocalDateTime)), filterClauseExpr)
-
-    // return
-    transformedSubFeed
+  override def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+    applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, Some(historizeDataFrame(_: SparkSubFeed,_: Option[DataFrame],_:Seq[String],_: LocalDateTime)), filterClauseExpr)
   }
 
   protected def historizeDataFrame( subFeed: SparkSubFeed,

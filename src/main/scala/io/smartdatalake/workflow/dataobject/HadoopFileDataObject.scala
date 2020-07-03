@@ -230,6 +230,6 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
 
   protected[workflow] def applyAcls(implicit session: SparkSession): Unit = {
     val aclToApply = acl().orElse(connection.flatMap(_.acl))
-    if (aclToApply.isDefined) AclUtil.addACLs(acl().get, hadoopPath)(filesystem)
+    if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
   }
 }

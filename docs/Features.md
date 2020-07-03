@@ -9,7 +9,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
 
 ##### Support for complex workflows
 * Fork, join, parallel execution, multiple start- & end-nodes possible
-* Future: Recovery of failed runs
+* Recovery of failed runs
 
 ##### Execution Engines
 * Spark (DataFrames)
@@ -25,6 +25,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
 * Spark based: Copy, Historization, Deduplication
 * File based: FileTransfer
 * Easily extendable through implementing predefined scala traits
+* Future: applying MLFlow machine learning models
 
 ##### Customizable Transformations
 * Spark Transformations: 
@@ -43,8 +44,9 @@ The following is a list of implemented and planned (Future) features of Smart Da
 ##### Execution Modes
 * Process all data
 * Partition parameters: give partition values to process for start nodes as parameter
-* Init Partition Diff: search missing partitions on start nodes and use as parameter
-* Future: Partition Diff (every action individually), Incremental (get last processed timestamp from target), Continous (Streaming)
+* Partition Diff: search missing partitions and use as parameter
+* Spark Streaming Once: incremental processing by using Spark Structured Streaming with Trigger=Once mode
+* Future: Incremental (compare "watermark" column between source and target), Continous (Streaming)
 
 ##### Schema Evolution
 * Automatic evolution of data schemas (new column, removed column, changed datatype)

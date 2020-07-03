@@ -22,7 +22,7 @@ package io.smartdatalake.metrics
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionMetrics
-import org.apache.spark.scheduler.{SparkListener, SparkListenerJobStart, SparkListenerStageCompleted}
+import org.apache.spark.scheduler.{AccumulableInfo, SparkListener, SparkListenerJobStart, SparkListenerStageCompleted, SparkListenerTaskEnd}
 import org.joda.time.format.{DateTimeFormat, DateTimeFormatter, PeriodFormatter, PeriodFormatterBuilder}
 import org.joda.time.{Duration, Instant}
 
@@ -48,7 +48,8 @@ private[smartdatalake] case class SparkStageMetrics(jobInfo: JobInfo, stageId: I
                                                     shuffleRemoteBytesRead: Long, shuffleLocalBytesRead: Long, shuffleTotalBytesRead: Long,
                                                     shuffleRecordsRead: Long,
                                                     shuffleWriteTimeInNanos: Long, shuffleBytesWritten: Long,
-                                                    shuffleRecordsWritten: Long
+                                                    shuffleRecordsWritten: Long,
+                                                    accumulables: Seq[AccumulableInfo]
                                                    ) extends ActionMetrics {
 
   lazy val stageSubmissionTime: Instant  = new Instant(submissionTimestamp)
@@ -62,6 +63,8 @@ private[smartdatalake] case class SparkStageMetrics(jobInfo: JobInfo, stageId: I
   lazy val resultSerializationTime: Duration = Duration.millis(resultSerializationTimeInMillis)
   lazy val shuffleFetchWaitTime: Duration = Duration.millis(shuffleFetchWaitTimeInMillis)
   lazy val shuffleWriteTime: Duration = Duration.millis(shuffleWriteTimeInNanos / 1000000)
+  // for some sources (Kafka, Jdbc) recordsWritten is always 0, but there is an accumulator which has "number of output rows" set...
+  lazy val recordsWrittenCons: Long = if (recordsWritten>0) recordsWritten else accumulables.find(_.name.contains("number of output rows")).flatMap(_.value).map(_.asInstanceOf[Long]).getOrElse(0L)
 
   /**
    * Formats [[Duration]]s as human readable strings.
@@ -115,6 +118,7 @@ private[smartdatalake] case class SparkStageMetrics(jobInfo: JobInfo, stageId: I
        |    ${keyValueStringWithSeparator("bytes_written", bytesWritten.toString)} B
        |    ${keyValueStringWithSeparator("records_read", recordsRead.toString)}
        |    ${keyValueStringWithSeparator("records_written", recordsWritten.toString)}
+       |    ${keyValueStringWithSeparator("records_written consolidated", recordsWrittenCons.toString)}
        |    ${durationStringWithSeparator("shuffle_fetch_waittime", shuffleFetchWaitTime)}
        |    ${keyValueStringWithSeparator("shuffle_remote_blocks_fetched", shuffleRemoteBlocksFetched.toString)}
        |    ${keyValueStringWithSeparator("shuffle_local_blocks_fetched", shuffleLocalBlocksFetched.toString)}
@@ -131,7 +135,7 @@ private[smartdatalake] case class SparkStageMetrics(jobInfo: JobInfo, stageId: I
   def getId: String = jobInfo.toString
   def getOrder: Long = stageId
   def getMainInfos: Map[String, Any] = {
-    Map("records_written" -> recordsWritten, "bytes_written" -> bytesWritten, "num_tasks" -> numTasks, "stage" -> stageName.split(' ').head )
+    Map("records_written" -> recordsWrittenCons, "bytes_written" -> bytesWritten, "num_tasks" -> numTasks, "stage" -> stageName.split(' ').head )
   }
 }
 private[smartdatalake] case class JobInfo(id: Int, group: String, description: String)
@@ -177,21 +181,28 @@ private[smartdatalake] class SparkStageMetricsListener(notifyStageMetricsFunc: (
       shuffleReadMetrics.remoteBlocksFetched, shuffleReadMetrics.localBlocksFetched, shuffleReadMetrics.totalBlocksFetched,
       shuffleReadMetrics.remoteBytesRead, shuffleReadMetrics.localBytesRead, shuffleReadMetrics.totalBytesRead,
       shuffleReadMetrics.recordsRead,
-      taskMetrics.shuffleWriteMetrics.writeTime, taskMetrics.shuffleWriteMetrics.bytesWritten, taskMetrics.shuffleWriteMetrics.recordsWritten
+      taskMetrics.shuffleWriteMetrics.writeTime, taskMetrics.shuffleWriteMetrics.bytesWritten, taskMetrics.shuffleWriteMetrics.recordsWritten,
+      stageCompleted.stageInfo.accumulables.values.toSeq
     )
     // extract concerned Action and DataObject
     val actionIdRegex = "Action~([a-zA-Z0-9_-]+)".r.unanchored
     val actionId = sparkStageMetrics.jobInfo.group match {
       case actionIdRegex(id) => Some(ActionObjectId(id))
-      case _ =>
-        logger.warn(s"Couldn't extract ActionId from sparkJobGroupId (${sparkStageMetrics.jobInfo.group})")
-        None
+      case _ => sparkStageMetrics.jobInfo.description match { // for spark streaming jobs we cant set the jobGroup, but only the description
+        case actionIdRegex(id) => Some(ActionObjectId(id))
+        case _ =>
+          logger.warn(s"Couldn't extract ActionId from sparkJobGroupId (${sparkStageMetrics.jobInfo.group})")
+          None
+      }
     }
     if (actionId.isDefined) {
       val dataObjectIdRegex = "DataObject~([a-zA-Z0-9_-]+)".r.unanchored
       val dataObjectId = sparkStageMetrics.jobInfo.description match {
         case dataObjectIdRegex(id) => Some(DataObjectId(id))
-        case _ => None // there are some stages which are created by Spark DataFrame operations which dont belong to manipulation Actions target DataObject's, e.g. pivot operator
+        case _ => sparkStageMetrics.jobInfo.description match { // for spark streaming jobs we cant set the jobGroup, but only the description
+          case dataObjectIdRegex(id) => Some(DataObjectId(id))
+          case _ => None // there are some stages which are created by Spark DataFrame operations which dont belong to manipulation Actions target DataObject's, e.g. pivot operator
+        }
       }
       notifyStageMetricsFunc(actionId.get, dataObjectId, sparkStageMetrics)
     }

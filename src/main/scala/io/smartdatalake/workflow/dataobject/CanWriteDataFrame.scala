@@ -19,15 +19,46 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.PartitionValues
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
+import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 
 private[smartdatalake] trait CanWriteDataFrame {
+
+  // additional streaming options which can be overridden by the DataObject, e.g. Kafka topic to write to
+  def streamingOptions: Map[String, String] = Map()
 
   /**
    * Initialize callback before writing data out to disk/sinks.
    */
-  def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = Unit
+  def init(partitionValues: Seq[PartitionValues]=Seq())(implicit session: SparkSession): Unit = Unit
 
   def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit
+
+  /**
+   * Write Spark structured streaming DataFrame
+   * The default implementation uses foreachBatch and this traits writeDataFrame method to write the DataFrame.
+   * Some DataObjects will override this with specific implementations (Kafka).
+   *
+   * @param df      The Streaming DataFrame to write
+   * @param trigger Trigger frequency for stream
+   * @param checkpointLocation location for checkpoints of streaming query
+   */
+  def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String,String], checkpointLocation: String, queryName: String, outputMode: OutputMode = OutputMode.Append)(implicit session: SparkSession): StreamingQuery = {
+
+    // lambda function is ambiguous with foreachBatch in scala 2.12... we need to create a real function...
+    // Note: no partition values supported when writing streaming target
+    def microBatchWriter(dfMicrobatch: Dataset[Row], batchid: Long): Unit = writeDataFrame(dfMicrobatch, Seq())
+
+    df
+      .writeStream
+      .trigger(trigger)
+      .queryName(queryName)
+      .outputMode(outputMode)
+      .option("checkpointLocation", checkpointLocation)
+      .options(streamingOptions ++ options) // options override streamingOptions
+      .foreachBatch(microBatchWriter _)
+      .start()
+  }
+
 
 }

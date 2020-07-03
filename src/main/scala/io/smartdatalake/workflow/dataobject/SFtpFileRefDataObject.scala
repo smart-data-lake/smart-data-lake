@@ -22,7 +22,7 @@ import java.io.{InputStream, OutputStream}
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.filetransfer.SshUtil
 import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -61,8 +61,6 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
    * Connection defines host, port and credentials in central location
    */
   private val connection = getConnection[SftpFileRefConnection](connectionId)
-
-  def execWithSFtpClient[A]( func: SFTPClient => A ): A = connection.execWithSFtpClient(func)
 
   override def getFileRefs(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[FileRef] = {
     connection.execWithSFtpClient {
@@ -130,6 +128,12 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
               .map( f => PartitionLayout.extractPartitionValues(partitionLayout, "", f + separator))
         }
     }.getOrElse(Seq())
+  }
+
+  override def prepare(implicit session: SparkSession): Unit = try {
+    connection.test()
+  } catch {
+    case ex: Throwable => throw ConnectionTestException(s"($id) Can not connect. Error: ${ex.getMessage}", ex)
   }
 
   /**
