@@ -621,6 +621,21 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     }
   }
 
+  /**
+   * Normalizes a HDFS path so they can be better compared.
+   * i.e. by replacing \ with / and always pointing to tick
+   *
+   * @param path
+   * @return
+   */
+  def normalizePath(path: String) : String = {
+    path
+      .replaceAll("\\\\", "/")
+      .replaceAll("file:/", "")
+      .replaceAll("/+$", "")
+      .replaceAll("tock$", "tick")
+  }
+
   def listPartitions(table: Table, partitions: Seq[String])(implicit session: SparkSession): Seq[PartitionValues] = {
     import session.implicits._
     val separator = Environment.defaultPathSeparator
