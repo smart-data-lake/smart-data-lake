@@ -46,7 +46,8 @@ The following is a list of implemented and planned (Future) features of Smart Da
 * Partition parameters: give partition values to process for start nodes as parameter
 * Partition Diff: search missing partitions and use as parameter
 * Spark Streaming Once: incremental processing by using Spark Structured Streaming with Trigger=Once mode
-* Future: Incremental (compare "watermark" column between source and target), Continous (Streaming)
+* Spark Incremental: compare sortable column between source and target, load the difference
+* Future: Spark Streaming
 
 ##### Schema Evolution
 * Automatic evolution of data schemas (new column, removed column, changed datatype)
