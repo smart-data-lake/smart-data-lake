@@ -118,17 +118,17 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     val srcTable = Table(Some("default"), "ap_input")
     HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
     val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "src1", srcPath, table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
     instanceRegistry.register(srcDO)
     val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
     HiveUtil.dropTable(session, tgt1Table.db.get, tgt1Table.name )
     val tgt1Path = tempPath+s"/${tgt1Table.fullName}"
-    val tgt1DO = TickTockHiveTableDataObject("tgt1", tgt1Path, table = tgt1Table, numInitialHdfsPartitions = 1)
+    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tgt1Path), table = tgt1Table, numInitialHdfsPartitions = 1)
     instanceRegistry.register(tgt1DO)
     val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
     HiveUtil.dropTable(session, tgt2Table.db.get, tgt2Table.name )
     val tgt2Path = tempPath+s"/${tgt2Table.fullName}"
-    val tgt2DO = HiveTableDataObject( "tgt2", tgt2Path, table = tgt2Table, numInitialHdfsPartitions = 1)
+    val tgt2DO = HiveTableDataObject( "tgt2", Some(tgt2Path), table = tgt2Table, numInitialHdfsPartitions = 1)
     instanceRegistry.register(tgt2DO)
 
     // prepare DAG
@@ -174,7 +174,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
       val srcTable = Table(Some("default"), "ap_input")
       HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
       val srcPath = tempPath+s"/${srcTable.fullName}"
-      val srcDO = HiveTableDataObject( "src1", srcPath, table = srcTable, numInitialHdfsPartitions = 1)
+      val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
       instanceRegistry.register(srcDO)
       createCustomTopic("topic1", Map(), 1, 1)
       val tgt1DO = KafkaTopicDataObject("kafka1", topicName = "topic1", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"), schemaMin = Some(StructType(Seq(StructField("timestamp", TimestampType)))))
