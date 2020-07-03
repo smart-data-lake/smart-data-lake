@@ -19,14 +19,16 @@
 package io.smartdatalake.workflow.dataobject
 
 import java.sql.Timestamp
+import java.time._
 import java.time.format.DateTimeFormatter
 import java.time.temporal.{ChronoUnit, TemporalAccessor, TemporalQuery}
-import java.time._
 import java.util.Properties
 
 import com.typesafe.config.Config
+import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
+import io.confluent.kafka.serializers.KafkaAvroDeserializerConfig
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.workflow.connection.KafkaConnection
@@ -151,8 +153,16 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     require(connection.topicExists(topicName), s"($id) topic $topicName doesn't exist")
     // test schema registry connection
     if (schemaRegistryConfig.isDefined) {
-      SchemaManager.configureSchemaRegistry(schemaRegistryConfig.get)
-      SchemaManager.exists("dummy") // this is just a dummy request to check connection
+      val config = schemaRegistryConfig.get.asJava
+      val settings = new KafkaAvroDeserializerConfig(config)
+      val urls = settings.getSchemaRegistryUrls
+      val maxSchemaObject = settings.getMaxSchemasPerSubject
+      val schemaRegistryClient = new CachedSchemaRegistryClient(urls, maxSchemaObject, config)
+      try {
+        schemaRegistryClient.getMode // test connection by calling a simple function
+      } catch {
+        case e:Exception => throw ConfigurationException(s"($id) Can not connect to schema registry ($urls)")
+      }
     }
   }
 
