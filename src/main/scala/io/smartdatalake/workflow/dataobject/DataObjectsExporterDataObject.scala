@@ -94,7 +94,7 @@ case class DataObjectsExporterDataObject(id: DataObjectId,
           // metadata tags
           metadata.map(_.tags).map(_.mkString(listElementsSeparator)),
           // path
-          getFieldData[String](dataObject, "path"),
+          getEventuallyOptionalFieldData[String](dataObject, "path"),
           // partitions
           getFieldData[Seq[String]](dataObject, "partitions").map(_.mkString(listElementsSeparator)),
           // table
