@@ -27,7 +27,7 @@ import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil}
 import io.smartdatalake.workflow.connection.HiveTableConnection
-import org.apache.hadoop.fs.FileSystem
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 
@@ -35,7 +35,7 @@ import scala.collection.JavaConverters._
 
 //FIXME: there's significant code duplication from HiveTableDataObject here.
 case class TickTockHiveTableDataObject(override val id: DataObjectId,
-                                       path: String,
+                                       path: Option[String] = None,
                                        override val partitions: Seq[String] = Seq(),
                                        analyzeTableAfterWrite: Boolean = false,
                                        dateColumnType: DateColumnType = DateColumnType.Date,
@@ -54,8 +54,36 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
    */
   private val connection = connectionId.map(c => getConnection[HiveTableConnection](c))
 
-  // prepare final path and table
-  @transient private[workflow] lazy val hadoopPath = HdfsUtil.prefixHadoopPath(path, connection.map(_.pathPrefix))
+  // prepare table
+  table = table.overrideDb(connection.map(_.db))
+  if (table.db.isEmpty) throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
+
+  // prepare final path
+  @transient private var hadoopPathHolder: Path = _
+  def hadoopPath(implicit session: SparkSession): Path = {
+    val thisIsTableExisting = isTableExisting
+    require(thisIsTableExisting || path.isDefined, s"TickTockHiveTable ${table.fullName} does not exist, so path must be set.")
+
+    if (hadoopPathHolder == null) {
+      hadoopPathHolder = {
+        if (thisIsTableExisting) new Path(HiveUtil.existingTableLocation(table))
+        else HdfsUtil.prefixHadoopPath(path.get, connection.map(_.pathPrefix))
+      }
+
+      // For existing tables, check to see if we write to the same directory. If not, issue a warning.
+      if(thisIsTableExisting && path.isDefined) {
+        // Normalize both paths before comparing them (remove tick / tock folder and trailing slash)
+        val hadoopPathNormalized = HiveUtil.normalizePath(hadoopPathHolder.toString)
+        val definedPathNormalized = HiveUtil.normalizePath(path.get)
+
+
+        if (definedPathNormalized != hadoopPathNormalized)
+          logger.warn(s"Table ${table.fullName} exists already with different path. The table will be written with new path definition ${hadoopPathHolder}!")
+      }
+    }
+    hadoopPathHolder
+  }
+
   @transient private var filesystemHolder: FileSystem = _
   def filesystem(implicit session: SparkSession): FileSystem = {
     if (filesystemHolder == null) {
@@ -63,13 +91,11 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     }
     filesystemHolder
   }
-  table = table.overrideDb(connection.map(_.db))
-  if (table.db.isEmpty) {
-    throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
-  }
 
   override def prepare(implicit session: SparkSession): Unit = {
     require(isDbExisting, s"($id) Hive DB ${table.db.get} doesn't exist (needs to be created manually).")
+    if (!isTableExisting)
+      require(path.isDefined, "If Hive table does not exist yet, the path must be set.")
   }
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
@@ -83,6 +109,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     require(isDbExisting, s"Hive DB ${table.db.get} doesn't exist (needs to be created manually).")
     if (!isTableExisting) {
       logger.info(s"($id) Creating table ${table.fullName}.")
+      require(path.isDefined, "If Hive table does not exist yet, the path must be set.")
       writeDataFrame(df, createTableOnly = true, partitionValues)
     }
   }
