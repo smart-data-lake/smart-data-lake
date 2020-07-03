@@ -80,16 +80,6 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     df
   }
 
-  override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
-    // create tables if possible
-    require(isDbExisting, s"Hive DB ${table.db.get} doesn't exist (needs to be created manually).")
-    if (!isTableExisting) {
-      logger.info(s"($id) Creating table ${table.fullName}.")
-      require(path.isDefined, "If Hive table does not exist yet, the path must be set.")
-      writeDataFrame(df, createTableOnly = true, partitionValues)
-    }
-  }
-
   override def preWrite(implicit session: SparkSession): Unit = {
     super.preWrite
     // validate if acl's must be / are configured before writing
