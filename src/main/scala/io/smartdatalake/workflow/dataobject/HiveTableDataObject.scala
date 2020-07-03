@@ -158,17 +158,6 @@ case class HiveTableDataObject(override val id: DataObjectId,
     createMissingPartitions(partitionValues)
   }
 
-
-
-  override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
-    // on write: create tables if possible
-    require(isDbExisting, s"Hive DB ${table.db.get} doesn't exist (needs to be created manually).")
-    if (!isTableExisting) {
-      logger.info(s"Creating table ${table.fullName}.")
-      writeDataFrame(df, createTableOnly = true, partitionValues)
-    }
-  }
-
   override def isDbExisting(implicit session: SparkSession): Boolean = {
     session.catalog.databaseExists(table.db.get)
   }
