@@ -125,16 +125,16 @@ Often this should only happen on the start-Actions of a DAG, so it's clear what 
 But its also possible to let every Action in the DAG decide again dynamically, what partitions are missing and should be processed.
 You can configure this by the following attributes of an Action:
 - initExecutionMode: define the execution mode if this Action is a start-Actions of the DAG
-- executionMode: define the execution mode independently of its position is the DAG.
+- executionMode: define the execution mode independently of its position in the DAG.
 If both attributes are set, initExecutionMode overrides executionMode if the Action is a a start-Action of the DAG.
 
 ### Incremental load - SparkStreamingOnceMode
 Some DataObjects are not partitioned, but nevertheless you dont want to read all data from the input on every run. You want to load it incrementally.
 This can be accomplished by specifying execution mode SparkStreamingOnceMode. Under the hood it uses "Spark Structured Streaming" and triggers a single microbatch (Trigger.Once).
-"Spark Structured Streaming" helps keeps state about processed data. It needs a checkpointLocation configured which can be given as parameter to SparkStreamingOnceMode.
+"Spark Structured Streaming" helps keeping state information about processed data. It needs a checkpointLocation configured which can be given as parameter to SparkStreamingOnceMode.
 
-Note that "Spark Structured Streaming" needs a input DataObjects supporting the creation of streaming DataFrames. 
-For the time only the input sources delivered with Spark Streaming are supported. 
+Note that "Spark Structured Streaming" needs an input DataObject supporting the creation of streaming DataFrames. 
+For the time being, only the input sources delivered with Spark Streaming are supported. 
 This is KafkaTopicDataObject and all SparkFileDataObjects, see also [Spark StructuredStreaming](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html#creating-streaming-dataframes-and-streaming-datasets).
 
 ### Incremental Load - DeltaMode

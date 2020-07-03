@@ -35,6 +35,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSu
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import org.apache.spark.sql.streaming.Trigger
+import org.apache.spark.sql.types.StructType
 
 private[smartdatalake] abstract class SparkAction extends Action {
 
@@ -289,6 +290,23 @@ private[smartdatalake] abstract class SparkAction extends Action {
       val filterExpr = partitionValues.map(_.getSparkExpr).reduce( (a,b) => a or b)
       df.where(filterExpr)
     }
+  }
+
+  /**
+   * Applies changes to a SubFeed from a previous action in order to be used as input for this actions transformation.
+   */
+  def prepareInputSubFeed(subFeed: SparkSubFeed, input: DataObject with CanCreateDataFrame)(implicit session: SparkSession): SparkSubFeed = {
+    // persist if requested
+    var preparedSubFeed = if (persist) subFeed.persist else subFeed
+    // create dummy DataFrame if read schema is different from write schema on this DataObject
+    val writeSchema = preparedSubFeed.dataFrame.map(_.schema)
+    val readSchema = preparedSubFeed.dataFrame.map(df => input.createReadSchema(df.schema))
+    val schemaChanges = writeSchema != readSchema
+    preparedSubFeed = if (schemaChanges) preparedSubFeed.convertToDummy(readSchema.get) else preparedSubFeed
+    // break lineage if requested or if it's a streaming DataFrame
+    preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true)) preparedSubFeed.breakLineage else preparedSubFeed
+    // return
+    preparedSubFeed
   }
 
 }

@@ -213,11 +213,17 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   }
   def getFinalMetrics(dataObjectId: DataObjectId): Option[ActionMetrics] = {
     if (!runtimeMetricsEnabled) return None
-    // remember for which data object final metrics has been delivered, so that we can warn on late arriving metrics!
-    dataObjectRuntimeMetricsDelivered += dataObjectId
     // return latest metrics
     val latestMetrics = getLatestMetrics(dataObjectId)
-    if (latestMetrics.isEmpty) throw new IllegalStateException(s"($id) Metrics for $dataObjectId not found")
+      .orElse {
+        // wait some time and retry, because the metrics might be delivered by another thread...
+        Thread.sleep(500)
+        getLatestMetrics(dataObjectId)
+      }
+      .orElse( throw new IllegalStateException(s"($id) Metrics for $dataObjectId not found"))
+    // remember for which data object final metrics has been delivered, so that we can warn on late arriving metrics!
+    dataObjectRuntimeMetricsDelivered += dataObjectId
+    // return
     latestMetrics
   }
   def getAllLatestMetrics: Map[DataObjectId, Option[ActionMetrics]] = outputs.map(dataObject => (dataObject.id, getLatestMetrics(dataObject.id))).toMap
