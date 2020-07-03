@@ -30,7 +30,7 @@ import org.apache.spark.sql.functions.input_file_name
  *
  * Delegates read and write operations to Apache Spark [[DataFrameReader]] and [[DataFrameWriter]] respectively.
  */
-private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject with CanCreateDataFrame with CanWriteDataFrame
+private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject with CanCreateDataFrame with CanWriteDataFrame with CanCreateStreamingDataFrame
   with UserDefinedSchema with SchemaValidation {
 
   /**
@@ -104,7 +104,6 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     assert(wrongPartitionValues.isEmpty, s"getDataFrame got request with PartitionValues keys ${wrongPartitionValues.mkString(",")} not included in $id partition columns ${partitions.mkString(", ")}")
 
     val filesExists = checkFilesExisting
-
     if (!filesExists) {
       //without either schema or data, no data frame can be created
       require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined if there are no existing files.")
@@ -136,6 +135,21 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     // finalize & return DataFrame
     afterRead(df)
   }
+
+  override def getStreamingDataFrame(options: Map[String,String], pipelineSchema: Option[StructType])(implicit session: SparkSession): DataFrame = {
+    require(schema.orElse(pipelineSchema).isDefined, s"(${id}) Schema must be defined for streaming SparkFileDataObject")
+    // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
+    if (!filesystem.exists(hadoopPath.getParent)) filesystem.mkdirs(hadoopPath)
+
+    val df = session.readStream
+      .format(format)
+      .options(options)
+      .schema(schema.orElse(pipelineSchema).get)
+      .load(hadoopPath.toString)
+
+    afterRead(df)
+  }
+
 
   /**
    * Writes the provided [[DataFrame]] to the filesystem.

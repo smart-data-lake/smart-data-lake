@@ -28,6 +28,7 @@ import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.connection.HiveTableConnection
 import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 
@@ -136,7 +137,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
     writeDataFrame(df, createTableOnly = false, partitionValues)
   }
 
-  /**
+   /**
    * Writes DataFrame to HDFS/Parquet and creates Hive table.
    * DataFrames are repartitioned in order not to write too many small files
    * or only a few HDFS files that are too large.

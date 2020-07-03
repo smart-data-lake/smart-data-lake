@@ -64,6 +64,12 @@ case class SplunkDataObject(override val id: DataObjectId,
     readFromSplunk(params)
   }
 
+  override def prepare(implicit session: SparkSession): Unit = try {
+    connection.test()
+  } catch {
+    case ex: Throwable => throw ConnectionTestException(s"($id) Can not connect. Error: ${ex.getMessage}", ex)
+  }
+
   private def readFromSplunk(params: SplunkParams)(implicit spark: SparkSession): DataFrame = {
     val queryTimeIntervals = splitQueryTimes(params.queryFrom, params.queryTo, params.queryTimeInterval).repartition(params.parallelRequests)
     val searchResultRdd = queryTimeIntervals.map(interval => readRowsFromSplunk(interval, params)).as[Seq[Row]].rdd

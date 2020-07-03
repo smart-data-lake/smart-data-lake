@@ -113,6 +113,9 @@
 		<splunk.version>1.6.5.0</splunk.version>
 		<sshj.version>0.21.1</sshj.version>
 
+		<kafka.version>2.4.1</kafka.version>
+		<zk.version>3.4.13</zk.version>
+
 		<keycloak.version>4.5.0.Final</keycloak.version>
 		<license-maven-plugin.version>3.0</license-maven-plugin.version>
 
@@ -134,10 +137,16 @@
 	</scm>
 
 	<repositories>
+
 		<repository>
 			<id>spring-plugins</id>
 			<name>Spring Plugins Repository</name>
 			<url>https://repo.spring.io/plugins-release/</url>
+		</repository>
+		<repository>
+			<id>confluent</id>
+			<name>Confluent Schema Registry Repository</name>
+			<url>https://packages.confluent.io/maven/</url>
 		</repository>
 	</repositories>
 
@@ -438,7 +447,15 @@
 				<exclusion>
 					<groupId>javax.servlet</groupId>
 					<artifactId>servlet-api</artifactId>
-				</exclusion>			</exclusions>
+				</exclusion>
+			</exclusions>
+		</dependency>
+
+		<!-- Overrides version 3.4.6 in spark core/hadoop in order to support kafka tests -->
+		<dependency>
+			<groupId>org.apache.zookeeper</groupId>
+			<artifactId>zookeeper</artifactId>
+			<version>${zk.version}</version>
 		</dependency>
 
 		<dependency>
@@ -471,6 +488,64 @@
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-catalyst_${scala.minor.version}</artifactId>
 			<version>${spark.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-sql-kafka-0-10_${scala.minor.version}</artifactId>
+			<version>${spark.version}</version>
+			<exclusions>
+				<!-- replace kafka client with newer version -->
+				<exclusion>
+					<groupId>org.apache.kafka</groupId>
+					<artifactId>kafka-clients</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.kafka</groupId>
+			<artifactId>kafka-clients</artifactId>
+			<version>${kafka.version}</version>
+		</dependency>
+		<!-- this is for reading from kafka using confluent schema registry with Spark -->
+		<dependency>
+			<groupId>io.confluent</groupId>
+			<artifactId>kafka-avro-serializer</artifactId>
+			<version>5.4.1</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.apache.kafka</groupId>
+					<artifactId>kafka-clients</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.apache.avro</groupId>
+					<artifactId>avro</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.slf4j</groupId>
+					<artifactId>slf4j-api</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>com.fasterxml.jackson.core</groupId>
+					<artifactId>jackson-databind</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<!-- this is for converting confluent avro message to spark structtype -->
+		<dependency>
+			<groupId>za.co.absa</groupId>
+			<artifactId>abris_${scala.minor.version}</artifactId>
+			<version>3.1.1</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.apache.spark</groupId>
+					<artifactId>spark-streaming</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.apache.spark</groupId>
+					<artifactId>spark-streaming-kafka-0-10_${scala.compat.version}</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 
 		<dependency>
@@ -669,6 +744,22 @@
 			<artifactId>configs_${scala.minor.version}</artifactId>
 			<version>0.4.4</version>
 		</dependency>
+
+		<!--- Start Kafka Test dependencies -->
+		<!-- https://mvnrepository.com/artifact/net.manub/scalatest-embedded-kafka -->
+		<!--- This is old and unmaintained, but supports up to kafka 0.10 which is what
+		 the spark libraries are based on and also Scala 2.11. There is a replacement which we should
+		 use once 2.11 is dead, including Schema Registry-->
+
+		<dependency>
+			<groupId>io.github.embeddedkafka</groupId>
+			<artifactId>embedded-kafka_${scala.minor.version}</artifactId>
+			<version>${kafka.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<!-- https://mvnrepository.com/artifact/org.apache.kafka/kafka-clients -->
+
+
 
 		<dependency>
 			<groupId>io.monix</groupId>

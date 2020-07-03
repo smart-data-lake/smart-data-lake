@@ -20,8 +20,12 @@ package io.smartdatalake.workflow
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.DataFrameUtil
+import io.smartdatalake.util.streaming.DummyStreamProvider
 import io.smartdatalake.workflow.dataobject.FileRef
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.{DataFrame, SparkSession}
+import sun.reflect.generics.reflectiveObjects.NotImplementedException
 
 /**
  * A SubFeed transports references to data between Actions.
@@ -30,6 +34,7 @@ import org.apache.spark.sql.DataFrame
 trait SubFeed extends DAGResult {
   def dataObjectId: DataObjectId
   def partitionValues: Seq[PartitionValues]
+  def isDAGStart: Boolean
 
   /**
    * Break lineage.
@@ -37,11 +42,13 @@ trait SubFeed extends DAGResult {
    * This is usable to break long DataFrame Lineages over multiple Actions and instead reread the data from an intermediate table
    * @return
    */
-  def breakLineage(): SubFeed
+  def breakLineage(implicit session: SparkSession): SubFeed
 
   def clearPartitionValues(): SubFeed
 
   def updatePartitionValues(partitions: Seq[String]): SubFeed
+
+  def clearDAGStart(): SubFeed
 
   override def resultId: String = dataObjectId.id
 }
@@ -53,10 +60,17 @@ trait SubFeed extends DAGResult {
  * @param dataObjectId id of the DataObject this SubFeed corresponds to
  * @param partitionValues Values of Partitions transported by this SubFeed
  */
-case class SparkSubFeed(@transient dataFrame: Option[DataFrame], override val dataObjectId: DataObjectId, override val partitionValues: Seq[PartitionValues])
+case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
+                        override val dataObjectId: DataObjectId,
+                        override val partitionValues: Seq[PartitionValues],
+                        override val isDAGStart: Boolean = false,
+                        isDummy: Boolean = false
+                       )
   extends SubFeed {
-  override def breakLineage(): SparkSubFeed = {
-    this.copy(dataFrame = None)
+  override def breakLineage(implicit session: SparkSession): SparkSubFeed = {
+    // in order to keep the schema but truncate spark logical plan, a dummy DataFrame is created.
+    // dummy DataFrames must be exchanged to real DataFrames before reading in exec-phase.
+    if(dataFrame.isDefined) convertToDummy(dataFrame.get.schema) else this
   }
   override def clearPartitionValues(): SparkSubFeed = {
     this.copy(partitionValues = Seq())
@@ -65,15 +79,27 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame], override val da
     val updatedPartitionValues = partitionValues.map( pvs => PartitionValues(pvs.elements.filterKeys(partitions.contains))).filter(_.nonEmpty)
     this.copy(partitionValues = updatedPartitionValues)
   }
+  override def clearDAGStart(): SparkSubFeed = {
+    this.copy(isDAGStart = false)
+  }
   def persist: SparkSubFeed = {
-    copy(dataFrame = this.dataFrame.map(_.persist))
+    this.copy(dataFrame = this.dataFrame.map(_.persist))
+  }
+  def isStreaming: Option[Boolean] = dataFrame.map(_.isStreaming)
+  private[smartdatalake] def convertToDummy(schema: StructType)(implicit session: SparkSession): SparkSubFeed = {
+    val dummyDf = dataFrame.map{
+      df =>
+        if (df.isStreaming) DummyStreamProvider.getDummyDf(schema)
+        else DataFrameUtil.getEmptyDataFrame(schema)
+    }
+    this.copy(dataFrame = dummyDf, isDummy = true)
   }
 }
 object SparkSubFeed {
   def fromSubFeed( subFeed: SubFeed ): SparkSubFeed = {
     subFeed match {
       case sparkSubFeed: SparkSubFeed => sparkSubFeed
-      case _ => SparkSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues)
+      case _ => SparkSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart)
     }
   }
 }
@@ -89,10 +115,11 @@ object SparkSubFeed {
 case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
                        override val dataObjectId: DataObjectId,
                        override val partitionValues: Seq[PartitionValues],
+                       override val isDAGStart: Boolean = false,
                        processedInputFileRefs: Option[Seq[FileRef]] = None
                       )
   extends SubFeed {
-  override def breakLineage(): FileSubFeed = {
+  override def breakLineage(implicit session: SparkSession): FileSubFeed = {
     this.copy(fileRefs = None)
   }
   override def clearPartitionValues(): FileSubFeed = {
@@ -102,12 +129,15 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
     val updatedPartitionValues = partitionValues.map( pvs => PartitionValues(pvs.elements.filterKeys(partitions.contains))).filter(_.nonEmpty)
     this.copy(partitionValues = updatedPartitionValues)
   }
+  override def clearDAGStart(): FileSubFeed = {
+    this.copy(isDAGStart = false)
+  }
 }
 object FileSubFeed {
   def fromSubFeed( subFeed: SubFeed ): FileSubFeed = {
     subFeed match {
       case fileSubFeed: FileSubFeed => fileSubFeed
-      case _ => FileSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues)
+      case _ => FileSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart)
     }
   }
 }
@@ -120,7 +150,8 @@ object FileSubFeed {
  */
 case class InitSubFeed(override val dataObjectId: DataObjectId, override val partitionValues: Seq[PartitionValues])
   extends SubFeed {
-  override def breakLineage(): InitSubFeed = this
+  override def isDAGStart: Boolean = true
+  override def breakLineage(implicit session: SparkSession): InitSubFeed = this
   override def clearPartitionValues(): InitSubFeed = {
     this.copy(partitionValues = Seq())
   }
@@ -128,4 +159,5 @@ case class InitSubFeed(override val dataObjectId: DataObjectId, override val par
     val updatedPartitionValues = partitionValues.map( pvs => PartitionValues(pvs.elements.filterKeys(partitions.contains))).filter(_.nonEmpty)
     this.copy(partitionValues = updatedPartitionValues)
   }
+  override def clearDAGStart(): InitSubFeed = throw new NotImplementedException() // calling clearDAGStart makes no sense on InitSubFeed
 }
