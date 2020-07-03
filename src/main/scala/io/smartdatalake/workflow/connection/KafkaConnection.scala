@@ -81,7 +81,7 @@ case class KafkaConnection(override val id: ConnectionId,
 
   // Kafka Configs are prepended with "kafka." in data source option map
   private val authOptions = authProps.asScala.map(c => (s"${KafkaConfigOptionPrefix}${c._1}", c._2))
-  private[workflow] val sparkOptions = authOptions ++ dataSourceOptions + (KafkaConfigOptionPrefix+ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> brokers)
+  private[workflow] val sparkOptions = authOptions ++ datasourceOptions + (KafkaConfigOptionPrefix+ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> brokers)
 
   def topicExists(topic: String): Boolean = {
     adminClient.listTopics.names.get.asScala.contains(topic)
