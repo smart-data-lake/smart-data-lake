@@ -63,6 +63,7 @@ private[smartdatalake] case class SparkStageMetrics(jobInfo: JobInfo, stageId: I
   lazy val resultSerializationTime: Duration = Duration.millis(resultSerializationTimeInMillis)
   lazy val shuffleFetchWaitTime: Duration = Duration.millis(shuffleFetchWaitTimeInMillis)
   lazy val shuffleWriteTime: Duration = Duration.millis(shuffleWriteTimeInNanos / 1000000)
+  // for some sources (Kafka, Jdbc) recordsWritten is always 0, but there is an accumulator which has "number of output rows" set...
   lazy val recordsWrittenCons: Long = if (recordsWritten>0) recordsWritten else accumulables.find(_.name.contains("number of output rows")).flatMap(_.value).map(_.asInstanceOf[Long]).getOrElse(0L)
 
   /**
