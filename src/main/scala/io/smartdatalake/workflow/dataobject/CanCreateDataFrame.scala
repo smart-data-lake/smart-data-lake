@@ -19,17 +19,18 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.PartitionValues
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
 private[smartdatalake] trait CanCreateDataFrame {
 
   def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession) : DataFrame
 
-  // Default implementation just filters the input dataframe in spark
-  // Concrete implementations should implement pushdown logic for their
-  // respective data sources.
-  def getDeltaDataFrame(filterExpr: Column)(implicit session: SparkSession) : DataFrame = {
-    getDataFrame(Seq()).filter(filterExpr)
-  }
+  /**
+   * Creates the read schema based on a given write schema.
+   * Normally this is the same, but some DataObjects can remove & add columns on read (e.g. KafkaTopicDataObject, SparkFileDataObject)
+   * In this cases we have to break the DataFrame lineage und create a dummy DataFrame in init phase.
+   */
+  def createReadSchema(writeSchema: StructType)(implicit session: SparkSession): StructType = writeSchema
 
 }

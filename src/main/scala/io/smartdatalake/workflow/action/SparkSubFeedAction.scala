@@ -23,6 +23,7 @@ import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.col
 
 abstract class SparkSubFeedAction extends SparkAction {
 
@@ -57,10 +58,10 @@ abstract class SparkSubFeedAction extends SparkAction {
         }
       case _ => preparedSubFeed
     }
-    // persist if requested
-    preparedSubFeed = if (persist) preparedSubFeed.persist else preparedSubFeed
-    // break lineage if requested or if it's a streaming dataframe or if there is a filter set
-    preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined) preparedSubFeed.breakLineage else preparedSubFeed
+    // prepare as input SubFeed
+    preparedSubFeed = prepareInputSubFeed(preparedSubFeed, input)
+    // enrich with fresh DataFrame if needed
+    preparedSubFeed = enrichSubFeedDataFrame(input, preparedSubFeed, thisExecutionMode, context.phase)
     // transform
     val transformedSubFeed = transform(preparedSubFeed)
     // update partition values to output's partition columns and update dataObjectId
@@ -76,6 +77,7 @@ abstract class SparkSubFeedAction extends SparkAction {
    */
   override final def init(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == 1, s"Only one subfeed allowed for SparkSubFeedActions (Action $id, inputSubfeed's ${subFeeds.map(_.dataObjectId).mkString(",")})")
+    outputs.collect{ case x: CanWriteDataFrame => x }.foreach(_.init())
     val subFeed = subFeeds.head
     val thisExecutionMode = runtimeExecutionMode(subFeed)
     Seq(doTransform(subFeed, thisExecutionMode))

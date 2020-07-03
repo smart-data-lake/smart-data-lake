@@ -95,10 +95,13 @@ abstract class SparkSubFeedsAction extends SparkAction {
         }
       case _ => preparedSubFeeds
     }
-    // break lineage if requested
-    preparedSubFeeds = if (breakDataFrameLineage) preparedSubFeeds.map(_.breakLineage) else preparedSubFeeds
-    // persist if requested
-    preparedSubFeeds = if (persist) preparedSubFeeds.map(_.persist) else preparedSubFeeds
+    preparedSubFeeds = preparedSubFeeds.map{ subFeed =>
+      val input = inputs.find(_.id == subFeed.dataObjectId).get
+      // prepare as input SubFeed
+      val preparedSubFeed = prepareInputSubFeed(subFeed, input)
+      // enrich with fresh DataFrame if needed
+      enrichSubFeedDataFrame(input, preparedSubFeed, thisExecutionMode, context.phase)
+    }
     // transform
     val transformedSubFeeds = transform(preparedSubFeeds)
     // update partition values to output's partition columns and update dataObjectId
@@ -115,6 +118,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
    * */
   override final def init(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == inputs.size, s"Number of subFeed's must match number of inputs for SparkSubFeedActions (Action $id, subfeed's ${subFeeds.map(_.dataObjectId).mkString(",")}, inputs ${inputs.map(_.id).mkString(",")})")
+    outputs.collect{ case x: CanWriteDataFrame => x }.foreach(_.init())
     val mainInputSubFeed = subFeeds.find(_.dataObjectId == mainInput.id).getOrElse(throw new IllegalStateException(s"subFeed for main input ${mainInput.id} not found"))
     val thisExecutionMode = runtimeExecutionMode(mainInputSubFeed)
     doTransform(subFeeds, thisExecutionMode)

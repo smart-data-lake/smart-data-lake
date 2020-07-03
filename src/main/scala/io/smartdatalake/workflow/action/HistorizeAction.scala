@@ -87,16 +87,8 @@ case class HistorizeAction(
     case Failure(e) => throw new ConfigurationException(s"(${id}) Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
   }
 
-  def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
-    // create input subfeeds if not yet existing
-    var transformedSubFeed = enrichSubFeedDataFrame(input, subFeed, runtimeExecutionMode(subFeed), context.phase)
-
-    // apply transformations
-    transformedSubFeed = applyTransformations(
-      transformedSubFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, Some(historizeDataFrame(_: SparkSubFeed,_: Option[DataFrame],_:Seq[String],_: LocalDateTime)), filterClauseExpr)
-
-    // return
-    transformedSubFeed
+  override def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+    applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, Some(historizeDataFrame(_: SparkSubFeed,_: Option[DataFrame],_:Seq[String],_: LocalDateTime)), filterClauseExpr)
   }
 
   protected def historizeDataFrame( subFeed: SparkSubFeed,

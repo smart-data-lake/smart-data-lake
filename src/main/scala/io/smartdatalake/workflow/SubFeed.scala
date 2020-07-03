@@ -23,6 +23,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.util.streaming.DummyStreamProvider
 import io.smartdatalake.workflow.dataobject.FileRef
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{Column, DataFrame, SparkSession, functions}
 import sun.reflect.generics.reflectiveObjects.NotImplementedException
 
@@ -73,12 +74,7 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
   override def breakLineage(implicit session: SparkSession): SparkSubFeed = {
     // in order to keep the schema but truncate spark logical plan, a dummy DataFrame is created.
     // dummy DataFrames must be exchanged to real DataFrames before reading in exec-phase.
-    val dummyDf = dataFrame.map{
-      df =>
-        if (df.isStreaming) DummyStreamProvider.getDummyDf(df.schema)
-        else DataFrameUtil.getEmptyDataFrame(df.schema)
-    }
-    this.copy(dataFrame = dummyDf, isDummy = true)
+    if(dataFrame.isDefined) convertToDummy(dataFrame.get.schema) else this
   }
   override def clearPartitionValues(): SparkSubFeed = {
     this.copy(partitionValues = Seq())
@@ -99,6 +95,14 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
   def isStreaming: Option[Boolean] = dataFrame.map(_.isStreaming)
   def getFilterCol: Option[Column] = {
     filter.map(functions.expr)
+  }
+  private[smartdatalake] def convertToDummy(schema: StructType)(implicit session: SparkSession): SparkSubFeed = {
+    val dummyDf = dataFrame.map{
+      df =>
+        if (df.isStreaming) DummyStreamProvider.getDummyDf(schema)
+        else DataFrameUtil.getEmptyDataFrame(schema)
+    }
+    this.copy(dataFrame = dummyDf, isDummy = true)
   }
 }
 object SparkSubFeed {

@@ -19,15 +19,18 @@
 package io.smartdatalake.workflow.dataobject
 
 import java.sql.Timestamp
+import java.time._
 import java.time.format.DateTimeFormatter
 import java.time.temporal.{ChronoUnit, TemporalAccessor, TemporalQuery}
-import java.time._
 import java.util.Properties
 
 import com.typesafe.config.Config
+import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
+import io.confluent.kafka.serializers.KafkaAvroDeserializerConfig
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType
 import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer}
@@ -36,7 +39,7 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions.{col, udf}
 import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
-import org.apache.spark.sql.types.{StringType, StructType}
+import org.apache.spark.sql.types._
 import za.co.absa.abris.avro.functions.{from_confluent_avro, to_confluent_avro}
 import za.co.absa.abris.avro.read.confluent.SchemaManager
 
@@ -89,7 +92,7 @@ private object TemporalQueries {
   * @param valueType  Optional type the value column should be converted to. If none is given it will remain a bytearray / binary.
   * @param schemaMin  An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
   * @param selectCols Columns to be selected when reading the DataFrame. Available columns are key, value, topic,
-  *                   partition, offset, timestamp timestampType. If key/valueType is AvroSchemaRegistry the key/value column are
+  *                   partition, offset, timestamp, timestampType. If key/valueType is AvroSchemaRegistry the key/value column are
   *                   convert to a complex type according to the avro schema. To expand it select "value.*".
   *                   Default is to select key and value.
   * @param datePartitionCol definition of date partition column to extract formatted timestamp into column.
@@ -150,8 +153,16 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     require(connection.topicExists(topicName), s"($id) topic $topicName doesn't exist")
     // test schema registry connection
     if (schemaRegistryConfig.isDefined) {
-      SchemaManager.configureSchemaRegistry(schemaRegistryConfig.get)
-      SchemaManager.exists("dummy") // this is just a dummy request to check connection
+      val config = schemaRegistryConfig.get.asJava
+      val settings = new KafkaAvroDeserializerConfig(config)
+      val urls = settings.getSchemaRegistryUrls
+      val maxSchemaObject = settings.getMaxSchemasPerSubject
+      val schemaRegistryClient = new CachedSchemaRegistryClient(urls, maxSchemaObject, config)
+      try {
+        schemaRegistryClient.getMode // test connection by calling a simple function
+      } catch {
+        case e:Exception => throw ConfigurationException(s"($id) Can not connect to schema registry ($urls)")
+      }
     }
   }
 
@@ -263,7 +274,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
     import session.implicits._
-    require(df.columns.toSet == Set("key","value"), s"(${id}) Expects columns Set(key, value) in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
+    require(df.columns.toSet == Set("key","value"), s"(${id}) Expects columns key, value in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
     df.select(convertToKafka(keyType,$"key").as("key"), convertToKafka(valueType,$"value").as("value"))
       .write
       .format("kafka")
@@ -296,6 +307,14 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     colType match {
       case KafkaColumnType.Binary => col // default is that we get a byte array -> binary from kafka
       case KafkaColumnType.AvroSchemaRegistry => from_confluent_avro(col, schemaRegistryConfig.get)
+      case KafkaColumnType.String => col.cast(StringType)
+    }
+  }
+
+  private def convertToKafka(colType: KafkaColumnType, col: Column ): Column = {
+    colType match {
+      case KafkaColumnType.Binary => col // we let spark/kafka convert the column to binary
+      case KafkaColumnType.AvroSchemaRegistry => to_confluent_avro(col, schemaRegistryConfig.get)
       case KafkaColumnType.String => col.cast(StringType)
     }
   }
@@ -347,6 +366,19 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     // convert to partition values
     detectedPartitions.reverse.dropWhile(_._2).map(_._1)
       .map( startTime => PartitionValues(Map(datePartitionCol.get.colName -> datePartitionCol.get.format(startTime))))
+  }
+
+  override def createReadSchema(writeSchema: StructType)(implicit session: SparkSession): StructType = {
+    // add additional columns created by kafka source
+    val readSchemaRaw = writeSchema
+      .add("topic", StringType)
+      .add("partition", IntegerType)
+      .add("offset", LongType)
+      .add("timestamp", TimestampType)
+      .add("timestampType", IntegerType)
+    // apply selected columns and return schema
+    prepareDataFrame(DataFrameUtil.getEmptyDataFrame(readSchemaRaw))
+      .schema
   }
 
   /**

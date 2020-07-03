@@ -30,7 +30,7 @@ private[smartdatalake] trait CanWriteDataFrame {
   /**
    * Initialize callback before writing data out to disk/sinks.
    */
-  def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = Unit
+  def init(partitionValues: Seq[PartitionValues]=Seq())(implicit session: SparkSession): Unit = Unit
 
   def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit
 
