@@ -55,7 +55,7 @@ case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[
 /**
  * Compares max entry in "compare column" between mainOutput and mainInput and incrementally loads the delta.
  * This mode works only with SparkSubFeeds. The filter is not propagated to following actions.
- * @param compareCol a comparable column name existing in mainInput and mainOutput used to identify the delta. Column content should be bigger vor newer records.
+ * @param compareCol a comparable column name existing in mainInput and mainOutput used to identify the delta. Column content should be bigger for newer records.
  * @param mainInputId optional selection of inputId to be used for comparision. Only needed if there are multiple input DataObject's.
  * @param mainOutputId optional selection of outputId to be used for comparision. Only needed if there are multiple output DataObject's.
  */
