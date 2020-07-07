@@ -148,7 +148,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
       logger.info(s"($id) finished writing DataFrame to ${output.id}: duration=$d" + metricsLog)
     }
     // return
-    transformedSubFeeds
+    transformedSubFeeds.map( transformedSubFeed => updateSubFeedAfterWrite(transformedSubFeed, thisExecutionMode))
   }
 
   /**

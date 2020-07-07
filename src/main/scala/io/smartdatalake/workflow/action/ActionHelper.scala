@@ -154,27 +154,42 @@ object ActionHelper extends SmartDataLakeLogger {
       case mode:SparkIncrementalMode =>
         (input,output) match {
           case (sparkInput: CanCreateDataFrame, sparkOutput: CanCreateDataFrame) =>
-            val dfInput = sparkInput.getDataFrame()
-            val inputColType = dfInput.schema(mode.compareCol).dataType
-            require(SparkIncrementalMode.allowedDataTypes.contains(inputColType), s"($actionId) Type of compare column ${mode.compareCol} must be one of ${SparkIncrementalMode.allowedDataTypes.mkString(", ")} in ${sparkInput.id}")
-            val dfOutput = sparkOutput.getDataFrame()
-            val outputColType = dfOutput.schema(mode.compareCol).dataType
-            require(SparkIncrementalMode.allowedDataTypes.contains(outputColType), s"($actionId) Type of compare column ${mode.compareCol} must be one of ${SparkIncrementalMode.allowedDataTypes.mkString(", ")} in ${sparkOutput.id}")
-            require(inputColType == outputColType, s"($actionId) Type of compare column ${mode.compareCol} is different between ${sparkInput.id} ($inputColType) and ${sparkOutput.id} ($outputColType)")
-            // get latest values
-            val inputLatestValue = dfInput.agg(max(col(mode.compareCol)).cast(StringType)).as[String].head
-            val outputLatestValue = dfOutput.agg(max(col(mode.compareCol)).cast(StringType)).as[String].head
-            // stop processing if no new data
-            if (outputLatestValue == inputLatestValue) throw NoDataToProcessWarning(actionId.id, s"($actionId) No increment to process found for ${output.id} column ${mode.compareCol} (lastestValue=$outputLatestValue)")
-            logger.info(s"($actionId) SparkIncrementalMode selected increment for ${output.id} column ${mode.compareCol} from $outputLatestValue to $inputLatestValue to process")
-            // prepare filter
-            val selectedData = s"${mode.compareCol} > cast('$outputLatestValue' as ${inputColType.sql})"
-            Some((Seq(), Some(selectedData)))
+            // if data object is new, it might not be able to create a DataFrame
+            val dfInputOpt = getOptionalDataFrame(sparkInput)
+            val dfOutputOpt = getOptionalDataFrame(sparkOutput)
+            (dfInputOpt, dfOutputOpt) match {
+              // if both DataFrames exist, compare and create filter
+              case (Some(dfInput), Some(dfOutput)) =>
+                val inputColType = dfInput.schema(mode.compareCol).dataType
+                require(SparkIncrementalMode.allowedDataTypes.contains(inputColType), s"($actionId) Type of compare column ${mode.compareCol} must be one of ${SparkIncrementalMode.allowedDataTypes.mkString(", ")} in ${sparkInput.id}")
+                val outputColType = dfOutput.schema(mode.compareCol).dataType
+                require(SparkIncrementalMode.allowedDataTypes.contains(outputColType), s"($actionId) Type of compare column ${mode.compareCol} must be one of ${SparkIncrementalMode.allowedDataTypes.mkString(", ")} in ${sparkOutput.id}")
+                require(inputColType == outputColType, s"($actionId) Type of compare column ${mode.compareCol} is different between ${sparkInput.id} ($inputColType) and ${sparkOutput.id} ($outputColType)")
+                // get latest values
+                val inputLatestValue = dfInput.agg(max(col(mode.compareCol)).cast(StringType)).as[String].head
+                val outputLatestValue = dfOutput.agg(max(col(mode.compareCol)).cast(StringType)).as[String].head
+                // stop processing if no new data
+                if (outputLatestValue == inputLatestValue) throw NoDataToProcessWarning(actionId.id, s"($actionId) No increment to process found for ${output.id} column ${mode.compareCol} (lastestValue=$outputLatestValue)")
+                logger.info(s"($actionId) SparkIncrementalMode selected increment for writing to ${output.id}: column ${mode.compareCol} from $outputLatestValue to $inputLatestValue to process")
+                // prepare filter
+                val selectedData = s"${mode.compareCol} > cast('$outputLatestValue' as ${inputColType.sql})"
+                Some((Seq(), Some(selectedData)))
+              // otherwise don't filter
+              case _ =>
+                logger.info(s"($actionId) SparkIncrementalMode selected all records for writing to ${output.id}, because input or output DataObject is still empty.")
+                Some((Seq(), None))
+            }
           case _ => throw ConfigurationException(s"$actionId has set executionMode = $SparkIncrementalMode but $input or $output does not support creating Spark DataFrames!")
         }
 
       case _ => None
     }
+  }
+
+  private def getOptionalDataFrame(sparkInput: CanCreateDataFrame, partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession) : Option[DataFrame] = try {
+    Some(sparkInput.getDataFrame(partitionValues))
+  } catch {
+    case e: IllegalArgumentException if e.getMessage.contains("DataObject schema is undefined") => None
   }
 
   /**

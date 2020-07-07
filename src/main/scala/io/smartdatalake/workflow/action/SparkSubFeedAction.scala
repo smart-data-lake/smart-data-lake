@@ -104,7 +104,7 @@ abstract class SparkSubFeedAction extends SparkAction {
     else getFinalMetrics(output.id).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
     logger.info(s"($id) finished writing DataFrame to ${output.id}: duration=$d" + metricsLog)
     // return
-    Seq(transformedSubFeed)
+    Seq(updateSubFeedAfterWrite(transformedSubFeed, thisExecutionMode))
   }
 
   override final def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {

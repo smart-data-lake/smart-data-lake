@@ -86,8 +86,9 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
   override def clearDAGStart(): SparkSubFeed = {
     this.copy(isDAGStart = false)
   }
-  def clearFilter(): SparkSubFeed = {
-    this.copy(filter = None)
+  def clearFilter(implicit session: SparkSession): SparkSubFeed = {
+    // if filter is removed, also the DataFrame must be removed so that the next action get's an unfiltered DataFrame
+    if (filter.isDefined) this.copy(filter = None).breakLineage else this
   }
   def persist: SparkSubFeed = {
     this.copy(dataFrame = this.dataFrame.map(_.persist))

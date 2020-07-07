@@ -247,7 +247,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
    * @param subFeed SubFeed with transformed DataFrame
    * @return SubFeed with updated partition values.
    */
-  def validateAndUpdateSubFeedPartitionValues(output: DataObject, subFeed: SparkSubFeed ): SparkSubFeed = {
+  def validateAndUpdateSubFeedPartitionValues(output: DataObject, subFeed: SparkSubFeed )(implicit session: SparkSession): SparkSubFeed = {
     val updatedSubFeed = output match {
       case partitionedDO: CanHandlePartitions =>
         // validate output partition columns exist in DataFrame
@@ -256,7 +256,11 @@ private[smartdatalake] abstract class SparkAction extends Action {
         subFeed.updatePartitionValues(partitionedDO.partitions)
       case _ => subFeed.clearPartitionValues()
     }
-    updatedSubFeed.clearDAGStart().clearFilter()
+    updatedSubFeed.clearDAGStart()
+  }
+
+  def updateSubFeedAfterWrite(subFeed: SparkSubFeed, executionMode: Option[ExecutionMode])(implicit session: SparkSession): SparkSubFeed = {
+    subFeed.clearFilter // clear filter must be applied after write, because it includes removing the DataFrame
   }
 
   /**
