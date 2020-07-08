@@ -26,6 +26,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.util.misc.DataFrameUtil.arrayToSeq
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.HadoopFileConnection
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
@@ -197,7 +198,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     }
   }
 
-  override def preWrite(implicit session: SparkSession): Unit = {
+  override def preWrite(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.preWrite
     // validate if acl's must be / are configured before writing
     if (Environment.hadoopAuthoritiesWithAclsRequired.exists( a => filesystem.getUri.toString.contains(a))) {
@@ -205,8 +206,8 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     }
   }
 
-  override def postWrite(implicit session: SparkSession): Unit = {
-    super.postWrite
+  override def postWrite(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.postWrite(partitionValues)
     applyAcls
   }
 

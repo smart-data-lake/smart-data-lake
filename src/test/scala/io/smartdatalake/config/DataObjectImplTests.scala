@@ -82,7 +82,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
         |dataObjects = {123 = {
         | type = AccessTableDataObject
         | path = /path/to/foo
-        | preSql = "foo"
+        | preWriteSql = "foo"
         | table = ${tableConf}
         |}}
         |""".stripMargin).resolve
@@ -208,8 +208,8 @@ class DataObjectImplTests extends FlatSpec with Matchers {
     registry2.register(jdbcCon)
     registry.instances(DataObjectId("123")) shouldBe JdbcTableDataObject(
       id = "123",
-      preSql = None,
-      postSql = None,
+      preWriteSql = None,
+      postWriteSql = None,
       connectionId = "jdbc1",
       table = Table(
         db = Some("testDB"),

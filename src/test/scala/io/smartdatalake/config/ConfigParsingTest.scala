@@ -340,7 +340,7 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         | name = abc
         | path = "test~{id}/~{name}"
         | pre-sql = "test~{id}/~{name}"
-        | postSql = "test~{id}/~{name}"
+        | postWriteSql = "test~{id}/~{name}"
         | table {
         |  name = "test~{id}/~{name}"
         | }
@@ -352,7 +352,7 @@ class ConfigParsingTest extends FlatSpec with Matchers {
     }
     refinedConfig.getString("path") shouldEqual "test10/abc"
     refinedConfig.getString("pre-sql") shouldEqual "test10/abc"
-    refinedConfig.getString("postSql") shouldEqual "test10/abc"
+    refinedConfig.getString("postWriteSql") shouldEqual "test10/abc"
     refinedConfig.getString("table.name") shouldEqual "test10/abc"
   }
 }

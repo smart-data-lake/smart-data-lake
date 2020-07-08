@@ -22,6 +22,7 @@ import java.time.{Duration, LocalDateTime}
 
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
@@ -98,12 +99,12 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   /**
    * Executes operations needed before executing an action.
    * In this step any phase on Input- or Output-DataObjects needed before the main task is executed,
-   * e.g. JdbcTableDataObjects preSql
+   * e.g. JdbcTableDataObjects preWriteSql
    */
-  def preExec(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  def preExec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     setSparkJobMetadata(None) // init spark jobGroupId to identify metrics
-    inputs.foreach(_.preRead)
-    outputs.foreach(_.preWrite)
+    inputs.foreach( input => input.preRead(findSubFeedPartitionValues(input.id, subFeeds)))
+    outputs.foreach(_.preWrite) // Note: transformed subFeeds don't exist yet, that's why no partition values can be passed as parameters.
   }
 
   /**
@@ -118,11 +119,11 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   /**
    * Executes operations needed after executing an action.
    * In this step any phase on Input- or Output-DataObjects needed after the main task is executed,
-   * e.g. JdbcTableDataObjects postSql or CopyActions deleteInputData.
+   * e.g. JdbcTableDataObjects postWriteSql or CopyActions deleteInputData.
    */
   def postExec(inputSubFeed: Seq[SubFeed], outputSubFeed: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    inputs.foreach(_.postRead)
-    outputs.foreach(_.postWrite)
+    inputs.foreach( input => input.postRead(findSubFeedPartitionValues(input.id, inputSubFeed)))
+    outputs.foreach( output => output.postWrite(findSubFeedPartitionValues(output.id, outputSubFeed)))
   }
 
   /**
@@ -142,6 +143,11 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   def setSparkJobMetadata(operation: Option[String] = None)(implicit session: SparkSession) : Unit = {
     session.sparkContext.setJobGroup(s"${this.getClass.getSimpleName}.$id", operation.getOrElse("").take(255))
   }
+
+  /**
+   * Helper to find partition values for a specific DataObject in list of subFeeds
+   */
+  private def findSubFeedPartitionValues(dataObjectId: DataObjectId, subFeeds: Seq[SubFeed]): Seq[PartitionValues] = subFeeds.find(_.dataObjectId == dataObjectId).map(_.partitionValues).get
 
   /**
    * Handle class cast exception when getting objects from instance registry
