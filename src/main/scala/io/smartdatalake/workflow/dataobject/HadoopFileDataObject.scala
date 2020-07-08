@@ -92,6 +92,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   @transient private[workflow] lazy val hadoopPath = HdfsUtil.prefixHadoopPath(path, connection.map(_.pathPrefix))
   @transient private var filesystemHolder: FileSystem = _
   private var serializableHadoopConf: SerializableHadoopConfiguration = _ // we must serialize hadoop config for CustomFileAction running transformation on executors
+  override def getPath: String = hadoopPath.toUri.toString
 
   /**
    * Create a hadoop [[FileSystem]] API handle for the provided [[SparkSession]].
