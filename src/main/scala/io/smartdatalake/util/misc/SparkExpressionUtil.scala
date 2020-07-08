@@ -35,7 +35,7 @@ import scala.reflect.runtime.universe.TypeTag
 private[smartdatalake] object SparkExpressionUtil {
 
   val tokenStartChar = "%"
-  val tokenExpressionRegex = s"""$tokenStartChar\{(.*?)\}""".r
+  val tokenExpressionRegex = (tokenStartChar + """\{(.*?)\}""").r
 
   /**
    * Substitutes all tokens in a string by the expression defined by the token evaluated against the give case class instance.
