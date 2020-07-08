@@ -36,10 +36,14 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
  * Provides details for an action to access tables in a database through JDBC.
  * @param id unique name of this data object
  * @param createSql DDL-statement to be executed in prepare phase, using output jdbc connection
- * @param preReadSql SQL-statement to be executed in exec phase before reading input table, using input jdbc connection
+ * @param preReadSql SQL-statement to be executed in exec phase before reading input table, using input jdbc connection.
+ *                   Use tokens with syntax %{<spark sql expression>} to substitute with values from [[DefaultExpressionData]].
  * @param postReadSql SQL-statement to be executed in exec phase after reading input table and before action is finished, using input jdbc connection
+ *                   Use tokens with syntax %{<spark sql expression>} to substitute with values from [[DefaultExpressionData]].
  * @param preWriteSql SQL-statement to be executed in exec phase before writing output table, using outputv connection
+ *                   Use tokens with syntax %{<spark sql expression>} to substitute with values from [[DefaultExpressionData]].
  * @param postWriteSql SQL-statement to be executed in exec phase after writing output table, using output jdbc connection
+ *                   Use tokens with syntax %{<spark sql expression>} to substitute with values from [[DefaultExpressionData]].
  * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
  * @param table The jdbc table to be read
  * @param jdbcFetchSize Number of rows to be fetched together by the Jdbc driver
