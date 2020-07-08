@@ -53,13 +53,13 @@ case class JdbcTableConnection( override val id: ConnectionId,
   // prepare catalog implementation
   val catalog: SQLCatalog = SQLCatalog.fromJdbcDriver(driver, this)
 
-  def execJdbcStatement(sql:String ) : Boolean = {
+  def execJdbcStatement(sql:String, logging: Boolean = true) : Boolean = {
     var conn: SqlConnection = null
     var stmt: Statement = null
     try {
       conn = getConnection
       stmt = conn.createStatement
-      logger.info(s"execJdbcStatement: $sql")
+      if (logging) logger.info(s"execJdbcStatement: $sql")
       stmt.execute(sql)
     } finally {
       if (stmt!=null) stmt.close()

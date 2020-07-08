@@ -321,7 +321,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     implicit val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
     val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id, deleteDataAfterRead = true)
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
-    action1.preExec
+    action1.preExec(Seq(srcSubFeed))
     val tgtSubFeed1 = action1.exec(Seq(srcSubFeed)).head
     action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed1))
     assert(tgtSubFeed1.dataObjectId == tgtDO.id)
@@ -335,7 +335,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile+"2").toFile)
 
     // start load 2
-    action1.preExec
+    action1.preExec(Seq(srcSubFeed))
     val tgtSubFeed2 = action1.exec(Seq(srcSubFeed)).head
     action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed2))
 

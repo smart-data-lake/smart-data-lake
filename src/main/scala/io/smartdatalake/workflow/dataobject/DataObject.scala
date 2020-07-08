@@ -20,7 +20,9 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.Connection
 import org.apache.spark.sql.SparkSession
 
@@ -49,22 +51,23 @@ private[smartdatalake] trait DataObject extends SdlConfigObject with ParsableFro
   /**
    * Runs operations before reading from [[DataObject]]
    */
-  def preRead(implicit session: SparkSession): Unit = Unit
+  def preRead(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
 
   /**
    * Runs operations after reading from [[DataObject]]
    */
-  def postRead(implicit session: SparkSession): Unit = Unit
+  def postRead(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
 
   /**
    * Runs operations before writing to [[DataObject]]
+   * Note: As the transformed SubFeed doesnt yet exist in Action.preWrite, no partition values can be passed as parameters as in preRead
    */
-  def preWrite(implicit session: SparkSession): Unit = Unit
+  def preWrite(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
 
   /**
    * Runs operations after writing to [[DataObject]]
    */
-  def postWrite(implicit session: SparkSession): Unit = Unit
+  def postWrite(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
 
   /**
    * Handle class cast exception when getting objects from instance registry

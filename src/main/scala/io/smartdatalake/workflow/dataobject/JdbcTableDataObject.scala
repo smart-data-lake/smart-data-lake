@@ -18,11 +18,15 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import java.sql.Timestamp
+
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import io.smartdatalake.util.misc.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.JdbcTableConnection
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
@@ -31,9 +35,15 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
  * [[DataObject]] of type JDBC.
  * Provides details for an action to access tables in a database through JDBC.
  * @param id unique name of this data object
- * @param createSql DDL-statement to be executed in prepare phase
- * @param preSql SQL-statement to be executed before writing to table
- * @param postSql SQL-statement to be executed after writing to table
+ * @param createSql DDL-statement to be executed in prepare phase, using output jdbc connection
+ * @param preReadSql SQL-statement to be executed in exec phase before reading input table, using input jdbc connection.
+ *                   Use tokens with syntax %{<spark sql expression>} to substitute with values from [[DefaultExpressionData]].
+ * @param postReadSql SQL-statement to be executed in exec phase after reading input table and before action is finished, using input jdbc connection
+ *                   Use tokens with syntax %{<spark sql expression>} to substitute with values from [[DefaultExpressionData]].
+ * @param preWriteSql SQL-statement to be executed in exec phase before writing output table, using outputv connection
+ *                   Use tokens with syntax %{<spark sql expression>} to substitute with values from [[DefaultExpressionData]].
+ * @param postWriteSql SQL-statement to be executed in exec phase after writing output table, using output jdbc connection
+ *                   Use tokens with syntax %{<spark sql expression>} to substitute with values from [[DefaultExpressionData]].
  * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
  * @param table The jdbc table to be read
  * @param jdbcFetchSize Number of rows to be fetched together by the Jdbc driver
@@ -43,8 +53,10 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
  */
 case class JdbcTableDataObject(override val id: DataObjectId,
                                createSql: Option[String] = None,
-                               preSql: Option[String] = None,
-                               postSql: Option[String] = None,
+                               preReadSql: Option[String] = None,
+                               postReadSql: Option[String] = None,
+                               preWriteSql: Option[String] = None,
+                               postWriteSql: Option[String] = None,
                                override val schemaMin: Option[StructType] = None,
                                override var table: Table,
                                jdbcFetchSize: Int = 1000,
@@ -97,14 +109,6 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     df.colNamesLowercase
   }
 
-  override def preWrite(implicit session: SparkSession): Unit = {
-    super.preWrite
-    preSql.foreach { sql =>
-      logger.info(s"($id) preSQL is being executed")
-      connection.execJdbcStatement(sql)
-    }
-  }
-
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
     require(table.query.isEmpty, s"($id) Cannot write to jdbc DataObject defined by a query.")
     validateSchemaMin(df)
@@ -121,11 +125,28 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       .save
   }
 
-   override def postWrite(implicit session: SparkSession): Unit = {
-    super.postWrite
-    postSql.foreach{ sql =>
-      logger.info(s"($id) postSQL is being executed")
-      connection.execJdbcStatement(sql)
+  override def preRead(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.preRead(partitionValues)
+    preparedAndExecSql(preReadSql, Some("preReadSql"), partitionValues)
+  }
+  override def postRead(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.postRead(partitionValues)
+    preparedAndExecSql(postReadSql, Some("postReadSql"), partitionValues)
+  }
+  override def preWrite(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.preWrite
+    preparedAndExecSql(preWriteSql, Some("preWriteSql"), Seq()) // no partition values here...
+  }
+  override def postWrite(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.postWrite(partitionValues)
+    preparedAndExecSql(postWriteSql, Some("postWriteSql"), partitionValues)
+  }
+  private def preparedAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext) = {
+    sqlOpt.foreach { sql =>
+      val params = DefaultExpressionData(context.feed, context.application, context.runId, context.attemptId, context.referenceTimestamp.map(Timestamp.valueOf), partitionValues.map(_.elements.mapValues(_.toString)) )
+      val preparedSql = SparkExpressionUtil.substitute(id, configName, sql, params)
+      logger.info(s"($id) ${configName.getOrElse("SQL")} is being executed: $preparedSql")
+      connection.execJdbcStatement(preparedSql, logging = false)
     }
   }
 

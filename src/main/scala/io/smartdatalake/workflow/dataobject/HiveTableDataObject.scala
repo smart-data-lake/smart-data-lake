@@ -26,6 +26,7 @@ import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SmartDataLakeLogger}
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.HiveTableConnection
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.streaming.Trigger
@@ -123,7 +124,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
     df
   }
 
-  override def preWrite(implicit session: SparkSession): Unit = {
+  override def preWrite(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.preWrite
     // validate if acl's must be / are configured before writing
     if (Environment.hadoopAuthoritiesWithAclsRequired.exists( a => filesystem.getUri.toString.contains(a))) {
