@@ -24,7 +24,7 @@ import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.util.streaming.DummyStreamProvider
 import io.smartdatalake.workflow.dataobject.FileRef
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, SparkSession, functions}
 import sun.reflect.generics.reflectiveObjects.NotImplementedException
 
 /**
@@ -59,12 +59,16 @@ trait SubFeed extends DAGResult {
  * @param dataFrame Spark [[DataFrame]] to be processed. DataFrame should not be saved to state (@transient).
  * @param dataObjectId id of the DataObject this SubFeed corresponds to
  * @param partitionValues Values of Partitions transported by this SubFeed
+ * @param isDAGStart true if this subfeed is a start node of the dag
+ * @param isDummy true if this subfeed only contains a dummy DataFrame. Dummy DataFrames can be used for validating the lineage in init phase, but not for the exec phase.
+ * @param filter a spark sql filter expression. This is used by SparkIncrementalMode.
  */
 case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
                         override val dataObjectId: DataObjectId,
                         override val partitionValues: Seq[PartitionValues],
                         override val isDAGStart: Boolean = false,
-                        isDummy: Boolean = false
+                        isDummy: Boolean = false,
+                        filter: Option[String] = None
                        )
   extends SubFeed {
   override def breakLineage(implicit session: SparkSession): SparkSubFeed = {
@@ -82,10 +86,17 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
   override def clearDAGStart(): SparkSubFeed = {
     this.copy(isDAGStart = false)
   }
+  def clearFilter(implicit session: SparkSession): SparkSubFeed = {
+    // if filter is removed, also the DataFrame must be removed so that the next action get's an unfiltered DataFrame
+    if (filter.isDefined) this.copy(filter = None).breakLineage else this
+  }
   def persist: SparkSubFeed = {
     this.copy(dataFrame = this.dataFrame.map(_.persist))
   }
   def isStreaming: Option[Boolean] = dataFrame.map(_.isStreaming)
+  def getFilterCol: Option[Column] = {
+    filter.map(functions.expr)
+  }
   private[smartdatalake] def convertToDummy(schema: StructType)(implicit session: SparkSession): SparkSubFeed = {
     val dummyDf = dataFrame.map{
       df =>

@@ -19,9 +19,18 @@
 package io.smartdatalake.definitions
 
 import org.apache.spark.sql.streaming.OutputMode
+import org.apache.spark.sql.types._
 
 /**
- * Execution mode's defines how data is selected when running a data pipeline.
+ * Execution mode defines how data is selected when running a data pipeline.
+ * You need to select one of the subclasses by defining type, i.e.
+ *
+ * {{{
+ * executionMode = {
+ *   type = SparkIncrementalMode
+ *   compareCol = "id"
+ * }
+ * }}}
  */
 sealed trait ExecutionMode
 
@@ -31,8 +40,10 @@ trait ExecutionModeWithMainInputOutput {
 }
 
 /**
- * Partition difference execution mode lists partitions on input & output DataObject and starts loading all missing partitions.
+ * Partition difference execution mode lists partitions on mainInput & mainOutput DataObject and starts loading all missing partitions.
  * Partition columns to be used for comparision need to be a common 'init' of input and output partition columns.
+ * This mode needs mainInput/Output DataObjects which CanHandlePartitions to list partitions.
+ * Partition values are passed to following actions, if for partition columns which they have in common.
  * @param partitionColNb optional number of partition columns to use as a common 'init'.
  * @param mainInputId optional selection of inputId to be used for partition comparision. Only needed if there are multiple input DataObject's.
  * @param mainOutputId optional selection of outputId to be used for partition comparision. Only needed if there are multiple output DataObject's.
@@ -42,9 +53,21 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None, override val ma
 
 /**
  * Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads (trigger=Trigger.Once) and keep track of processed data.
+ * This mode needs a DataObject implementing CanCreateStreamingDataFrame and works only with SparkSubFeeds.
  * @param checkpointLocation location for checkpoints of streaming query to keep state
  * @param inputOptions additional option to apply when reading streaming source. This overwrites options set by the DataObjects.
  * @param outputOptions additional option to apply when writing to streaming sink. This overwrites options set by the DataObjects.
  */
 case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[String,String] = Map(), outputOptions: Map[String,String] = Map(), outputMode: OutputMode = OutputMode.Append) extends ExecutionMode
 
+/**
+ * Compares max entry in "compare column" between mainOutput and mainInput and incrementally loads the delta.
+ * This mode works only with SparkSubFeeds. The filter is not propagated to following actions.
+ * @param compareCol a comparable column name existing in mainInput and mainOutput used to identify the delta. Column content should be bigger for newer records.
+ * @param mainInputId optional selection of inputId to be used for comparision. Only needed if there are multiple input DataObject's.
+ * @param mainOutputId optional selection of outputId to be used for comparision. Only needed if there are multiple output DataObject's.
+ */
+case class SparkIncrementalMode(compareCol: String, override val mainInputId: Option[String] = None, override val mainOutputId: Option[String] = None) extends ExecutionMode with ExecutionModeWithMainInputOutput
+object SparkIncrementalMode {
+  private[smartdatalake] val allowedDataTypes = Seq(StringType, LongType, IntegerType, ShortType, FloatType, DoubleType, TimestampType)
+}

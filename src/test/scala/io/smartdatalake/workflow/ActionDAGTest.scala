@@ -19,11 +19,12 @@
 package io.smartdatalake.workflow
 
 import java.nio.file.Files
-import java.time.LocalDateTime
+import java.sql.Timestamp
+import java.time.{Instant, LocalDateTime}
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.{PartitionDiffMode, SparkStreamingOnceMode}
+import io.smartdatalake.definitions.{PartitionDiffMode, SparkIncrementalMode, SparkStreamingOnceMode}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.hive.HiveUtil
@@ -491,7 +492,6 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     val srcCount = dfSrc.count
     val dfTgt1 = tgt1DO.getDataFrame()
     val dfTgt2 = tgt2DO.getDataFrame()
-    dfTgt2.show(3)
     val tgtCount = dfTgt2.count
     assert(srcCount == tgtCount)
   }
@@ -641,7 +641,6 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     dag.reset
     dag.prepare
     dag.init
-    dag.exec
 
     // check
     val r2 = tgt2DO.getDataFrame()
@@ -712,7 +711,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     val r2 = tgt2DO.getDataFrame()
       .select($"rating".cast("int"))
       .as[Int].collect().toSeq
-    assert(r1 == Seq(5))
+    assert(r2 == Seq(5))
 
     // third dag run - new data to process
     val df2 = Seq(("doe","john 2",10)).toDF("lastname", "firstname", "rating")
@@ -726,7 +725,6 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     val r3 = tgt2DO.getDataFrame()
       .select($"rating".cast("int"))
       .as[Int].collect().toSeq
-    tgt2DO.getDataFrame().show
     assert(r3.size == 2)
 
     // check metrics
@@ -766,7 +764,6 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     dag.exec
 
     // check
-    val dfTgt1 = tgt1DO.getDataFrame()
     val r1 = tgt1DO.getDataFrame().select($"lastname",$"firstname",$"rating".cast("int")).as[(String,String,Int)].collect().toSet
     assert(r1 == (data1src1 ++ data1src2).toSet)
 
@@ -796,6 +793,70 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     val action1MainMetrics = action1.getFinalMetrics(action1.outputIds.head).get.getMainInfos
     assert(action1MainMetrics("records_written")==1)
   }
+
+  test("action dag with 2 actions in sequence, first is executionMode=SparkIncrementalMode, second is normal") {
+    // setup DataObjects
+    val feed = "actionpipeline"
+    val tempDir = Files.createTempDirectory(feed)
+    val schema = DataType.fromDDL("lastname string, firstname string, rating int, tstmp timestamp").asInstanceOf[StructType]
+    val srcDO = JsonFileDataObject( "src1", tempDir.resolve("src1").toString.replace('\\', '/'), schema = Some(schema))
+    instanceRegistry.register(srcDO)
+    val tgt1DO = ParquetFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SaveMode.Append)
+    instanceRegistry.register(tgt1DO)
+    val tgt2DO = ParquetFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'))
+    instanceRegistry.register(tgt2DO)
+
+    // prepare DAG
+    val refTimestamp1 = LocalDateTime.now()
+    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+    val df1 = Seq(("doe","john",5, Timestamp.from(Instant.now))).toDF("lastname", "firstname", "rating", "tstmp")
+    srcDO.writeDataFrame(df1, Seq())
+
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkIncrementalMode(compareCol = "tstmp")))
+    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id)
+    val dag: ActionDAGRun = ActionDAGRun(Seq(action1,action2), 1, 1)
+
+    // first dag run, first file processed
+    dag.prepare
+    dag.init
+    dag.exec
+
+    // check
+    val r1 = tgt2DO.getDataFrame()
+      .select($"rating")
+      .as[Int].collect().toSeq
+    assert(r1 == Seq(5))
+
+    // second dag run - no data to process
+    dag.reset
+    dag.prepare
+    intercept[NoDataToProcessWarning](dag.init)
+
+    // check
+    val r2 = tgt2DO.getDataFrame()
+      .select($"rating")
+      .as[Int].collect().toSeq
+    assert(r2 == Seq(5))
+
+    // third dag run - new data to process
+    val df2 = Seq(("doe","john 2",10, Timestamp.from(Instant.now))).toDF("lastname", "firstname", "rating", "tstmp")
+    srcDO.writeDataFrame(df2, Seq())
+    dag.reset
+    dag.prepare
+    dag.init
+    dag.exec
+
+    // check
+    val r3 = tgt2DO.getDataFrame()
+      .select($"rating")
+      .as[Int].collect().toSeq
+    assert(r3.size == 2)
+
+    // check metrics
+    val action2MainMetrics = action2.getFinalMetrics(action2.outputId).get.getMainInfos
+    assert(action2MainMetrics("records_written")==2) // without execution mode always the whole table is processed
+  }
+
 }
 
 class TestActionDagTransformer extends CustomDfsTransformer {
