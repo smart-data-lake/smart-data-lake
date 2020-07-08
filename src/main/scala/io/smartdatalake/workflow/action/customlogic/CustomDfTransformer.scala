@@ -44,7 +44,6 @@ trait CustomDfTransformer extends Serializable {
 case class CustomDfTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Option[String] = None, options: Map[String,String] = Map()) {
   require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || sqlCode.isDefined, "Either className, scalaFile, scalaCode or sqlCode must be defined for CustomDfTransformer")
 
-
   val impl : Option[CustomDfTransformer] = className.map {
     clazz => CustomCodeUtil.getClassInstanceByName[CustomDfTransformer](clazz)
   }.orElse{

@@ -25,11 +25,12 @@ class TestFileTransformer extends CustomFileTransformer {
   /**
    * This method has to be implemented by the custom transformer to define the transformation.
    *
+   * @paran options
    * @param input  Hadoop Input Stream of the file to be read
    * @param output Hadoop Output Stream of the file to be written
    * @return exception if something goes wrong and processing should not be stopped for all files
    */
-  override def transform(input: FSDataInputStream, output: FSDataOutputStream): Option[Exception] = None
+  override def transform(options: Map[String,String], input: FSDataInputStream, output: FSDataOutputStream): Option[Exception] = None
 
   override def equals(obj: Any): Boolean = getClass.equals(obj.getClass)
 }
