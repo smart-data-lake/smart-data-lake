@@ -339,7 +339,7 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         | id = 10
         | name = abc
         | path = "test~{id}/~{name}"
-        | pre-sql = "test~{id}/~{name}"
+        | pre-read-sql = "test~{id}/~{name}"
         | postWriteSql = "test~{id}/~{name}"
         | table {
         |  name = "test~{id}/~{name}"
@@ -351,7 +351,7 @@ class ConfigParsingTest extends FlatSpec with Matchers {
       case (config, path) => localSubstitution(config, path)
     }
     refinedConfig.getString("path") shouldEqual "test10/abc"
-    refinedConfig.getString("pre-sql") shouldEqual "test10/abc"
+    refinedConfig.getString("pre-read-sql") shouldEqual "test10/abc"
     refinedConfig.getString("postWriteSql") shouldEqual "test10/abc"
     refinedConfig.getString("table.name") shouldEqual "test10/abc"
   }

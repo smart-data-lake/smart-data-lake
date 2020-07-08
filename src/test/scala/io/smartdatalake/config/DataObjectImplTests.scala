@@ -82,7 +82,6 @@ class DataObjectImplTests extends FlatSpec with Matchers {
         |dataObjects = {123 = {
         | type = AccessTableDataObject
         | path = /path/to/foo
-        | preWriteSql = "foo"
         | table = ${tableConf}
         |}}
         |""".stripMargin).resolve
@@ -91,8 +90,6 @@ class DataObjectImplTests extends FlatSpec with Matchers {
     registry.instances.values.head shouldBe AccessTableDataObject(
       id = "123",
       path = "/path/to/foo",
-      preSql = Some("foo"),
-      postSql = None,
       table = Table(
         db = Some("testDB"),
         name = "test",
