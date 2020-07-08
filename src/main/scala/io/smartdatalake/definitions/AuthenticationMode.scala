@@ -24,6 +24,15 @@ import io.smartdatalake.util.misc.CredentialsUtil
  * Authentication modes define how an application authenticates itself
  * to a given data object/connection
  *
+ * You need to define one of the AuthModes (subclasses) as type, i.e.
+ * {{{
+ * authMode {
+ *   type = BasicAuthMode
+ *   user = myUser
+ *   password = myPassword
+ * }
+ * }}}
+ *
  */
 sealed trait AuthMode
 

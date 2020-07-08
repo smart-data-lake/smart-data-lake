@@ -22,7 +22,15 @@ import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types._
 
 /**
- * Execution mode's defines how data is selected when running a data pipeline.
+ * Execution mode defines how data is selected when running a data pipeline.
+ * You need to select one of the subclasses by defining type, i.e.
+ *
+ * {{{
+ * executionMode = {
+ *   type = SparkIncrementalMode
+ *   compareCol = "id"
+ * }
+ * }}}
  */
 sealed trait ExecutionMode
 
