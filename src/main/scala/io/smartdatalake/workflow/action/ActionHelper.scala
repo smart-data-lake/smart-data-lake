@@ -30,7 +30,7 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StringType, TimestampType}
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame, SparkSession}
 
 object ActionHelper extends SmartDataLakeLogger {
 
@@ -190,6 +190,7 @@ object ActionHelper extends SmartDataLakeLogger {
     Some(sparkInput.getDataFrame(partitionValues))
   } catch {
     case e: IllegalArgumentException if e.getMessage.contains("DataObject schema is undefined") => None
+    case e: AnalysisException if e.getMessage.contains("Table or view not found") => None
   }
 
   /**
