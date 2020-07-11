@@ -30,7 +30,7 @@ import io.smartdatalake.util.streaming.DummyStreamProvider
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.ActionHelper.{filterBlacklist, filterWhitelist}
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanCreateStreamingDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject, TableDataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanCreateStreamingDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject, SparkFileDataObject, TableDataObject, UserDefinedSchema}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
@@ -95,10 +95,22 @@ private[smartdatalake] abstract class SparkAction extends Action {
           subFeed.copy(dataFrame = emptyStreamingDataFrame, partitionValues = Seq()) // remove partition values for streaming mode
         } else subFeed
       case _ =>
-        if (subFeed.dataFrame.isEmpty || (phase==ExecutionPhase.Exec && (subFeed.isDummy || subFeed.isStreaming.contains(true)))) {
+        if (phase==ExecutionPhase.Exec && (subFeed.dataFrame.isEmpty || subFeed.isDummy || subFeed.isStreaming.contains(true))) {
           // recreate DataFrame from DataObject
           logger.info(s"($id) getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
           val df = input.getDataFrame(subFeed.partitionValues)
+            .colNamesLowercase // convert to lower case by default
+          val filteredDf = filterDataFrame(df, subFeed.partitionValues, subFeed.getFilterCol)
+          subFeed.copy(dataFrame = Some(filteredDf))
+        } else if (subFeed.dataFrame.isEmpty) {
+          // create a dummy dataframe if possible as we are not in exec phase
+          val schema = input match {
+            case sparkFileInput: SparkFileDataObject => sparkFileInput.readSchema(false)
+            case userDefInput: UserDefinedSchema => userDefInput.schema
+            case _ => None
+          }
+          val df = schema.map( s => DataFrameUtil.getEmptyDataFrame(s))
+            .getOrElse(input.getDataFrame(subFeed.partitionValues))
             .colNamesLowercase // convert to lower case by default
           val filteredDf = filterDataFrame(df, subFeed.partitionValues, subFeed.getFilterCol)
           subFeed.copy(dataFrame = Some(filteredDf))

@@ -28,16 +28,25 @@ import org.slf4j.Logger
 trait CustomFileTransformer extends Serializable {
 
   /**
-   * This method has to be implemented by the custom transformer to define the transformation.
+   * Function to be implemented to define the transformation between an input and output stream
    *
+   * @param options Options specified in the configuration for this transformation
    * @param input Hadoop Input Stream of the file to be read
    * @param output Hadoop Output Stream of the file to be written
    * @return exception if something goes wrong and processing should not be stopped for all files
    */
-  def transform(input: FSDataInputStream, output: FSDataOutputStream): Option[Exception]
+  def transform(options: Map[String,String], input: FSDataInputStream, output: FSDataOutputStream): Option[Exception]
 }
 
-case class CustomFileTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None) {
+/**
+ * Configuration of custom file transformation between one input and one output (1:1)
+ *
+ * @param className Optional class name to load transformer code from
+ * @param scalaFile Optional file where scala code for transformation is loaded from
+ * @param scalaCode Optional scala code for transformation
+ * @param options Options to pass to the transformation
+ */
+case class CustomFileTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, options: Map[String,String] = Map()) {
   require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined, "Either className or scalaFile must be defined for CustomDfTransformer")
 
   val impl : CustomFileTransformer = className.map {
@@ -45,26 +54,26 @@ case class CustomFileTransformerConfig( className: Option[String] = None, scalaF
   }.orElse{
     scalaFile.map {
       file =>
-        val fnTransform = CustomCodeUtil.compileFromFile[(FSDataInputStream, FSDataOutputStream, Logger) => Option[Exception]](file)
+        val fnTransform = CustomCodeUtil.compileFromFile[(Map[String,String], FSDataInputStream, FSDataOutputStream, Logger) => Option[Exception]](file)
         new CustomFileTransformerWrapper( fnTransform )
     }
   }.orElse{
     scalaCode.map {
       code =>
-        val fnTransform = CustomCodeUtil.compileCode[(FSDataInputStream, FSDataOutputStream, Logger) => Option[Exception]](code)
+        val fnTransform = CustomCodeUtil.compileCode[(Map[String,String], FSDataInputStream, FSDataOutputStream, Logger) => Option[Exception]](code)
         new CustomFileTransformerWrapper( fnTransform )
     }
   }.get
 
   def transform(input: FSDataInputStream, output: FSDataOutputStream): Option[Exception] = {
-    impl.transform(input, output)
+    impl.transform(options, input, output)
   }
 }
 
-class CustomFileTransformerWrapper(val fnExec: (FSDataInputStream, FSDataOutputStream, Logger) => Option[Exception])
+class CustomFileTransformerWrapper(val fnExec: (Map[String,String], FSDataInputStream, FSDataOutputStream, Logger) => Option[Exception])
 extends CustomFileTransformer with SmartDataLakeLogger {
-  override def transform(input: FSDataInputStream, output: FSDataOutputStream): Option[Exception] = {
+  override def transform(options: Map[String,String], input: FSDataInputStream, output: FSDataOutputStream): Option[Exception] = {
     // TODO: This used to be logger.underlying, is it OK to use logger ?
-    fnExec(input, output, logger)
+    fnExec(options, input, output, logger)
   }
 }
