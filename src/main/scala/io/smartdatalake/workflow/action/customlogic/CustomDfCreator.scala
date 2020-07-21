@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.workflow.action.customlogic
 
+import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.CustomCodeUtil
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -48,7 +49,7 @@ case class CustomDfCreatorConfig(className: Option[String] = None,
   }.orElse{
     scalaFile.map {
       file =>
-        val fnTransform = CustomCodeUtil.compileFromFile[(SparkSession, Map[String, String]) => DataFrame](file)
+        val fnTransform = CustomCodeUtil.compileCode[(SparkSession, Map[String, String]) => DataFrame](HdfsUtil.readHadoopFile(file))
         new CustomDfCreatorWrapper(fnTransform)
     }
   }.orElse{

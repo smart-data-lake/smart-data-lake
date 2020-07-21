@@ -19,6 +19,7 @@
 package io.smartdatalake.workflow.action.customlogic
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.workflow.action.ActionHelper
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -41,7 +42,7 @@ trait CustomDfsTransformer extends Serializable {
  * @param options
  */
 case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Map[DataObjectId,String] = Map(), options: Map[String,String] = Map()) {
-  require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || !sqlCode.isEmpty, "Either className, scalaFile, scalaCode or sqlCode must be defined for CustomDfsTransformer")
+  require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || sqlCode.nonEmpty, "Either className, scalaFile, scalaCode or sqlCode must be defined for CustomDfsTransformer")
 
 
   // Load Transformer code from appropriate location
@@ -50,7 +51,7 @@ case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFi
   }.orElse{
     scalaFile.map {
       file =>
-        val fnTransform = CustomCodeUtil.compileFromFile[(SparkSession, Map[String,String], Map[String,DataFrame]) => Map[String,DataFrame]](file)
+        val fnTransform = CustomCodeUtil.compileCode[(SparkSession, Map[String,String], Map[String,DataFrame]) => Map[String,DataFrame]](HdfsUtil.readHadoopFile(file))
         new CustomDfsTransformerWrapper( fnTransform )
     }
   }.orElse{
@@ -86,6 +87,7 @@ case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFi
       sqlCode.map {
         case (dataObjectId,sqlCode) => {
           val df = try {
+            //TODO: replace tokens with options
             session.sql(sqlCode)
           } catch {
             case e : Throwable => throw new SQLTransformationException(s"Could not execute SQL query. Check your query and remember that special characters are replaced by underscores. Error: ${e.getMessage}")

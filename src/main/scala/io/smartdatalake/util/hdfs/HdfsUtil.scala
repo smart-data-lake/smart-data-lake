@@ -23,9 +23,11 @@ import java.net.URI
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.{FileSystem, FileUtil, Path}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.{DataFrame, SparkSession}
+
+import scala.io.Source
 
 /**
  * Provides utility functions for HDFS.
@@ -233,5 +235,12 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
 
   def getHadoopPartitionLayout(partitionCols: Seq[String], separator: Char): String = {
     partitionCols.map(col => s"$col=%$col%$separator").mkString
+  }
+
+  def readHadoopFile( file: String ): String = {
+    val path = addHadoopDefaultSchemaAuthority(new Path(file))
+    val fileSystem: FileSystem = getHadoopFs(path)
+    val is = fileSystem.open(path)
+    Source.fromInputStream(is).getLines.mkString(sys.props("line.separator"))
   }
 }
