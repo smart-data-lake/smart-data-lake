@@ -24,25 +24,34 @@ import io.smartdatalake.workflow.action.ActionHelper
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
- * Same trait as [[CustomDfTransformer]] but supported multiple input and outputs.
+ * Interface to define a custom Spark-DataFrame transformation (n:m)
+ * Same trait as [[CustomDfTransformer]], but multiple input and outputs supported.
  */
 trait CustomDfsTransformer extends Serializable {
 
+  /**
+   * Function be implemented to define the transformation between several input and output DataFrames (n:m)
+   *
+   * @param session Spark Session
+   * @param options Options specified in the configuration for this transformation
+   * @param dfs DataFrames to be transformed
+   * @return Transformed DataFrame
+   */
   def transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]) : Map[String,DataFrame]
 
 }
 
 /**
+ * Configuration of a custom Spark-DataFrame transformation between several inputs and outputs (n:m)
  *
  * @param className Optional class name to load transformer code from
  * @param scalaFile Optional file where scala code for transformation is loaded from
  * @param scalaCode Optional scala code for transformation
  * @param sqlCode Optional map of DataObjectId and corresponding SQL Code
- * @param options
+ * @param options Options to pass to the transformation
  */
 case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Map[DataObjectId,String] = Map(), options: Map[String,String] = Map()) {
-  require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || !sqlCode.isEmpty, "Either className, scalaFile, scalaCode or sqlCode must be defined for CustomDfsTransformer")
-
+  require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || sqlCode.nonEmpty, "Either className, scalaFile, scalaCode or sqlCode must be defined for CustomDfsTransformer")
 
   // Load Transformer code from appropriate location
   val impl: Option[CustomDfsTransformer] = className.map {
