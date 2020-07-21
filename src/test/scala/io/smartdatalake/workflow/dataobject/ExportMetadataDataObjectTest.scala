@@ -64,7 +64,7 @@ class ExportMetadataDataObjectTest extends DataObjectTestSuite {
     instanceRegistry.register(do2)
 
     val metaData = ActionMetadata(name = Some("Test Action"), Some("For Testing"), Some("test feed"))
-    val testAction = TestAction("testAction", "do1", "do2", None, None, Some(metaData))
+    val testAction = TestAction("testAction", "do1", "do2", None, metadata = Some(metaData))
     instanceRegistry.register(testAction)
 
     val config = ConfigFactory.parseString("id = actions-exporter")

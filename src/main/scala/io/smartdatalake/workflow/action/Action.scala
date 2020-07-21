@@ -65,6 +65,12 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   def outputs: Seq[DataObject]
 
   /**
+   * Spark SQL condition evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
+   * If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
+   */
+  def metricsFailCondition: Option[String]
+
+  /**
    * Prepare DataObjects prerequisites.
    * In this step preconditions are prepared & tested:
    * - connections can be created
@@ -122,8 +128,26 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * e.g. JdbcTableDataObjects postWriteSql or CopyActions deleteInputData.
    */
   def postExec(inputSubFeed: Seq[SubFeed], outputSubFeed: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    // evaluate metrics fail condition if defined
+    metricsFailCondition.foreach(evaluateMetricsFailCondition)
+    // process postRead/Write hooks
     inputs.foreach( input => input.postRead(findSubFeedPartitionValues(input.id, inputSubFeed)))
     outputs.foreach( output => output.postWrite(findSubFeedPartitionValues(output.id, outputSubFeed)))
+  }
+
+  /**
+   * Evaluates a condition against latest metrics and throws an MetricsCheckFailed if there is a match.
+   */
+  private def evaluateMetricsFailCondition(condition: String)(implicit session: SparkSession): Unit = {
+    import session.implicits._
+    val metrics = getAllLatestMetrics.flatMap{
+      case (dataObjectId, Some(metrics)) => metrics.getMainInfos.map{ case (k,v) => (dataObjectId.id, Some(k), Some(v.toString))}.toSeq
+      case (dataObjectId, _) => Seq((dataObjectId.id, None, None))
+    }.toSeq
+    val failedMetrics = metrics.toDF("dataObjectId", "key", "value")
+      .where(condition)
+      .collect
+    if (failedMetrics.nonEmpty) throw MetricsCheckFailed(s"""($id) metrics check failed: ${failedMetrics.mkString(", ")} matched condition "$condition"""")
   }
 
   /**
@@ -197,7 +221,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * Runtime metrics
    *
    * Note: runtime metrics are disabled by default, because they are only collected when running Actions from an ActionDAG.
-   * This is not the case for Tests other use cases. If enabled exceptions are thrown if metrics are not found.
+   * This is not the case for Tests or other use cases. If enabled exceptions are thrown if metrics are not found.
    */
   def enableRuntimeMetrics(): Unit = runtimeMetricsEnabled = true
   def onRuntimeMetrics(dataObjectId: Option[DataObjectId], metrics: ActionMetrics): Unit = {
