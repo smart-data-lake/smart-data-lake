@@ -37,6 +37,8 @@ import org.apache.spark.sql.SparkSession
  * @param transformer Custom Transformer to transform Seq[DataFrames]
  * @param initExecutionMode optional execution mode if this Action is a start node of a DAG run
  * @param executionMode optional execution mode for this Action
+ * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
+ *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  */
 case class CustomSparkAction ( override val id: ActionObjectId,
                                inputIds: Seq[DataObjectId],
@@ -46,6 +48,7 @@ case class CustomSparkAction ( override val id: ActionObjectId,
                                override val persist: Boolean = false,
                                override val initExecutionMode: Option[ExecutionMode] = None,
                                override val executionMode: Option[ExecutionMode] = None,
+                               override val metricsFailCondition: Option[String] = None,
                                override val metadata: Option[ActionMetadata] = None
 )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedsAction {
 

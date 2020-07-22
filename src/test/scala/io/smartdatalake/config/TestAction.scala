@@ -39,6 +39,7 @@ case class TestAction(override val id: ActionObjectId,
                       outputId: DataObjectId,
                       arg1: Option[String],
                       executionMode: Option[ExecutionMode] = None,
+                      override val metricsFailCondition: Option[String] = None,
                       override val metadata: Option[ActionMetadata] = None
                      )(implicit instanceRegistry: InstanceRegistry)
   extends Action {
