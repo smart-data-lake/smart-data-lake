@@ -38,7 +38,7 @@ private[smartdatalake] object SparkExpressionUtil {
   val tokenExpressionRegex = (tokenStartChar + """\{(.*?)\}""").r
 
   /**
-   * Substitutes all tokens in a string by the expression defined by the token evaluated against the give case class instance.
+   * Substitutes all tokens in a string by the expression defined by the token evaluated against the given case class instance.
    * Token syntax: "%{<spark sql expression>}
    * @param id object id for logging
    * @param configName config name for logging
