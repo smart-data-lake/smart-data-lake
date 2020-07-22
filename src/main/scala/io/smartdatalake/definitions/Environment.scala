@@ -137,7 +137,10 @@ object Environment {
   }
 
   // static configurations
-  val configPathsForLocalSubstitution: Seq[String] = Seq("path", "table.name", "create-sql", "createSql", "pre-sql", "preSql", "post-sql", "postSql", "executionMode.checkpointLocation", "execution-mode.checkpoint-location")
+  val configPathsForLocalSubstitution: Seq[String] = Seq(
+      "path", "table.name"
+    , "create-sql", "createSql", "pre-read-sql", "preReadSql", "post-read-sql", "postReadSql", "pre-write-sql", "preWriteSql", "post-write-sql", "postWriteSql"
+    , "executionMode.checkpointLocation", "execution-mode.checkpoint-location")
   val defaultPathSeparator: Char = '/'
 
   // dynamically shared environment for custom code (see also #106)
