@@ -39,7 +39,7 @@ private[smartdatalake] object SparkExpressionUtil {
 
   /**
    * Substitutes all tokens in a string by the expression defined by the token evaluated against the give case class instance.
-   * Token syntax: "${<spark sql expression>}
+   * Token syntax: "%{<spark sql expression>}
    * @param id object id for logging
    * @param configName config name for logging
    * @param str String with tokens to replace
@@ -73,4 +73,3 @@ private[smartdatalake] object SparkExpressionUtil {
 }
 
 case class DefaultExpressionData(feed: String, application: String, runId: Int, attemptId: Int, referenceTimestamp: Option[Timestamp] = None, partitionValues: Seq[Map[String,String]])
-
