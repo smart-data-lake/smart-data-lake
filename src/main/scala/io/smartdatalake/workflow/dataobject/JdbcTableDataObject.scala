@@ -40,7 +40,7 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
  *                   Use tokens with syntax %{<spark sql expression>} to substitute with values from [[DefaultExpressionData]].
  * @param postReadSql SQL-statement to be executed in exec phase after reading input table and before action is finished, using input jdbc connection
  *                   Use tokens with syntax %{<spark sql expression>} to substitute with values from [[DefaultExpressionData]].
- * @param preWriteSql SQL-statement to be executed in exec phase before writing output table, using outputv connection
+ * @param preWriteSql SQL-statement to be executed in exec phase before writing output table, using output jdbc connection
  *                   Use tokens with syntax %{<spark sql expression>} to substitute with values from [[DefaultExpressionData]].
  * @param postWriteSql SQL-statement to be executed in exec phase after writing output table, using output jdbc connection
  *                   Use tokens with syntax %{<spark sql expression>} to substitute with values from [[DefaultExpressionData]].
