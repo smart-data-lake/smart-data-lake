@@ -134,8 +134,10 @@ case class SparkIncrementalMode(compareCol: String, override val alternativeOutp
     // check alternativeOutput exists
     alternativeOutput
   }
-  override def apply(actionId: ActionObjectId, input: DataObject, output: DataObject)(implicit session: SparkSession, context: ActionPipelineContext): Option[(Seq[PartitionValues], Option[String])] = {
+  override def apply(actionId: ActionObjectId, mainInput: DataObject, mainOutput: DataObject)(implicit session: SparkSession, context: ActionPipelineContext): Option[(Seq[PartitionValues], Option[String])] = {
     import session.implicits._
+    val input = mainInput
+    val output = alternativeOutput.getOrElse(mainOutput)
     (input,output) match {
       case (sparkInput: CanCreateDataFrame, sparkOutput: CanCreateDataFrame) =>
         // if data object is new, it might not be able to create a DataFrame
