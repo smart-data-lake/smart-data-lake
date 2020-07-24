@@ -78,7 +78,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     implicit val context: ActionPipelineContext = ActionPipelineContext(feed, appName, 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
     TestUtil.prepareHiveTable(srcTable, srcPath, l1)
-    val action1 = DeduplicateAction("a", srcDO.id, tgt1DO.id)
+    val action1 = DeduplicateAction("a", srcDO.id, tgt1DO.id, metricsFailCondition = Some(s"dataObjectId = '${tgt1DO.id.id}' and key = 'records_written' and value = 0"))
     val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id)
     val actions: Seq[SparkSubFeedAction] = Seq(action1, action2)
     val stateStore = ActionDAGRunStateStore(statePath, appName)
@@ -855,6 +855,32 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     // check metrics
     val action2MainMetrics = action2.getFinalMetrics(action2.outputId).get.getMainInfos
     assert(action2MainMetrics("records_written")==2) // without execution mode always the whole table is processed
+  }
+
+  test("action dag failes because of metricsFailCondition") {
+    // setup DataObjects
+    val feed = "actionpipeline"
+    val tempDir = Files.createTempDirectory(feed)
+    val schema = DataType.fromDDL("lastname string, firstname string, rating int, tstmp timestamp").asInstanceOf[StructType]
+    val srcDO = JsonFileDataObject( "src1", tempDir.resolve("src1").toString.replace('\\', '/'), schema = Some(schema))
+    instanceRegistry.register(srcDO)
+    val tgt1DO = ParquetFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SaveMode.Append)
+    instanceRegistry.register(tgt1DO)
+
+    // prepare DAG
+    val refTimestamp1 = LocalDateTime.now()
+    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+    val df1 = Seq(("doe","john",5, Timestamp.from(Instant.now))).toDF("lastname", "firstname", "rating", "tstmp")
+    srcDO.writeDataFrame(df1, Seq())
+
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, metricsFailCondition = Some(s"dataObjectId = '${tgt1DO.id.id}' and value > 0"))
+    val dag: ActionDAGRun = ActionDAGRun(Seq(action1), 1, 1)
+
+    // first dag run, first file processed
+    dag.prepare
+    dag.init
+    val ex = intercept[TaskFailedException](dag.exec)
+    assert(ex.cause.isInstanceOf[MetricsCheckFailed])
   }
 
 }

@@ -40,12 +40,10 @@ import scala.collection.JavaConverters._
  * to avoid problems with net.ucanaccess.jdbc.UcanaccessDriver
  */
 case class AccessTableDataObject(override val id: DataObjectId,
-                                  path: String,
-                                  preSql: Option[String] = None,
-                                  postSql: Option[String] = None,
-                                  override val schemaMin: Option[StructType] = None,
-                                  override var table: Table,
-                                  override val metadata: Option[DataObjectMetadata] = None
+                                 path: String,
+                                 override val schemaMin: Option[StructType] = None,
+                                 override var table: Table,
+                                 override val metadata: Option[DataObjectMetadata] = None
                                 )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends TableDataObject {
 

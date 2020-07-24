@@ -39,6 +39,8 @@ import org.apache.spark.sql.SparkSession
  * @param transformer a custom file transformer, which reads a file from HadoopFileDataObject and writes it back to another HadoopFileDataObject
  * @param deleteDataAfterRead if the input files should be deleted after processing successfully
  * @param filesPerPartition number of files per Spark partition
+ * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
+ *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  */
 case class CustomFileAction(override val id: ActionObjectId,
                             inputId: DataObjectId,
@@ -48,6 +50,7 @@ case class CustomFileAction(override val id: ActionObjectId,
                             filesPerPartition: Int = 10,
                             override val breakFileRefLineage: Boolean = false,
                             override val initExecutionMode: Option[ExecutionMode] = None,
+                            override val metricsFailCondition: Option[String] = None,
                             override val metadata: Option[ActionMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)
   extends FileSubFeedAction with SmartDataLakeLogger {
