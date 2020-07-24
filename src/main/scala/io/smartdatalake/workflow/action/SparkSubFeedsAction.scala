@@ -19,9 +19,10 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.{ExecutionMode, ExecutionModeWithMainInputOutput}
 import io.smartdatalake.util.misc.PerformanceUtils
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 
@@ -30,45 +31,13 @@ abstract class SparkSubFeedsAction extends SparkAction {
   override def inputs: Seq[DataObject with CanCreateDataFrame]
   override def outputs: Seq[DataObject with CanWriteDataFrame]
 
+  def mainInputId: Option[DataObjectId]
+  def mainOutputId: Option[DataObjectId]
+
   // prepare main input / output
   // this must be lazy because inputs / outputs is evaluated later in subclasses
-  val initExecutionModeMainInputOutput: Option[ExecutionModeWithMainInputOutput] = initExecutionMode.collect{ case mode: ExecutionModeWithMainInputOutput => mode }
-  lazy val initMainInput: Option[DataObject with CanCreateDataFrame] = initExecutionModeMainInputOutput.flatMap {
-    _.mainInputId.map( inputId => inputs.find(_.id.id == inputId).getOrElse(throw ConfigurationException(s"$id has set an initExecutionMode with inputId $inputId, which was not found in inputs")))
-  }
-  val normalExecutionModeMainInputOutput: Option[ExecutionModeWithMainInputOutput] = executionMode.collect{ case mode: ExecutionModeWithMainInputOutput => mode }
-  lazy val normalMainInput: Option[DataObject with CanCreateDataFrame] = normalExecutionModeMainInputOutput.flatMap {
-    _.mainInputId.map( inputId => inputs.find(_.id.id == inputId).getOrElse(throw ConfigurationException(s"$id has set an initExecutionMode with inputId $inputId, which was not found in inputs")))
-  }
-  lazy protected val mainInput: DataObject with CanCreateDataFrame = initMainInput
-  .orElse(normalMainInput)
-  .orElse {
-    val paritionedInputs = inputs.collect{ case x: CanHandlePartitions => x }.filter(_.partitions.nonEmpty)
-    if (paritionedInputs.size==1) paritionedInputs.headOption
-    else None
-  }.orElse {
-    if (inputs.size==1) inputs.headOption else None
-  }.getOrElse {
-    if (executionModeNeedsMainInputOutput) logger.warn(s"($id) Could not determine unique main input but execution mode might need it. Decided for ${inputs.head.id}.")
-    inputs.head
-  }
-  lazy protected val initMainOutput: Option[DataObject with CanWriteDataFrame] = initExecutionModeMainInputOutput.flatMap {
-    _.mainOutputId.map( outputId => outputs.find(_.id.id == outputId).getOrElse(throw ConfigurationException(s"$id has set an initExecutionMode with outputId $outputId, which was not found in outputs")))
-  }
-  lazy protected val normalMainOutput: Option[DataObject with CanWriteDataFrame] = normalExecutionModeMainInputOutput.flatMap {
-    _.mainOutputId.map( outputId => outputs.find(_.id.id == outputId).getOrElse(throw ConfigurationException(s"$id has set an initExecutionMode with outputId $outputId, which was not found in outputs")))
-  }
-  lazy protected val mainOutput: DataObject with CanWriteDataFrame = initMainOutput
-  .orElse(normalMainOutput)
-  .orElse{
-    val paritionedOutputs = outputs.collect{ case x: CanHandlePartitions => x }.filter(_.partitions.nonEmpty)
-    if (paritionedOutputs.size==1) paritionedOutputs.headOption else None
-  }.orElse{
-    if (outputs.size==1) outputs.headOption else None
-  }.getOrElse {
-    if (executionModeNeedsMainInputOutput) logger.warn(s"($id) Could not determine unique main output but execution mode might need it. Decided for ${outputs.head.id}.")
-    outputs.head
-  }
+  lazy val mainInput: DataObject with CanCreateDataFrame = ActionHelper.getMainDataObject[DataObject with CanCreateDataFrame](mainInputId, inputs, "input", executionModeNeedsMainInputOutput, id)
+  lazy val mainOutput: DataObject with CanWriteDataFrame = ActionHelper.getMainDataObject[DataObject with CanWriteDataFrame](mainOutputId, outputs, "output", executionModeNeedsMainInputOutput, id)
 
   /**
    * Transform [[SparkSubFeed]]'s.
@@ -85,7 +54,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
     // apply execution mode
     preparedSubFeeds = thisExecutionMode match {
       case Some(mode) =>
-        val executionModeParameters = ActionHelper.applyExecutionMode(mode, id, mainInput, mainOutput, context.phase)
+        val executionModeParameters = mode.apply(id, mainInput, mainOutput)
         preparedSubFeeds.map {
           subFeed =>
             executionModeParameters match {

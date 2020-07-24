@@ -18,12 +18,11 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode}
+import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SparkSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.functions.col
 
 abstract class SparkSubFeedAction extends SparkAction {
 
@@ -52,7 +51,7 @@ abstract class SparkSubFeedAction extends SparkAction {
     // apply execution mode
     preparedSubFeed = thisExecutionMode match {
       case Some(mode) =>
-        ActionHelper.applyExecutionMode(mode, id, input, output, context.phase) match {
+        mode.apply(id, input, output) match {
           case Some((newPartitionValues, newFilter)) => preparedSubFeed.copy(partitionValues = newPartitionValues, filter = newFilter)
           case None => preparedSubFeed
         }
@@ -66,10 +65,6 @@ abstract class SparkSubFeedAction extends SparkAction {
     val transformedSubFeed = transform(preparedSubFeed)
     // update partition values to output's partition columns and update dataObjectId
     validateAndUpdateSubFeedPartitionValues(output, transformedSubFeed).copy(dataObjectId = output.id)
-  }
-
-  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    super.prepare
   }
 
   /**

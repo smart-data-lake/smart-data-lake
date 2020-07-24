@@ -44,6 +44,8 @@ case class CustomSparkAction ( override val id: ActionObjectId,
                                transformer: CustomDfsTransformerConfig,
                                override val breakDataFrameLineage: Boolean = false,
                                override val persist: Boolean = false,
+                               override val mainInputId: Option[DataObjectId] = None,
+                               override val mainOutputId: Option[DataObjectId] = None,
                                override val initExecutionMode: Option[ExecutionMode] = None,
                                override val executionMode: Option[ExecutionMode] = None,
                                override val metadata: Option[ActionMetadata] = None

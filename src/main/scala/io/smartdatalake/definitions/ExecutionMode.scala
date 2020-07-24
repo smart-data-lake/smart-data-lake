@@ -18,6 +18,16 @@
  */
 package io.smartdatalake.definitions
 
+import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.config.SdlConfigObject.ActionObjectId
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.action.ActionHelper.{getOptionalDataFrame, searchCommonInits}
+import io.smartdatalake.workflow.action.NoDataToProcessWarning
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject}
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.{col, max}
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types._
 
@@ -32,11 +42,19 @@ import org.apache.spark.sql.types._
  * }
  * }}}
  */
-sealed trait ExecutionMode
+sealed trait ExecutionMode extends SmartDataLakeLogger {
+  def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
+  def init(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
+  def apply(actionId: ActionObjectId, mainInput: DataObject, mainOutput: DataObject)(implicit session: SparkSession, context: ActionPipelineContext): Option[(Seq[PartitionValues], Option[String])]
+  def mainInputOutputNeeded: Boolean = false
+}
 
 trait ExecutionModeWithMainInputOutput {
-  def mainInputId: Option[String]
-  def mainOutputId: Option[String]
+  def alternativeOutputId: Option[String] = None
+  def alternativeOutput(implicit context: ActionPipelineContext): Option[DataObject] = {
+    import io.smartdatalake.config.SdlConfigObject.stringToDataObjectId
+    alternativeOutputId.map(context.instanceRegistry.get[DataObject](_))
+  }
 }
 
 /**
@@ -45,11 +63,52 @@ trait ExecutionModeWithMainInputOutput {
  * This mode needs mainInput/Output DataObjects which CanHandlePartitions to list partitions.
  * Partition values are passed to following actions, if for partition columns which they have in common.
  * @param partitionColNb optional number of partition columns to use as a common 'init'.
- * @param mainInputId optional selection of inputId to be used for partition comparision. Only needed if there are multiple input DataObject's.
- * @param mainOutputId optional selection of outputId to be used for partition comparision. Only needed if there are multiple output DataObject's.
+ * @param alternativeOutputId optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
+ *                            It can be used to ensure processing all partitions over multiple actions in case of errors.
  * @param nbOfPartitionValuesPerRun optional restriction of the number of partition values per run.
  */
-case class PartitionDiffMode(partitionColNb: Option[Int] = None, override val mainInputId: Option[String] = None, override val mainOutputId: Option[String] = None, nbOfPartitionValuesPerRun: Option[Int] = None) extends ExecutionMode with ExecutionModeWithMainInputOutput
+case class PartitionDiffMode(partitionColNb: Option[Int] = None, override val alternativeOutputId: Option[String] = None, nbOfPartitionValuesPerRun: Option[Int] = None) extends ExecutionMode with ExecutionModeWithMainInputOutput {
+  override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
+  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    // check alternativeOutput exists
+    alternativeOutput
+  }
+  override def apply(actionId: ActionObjectId, mainInput: DataObject, mainOutput: DataObject)(implicit session: SparkSession, context: ActionPipelineContext): Option[(Seq[PartitionValues], Option[String])] = {
+    val input = mainInput
+    val output = alternativeOutput.getOrElse(mainOutput)
+    (input, output) match {
+      case (partitionInput: CanHandlePartitions, partitionOutput: CanHandlePartitions)  =>
+        if (partitionInput.partitions.nonEmpty) {
+          if (partitionOutput.partitions.nonEmpty) {
+            // prepare common partition columns
+            val commonInits = searchCommonInits(partitionInput.partitions, partitionOutput.partitions)
+            require(commonInits.nonEmpty, s"$actionId has set initExecutionMode = 'PartitionDiffMode' but no common init was found in partition columns for $input and $output")
+            val commonPartitions = if (partitionColNb.isDefined) {
+              commonInits.find(_.size==partitionColNb.get).getOrElse(throw ConfigurationException(s"$actionId has set initExecutionMode = 'PartitionDiffMode' but no common init with ${partitionColNb.get} was found in partition columns of $input and $output from $commonInits!"))
+            } else {
+              commonInits.maxBy(_.size)
+            }
+            // calculate missing partition values
+            val partitionValuesToBeProcessed = partitionInput.listPartitions.map(_.filterKeys(commonPartitions)).toSet
+              .diff(partitionOutput.listPartitions.map(_.filterKeys(commonPartitions)).toSet).toSeq
+            // stop processing if no new data
+            if (partitionValuesToBeProcessed.isEmpty) throw NoDataToProcessWarning(actionId.id, s"($actionId) No partitions to process found for ${input.id}")
+            // sort and limit number of partitions processed
+            val ordering = PartitionValues.getOrdering(commonPartitions)
+            val selectedPartitionValues = nbOfPartitionValuesPerRun match {
+              case Some(n) => partitionValuesToBeProcessed.sorted(ordering).take(n)
+              case None => partitionValuesToBeProcessed.sorted(ordering)
+            }
+            logger.info(s"($actionId) PartitionDiffMode selected partition values ${selectedPartitionValues.mkString(", ")} to process")
+            //return
+            Some((selectedPartitionValues, None))
+          } else throw ConfigurationException(s"$actionId has set initExecutionMode = PartitionDiffMode but $output has no partition columns defined!")
+        } else throw ConfigurationException(s"$actionId has set initExecutionMode = PartitionDiffMode but $input has no partition columns defined!")
+      case (_: CanHandlePartitions, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = PartitionDiffMode but $output does not support partitions!")
+      case (_, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = PartitionDiffMode but $input does not support partitions!")
+    }
+  }
+}
 
 /**
  * Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads (trigger=Trigger.Once) and keep track of processed data.
@@ -58,16 +117,56 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None, override val ma
  * @param inputOptions additional option to apply when reading streaming source. This overwrites options set by the DataObjects.
  * @param outputOptions additional option to apply when writing to streaming sink. This overwrites options set by the DataObjects.
  */
-case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[String,String] = Map(), outputOptions: Map[String,String] = Map(), outputMode: OutputMode = OutputMode.Append) extends ExecutionMode
+case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[String,String] = Map(), outputOptions: Map[String,String] = Map(), outputMode: OutputMode = OutputMode.Append) extends ExecutionMode {
+  override def apply(actionId: ActionObjectId, mainInput: DataObject, mainOutput: DataObject)(implicit session: SparkSession, context: ActionPipelineContext): Option[(Seq[PartitionValues], Option[String])] = throw new NotImplementedError
+}
 
 /**
  * Compares max entry in "compare column" between mainOutput and mainInput and incrementally loads the delta.
  * This mode works only with SparkSubFeeds. The filter is not propagated to following actions.
  * @param compareCol a comparable column name existing in mainInput and mainOutput used to identify the delta. Column content should be bigger for newer records.
- * @param mainInputId optional selection of inputId to be used for comparision. Only needed if there are multiple input DataObject's.
- * @param mainOutputId optional selection of outputId to be used for comparision. Only needed if there are multiple output DataObject's.
+ * @param alternativeOutputId optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
+ *                            It can be used to ensure processing all partitions over multiple actions in case of errors.
  */
-case class SparkIncrementalMode(compareCol: String, override val mainInputId: Option[String] = None, override val mainOutputId: Option[String] = None) extends ExecutionMode with ExecutionModeWithMainInputOutput
+case class SparkIncrementalMode(compareCol: String, override val alternativeOutputId: Option[String] = None) extends ExecutionMode with ExecutionModeWithMainInputOutput {
+  override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
+  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    // check alternativeOutput exists
+    alternativeOutput
+  }
+  override def apply(actionId: ActionObjectId, input: DataObject, output: DataObject)(implicit session: SparkSession, context: ActionPipelineContext): Option[(Seq[PartitionValues], Option[String])] = {
+    import session.implicits._
+    (input,output) match {
+      case (sparkInput: CanCreateDataFrame, sparkOutput: CanCreateDataFrame) =>
+        // if data object is new, it might not be able to create a DataFrame
+        val dfInputOpt = getOptionalDataFrame(sparkInput)
+        val dfOutputOpt = getOptionalDataFrame(sparkOutput)
+        (dfInputOpt, dfOutputOpt) match {
+          // if both DataFrames exist, compare and create filter
+          case (Some(dfInput), Some(dfOutput)) =>
+            val inputColType = dfInput.schema(compareCol).dataType
+            require(SparkIncrementalMode.allowedDataTypes.contains(inputColType), s"($actionId) Type of compare column ${compareCol} must be one of ${SparkIncrementalMode.allowedDataTypes.mkString(", ")} in ${sparkInput.id}")
+            val outputColType = dfOutput.schema(compareCol).dataType
+            require(SparkIncrementalMode.allowedDataTypes.contains(outputColType), s"($actionId) Type of compare column ${compareCol} must be one of ${SparkIncrementalMode.allowedDataTypes.mkString(", ")} in ${sparkOutput.id}")
+            require(inputColType == outputColType, s"($actionId) Type of compare column ${compareCol} is different between ${sparkInput.id} ($inputColType) and ${sparkOutput.id} ($outputColType)")
+            // get latest values
+            val inputLatestValue = dfInput.agg(max(col(compareCol)).cast(StringType)).as[String].head
+            val outputLatestValue = dfOutput.agg(max(col(compareCol)).cast(StringType)).as[String].head
+            // stop processing if no new data
+            if (outputLatestValue == inputLatestValue) throw NoDataToProcessWarning(actionId.id, s"($actionId) No increment to process found for ${output.id} column ${compareCol} (lastestValue=$outputLatestValue)")
+            logger.info(s"($actionId) SparkIncrementalMode selected increment for writing to ${output.id}: column ${compareCol} from $outputLatestValue to $inputLatestValue to process")
+            // prepare filter
+            val selectedData = s"${compareCol} > cast('$outputLatestValue' as ${inputColType.sql})"
+            Some((Seq(), Some(selectedData)))
+          // otherwise don't filter
+          case _ =>
+            logger.info(s"($actionId) SparkIncrementalMode selected all records for writing to ${output.id}, because input or output DataObject is still empty.")
+            Some((Seq(), None))
+        }
+      case _ => throw ConfigurationException(s"$actionId has set executionMode = $SparkIncrementalMode but $input or $output does not support creating Spark DataFrames!")
+    }
+  }
+}
 object SparkIncrementalMode {
   private[smartdatalake] val allowedDataTypes = Seq(StringType, LongType, IntegerType, ShortType, FloatType, DoubleType, TimestampType)
 }

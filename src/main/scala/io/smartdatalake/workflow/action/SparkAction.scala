@@ -30,12 +30,11 @@ import io.smartdatalake.util.streaming.DummyStreamProvider
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.ActionHelper.{filterBlacklist, filterWhitelist}
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanCreateStreamingDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject, SparkFileDataObject, TableDataObject, UserDefinedSchema}
+import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.functions.col
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import org.apache.spark.sql.streaming.Trigger
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
 private[smartdatalake] abstract class SparkAction extends Action {
 
@@ -70,6 +69,12 @@ private[smartdatalake] abstract class SparkAction extends Action {
   def runtimeExecutionMode(subFeed: SubFeed): Option[ExecutionMode] = {
     // override executionMode with initExecutionMode if is start node of a DAG run
     if (subFeed.isDAGStart) initExecutionMode.orElse(executionMode) else executionMode
+  }
+
+  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.prepare
+    initExecutionMode.foreach(_.prepare)
+    executionMode.foreach(_.prepare)
   }
 
   /**
