@@ -531,22 +531,6 @@
 				</exclusion>
 			</exclusions>
 		</dependency>
-		<!-- this is for converting confluent avro message to spark structtype -->
-		<dependency>
-			<groupId>za.co.absa</groupId>
-			<artifactId>abris_${scala.minor.version}</artifactId>
-			<version>3.1.1</version>
-			<exclusions>
-				<exclusion>
-					<groupId>org.apache.spark</groupId>
-					<artifactId>spark-streaming</artifactId>
-				</exclusion>
-				<exclusion>
-					<groupId>org.apache.spark</groupId>
-					<artifactId>spark-streaming-kafka-0-10_${scala.compat.version}</artifactId>
-				</exclusion>
-			</exclusions>
-		</dependency>
 
 		<dependency>
 			<groupId>com.databricks</groupId>
@@ -559,7 +543,6 @@
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-avro_${scala.minor.version}</artifactId>
 			<version>${spark.version}</version>
-			<scope>runtime</scope>
 		</dependency>
 
 		<dependency>

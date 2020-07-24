@@ -22,13 +22,16 @@ package io.smartdatalake.workflow.connection
 import java.util.Properties
 
 import com.typesafe.config.Config
+import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.definitions.{AuthMode, SSLCertsAuthMode}
+import io.smartdatalake.util.misc.TryWithResourcePool
 import org.apache.kafka.clients.admin.AdminClient
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.admin.AdminClientConfig
 import org.apache.kafka.common.config.SslConfigs
+import org.apache.spark.sql.avro.confluent.ConfluentHelper
 
 import scala.collection.JavaConverters._
 
@@ -55,6 +58,8 @@ case class KafkaConnection(override val id: ConnectionId,
     props.putAll(authProps)
     AdminClient.create(props)
   }
+
+  @transient lazy val confluentHelper: Option[ConfluentHelper] = schemaRegistry.map(new ConfluentHelper(_))
 
   private val KafkaConfigOptionPrefix = "kafka."
   private val KafkaSSLSecurityProtocol = "SSL"
@@ -85,6 +90,14 @@ case class KafkaConnection(override val id: ConnectionId,
 
   def topicExists(topic: String): Boolean = {
     adminClient.listTopics.names.get.asScala.contains(topic)
+  }
+
+  def testSchemaRegistry(): Unit = {
+    try {
+      confluentHelper.foreach(_.test())
+    } catch {
+      case e:Exception => throw ConfigurationException(s"($id) Can not connect to schema registry (${schemaRegistry.get})")
+    }
   }
 
   override def factory: FromConfigFactory[Connection] = KafkaConnection
