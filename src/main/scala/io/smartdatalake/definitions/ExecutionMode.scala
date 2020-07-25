@@ -45,7 +45,7 @@ import org.apache.spark.sql.types._
 sealed trait ExecutionMode extends SmartDataLakeLogger {
   def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
   def init(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
-  def apply(actionId: ActionObjectId, mainInput: DataObject, mainOutput: DataObject)(implicit session: SparkSession, context: ActionPipelineContext): Option[(Seq[PartitionValues], Option[String])]
+  def apply(actionId: ActionObjectId, mainInput: DataObject, mainOutput: DataObject)(implicit session: SparkSession, context: ActionPipelineContext): Option[(Seq[PartitionValues], Option[String])] = None
   def mainInputOutputNeeded: Boolean = false
 }
 
@@ -116,9 +116,7 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None, override val al
  * @param inputOptions additional option to apply when reading streaming source. This overwrites options set by the DataObjects.
  * @param outputOptions additional option to apply when writing to streaming sink. This overwrites options set by the DataObjects.
  */
-case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[String,String] = Map(), outputOptions: Map[String,String] = Map(), outputMode: OutputMode = OutputMode.Append) extends ExecutionMode {
-  override def apply(actionId: ActionObjectId, mainInput: DataObject, mainOutput: DataObject)(implicit session: SparkSession, context: ActionPipelineContext): Option[(Seq[PartitionValues], Option[String])] = throw new NotImplementedError
-}
+case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[String,String] = Map(), outputOptions: Map[String,String] = Map(), outputMode: OutputMode = OutputMode.Append) extends ExecutionMode
 
 /**
  * Compares max entry in "compare column" between mainOutput and mainInput and incrementally loads the delta.
