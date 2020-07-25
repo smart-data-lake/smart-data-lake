@@ -603,6 +603,57 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     intercept[NoDataToProcessWarning](dag.init)
   }
 
+  test("action dag with 2 actions in sequence and executionMode=PartitionDiffMode alternativeOutputId") {
+    // setup DataObjects
+    val feed = "actionpipeline"
+    val srcTable = Table(Some("default"), "ap_input")
+    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
+    val srcPath = tempPath+s"/${srcTable.fullName}"
+    val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    instanceRegistry.register(srcDO)
+    val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
+    HiveUtil.dropTable(session, tgt1Table.db.get, tgt1Table.name )
+    val tgt1Path = tempPath+s"/${tgt1Table.fullName}"
+    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tgt1Path), table = tgt1Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    instanceRegistry.register(tgt1DO)
+    val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
+    HiveUtil.dropTable(session, tgt2Table.db.get, tgt2Table.name )
+    val tgt2Path = tempPath+s"/${tgt2Table.fullName}"
+    val tgt2DO = HiveTableDataObject( "tgt2", Some(tgt2Path), table = tgt2Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    instanceRegistry.register(tgt2DO)
+
+    // prepare DAG
+    // prepare data in srcDO and tgt1DO. Because of alternativeOutputId in action~a it should be processed again.
+    val refTimestamp1 = LocalDateTime.now()
+    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+    val df1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
+    val expectedPartitions = Seq(PartitionValues(Map("lastname"->"doe")))
+    srcDO.writeDataFrame(df1, expectedPartitions)
+    tgt1DO.writeDataFrame(df1, expectedPartitions)
+    val actions: Seq[SparkSubFeedAction] = Seq(
+      CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(alternativeOutputId = Some(tgt2DO.id))))
+      , CopyAction("b", tgt1DO.id, tgt2DO.id)
+    )
+    val dag: ActionDAGRun = ActionDAGRun(actions, 1, 1)
+
+    // first dag run
+    dag.prepare
+    dag.init
+    dag.exec
+
+    // check
+    val r1 = tgt2DO.getDataFrame()
+      .select($"rating")
+      .as[Int].collect().toSeq
+    assert(r1.size == 1)
+    assert(r1.head == 5)
+    assert(tgt2DO.listPartitions == expectedPartitions)
+
+    // second dag run - skip action execution because there are no new partitions to process
+    dag.prepare
+    intercept[NoDataToProcessWarning](dag.init)
+  }
+
   test("action dag with 2 actions in sequence and executionMode=SparkStreamingOnceMode") {
     // setup DataObjects
     val feed = "actionpipeline"

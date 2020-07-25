@@ -19,7 +19,7 @@
 package io.smartdatalake.definitions
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.config.SdlConfigObject.ActionObjectId
+import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -50,9 +50,8 @@ sealed trait ExecutionMode extends SmartDataLakeLogger {
 }
 
 private[smartdatalake] trait ExecutionModeWithMainInputOutput {
-  def alternativeOutputId: Option[String] = None
+  def alternativeOutputId: Option[DataObjectId] = None
   def alternativeOutput(implicit context: ActionPipelineContext): Option[DataObject] = {
-    import io.smartdatalake.config.SdlConfigObject.stringToDataObjectId
     alternativeOutputId.map(context.instanceRegistry.get[DataObject](_))
   }
 }
@@ -67,7 +66,7 @@ private[smartdatalake] trait ExecutionModeWithMainInputOutput {
  *                            It can be used to ensure processing all partitions over multiple actions in case of errors.
  * @param nbOfPartitionValuesPerRun optional restriction of the number of partition values per run.
  */
-case class PartitionDiffMode(partitionColNb: Option[Int] = None, override val alternativeOutputId: Option[String] = None, nbOfPartitionValuesPerRun: Option[Int] = None) extends ExecutionMode with ExecutionModeWithMainInputOutput {
+case class PartitionDiffMode(partitionColNb: Option[Int] = None, override val alternativeOutputId: Option[DataObjectId] = None, nbOfPartitionValuesPerRun: Option[Int] = None) extends ExecutionMode with ExecutionModeWithMainInputOutput {
   override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
   override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     // check alternativeOutput exists
@@ -128,7 +127,7 @@ case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[
  * @param alternativeOutputId optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
  *                            It can be used to ensure processing all partitions over multiple actions in case of errors.
  */
-case class SparkIncrementalMode(compareCol: String, override val alternativeOutputId: Option[String] = None) extends ExecutionMode with ExecutionModeWithMainInputOutput {
+case class SparkIncrementalMode(compareCol: String, override val alternativeOutputId: Option[DataObjectId] = None) extends ExecutionMode with ExecutionModeWithMainInputOutput {
   override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
   override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     // check alternativeOutput exists
