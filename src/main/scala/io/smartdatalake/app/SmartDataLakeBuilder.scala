@@ -60,7 +60,7 @@ case class SmartDataLakeBuilderConfig(feedSel: String = null,
                                       overrideJars: Option[Seq[String]] = None
                                 ) {
   def validate(): Unit = {
-    assert(!applicationName.exists(_.contains({ActionDAGRunStateStore.fileNamePartSeparator})), s"Application name must not contain character '${ActionDAGRunStateStore.fileNamePartSeparator}' ($applicationName)")
+    assert(!applicationName.exists(_.contains({HadoopFileActionDAGRunStateStore.fileNamePartSeparator})), s"Application name must not contain character '${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}' ($applicationName)")
     assert(!master.contains("yarn") || deployMode.nonEmpty, "spark deploy-mode must be set if spark master=yarn")
     assert(partitionValues.isEmpty || multiPartitionValues.isEmpty, "partitionValues and multiPartitionValues cannot be defined at the same time")
     assert(statePath.isEmpty || applicationName.isDefined, "application name must be defined if state path is set")
@@ -152,11 +152,11 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       assert(appConfig.applicationName.nonEmpty, "Application name must be defined if statePath is set")
       // check if latest run succeeded
       val appName = appConfig.applicationName.get
-      val stateStore = ActionDAGRunStateStore(appConfig.statePath.get, appName)
+      val stateStore = HadoopFileActionDAGRunStateStore(appConfig.statePath.get, appName)
       val latestRunId = stateStore.getLatestRunId
       if (latestRunId.isDefined) {
         val latestStateFile = stateStore.getLatestState(latestRunId)
-        val latestRunState = stateStore.recoverRunState(latestStateFile.path)
+        val latestRunState = stateStore.recoverRunState(latestStateFile)
         if (latestRunState.isFailed) {
           // start recovery
           recoverRun(appConfig, stateStore, latestRunState)
@@ -175,7 +175,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   /**
    * Recover previous failed run.
    */
-  private def recoverRun(appConfig: SmartDataLakeBuilderConfig, stateStore: ActionDAGRunStateStore, runState: ActionDAGRunState): String = {
+  private def recoverRun(appConfig: SmartDataLakeBuilderConfig, stateStore: ActionDAGRunStateStore[_ <: StateId], runState: ActionDAGRunState): String = {
     logger.info(s"recovering application ${appConfig.applicationName.get} runId=${runState.runId} lastAttemptId=${runState.attemptId}")
     // skip all succeeded actions
     val actionsToSkip = runState.actionsState
@@ -187,10 +187,12 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     startRun(runState.appConfig, runState.runId, runState.attemptId+1, actionIdsToSkip, initialSubFeeds, Some(stateStore))
   }
 
+  //def runSimulation(appConfig: SmartDataLakeBuilderConfig, )
+
   /**
    * Start run.
    */
-  private def startRun(appConfig: SmartDataLakeBuilderConfig, runId: Int = 1, attemptId: Int = 1, actionIdsToSkip: Seq[ActionObjectId] = Seq(), initialSubFeeds: Seq[SubFeed] = Seq(), stateStore: Option[ActionDAGRunStateStore] = None): String = {
+  private def startRun(appConfig: SmartDataLakeBuilderConfig, runId: Int = 1, attemptId: Int = 1, actionIdsToSkip: Seq[ActionObjectId] = Seq(), initialSubFeeds: Seq[SubFeed] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None): String = {
 
     // validate application config
     appConfig.validate()

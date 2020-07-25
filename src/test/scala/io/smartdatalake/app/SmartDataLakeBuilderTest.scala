@@ -27,7 +27,7 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.EnvironmentUtil
-import io.smartdatalake.workflow.{ActionDAGRunStateStore, TaskFailedException}
+import io.smartdatalake.workflow.{ActionDAGRunStateStore, HadoopFileActionDAGRunStateStore, TaskFailedException}
 import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, CustomDfTransformerConfig}
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction, DeduplicateAction, RuntimeEventState}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
@@ -103,9 +103,9 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // check latest state
     {
-      val stateStore = ActionDAGRunStateStore(statePath, appName)
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
       val stateFile = stateStore.getLatestState()
-      val runState = stateStore.recoverRunState(stateFile.path)
+      val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
       assert(runState.actionsState.mapValues(_.state) == Map(action1.id.id -> RuntimeEventState.SUCCEEDED, action2fail.id.id -> RuntimeEventState.FAILED))
@@ -133,9 +133,9 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // check latest state
     {
-      val stateStore = ActionDAGRunStateStore(statePath, appName)
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
       val stateFile = stateStore.getLatestState()
-      val runState = stateStore.recoverRunState(stateFile.path)
+      val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
       assert(runState.actionsState.mapValues(_.state) == Map(action2success.id.id -> RuntimeEventState.SUCCEEDED))
@@ -185,9 +185,9 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // check latest state
     {
-      val stateStore = ActionDAGRunStateStore(statePath, appName)
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
       val stateFile = stateStore.getLatestState()
-      val runState = stateStore.recoverRunState(stateFile.path)
+      val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
       assert(runState.actionsState.mapValues(_.state) == Map(action1.id.id -> RuntimeEventState.SUCCEEDED))
@@ -213,9 +213,9 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // check latest state
     {
-      val stateStore = ActionDAGRunStateStore(statePath, appName)
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
       val stateFile = stateStore.getLatestState()
-      val runState = stateStore.recoverRunState(stateFile.path)
+      val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 2)
       assert(runState.attemptId == 1)
       assert(runState.actionsState.mapValues(_.state) == Map(action1.id.id -> RuntimeEventState.SUCCEEDED))
