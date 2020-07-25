@@ -27,7 +27,8 @@ import io.smartdatalake.config.{ConfigLoader, ConfigParser, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SmartDataLakeLogger}
 import io.smartdatalake.workflow._
-import io.smartdatalake.workflow.action.RuntimeEventState
+import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
+import io.smartdatalake.workflow.action.{ResultRuntimeInfo, RuntimeEventState, SparkAction}
 import org.apache.spark.sql.SparkSession
 import scopt.OptionParser
 
@@ -147,7 +148,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    *
    * @param appConfig Application configuration (parsed from command line).
    */
-  def run(appConfig: SmartDataLakeBuilderConfig): String = try {
+  def run(appConfig: SmartDataLakeBuilderConfig): Map[RuntimeEventState,Int] = try {
     if (appConfig.statePath.isDefined) {
       assert(appConfig.applicationName.nonEmpty, "Application name must be defined if statePath is set")
       // check if latest run succeeded
@@ -159,14 +160,14 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         val latestRunState = stateStore.recoverRunState(latestStateFile)
         if (latestRunState.isFailed) {
           // start recovery
-          recoverRun(appConfig, stateStore, latestRunState)
+          recoverRun(appConfig, stateStore, latestRunState)._2
         } else {
-          startRun(appConfig, runId = latestRunState.runId+1, stateStore = Some(stateStore))
+          startRun(appConfig, runId = latestRunState.runId+1, stateStore = Some(stateStore))._2
         }
       } else {
-        startRun(appConfig, stateStore = Some(stateStore))
+        startRun(appConfig, stateStore = Some(stateStore))._2
       }
-    } else startRun(appConfig)
+    } else startRun(appConfig)._2
   } finally {
     // make sure memory logger timer task is stopped
     MemoryUtils.stopMemoryLogger()
@@ -175,24 +176,38 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   /**
    * Recover previous failed run.
    */
-  private def recoverRun(appConfig: SmartDataLakeBuilderConfig, stateStore: ActionDAGRunStateStore[_ <: StateId], runState: ActionDAGRunState): String = {
+  private def recoverRun(appConfig: SmartDataLakeBuilderConfig, stateStore: ActionDAGRunStateStore[_ <: StateId], runState: ActionDAGRunState): (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
     logger.info(s"recovering application ${appConfig.applicationName.get} runId=${runState.runId} lastAttemptId=${runState.attemptId}")
     // skip all succeeded actions
     val actionsToSkip = runState.actionsState
       .filter { case (id,info) => info.state==RuntimeEventState.SUCCEEDED }
     val actionIdsToSkip = actionsToSkip
-      .map { case (id,info) => ActionObjectId(id) }.toSeq
+      .map { case (id,info) => id }.toSeq
     val initialSubFeeds = actionsToSkip.flatMap(_._2.results.map(_.subFeed)).toSeq
     // start run, increase attempt counter
     startRun(runState.appConfig, runState.runId, runState.attemptId+1, actionIdsToSkip, initialSubFeeds, Some(stateStore))
   }
 
-  //def runSimulation(appConfig: SmartDataLakeBuilderConfig, )
+  /**
+   * Start dry run.
+   * This executes the DAG and returns all subfeeds. Only prepare and init are executed
+   * All initial subfeeds must be provided as input.
+   *
+   * Note: this only works with SparkActions for now
+   * @param appConfig application configuration
+   * @param initialSubFeeds initial subfeeds for DataObjects at the beginning of the DAG
+   * @return tuple of list of final subfeeds and statistics (action count per RuntimeEventState)
+   */
+  def startDryRun(appConfig: SmartDataLakeBuilderConfig, initialSubFeeds: Seq[SparkSubFeed]): (Seq[SparkSubFeed], Map[RuntimeEventState,Int]) = {
+    val (subFeeds, stats) = startRun(appConfig, initialSubFeeds = initialSubFeeds, dryRun = true)
+    (subFeeds.map(_.asInstanceOf[SparkSubFeed]), stats)
+  }
 
   /**
    * Start run.
+   * @return tuple of list of final subfeeds and statistics (action count per RuntimeEventState)
    */
-  private def startRun(appConfig: SmartDataLakeBuilderConfig, runId: Int = 1, attemptId: Int = 1, actionIdsToSkip: Seq[ActionObjectId] = Seq(), initialSubFeeds: Seq[SubFeed] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None): String = {
+  private def startRun(appConfig: SmartDataLakeBuilderConfig, runId: Int = 1, attemptId: Int = 1, actionIdsToSkip: Seq[ActionObjectId] = Seq(), initialSubFeeds: Seq[SubFeed] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, dryRun: Boolean = false): (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
 
     // validate application config
     appConfig.validate()
@@ -236,19 +251,26 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     // create and execute actions
     logger.info(s"starting application ${appName} runId=$runId attemptId=$attemptId")
-    implicit val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appName, runId, attemptId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig)
+    implicit val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appName, runId, attemptId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig, dryRun)
     val actionDAGRun = ActionDAGRun(actionsToExec, runId, attemptId, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, stateStore)
-    try {
-      actionDAGRun.prepare
-      actionDAGRun.init
-      actionDAGRun.exec
-      actionDAGRun.saveState(true)
+    val finalSubFeeds = try {
+      if (dryRun) {
+        require(actionsToExec.forall(_.isInstanceOf[SparkAction]), s"Dry run needs all selected actions to be instances of SparkAction. This is not the case for ${actionsToExec.filterNot(_.isInstanceOf[SparkAction]).map(_.id).mkString(", ")}")
+        actionDAGRun.init
+      } else {
+        actionDAGRun.prepare
+        val subFeeds = actionDAGRun.exec
+        actionDAGRun.saveState(true)
+        subFeeds
+      }
     } catch {
       // don't fail an not severe exceptions like having no data to process
-      case ex: DAGException if (ex.severity == ExceptionSeverity.SKIPPED) => logger.warn(s"dag run is skipped because of ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+      case ex: DAGException if (ex.severity == ExceptionSeverity.SKIPPED) =>
+        logger.warn(s"dag run is skipped because of ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+        Seq()
     }
 
     // return result statistics as string
-    actionDAGRun.getStatistics.map(x => x._1 + "=" + x._2).mkString(" ")
+    (finalSubFeeds, actionDAGRun.getStatistics)
   }
 }

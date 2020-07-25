@@ -42,7 +42,7 @@ trait SubFeed extends DAGResult {
    * This is usable to break long DataFrame Lineages over multiple Actions and instead reread the data from an intermediate table
    * @return
    */
-  def breakLineage(implicit session: SparkSession): SubFeed
+  def breakLineage(implicit session: SparkSession, context: ActionPipelineContext): SubFeed
 
   def clearPartitionValues(): SubFeed
 
@@ -71,10 +71,10 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
                         filter: Option[String] = None
                        )
   extends SubFeed {
-  override def breakLineage(implicit session: SparkSession): SparkSubFeed = {
+  override def breakLineage(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // in order to keep the schema but truncate spark logical plan, a dummy DataFrame is created.
     // dummy DataFrames must be exchanged to real DataFrames before reading in exec-phase.
-    if(dataFrame.isDefined) convertToDummy(dataFrame.get.schema) else this
+    if(dataFrame.isDefined && !context.dryRun) convertToDummy(dataFrame.get.schema) else this
   }
   override def clearPartitionValues(): SparkSubFeed = {
     this.copy(partitionValues = Seq())
@@ -86,7 +86,7 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
   override def clearDAGStart(): SparkSubFeed = {
     this.copy(isDAGStart = false)
   }
-  def clearFilter(implicit session: SparkSession): SparkSubFeed = {
+  def clearFilter(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // if filter is removed, also the DataFrame must be removed so that the next action get's an unfiltered DataFrame
     if (filter.isDefined) this.copy(filter = None).breakLineage else this
   }
@@ -130,7 +130,7 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
                        processedInputFileRefs: Option[Seq[FileRef]] = None
                       )
   extends SubFeed {
-  override def breakLineage(implicit session: SparkSession): FileSubFeed = {
+  override def breakLineage(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
     this.copy(fileRefs = None)
   }
   override def clearPartitionValues(): FileSubFeed = {
@@ -162,7 +162,7 @@ object FileSubFeed {
 case class InitSubFeed(override val dataObjectId: DataObjectId, override val partitionValues: Seq[PartitionValues])
   extends SubFeed {
   override def isDAGStart: Boolean = true
-  override def breakLineage(implicit session: SparkSession): InitSubFeed = this
+  override def breakLineage(implicit session: SparkSession, context: ActionPipelineContext): InitSubFeed = this
   override def clearPartitionValues(): InitSubFeed = {
     this.copy(partitionValues = Seq())
   }

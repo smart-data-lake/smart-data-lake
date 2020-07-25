@@ -32,6 +32,7 @@ private[smartdatalake] case class ActionPipelineContext(
   instanceRegistry: InstanceRegistry,
   referenceTimestamp: Option[LocalDateTime] = None,
   appConfig: SmartDataLakeBuilderConfig, // application config is needed to persist action dag state for recovery
+  dryRun: Boolean = false,
   var phase: ExecutionPhase = ExecutionPhase.Prepare
 ) {
   def getReferenceTimestampOrNow: LocalDateTime = referenceTimestamp.getOrElse(LocalDateTime.now)
