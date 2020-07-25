@@ -246,9 +246,8 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tgt1Path), table = tgt1Table, numInitialHdfsPartitions = 1)
     instanceRegistry.register(tgt1DO)
     val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname", "firstname")))
-    HiveUtil.dropTable(session, tgt1Table.db.get, tgt1Table.name)
     val tgt2Path = tempPath + s"/${tgt1Table.fullName}"
-    val tgt2DO = HiveTableDataObject("tgt2", Some(tgt1Path), table = tgt2Table, numInitialHdfsPartitions = 1)
+    val tgt2DO = HiveTableDataObject("tgt2", Some(tgt2Path), table = tgt2Table, numInitialHdfsPartitions = 1)
     instanceRegistry.register(tgt2DO)
 
     // prepare input DataFrame
