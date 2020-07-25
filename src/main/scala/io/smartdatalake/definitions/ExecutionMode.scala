@@ -49,7 +49,7 @@ sealed trait ExecutionMode extends SmartDataLakeLogger {
   def mainInputOutputNeeded: Boolean = false
 }
 
-trait ExecutionModeWithMainInputOutput {
+private[smartdatalake] trait ExecutionModeWithMainInputOutput {
   def alternativeOutputId: Option[String] = None
   def alternativeOutput(implicit context: ActionPipelineContext): Option[DataObject] = {
     import io.smartdatalake.config.SdlConfigObject.stringToDataObjectId
