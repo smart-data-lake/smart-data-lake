@@ -35,6 +35,8 @@ import org.apache.spark.sql.SparkSession
  * @param inputIds input DataObject's
  * @param outputIds output DataObject's
  * @param transformer Custom Transformer to transform Seq[DataFrames]
+ * @param mainInputId optional selection of main inputId used for execution mode and partition values propagation. Only needed if there are multiple input DataObject's.
+ * @param mainOutputId optional selection of main outputId used for execution mode and partition values propagation. Only needed if there are multiple output DataObject's.
  * @param initExecutionMode optional execution mode if this Action is a start node of a DAG run
  * @param executionMode optional execution mode for this Action
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.

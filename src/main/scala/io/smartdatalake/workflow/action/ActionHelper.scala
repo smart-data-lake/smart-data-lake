@@ -131,8 +131,8 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
     mainId.map {
       id => dataObjects.find(_.id == id).getOrElse(throw ConfigurationException(s"($actionId) main${inputOutput}Id $id not found in ${inputOutput}s"))
     }.orElse {
-      val paritionedDataObjects = dataObjects.collect{ case x: T with CanHandlePartitions => x }.filter(_.partitions.nonEmpty)
-      if (paritionedDataObjects.size==1) paritionedDataObjects.headOption
+      val partitionedDataObjects = dataObjects.collect{ case x: T @unchecked with CanHandlePartitions => x }.filter(_.partitions.nonEmpty)
+      if (partitionedDataObjects.size==1) partitionedDataObjects.headOption
       else None
     }.orElse {
       if (dataObjects.size==1) dataObjects.headOption else None
