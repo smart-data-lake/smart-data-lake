@@ -22,16 +22,13 @@ package io.smartdatalake.workflow.connection
 import java.util.Properties
 
 import com.typesafe.config.Config
-import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{AuthMode, SSLCertsAuthMode}
-import io.smartdatalake.util.misc.TryWithResourcePool
-import org.apache.kafka.clients.admin.AdminClient
+import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig}
 import org.apache.kafka.clients.consumer.ConsumerConfig
-import org.apache.kafka.clients.admin.AdminClientConfig
 import org.apache.kafka.common.config.SslConfigs
-import org.apache.spark.sql.avro.confluent.ConfluentHelper
+import org.apache.spark.sql.avro.confluent.ConfluentClient
 
 import scala.collection.JavaConverters._
 
@@ -59,7 +56,7 @@ case class KafkaConnection(override val id: ConnectionId,
     AdminClient.create(props)
   }
 
-  @transient lazy val confluentHelper: Option[ConfluentHelper] = schemaRegistry.map(new ConfluentHelper(_))
+  @transient lazy val confluentHelper: Option[ConfluentClient] = schemaRegistry.map(new ConfluentClient(_))
 
   private val KafkaConfigOptionPrefix = "kafka."
   private val KafkaSSLSecurityProtocol = "SSL"

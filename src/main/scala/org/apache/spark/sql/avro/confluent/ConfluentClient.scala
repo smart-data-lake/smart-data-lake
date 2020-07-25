@@ -1,25 +1,21 @@
 package org.apache.spark.sql.avro.confluent
 
-import java.io.ByteArrayOutputStream
-import java.nio.ByteBuffer
-
 import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, SchemaRegistryClient}
-import org.apache.avro.generic.{GenericDatumReader, GenericDatumWriter}
-import org.apache.avro.io.{BinaryDecoder, BinaryEncoder, DecoderFactory, EncoderFactory}
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.avro.confluent.SubjectType.SubjectType
-import org.apache.spark.sql.avro.{AvroDeserializer, AvroSerializer, SchemaConverters}
-import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenerator, CodegenContext, ExprCode}
-import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, Expression, UnaryExpression}
-import org.apache.spark.sql.types.{AbstractDataType, BinaryType, DataType}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.util.Try
 
-class ConfluentHelper (schemaRegistryUrl: String) extends Logging with Serializable {
+/**
+ * Wrapper for schema registry client.
+ * It supports advanced logic for schema compatibility check and update.
+ * It provides Spark SQL functions from/to_confluent_avro for decoding/encoding confluent avro messages.
+ */
+class ConfluentClient(schemaRegistryUrl: String) extends Logging with Serializable {
 
   @transient lazy val sr: SchemaRegistryClient = new CachedSchemaRegistryClient(schemaRegistryUrl, 1000)
   @transient private lazy val subjects = mutable.Set(sr.getAllSubjects.asScala.toSeq: _*)
@@ -203,102 +199,3 @@ object SubjectType extends Enumeration {
 class SubjectNotExistingException(msg:String) extends Exception(msg)
 
 class SchemaIncompatibleException(msg:String) extends Exception(msg)
-
-// copied from org.apache.spark.sql.avro.*
-case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confluentHelper: ConfluentHelper)
-  extends UnaryExpression with ExpectsInputTypes {
-
-  override def inputTypes: Seq[AbstractDataType] = Seq(BinaryType)
-
-  override lazy val dataType: DataType = SchemaConverters.toSqlType(tgtSchema).dataType
-
-  override def nullable: Boolean = true
-
-  @transient private lazy val (tgtSchemaId,tgtSchema) = confluentHelper.getLatestSchemaFromConfluent(subject)
-
-  @transient private lazy val reader = new GenericDatumReader[Any](tgtSchema)
-
-  // To decode a message we need to use the schema referenced by the message. Therefore we might need different deserializers.
-  @transient private lazy val deserializers = mutable.Map(tgtSchemaId -> new AvroDeserializer(tgtSchema, dataType))
-
-  @transient private var decoder: BinaryDecoder = _
-
-  @transient private var result: Any = _
-
-  override def nullSafeEval(input: Any): Any = {
-    val binary = input.asInstanceOf[Array[Byte]]
-    val (schemaId,avroMsg) = parseConfluentMsg(binary)
-    val (_,msgSchema) = confluentHelper.getSchemaFromConfluent(schemaId)
-    decoder = DecoderFactory.get().binaryDecoder(avroMsg, 0, avroMsg.length, decoder)
-    result = reader.read(result, decoder)
-    deserializers.getOrElseUpdate(schemaId, new AvroDeserializer(msgSchema, dataType))
-      .deserialize(result)
-  }
-
-  override def prettyName: String = "from_avro"
-
-  override protected def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
-    val expr = ctx.addReferenceObj("this", this)
-    defineCodeGen(ctx, ev, input =>
-      s"(${CodeGenerator.boxedType(dataType)})$expr.nullSafeEval($input)")
-  }
-
-  def parseConfluentMsg(msg:Array[Byte]): (Int,Array[Byte]) = {
-    val msgBuffer = ByteBuffer.wrap(msg)
-    val magicByte = msgBuffer.get
-    require(magicByte == confluentHelper.CONFLUENT_MAGIC_BYTE, "Magic byte not present at start of confluent message!")
-    val schemaId = msgBuffer.getInt
-    val avroMsg = msg.slice(msgBuffer.position, msgBuffer.limit)
-    //return
-    (schemaId, avroMsg)
-  }
-}
-
-// copied from org.apache.spark.sql.avro.*
-case class CatalystDataToConfluentAvro(child: Expression, subject: String, confluentHelper: ConfluentHelper, updateAllowed: Boolean) extends UnaryExpression {
-
-  override def dataType: DataType = BinaryType
-
-  @transient private lazy val newSchema = SchemaConverters.toAvroType(child.dataType, child.nullable)
-
-  @transient private lazy val (id,targetSchema) = if (updateAllowed) confluentHelper.setOrUpdateSchema(subject, newSchema)
-  else confluentHelper.setOrCheckSchema(subject, newSchema)
-
-  @transient private lazy val serializer = new AvroSerializer(child.dataType, targetSchema, child.nullable)
-
-  @transient private lazy val writer = new GenericDatumWriter[Any](targetSchema)
-
-  @transient private var encoder: BinaryEncoder = _
-
-  @transient private lazy val out = new ByteArrayOutputStream
-
-  /**
-   * Instantiate serializer and writer for schema compatibility check
-   */
-  def test(): Unit = {
-    serializer
-    writer
-  }
-
-  override def nullSafeEval(input: Any): Any = {
-    out.reset()
-    appendSchemaId(id, out)
-    encoder = EncoderFactory.get().directBinaryEncoder(out, encoder)
-    val avroData = serializer.serialize(input)
-    writer.write(avroData, encoder)
-    encoder.flush()
-    out.toByteArray
-  }
-
-  override def prettyName: String = "to_avro"
-
-  override protected def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
-    val expr = ctx.addReferenceObj("this", this)
-    defineCodeGen(ctx, ev, input => s"(byte[]) $expr.nullSafeEval($input)")
-  }
-
-  private def appendSchemaId(id: Int, os:ByteArrayOutputStream): Unit = {
-    os.write(confluentHelper.CONFLUENT_MAGIC_BYTE)
-    os.write(ByteBuffer.allocate(Integer.BYTES).putInt(id).array())
-  }
-}
