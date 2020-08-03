@@ -135,7 +135,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
         case (node: InitDAGNode, _) =>
           node.edges.map(dataObjectId => getInitialSubFeed(dataObjectId))
         case (node: Action, subFeeds) =>
-          node.preExec
+          node.preExec(subFeeds)
           val resultSubFeeds = node.exec(subFeeds)
           node.postExec(subFeeds, resultSubFeeds)
           //return

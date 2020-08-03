@@ -16,12 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.config
 
-import io.smartdatalake.workflow.action.customlogic.CustomFileTransformer
-import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
+package io.smartdatalake.workflow.action
 
-class TestFileTransformer extends CustomFileTransformer {
-  override def transform(options: Map[String,String], input: FSDataInputStream, output: FSDataOutputStream): Option[Exception] = None
-  override def equals(obj: Any): Boolean = getClass.equals(obj.getClass)
-}
+private[smartdatalake] case class MetricsCheckFailed(msg: String) extends Exception(msg)

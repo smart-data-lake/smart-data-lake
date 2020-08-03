@@ -62,8 +62,11 @@ abstract class FileSubFeedAction extends Action {
     // convert subfeeds to FileSubFeed type or initialize if not yet existing
     var preparedSubFeed = FileSubFeed.fromSubFeed(subFeed)
     // apply init execution mode if there are no partition values given in command line
-    preparedSubFeed = if (initExecutionMode.isDefined && subFeed.isInstanceOf[InitSubFeed] && preparedSubFeed.partitionValues.isEmpty) {
-      preparedSubFeed.copy( partitionValues = ActionHelper.applyExecutionMode(initExecutionMode.get, id, input, output, preparedSubFeed.partitionValues))
+    preparedSubFeed = if (initExecutionMode.isDefined && preparedSubFeed.isDAGStart && preparedSubFeed.partitionValues.isEmpty) {
+      ActionHelper.applyExecutionMode(initExecutionMode.get, id, input, output, context.phase) match {
+        case Some((partitionValues, _)) => preparedSubFeed.copy(partitionValues = partitionValues)
+        case None => preparedSubFeed
+      }
     } else preparedSubFeed
     // break lineage if requested
     preparedSubFeed = if (breakFileRefLineage) preparedSubFeed.breakLineage else preparedSubFeed
@@ -82,15 +85,18 @@ abstract class FileSubFeedAction extends Action {
     // convert subfeeds to FileSubFeed type or initialize if not yet existing
     var preparedSubFeed = FileSubFeed.fromSubFeed(subFeed)
     // apply init execution mode if there are no partition values given in command line
-    preparedSubFeed = if (initExecutionMode.isDefined && subFeed.isInstanceOf[InitSubFeed] && preparedSubFeed.partitionValues.isEmpty) {
-      preparedSubFeed.copy( partitionValues = ActionHelper.applyExecutionMode(initExecutionMode.get, id, input, output, preparedSubFeed.partitionValues))
+    preparedSubFeed = if (initExecutionMode.isDefined && preparedSubFeed.isDAGStart && preparedSubFeed.partitionValues.isEmpty) {
+      ActionHelper.applyExecutionMode(initExecutionMode.get, id, input, output, context.phase) match {
+        case Some((partitionValues, _)) => preparedSubFeed.copy(partitionValues = partitionValues)
+        case None => preparedSubFeed
+      }
     } else preparedSubFeed
     // break lineage if requested
     preparedSubFeed = if (breakFileRefLineage) preparedSubFeed.breakLineage else preparedSubFeed
     // delete existing files on overwrite
     if (output.saveMode == SaveMode.Overwrite) {
       if (output.partitions.nonEmpty)
-        if (subFeed.partitionValues.nonEmpty) output.deletePartitions(subFeed.partitionValues)
+        if (preparedSubFeed.partitionValues.nonEmpty) output.deletePartitions(preparedSubFeed.partitionValues)
         else logger.warn(s"($id) Cannot delete data from partitioned data object ${output.id} as no partition values are given but saveMode=overwrite")
       else output.deleteAll
     }
@@ -99,7 +105,7 @@ abstract class FileSubFeedAction extends Action {
     val (transformedSubFeed,d) = PerformanceUtils.measureDuration {
       execSubFeed(preparedSubFeed)
     }
-    logger.info(s"($id) finished writing files to ${output.id}, took $d")
+    logger.info(s"($id) finished writing files to ${output.id}: duration=$d files_written=${transformedSubFeed.fileRefs.get.size}")
     // update partition values to output's partition columns and update dataObjectId
     Seq(transformedSubFeed.updatePartitionValues(output.partitions).copy(dataObjectId = output.id))
   }

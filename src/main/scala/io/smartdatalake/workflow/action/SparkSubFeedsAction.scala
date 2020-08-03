@@ -85,10 +85,13 @@ abstract class SparkSubFeedsAction extends SparkAction {
     // apply execution mode
     preparedSubFeeds = thisExecutionMode match {
       case Some(mode) =>
+        val executionModeParameters = ActionHelper.applyExecutionMode(mode, id, mainInput, mainOutput, context.phase)
         preparedSubFeeds.map {
           subFeed =>
-            val newPartitionValues = ActionHelper.applyExecutionMode(mode, id, mainInput, mainOutput, subFeed.partitionValues)
-            subFeed.copy(partitionValues = newPartitionValues)
+            executionModeParameters match {
+              case Some((newPartitionValues, newFilter)) => subFeed.copy(partitionValues = newPartitionValues, filter = newFilter)
+              case None => subFeed
+            }
         }
       case _ => preparedSubFeeds
     }
@@ -117,7 +120,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
     assert(subFeeds.size == inputs.size, s"Number of subFeed's must match number of inputs for SparkSubFeedActions (Action $id, subfeed's ${subFeeds.map(_.dataObjectId).mkString(",")}, inputs ${inputs.map(_.id).mkString(",")})")
     outputs.collect{ case x: CanWriteDataFrame => x }.foreach(_.init())
     val mainInputSubFeed = subFeeds.find(_.dataObjectId == mainInput.id).getOrElse(throw new IllegalStateException(s"subFeed for main input ${mainInput.id} not found"))
-    val thisExecutionMode = runtimeExecutionMode(mainInputSubFeed.isDAGStart)
+    val thisExecutionMode = runtimeExecutionMode(mainInputSubFeed)
     doTransform(subFeeds, thisExecutionMode)
   }
 
@@ -127,7 +130,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
   override final def exec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == inputs.size, s"Number of subFeed's must match number of inputs for SparkSubFeedActions (Action $id, subfeed's ${subFeeds.map(_.dataObjectId).mkString(",")}, inputs ${inputs.map(_.id).mkString(",")})")
     val mainInputSubFeed = subFeeds.find(_.dataObjectId == mainInput.id).getOrElse(throw new IllegalStateException(s"subFeed for main input ${mainInput.id} not found"))
-    val thisExecutionMode = runtimeExecutionMode(mainInputSubFeed.isDAGStart)
+    val thisExecutionMode = runtimeExecutionMode(mainInputSubFeed)
     //transform
     val transformedSubFeeds = doTransform(subFeeds, thisExecutionMode)
     // write output
@@ -145,7 +148,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
       logger.info(s"($id) finished writing DataFrame to ${output.id}: duration=$d" + metricsLog)
     }
     // return
-    transformedSubFeeds
+    transformedSubFeeds.map( transformedSubFeed => updateSubFeedAfterWrite(transformedSubFeed, thisExecutionMode))
   }
 
   /**
@@ -158,7 +161,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
     assert(inputs.size==subFeeds.size, s"Number of inputs must match number of subFeeds given for $id")
     inputs.map { input =>
       val subFeed = subFeeds.find(_.dataObjectId == input.id).getOrElse(throw new IllegalStateException(s"subFeed for input ${input.id} not found"))
-      enrichSubFeedDataFrame(input, subFeed, runtimeExecutionMode(subFeed.isDAGStart), context.phase)
+      enrichSubFeedDataFrame(input, subFeed, runtimeExecutionMode(subFeed), context.phase)
     }
   }
 

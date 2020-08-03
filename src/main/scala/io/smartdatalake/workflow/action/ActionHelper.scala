@@ -23,13 +23,14 @@ import java.time.LocalDateTime
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.ActionObjectId
-import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode}
+import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode, SparkIncrementalMode, SparkStreamingOnceMode}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject}
+import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.TimestampType
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import org.apache.spark.sql.types.{StringType, TimestampType}
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame, SparkSession}
 
 object ActionHelper extends SmartDataLakeLogger {
 
@@ -113,7 +114,9 @@ object ActionHelper extends SmartDataLakeLogger {
   /**
    * Apply execution mode to partition values
    */
-  def applyExecutionMode(executionMode: ExecutionMode, actionId: ActionObjectId, input: DataObject, output: DataObject, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[PartitionValues] = {
+  def applyExecutionMode(executionMode: ExecutionMode, actionId: ActionObjectId, input: DataObject, output: DataObject, phase: ExecutionPhase)(implicit session: SparkSession): Option[(Seq[PartitionValues], Option[String])] = {
+    import session.implicits._
+
     executionMode match {
       case mode:PartitionDiffMode =>
         (input,output) match {
@@ -122,9 +125,9 @@ object ActionHelper extends SmartDataLakeLogger {
               if (partitionOutput.partitions.nonEmpty) {
                 // prepare common partition columns
                 val commonInits = searchCommonInits(partitionInput.partitions, partitionOutput.partitions)
-                require(commonInits.nonEmpty, throw ConfigurationException(s"$actionId has set initExecutionMode = 'partitionDiff' but no common init was found in partition columns for $input and $output"))
+                require(commonInits.nonEmpty, s"$actionId has set initExecutionMode = 'PartitionDiffMode' but no common init was found in partition columns for $input and $output")
                 val commonPartitions = if (mode.partitionColNb.isDefined) {
-                  commonInits.find(_.size==mode.partitionColNb.get).getOrElse(throw ConfigurationException(s"$actionId has set initExecutionMode = 'partitionDiff' but no common init with ${mode.partitionColNb.get} was found in partition columns of $input and $output from $commonInits!"))
+                  commonInits.find(_.size==mode.partitionColNb.get).getOrElse(throw ConfigurationException(s"$actionId has set initExecutionMode = 'PartitionDiffMode' but no common init with ${mode.partitionColNb.get} was found in partition columns of $input and $output from $commonInits!"))
                 } else {
                   commonInits.maxBy(_.size)
                 }
@@ -139,16 +142,55 @@ object ActionHelper extends SmartDataLakeLogger {
                   case Some(n) => partitionValuesToBeProcessed.sorted(ordering).take(n)
                   case None => partitionValuesToBeProcessed.sorted(ordering)
                 }
-                logger.info(s"($actionId) $PartitionDiffMode selected partition values ${selectedPartitionValues.mkString(", ")} to process")
+                logger.info(s"($actionId) PartitionDiffMode selected partition values ${selectedPartitionValues.mkString(", ")} to process")
                 //return
-                selectedPartitionValues
-              } else throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $output has no partition columns defined!")
-            } else throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $input has no partition columns defined!")
-          case (_: CanHandlePartitions, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $output does not support partitions!")
-          case (_, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = $PartitionDiffMode but $input does not support partitions!")
+                Some((selectedPartitionValues, None))
+              } else throw ConfigurationException(s"$actionId has set initExecutionMode = PartitionDiffMode but $output has no partition columns defined!")
+            } else throw ConfigurationException(s"$actionId has set initExecutionMode = PartitionDiffMode but $input has no partition columns defined!")
+          case (_: CanHandlePartitions, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = PartitionDiffMode but $output does not support partitions!")
+          case (_, _) => throw ConfigurationException(s"$actionId has set initExecutionMode = PartitionDiffMode but $input does not support partitions!")
         }
-      case _ => partitionValues
+
+      case mode:SparkIncrementalMode =>
+        (input,output) match {
+          case (sparkInput: CanCreateDataFrame, sparkOutput: CanCreateDataFrame) =>
+            // if data object is new, it might not be able to create a DataFrame
+            val dfInputOpt = getOptionalDataFrame(sparkInput)
+            val dfOutputOpt = getOptionalDataFrame(sparkOutput)
+            (dfInputOpt, dfOutputOpt) match {
+              // if both DataFrames exist, compare and create filter
+              case (Some(dfInput), Some(dfOutput)) =>
+                val inputColType = dfInput.schema(mode.compareCol).dataType
+                require(SparkIncrementalMode.allowedDataTypes.contains(inputColType), s"($actionId) Type of compare column ${mode.compareCol} must be one of ${SparkIncrementalMode.allowedDataTypes.mkString(", ")} in ${sparkInput.id}")
+                val outputColType = dfOutput.schema(mode.compareCol).dataType
+                require(SparkIncrementalMode.allowedDataTypes.contains(outputColType), s"($actionId) Type of compare column ${mode.compareCol} must be one of ${SparkIncrementalMode.allowedDataTypes.mkString(", ")} in ${sparkOutput.id}")
+                require(inputColType == outputColType, s"($actionId) Type of compare column ${mode.compareCol} is different between ${sparkInput.id} ($inputColType) and ${sparkOutput.id} ($outputColType)")
+                // get latest values
+                val inputLatestValue = dfInput.agg(max(col(mode.compareCol)).cast(StringType)).as[String].head
+                val outputLatestValue = dfOutput.agg(max(col(mode.compareCol)).cast(StringType)).as[String].head
+                // stop processing if no new data
+                if (outputLatestValue == inputLatestValue) throw NoDataToProcessWarning(actionId.id, s"($actionId) No increment to process found for ${output.id} column ${mode.compareCol} (lastestValue=$outputLatestValue)")
+                logger.info(s"($actionId) SparkIncrementalMode selected increment for writing to ${output.id}: column ${mode.compareCol} from $outputLatestValue to $inputLatestValue to process")
+                // prepare filter
+                val selectedData = s"${mode.compareCol} > cast('$outputLatestValue' as ${inputColType.sql})"
+                Some((Seq(), Some(selectedData)))
+              // otherwise don't filter
+              case _ =>
+                logger.info(s"($actionId) SparkIncrementalMode selected all records for writing to ${output.id}, because input or output DataObject is still empty.")
+                Some((Seq(), None))
+            }
+          case _ => throw ConfigurationException(s"$actionId has set executionMode = $SparkIncrementalMode but $input or $output does not support creating Spark DataFrames!")
+        }
+
+      case _ => None
     }
+  }
+
+  private def getOptionalDataFrame(sparkInput: CanCreateDataFrame, partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession) : Option[DataFrame] = try {
+    Some(sparkInput.getDataFrame(partitionValues))
+  } catch {
+    case e: IllegalArgumentException if e.getMessage.contains("DataObject schema is undefined") => None
+    case e: AnalysisException if e.getMessage.contains("Table or view not found") => None
   }
 
   /**

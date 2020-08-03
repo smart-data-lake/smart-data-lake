@@ -52,8 +52,10 @@ abstract class SparkSubFeedAction extends SparkAction {
     // apply execution mode
     preparedSubFeed = thisExecutionMode match {
       case Some(mode) =>
-        val newPartitionValues = ActionHelper.applyExecutionMode(mode, id, input, output, preparedSubFeed.partitionValues)
-        preparedSubFeed.copy(partitionValues = newPartitionValues)
+        ActionHelper.applyExecutionMode(mode, id, input, output, context.phase) match {
+          case Some((newPartitionValues, newFilter)) => preparedSubFeed.copy(partitionValues = newPartitionValues, filter = newFilter)
+          case None => preparedSubFeed
+        }
       case _ => preparedSubFeed
     }
     // prepare as input SubFeed
@@ -77,7 +79,7 @@ abstract class SparkSubFeedAction extends SparkAction {
     assert(subFeeds.size == 1, s"Only one subfeed allowed for SparkSubFeedActions (Action $id, inputSubfeed's ${subFeeds.map(_.dataObjectId).mkString(",")})")
     outputs.collect{ case x: CanWriteDataFrame => x }.foreach(_.init())
     val subFeed = subFeeds.head
-    val thisExecutionMode = runtimeExecutionMode(subFeed.isDAGStart)
+    val thisExecutionMode = runtimeExecutionMode(subFeed)
     Seq(doTransform(subFeed, thisExecutionMode))
   }
 
@@ -87,7 +89,7 @@ abstract class SparkSubFeedAction extends SparkAction {
   override final def exec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == 1, s"Only one subfeed allowed for SparkSubFeedActions (Action $id, inputSubfeed's ${subFeeds.map(_.dataObjectId).mkString(",")})")
     val subFeed = subFeeds.head
-    val thisExecutionMode = runtimeExecutionMode(subFeed.isDAGStart)
+    val thisExecutionMode = runtimeExecutionMode(subFeed)
     // transform
     val transformedSubFeed = doTransform(subFeed, thisExecutionMode)
     // write output
@@ -102,10 +104,11 @@ abstract class SparkSubFeedAction extends SparkAction {
     else getFinalMetrics(output.id).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
     logger.info(s"($id) finished writing DataFrame to ${output.id}: duration=$d" + metricsLog)
     // return
-    Seq(transformedSubFeed)
+    Seq(updateSubFeedAfterWrite(transformedSubFeed, thisExecutionMode))
   }
 
   override final def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.postExec(inputSubFeeds, outputSubFeeds)
     assert(inputSubFeeds.size == 1, s"Only one inputSubFeed allowed for SparkSubFeedActions (Action $id, inputSubfeed's ${inputSubFeeds.map(_.dataObjectId).mkString(",")})")
     assert(outputSubFeeds.size == 1, s"Only one outputSubFeed allowed for SparkSubFeedActions (Action $id, inputSubfeed's ${outputSubFeeds.map(_.dataObjectId).mkString(",")})")
     postExecSubFeed(inputSubFeeds.head, outputSubFeeds.head)

@@ -24,6 +24,15 @@ import io.smartdatalake.util.misc.CredentialsUtil
  * Authentication modes define how an application authenticates itself
  * to a given data object/connection
  *
+ * You need to define one of the AuthModes (subclasses) as type, i.e.
+ * {{{
+ * authMode {
+ *   type = BasicAuthMode
+ *   user = myUser
+ *   password = myPassword
+ * }
+ * }}}
+ *
  */
 sealed trait AuthMode
 
@@ -31,15 +40,15 @@ sealed trait AuthMode
  * Derive options for various connection types to connect by basic authentication
  */
 case class BasicAuthMode(userVariable: String, passwordVariable: String) extends AuthMode {
-  val user: String = CredentialsUtil.getCredentials(userVariable)
-  val password: String = CredentialsUtil.getCredentials(passwordVariable)
+  private[smartdatalake] val user: String = CredentialsUtil.getCredentials(userVariable)
+  private[smartdatalake] val password: String = CredentialsUtil.getCredentials(passwordVariable)
 }
 
 /**
  * Derive options for various connection types to connect by token
   */
 case class TokenAuthMode(tokenVariable: String) extends AuthMode {
-  val token: String = CredentialsUtil.getCredentials(tokenVariable)
+  private[smartdatalake] val token: String = CredentialsUtil.getCredentials(tokenVariable)
 }
 
 /**
@@ -47,7 +56,7 @@ case class TokenAuthMode(tokenVariable: String) extends AuthMode {
  * Private key is read from .ssh
  */
 case class PublicKeyAuthMode(userVariable: String) extends AuthMode {
-  val user: String = CredentialsUtil.getCredentials(userVariable)
+  private[smartdatalake] val user: String = CredentialsUtil.getCredentials(userVariable)
 }
 
 /**
@@ -62,6 +71,6 @@ case class SSLCertsAuthMode (
                             truststoreType: Option[String],
                             truststorePassVariable: String
                            ) extends AuthMode {
-  val truststorePass: String = CredentialsUtil.getCredentials(truststorePassVariable)
-  val keystorePass: String = CredentialsUtil.getCredentials(keystorePassVariable)
+  private[smartdatalake] val truststorePass: String = CredentialsUtil.getCredentials(truststorePassVariable)
+  private[smartdatalake] val keystorePass: String = CredentialsUtil.getCredentials(keystorePassVariable)
 }

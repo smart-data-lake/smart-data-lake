@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.action
 import java.time.LocalDateTime
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode, SparkStreamingOnceMode}
+import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode, SparkIncrementalMode, SparkStreamingOnceMode}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
@@ -30,8 +30,8 @@ import io.smartdatalake.util.streaming.DummyStreamProvider
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.ActionHelper.{filterBlacklist, filterWhitelist}
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanCreateStreamingDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject, TableDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanCreateStreamingDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject, SparkFileDataObject, TableDataObject, UserDefinedSchema}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import org.apache.spark.sql.streaming.Trigger
@@ -67,9 +67,9 @@ private[smartdatalake] abstract class SparkAction extends Action {
   /**
    * Returns the execution mode used on runtime of the action, depending if this Action is a start node of a DAG run
    */
-  def runtimeExecutionMode(isDAGStart: Boolean): Option[ExecutionMode] = {
+  def runtimeExecutionMode(subFeed: SubFeed): Option[ExecutionMode] = {
     // override executionMode with initExecutionMode if is start node of a DAG run
-    if (isDAGStart) initExecutionMode.orElse(executionMode) else executionMode
+    if (subFeed.isDAGStart) initExecutionMode.orElse(executionMode) else executionMode
   }
 
   /**
@@ -95,12 +95,24 @@ private[smartdatalake] abstract class SparkAction extends Action {
           subFeed.copy(dataFrame = emptyStreamingDataFrame, partitionValues = Seq()) // remove partition values for streaming mode
         } else subFeed
       case _ =>
-        if (subFeed.dataFrame.isEmpty || (phase==ExecutionPhase.Exec && (subFeed.isDummy || subFeed.isStreaming.contains(true)))) {
+        if (phase==ExecutionPhase.Exec && (subFeed.dataFrame.isEmpty || subFeed.isDummy || subFeed.isStreaming.contains(true))) {
           // recreate DataFrame from DataObject
           logger.info(s"($id) getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
           val df = input.getDataFrame(subFeed.partitionValues)
             .colNamesLowercase // convert to lower case by default
-          val filteredDf = filterDataFrame(df, subFeed.partitionValues)
+          val filteredDf = filterDataFrame(df, subFeed.partitionValues, subFeed.getFilterCol)
+          subFeed.copy(dataFrame = Some(filteredDf))
+        } else if (subFeed.dataFrame.isEmpty) {
+          // create a dummy dataframe if possible as we are not in exec phase
+          val schema = input match {
+            case sparkFileInput: SparkFileDataObject => sparkFileInput.readSchema(false)
+            case userDefInput: UserDefinedSchema => userDefInput.schema
+            case _ => None
+          }
+          val df = schema.map( s => DataFrameUtil.getEmptyDataFrame(s))
+            .getOrElse(input.getDataFrame(subFeed.partitionValues))
+            .colNamesLowercase // convert to lower case by default
+          val filteredDf = filterDataFrame(df, subFeed.partitionValues, subFeed.getFilterCol)
           subFeed.copy(dataFrame = Some(filteredDf))
         } else if (subFeed.isStreaming.contains(true)) {
           // convert to empty normal DataFrame
@@ -125,7 +137,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
         if (noData) logger.info(s"($id) no data to process for ${output.id} in streaming mode")
         // return
         noData
-      case None | Some(_: PartitionDiffMode) =>
+      case None | Some(_: PartitionDiffMode) | Some(_: SparkIncrementalMode) =>
         // Write in batch mode
         assert(!subFeed.dataFrame.get.isStreaming, s"($id) Input from ${subFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingOnceMode.getClass.getSimpleName}")
         output.writeDataFrame(subFeed.dataFrame.get, subFeed.partitionValues)
@@ -247,7 +259,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
    * @param subFeed SubFeed with transformed DataFrame
    * @return SubFeed with updated partition values.
    */
-  def validateAndUpdateSubFeedPartitionValues(output: DataObject, subFeed: SparkSubFeed ): SparkSubFeed = {
+  def validateAndUpdateSubFeedPartitionValues(output: DataObject, subFeed: SparkSubFeed )(implicit session: SparkSession): SparkSubFeed = {
     val updatedSubFeed = output match {
       case partitionedDO: CanHandlePartitions =>
         // validate output partition columns exist in DataFrame
@@ -257,6 +269,10 @@ private[smartdatalake] abstract class SparkAction extends Action {
       case _ => subFeed.clearPartitionValues()
     }
     updatedSubFeed.clearDAGStart()
+  }
+
+  def updateSubFeedAfterWrite(subFeed: SparkSubFeed, executionMode: Option[ExecutionMode])(implicit session: SparkSession): SparkSubFeed = {
+    subFeed.clearFilter // clear filter must be applied after write, because it includes removing the DataFrame
   }
 
   /**
@@ -276,11 +292,13 @@ private[smartdatalake] abstract class SparkAction extends Action {
    *
    * @param df DataFrame to filter
    * @param partitionValues partition values to use as filter condition
+   * @param genericFilter filter expression to apply
    * @return filtered DataFrame
    */
-  def filterDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues]): DataFrame = {
+  def filterDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], genericFilter: Option[Column]): DataFrame = {
+    // apply partition filter
     val partitionValuesColumn = partitionValues.flatMap(_.keys).distinct
-    if (partitionValues.isEmpty) df
+    val dfPartitionFiltered = if (partitionValues.isEmpty) df
     else if (partitionValuesColumn.size == 1) {
       // filter with Sql "isin" expression if only one column
       val filterExpr = col(partitionValuesColumn.head).isin(partitionValues.flatMap(_.elements.values):_*)
@@ -290,6 +308,9 @@ private[smartdatalake] abstract class SparkAction extends Action {
       val filterExpr = partitionValues.map(_.getSparkExpr).reduce( (a,b) => a or b)
       df.where(filterExpr)
     }
+    // apply generic filter
+    if (genericFilter.isDefined) dfPartitionFiltered.where(genericFilter.get)
+    else dfPartitionFiltered
   }
 
   /**
@@ -303,8 +324,8 @@ private[smartdatalake] abstract class SparkAction extends Action {
     val readSchema = preparedSubFeed.dataFrame.map(df => input.createReadSchema(df.schema))
     val schemaChanges = writeSchema != readSchema
     preparedSubFeed = if (schemaChanges) preparedSubFeed.convertToDummy(readSchema.get) else preparedSubFeed
-    // break lineage if requested or if it's a streaming DataFrame
-    preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true)) preparedSubFeed.breakLineage else preparedSubFeed
+    // break lineage if requested or if it's a streaming DataFrame or if a filter expression is set
+    preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined) preparedSubFeed.breakLineage else preparedSubFeed
     // return
     preparedSubFeed
   }
