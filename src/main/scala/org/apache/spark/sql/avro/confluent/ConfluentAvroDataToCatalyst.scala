@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 
 import org.apache.avro.generic.GenericDatumReader
 import org.apache.avro.io.{BinaryDecoder, DecoderFactory}
-import org.apache.spark.sql.avro.{AvroDeserializer, SchemaConverters}
+import org.apache.spark.sql.avro.AvroDeserializer
 import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, Expression, UnaryExpression}
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenerator, CodegenContext, ExprCode}
 import org.apache.spark.sql.types.{AbstractDataType, BinaryType, DataType}
@@ -17,7 +17,7 @@ case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confl
 
   override def inputTypes: Seq[AbstractDataType] = Seq(BinaryType)
 
-  override lazy val dataType: DataType = SchemaConverters.toSqlType(tgtSchema).dataType
+  override lazy val dataType: DataType = MySchemaConverters.toSqlType(tgtSchema).dataType
 
   override def nullable: Boolean = true
 

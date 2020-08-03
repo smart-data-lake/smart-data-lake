@@ -41,15 +41,16 @@ class ConfluentClient(schemaRegistryUrl: String) extends Logging with Serializab
    * Throws exception if new schema is not compatible.
    * @return confluent schemaId and registered schema
    */
-  def setOrUpdateSchema(subject: String, newSchema: Schema): (Int, Schema) = {
+  def setOrUpdateSchema(subject: String, newSchema: Schema, mutualReadCheck: Boolean = false): (Int, Schema) = {
     if (!schemaExists(subject)) return registerSchema(subject, newSchema)
     val latestSchema = getLatestSchemaFromConfluent(subject)
     if (!latestSchema._2.equals(newSchema)) {
-      if (checkSchemaEvolutionAllowed(latestSchema._2, newSchema)) {
-        logInfo(s"New schema for subject $subject is compatible with latest schema: new=$newSchema diffs=${debugSchemaDiff(newSchema, latestSchema._2)}")
+      val checkSchemaFunc = if (mutualReadCheck) checkSchemaMutualReadable _ else checkSchemaCanRead _
+      if (checkSchemaFunc(latestSchema._2, newSchema)) {
+        logInfo(s"New schema for subject $subject is compatible with latest schema (mutualRead=$mutualReadCheck): new=$newSchema diffs=${debugSchemaDiff(newSchema, latestSchema._2)}")
         registerSchema(subject, newSchema)
       } else {
-        val msg = s"New schema for subject $subject is not compatible with latest schema"
+        val msg = s"New schema for subject $subject is not compatible with latest schema (mutualRead=$mutualReadCheck)"
         logError(s"$msg: latest=${latestSchema._2} new=$newSchema diffs=${debugSchemaDiff(newSchema, latestSchema._2)}")
         throw new SchemaIncompatibleException(msg)
       }
@@ -60,26 +61,12 @@ class ConfluentClient(schemaRegistryUrl: String) extends Logging with Serializab
   }
 
   /**
-   * If schema already exists, check if compatible, otherwise create schema
-   * Throws exception if new schema is not compatible.
+   * Get existing schema, otherwise create schema
    * @return confluent schemaId and registered schema
    */
-  def setOrCheckSchema(subject: String, newSchema: Schema): (Int, Schema) = {
+  def setOrGetSchema(subject: String, newSchema: Schema): (Int, Schema) = {
     if (!schemaExists(subject)) return registerSchema(subject, newSchema)
-    val latestSchema = getLatestSchemaFromConfluent(subject)
-    if (!latestSchema._2.equals(newSchema)) {
-      if (checkSchemaMutualReadable(latestSchema._2, newSchema)) {
-        logInfo(s"New schema for subject $subject is compatible with latest schema: new=$newSchema diffs=${debugSchemaDiff(newSchema, latestSchema._2)}")
-        latestSchema
-      } else {
-        val msg = s"New schema for subject $subject is not compatible with latest schema"
-        logError(s"$msg: latest=${latestSchema._2} new=$newSchema diffs=${debugSchemaDiff(newSchema, latestSchema._2)}")
-        throw new SchemaIncompatibleException(msg)
-      }
-    } else {
-      logDebug(s"New schema for subject $subject is equal to latest schema")
-      latestSchema
-    }
+    getLatestSchemaFromConfluent(subject)
   }
 
   def getLatestSchemaFromConfluent(subject:String): (Int,Schema) = {
@@ -118,9 +105,9 @@ class ConfluentClient(schemaRegistryUrl: String) extends Logging with Serializab
    * @param updateAllowed if subject schema should be updated if compatible
    * @param eagerCheck if true tiggers instantiation of converter object instances
    */
-  def to_confluent_avro(data: Column, topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, eagerCheck: Boolean = false): Column = {
+  def to_confluent_avro(data: Column, topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, eagerCheck: Boolean = false): Column = {
     val subject = getSubject(topic, subjectType)
-    val converterExpr = CatalystDataToConfluentAvro(data.expr, subject, this, updateAllowed )
+    val converterExpr = CatalystDataToConfluentAvro(data.expr, subject, this, updateAllowed, mutualReadCheck )
     if (eagerCheck) converterExpr.test()
     new Column(converterExpr)
   }
@@ -135,26 +122,23 @@ class ConfluentClient(schemaRegistryUrl: String) extends Logging with Serializab
 
   private def schemaExists(subject:String): Boolean = subjects.contains(subject)
 
-  // check if the new schema is compatible with the latest schema
-  // means old data can be read with the new schema
-  // this is needed if we want to update the schema in the schema registry
-  private def checkSchemaCompatible(subject:String, newSchema:Schema): Boolean = {
-    if (!schemaExists(subject)) throw new SubjectNotExistingException("Subject $subject not found!")
-    sr.testCompatibility(subject, newSchema)
-  }
-
-  // check if the data produced by the latest schema can be read by the new schema
-  // this is needed to do schema evolution, as readers still need to read messages with latest schema.
-  private def checkSchemaEvolutionAllowed(latestSchema:Schema, newSchema:Schema): Boolean = {
+  /**
+   * Check if the data produced by existing schema can be read by the new schema.
+   * It allows readers to read old & new messages with the new schema.
+   * This is sufficient for schema evolution if all readers can be easily migrated to read using the new schema.
+   **/
+  private def checkSchemaCanRead(dataSchema:Schema, readSchema:Schema): Boolean = {
     val validatorRead = new SchemaValidatorBuilder().canReadStrategy.validateLatest
-    Try{validatorRead.validate(newSchema, Seq(latestSchema).asJava)}.isSuccess
+    Try{validatorRead.validate(readSchema, Seq(dataSchema).asJava)}.isSuccess
   }
 
-  // check if the data produced by the new schema can be read by the latest schema and vice versa
-  // this is needed as check if schema should not be updated.
-  private def checkSchemaMutualReadable(latestSchema:Schema, newSchema:Schema): Boolean = {
+  /**
+   * Check if the data produced by an existnig schema can be read by the new schema and vice versa
+   * It allows readers to keep using the old schema and reading messages with the new schema.
+   **/
+  private def checkSchemaMutualReadable(schema1:Schema, schema2:Schema): Boolean = {
     val validatorRead = new SchemaValidatorBuilder().mutualReadStrategy().validateLatest()
-    Try{validatorRead.validate(newSchema, Seq(latestSchema).asJava)}.isSuccess
+    Try{validatorRead.validate(schema2, Seq(schema1).asJava)}.isSuccess
   }
 
   private def debugTypeIsCompatible(type1: Schema.Type, type2: Schema.Type) = (type1, type2) match {
@@ -163,9 +147,9 @@ class ConfluentClient(schemaRegistryUrl: String) extends Logging with Serializab
     case _ => type1 == type2
   }
 
-  private def debugSchemaDiff(schema1:Schema, schema2:Schema): Seq[String] = {
-    if (schema1.getName!=schema2.getName) Seq(s"schema names don't match (${schema1.getName}, ${schema2.getName})")
-    if (!debugTypeIsCompatible(schema1.getType, schema2.getType)) Seq(s"(${schema1.getName}) schema types don't match (${schema1.getType}, ${schema2.getType})")
+  private def debugSchemaDiff(schema1:Schema, schema2:Schema, fieldName: Option[String] = None): Seq[String] = {
+    //if (schema1.getName!=schema2.getName) Seq(s"schema names don't match (${schema1.getName}, ${schema2.getName})")
+    if (!debugTypeIsCompatible(schema1.getType, schema2.getType)) Seq(s"""${fieldName.map("("+_+")").getOrElse("")} schema types don't match (${schema1.getType}, ${schema2.getType})""")
     else {
       if (schema1.getType==Schema.Type.RECORD) {
         val diffs = mutable.Buffer[String]()
@@ -175,7 +159,7 @@ class ConfluentClient(schemaRegistryUrl: String) extends Logging with Serializab
         if (f1m2.nonEmpty) diffs += s"""fields ${f1m2.mkString(", ")} missing in schema2"""
         val f2m1 = fields2.keys.toSeq.diff(fields1.keys.toSeq)
         if (f2m1.nonEmpty) diffs += s"""fields ${f2m1.mkString(", ")} missing in schema1"""
-        diffs ++= fields1.keys.toSeq.intersect(fields2.keys.toSeq).flatMap( f => debugSchemaDiff(debugSchemaReduceUnion(fields1(f)),debugSchemaReduceUnion(fields2(f))))
+        diffs ++= fields1.keys.toSeq.intersect(fields2.keys.toSeq).flatMap( f => debugSchemaDiff(debugSchemaReduceUnion(fields1(f)),debugSchemaReduceUnion(fields2(f)), Some(f)))
         diffs
       } else Seq()
     }
