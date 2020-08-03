@@ -81,7 +81,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
   def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, executionMode: Option[ExecutionMode], phase: ExecutionPhase)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     assert(input.id == subFeed.dataObjectId, s"($id) DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
     executionMode match {
-      case Some(m: SparkStreamingOnceMode) if !context.dryRun =>
+      case Some(m: SparkStreamingOnceMode) if !context.simulation =>
         if (subFeed.dataFrame.isEmpty || phase==ExecutionPhase.Exec) { // in exec phase we always needs a fresh streaming DataFrame
           // recreate DataFrame from DataObject
           assert(input.isInstanceOf[CanCreateStreamingDataFrame], s"($id) DataObject ${input.id} doesn't implement CanCreateStreamingDataFrame. Can not create StreamingDataFrame for executionMode=SparkStreamingOnceMode")

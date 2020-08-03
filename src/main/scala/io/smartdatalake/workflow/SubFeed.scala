@@ -74,7 +74,7 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
   override def breakLineage(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // in order to keep the schema but truncate spark logical plan, a dummy DataFrame is created.
     // dummy DataFrames must be exchanged to real DataFrames before reading in exec-phase.
-    if(dataFrame.isDefined && !context.dryRun) convertToDummy(dataFrame.get.schema) else this
+    if(dataFrame.isDefined && !context.simulation) convertToDummy(dataFrame.get.schema) else this
   }
   override def clearPartitionValues(): SparkSubFeed = {
     this.copy(partitionValues = Seq())

@@ -25,15 +25,15 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 
 private[smartdatalake] case class ActionPipelineContext(
-  feed: String,
-  application: String,
-  runId: Int,
-  attemptId: Int,
-  instanceRegistry: InstanceRegistry,
-  referenceTimestamp: Option[LocalDateTime] = None,
-  appConfig: SmartDataLakeBuilderConfig, // application config is needed to persist action dag state for recovery
-  dryRun: Boolean = false,
-  var phase: ExecutionPhase = ExecutionPhase.Prepare
+                                                         feed: String,
+                                                         application: String,
+                                                         runId: Int,
+                                                         attemptId: Int,
+                                                         instanceRegistry: InstanceRegistry,
+                                                         referenceTimestamp: Option[LocalDateTime] = None,
+                                                         appConfig: SmartDataLakeBuilderConfig, // application config is needed to persist action dag state for recovery
+                                                         simulation: Boolean = false,
+                                                         var phase: ExecutionPhase = ExecutionPhase.Prepare
 ) {
   def getReferenceTimestampOrNow: LocalDateTime = referenceTimestamp.getOrElse(LocalDateTime.now)
 }

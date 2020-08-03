@@ -156,7 +156,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
   private def getInitialSubFeed(dataObjectId: DataObjectId)(implicit context: ActionPipelineContext) = {
     initialSubFeeds.find(_.dataObjectId==dataObjectId)
       .getOrElse(
-        if (context.dryRun) throw new IllegalStateException(s"Initial subfeed for $dataObjectId missing for dry run.")
+        if (context.simulation) throw new IllegalStateException(s"Initial subfeed for $dataObjectId missing for dry run.")
         else InitSubFeed(dataObjectId, partitionValues)
       )
   }

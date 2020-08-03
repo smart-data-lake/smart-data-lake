@@ -225,10 +225,10 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     }
   }
 
-  test("sdlb run dry run") {
+  test("sdlb simulation run") {
 
     // init sdlb
-    val appName = "sdlb-dryRun"
+    val appName = "sdlb-simulation"
     val feedName = "test"
 
     HdfsUtil.deleteFiles(s"$statePath", filesystem, false)
@@ -260,7 +260,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action2)
     val configStart = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName))
-    val (finalSubFeeds, stats) = sdlb.startDryRun(configStart, Seq(SparkSubFeed(Some(dfSrc1), srcDO.id, Seq())))
+    val (finalSubFeeds, stats) = sdlb.startSimulation(configStart, Seq(SparkSubFeed(Some(dfSrc1), srcDO.id, Seq())))
 
     // check results
     assert(finalSubFeeds.size == 1)

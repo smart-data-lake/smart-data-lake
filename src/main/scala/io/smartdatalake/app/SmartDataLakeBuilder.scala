@@ -45,6 +45,9 @@ import scopt.OptionParser
  * @param username        Kerberos user name (`username`@`kerberosDomain`) for local mode.
  * @param kerberosDomain  Kerberos domain (`username`@`kerberosDomain`) for local mode.
  * @param keytabPath      Path to Kerberos keytab file for local mode.
+ * @param test            Run in test mode:
+ *                        - "config": validate configuration
+ *                        - "dry-run": execute "prepare" and "init" phase to check environment
  */
 case class SmartDataLakeBuilderConfig(feedSel: String = null,
                                       applicationName: Option[String] = None,
@@ -58,7 +61,8 @@ case class SmartDataLakeBuilderConfig(feedSel: String = null,
                                       multiPartitionValues: Option[Seq[PartitionValues]] = None,
                                       parallelism: Int = 1,
                                       statePath: Option[String] = None,
-                                      overrideJars: Option[Seq[String]] = None
+                                      overrideJars: Option[Seq[String]] = None,
+                                      test: Option[TestMode.Value] = None
                                 ) {
   def validate(): Unit = {
     assert(!applicationName.exists(_.contains({HadoopFileActionDAGRunStateStore.fileNamePartSeparator})), s"Application name must not contain character '${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}' ($applicationName)")
@@ -67,6 +71,22 @@ case class SmartDataLakeBuilderConfig(feedSel: String = null,
     assert(statePath.isEmpty || applicationName.isDefined, "application name must be defined if state path is set")
   }
   def getPartitionValues: Option[Seq[PartitionValues]] = partitionValues.orElse(multiPartitionValues)
+}
+object TestMode extends Enumeration {
+  type TestMode = Value
+
+  /**
+   * Test if config is valid.
+   * Note that this only parses and validates the configuration. No attempts are made to check the environment (e.g. connection informations...).
+   */
+  val Config = Value("config")
+
+  /**
+   * Test the environment if connections can be initalized and spark lineage can be created.
+   * Note that no changes are made to the environment if possible.
+   * The test executes "prepare" and "init" phase, but not the "exec" phase of an SDLB run.
+   */
+  val DryRun = Value("dry-run")
 }
 
 /**
@@ -125,6 +145,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     opt[String]("override-jars")
       .action((arg, config) => config.copy(overrideJars = Some(arg.split(','))))
       .text("Comma separated list of jars for child-first class loader. The jars must be present in classpath.")
+    opt[String]("test")
+      .action((arg, config) => config.copy(test = Some(TestMode.withName(arg))))
+      .text("Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage")
     help("help").text("Display the help text.")
     version("version").text("Display version information.")
   }
@@ -189,8 +212,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   }
 
   /**
-   * Start dry run.
-   * This executes the DAG and returns all subfeeds. Only prepare and init are executed
+   * Start a simulation run.
+   * This executes the DAG and returns all subfeeds including the transformed DataFrames.
+   * Only prepare and init are executed.
    * All initial subfeeds must be provided as input.
    *
    * Note: this only works with SparkActions for now
@@ -198,8 +222,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * @param initialSubFeeds initial subfeeds for DataObjects at the beginning of the DAG
    * @return tuple of list of final subfeeds and statistics (action count per RuntimeEventState)
    */
-  def startDryRun(appConfig: SmartDataLakeBuilderConfig, initialSubFeeds: Seq[SparkSubFeed]): (Seq[SparkSubFeed], Map[RuntimeEventState,Int]) = {
-    val (subFeeds, stats) = startRun(appConfig, initialSubFeeds = initialSubFeeds, dryRun = true)
+  def startSimulation(appConfig: SmartDataLakeBuilderConfig, initialSubFeeds: Seq[SparkSubFeed]): (Seq[SparkSubFeed], Map[RuntimeEventState,Int]) = {
+    val (subFeeds, stats) = startRun(appConfig, initialSubFeeds = initialSubFeeds, simulation = true)
     (subFeeds.map(_.asInstanceOf[SparkSubFeed]), stats)
   }
 
@@ -207,7 +231,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * Start run.
    * @return tuple of list of final subfeeds and statistics (action count per RuntimeEventState)
    */
-  private def startRun(appConfig: SmartDataLakeBuilderConfig, runId: Int = 1, attemptId: Int = 1, actionIdsToSkip: Seq[ActionObjectId] = Seq(), initialSubFeeds: Seq[SubFeed] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, dryRun: Boolean = false): (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
+  private def startRun(appConfig: SmartDataLakeBuilderConfig, runId: Int = 1, attemptId: Int = 1, actionIdsToSkip: Seq[ActionObjectId] = Seq(), initialSubFeeds: Seq[SubFeed] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, simulation: Boolean = false): (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
 
     // validate application config
     appConfig.validate()
@@ -217,6 +241,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     logger.info(s"Application: ${appConfig.applicationName}")
     logger.info(s"Master: ${appConfig.master.getOrElse(sys.props.get("spark.master"))}")
     logger.info(s"Deploy-Mode: ${appConfig.deployMode.getOrElse(sys.props.get("spark.submit.deployMode"))}")
+    logger.info(s"Test-Mode: ${appConfig.test}")
     logger.debug(s"Environment: " + sys.env.map(x => x._1 + "=" + x._2).mkString(" "))
     logger.debug(s"System properties: " + sys.props.toMap.map(x => x._1 + "=" + x._2).mkString(" "))
     val appName = appConfig.applicationName.getOrElse(appConfig.feedSel)
@@ -235,6 +260,10 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     val actionsSelected = instanceRegistry.getActions.filter(_.metadata.flatMap(_.feed).exists(_.matches(appConfig.feedSel)))
     require(actionsSelected.nonEmpty, s"No action matched the given feed selector: ${appConfig.feedSel}. At least one action needs to be selected.")
     logger.info(s"selected actions ${actionsSelected.map(_.id).mkString(", ")}")
+    if (appConfig.test.contains(TestMode.Config)) { // stop here if only config check
+      logger.info(s"${appConfig.test.get}-Test successfull")
+      return (Seq(), Map())
+    }
 
     // filter actions to skip
     val actionIdsSelected = actionsSelected.map(_.id)
@@ -251,14 +280,19 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     // create and execute actions
     logger.info(s"starting application ${appName} runId=$runId attemptId=$attemptId")
-    implicit val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appName, runId, attemptId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig, dryRun)
+    implicit val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appName, runId, attemptId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig, simulation)
     val actionDAGRun = ActionDAGRun(actionsToExec, runId, attemptId, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, stateStore)
     val finalSubFeeds = try {
-      if (dryRun) {
-        require(actionsToExec.forall(_.isInstanceOf[SparkAction]), s"Dry run needs all selected actions to be instances of SparkAction. This is not the case for ${actionsToExec.filterNot(_.isInstanceOf[SparkAction]).map(_.id).mkString(", ")}")
+      if (simulation) {
+        require(actionsToExec.forall(_.isInstanceOf[SparkAction]), s"Simulation needs all selected actions to be instances of SparkAction. This is not the case for ${actionsToExec.filterNot(_.isInstanceOf[SparkAction]).map(_.id).mkString(", ")}")
         actionDAGRun.init
       } else {
         actionDAGRun.prepare
+        actionDAGRun.init
+        if (appConfig.test.contains(TestMode.DryRun)) { // stop here if only dry-run
+          logger.info(s"${appConfig.test.get}-Test successfull")
+          return (Seq(), Map())
+        }
         val subFeeds = actionDAGRun.exec
         actionDAGRun.saveState(true)
         subFeeds
