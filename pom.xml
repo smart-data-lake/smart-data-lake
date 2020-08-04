@@ -510,7 +510,7 @@
 		<!-- this is for reading from kafka using confluent schema registry with Spark -->
 		<dependency>
 			<groupId>io.confluent</groupId>
-			<artifactId>kafka-avro-serializer</artifactId>
+			<artifactId>kafka-schema-registry-client</artifactId>
 			<version>5.4.1</version>
 			<exclusions>
 				<exclusion>
