@@ -120,7 +120,8 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
       case (node: InitDAGNode, _) =>
         node.edges.map(dataObjectId => getInitialSubFeed(dataObjectId))
       case (node: Action, subFeeds) =>
-        node.init(subFeeds)
+        val recursiveSubFeeds = node.recursiveInputs.map(dataObject => getInitialSubFeed(dataObject.id))
+        node.init(subFeeds ++ recursiveSubFeeds)
       case x => throw new IllegalStateException(s"Unmatched case $x")
     }
   }
@@ -136,7 +137,8 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
           node.edges.map(dataObjectId => getInitialSubFeed(dataObjectId))
         case (node: Action, subFeeds) =>
           node.preExec(subFeeds)
-          val resultSubFeeds = node.exec(subFeeds)
+          val recursiveSubFeeds = node.recursiveInputs.map(dataObject => getInitialSubFeed(dataObject.id))
+          val resultSubFeeds = node.exec(subFeeds ++ recursiveSubFeeds)
           node.postExec(subFeeds, resultSubFeeds)
           //return
           resultSubFeeds

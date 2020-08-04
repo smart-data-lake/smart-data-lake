@@ -38,6 +38,12 @@ abstract class SparkSubFeedAction extends SparkAction {
   def output:  DataObject with CanWriteDataFrame
 
   /**
+   * Recursive Inputs are not supported on SparkSubFeedAction (only on SparkSubFeedsAction) so set to empty Seq
+   *  @return
+   */
+  override def recursiveInputs: Seq[DataObject with CanCreateDataFrame] = Seq()
+
+  /**
    * Transform a [[SparkSubFeed]].
    * To be implemented by subclasses.
    *
