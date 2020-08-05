@@ -491,6 +491,12 @@
 		</dependency>
 
 		<dependency>
+			<groupId>io.smartdatalake</groupId>
+			<artifactId>spark-extensions_${scala.minor.version}</artifactId>
+			<version>1.0.0</version>
+		</dependency>
+
+		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-sql-kafka-0-10_${scala.minor.version}</artifactId>
 			<version>${spark.version}</version>
