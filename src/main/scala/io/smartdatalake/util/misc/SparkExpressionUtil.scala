@@ -20,10 +20,12 @@
 package io.smartdatalake.util.misc
 
 import java.sql.Timestamp
+import java.time.LocalDateTime
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.types.BooleanType
 
 import scala.util.{Failure, Success, Try}
 import scala.util.matching.Regex
@@ -70,6 +72,28 @@ private[smartdatalake] object SparkExpressionUtil {
     tokenExpressionRegex.replaceAllIn(str, substituter)
   }
 
+  def evaluateBoolean[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], expression: String, data: T, onlySyntaxCheck: Boolean = false)(implicit session: SparkSession): Boolean = {
+    import org.apache.spark.sql.functions.expr
+    import org.apache.spark.sql.types.StringType
+    import session.implicits._
+    val dsData = Seq(data).toDS
+    val dsValue = Try {
+      dsData.select(expr(expression).cast(BooleanType).as("value")).as[Option[Boolean]]
+    } match {
+      case Success(v) => v
+      case Failure(e) => throw ConfigurationException(s"($id) spark expression evaluation for '$expression' not possible", configName, e)
+    }
+    if (!onlySyntaxCheck) {
+      Try {
+        dsValue.head
+      } match {
+        case Success(v) => v.getOrElse(throw new IllegalStateException(s"($id) spark expression evaluation for '$expression' and config $configName is null for $data"))
+        case Failure(e) => throw new IllegalStateException(s"($id) spark expression evaluation for '$expression' and config $configName failed", e)
+      }
+    } else false
+  }
+
 }
 
-case class DefaultExpressionData(feed: String, application: String, runId: Int, attemptId: Int, referenceTimestamp: Option[Timestamp] = None, partitionValues: Seq[Map[String,String]])
+case class DefaultExpressionData( feed: String, application: String, runId: Int, attemptId: Int, referenceTimestamp: Option[Timestamp]
+                                , runStartTime: Timestamp, attemptStartTime: Timestamp, partitionValues: Seq[Map[String,String]])

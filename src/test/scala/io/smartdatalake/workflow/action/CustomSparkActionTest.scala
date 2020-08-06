@@ -124,7 +124,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val refTimestamp = LocalDateTime.now()
     implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp), SmartDataLakeBuilderConfig())
     val customTransformerConfig = CustomDfsTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestDfsTransformerDummy"))
-    val action = CustomSparkAction("a1", Seq(srcDO.id), Seq(tgtDO.id), transformer = customTransformerConfig, initExecutionMode = Some(PartitionDiffMode()))
+    val action = CustomSparkAction("a1", Seq(srcDO.id), Seq(tgtDO.id), transformer = customTransformerConfig, executionMode = Some(PartitionDiffMode()))
     val srcSubFeed = InitSubFeed("src1", Seq()) // InitSubFeed needed to test initExecutionMode!
 
     // prepare & start first load
@@ -183,7 +183,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp), SmartDataLakeBuilderConfig())
     val customTransformerConfig = CustomDfsTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestDfsTransformerDummy"))
     val action = CustomSparkAction("a1", Seq(srcDO.id, srcDO2.id), Seq(tgtDO.id, tgtDO2.id), transformer = customTransformerConfig
-      , mainInputId = Some("src1"), mainOutputId = Some("tgt1"), initExecutionMode = Some(PartitionDiffMode()))
+      , mainInputId = Some("src1"), mainOutputId = Some("tgt1"), executionMode = Some(PartitionDiffMode()))
     val srcSubFeed1 = InitSubFeed("src1", Seq()) // InitSubFeed needed to test initExecutionMode!
     val srcSubFeed2 = InitSubFeed("src2", Seq())
 

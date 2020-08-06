@@ -176,7 +176,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // start first dag run
     // use only first partition col (dt) for partition diff mode
-    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, initExecutionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName))))
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action1.copy())
     val configStart = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
     sdlb.run(configStart)

@@ -46,7 +46,6 @@ import scala.util.{Failure, Success, Try}
  * @param ignoreOldDeletedNestedColumns if true, remove no longer existing columns from nested data types in Schema Evolution.
  *                                      Keeping deleted columns in complex data types has performance impact as all new data
  *                                      in the future has to be converted by a complex function.
- * @param initExecutionMode optional execution mode if this Action is a start node of a DAG run
  * @param executionMode optional execution mode for this Action
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
@@ -63,7 +62,6 @@ case class DeduplicateAction(override val id: ActionObjectId,
                              ignoreOldDeletedNestedColumns: Boolean = true,
                              override val breakDataFrameLineage: Boolean = false,
                              override val persist: Boolean = false,
-                             override val initExecutionMode: Option[ExecutionMode] = None,
                              override val executionMode: Option[ExecutionMode] = None,
                              override val metricsFailCondition: Option[String] = None,
                              override val metadata: Option[ActionMetadata] = None

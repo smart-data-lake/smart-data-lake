@@ -52,6 +52,7 @@ private[smartdatalake] case class PartitionValues(elements: Map[String, Any]) {
   def keys: Set[String] = elements.keySet
   def isDefinedAt(colName: String): Boolean = elements.isDefinedAt(colName)
   def filterKeys(colNames: Seq[String]): PartitionValues = this.copy(elements = elements.filterKeys(colNames.contains))
+  def getMapString: Map[String,String] = elements.mapValues(_.toString)
 }
 
 private[smartdatalake] object PartitionValues {

@@ -37,7 +37,6 @@ import org.apache.spark.sql.SparkSession
  * @param transformer Custom Transformer to transform Seq[DataFrames]
  * @param mainInputId optional selection of main inputId used for execution mode and partition values propagation. Only needed if there are multiple input DataObject's.
  * @param mainOutputId optional selection of main outputId used for execution mode and partition values propagation. Only needed if there are multiple output DataObject's.
- * @param initExecutionMode optional execution mode if this Action is a start node of a DAG run
  * @param executionMode optional execution mode for this Action
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
@@ -50,7 +49,6 @@ case class CustomSparkAction ( override val id: ActionObjectId,
                                override val persist: Boolean = false,
                                override val mainInputId: Option[DataObjectId] = None,
                                override val mainOutputId: Option[DataObjectId] = None,
-                               override val initExecutionMode: Option[ExecutionMode] = None,
                                override val executionMode: Option[ExecutionMode] = None,
                                override val metricsFailCondition: Option[String] = None,
                                override val metadata: Option[ActionMetadata] = None
