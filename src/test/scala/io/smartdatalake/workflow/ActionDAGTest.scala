@@ -105,7 +105,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     // check state: two actions succeeded
     val latestState = stateStore.getLatestState()
     val previousRunState = stateStore.recoverRunState(latestState)
-    assert(previousRunState.actionsState.mapValues(_.state) == actions.map( a => (a.id.id, RuntimeEventState.SUCCEEDED)).toMap)
+    assert(previousRunState.actionsState.mapValues(_.state) == actions.map( a => (a.id, RuntimeEventState.SUCCEEDED)).toMap)
   }
 
   test("action dag with 2 actions in sequence and breakDataframeLineage=true") {
