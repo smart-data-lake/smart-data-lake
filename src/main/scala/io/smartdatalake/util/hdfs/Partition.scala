@@ -109,6 +109,23 @@ private[smartdatalake] object PartitionValues {
     if (partitionValues.nonEmpty) partitionValues.map(_.keys).reduce(_ ++ _).diff(partitions.toSet).toSeq
     else Seq()
   }
+
+  /**
+   * Checks if expected partition values are covered by existing partition values
+   * challenge: handle multiple partition columns correctly and performant
+   * @return list of missing partition values
+   */
+  def checkExpectedPartitionValues(existingPartitionValues: Seq[PartitionValues], expectedPartitionValues: Seq[PartitionValues]): Seq[PartitionValues] = {
+    val partitionColCombinations = expectedPartitionValues.map(_.keys).distinct
+    def diffPartitionValues(inputPartitions: Seq[PartitionValues], expectedPartitionValues: Seq[PartitionValues], partitionColCombinations: Seq[Set[String]]): Seq[PartitionValues] = {
+      if (partitionColCombinations.isEmpty) return Seq()
+      val partitionColCombination = partitionColCombinations.head
+      val (partitionValuesCurrentCombination, partitionValuesOtherCombination) = expectedPartitionValues.partition(_.keys==partitionColCombination)
+      val missingPartitionValuesCurrentCombination = partitionValuesCurrentCombination.diff(inputPartitions.map(_.filterKeys(partitionColCombination.toSeq)))
+      missingPartitionValuesCurrentCombination ++ diffPartitionValues(inputPartitions, partitionValuesOtherCombination, partitionColCombinations.tail)
+    }
+    diffPartitionValues(existingPartitionValues, expectedPartitionValues, partitionColCombinations)
+  }
 }
 
 /**

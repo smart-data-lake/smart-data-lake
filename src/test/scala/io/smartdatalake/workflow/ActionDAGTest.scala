@@ -417,7 +417,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     val dfSrc = Seq(("20180101", "person", "doe","john",5) // partition 20180101 is included in partition values filter
       ,("20190101", "company", "olmo","-",10)) // partition 20190101 is not included
       .toDF("dt", "type", "lastname", "firstname", "rating")
-    TestUtil.prepareHiveTable(srcTable, srcPath, dfSrc, Seq("dt","type"))
+    srcDO.writeDataFrame(dfSrc, Seq())
 
     // prepare DAG
     val refTimestamp1 = LocalDateTime.now()
