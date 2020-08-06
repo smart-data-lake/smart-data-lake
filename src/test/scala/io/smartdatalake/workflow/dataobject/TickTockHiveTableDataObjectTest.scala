@@ -22,15 +22,11 @@ import java.time.LocalDateTime
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.PartitionDiffMode
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.workflow.action.CustomSparkAction
 import io.smartdatalake.workflow.action.customlogic.{CustomDfsTransformer, CustomDfsTransformerConfig}
-import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}

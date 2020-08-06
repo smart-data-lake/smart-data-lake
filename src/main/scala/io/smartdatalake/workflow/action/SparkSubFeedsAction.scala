@@ -92,7 +92,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
     outputs.foreach{
       output =>
         val subFeed = transformedSubFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"subFeed for output ${output.id} not found"))
-        output.init(subFeed.partitionValues)
+        output.init(subFeed.dataFrame.get, subFeed.partitionValues)
     }
     // return
     transformedSubFeeds.map( transformedSubFeed => updateSubFeedAfterWrite(transformedSubFeed))
