@@ -28,9 +28,10 @@ private[smartdatalake] trait CanWriteDataFrame {
   def streamingOptions: Map[String, String] = Map()
 
   /**
-   * Initialize callback before writing data out to disk/sinks.
+   * Called during init phase for checks and initialization.
+   * If possible dont change the system until execution phase.
    */
-  def init(partitionValues: Seq[PartitionValues]=Seq())(implicit session: SparkSession): Unit = Unit
+  def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = Unit
 
   def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit
 

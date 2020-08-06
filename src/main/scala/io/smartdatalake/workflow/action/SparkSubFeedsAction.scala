@@ -119,10 +119,18 @@ abstract class SparkSubFeedsAction extends SparkAction {
    * */
   override final def init(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == inputs.size + recursiveInputs.size, s"Number of subFeed's must match number of inputs for SparkSubFeedActions (Action $id, subfeed's ${subFeeds.map(_.dataObjectId).mkString(",")}, inputs ${inputs.map(_.id).mkString(",")})")
-    outputs.collect{ case x: CanWriteDataFrame => x }.foreach(_.init())
     val mainInputSubFeed = subFeeds.find(_.dataObjectId == mainInput.id).getOrElse(throw new IllegalStateException(s"subFeed for main input ${mainInput.id} not found"))
     val thisExecutionMode = runtimeExecutionMode(mainInputSubFeed)
-    doTransform(subFeeds, thisExecutionMode)
+    // transform
+    val transformedSubFeeds = doTransform(subFeeds, thisExecutionMode)
+    // check output
+    outputs.foreach{
+      output =>
+        val subFeed = transformedSubFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"subFeed for output ${output.id} not found"))
+        output.init(subFeed.dataFrame.get, subFeed.partitionValues)
+    }
+    // return
+    transformedSubFeeds.map( transformedSubFeed => updateSubFeedAfterWrite(transformedSubFeed, thisExecutionMode))
   }
 
   /**
@@ -132,7 +140,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
     assert(subFeeds.size == inputs.size + recursiveInputs.size, s"Number of subFeed's must match number of inputs for SparkSubFeedActions (Action $id, subfeed's ${subFeeds.map(_.dataObjectId).mkString(",")}, inputs ${inputs.map(_.id).mkString(",")})")
     val mainInputSubFeed = subFeeds.find(_.dataObjectId == mainInput.id).getOrElse(throw new IllegalStateException(s"subFeed for main input ${mainInput.id} not found"))
     val thisExecutionMode = runtimeExecutionMode(mainInputSubFeed)
-    //transform
+    // transform
     val transformedSubFeeds = doTransform(subFeeds, thisExecutionMode)
     // write output
     outputs.foreach { output =>
