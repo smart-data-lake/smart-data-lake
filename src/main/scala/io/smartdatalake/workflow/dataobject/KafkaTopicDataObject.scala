@@ -25,10 +25,8 @@ import java.time.temporal.{ChronoUnit, TemporalAccessor, TemporalQuery}
 import java.util.Properties
 
 import com.typesafe.config.Config
-import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
-import io.confluent.kafka.serializers.KafkaAvroDeserializerConfig
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.workflow.connection.KafkaConnection
@@ -37,11 +35,11 @@ import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.spark.sql._
+import org.apache.spark.sql.avro.confluent.SubjectType
+import org.apache.spark.sql.avro.confluent.SubjectType.SubjectType
 import org.apache.spark.sql.functions.{col, udf}
 import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 import org.apache.spark.sql.types._
-import za.co.absa.abris.avro.functions.{from_confluent_avro, to_confluent_avro}
-import za.co.absa.abris.avro.read.confluent.SchemaManager
 
 import scala.collection.JavaConverters._
 
@@ -127,15 +125,6 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
 
   private val instanceOptions = connection.sparkOptions ++ dataSourceOptions
 
-  private val schemaRegistryConfig = connection.schemaRegistry.map (
-    schemaRegistry => Map(
-      SchemaManager.PARAM_SCHEMA_REGISTRY_URL -> schemaRegistry,
-      SchemaManager.PARAM_SCHEMA_REGISTRY_TOPIC -> topicName,
-      SchemaManager.PARAM_VALUE_SCHEMA_NAMING_STRATEGY -> SchemaManager.SchemaStorageNamingStrategies.TOPIC_NAME,
-      SchemaManager.PARAM_VALUE_SCHEMA_ID -> "latest"
-    )
-  )
-
   // consumer for reading topic metadata
   @transient private lazy val consumer = {
     val props = new Properties()
@@ -149,21 +138,18 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   override def prepare(implicit session: SparkSession): Unit = {
-    // test kafka connection
-    require(connection.topicExists(topicName), s"($id) topic $topicName doesn't exist")
     // test schema registry connection
-    if (schemaRegistryConfig.isDefined) {
-      val config = schemaRegistryConfig.get.asJava
-      val settings = new KafkaAvroDeserializerConfig(config)
-      val urls = settings.getSchemaRegistryUrls
-      val maxSchemaObject = settings.getMaxSchemasPerSubject
-      val schemaRegistryClient = new CachedSchemaRegistryClient(urls, maxSchemaObject, config)
-      try {
-        schemaRegistryClient.getMode // test connection by calling a simple function
-      } catch {
-        case e:Exception => throw ConfigurationException(s"($id) Can not connect to schema registry ($urls)")
-      }
-    }
+    connection.testSchemaRegistry()
+    // test kafka connection and topic existing
+    // TODO: einkommentieren!
+    //require(connection.topicExists(topicName), s"($id) topic $topicName doesn't exist")
+  }
+
+  override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+    // check schema compatibility
+    require(df.columns.toSet == Set("key","value"), s"(${id}) Expects columns key, value in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
+    convertToKafka(keyType, df("key"), SubjectType.key, eagerCheck = true)
+    convertToKafka(valueType, df("value"), SubjectType.value, eagerCheck = true)
   }
 
   override def getStreamingDataFrame(options: Map[String,String], schema: Option[StructType])(implicit session: SparkSession): DataFrame = {
@@ -173,18 +159,17 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       .options(instanceOptions ++ options) // options override kafkaOptions override connection.kafkaOptions
       .option("subscribe", topicName)
       .load()
-    prepareDataFrame(dfRaw)
+    convertToReadDataFrame(dfRaw)
   }
 
-  private def prepareDataFrame(dfRaw: DataFrame): DataFrame = {
+  private def convertToReadDataFrame(dfRaw: DataFrame): DataFrame = {
     import io.smartdatalake.util.misc.DataFrameUtil._
 
-    // Deserialize key/value to make human readable
     // convert key & value
     val colsToSelect = ((if (selectCols.nonEmpty) selectCols else Seq("kafka.*")) ++ partitions).distinct.map(col)
     val df = dfRaw
-      .withColumn("key", convertFromKafka(keyType, col("key")))
-      .withColumn("value", convertFromKafka(valueType, col("value")))
+      .withColumn("key", convertFromKafka(keyType, col("key"), SubjectType.key))
+      .withColumn("value", convertFromKafka(valueType, col("value"), SubjectType.value))
       .as("kafka")
       .withOptionalColumn(datePartitionCol.map(_.colName), udfFormatPartition(col("timestamp")))
       .select(colsToSelect:_*)
@@ -269,13 +254,19 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
         .load()
     }
 
-    prepareDataFrame(dfRaw)
+    convertToReadDataFrame(dfRaw)
+  }
+
+  private def convertToWriteDataFrame(df: DataFrame): DataFrame = {
+    require(df.columns.toSet == Set("key","value"), s"(${id}) Expects columns key, value in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
+    df.select(
+      convertToKafka(keyType, col("key"), SubjectType.key).as("key"),
+      convertToKafka(valueType, col("value"), SubjectType.value).as("value")
+    )
   }
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
-    import session.implicits._
-    require(df.columns.toSet == Set("key","value"), s"(${id}) Expects columns key, value in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
-    df.select(convertToKafka(keyType,$"key").as("key"), convertToKafka(valueType,$"value").as("value"))
+    convertToWriteDataFrame(df)
       .write
       .format("kafka")
       .options(instanceOptions)
@@ -284,9 +275,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   override def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String, String], checkpointLocation: String, queryName: String, outputMode: OutputMode)(implicit session: SparkSession): StreamingQuery = {
-    import session.implicits._
-    require(df.columns.toSet == Set("key","value"), s"(${id}) Expects columns Set(key, value) in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
-    df.select(convertToKafka(keyType,$"key").as("key"), convertToKafka(valueType,$"value").as("value"))
+    convertToWriteDataFrame(df)
       .writeStream
       .format("kafka")
       .trigger(trigger)
@@ -303,19 +292,19 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     consumer.offsetsForTimes(topicPartitionsStart).asScala.toSeq.sortBy(_._1.partition)
   }
 
-  private def convertFromKafka(colType: KafkaColumnType, col: Column ): Column = {
+  private def convertFromKafka(colType: KafkaColumnType, col: Column, subjectType: SubjectType): Column = {
     colType match {
       case KafkaColumnType.Binary => col // default is that we get a byte array -> binary from kafka
-      case KafkaColumnType.AvroSchemaRegistry => from_confluent_avro(col, schemaRegistryConfig.get)
       case KafkaColumnType.String => col.cast(StringType)
+      case KafkaColumnType.AvroSchemaRegistry => connection.confluentHelper.get.from_confluent_avro(col, topicName, subjectType)
     }
   }
 
-  private def convertToKafka(colType: KafkaColumnType, col: Column ): Column = {
+  private def convertToKafka(colType: KafkaColumnType, col: Column, subjectType: SubjectType, eagerCheck: Boolean = false): Column = {
     colType match {
       case KafkaColumnType.Binary => col // we let spark/kafka convert the column to binary
-      case KafkaColumnType.AvroSchemaRegistry => to_confluent_avro(col, schemaRegistryConfig.get)
       case KafkaColumnType.String => col.cast(StringType)
+      case KafkaColumnType.AvroSchemaRegistry => connection.confluentHelper.get.to_confluent_avro(col, topicName, subjectType, eagerCheck = eagerCheck)
     }
   }
 
@@ -369,7 +358,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       .add("timestamp", TimestampType)
       .add("timestampType", IntegerType)
     // apply selected columns and return schema
-    prepareDataFrame(DataFrameUtil.getEmptyDataFrame(readSchemaRaw))
+    convertToReadDataFrame(DataFrameUtil.getEmptyDataFrame(readSchemaRaw))
       .schema
   }
 
