@@ -26,6 +26,7 @@ import io.smartdatalake.workflow.DAGHelper._
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{Action, RuntimeEventState, RuntimeInfo}
+import io.smartdatalake.workflow.dataobject.TransactionalSparkTableDataObject
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import org.apache.spark.sql.SparkSession
@@ -120,6 +121,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
       case (node: InitDAGNode, _) =>
         node.edges.map(dataObjectId => getInitialSubFeed(dataObjectId))
       case (node: Action, subFeeds) =>
+        assert(node.recursiveInputs.map(_.isInstanceOf[TransactionalSparkTableDataObject]).forall(_==true),"Recursive inputs only work for TransactionalSparkTableDataObjects.")
         val recursiveSubFeeds = node.recursiveInputs.map(dataObject => getInitialSubFeed(dataObject.id))
         node.init(subFeeds ++ recursiveSubFeeds)
       case x => throw new IllegalStateException(s"Unmatched case $x")
