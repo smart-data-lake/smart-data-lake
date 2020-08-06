@@ -109,7 +109,9 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      assert(runState.actionsState.mapValues(_.state) == Map(action1.id -> RuntimeEventState.SUCCEEDED, action2fail.id -> RuntimeEventState.FAILED))
+      val resultActionsState = runState.actionsState.mapValues(_.state)
+      val expectedActionsState = Map((action1.id, RuntimeEventState.SUCCEEDED), (action2fail.id, RuntimeEventState.FAILED))
+      assert(resultActionsState == expectedActionsState)
     }
 
     // now fill tgt1 with both partitions
@@ -139,7 +141,9 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
-      assert(runState.actionsState.mapValues(_.state) == Map(action2success.id -> RuntimeEventState.SUCCEEDED))
+      val resultActionsState = runState.actionsState.mapValues(_.state)
+      val expectedActionsState = Map((action2success.id, RuntimeEventState.SUCCEEDED))
+      assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == selectedPartitions)
       if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
     }
@@ -191,7 +195,9 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      assert(runState.actionsState.mapValues(_.state) == Map(action1.id -> RuntimeEventState.SUCCEEDED))
+      val resultActionsState = runState.actionsState.mapValues(_.state)
+      val expectedActionsState = Map((action1.id , RuntimeEventState.SUCCEEDED))
+      assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == Seq(PartitionValues(Map("dt"->"20180101"))))
     }
 
@@ -219,7 +225,9 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 2)
       assert(runState.attemptId == 1)
-      assert(runState.actionsState.mapValues(_.state) == Map(action1.id -> RuntimeEventState.SUCCEEDED))
+      val resultActionsState = runState.actionsState.mapValues(_.state)
+      val expectedActionsState = Map((action1.id , RuntimeEventState.SUCCEEDED))
+      assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == Seq(PartitionValues(Map("dt"->"20190101"))))
       if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty) // doesnt work on windows
     }
