@@ -76,14 +76,6 @@ private[smartdatalake] object ActionDAGRunState {
   ))
 }
 
-trait ActionDAGRunStateTracker extends SmartDataLakeLogger {
-
-  /**
-   * Notify State
-   */
-  def notifyState(state: ActionDAGRunState): Unit
-}
-
 private[smartdatalake] trait ActionDAGRunStateStore[A <: StateId] extends SmartDataLakeLogger {
 
   /**
