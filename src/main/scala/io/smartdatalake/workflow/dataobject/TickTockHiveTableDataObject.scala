@@ -25,7 +25,7 @@ import io.smartdatalake.definitions.{DateColumnType, Environment}
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
-import io.smartdatalake.util.misc.{AclDef, AclUtil}
+import io.smartdatalake.util.misc.{AclDef, AclUtil, DataFrameUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.HiveTableConnection
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -100,7 +100,14 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   }
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
-    val df = session.table(table.fullName)
+    val df = if(!isTableExisting && schemaMin.isDefined) {
+      logger.info(s"Table ${table.fullName} does not exist but schemaMin was provided. Creating empty DataFrame.")
+      DataFrameUtil.getEmptyDataFrame(schemaMin.get)
+    }
+    else {
+      session.table(s"${table.fullName}")
+    }
+
     validateSchemaMin(df)
     df
   }
