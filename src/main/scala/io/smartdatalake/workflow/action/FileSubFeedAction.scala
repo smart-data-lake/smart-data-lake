@@ -20,8 +20,8 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.util.misc.PerformanceUtils
-import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, CanHandlePartitions, DataObject, FileRefDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, InitSubFeed, SparkSubFeed, SubFeed}
+import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRefDataObject}
+import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, SubFeed}
 import org.apache.spark.sql.{SaveMode, SparkSession}
 
 abstract class FileSubFeedAction extends Action {
@@ -59,6 +59,11 @@ abstract class FileSubFeedAction extends Action {
    */
   def execSubFeed(subFeed: FileSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed
 
+  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.prepare
+    executionMode.foreach(_.prepare(id))
+  }
+
   /**
    * Action.init implementation
    */
@@ -67,13 +72,15 @@ abstract class FileSubFeedAction extends Action {
     val subFeed = subFeeds.head
     // convert subfeeds to FileSubFeed type or initialize if not yet existing
     var preparedSubFeed = FileSubFeed.fromSubFeed(subFeed)
-    // apply init execution mode if there are no partition values given in command line
-    preparedSubFeed = if (initExecutionMode.isDefined && preparedSubFeed.isDAGStart && preparedSubFeed.partitionValues.isEmpty) {
-      ActionHelper.applyExecutionMode(initExecutionMode.get, id, input, output, context.phase) match {
-        case Some((partitionValues, _)) => preparedSubFeed.copy(partitionValues = partitionValues)
-        case None => preparedSubFeed
-      }
-    } else preparedSubFeed
+    // apply execution mode
+    preparedSubFeed = executionMode match {
+      case Some(mode) =>
+        mode.apply(id, input, output, preparedSubFeed) match {
+          case Some((partitionValues, _)) => preparedSubFeed.copy(partitionValues = partitionValues)
+          case None => preparedSubFeed
+        }
+      case _ => preparedSubFeed
+    }
     // break lineage if requested
     preparedSubFeed = if (breakFileRefLineage) preparedSubFeed.breakLineage else preparedSubFeed
     // transform
@@ -91,12 +98,14 @@ abstract class FileSubFeedAction extends Action {
     // convert subfeeds to FileSubFeed type or initialize if not yet existing
     var preparedSubFeed = FileSubFeed.fromSubFeed(subFeed)
     // apply init execution mode if there are no partition values given in command line
-    preparedSubFeed = if (initExecutionMode.isDefined && preparedSubFeed.isDAGStart && preparedSubFeed.partitionValues.isEmpty) {
-      ActionHelper.applyExecutionMode(initExecutionMode.get, id, input, output, context.phase) match {
-        case Some((partitionValues, _)) => preparedSubFeed.copy(partitionValues = partitionValues)
-        case None => preparedSubFeed
-      }
-    } else preparedSubFeed
+    preparedSubFeed = executionMode match {
+      case Some(mode) =>
+        mode.apply(id, input, output, preparedSubFeed) match {
+          case Some((partitionValues, _)) => preparedSubFeed.copy(partitionValues = partitionValues)
+          case None => preparedSubFeed
+        }
+      case _ => preparedSubFeed
+    }
     // break lineage if requested
     preparedSubFeed = if (breakFileRefLineage) preparedSubFeed.breakLineage else preparedSubFeed
     // delete existing files on overwrite
@@ -141,7 +150,7 @@ abstract class FileSubFeedAction extends Action {
   /**
    * Execution mode if this Action is a start node of a DAG run
    */
-  def initExecutionMode: Option[ExecutionMode]
+  def executionMode: Option[ExecutionMode]
 
   /**
    * If true delete files after they are successfully processed.

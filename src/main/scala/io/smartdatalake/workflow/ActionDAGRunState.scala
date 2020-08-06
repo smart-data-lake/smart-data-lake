@@ -30,7 +30,8 @@ import io.smartdatalake.workflow.action.{RuntimeEventState, RuntimeInfo}
 /**
  * ActionDAGRunState contains all configuration and state of an ActionDAGRun needed to start a recovery run in case of failure.
  */
-private[smartdatalake] case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, actionsState: Map[ActionObjectId, RuntimeInfo], isFinal: Boolean) {
+private[smartdatalake] case class ActionDAGRunState( appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int,runStartTime: LocalDateTime, attemptStartTime: LocalDateTime
+                                                   , actionsState: Map[ActionObjectId, RuntimeInfo], isFinal: Boolean) {
   def toJson: String = ActionDAGRunState.toJson(this)
   def isFailed: Boolean = actionsState.exists(_._2.state==RuntimeEventState.FAILED)
   def isSucceeded: Boolean = isFinal && !isFailed

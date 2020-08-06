@@ -19,9 +19,10 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.{ExecutionMode, ExecutionModeWithMainInputOutput}
 import io.smartdatalake.util.misc.PerformanceUtils
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 
@@ -31,45 +32,13 @@ abstract class SparkSubFeedsAction extends SparkAction {
   override def outputs: Seq[DataObject with CanWriteDataFrame]
   override def recursiveInputs: Seq[DataObject with CanCreateDataFrame] = Seq()
 
+  def mainInputId: Option[DataObjectId]
+  def mainOutputId: Option[DataObjectId]
+
   // prepare main input / output
   // this must be lazy because inputs / outputs is evaluated later in subclasses
-  val initExecutionModeMainInputOutput: Option[ExecutionModeWithMainInputOutput] = initExecutionMode.collect{ case mode: ExecutionModeWithMainInputOutput => mode }
-  lazy val initMainInput: Option[DataObject with CanCreateDataFrame] = initExecutionModeMainInputOutput.flatMap {
-    _.mainInputId.map( inputId => inputs.find(_.id.id == inputId).getOrElse(throw ConfigurationException(s"$id has set an initExecutionMode with inputId $inputId, which was not found in inputs")))
-  }
-  val normalExecutionModeMainInputOutput: Option[ExecutionModeWithMainInputOutput] = executionMode.collect{ case mode: ExecutionModeWithMainInputOutput => mode }
-  lazy val normalMainInput: Option[DataObject with CanCreateDataFrame] = normalExecutionModeMainInputOutput.flatMap {
-    _.mainInputId.map( inputId => inputs.find(_.id.id == inputId).getOrElse(throw ConfigurationException(s"$id has set an initExecutionMode with inputId $inputId, which was not found in inputs")))
-  }
-  lazy protected val mainInput: DataObject with CanCreateDataFrame = initMainInput
-  .orElse(normalMainInput)
-  .orElse {
-    val paritionedInputs = inputs.collect{ case x: CanHandlePartitions => x }.filter(_.partitions.nonEmpty)
-    if (paritionedInputs.size==1) paritionedInputs.headOption
-    else None
-  }.orElse {
-    if (inputs.size==1) inputs.headOption else None
-  }.getOrElse {
-    if (executionModeNeedsMainInputOutput) logger.warn(s"($id) Could not determine unique main input but execution mode might need it. Decided for ${inputs.head.id}.")
-    inputs.head
-  }
-  lazy protected val initMainOutput: Option[DataObject with CanWriteDataFrame] = initExecutionModeMainInputOutput.flatMap {
-    _.mainOutputId.map( outputId => outputs.find(_.id.id == outputId).getOrElse(throw ConfigurationException(s"$id has set an initExecutionMode with outputId $outputId, which was not found in outputs")))
-  }
-  lazy protected val normalMainOutput: Option[DataObject with CanWriteDataFrame] = normalExecutionModeMainInputOutput.flatMap {
-    _.mainOutputId.map( outputId => outputs.find(_.id.id == outputId).getOrElse(throw ConfigurationException(s"$id has set an initExecutionMode with outputId $outputId, which was not found in outputs")))
-  }
-  lazy protected val mainOutput: DataObject with CanWriteDataFrame = initMainOutput
-  .orElse(normalMainOutput)
-  .orElse{
-    val paritionedOutputs = outputs.collect{ case x: CanHandlePartitions => x }.filter(_.partitions.nonEmpty)
-    if (paritionedOutputs.size==1) paritionedOutputs.headOption else None
-  }.orElse{
-    if (outputs.size==1) outputs.headOption else None
-  }.getOrElse {
-    if (executionModeNeedsMainInputOutput) logger.warn(s"($id) Could not determine unique main output but execution mode might need it. Decided for ${outputs.head.id}.")
-    outputs.head
-  }
+  lazy val mainInput: DataObject with CanCreateDataFrame = ActionHelper.getMainDataObject[DataObject with CanCreateDataFrame](mainInputId, inputs, "input", executionModeNeedsMainInputOutput, id)
+  lazy val mainOutput: DataObject with CanWriteDataFrame = ActionHelper.getMainDataObject[DataObject with CanWriteDataFrame](mainOutputId, outputs, "output", executionModeNeedsMainInputOutput, id)
 
   /**
    * Transform [[SparkSubFeed]]'s.
@@ -80,19 +49,17 @@ abstract class SparkSubFeedsAction extends SparkAction {
    */
   def transform(subFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed]
 
-  private def doTransform(subFeeds: Seq[SubFeed], thisExecutionMode: Option[ExecutionMode])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
+  private def doTransform(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
     // convert subfeeds to SparkSubFeed type or initialize if not yet existing
     var preparedSubFeeds = subFeeds.map( SparkSubFeed.fromSubFeed )
     // apply execution mode
-    preparedSubFeeds = thisExecutionMode match {
+    preparedSubFeeds = executionMode match {
       case Some(mode) =>
-        val executionModeParameters = ActionHelper.applyExecutionMode(mode, id, mainInput, mainOutput, context.phase)
-        preparedSubFeeds.map {
-          subFeed =>
-            executionModeParameters match {
-              case Some((newPartitionValues, newFilter)) => subFeed.copy(partitionValues = newPartitionValues, filter = newFilter)
-              case None => subFeed
-            }
+        val mainSubFeed = preparedSubFeeds.find(_.dataObjectId == mainInput.id).get
+        mode.apply(id, mainInput, mainOutput, mainSubFeed) match {
+          case Some((newPartitionValues, newFilter)) =>
+            preparedSubFeeds.map( subFeed => subFeed.copy(partitionValues = newPartitionValues, filter = newFilter))
+          case None => preparedSubFeeds
         }
       case _ => preparedSubFeeds
     }
@@ -101,7 +68,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
       // prepare as input SubFeed
       val preparedSubFeed = prepareInputSubFeed(subFeed, input)
       // enrich with fresh DataFrame if needed
-      enrichSubFeedDataFrame(input, preparedSubFeed, thisExecutionMode, context.phase)
+      enrichSubFeedDataFrame(input, preparedSubFeed, context.phase)
     }
     // transform
     val transformedSubFeeds = transform(preparedSubFeeds)
@@ -119,10 +86,8 @@ abstract class SparkSubFeedsAction extends SparkAction {
    * */
   override final def init(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == inputs.size + recursiveInputs.size, s"Number of subFeed's must match number of inputs for SparkSubFeedActions (Action $id, subfeed's ${subFeeds.map(_.dataObjectId).mkString(",")}, inputs ${inputs.map(_.id).mkString(",")})")
-    val mainInputSubFeed = subFeeds.find(_.dataObjectId == mainInput.id).getOrElse(throw new IllegalStateException(s"subFeed for main input ${mainInput.id} not found"))
-    val thisExecutionMode = runtimeExecutionMode(mainInputSubFeed)
     // transform
-    val transformedSubFeeds = doTransform(subFeeds, thisExecutionMode)
+    val transformedSubFeeds = doTransform(subFeeds)
     // check output
     outputs.foreach{
       output =>
@@ -130,7 +95,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
         output.init(subFeed.dataFrame.get, subFeed.partitionValues)
     }
     // return
-    transformedSubFeeds.map( transformedSubFeed => updateSubFeedAfterWrite(transformedSubFeed, thisExecutionMode))
+    transformedSubFeeds.map( transformedSubFeed => updateSubFeedAfterWrite(transformedSubFeed))
   }
 
   /**
@@ -139,9 +104,8 @@ abstract class SparkSubFeedsAction extends SparkAction {
   override final def exec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == inputs.size + recursiveInputs.size, s"Number of subFeed's must match number of inputs for SparkSubFeedActions (Action $id, subfeed's ${subFeeds.map(_.dataObjectId).mkString(",")}, inputs ${inputs.map(_.id).mkString(",")})")
     val mainInputSubFeed = subFeeds.find(_.dataObjectId == mainInput.id).getOrElse(throw new IllegalStateException(s"subFeed for main input ${mainInput.id} not found"))
-    val thisExecutionMode = runtimeExecutionMode(mainInputSubFeed)
     // transform
-    val transformedSubFeeds = doTransform(subFeeds, thisExecutionMode)
+    val transformedSubFeeds = doTransform(subFeeds)
     // write output
     outputs.foreach { output =>
       val subFeed = transformedSubFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"subFeed for output ${output.id} not found"))
@@ -149,7 +113,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
       logger.info(s"($id) start " + msg)
       setSparkJobMetadata(Some(msg))
       val (noData,d) = PerformanceUtils.measureDuration {
-        writeSubFeed(thisExecutionMode, subFeed, output)
+        writeSubFeed(subFeed, output)
       }
       setSparkJobMetadata()
       val metricsLog = if (noData) ", no data found"
@@ -157,7 +121,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
       logger.info(s"($id) finished writing DataFrame to ${output.id}: duration=$d" + metricsLog)
     }
     // return
-    transformedSubFeeds.map( transformedSubFeed => updateSubFeedAfterWrite(transformedSubFeed, thisExecutionMode))
+    transformedSubFeeds.map( transformedSubFeed => updateSubFeedAfterWrite(transformedSubFeed))
   }
 
   /**
@@ -170,11 +134,11 @@ abstract class SparkSubFeedsAction extends SparkAction {
     assert(inputs.size+recursiveInputs.size == subFeeds.size, s"Number of inputs must match number of subFeeds given for $id")
     (inputs ++ recursiveInputs).map { input =>
       val subFeed = subFeeds.find(_.dataObjectId == input.id).getOrElse(throw new IllegalStateException(s"subFeed for input ${input.id} not found"))
-      enrichSubFeedDataFrame(input, subFeed, runtimeExecutionMode(subFeed), context.phase)
+      enrichSubFeedDataFrame(input, subFeed, context.phase)
     }
   }
 
   private def executionModeNeedsMainInputOutput: Boolean = {
-    initExecutionMode.exists{_.isInstanceOf[ExecutionModeWithMainInputOutput]} || executionMode.exists{_.isInstanceOf[ExecutionModeWithMainInputOutput]}
+    executionMode.exists{_.isInstanceOf[ExecutionModeWithMainInputOutput]}
   }
 }

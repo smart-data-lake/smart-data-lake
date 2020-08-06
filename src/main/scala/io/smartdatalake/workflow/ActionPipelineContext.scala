@@ -32,6 +32,8 @@ private[smartdatalake] case class ActionPipelineContext(
                                                          instanceRegistry: InstanceRegistry,
                                                          referenceTimestamp: Option[LocalDateTime] = None,
                                                          appConfig: SmartDataLakeBuilderConfig, // application config is needed to persist action dag state for recovery
+                                                         runStartTime: LocalDateTime = LocalDateTime.now(),
+                                                         attemptStartTime: LocalDateTime = LocalDateTime.now(),
                                                          simulation: Boolean = false,
                                                          var phase: ExecutionPhase = ExecutionPhase.Prepare
 ) {

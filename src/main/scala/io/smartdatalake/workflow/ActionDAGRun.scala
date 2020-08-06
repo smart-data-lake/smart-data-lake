@@ -176,7 +176,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
    * Save state of dag to file
    */
   def saveState(isFinal: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    stateStore.foreach(_.saveState(ActionDAGRunState(context.appConfig, runId, attemptId, getRuntimeInfos, isFinal)))
+    stateStore.foreach(_.saveState(ActionDAGRunState(context.appConfig, runId, attemptId, context.runStartTime, context.attemptStartTime, getRuntimeInfos, isFinal)))
   }
 
   private class ActionEventListener(phase: ExecutionPhase)(implicit session: SparkSession, context: ActionPipelineContext) extends DAGEventListener[Action] with SmartDataLakeLogger {
