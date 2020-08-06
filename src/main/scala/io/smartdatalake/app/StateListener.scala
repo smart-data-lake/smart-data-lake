@@ -19,15 +19,20 @@
 
 package io.smartdatalake.app
 
+import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionDAGRunState
 
 case class StateListenerConfig(className: String, options: Option[Map[String,String]] = None) {
   // instantiate listener
-  private val clazz = Class.forName(className)
-  private val constructor = clazz.getConstructors.head
-  private val constructor1 = clazz.getConstructor(classOf[Map[String,String]])
-  private[smartdatalake] val listener: StateListener = constructor.newInstance(options.getOrElse(Map())).asInstanceOf[StateListener]
+  private[smartdatalake] val listener: StateListener = try {
+    val clazz = Class.forName(className)
+    val constructor = clazz.getConstructor(classOf[Map[String,String]])
+    constructor.newInstance(options.getOrElse(Map())).asInstanceOf[StateListener]
+  } catch {
+    case e: NoSuchMethodException => throw ConfigurationException(s"State listener class $className needs constructor with parameter Map[String,String]: ${e.getMessage}", Some("globalConfig.stateListeners"), e)
+    case e: Exception => throw ConfigurationException(s"Cannot instantiate state listener class $className: ${e.getMessage}", Some("globalConfig.stateListeners"), e)
+  }
 }
 
 trait StateListener extends SmartDataLakeLogger {

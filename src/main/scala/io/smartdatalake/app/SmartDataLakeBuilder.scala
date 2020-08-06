@@ -225,7 +225,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * @return tuple of list of final subfeeds and statistics (action count per RuntimeEventState)
    */
   def startSimulation(appConfig: SmartDataLakeBuilderConfig, initialSubFeeds: Seq[SparkSubFeed])(implicit instanceRegistry: InstanceRegistry, session: SparkSession): (Seq[SparkSubFeed], Map[RuntimeEventState,Int]) = {
-    val (subFeeds, stats) = exec(appConfig, runId = 1, attemptId = 1, runStartTime = LocalDateTime.now, attemptStartTime = LocalDateTime.now, actionIdsToSkip = Seq(), initialSubFeeds = initialSubFeeds, stateStore = None, simulation = true)
+    val (subFeeds, stats) = exec(appConfig, runId = 1, attemptId = 1, runStartTime = LocalDateTime.now, attemptStartTime = LocalDateTime.now, actionIdsToSkip = Seq(), initialSubFeeds = initialSubFeeds, stateStore = None, stateListeners = Seq(), simulation = true)
     (subFeeds.map(_.asInstanceOf[SparkSubFeed]), stats)
   }
 
@@ -254,20 +254,20 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     }
     require(config.hasPath("actions"), s"No configuration parsed or it does not have a section called actions")
     require(config.hasPath("dataObjects"), s"No configuration parsed or it does not have a section called dataObjects")
-    val globalConfig = GlobalConfig.from(config)
 
     // parse config objects
-    ConfigParser.parse(config, instanceRegistry)
-    Environment._instanceRegistry = instanceRegistry // share instance registry for custom code
+    Environment._instanceRegistry = ConfigParser.parse(config, instanceRegistry) // share instance registry for custom code
+    Environment._globalConfig = GlobalConfig.from(config)
+    val stateListeners = Environment._globalConfig.stateListeners.map(_.listener)
 
     // create Spark Session
-    val session: SparkSession = globalConfig.createSparkSession(appConfig.appName, appConfig.master, appConfig.deployMode)
+    val session: SparkSession = Environment._globalConfig.createSparkSession(appConfig.appName, appConfig.master, appConfig.deployMode)
     LogUtil.setLogLevel(session.sparkContext)
 
-    exec(appConfig, runId, attemptId, runStartTime, attemptStartTime, actionIdsToSkip, initialSubFeeds, stateStore, simulation)(instanceRegistry, session)
+    exec(appConfig, runId, attemptId, runStartTime, attemptStartTime, actionIdsToSkip, initialSubFeeds, stateStore, stateListeners, simulation)(Environment._instanceRegistry, session)
   }
 
-  private def exec(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime, actionIdsToSkip: Seq[ActionObjectId], initialSubFeeds: Seq[SubFeed], stateStore: Option[ActionDAGRunStateStore[_]], simulation: Boolean)(implicit instanceRegistry: InstanceRegistry, session: SparkSession) : (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
+  private def exec(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime, actionIdsToSkip: Seq[ActionObjectId], initialSubFeeds: Seq[SubFeed], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener], simulation: Boolean)(implicit instanceRegistry: InstanceRegistry, session: SparkSession) : (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
 
     // select actions by feedSel
     val actionsSelected = instanceRegistry.getActions.filter(_.metadata.flatMap(_.feed).exists(_.matches(appConfig.feedSel)))
@@ -290,7 +290,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // create and execute actions
     logger.info(s"starting application ${appConfig.appName} runId=$runId attemptId=$attemptId")
     implicit val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appConfig.appName, runId, attemptId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig, runStartTime, attemptStartTime, simulation)
-    val actionDAGRun = ActionDAGRun(actionsToExec, runId, attemptId, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, stateStore)
+    val actionDAGRun = ActionDAGRun(actionsToExec, runId, attemptId, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, stateStore, stateListeners)
     val finalSubFeeds = try {
       if (simulation) {
         require(actionsToExec.forall(_.isInstanceOf[SparkAction]), s"Simulation needs all selected actions to be instances of SparkAction. This is not the case for ${actionsToExec.filterNot(_.isInstanceOf[SparkAction]).map(_.id).mkString(", ")}")

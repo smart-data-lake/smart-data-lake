@@ -20,6 +20,7 @@ package io.smartdatalake.definitions
 
 import java.net.URI
 
+import io.smartdatalake.app.GlobalConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.util.misc.EnvironmentUtil
 import org.apache.spark.sql.SparkSession
@@ -149,5 +150,7 @@ object Environment {
   private [smartdatalake] var _sparkSession: SparkSession = _
   def instanceRegistry: InstanceRegistry = _instanceRegistry
   private [smartdatalake] var _instanceRegistry: InstanceRegistry = _
+  def globalConfig: GlobalConfig = _globalConfig
+  private [smartdatalake] var _globalConfig: GlobalConfig = _
 
 }

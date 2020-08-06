@@ -20,6 +20,7 @@
 package io.smartdatalake.app
 
 import com.typesafe.config.Config
+import configs.Configs
 import configs.syntax._
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.{MemoryUtils, SmartDataLakeLogger}
@@ -36,7 +37,7 @@ import org.apache.spark.sql.SparkSession
  */
 case class GlobalConfig( kryoClasses: Option[Seq[String]] = None, sparkOptions: Option[Map[String,String]] = None, enableHive: Boolean = true
                        , memoryLogTimer: Option[MemoryLogTimerConfig] = None, shutdownHookLogger: Boolean = false
-                       , stateListeners: Option[Seq[StateListener]] = None)
+                       , stateListeners: Seq[StateListenerConfig] = Seq())
 extends SmartDataLakeLogger {
 
   // start memory logger, else log memory once
@@ -66,7 +67,8 @@ extends SmartDataLakeLogger {
 }
 object GlobalConfig {
   private[smartdatalake] def from(config: Config): GlobalConfig = {
-    globalConfig = Some(config.get[Option[GlobalConfig]]("global").value.get)//.getOrElse(GlobalConfig()))
+    implicit val customStateListenerConfig: Configs[StateListenerConfig] = Configs.derive[StateListenerConfig]
+    globalConfig = Some(config.get[Option[GlobalConfig]]("global").value.getOrElse(GlobalConfig()))
     globalConfig.get
   }
   // store global config to be used in MemoryLoggerExecutorPlugin
