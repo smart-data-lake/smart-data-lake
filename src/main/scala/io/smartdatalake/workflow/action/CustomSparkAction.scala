@@ -40,6 +40,8 @@ import org.apache.spark.sql.SparkSession
  * @param executionMode optional execution mode for this Action
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
+ * @param metadata
+ * @param recursiveInputIds output of action that are used as input in the same action
  */
 case class CustomSparkAction ( override val id: ActionObjectId,
                                inputIds: Seq[DataObjectId],
@@ -51,9 +53,12 @@ case class CustomSparkAction ( override val id: ActionObjectId,
                                override val mainOutputId: Option[DataObjectId] = None,
                                override val executionMode: Option[ExecutionMode] = None,
                                override val metricsFailCondition: Option[String] = None,
-                               override val metadata: Option[ActionMetadata] = None
+                               override val metadata: Option[ActionMetadata] = None,
+                               recursiveInputIds: Seq[DataObjectId] = Seq()
 )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedsAction {
 
+  assert(recursiveInputIds.forall(outputIds.contains(_)), "All recursive inputs must be in output of the same action.")
+  override val recursiveInputs: Seq[DataObject with CanCreateDataFrame] = recursiveInputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
   override val inputs: Seq[DataObject with CanCreateDataFrame] = inputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
   override val outputs: Seq[DataObject with CanWriteDataFrame] = outputIds.map(getOutputDataObject[DataObject with CanWriteDataFrame])
 

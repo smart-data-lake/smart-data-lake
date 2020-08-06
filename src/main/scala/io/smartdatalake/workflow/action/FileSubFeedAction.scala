@@ -37,6 +37,12 @@ abstract class FileSubFeedAction extends Action {
   def output:  FileRefDataObject with CanCreateOutputStream
 
   /**
+   * Recursive Inputs on FileSubFeeds are not supported so empty Seq is set.
+   *  @return
+   */
+  override def recursiveInputs: Seq[FileRefDataObject with CanCreateInputStream] = Seq()
+
+  /**
    * Initialize Action with a given [[FileSubFeed]]
    * Note that this only checks the prerequisits to do the processing and simulates the output FileRef's that would be created.
    *

@@ -30,6 +30,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
 
   override def inputs: Seq[DataObject with CanCreateDataFrame]
   override def outputs: Seq[DataObject with CanWriteDataFrame]
+  override def recursiveInputs: Seq[DataObject with CanCreateDataFrame] = Seq()
 
   def mainInputId: Option[DataObjectId]
   def mainOutputId: Option[DataObjectId]
@@ -63,7 +64,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
       case _ => preparedSubFeeds
     }
     preparedSubFeeds = preparedSubFeeds.map{ subFeed =>
-      val input = inputs.find(_.id == subFeed.dataObjectId).get
+      val input = (inputs ++ recursiveInputs).find(_.id == subFeed.dataObjectId).get
       // prepare as input SubFeed
       val preparedSubFeed = prepareInputSubFeed(subFeed, input)
       // enrich with fresh DataFrame if needed
@@ -84,8 +85,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
    * Generic init implementation for Action.init
    * */
   override final def init(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
-    assert(subFeeds.size == inputs.size, s"Number of subFeed's must match number of inputs for SparkSubFeedActions (Action $id, subfeed's ${subFeeds.map(_.dataObjectId).mkString(",")}, inputs ${inputs.map(_.id).mkString(",")})")
-    val mainInputSubFeed = subFeeds.find(_.dataObjectId == mainInput.id).getOrElse(throw new IllegalStateException(s"subFeed for main input ${mainInput.id} not found"))
+    assert(subFeeds.size == inputs.size + recursiveInputs.size, s"Number of subFeed's must match number of inputs for SparkSubFeedActions (Action $id, subfeed's ${subFeeds.map(_.dataObjectId).mkString(",")}, inputs ${inputs.map(_.id).mkString(",")})")
     // transform
     val transformedSubFeeds = doTransform(subFeeds)
     // check output
@@ -102,7 +102,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
    * Action.exec implementation
    */
   override final def exec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
-    assert(subFeeds.size == inputs.size, s"Number of subFeed's must match number of inputs for SparkSubFeedActions (Action $id, subfeed's ${subFeeds.map(_.dataObjectId).mkString(",")}, inputs ${inputs.map(_.id).mkString(",")})")
+    assert(subFeeds.size == inputs.size + recursiveInputs.size, s"Number of subFeed's must match number of inputs for SparkSubFeedActions (Action $id, subfeed's ${subFeeds.map(_.dataObjectId).mkString(",")}, inputs ${inputs.map(_.id).mkString(",")})")
     val mainInputSubFeed = subFeeds.find(_.dataObjectId == mainInput.id).getOrElse(throw new IllegalStateException(s"subFeed for main input ${mainInput.id} not found"))
     // transform
     val transformedSubFeeds = doTransform(subFeeds)
@@ -131,8 +131,8 @@ abstract class SparkSubFeedsAction extends SparkAction {
    * @param subFeeds input SubFeeds.
    */
   protected def enrichSubFeedsDataFrame(inputs: Seq[DataObject with CanCreateDataFrame], subFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
-    assert(inputs.size==subFeeds.size, s"Number of inputs must match number of subFeeds given for $id")
-    inputs.map { input =>
+    assert(inputs.size+recursiveInputs.size == subFeeds.size, s"Number of inputs must match number of subFeeds given for $id")
+    (inputs ++ recursiveInputs).map { input =>
       val subFeed = subFeeds.find(_.dataObjectId == input.id).getOrElse(throw new IllegalStateException(s"subFeed for input ${input.id} not found"))
       enrichSubFeedDataFrame(input, subFeed, context.phase)
     }
