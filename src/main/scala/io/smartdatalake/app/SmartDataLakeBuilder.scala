@@ -24,6 +24,7 @@ import java.time.LocalDateTime
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ActionObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, InstanceRegistry}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SmartDataLakeLogger}
 import io.smartdatalake.workflow._
@@ -257,6 +258,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     // parse config objects
     ConfigParser.parse(config, instanceRegistry)
+    Environment._instanceRegistry = instanceRegistry // share instance registry for custom code
 
     // create Spark Session
     val session: SparkSession = globalConfig.createSparkSession(appConfig.appName, appConfig.master, appConfig.deployMode)

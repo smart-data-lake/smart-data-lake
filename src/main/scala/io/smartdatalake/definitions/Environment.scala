@@ -20,6 +20,7 @@ package io.smartdatalake.definitions
 
 import java.net.URI
 
+import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.util.misc.EnvironmentUtil
 import org.apache.spark.sql.SparkSession
 
@@ -146,5 +147,7 @@ object Environment {
   // dynamically shared environment for custom code (see also #106)
   def sparkSession: SparkSession = _sparkSession
   private [smartdatalake] var _sparkSession: SparkSession = _
+  def instanceRegistry: InstanceRegistry = _instanceRegistry
+  private [smartdatalake] var _instanceRegistry: InstanceRegistry = _
 
 }
