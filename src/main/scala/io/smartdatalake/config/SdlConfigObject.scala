@@ -47,21 +47,21 @@ object SdlConfigObject {
   /**
    * Value class for connection identifiers.
    */
-  case class ConnectionId(id: String) extends AnyVal with ConfigObjectId {
+  case class ConnectionId(override val id: String) extends AnyVal with ConfigObjectId {
     override def toString: String = "Connection~"+id
   }
 
   /**
    * Value class for data object identifiers.
    */
-  case class DataObjectId(id: String) extends AnyVal with ConfigObjectId {
+  case class DataObjectId(override val id: String) extends AnyVal with ConfigObjectId {
     override def toString: String = "DataObject~"+id
   }
 
   /**
    * Value class for action object identifiers.
    */
-  case class ActionObjectId(id: String) extends AnyVal with ConfigObjectId {
+  case class ActionObjectId(override val id: String) extends AnyVal with ConfigObjectId {
     override def toString: String = "Action~"+id
   }
 

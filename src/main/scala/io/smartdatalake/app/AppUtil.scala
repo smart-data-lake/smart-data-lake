@@ -45,7 +45,7 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
   def createSparkSession(name:String, masterOpt: Option[String] = None,
                          deployModeOpt: Option[String] = None,
                          kryoClassNamesOpt: Option[Seq[String]] = None,
-                         sparkOptionsOpt: Option[Map[String,String]] = None,
+                         sparkOptionsOpt: Map[String,String] = Map(),
                          enableHive: Boolean = true
                         ): SparkSession = {
 
@@ -124,10 +124,10 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
         builder.config(key, value.get)
       } else builder
     }
-    def optionalConfigs( options: Option[Map[String,String]] ): SparkSession.Builder = {
-      if (options.isDefined) {
-        logger.info("Additional sparkOptions: " + options.get.map{ case (k,v) => createMaskedSecretsKVLog(k,v) }.mkString(", "))
-        options.get.foldLeft( builder ){
+    def optionalConfigs( options: Map[String,String] ): SparkSession.Builder = {
+      if (options.nonEmpty) {
+        logger.info("Additional sparkOptions: " + options.map{ case (k,v) => createMaskedSecretsKVLog(k,v) }.mkString(", "))
+        options.foldLeft( builder ){
           case (sb,(key,value)) => sb.config(key,value)
         }
       } else builder
