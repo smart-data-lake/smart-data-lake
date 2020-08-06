@@ -51,6 +51,7 @@ case class TestAction(override val id: ActionObjectId,
   private[config] val output = instanceRegistry.get[TransactionalSparkTableDataObject](outputId)
   override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
   override val outputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
+  override val recursiveInputs:Seq[DataObject with CanCreateDataFrame] = Seq()
 
   /**
    * @inheritdoc

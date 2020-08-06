@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.util.misc.PerformanceUtils
-import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, CanHandlePartitions, FileRefDataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, CanHandlePartitions, DataObject, FileRefDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, InitSubFeed, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.{SaveMode, SparkSession}
 
@@ -35,6 +35,12 @@ abstract class FileSubFeedAction extends Action {
    * Output [[FileRefDataObject]] which can CanCreateOutputStream
    */
   def output:  FileRefDataObject with CanCreateOutputStream
+
+  /**
+   * Recursive Inputs on FileSubFeeds are not supported so empty Seq is set.
+   *  @return
+   */
+  override def recursiveInputs: Seq[FileRefDataObject with CanCreateInputStream] = Seq()
 
   /**
    * Initialize Action with a given [[FileSubFeed]]
