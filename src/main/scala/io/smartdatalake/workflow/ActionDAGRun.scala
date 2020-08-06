@@ -67,7 +67,7 @@ private[smartdatalake] trait ActionMetrics {
   def getAsText: String
 }
 
-private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, attemptId: Int, partitionValues: Seq[PartitionValues], parallelism: Int, initialSubFeeds: Seq[SubFeed], stateStore: Option[ActionDAGRunStateStore]) extends SmartDataLakeLogger {
+private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, attemptId: Int, partitionValues: Seq[PartitionValues], parallelism: Int, initialSubFeeds: Seq[SubFeed], stateStore: Option[ActionDAGRunStateStore[_]]) extends SmartDataLakeLogger {
 
   private def createScheduler(parallelism: Int = 1) = Scheduler.fixedPool(s"dag-$runId", parallelism)
 
@@ -116,13 +116,14 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
   def init(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     // run init for every node
     context.phase = ExecutionPhase.Init
-    run[SubFeed](context.phase) {
+    val t = run[SubFeed](context.phase) {
       case (node: InitDAGNode, _) =>
         node.edges.map(dataObjectId => getInitialSubFeed(dataObjectId))
       case (node: Action, subFeeds) =>
         node.init(subFeeds)
       case x => throw new IllegalStateException(s"Unmatched case $x")
     }
+    t
   }
 
   def exec(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
@@ -152,15 +153,19 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
     result
   }
 
-  private def getInitialSubFeed(dataObjectId: DataObjectId) = {
-    initialSubFeeds.find(_.dataObjectId==dataObjectId).getOrElse(InitSubFeed(dataObjectId, partitionValues))
+  private def getInitialSubFeed(dataObjectId: DataObjectId)(implicit context: ActionPipelineContext) = {
+    initialSubFeeds.find(_.dataObjectId==dataObjectId)
+      .getOrElse(
+        if (context.simulation) throw new IllegalStateException(s"Initial subfeed for $dataObjectId missing for dry run.")
+        else InitSubFeed(dataObjectId, partitionValues)
+      )
   }
 
   /**
    * Collect runtime information for every action of the dag
    */
-  def getRuntimeInfos: Map[String, RuntimeInfo] = {
-    dag.getNodes.map( a => (a.id.id, a.getRuntimeInfo.getOrElse(RuntimeInfo(RuntimeEventState.PENDING)))).toMap
+  def getRuntimeInfos: Map[ActionObjectId, RuntimeInfo] = {
+    dag.getNodes.map( a => (a.id, a.getRuntimeInfo.getOrElse(RuntimeInfo(RuntimeEventState.PENDING)))).toMap
   }
 
   /**
@@ -196,8 +201,8 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
   /**
    * Get Action count per RuntimeEventState
    */
-  def getStatistics: Seq[(RuntimeEventState,Int)] = {
-    getRuntimeInfos.map(_._2.state).groupBy(identity).mapValues(_.size).toSeq.sortBy(_._1)
+  def getStatistics: Map[RuntimeEventState,Int] = {
+    getRuntimeInfos.map(_._2.state).groupBy(identity).mapValues(_.size)
   }
 
   /**
@@ -225,7 +230,7 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
   /**
    * create ActionDAGRun
    */
-  def apply(actions: Seq[Action], runId: Int, attemptId: Int, partitionValues: Seq[PartitionValues] = Seq(), parallelism: Int = 1, initialSubFeeds: Seq[SubFeed] = Seq(), stateStore: Option[ActionDAGRunStateStore] = None)(implicit session: SparkSession, context: ActionPipelineContext): ActionDAGRun = {
+  def apply(actions: Seq[Action], runId: Int, attemptId: Int, partitionValues: Seq[PartitionValues] = Seq(), parallelism: Int = 1, initialSubFeeds: Seq[SubFeed] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None)(implicit session: SparkSession, context: ActionPipelineContext): ActionDAGRun = {
 
     // prepare edges: list of actions dependencies
     // this can be created by combining input and output ids between actions

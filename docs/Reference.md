@@ -81,6 +81,7 @@ Usage: DefaultSmartDataLakeBuilder [options]
   --parallelism <value>    Parallelism for DAG run.
   --state-path <value>     Path to save run state files. Must be set to enable recovery in case of failures.
   --override-jars <value>  Comma separated list of jars for child-first class loader. The jars must be present in classpath.
+  --test <value>           Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage
   --help                   Display the help text.
   --version                Display version information.
 ```

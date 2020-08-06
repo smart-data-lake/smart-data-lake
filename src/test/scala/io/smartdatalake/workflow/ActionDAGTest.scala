@@ -81,7 +81,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     val action1 = DeduplicateAction("a", srcDO.id, tgt1DO.id, metricsFailCondition = Some(s"dataObjectId = '${tgt1DO.id.id}' and key = 'records_written' and value = 0"))
     val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id)
     val actions: Seq[SparkSubFeedAction] = Seq(action1, action2)
-    val stateStore = ActionDAGRunStateStore(statePath, appName)
+    val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
     val dag: ActionDAGRun = ActionDAGRun(actions, 1, 1, stateStore = Some(stateStore))
 
     // exec dag
@@ -104,7 +104,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
 
     // check state: two actions succeeded
     val latestState = stateStore.getLatestState()
-    val previousRunState = stateStore.recoverRunState(latestState.path)
+    val previousRunState = stateStore.recoverRunState(latestState)
     assert(previousRunState.actionsState.mapValues(_.state) == actions.map( a => (a.id.id, RuntimeEventState.SUCCEEDED)).toMap)
   }
 

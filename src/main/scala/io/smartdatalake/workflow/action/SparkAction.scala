@@ -83,10 +83,10 @@ private[smartdatalake] abstract class SparkAction extends Action {
    * @param input input data object.
    * @param subFeed input SubFeed.
    */
-  def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, executionMode: Option[ExecutionMode], phase: ExecutionPhase)(implicit session: SparkSession): SparkSubFeed = {
+  def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, executionMode: Option[ExecutionMode], phase: ExecutionPhase)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     assert(input.id == subFeed.dataObjectId, s"($id) DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
     executionMode match {
-      case Some(m: SparkStreamingOnceMode) =>
+      case Some(m: SparkStreamingOnceMode) if !context.simulation =>
         if (subFeed.dataFrame.isEmpty || phase==ExecutionPhase.Exec) { // in exec phase we always needs a fresh streaming DataFrame
           // recreate DataFrame from DataObject
           assert(input.isInstanceOf[CanCreateStreamingDataFrame], s"($id) DataObject ${input.id} doesn't implement CanCreateStreamingDataFrame. Can not create StreamingDataFrame for executionMode=SparkStreamingOnceMode")
@@ -276,7 +276,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
     updatedSubFeed.clearDAGStart()
   }
 
-  def updateSubFeedAfterWrite(subFeed: SparkSubFeed, executionMode: Option[ExecutionMode])(implicit session: SparkSession): SparkSubFeed = {
+  def updateSubFeedAfterWrite(subFeed: SparkSubFeed, executionMode: Option[ExecutionMode])(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     subFeed.clearFilter // clear filter must be applied after write, because it includes removing the DataFrame
   }
 
@@ -321,7 +321,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
   /**
    * Applies changes to a SubFeed from a previous action in order to be used as input for this actions transformation.
    */
-  def prepareInputSubFeed(subFeed: SparkSubFeed, input: DataObject with CanCreateDataFrame)(implicit session: SparkSession): SparkSubFeed = {
+  def prepareInputSubFeed(subFeed: SparkSubFeed, input: DataObject with CanCreateDataFrame)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // persist if requested
     var preparedSubFeed = if (persist) subFeed.persist else subFeed
     // create dummy DataFrame if read schema is different from write schema on this DataObject
