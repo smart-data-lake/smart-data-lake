@@ -48,6 +48,7 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
                          sparkOptionsOpt: Map[String,String] = Map(),
                          enableHive: Boolean = true
                         ): SparkSession = {
+    logger.info(s"Creating spark session: name=$name master=$masterOpt deployMode=$deployModeOpt enableHive=$enableHive")
 
     // create configObject
     val sessionBuilder = SparkSession.builder()

@@ -239,11 +239,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     appConfig.validate()
 
     // log start parameters
-    logger.info(s"Feed selector: ${appConfig.feedSel}")
-    logger.info(s"Application: ${appConfig.appName}")
-    logger.info(s"Master: ${appConfig.master.getOrElse(sys.props.get("spark.master"))}")
-    logger.info(s"Deploy-Mode: ${appConfig.deployMode.getOrElse(sys.props.get("spark.submit.deployMode"))}")
-    logger.info(s"Test-Mode: ${appConfig.test}")
+    logger.info(s"Starting run: runId=$runId attemptId=$attemptId feedSel=${appConfig.feedSel} appName=${appConfig.appName} test=${appConfig.test}")
     logger.debug(s"Environment: " + sys.env.map(x => x._1 + "=" + x._2).mkString(" "))
     logger.debug(s"System properties: " + sys.props.toMap.map(x => x._1 + "=" + x._2).mkString(" "))
 
