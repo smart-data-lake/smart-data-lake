@@ -20,8 +20,8 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.util.misc.PerformanceUtils
-import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, CanHandlePartitions, FileRefDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, InitSubFeed, SparkSubFeed, SubFeed}
+import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRefDataObject}
+import io.smartdatalake.workflow.{ActionMetrics, ActionPipelineContext, FileSubFeed, GenericMetrics, SubFeed}
 import org.apache.spark.sql.{SaveMode, SparkSession}
 
 abstract class FileSubFeedAction extends Action {
@@ -35,6 +35,12 @@ abstract class FileSubFeedAction extends Action {
    * Output [[FileRefDataObject]] which can CanCreateOutputStream
    */
   def output:  FileRefDataObject with CanCreateOutputStream
+
+  /**
+   * Recursive Inputs on FileSubFeeds are not supported so empty Seq is set.
+   *  @return
+   */
+  override def recursiveInputs: Seq[FileRefDataObject with CanCreateInputStream] = Seq()
 
   /**
    * Initialize Action with a given [[FileSubFeed]]
@@ -53,6 +59,11 @@ abstract class FileSubFeedAction extends Action {
    */
   def execSubFeed(subFeed: FileSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed
 
+  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.prepare
+    executionMode.foreach(_.prepare(id))
+  }
+
   /**
    * Action.init implementation
    */
@@ -61,13 +72,15 @@ abstract class FileSubFeedAction extends Action {
     val subFeed = subFeeds.head
     // convert subfeeds to FileSubFeed type or initialize if not yet existing
     var preparedSubFeed = FileSubFeed.fromSubFeed(subFeed)
-    // apply init execution mode if there are no partition values given in command line
-    preparedSubFeed = if (initExecutionMode.isDefined && preparedSubFeed.isDAGStart && preparedSubFeed.partitionValues.isEmpty) {
-      ActionHelper.applyExecutionMode(initExecutionMode.get, id, input, output, context.phase) match {
-        case Some((partitionValues, _)) => preparedSubFeed.copy(partitionValues = partitionValues)
-        case None => preparedSubFeed
-      }
-    } else preparedSubFeed
+    // apply execution mode
+    preparedSubFeed = executionMode match {
+      case Some(mode) =>
+        mode.apply(id, input, output, preparedSubFeed) match {
+          case Some((partitionValues, _)) => preparedSubFeed.copy(partitionValues = partitionValues)
+          case None => preparedSubFeed
+        }
+      case _ => preparedSubFeed
+    }
     // break lineage if requested
     preparedSubFeed = if (breakFileRefLineage) preparedSubFeed.breakLineage else preparedSubFeed
     // transform
@@ -85,12 +98,14 @@ abstract class FileSubFeedAction extends Action {
     // convert subfeeds to FileSubFeed type or initialize if not yet existing
     var preparedSubFeed = FileSubFeed.fromSubFeed(subFeed)
     // apply init execution mode if there are no partition values given in command line
-    preparedSubFeed = if (initExecutionMode.isDefined && preparedSubFeed.isDAGStart && preparedSubFeed.partitionValues.isEmpty) {
-      ActionHelper.applyExecutionMode(initExecutionMode.get, id, input, output, context.phase) match {
-        case Some((partitionValues, _)) => preparedSubFeed.copy(partitionValues = partitionValues)
-        case None => preparedSubFeed
-      }
-    } else preparedSubFeed
+    preparedSubFeed = executionMode match {
+      case Some(mode) =>
+        mode.apply(id, input, output, preparedSubFeed) match {
+          case Some((partitionValues, _)) => preparedSubFeed.copy(partitionValues = partitionValues)
+          case None => preparedSubFeed
+        }
+      case _ => preparedSubFeed
+    }
     // break lineage if requested
     preparedSubFeed = if (breakFileRefLineage) preparedSubFeed.breakLineage else preparedSubFeed
     // delete existing files on overwrite
@@ -105,7 +120,10 @@ abstract class FileSubFeedAction extends Action {
     val (transformedSubFeed,d) = PerformanceUtils.measureDuration {
       execSubFeed(preparedSubFeed)
     }
-    logger.info(s"($id) finished writing files to ${output.id}: duration=$d files_written=${transformedSubFeed.fileRefs.get.size}")
+    val filesWritten = transformedSubFeed.fileRefs.get.size.toLong
+    logger.info(s"($id) finished writing files to ${output.id}: duration=$d files_written=$filesWritten")
+    // send metric to action (for file subfeeds this has to be done manually while spark subfeeds get's the metrics via a spark events listener)
+    onRuntimeMetrics(Some(output.id), GenericMetrics(s"$id-${output.id}", 1, Map("duration"->d, "files_written"->filesWritten)))
     // update partition values to output's partition columns and update dataObjectId
     Seq(transformedSubFeed.updatePartitionValues(output.partitions).copy(dataObjectId = output.id))
   }
@@ -135,7 +153,7 @@ abstract class FileSubFeedAction extends Action {
   /**
    * Execution mode if this Action is a start node of a DAG run
    */
-  def initExecutionMode: Option[ExecutionMode]
+  def executionMode: Option[ExecutionMode]
 
   /**
    * If true delete files after they are successfully processed.

@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.action
 import java.time.LocalDateTime
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.definitions.{ExecutionMode, PartitionDiffMode, SparkIncrementalMode, SparkStreamingOnceMode}
+import io.smartdatalake.definitions.{ExecutionMode, FailIfNoPartitionValuesMode, PartitionDiffMode, SparkIncrementalMode, SparkStreamingOnceMode}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
@@ -30,12 +30,11 @@ import io.smartdatalake.util.streaming.DummyStreamProvider
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.ActionHelper.{filterBlacklist, filterWhitelist}
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanCreateStreamingDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject, SparkFileDataObject, TableDataObject, UserDefinedSchema}
+import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.functions.col
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import org.apache.spark.sql.streaming.Trigger
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
 private[smartdatalake] abstract class SparkAction extends Action {
 
@@ -53,23 +52,13 @@ private[smartdatalake] abstract class SparkAction extends Action {
   def persist: Boolean
 
   /**
-   * Execution mode if this Action is a start node of a DAG run
-   */
-  def initExecutionMode: Option[ExecutionMode]
-  require(initExecutionMode.isEmpty || initExecutionMode.exists(_.isInstanceOf[PartitionDiffMode]), s"($id) $initExecutionMode not supported as initExecutionMode")
-
-  /**
-   * General execution mode for this action.
-   * Note that this is overridden by initExecutionMode if it is defined and this Action is a start node of a DAG run.
+   * execution mode for this action.
    */
   def executionMode: Option[ExecutionMode]
 
-  /**
-   * Returns the execution mode used on runtime of the action, depending if this Action is a start node of a DAG run
-   */
-  def runtimeExecutionMode(subFeed: SubFeed): Option[ExecutionMode] = {
-    // override executionMode with initExecutionMode if is start node of a DAG run
-    if (subFeed.isDAGStart) initExecutionMode.orElse(executionMode) else executionMode
+  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.prepare
+    executionMode.foreach(_.prepare(id))
   }
 
   /**
@@ -78,10 +67,10 @@ private[smartdatalake] abstract class SparkAction extends Action {
    * @param input input data object.
    * @param subFeed input SubFeed.
    */
-  def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, executionMode: Option[ExecutionMode], phase: ExecutionPhase)(implicit session: SparkSession): SparkSubFeed = {
+  def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, phase: ExecutionPhase)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     assert(input.id == subFeed.dataObjectId, s"($id) DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
     executionMode match {
-      case Some(m: SparkStreamingOnceMode) =>
+      case Some(m: SparkStreamingOnceMode) if !context.simulation =>
         if (subFeed.dataFrame.isEmpty || phase==ExecutionPhase.Exec) { // in exec phase we always needs a fresh streaming DataFrame
           // recreate DataFrame from DataObject
           assert(input.isInstanceOf[CanCreateStreamingDataFrame], s"($id) DataObject ${input.id} doesn't implement CanCreateStreamingDataFrame. Can not create StreamingDataFrame for executionMode=SparkStreamingOnceMode")
@@ -96,6 +85,14 @@ private[smartdatalake] abstract class SparkAction extends Action {
         } else subFeed
       case _ =>
         if (phase==ExecutionPhase.Exec && (subFeed.dataFrame.isEmpty || subFeed.isDummy || subFeed.isStreaming.contains(true))) {
+          // validate partition values existing for input
+          input match {
+            case partitionedInput: DataObject with CanHandlePartitions if subFeed.partitionValues.nonEmpty =>
+              val missingPartitionValues = PartitionValues.checkExpectedPartitionValues(partitionedInput.listPartitions, subFeed.partitionValues)
+              assert(missingPartitionValues.isEmpty, s"($id) partitions $missingPartitionValues missing for ${input.id}")
+            case _ => Unit
+          }
+          if (subFeed.partitionValues.nonEmpty)
           // recreate DataFrame from DataObject
           logger.info(s"($id) getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
           val df = input.getDataFrame(subFeed.partitionValues)
@@ -126,7 +123,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
    * writes subfeed to output respecting given execution mode
    * @return true if no data was transfered, otherwise false
    */
-  def writeSubFeed(executionMode: Option[ExecutionMode], subFeed: SparkSubFeed, output: DataObject with CanWriteDataFrame)(implicit session: SparkSession): Boolean = {
+  def writeSubFeed(subFeed: SparkSubFeed, output: DataObject with CanWriteDataFrame)(implicit session: SparkSession): Boolean = {
     executionMode match {
       case Some(m: SparkStreamingOnceMode) =>
         // Write in streaming mode - use spark streaming with Trigger.Once and awaitTermination
@@ -137,7 +134,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
         if (noData) logger.info(s"($id) no data to process for ${output.id} in streaming mode")
         // return
         noData
-      case None | Some(_: PartitionDiffMode) | Some(_: SparkIncrementalMode) =>
+      case None | Some(_: PartitionDiffMode) | Some(_: SparkIncrementalMode) | Some(_: FailIfNoPartitionValuesMode) =>
         // Write in batch mode
         assert(!subFeed.dataFrame.get.isStreaming, s"($id) Input from ${subFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingOnceMode.getClass.getSimpleName}")
         output.writeDataFrame(subFeed.dataFrame.get, subFeed.partitionValues)
@@ -271,7 +268,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
     updatedSubFeed.clearDAGStart()
   }
 
-  def updateSubFeedAfterWrite(subFeed: SparkSubFeed, executionMode: Option[ExecutionMode])(implicit session: SparkSession): SparkSubFeed = {
+  def updateSubFeedAfterWrite(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     subFeed.clearFilter // clear filter must be applied after write, because it includes removing the DataFrame
   }
 
@@ -316,7 +313,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
   /**
    * Applies changes to a SubFeed from a previous action in order to be used as input for this actions transformation.
    */
-  def prepareInputSubFeed(subFeed: SparkSubFeed, input: DataObject with CanCreateDataFrame)(implicit session: SparkSession): SparkSubFeed = {
+  def prepareInputSubFeed(subFeed: SparkSubFeed, input: DataObject with CanCreateDataFrame)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // persist if requested
     var preparedSubFeed = if (persist) subFeed.persist else subFeed
     // create dummy DataFrame if read schema is different from write schema on this DataObject

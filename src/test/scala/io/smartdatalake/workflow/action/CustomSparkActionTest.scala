@@ -29,7 +29,7 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.workflow.action.customlogic.{CustomDfsTransformer, CustomDfsTransformerConfig}
-import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
+import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SparkSubFeed}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -105,6 +105,57 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     assert(r2.head == 6)
   }
 
+  test("spark action with recursive input") {
+    // setup DataObjects
+    val feed = "recursive_inputs"
+
+    val srcTable1 = Table(Some("default"), "copy_input1")
+    HiveUtil.dropTable(session, srcTable1.db.get, srcTable1.name)
+    val srcPath1 = tempPath + s"/${srcTable1.fullName}"
+    val srcDO1 = TickTockHiveTableDataObject("src1", Some(srcPath1), table = srcTable1, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(srcDO1)
+
+    val tgtTable1 = Table(Some("default"), "copy_output1", None, Some(Seq("lastname", "firstname")))
+    HiveUtil.dropTable(session, tgtTable1.db.get, tgtTable1.name)
+    val tgtPath1 = tempPath + s"/${tgtTable1.fullName}"
+    val tgtDO1 = TickTockHiveTableDataObject("tgt1", Some(tgtPath1), table = tgtTable1, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(tgtDO1)
+
+    // prepare & start load
+    val refTimestamp1 = LocalDateTime.now()
+    implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+    val customTransformerConfig = CustomDfsTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestDfsTransformerRecursive"))
+
+    // first action to create output table as it does not exist yet
+    val action1 = CustomSparkAction("action1", List(srcDO1.id), List(tgtDO1.id), transformer = customTransformerConfig)(context1.instanceRegistry)
+
+    val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
+    TestUtil.prepareHiveTable(srcTable1, srcPath1, l1)
+
+    val tgtSubFeedsNonRecursive = action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))
+    assert(tgtSubFeedsNonRecursive.size == 1)
+    assert(tgtSubFeedsNonRecursive.map(_.dataObjectId) == Seq(tgtDO1.id))
+
+    val r1 = session.table(s"${tgtTable1.fullName}")
+      .select($"rating")
+      .as[Int].collect().toSeq
+    assert(r1.size == 1)
+    assert(r1.head == 6) // should be increased by 1 through TestDfTransformer
+
+    // second action to test recursive inputs
+    val action2 = CustomSparkAction("action1", List(srcDO1.id), List(tgtDO1.id), transformer = customTransformerConfig, recursiveInputIds = List(tgtDO1.id))(context1.instanceRegistry)
+
+    val tgtSubFeedsRecursive = action2.exec(Seq(SparkSubFeed(None, "src1", Seq()), SparkSubFeed(None, "tgt1", Seq())))
+    assert(tgtSubFeedsRecursive.size == 1) // still 1 as recursive inputs are handled separately
+
+    val r2 = session.table(s"${tgtTable1.fullName}")
+      .select($"rating")
+      .as[Int].collect().toSeq
+    assert(r2.size == 1)
+    assert(r2.head == 11) // Record should be updated a second time with data from tgt1
+
+  }
+
   test("copy with partition diff execution mode 2 iterations") {
 
     // setup DataObjects
@@ -124,7 +175,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val refTimestamp = LocalDateTime.now()
     implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp), SmartDataLakeBuilderConfig())
     val customTransformerConfig = CustomDfsTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestDfsTransformerDummy"))
-    val action = CustomSparkAction("a1", Seq(srcDO.id), Seq(tgtDO.id), transformer = customTransformerConfig, initExecutionMode = Some(PartitionDiffMode()))
+    val action = CustomSparkAction("a1", Seq(srcDO.id), Seq(tgtDO.id), transformer = customTransformerConfig, executionMode = Some(PartitionDiffMode()))
     val srcSubFeed = InitSubFeed("src1", Seq()) // InitSubFeed needed to test initExecutionMode!
 
     // prepare & start first load
@@ -183,7 +234,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp), SmartDataLakeBuilderConfig())
     val customTransformerConfig = CustomDfsTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestDfsTransformerDummy"))
     val action = CustomSparkAction("a1", Seq(srcDO.id, srcDO2.id), Seq(tgtDO.id, tgtDO2.id), transformer = customTransformerConfig
-      , initExecutionMode = Some(PartitionDiffMode(mainInputId = Some("src1"), mainOutputId = Some("tgt1"))))
+      , mainInputId = Some("src1"), mainOutputId = Some("tgt1"), executionMode = Some(PartitionDiffMode()))
     val srcSubFeed1 = InitSubFeed("src1", Seq()) // InitSubFeed needed to test initExecutionMode!
     val srcSubFeed2 = InitSubFeed("src2", Seq())
 
@@ -259,6 +310,25 @@ class TestDfsTransformerIncrement extends CustomDfsTransformer {
       "tgt1" -> dfs("src1").withColumn("rating", $"rating"+1)
     , "tgt2" -> dfs("src2").withColumn("rating", $"rating"+1)
     )
+  }
+}
+
+class TestDfsTransformerRecursive extends CustomDfsTransformer {
+  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
+    import session.implicits._
+    if(!dfs.contains("tgt1")) {
+      // first run without recursive inputs
+      Map(
+        "tgt1" -> dfs("src1").withColumn("rating", $"rating"+1)
+      )
+    }
+    else {
+      // second run with recursive inputs
+      Map(
+        "tgt1" -> dfs("tgt1").withColumn("rating", $"rating"+5)
+      )
+    }
+
   }
 }
 

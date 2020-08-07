@@ -210,8 +210,8 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // prepare action
     val refTimestamp = LocalDateTime.now()
     implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp), SmartDataLakeBuilderConfig())
-    val action = CopyAction("a1", srcDO.id, tgtDO.id, initExecutionMode = Some(PartitionDiffMode()))
-    val srcSubFeed = InitSubFeed("src1", Seq()) // InitSubFeed needed to test initExecutionMode!
+    val action = CopyAction("a1", srcDO.id, tgtDO.id, executionMode = Some(PartitionDiffMode()))
+    val srcSubFeed = InitSubFeed("src1", Seq()) // InitSubFeed needed to test executionMode!
 
     // prepare & start first load
     val l1 = Seq(("A","doe","john",5)).toDF("type", "lastname", "firstname", "rating")

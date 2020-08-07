@@ -67,6 +67,7 @@ To see how all this works in action, head over to the [Getting Started](docs/Get
 [Getting Started](docs/GettingStarted.md)  
 [Reference](docs/Reference.md)  
 [Architecture](docs/Architecture.md)  
+[Testing](docs/Testing.md)  
 [Glossary](docs/Glossary.md)  
 [Troubleshooting](docs/Troubleshooting.md)    
 [FAQ](docs/FAQ.md)  

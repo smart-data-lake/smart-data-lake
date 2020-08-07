@@ -28,7 +28,6 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.dataobject.DataObject
-import io.smartdatalake.workflow._
 import org.apache.spark.sql.SparkSession
 
 import scala.collection.mutable
@@ -57,6 +56,15 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * To be implemented by subclasses
    */
   def inputs: Seq[DataObject]
+
+  /**
+   * Recursive Inputs are DataObjects that are used as Output and Input in the same action
+   * This is usually prohibited as it creates loops in the DAG.
+   * In special cases this makes sense, i.e. when building a complex delta logic
+   *
+   * @return
+   */
+  def recursiveInputs: Seq[DataObject]
 
   /**
    * Output [[DataObject]]s

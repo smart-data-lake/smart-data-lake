@@ -37,7 +37,6 @@ import scala.util.{Failure, Success, Try}
  * @param outputId output DataObject
  * @param deleteDataAfterRead a flag to enable deletion of input partitions after copying.
  * @param transformer a custom transformation that is applied to each SubFeed separately
- * @param initExecutionMode optional execution mode if this Action is a start node of a DAG run
  * @param executionMode optional execution mode for this Action
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
@@ -53,7 +52,6 @@ case class CopyAction(override val id: ActionObjectId,
                       standardizeDatatypes: Boolean = false,
                       override val breakDataFrameLineage: Boolean = false,
                       override val persist: Boolean = false,
-                      override val initExecutionMode: Option[ExecutionMode] = None,
                       override val executionMode: Option[ExecutionMode] = None,
                       override val metricsFailCondition: Option[String] = None,
                       override val metadata: Option[ActionMetadata] = None

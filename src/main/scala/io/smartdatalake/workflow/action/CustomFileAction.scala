@@ -49,7 +49,7 @@ case class CustomFileAction(override val id: ActionObjectId,
                             override val deleteDataAfterRead: Boolean = false,
                             filesPerPartition: Int = 10,
                             override val breakFileRefLineage: Boolean = false,
-                            override val initExecutionMode: Option[ExecutionMode] = None,
+                            override val executionMode: Option[ExecutionMode] = None,
                             override val metricsFailCondition: Option[String] = None,
                             override val metadata: Option[ActionMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)

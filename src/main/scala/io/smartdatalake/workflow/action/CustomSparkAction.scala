@@ -35,10 +35,13 @@ import org.apache.spark.sql.SparkSession
  * @param inputIds input DataObject's
  * @param outputIds output DataObject's
  * @param transformer Custom Transformer to transform Seq[DataFrames]
- * @param initExecutionMode optional execution mode if this Action is a start node of a DAG run
+ * @param mainInputId optional selection of main inputId used for execution mode and partition values propagation. Only needed if there are multiple input DataObject's.
+ * @param mainOutputId optional selection of main outputId used for execution mode and partition values propagation. Only needed if there are multiple output DataObject's.
  * @param executionMode optional execution mode for this Action
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
+ * @param metadata
+ * @param recursiveInputIds output of action that are used as input in the same action
  */
 case class CustomSparkAction ( override val id: ActionObjectId,
                                inputIds: Seq[DataObjectId],
@@ -46,12 +49,16 @@ case class CustomSparkAction ( override val id: ActionObjectId,
                                transformer: CustomDfsTransformerConfig,
                                override val breakDataFrameLineage: Boolean = false,
                                override val persist: Boolean = false,
-                               override val initExecutionMode: Option[ExecutionMode] = None,
+                               override val mainInputId: Option[DataObjectId] = None,
+                               override val mainOutputId: Option[DataObjectId] = None,
                                override val executionMode: Option[ExecutionMode] = None,
                                override val metricsFailCondition: Option[String] = None,
-                               override val metadata: Option[ActionMetadata] = None
+                               override val metadata: Option[ActionMetadata] = None,
+                               recursiveInputIds: Seq[DataObjectId] = Seq()
 )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedsAction {
 
+  assert(recursiveInputIds.forall(outputIds.contains(_)), "All recursive inputs must be in output of the same action.")
+  override val recursiveInputs: Seq[DataObject with CanCreateDataFrame] = recursiveInputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
   override val inputs: Seq[DataObject with CanCreateDataFrame] = inputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
   override val outputs: Seq[DataObject with CanWriteDataFrame] = outputIds.map(getOutputDataObject[DataObject with CanWriteDataFrame])
 
@@ -71,10 +78,8 @@ case class CustomSparkAction ( override val id: ActionObjectId,
         case (dataObjectId, dataFrame) =>
           val output = outputs.find(_.id.id == dataObjectId)
             .getOrElse(throw ConfigurationException(s"No output found for result ${dataObjectId} in $id. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
-          // if main output, get partition values from main input
-          val partitionValues = if (mainOutput.id.id == dataObjectId) {
-            mainInputSubFeed.map(_.partitionValues).getOrElse(Seq())
-          } else Seq()
+          // get partition values from main input
+          val partitionValues = mainInputSubFeed.map(_.partitionValues).getOrElse(Seq())
           SparkSubFeed(Some(dataFrame),dataObjectId, partitionValues)
       }.toSeq
   }

@@ -27,10 +27,13 @@ import org.apache.spark.sql.SaveMode
 /**
  * DataObject of type raw for files with unknown content.
  * Provides details to an Action to access raw files.
+ * @param fileName Definition of fileName. This is concatenated with path and partition layout to search for files. Default is an asterix to match everything.
  * @param saveMode Overwrite or Append new data.
+ *
  */
 case class RawFileDataObject( override val id: DataObjectId,
                               override val path: String,
+                              override val fileName: String = "*",
                               override val partitions: Seq[String] = Seq(),
                               override val saveMode: SaveMode = SaveMode.Overwrite,
                               override val acl: Option[AclDef] = None,
