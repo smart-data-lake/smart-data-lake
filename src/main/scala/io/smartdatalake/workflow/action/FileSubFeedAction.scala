@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRefDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionMetrics, ActionPipelineContext, FileSubFeed, GenericMetrics, SubFeed}
 import org.apache.spark.sql.{SaveMode, SparkSession}
 
 abstract class FileSubFeedAction extends Action {
@@ -120,7 +120,10 @@ abstract class FileSubFeedAction extends Action {
     val (transformedSubFeed,d) = PerformanceUtils.measureDuration {
       execSubFeed(preparedSubFeed)
     }
-    logger.info(s"($id) finished writing files to ${output.id}: duration=$d files_written=${transformedSubFeed.fileRefs.get.size}")
+    val filesWritten = transformedSubFeed.fileRefs.get.size.toLong
+    logger.info(s"($id) finished writing files to ${output.id}: duration=$d files_written=$filesWritten")
+    // send metric to action (for file subfeeds this has to be done manually while spark subfeeds get's the metrics via a spark events listener)
+    onRuntimeMetrics(Some(output.id), GenericMetrics(s"$id-${output.id}", 1, Map("duration"->d, "files_written"->filesWritten)))
     // update partition values to output's partition columns and update dataObjectId
     Seq(transformedSubFeed.updatePartitionValues(output.partitions).copy(dataObjectId = output.id))
   }

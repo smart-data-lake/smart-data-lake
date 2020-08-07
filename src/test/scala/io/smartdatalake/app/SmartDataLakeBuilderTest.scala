@@ -22,7 +22,7 @@ package io.smartdatalake.app
 import java.nio.file.Files
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.PartitionDiffMode
+import io.smartdatalake.definitions.{Environment, PartitionDiffMode}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
@@ -30,7 +30,7 @@ import io.smartdatalake.util.misc.EnvironmentUtil
 import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, CustomDfTransformerConfig}
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction, DeduplicateAction, RuntimeEventState}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
-import io.smartdatalake.workflow.{HadoopFileActionDAGRunStateStore, SparkSubFeed, TaskFailedException}
+import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore, SparkSubFeed, TaskFailedException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.{col, udf}
 import org.apache.spark.sql.types.StringType
@@ -38,6 +38,9 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 
+/**
+ * This tests use configuration test/resources/application.conf
+ */
 class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
@@ -149,7 +152,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     }
   }
 
-  test("sdlb run with initialExecutionMode=PartitionDiffMode, increase runId on second run") {
+  test("sdlb run with initialExecutionMode=PartitionDiffMode, increase runId on second run, state listener") {
 
     // init sdlb
     val appName = "sdlb-runId"
@@ -230,6 +233,9 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == Seq(PartitionValues(Map("dt"->"20190101"))))
       if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty) // doesnt work on windows
+      val stateListener = Environment._globalConfig.stateListeners.head.listener.asInstanceOf[TestStateListener]
+      assert(stateListener.firstState.isDefined && !stateListener.firstState.get.isFinal)
+      assert(stateListener.finalState.isDefined && stateListener.finalState.get.isFinal)
     }
   }
 
@@ -284,5 +290,14 @@ class FailTransformer extends CustomDfTransformer {
     val udfFail = udf((s: String) => {throw new IllegalStateException("aborted by FailTransformer"); s})
     // fail at spark runtime
     df.withColumn(firstStringColumn, udfFail(col(firstStringColumn)))
+  }
+}
+
+class TestStateListener(options: Map[String,String]) extends StateListener {
+  var firstState: Option[ActionDAGRunState] = None
+  var finalState: Option[ActionDAGRunState] = None
+  override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext): Unit = {
+    if (firstState.isEmpty) firstState = Some(state)
+    finalState = Some(state)
   }
 }
