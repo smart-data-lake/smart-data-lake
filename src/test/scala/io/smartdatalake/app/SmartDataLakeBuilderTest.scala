@@ -233,6 +233,9 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == Seq(PartitionValues(Map("dt"->"20190101"))))
       if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty) // doesnt work on windows
+      val stateListener = Environment._globalConfig.stateListeners.head.listener.asInstanceOf[TestStateListener]
+      assert(stateListener.firstState.isDefined && !stateListener.firstState.get.isFinal)
+      assert(stateListener.finalState.isDefined && stateListener.finalState.get.isFinal)
     }
   }
 
@@ -277,9 +280,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     assert(finalSubFeeds.size == 1)
     assert(stats == Map(RuntimeEventState.SUCCEEDED -> 2))
     assert(finalSubFeeds.head.dataFrame.get.select(dfSrc1.columns.map(col):_*).symmetricDifference(dfSrc1).isEmpty)
-    val stateListener = Environment._globalConfig.stateListeners.head.listener.asInstanceOf[TestStateListener]
-    assert(stateListener.firstState.isDefined && !stateListener.firstState.get.isFinal)
-    assert(stateListener.finalState.isDefined && stateListener.firstState.get.isFinal)
   }
 }
 
