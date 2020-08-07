@@ -78,10 +78,8 @@ case class CustomSparkAction ( override val id: ActionObjectId,
         case (dataObjectId, dataFrame) =>
           val output = outputs.find(_.id.id == dataObjectId)
             .getOrElse(throw ConfigurationException(s"No output found for result ${dataObjectId} in $id. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
-          // if main output, get partition values from main input
-          val partitionValues = if (mainOutput.id.id == dataObjectId) {
-            mainInputSubFeed.map(_.partitionValues).getOrElse(Seq())
-          } else Seq()
+          // get partition values from main input
+          val partitionValues = mainInputSubFeed.map(_.partitionValues).getOrElse(Seq())
           SparkSubFeed(Some(dataFrame),dataObjectId, partitionValues)
       }.toSeq
   }
