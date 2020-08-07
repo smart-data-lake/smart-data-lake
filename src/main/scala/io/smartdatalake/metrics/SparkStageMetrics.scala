@@ -135,7 +135,7 @@ private[smartdatalake] case class SparkStageMetrics(jobInfo: JobInfo, stageId: I
   def getId: String = jobInfo.toString
   def getOrder: Long = stageId
   def getMainInfos: Map[String, Any] = {
-    Map("records_written" -> recordsWrittenCons, "bytes_written" -> bytesWritten, "num_tasks" -> numTasks.toLong, "stage" -> stageName.split(' ').head )
+    Map("duration" -> stageRuntime, "records_written" -> recordsWrittenCons, "bytes_written" -> bytesWritten, "num_tasks" -> numTasks.toLong, "stage" -> stageName.split(' ').head )
   }
 }
 private[smartdatalake] case class JobInfo(id: Int, group: String, description: String)
