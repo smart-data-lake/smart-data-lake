@@ -35,7 +35,7 @@ case class StateListenerConfig(className: String, options: Option[Map[String,Str
   }
 }
 
-trait StateListener extends SmartDataLakeLogger {
+trait StateListener {
 
   /**
    * Notify State
