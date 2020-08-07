@@ -69,6 +69,15 @@ private[smartdatalake] trait ActionMetrics {
   def getAsText: String
 }
 
+private[smartdatalake] case class GenericMetrics(id: String, order: Long, mainInfos: Map[String, Any]) extends ActionMetrics {
+  def getId: String = id
+  def getOrder: Long = order
+  def getMainInfos: Map[String, Any] = mainInfos
+  def getAsText: String = {
+    mainInfos.map{ case (k,v) => s"$k=$v" }.mkString(" ")
+  }
+}
+
 private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, attemptId: Int, partitionValues: Seq[PartitionValues], parallelism: Int, initialSubFeeds: Seq[SubFeed], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener]) extends SmartDataLakeLogger {
 
   private def createScheduler(parallelism: Int = 1) = Scheduler.fixedPool(s"dag-$runId", parallelism)
