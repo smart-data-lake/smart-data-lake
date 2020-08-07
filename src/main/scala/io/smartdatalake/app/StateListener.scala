@@ -21,7 +21,7 @@ package io.smartdatalake.app
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.ActionDAGRunState
+import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
 
 case class StateListenerConfig(className: String, options: Option[Map[String,String]] = None) {
   // instantiate listener
@@ -40,5 +40,5 @@ trait StateListener extends SmartDataLakeLogger {
   /**
    * Notify State
    */
-  def notifyState(state: ActionDAGRunState): Unit
+  def notifyState(state: ActionDAGRunState, context: ActionPipelineContext): Unit
 }

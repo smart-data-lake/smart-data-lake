@@ -30,7 +30,7 @@ import io.smartdatalake.util.misc.EnvironmentUtil
 import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, CustomDfTransformerConfig}
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction, DeduplicateAction, RuntimeEventState}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
-import io.smartdatalake.workflow.{ActionDAGRunState, HadoopFileActionDAGRunStateStore, SparkSubFeed, TaskFailedException}
+import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore, SparkSubFeed, TaskFailedException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.{col, udf}
 import org.apache.spark.sql.types.StringType
@@ -296,7 +296,7 @@ class FailTransformer extends CustomDfTransformer {
 class TestStateListener(options: Map[String,String]) extends StateListener {
   var firstState: Option[ActionDAGRunState] = None
   var finalState: Option[ActionDAGRunState] = None
-  def notifyState(state: ActionDAGRunState): Unit = {
+  override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext): Unit = {
     if (firstState.isEmpty) firstState = Some(state)
     finalState = Some(state)
   }
