@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>HiveTableDataObject - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.dataobject.HiveTableDataObject</title>
-          <meta name="description" content="HiveTableDataObject - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.dataobject.HiveTableDataObject" />
-          <meta name="keywords" content="HiveTableDataObject Smart Data Lake 1.0.6 API io.smartdatalake.workflow.dataobject.HiveTableDataObject" />
+          <title>HiveTableDataObject - Smart Data Lake 1.1.0 API - io.smartdatalake.workflow.dataobject.HiveTableDataObject</title>
+          <meta name="description" content="HiveTableDataObject - Smart Data Lake 1.1.0 API - io.smartdatalake.workflow.dataobject.HiveTableDataObject" />
+          <meta name="keywords" content="HiveTableDataObject Smart Data Lake 1.1.0 API io.smartdatalake.workflow.dataobject.HiveTableDataObject" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -607,22 +607,23 @@ The companion object in turn should implement <span class="extype" name="FromCon
     </span>
       <p class="shortcomment cmt">unique name of this data object</p><div class="fullcomment"><div class="comment cmt"><p>unique name of this data object</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.HiveTableDataObject">HiveTableDataObject</a> → DataObject → SdlConfigObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame#init" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="init(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
-      <a id="init(Seq[PartitionValues])(SparkSession):Unit"></a>
+      <a id="init(df:org.apache.spark.sql.DataFrame,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
+      <a id="init(DataFrame,Seq[PartitionValues])(SparkSession):Unit"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">init</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>] = <span class="symbol">Seq()</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">init</span><span class="params">(<span name="df">df: <span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.HiveTableDataObject@init(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.HiveTableDataObject@init(df:org.apache.spark.sql.DataFrame,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt">Initialize callback before writing data out to disk/sinks.</p><div class="fullcomment"><div class="comment cmt"><p>Initialize callback before writing data out to disk/sinks.
+      <p class="shortcomment cmt">Called during init phase for checks and initialization.</p><div class="fullcomment"><div class="comment cmt"><p>Called during init phase for checks and initialization.
+If possible dont change the system until execution phase.
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>CanWriteDataFrame</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.HiveTableDataObject#instanceRegistry" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="instanceRegistry:io.smartdatalake.config.InstanceRegistry"></a>
@@ -868,18 +869,18 @@ The companion object in turn should implement <span class="extype" name="FromCon
             If DataObject is only used for reading or if the HiveTable already exist, the path can be omitted.
             If the HiveTable already exists but with a different path, a warning is issued</p></div></div>
     </li><li name="io.smartdatalake.workflow.dataobject.DataObject#postRead" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="postRead(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
-      <a id="postRead(SparkSession):Unit"></a>
+      <a id="postRead(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
+      <a id="postRead(Seq[PartitionValues])(SparkSession,ActionPipelineContext):Unit"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">postRead</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">postRead</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.HiveTableDataObject@postRead(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.HiveTableDataObject@postRead(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -887,18 +888,18 @@ The companion object in turn should implement <span class="extype" name="FromCon
 </p><div class="fullcomment"><div class="comment cmt"><p>Runs operations after reading from <span class="extype" name="DataObject">DataObject</span>
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>DataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.DataObject#postWrite" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="postWrite(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
-      <a id="postWrite(SparkSession):Unit"></a>
+      <a id="postWrite(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
+      <a id="postWrite(Seq[PartitionValues])(SparkSession,ActionPipelineContext):Unit"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">postWrite</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">postWrite</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.HiveTableDataObject@postWrite(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.HiveTableDataObject@postWrite(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -906,18 +907,18 @@ The companion object in turn should implement <span class="extype" name="FromCon
 </p><div class="fullcomment"><div class="comment cmt"><p>Runs operations after writing to <span class="extype" name="DataObject">DataObject</span>
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>DataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.DataObject#preRead" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="preRead(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
-      <a id="preRead(SparkSession):Unit"></a>
+      <a id="preRead(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
+      <a id="preRead(Seq[PartitionValues])(SparkSession,ActionPipelineContext):Unit"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">preRead</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">preRead</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.HiveTableDataObject@preRead(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.HiveTableDataObject@preRead(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -925,23 +926,25 @@ The companion object in turn should implement <span class="extype" name="FromCon
 </p><div class="fullcomment"><div class="comment cmt"><p>Runs operations before reading from <span class="extype" name="DataObject">DataObject</span>
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>DataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.HiveTableDataObject#preWrite" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="preWrite(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
-      <a id="preWrite(SparkSession):Unit"></a>
+      <a id="preWrite(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
+      <a id="preWrite(SparkSession,ActionPipelineContext):Unit"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">preWrite</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">preWrite</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.HiveTableDataObject@preWrite(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.HiveTableDataObject@preWrite(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
       <p class="shortcomment cmt">Runs operations before writing to <span class="extype" name="DataObject">DataObject</span>
+Note: As the transformed SubFeed doesnt yet exist in Action.preWrite, no partition values can be passed as parameters as in preRead
 </p><div class="fullcomment"><div class="comment cmt"><p>Runs operations before writing to <span class="extype" name="DataObject">DataObject</span>
+Note: As the transformed SubFeed doesnt yet exist in Action.preWrite, no partition values can be passed as parameters as in preRead
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.HiveTableDataObject">HiveTableDataObject</a> → DataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.HiveTableDataObject#prepare" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="prepare(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>

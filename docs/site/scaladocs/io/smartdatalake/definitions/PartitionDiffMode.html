@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>PartitionDiffMode - Smart Data Lake 1.0.6 API - io.smartdatalake.definitions.PartitionDiffMode</title>
-          <meta name="description" content="PartitionDiffMode - Smart Data Lake 1.0.6 API - io.smartdatalake.definitions.PartitionDiffMode" />
-          <meta name="keywords" content="PartitionDiffMode Smart Data Lake 1.0.6 API io.smartdatalake.definitions.PartitionDiffMode" />
+          <title>PartitionDiffMode - Smart Data Lake 1.1.0 API - io.smartdatalake.definitions.PartitionDiffMode</title>
+          <meta name="description" content="PartitionDiffMode - Smart Data Lake 1.1.0 API - io.smartdatalake.definitions.PartitionDiffMode" />
+          <meta name="keywords" content="PartitionDiffMode Smart Data Lake 1.1.0 API io.smartdatalake.definitions.PartitionDiffMode" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -45,14 +45,20 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <span class="name">PartitionDiffMode</span><span class="params">(<span name="partitionColNb">partitionColNb: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="mainInputId">mainInputId: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="mainOutputId">mainOutputId: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="nbOfPartitionValuesPerRun">nbOfPartitionValuesPerRun: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a> with <a href="ExecutionModeWithMainInputOutput.html" class="extype" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput">ExecutionModeWithMainInputOutput</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <span class="name">PartitionDiffMode</span><span class="params">(<span name="partitionColNb">partitionColNb: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="alternativeOutputId">alternativeOutputId: <span class="extype" name="scala.Option">Option</span>[<a href="../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a>] = <span class="symbol">None</span></span>, <span name="nbOfPartitionValuesPerRun">nbOfPartitionValuesPerRun: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="applyCondition">applyCondition: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="failCondition">failCondition: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a> with <span class="extype" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput">ExecutionModeWithMainInputOutput</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4>
       
-          <div id="comment" class="fullcommenttop"><div class="comment cmt"><p>Partition difference execution mode lists partitions on input &amp; output DataObject and starts loading all missing partitions.
-Partition columns to be used for comparision need to be a common 'init' of input and output partition columns.</p></div><dl class="paramcmts block"><dt class="param">partitionColNb</dt><dd class="cmt"><p>optional number of partition columns to use as a common 'init'.</p></dd><dt class="param">mainInputId</dt><dd class="cmt"><p>optional selection of inputId to be used for partition comparision. Only needed if there are multiple input DataObject's.</p></dd><dt class="param">mainOutputId</dt><dd class="cmt"><p>optional selection of outputId to be used for partition comparision. Only needed if there are multiple output DataObject's.</p></dd><dt class="param">nbOfPartitionValuesPerRun</dt><dd class="cmt"><p>optional restriction of the number of partition values per run.</p></dd></dl><div class="toggleContainer block">
+          <div id="comment" class="fullcommenttop"><div class="comment cmt"><p>Partition difference execution mode lists partitions on mainInput &amp; mainOutput DataObject and starts loading all missing partitions.
+Partition columns to be used for comparision need to be a common 'init' of input and output partition columns.
+This mode needs mainInput/Output DataObjects which CanHandlePartitions to list partitions.
+Partition values are passed to following actions, if for partition columns which they have in common.
+</p></div><dl class="paramcmts block"><dt class="param">partitionColNb</dt><dd class="cmt"><p>optional number of partition columns to use as a common 'init'.</p></dd><dt class="param">alternativeOutputId</dt><dd class="cmt"><p>optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
+                                 It can be used to ensure processing all partitions over multiple actions in case of errors.</p></dd><dt class="param">nbOfPartitionValuesPerRun</dt><dd class="cmt"><p>optional restriction of the number of partition values per run.</p></dd><dt class="param">applyCondition</dt><dd class="cmt"><p>Condition to decide if execution mode should be applied or not. Define a spark sql expression working with attributes of <a href="DefaultExecutionModeExpressionData.html" class="extype" name="io.smartdatalake.definitions.DefaultExecutionModeExpressionData">DefaultExecutionModeExpressionData</a> returning a boolean.
+                                 Default is to apply the execution mode if given partition values (partition values from command line or passed from previous action) are not empty.</p></dd><dt class="param">failCondition</dt><dd class="cmt"><p>Condition to fail application of execution mode if true. Define a spark sql expression working with attributes of <a href="PartitionDiffModeExpressionData.html" class="extype" name="io.smartdatalake.definitions.PartitionDiffModeExpressionData">PartitionDiffModeExpressionData</a> returning a boolean.
+                                 Default is that the application of the PartitionDiffMode does not fail the action. If there is no data to process, the following actions are skipped.</p></dd></dl><div class="toggleContainer block">
           <span class="toggle">Linear Supertypes</span>
-          <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.Product">Product</span>, <span class="extype" name="scala.Equals">Equals</span>, <a href="ExecutionModeWithMainInputOutput.html" class="extype" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput">ExecutionModeWithMainInputOutput</a>, <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
+          <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.Product">Product</span>, <span class="extype" name="scala.Equals">Equals</span>, <span class="extype" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput">ExecutionModeWithMainInputOutput</span>, <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>, <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
         </div></div>
         
 
@@ -70,7 +76,7 @@ Partition columns to be used for comparision need to be a common 'init' of input
                 <span class="filtertype">Inherited<br />
                 </span>
                 <ol id="linearization">
-                  <li class="in" name="io.smartdatalake.definitions.PartitionDiffMode"><span>PartitionDiffMode</span></li><li class="in" name="scala.Serializable"><span>Serializable</span></li><li class="in" name="java.io.Serializable"><span>Serializable</span></li><li class="in" name="scala.Product"><span>Product</span></li><li class="in" name="scala.Equals"><span>Equals</span></li><li class="in" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput"><span>ExecutionModeWithMainInputOutput</span></li><li class="in" name="io.smartdatalake.definitions.ExecutionMode"><span>ExecutionMode</span></li><li class="in" name="scala.AnyRef"><span>AnyRef</span></li><li class="in" name="scala.Any"><span>Any</span></li>
+                  <li class="in" name="io.smartdatalake.definitions.PartitionDiffMode"><span>PartitionDiffMode</span></li><li class="in" name="scala.Serializable"><span>Serializable</span></li><li class="in" name="java.io.Serializable"><span>Serializable</span></li><li class="in" name="scala.Product"><span>Product</span></li><li class="in" name="scala.Equals"><span>Equals</span></li><li class="in" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput"><span>ExecutionModeWithMainInputOutput</span></li><li class="in" name="io.smartdatalake.definitions.ExecutionMode"><span>ExecutionMode</span></li><li class="in" name="io.smartdatalake.util.misc.SmartDataLakeLogger"><span>SmartDataLakeLogger</span></li><li class="in" name="scala.AnyRef"><span>AnyRef</span></li><li class="in" name="scala.Any"><span>Any</span></li>
                 </ol>
               </div><div id="ancestors">
             <span class="filtertype"></span>
@@ -90,7 +96,7 @@ Partition columns to be used for comparision need to be a common 'init' of input
         <div id="constructors" class="members">
               <h3>Instance Constructors</h3>
               <ol><li name="io.smartdatalake.definitions.PartitionDiffMode#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="&lt;init&gt;(partitionColNb:Option[Int],mainInputId:Option[String],mainOutputId:Option[String],nbOfPartitionValuesPerRun:Option[Int]):io.smartdatalake.definitions.PartitionDiffMode"></a>
+      <a id="&lt;init&gt;(partitionColNb:Option[Int],alternativeOutputId:Option[io.smartdatalake.config.SdlConfigObject.DataObjectId],nbOfPartitionValuesPerRun:Option[Int],applyCondition:Option[String],failCondition:Option[String]):io.smartdatalake.definitions.PartitionDiffMode"></a>
       <a id="&lt;init&gt;:PartitionDiffMode"></a>
       <h4 class="signature">
       <span class="modifier_kind">
@@ -98,14 +104,17 @@ Partition columns to be used for comparision need to be a common 'init' of input
         <span class="kind">new</span>
       </span>
       <span class="symbol">
-        <span class="name">PartitionDiffMode</span><span class="params">(<span name="partitionColNb">partitionColNb: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="mainInputId">mainInputId: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="mainOutputId">mainOutputId: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="nbOfPartitionValuesPerRun">nbOfPartitionValuesPerRun: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>)</span>
+        <span class="name">PartitionDiffMode</span><span class="params">(<span name="partitionColNb">partitionColNb: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="alternativeOutputId">alternativeOutputId: <span class="extype" name="scala.Option">Option</span>[<a href="../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a>] = <span class="symbol">None</span></span>, <span name="nbOfPartitionValuesPerRun">nbOfPartitionValuesPerRun: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="applyCondition">applyCondition: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="failCondition">failCondition: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>)</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.definitions.PartitionDiffMode@&lt;init&gt;(partitionColNb:Option[Int],mainInputId:Option[String],mainOutputId:Option[String],nbOfPartitionValuesPerRun:Option[Int]):io.smartdatalake.definitions.PartitionDiffMode" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.definitions.PartitionDiffMode@&lt;init&gt;(partitionColNb:Option[Int],alternativeOutputId:Option[io.smartdatalake.config.SdlConfigObject.DataObjectId],nbOfPartitionValuesPerRun:Option[Int],applyCondition:Option[String],failCondition:Option[String]):io.smartdatalake.definitions.PartitionDiffMode" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">partitionColNb</dt><dd class="cmt"><p>optional number of partition columns to use as a common 'init'.</p></dd><dt class="param">mainInputId</dt><dd class="cmt"><p>optional selection of inputId to be used for partition comparision. Only needed if there are multiple input DataObject's.</p></dd><dt class="param">mainOutputId</dt><dd class="cmt"><p>optional selection of outputId to be used for partition comparision. Only needed if there are multiple output DataObject's.</p></dd><dt class="param">nbOfPartitionValuesPerRun</dt><dd class="cmt"><p>optional restriction of the number of partition values per run.</p></dd></dl></div>
+      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">partitionColNb</dt><dd class="cmt"><p>optional number of partition columns to use as a common 'init'.</p></dd><dt class="param">alternativeOutputId</dt><dd class="cmt"><p>optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
+                                 It can be used to ensure processing all partitions over multiple actions in case of errors.</p></dd><dt class="param">nbOfPartitionValuesPerRun</dt><dd class="cmt"><p>optional restriction of the number of partition values per run.</p></dd><dt class="param">applyCondition</dt><dd class="cmt"><p>Condition to decide if execution mode should be applied or not. Define a spark sql expression working with attributes of <a href="DefaultExecutionModeExpressionData.html" class="extype" name="io.smartdatalake.definitions.DefaultExecutionModeExpressionData">DefaultExecutionModeExpressionData</a> returning a boolean.
+                                 Default is to apply the execution mode if given partition values (partition values from command line or passed from previous action) are not empty.</p></dd><dt class="param">failCondition</dt><dd class="cmt"><p>Condition to fail application of execution mode if true. Define a spark sql expression working with attributes of <a href="PartitionDiffModeExpressionData.html" class="extype" name="io.smartdatalake.definitions.PartitionDiffModeExpressionData">PartitionDiffModeExpressionData</a> returning a boolean.
+                                 Default is that the application of the PartitionDiffMode does not fail the action. If there is no data to process, the following actions are skipped.</p></dd></dl></div>
     </li></ol>
             </div>
 
@@ -166,6 +175,76 @@ Partition columns to be used for comparision need to be a common 'init' of input
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
+    </li><li name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput#alternativeOutput" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="alternativeOutput(implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Option[io.smartdatalake.workflow.dataobject.DataObject]"></a>
+      <a id="alternativeOutput(ActionPipelineContext):Option[DataObject]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">alternativeOutput</span><span class="params">(<span class="implicit">implicit </span><span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.PartitionDiffMode@alternativeOutput(implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Option[io.smartdatalake.workflow.dataobject.DataObject]" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>ExecutionModeWithMainInputOutput</dd></dl></div>
+    </li><li name="io.smartdatalake.definitions.PartitionDiffMode#alternativeOutputId" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="alternativeOutputId:Option[io.smartdatalake.config.SdlConfigObject.DataObjectId]"></a>
+      <a id="alternativeOutputId:Option[DataObjectId]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">alternativeOutputId</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<a href="../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.PartitionDiffMode@alternativeOutputId:Option[io.smartdatalake.config.SdlConfigObject.DataObjectId]" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">optional alternative outputId of DataObject later in the DAG.</p><div class="fullcomment"><div class="comment cmt"><p>optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
+                                 It can be used to ensure processing all partitions over multiple actions in case of errors.</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.definitions.PartitionDiffMode">PartitionDiffMode</a> → ExecutionModeWithMainInputOutput</dd></dl></div>
+    </li><li name="io.smartdatalake.definitions.PartitionDiffMode#apply" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="apply(actionId:io.smartdatalake.config.SdlConfigObject.ActionObjectId,mainInput:io.smartdatalake.workflow.dataobject.DataObject,mainOutput:io.smartdatalake.workflow.dataobject.DataObject,subFeed:io.smartdatalake.workflow.SubFeed)(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Option[(Seq[io.smartdatalake.util.hdfs.PartitionValues],Option[String])]"></a>
+      <a id="apply(ActionObjectId,DataObject,DataObject,SubFeed)(SparkSession,ActionPipelineContext):Option[(Seq[PartitionValues],Option[String])]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">apply</span><span class="params">(<span name="actionId">actionId: <a href="../config/SdlConfigObject$$ActionObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ActionObjectId">ActionObjectId</a></span>, <span name="mainInput">mainInput: <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span></span>, <span name="mainOutput">mainOutput: <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span></span>, <span name="subFeed">subFeed: <a href="../workflow/SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[(<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>], <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>])]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.PartitionDiffMode@apply(actionId:io.smartdatalake.config.SdlConfigObject.ActionObjectId,mainInput:io.smartdatalake.workflow.dataobject.DataObject,mainOutput:io.smartdatalake.workflow.dataobject.DataObject,subFeed:io.smartdatalake.workflow.SubFeed)(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Option[(Seq[io.smartdatalake.util.hdfs.PartitionValues],Option[String])]" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.definitions.PartitionDiffMode">PartitionDiffMode</a> → <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a></dd></dl></div>
+    </li><li name="io.smartdatalake.definitions.PartitionDiffMode#applyCondition" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="applyCondition:Option[String]"></a>
+      <a id="applyCondition:Option[String]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">applyCondition</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.PartitionDiffMode@applyCondition:Option[String]" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Condition to decide if execution mode should be applied or not.</p><div class="fullcomment"><div class="comment cmt"><p>Condition to decide if execution mode should be applied or not. Define a spark sql expression working with attributes of <a href="DefaultExecutionModeExpressionData.html" class="extype" name="io.smartdatalake.definitions.DefaultExecutionModeExpressionData">DefaultExecutionModeExpressionData</a> returning a boolean.
+                                 Default is to apply the execution mode if given partition values (partition values from command line or passed from previous action) are not empty.</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.definitions.PartitionDiffMode">PartitionDiffMode</a> → <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a></dd></dl></div>
     </li><li name="scala.Any#asInstanceOf" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="asInstanceOf[T0]:T0"></a>
       <a id="asInstanceOf[T0]:T0"></a>
@@ -223,6 +302,41 @@ Partition columns to be used for comparision need to be a common 'init' of input
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li name="io.smartdatalake.definitions.ExecutionMode#evaluateApplyCondition" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="evaluateApplyCondition(actionId:io.smartdatalake.config.SdlConfigObject.ActionObjectId,subFeed:io.smartdatalake.workflow.SubFeed)(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Option[Boolean]"></a>
+      <a id="evaluateApplyCondition(ActionObjectId,SubFeed)(SparkSession,ActionPipelineContext):Option[Boolean]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">evaluateApplyCondition</span><span class="params">(<span name="actionId">actionId: <a href="../config/SdlConfigObject$$ActionObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ActionObjectId">ActionObjectId</a></span>, <span name="subFeed">subFeed: <a href="../workflow/SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Boolean">Boolean</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.PartitionDiffMode@evaluateApplyCondition(actionId:io.smartdatalake.config.SdlConfigObject.ActionObjectId,subFeed:io.smartdatalake.workflow.SubFeed)(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Option[Boolean]" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a></dd></dl></div>
+    </li><li name="io.smartdatalake.definitions.PartitionDiffMode#failCondition" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="failCondition:Option[String]"></a>
+      <a id="failCondition:Option[String]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">failCondition</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.PartitionDiffMode@failCondition:Option[String]" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Condition to fail application of execution mode if true.</p><div class="fullcomment"><div class="comment cmt"><p>Condition to fail application of execution mode if true. Define a spark sql expression working with attributes of <a href="PartitionDiffModeExpressionData.html" class="extype" name="io.smartdatalake.definitions.PartitionDiffModeExpressionData">PartitionDiffModeExpressionData</a> returning a boolean.
+                                 Default is that the application of the PartitionDiffMode does not fail the action. If there is no data to process, the following actions are skipped.</p></div></div>
     </li><li name="scala.AnyRef#finalize" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="finalize():Unit"></a>
       <a id="finalize():Unit"></a>
@@ -280,40 +394,40 @@ Partition columns to be used for comparision need to be a common 'init' of input
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Any</dd></dl></div>
-    </li><li name="io.smartdatalake.definitions.PartitionDiffMode#mainInputId" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="mainInputId:Option[String]"></a>
-      <a id="mainInputId:Option[String]"></a>
+    </li><li name="io.smartdatalake.util.misc.SmartDataLakeLogger#logger" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="logger:org.slf4j.Logger"></a>
+      <a id="logger:Logger"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
-        <span class="kind">val</span>
+        <span class="kind">lazy val</span>
       </span>
       <span class="symbol">
-        <span class="name">mainInputId</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
+        <span class="name">logger</span><span class="result">: <span class="extype" name="org.slf4j.Logger">Logger</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.definitions.PartitionDiffMode@mainInputId:Option[String]" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.definitions.PartitionDiffMode@logger:org.slf4j.Logger" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt">optional selection of inputId to be used for partition comparision.</p><div class="fullcomment"><div class="comment cmt"><p>optional selection of inputId to be used for partition comparision. Only needed if there are multiple input DataObject's.</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.definitions.PartitionDiffMode">PartitionDiffMode</a> → <a href="ExecutionModeWithMainInputOutput.html" class="extype" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput">ExecutionModeWithMainInputOutput</a></dd></dl></div>
-    </li><li name="io.smartdatalake.definitions.PartitionDiffMode#mainOutputId" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="mainOutputId:Option[String]"></a>
-      <a id="mainOutputId:Option[String]"></a>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Attributes</dt><dd>protected </dd><dt>Definition Classes</dt><dd>SmartDataLakeLogger</dd></dl></div>
+    </li><li name="io.smartdatalake.definitions.PartitionDiffMode#mainInputOutputNeeded" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="mainInputOutputNeeded:Boolean"></a>
+      <a id="mainInputOutputNeeded:Boolean"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
-        <span class="kind">val</span>
+        <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">mainOutputId</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
+        <span class="name">mainInputOutputNeeded</span><span class="result">: <span class="extype" name="scala.Boolean">Boolean</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.definitions.PartitionDiffMode@mainOutputId:Option[String]" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.definitions.PartitionDiffMode@mainInputOutputNeeded:Boolean" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt">optional selection of outputId to be used for partition comparision.</p><div class="fullcomment"><div class="comment cmt"><p>optional selection of outputId to be used for partition comparision. Only needed if there are multiple output DataObject's.</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.definitions.PartitionDiffMode">PartitionDiffMode</a> → <a href="ExecutionModeWithMainInputOutput.html" class="extype" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput">ExecutionModeWithMainInputOutput</a></dd></dl></div>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.definitions.PartitionDiffMode">PartitionDiffMode</a> → <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a></dd></dl></div>
     </li><li name="io.smartdatalake.definitions.PartitionDiffMode#nbOfPartitionValuesPerRun" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="nbOfPartitionValuesPerRun:Option[Int]"></a>
       <a id="nbOfPartitionValuesPerRun:Option[Int]"></a>
@@ -399,6 +513,23 @@ Partition columns to be used for comparision need to be a common 'init' of input
       </a>
     </span>
       <p class="shortcomment cmt">optional number of partition columns to use as a common 'init'.</p>
+    </li><li name="io.smartdatalake.definitions.PartitionDiffMode#prepare" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="prepare(actionId:io.smartdatalake.config.SdlConfigObject.ActionObjectId)(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
+      <a id="prepare(ActionObjectId)(SparkSession,ActionPipelineContext):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">prepare</span><span class="params">(<span name="actionId">actionId: <a href="../config/SdlConfigObject$$ActionObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ActionObjectId">ActionObjectId</a></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.PartitionDiffMode@prepare(actionId:io.smartdatalake.config.SdlConfigObject.ActionObjectId)(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.definitions.PartitionDiffMode">PartitionDiffMode</a> → <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a></dd></dl></div>
     </li><li name="scala.AnyRef#synchronized" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="synchronized[T0](x$1:=&gt;T0):T0"></a>
       <a id="synchronized[T0](⇒T0):T0"></a>
@@ -503,9 +634,11 @@ Partition columns to be used for comparision need to be a common 'init' of input
             </div><div class="parent" name="scala.Equals">
               <h3>Inherited from <span class="extype" name="scala.Equals">Equals</span></h3>
             </div><div class="parent" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput">
-              <h3>Inherited from <a href="ExecutionModeWithMainInputOutput.html" class="extype" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput">ExecutionModeWithMainInputOutput</a></h3>
+              <h3>Inherited from <span class="extype" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput">ExecutionModeWithMainInputOutput</span></h3>
             </div><div class="parent" name="io.smartdatalake.definitions.ExecutionMode">
               <h3>Inherited from <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a></h3>
+            </div><div class="parent" name="io.smartdatalake.util.misc.SmartDataLakeLogger">
+              <h3>Inherited from <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span></h3>
             </div><div class="parent" name="scala.AnyRef">
               <h3>Inherited from <span class="extype" name="scala.AnyRef">AnyRef</span></h3>
             </div><div class="parent" name="scala.Any">

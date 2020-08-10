@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>ExcelFileDataObject - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.dataobject.ExcelFileDataObject</title>
-          <meta name="description" content="ExcelFileDataObject - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.dataobject.ExcelFileDataObject" />
-          <meta name="keywords" content="ExcelFileDataObject Smart Data Lake 1.0.6 API io.smartdatalake.workflow.dataobject.ExcelFileDataObject" />
+          <title>ExcelFileDataObject - Smart Data Lake 1.1.0 API - io.smartdatalake.workflow.dataobject.ExcelFileDataObject</title>
+          <meta name="description" content="ExcelFileDataObject - Smart Data Lake 1.1.0 API - io.smartdatalake.workflow.dataobject.ExcelFileDataObject" />
+          <meta name="keywords" content="ExcelFileDataObject Smart Data Lake 1.1.0 API io.smartdatalake.workflow.dataobject.ExcelFileDataObject" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -788,6 +788,24 @@ This is concatenated with the partition layout to search for files.
       <p class="shortcomment cmt">get partition values formatted by partition layout
 </p><div class="fullcomment"><div class="comment cmt"><p>get partition values formatted by partition layout
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>FileRefDataObject</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.HadoopFileDataObject#getPath" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="getPath:String"></a>
+      <a id="getPath:String"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">getPath</span><span class="result">: <span class="extype" name="scala.Predef.String">String</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.ExcelFileDataObject@getPath:String" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Method for subclasses to override the base path for this DataObject.</p><div class="fullcomment"><div class="comment cmt"><p>Method for subclasses to override the base path for this DataObject.
+This is for instance needed if pathPrefix is defined in a connection.</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>HadoopFileDataObject → FileRefDataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.FileRefDataObject#getSearchPaths" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="getSearchPaths(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Seq[(io.smartdatalake.util.hdfs.PartitionValues,String)]"></a>
       <a id="getSearchPaths(Seq[PartitionValues])(SparkSession):Seq[(PartitionValues,String)]"></a>
@@ -843,22 +861,23 @@ This is concatenated with the partition layout to search for files.
       <p class="shortcomment cmt">A unique identifier for this instance.</p><div class="fullcomment"><div class="comment cmt"><p>A unique identifier for this instance.
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.ExcelFileDataObject">ExcelFileDataObject</a> → DataObject → SdlConfigObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.CanWriteDataFrame#init" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="init(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
-      <a id="init(Seq[PartitionValues])(SparkSession):Unit"></a>
+      <a id="init(df:org.apache.spark.sql.DataFrame,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
+      <a id="init(DataFrame,Seq[PartitionValues])(SparkSession):Unit"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">init</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>] = <span class="symbol">Seq()</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">init</span><span class="params">(<span name="df">df: <span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.ExcelFileDataObject@init(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.ExcelFileDataObject@init(df:org.apache.spark.sql.DataFrame,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt">Initialize callback before writing data out to disk/sinks.</p><div class="fullcomment"><div class="comment cmt"><p>Initialize callback before writing data out to disk/sinks.
+      <p class="shortcomment cmt">Called during init phase for checks and initialization.</p><div class="fullcomment"><div class="comment cmt"><p>Called during init phase for checks and initialization.
+If possible dont change the system until execution phase.
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>CanWriteDataFrame</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.ExcelFileDataObject#instanceRegistry" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="instanceRegistry:io.smartdatalake.config.InstanceRegistry"></a>
@@ -1074,18 +1093,18 @@ This is concatenated with the partition layout to search for files.
       <p class="shortcomment cmt">The root path of the files that are handled by this DataObject.</p><div class="fullcomment"><div class="comment cmt"><p>The root path of the files that are handled by this DataObject.
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.ExcelFileDataObject">ExcelFileDataObject</a> → FileDataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.DataObject#postRead" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="postRead(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
-      <a id="postRead(SparkSession):Unit"></a>
+      <a id="postRead(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
+      <a id="postRead(Seq[PartitionValues])(SparkSession,ActionPipelineContext):Unit"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">postRead</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">postRead</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.ExcelFileDataObject@postRead(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.ExcelFileDataObject@postRead(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -1093,18 +1112,18 @@ This is concatenated with the partition layout to search for files.
 </p><div class="fullcomment"><div class="comment cmt"><p>Runs operations after reading from <span class="extype" name="DataObject">DataObject</span>
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>DataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.HadoopFileDataObject#postWrite" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="postWrite(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
-      <a id="postWrite(SparkSession):Unit"></a>
+      <a id="postWrite(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
+      <a id="postWrite(Seq[PartitionValues])(SparkSession,ActionPipelineContext):Unit"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">postWrite</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">postWrite</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.ExcelFileDataObject@postWrite(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.ExcelFileDataObject@postWrite(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -1112,18 +1131,18 @@ This is concatenated with the partition layout to search for files.
 </p><div class="fullcomment"><div class="comment cmt"><p>Runs operations after writing to <span class="extype" name="DataObject">DataObject</span>
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>HadoopFileDataObject → DataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.DataObject#preRead" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="preRead(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
-      <a id="preRead(SparkSession):Unit"></a>
+      <a id="preRead(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
+      <a id="preRead(Seq[PartitionValues])(SparkSession,ActionPipelineContext):Unit"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">preRead</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">preRead</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.ExcelFileDataObject@preRead(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.ExcelFileDataObject@preRead(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -1131,23 +1150,25 @@ This is concatenated with the partition layout to search for files.
 </p><div class="fullcomment"><div class="comment cmt"><p>Runs operations before reading from <span class="extype" name="DataObject">DataObject</span>
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>DataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.HadoopFileDataObject#preWrite" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="preWrite(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
-      <a id="preWrite(SparkSession):Unit"></a>
+      <a id="preWrite(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
+      <a id="preWrite(SparkSession,ActionPipelineContext):Unit"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">preWrite</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">preWrite</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.ExcelFileDataObject@preWrite(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.ExcelFileDataObject@preWrite(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
       <p class="shortcomment cmt">Runs operations before writing to <span class="extype" name="DataObject">DataObject</span>
+Note: As the transformed SubFeed doesnt yet exist in Action.preWrite, no partition values can be passed as parameters as in preRead
 </p><div class="fullcomment"><div class="comment cmt"><p>Runs operations before writing to <span class="extype" name="DataObject">DataObject</span>
+Note: As the transformed SubFeed doesnt yet exist in Action.preWrite, no partition values can be passed as parameters as in preRead
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>HadoopFileDataObject → DataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.DataObject#prepare" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="prepare(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>

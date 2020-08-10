@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>FileTransferAction - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.action.FileTransferAction</title>
-          <meta name="description" content="FileTransferAction - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.action.FileTransferAction" />
-          <meta name="keywords" content="FileTransferAction Smart Data Lake 1.0.6 API io.smartdatalake.workflow.action.FileTransferAction" />
+          <title>FileTransferAction - Smart Data Lake 1.1.0 API - io.smartdatalake.workflow.action.FileTransferAction</title>
+          <meta name="description" content="FileTransferAction - Smart Data Lake 1.1.0 API - io.smartdatalake.workflow.action.FileTransferAction" />
+          <meta name="keywords" content="FileTransferAction Smart Data Lake 1.1.0 API io.smartdatalake.workflow.action.FileTransferAction" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -47,12 +47,13 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <span class="name">FileTransferAction</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ActionObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ActionObjectId">ActionObjectId</a></span>, <span name="inputId">inputId: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="outputId">outputId: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="deleteDataAfterRead">deleteDataAfterRead: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="overwrite">overwrite: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">true</span></span>, <span name="breakFileRefLineage">breakFileRefLineage: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="initExecutionMode">initExecutionMode: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="ActionMetadata.html" class="extype" name="io.smartdatalake.workflow.action.ActionMetadata">ActionMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <a href="FileSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.FileSubFeedAction">FileSubFeedAction</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <span class="name">FileTransferAction</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ActionObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ActionObjectId">ActionObjectId</a></span>, <span name="inputId">inputId: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="outputId">outputId: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="deleteDataAfterRead">deleteDataAfterRead: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="overwrite">overwrite: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">true</span></span>, <span name="breakFileRefLineage">breakFileRefLineage: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="executionMode">executionMode: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>] = <span class="symbol">None</span></span>, <span name="metricsFailCondition">metricsFailCondition: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="ActionMetadata.html" class="extype" name="io.smartdatalake.workflow.action.ActionMetadata">ActionMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <a href="FileSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.FileSubFeedAction">FileSubFeedAction</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4>
       
           <div id="comment" class="fullcommenttop"><div class="comment cmt"><p><span class="extype" name="Action">Action</span> to transfer files between SFtp, Hadoop and local Fs.
-</p></div><dl class="paramcmts block"><dt class="param">inputId</dt><dd class="cmt"><p>inputs DataObject</p></dd><dt class="param">outputId</dt><dd class="cmt"><p>output DataObject</p></dd><dt class="param">deleteDataAfterRead</dt><dd class="cmt"><p>if the input files should be deleted after processing successfully</p></dd></dl><div class="toggleContainer block">
+</p></div><dl class="paramcmts block"><dt class="param">inputId</dt><dd class="cmt"><p>inputs DataObject</p></dd><dt class="param">outputId</dt><dd class="cmt"><p>output DataObject</p></dd><dt class="param">deleteDataAfterRead</dt><dd class="cmt"><p>if the input files should be deleted after processing successfully</p></dd><dt class="param">metricsFailCondition</dt><dd class="cmt"><p>optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
+                            If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.</p></dd></dl><div class="toggleContainer block">
           <span class="toggle">Linear Supertypes</span>
           <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.Product">Product</span>, <span class="extype" name="scala.Equals">Equals</span>, <a href="FileSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.FileSubFeedAction">FileSubFeedAction</a>, <span class="extype" name="io.smartdatalake.workflow.action.Action">Action</span>, <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span>, <span class="extype" name="io.smartdatalake.workflow.DAGNode">DAGNode</span>, <span class="extype" name="io.smartdatalake.config.ParsableFromConfig">ParsableFromConfig</span>[<span class="extype" name="io.smartdatalake.workflow.action.Action">Action</span>], <span class="extype" name="io.smartdatalake.config.SdlConfigObject">SdlConfigObject</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
         </div></div>
@@ -92,7 +93,7 @@
         <div id="constructors" class="members">
               <h3>Instance Constructors</h3>
               <ol><li name="io.smartdatalake.workflow.action.FileTransferAction#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ActionObjectId,inputId:io.smartdatalake.config.SdlConfigObject.DataObjectId,outputId:io.smartdatalake.config.SdlConfigObject.DataObjectId,deleteDataAfterRead:Boolean,overwrite:Boolean,breakFileRefLineage:Boolean,initExecutionMode:Option[io.smartdatalake.definitions.ExecutionMode],metadata:Option[io.smartdatalake.workflow.action.ActionMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.action.FileTransferAction"></a>
+      <a id="&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ActionObjectId,inputId:io.smartdatalake.config.SdlConfigObject.DataObjectId,outputId:io.smartdatalake.config.SdlConfigObject.DataObjectId,deleteDataAfterRead:Boolean,overwrite:Boolean,breakFileRefLineage:Boolean,executionMode:Option[io.smartdatalake.definitions.ExecutionMode],metricsFailCondition:Option[String],metadata:Option[io.smartdatalake.workflow.action.ActionMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.action.FileTransferAction"></a>
       <a id="&lt;init&gt;:FileTransferAction"></a>
       <h4 class="signature">
       <span class="modifier_kind">
@@ -100,14 +101,15 @@
         <span class="kind">new</span>
       </span>
       <span class="symbol">
-        <span class="name">FileTransferAction</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ActionObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ActionObjectId">ActionObjectId</a></span>, <span name="inputId">inputId: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="outputId">outputId: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="deleteDataAfterRead">deleteDataAfterRead: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="overwrite">overwrite: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">true</span></span>, <span name="breakFileRefLineage">breakFileRefLineage: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="initExecutionMode">initExecutionMode: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="ActionMetadata.html" class="extype" name="io.smartdatalake.workflow.action.ActionMetadata">ActionMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span>
+        <span class="name">FileTransferAction</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$ActionObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ActionObjectId">ActionObjectId</a></span>, <span name="inputId">inputId: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="outputId">outputId: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="deleteDataAfterRead">deleteDataAfterRead: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="overwrite">overwrite: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">true</span></span>, <span name="breakFileRefLineage">breakFileRefLineage: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="executionMode">executionMode: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>] = <span class="symbol">None</span></span>, <span name="metricsFailCondition">metricsFailCondition: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="ActionMetadata.html" class="extype" name="io.smartdatalake.workflow.action.ActionMetadata">ActionMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileTransferAction@&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ActionObjectId,inputId:io.smartdatalake.config.SdlConfigObject.DataObjectId,outputId:io.smartdatalake.config.SdlConfigObject.DataObjectId,deleteDataAfterRead:Boolean,overwrite:Boolean,breakFileRefLineage:Boolean,initExecutionMode:Option[io.smartdatalake.definitions.ExecutionMode],metadata:Option[io.smartdatalake.workflow.action.ActionMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.action.FileTransferAction" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileTransferAction@&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.ActionObjectId,inputId:io.smartdatalake.config.SdlConfigObject.DataObjectId,outputId:io.smartdatalake.config.SdlConfigObject.DataObjectId,deleteDataAfterRead:Boolean,overwrite:Boolean,breakFileRefLineage:Boolean,executionMode:Option[io.smartdatalake.definitions.ExecutionMode],metricsFailCondition:Option[String],metadata:Option[io.smartdatalake.workflow.action.ActionMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.action.FileTransferAction" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">inputId</dt><dd class="cmt"><p>inputs DataObject</p></dd><dt class="param">outputId</dt><dd class="cmt"><p>output DataObject</p></dd><dt class="param">deleteDataAfterRead</dt><dd class="cmt"><p>if the input files should be deleted after processing successfully</p></dd></dl></div>
+      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">inputId</dt><dd class="cmt"><p>inputs DataObject</p></dd><dt class="param">outputId</dt><dd class="cmt"><p>output DataObject</p></dd><dt class="param">deleteDataAfterRead</dt><dd class="cmt"><p>if the input files should be deleted after processing successfully</p></dd><dt class="param">metricsFailCondition</dt><dd class="cmt"><p>optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
+                            If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.</p></dd></dl></div>
     </li></ol>
             </div>
 
@@ -280,7 +282,7 @@ This is needed to reprocess all files of a path/partition instead of the FileRef
       </a>
     </span>
       <p class="shortcomment cmt">Runtime metrics</p><div class="fullcomment"><div class="comment cmt"><p>Runtime metrics</p><p>Note: runtime metrics are disabled by default, because they are only collected when running Actions from an ActionDAG.
-This is not the case for Tests other use cases. If enabled exceptions are thrown if metrics are not found.
+This is not the case for Tests or other use cases. If enabled exceptions are thrown if metrics are not found.
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
     </li><li name="scala.AnyRef#eq" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="eq(x$1:AnyRef):Boolean"></a>
@@ -335,6 +337,25 @@ This is not the case for Tests other use cases. If enabled exceptions are thrown
       <p class="shortcomment cmt">Executes Action for a given <a href="../FileSubFeed.html" class="extype" name="io.smartdatalake.workflow.FileSubFeed">FileSubFeed</a>
 </p><div class="fullcomment"><div class="comment cmt"><p>Executes Action for a given <a href="../FileSubFeed.html" class="extype" name="io.smartdatalake.workflow.FileSubFeed">FileSubFeed</a>
 </p></div><dl class="paramcmts block"><dt class="param">subFeed</dt><dd class="cmt"><p>subFeed to be processed (referencing files to be read)</p></dd><dt>returns</dt><dd class="cmt"><p>processed subFeed (referencing files written by this action)</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.action.FileTransferAction">FileTransferAction</a> → <a href="FileSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.FileSubFeedAction">FileSubFeedAction</a></dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.FileTransferAction#executionMode" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="executionMode:Option[io.smartdatalake.definitions.ExecutionMode]"></a>
+      <a id="executionMode:Option[ExecutionMode]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">executionMode</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileTransferAction@executionMode:Option[io.smartdatalake.definitions.ExecutionMode]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Execution mode if this Action is a start node of a DAG run
+</p><div class="fullcomment"><div class="comment cmt"><p>Execution mode if this Action is a start node of a DAG run
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.action.FileTransferAction">FileTransferAction</a> → <a href="FileSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.FileSubFeedAction">FileSubFeedAction</a></dd></dl></div>
     </li><li name="io.smartdatalake.workflow.action.FileTransferAction#factory" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="factory:io.smartdatalake.config.FromConfigFactory[io.smartdatalake.workflow.action.Action]"></a>
       <a id="factory:FromConfigFactory[Action]"></a>
@@ -532,25 +553,6 @@ The companion object in turn should implement <span class="extype" name="FromCon
       </a>
     </span>
       <p class="shortcomment cmt">Action.init implementation</p><div class="fullcomment"><div class="comment cmt"><p>Action.init implementation</p></div><dl class="paramcmts block"><dt class="param">subFeeds</dt><dd class="cmt"><p><a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a>'s to be processed</p></dd><dt>returns</dt><dd class="cmt"><p>processed <a href="../SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a>'s</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="FileSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.FileSubFeedAction">FileSubFeedAction</a> → Action</dd></dl></div>
-    </li><li name="io.smartdatalake.workflow.action.FileTransferAction#initExecutionMode" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="initExecutionMode:Option[io.smartdatalake.definitions.ExecutionMode]"></a>
-      <a id="initExecutionMode:Option[ExecutionMode]"></a>
-      <h4 class="signature">
-      <span class="modifier_kind">
-        <span class="modifier"></span>
-        <span class="kind">val</span>
-      </span>
-      <span class="symbol">
-        <span class="name">initExecutionMode</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<a href="../../definitions/ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a>]</span>
-      </span>
-      </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileTransferAction@initExecutionMode:Option[io.smartdatalake.definitions.ExecutionMode]" title="Permalink" target="_top">
-        <img src="../../../../lib/permalink.png" alt="Permalink" />
-      </a>
-    </span>
-      <p class="shortcomment cmt">Execution mode if this Action is a start node of a DAG run
-</p><div class="fullcomment"><div class="comment cmt"><p>Execution mode if this Action is a start node of a DAG run
-</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.action.FileTransferAction">FileTransferAction</a> → <a href="FileSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.FileSubFeedAction">FileSubFeedAction</a></dd></dl></div>
     </li><li name="io.smartdatalake.workflow.action.FileTransferAction#initSubFeed" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="initSubFeed(subFeed:io.smartdatalake.workflow.FileSubFeed)(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):io.smartdatalake.workflow.FileSubFeed"></a>
       <a id="initSubFeed(FileSubFeed)(SparkSession,ActionPipelineContext):FileSubFeed"></a>
@@ -681,6 +683,24 @@ To be implemented by subclasses
       <p class="shortcomment cmt">Additional metadata for the Action
 </p><div class="fullcomment"><div class="comment cmt"><p>Additional metadata for the Action
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.action.FileTransferAction">FileTransferAction</a> → Action</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.FileTransferAction#metricsFailCondition" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="metricsFailCondition:Option[String]"></a>
+      <a id="metricsFailCondition:Option[String]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">metricsFailCondition</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileTransferAction@metricsFailCondition:Option[String]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">optional spark sql expression evaluated as where-clause against dataframe of metrics.</p><div class="fullcomment"><div class="comment cmt"><p>optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
+                            If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.action.FileTransferAction">FileTransferAction</a> → Action</dd></dl></div>
     </li><li name="scala.AnyRef#ne" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="ne(x$1:AnyRef):Boolean"></a>
       <a id="ne(AnyRef):Boolean"></a>
@@ -860,7 +880,7 @@ To be implemented by subclasses
     </span>
       <p class="shortcomment cmt">Executes operations needed after executing an action.</p><div class="fullcomment"><div class="comment cmt"><p>Executes operations needed after executing an action.
 In this step any phase on Input- or Output-DataObjects needed after the main task is executed,
-e.g. JdbcTableDataObjects postSql or CopyActions deleteInputData.
+e.g. JdbcTableDataObjects postWriteSql or CopyActions deleteInputData.
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="FileSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.FileSubFeedAction">FileSubFeedAction</a> → Action</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.action.FileSubFeedAction#postExecSubFeed" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="postExecSubFeed(inputSubFeed:io.smartdatalake.workflow.SubFeed,outputSubFeed:io.smartdatalake.workflow.SubFeed)(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
@@ -880,26 +900,26 @@ e.g. JdbcTableDataObjects postSql or CopyActions deleteInputData.
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="FileSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.FileSubFeedAction">FileSubFeedAction</a></dd></dl></div>
     </li><li name="io.smartdatalake.workflow.action.Action#preExec" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="preExec(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
-      <a id="preExec(SparkSession,ActionPipelineContext):Unit"></a>
+      <a id="preExec(subFeeds:Seq[io.smartdatalake.workflow.SubFeed])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
+      <a id="preExec(Seq[SubFeed])(SparkSession,ActionPipelineContext):Unit"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">preExec</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">preExec</span><span class="params">(<span name="subFeeds">subFeeds: <span class="extype" name="scala.Seq">Seq</span>[<a href="../SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileTransferAction@preExec(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileTransferAction@preExec(subFeeds:Seq[io.smartdatalake.workflow.SubFeed])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
       <p class="shortcomment cmt">Executes operations needed before executing an action.</p><div class="fullcomment"><div class="comment cmt"><p>Executes operations needed before executing an action.
 In this step any phase on Input- or Output-DataObjects needed before the main task is executed,
-e.g. JdbcTableDataObjects preSql
+e.g. JdbcTableDataObjects preWriteSql
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
-    </li><li name="io.smartdatalake.workflow.action.Action#prepare" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+    </li><li name="io.smartdatalake.workflow.action.FileSubFeedAction#prepare" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="prepare(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
       <a id="prepare(SparkSession,ActionPipelineContext):Unit"></a>
       <h4 class="signature">
@@ -919,7 +939,24 @@ e.g. JdbcTableDataObjects preSql
 In this step preconditions are prepared &amp; tested:
 - connections can be created
 - needed structures exist, e.g Kafka topic or Jdbc table</p><p>This runs during the &quot;prepare&quot; phase of the DAG.
-</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>Action</dd></dl></div>
+</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="FileSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.FileSubFeedAction">FileSubFeedAction</a> → Action</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.action.FileSubFeedAction#recursiveInputs" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="recursiveInputs:Seq[io.smartdatalake.workflow.dataobject.FileRefDataObjectwithio.smartdatalake.workflow.dataobject.CanCreateInputStream]"></a>
+      <a id="recursiveInputs:Seq[FileRefDataObjectwithCanCreateInputStream]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">recursiveInputs</span><span class="result">: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.FileRefDataObject">FileRefDataObject</span> with <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateInputStream">CanCreateInputStream</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.action.FileTransferAction@recursiveInputs:Seq[io.smartdatalake.workflow.dataobject.FileRefDataObjectwithio.smartdatalake.workflow.dataobject.CanCreateInputStream]" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Recursive Inputs on FileSubFeeds are not supported so empty Seq is set.</p><div class="fullcomment"><div class="comment cmt"><p>Recursive Inputs on FileSubFeeds are not supported so empty Seq is set.</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="FileSubFeedAction.html" class="extype" name="io.smartdatalake.workflow.action.FileSubFeedAction">FileSubFeedAction</a> → Action</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.action.Action#reset" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="reset():Unit"></a>
       <a id="reset():Unit"></a>

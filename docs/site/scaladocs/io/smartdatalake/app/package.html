@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>app - Smart Data Lake 1.0.6 API - io.smartdatalake.app</title>
-          <meta name="description" content="app - Smart Data Lake 1.0.6 API - io.smartdatalake.app" />
-          <meta name="keywords" content="app Smart Data Lake 1.0.6 API io.smartdatalake.app" />
+          <title>app - Smart Data Lake 1.1.0 API - io.smartdatalake.app</title>
+          <meta name="description" content="app - Smart Data Lake 1.1.0 API - io.smartdatalake.app" />
+          <meta name="keywords" content="app Smart Data Lake 1.1.0 API io.smartdatalake.app" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -93,7 +93,7 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <a href="GlobalConfig.html"><span class="name">GlobalConfig</span></a><span class="params">(<span name="kryoClasses">kryoClasses: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="sparkOptions">sparkOptions: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="enableHive">enableHive: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">true</span></span>, <span name="memoryLogTimer">memoryLogTimer: <span class="extype" name="scala.Option">Option</span>[<a href="MemoryLogTimerConfig.html" class="extype" name="io.smartdatalake.app.MemoryLogTimerConfig">MemoryLogTimerConfig</a>] = <span class="symbol">None</span></span>, <span name="shutdownHookLogger">shutdownHookLogger: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <a href="GlobalConfig.html"><span class="name">GlobalConfig</span></a><span class="params">(<span name="kryoClasses">kryoClasses: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="sparkOptions">sparkOptions: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="enableHive">enableHive: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">true</span></span>, <span name="memoryLogTimer">memoryLogTimer: <span class="extype" name="scala.Option">Option</span>[<a href="MemoryLogTimerConfig.html" class="extype" name="io.smartdatalake.app.MemoryLogTimerConfig">MemoryLogTimerConfig</a>] = <span class="symbol">None</span></span>, <span name="shutdownHookLogger">shutdownHookLogger: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="stateListeners">stateListeners: <span class="extype" name="scala.Seq">Seq</span>[<a href="StateListenerConfig.html" class="extype" name="io.smartdatalake.app.StateListenerConfig">StateListenerConfig</a>] = <span class="symbol">Seq()</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4><span class="permalink">
       <a href="../../../index.html#io.smartdatalake.app.package@GlobalConfigextendsSmartDataLakeLoggerwithProductwithSerializable" title="Permalink" target="_top">
@@ -148,7 +148,7 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <a href="SmartDataLakeBuilderConfig.html"><span class="name">SmartDataLakeBuilderConfig</span></a><span class="params">(<span name="feedSel">feedSel: <span class="extype" name="scala.Predef.String">String</span> = <span class="symbol">null</span></span>, <span name="applicationName">applicationName: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="configuration">configuration: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="master">master: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="deployMode">deployMode: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="username">username: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="kerberosDomain">kerberosDomain: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="keytabPath">keytabPath: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="java.io.File">File</span>] = <span class="symbol">None</span></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]] = <span class="symbol">None</span></span>, <span name="multiPartitionValues">multiPartitionValues: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]] = <span class="symbol">None</span></span>, <span name="parallelism">parallelism: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">1</span></span>, <span name="statePath">statePath: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="overrideJars">overrideJars: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <a href="SmartDataLakeBuilderConfig.html"><span class="name">SmartDataLakeBuilderConfig</span></a><span class="params">(<span name="feedSel">feedSel: <span class="extype" name="scala.Predef.String">String</span> = <span class="symbol">null</span></span>, <span name="applicationName">applicationName: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="configuration">configuration: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="master">master: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="deployMode">deployMode: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="username">username: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="kerberosDomain">kerberosDomain: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="keytabPath">keytabPath: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="java.io.File">File</span>] = <span class="symbol">None</span></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]] = <span class="symbol">None</span></span>, <span name="multiPartitionValues">multiPartitionValues: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]] = <span class="symbol">None</span></span>, <span name="parallelism">parallelism: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">1</span></span>, <span name="statePath">statePath: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="overrideJars">overrideJars: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="test">test: <span class="extype" name="scala.Option">Option</span>[<a href="TestMode$.html#ValueextendsOrdered[Enumeration.this.Value]withSerializable" class="extmbr" name="io.smartdatalake.app.TestMode.Value">TestMode.Value</a>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4><span class="permalink">
       <a href="../../../index.html#io.smartdatalake.app.package@SmartDataLakeBuilderConfigextendsProductwithSerializable" title="Permalink" target="_top">
@@ -158,7 +158,41 @@
       <p class="shortcomment cmt">This case class represents a default configuration for the App.</p><div class="fullcomment"><div class="comment cmt"><p>This case class represents a default configuration for the App.
 It is populated by parsing command-line arguments.
 It also specifies default values.
-</p></div><dl class="paramcmts block"><dt class="param">feedSel</dt><dd class="cmt"><p>Regex pattern to select the feed to execute.</p></dd><dt class="param">applicationName</dt><dd class="cmt"><p>Application name.</p></dd><dt class="param">configuration</dt><dd class="cmt"><p>A configuration file or a directory containing configuration files.</p></dd><dt class="param">master</dt><dd class="cmt"><p>The Spark master URL passed to SparkContext when in local mode.</p></dd><dt class="param">deployMode</dt><dd class="cmt"><p>The Spark deploy mode passed to SparkContext when in local mode.</p></dd><dt class="param">username</dt><dd class="cmt"><p>Kerberos user name (<code>username</code>@<code>kerberosDomain</code>) for local mode.</p></dd><dt class="param">kerberosDomain</dt><dd class="cmt"><p>Kerberos domain (<code>username</code>@<code>kerberosDomain</code>) for local mode.</p></dd><dt class="param">keytabPath</dt><dd class="cmt"><p>Path to Kerberos keytab file for local mode.</p></dd></dl></div>
+</p></div><dl class="paramcmts block"><dt class="param">feedSel</dt><dd class="cmt"><p>Regex pattern to select the feed to execute.</p></dd><dt class="param">applicationName</dt><dd class="cmt"><p>Application name.</p></dd><dt class="param">configuration</dt><dd class="cmt"><p>A configuration file or a directory containing configuration files.</p></dd><dt class="param">master</dt><dd class="cmt"><p>The Spark master URL passed to SparkContext when in local mode.</p></dd><dt class="param">deployMode</dt><dd class="cmt"><p>The Spark deploy mode passed to SparkContext when in local mode.</p></dd><dt class="param">username</dt><dd class="cmt"><p>Kerberos user name (<code>username</code>@<code>kerberosDomain</code>) for local mode.</p></dd><dt class="param">kerberosDomain</dt><dd class="cmt"><p>Kerberos domain (<code>username</code>@<code>kerberosDomain</code>) for local mode.</p></dd><dt class="param">keytabPath</dt><dd class="cmt"><p>Path to Kerberos keytab file for local mode.</p></dd><dt class="param">test</dt><dd class="cmt"><p>Run in test mode:</p><ul><li>&quot;config&quot;: validate configuration</li><li>&quot;dry-run&quot;: execute &quot;prepare&quot; and &quot;init&quot; phase to check environment</li></ul></dd></dl></div>
+    </li><li name="io.smartdatalake.app.StateListener" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
+      <a id="StateListenerextendsAnyRef"></a>
+      <a id="StateListener:StateListener"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="StateListener.html"><span class="name">StateListener</span></a><span class="result"> extends <span class="extype" name="scala.AnyRef">AnyRef</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.app.package@StateListenerextendsAnyRef" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="io.smartdatalake.app.StateListenerConfig" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="StateListenerConfigextendsProductwithSerializable"></a>
+      <a id="StateListenerConfig:StateListenerConfig"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="StateListenerConfig.html"><span class="name">StateListenerConfig</span></a><span class="params">(<span name="className">className: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="options">options: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.app.package@StateListenerConfigextendsProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
     </li></ol>
             </div>
 
@@ -236,6 +270,23 @@ It also specifies default values.
     </span>
       <p class="shortcomment cmt">Smart Data Lake Builder application for local mode.</p><div class="fullcomment"><div class="comment cmt"><p>Smart Data Lake Builder application for local mode.</p><p>Sets master to local[*] and deployMode to client by default.
 </p></div></div>
+    </li><li name="io.smartdatalake.app.TestMode" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="TestMode"></a>
+      <a id="TestMode:TestMode"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="TestMode$.html"><span class="name">TestMode</span></a><span class="result"> extends <span class="extype" name="scala.Enumeration">Enumeration</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.app.package@TestMode" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
     </li></ol>
             </div>
 

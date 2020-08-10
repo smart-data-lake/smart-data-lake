@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>RawFileDataObject - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.dataobject.RawFileDataObject</title>
-          <meta name="description" content="RawFileDataObject - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.dataobject.RawFileDataObject" />
-          <meta name="keywords" content="RawFileDataObject Smart Data Lake 1.0.6 API io.smartdatalake.workflow.dataobject.RawFileDataObject" />
+          <title>RawFileDataObject - Smart Data Lake 1.1.0 API - io.smartdatalake.workflow.dataobject.RawFileDataObject</title>
+          <meta name="description" content="RawFileDataObject - Smart Data Lake 1.1.0 API - io.smartdatalake.workflow.dataobject.RawFileDataObject" />
+          <meta name="keywords" content="RawFileDataObject Smart Data Lake 1.1.0 API io.smartdatalake.workflow.dataobject.RawFileDataObject" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -47,12 +47,12 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <span class="name">RawFileDataObject</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="saveMode">saveMode: <span class="extype" name="org.apache.spark.sql.SaveMode">SaveMode</span> = <span class="symbol">SaveMode.Overwrite</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<a href="../../util/misc/AclDef.html" class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</a>] = <span class="symbol">None</span></span>, <span name="connectionId">connectionId: <span class="extype" name="scala.Option">Option</span>[<a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="DataObjectMetadata.html" class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.HadoopFileDataObject">HadoopFileDataObject</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <span class="name">RawFileDataObject</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="fileName">fileName: <span class="extype" name="scala.Predef.String">String</span> = <span class="symbol">&quot;*&quot;</span></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="saveMode">saveMode: <span class="extype" name="org.apache.spark.sql.SaveMode">SaveMode</span> = <span class="symbol">SaveMode.Overwrite</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<a href="../../util/misc/AclDef.html" class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</a>] = <span class="symbol">None</span></span>, <span name="connectionId">connectionId: <span class="extype" name="scala.Option">Option</span>[<a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="DataObjectMetadata.html" class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.workflow.dataobject.HadoopFileDataObject">HadoopFileDataObject</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4>
       
           <div id="comment" class="fullcommenttop"><div class="comment cmt"><p>DataObject of type raw for files with unknown content.
-Provides details to an Action to access raw files.</p></div><dl class="paramcmts block"><dt class="param">saveMode</dt><dd class="cmt"><p>Overwrite or Append new data.</p></dd></dl><div class="toggleContainer block">
+Provides details to an Action to access raw files.</p></div><dl class="paramcmts block"><dt class="param">fileName</dt><dd class="cmt"><p>Definition of fileName. This is concatenated with path and partition layout to search for files. Default is an asterix to match everything.</p></dd><dt class="param">saveMode</dt><dd class="cmt"><p>Overwrite or Append new data.</p></dd></dl><div class="toggleContainer block">
           <span class="toggle">Linear Supertypes</span>
           <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.Product">Product</span>, <span class="extype" name="scala.Equals">Equals</span>, <span class="extype" name="io.smartdatalake.workflow.dataobject.HadoopFileDataObject">HadoopFileDataObject</span>, <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateOutputStream">CanCreateOutputStream</span>, <span class="extype" name="io.smartdatalake.workflow.dataobject.CanCreateInputStream">CanCreateInputStream</span>, <span class="extype" name="io.smartdatalake.workflow.dataobject.FileRefDataObject">FileRefDataObject</span>, <span class="extype" name="io.smartdatalake.workflow.dataobject.FileDataObject">FileDataObject</span>, <span class="extype" name="io.smartdatalake.workflow.dataobject.CanHandlePartitions">CanHandlePartitions</span>, <span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>, <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span>, <span class="extype" name="io.smartdatalake.config.ParsableFromConfig">ParsableFromConfig</span>[<span class="extype" name="io.smartdatalake.workflow.dataobject.DataObject">DataObject</span>], <span class="extype" name="io.smartdatalake.config.SdlConfigObject">SdlConfigObject</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
         </div></div>
@@ -92,7 +92,7 @@ Provides details to an Action to access raw files.</p></div><dl class="paramcmts
         <div id="constructors" class="members">
               <h3>Instance Constructors</h3>
               <ol><li name="io.smartdatalake.workflow.dataobject.RawFileDataObject#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.DataObjectId,path:String,partitions:Seq[String],saveMode:org.apache.spark.sql.SaveMode,acl:Option[io.smartdatalake.util.misc.AclDef],connectionId:Option[io.smartdatalake.config.SdlConfigObject.ConnectionId],metadata:Option[io.smartdatalake.workflow.dataobject.DataObjectMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.dataobject.RawFileDataObject"></a>
+      <a id="&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.DataObjectId,path:String,fileName:String,partitions:Seq[String],saveMode:org.apache.spark.sql.SaveMode,acl:Option[io.smartdatalake.util.misc.AclDef],connectionId:Option[io.smartdatalake.config.SdlConfigObject.ConnectionId],metadata:Option[io.smartdatalake.workflow.dataobject.DataObjectMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.dataobject.RawFileDataObject"></a>
       <a id="&lt;init&gt;:RawFileDataObject"></a>
       <h4 class="signature">
       <span class="modifier_kind">
@@ -100,14 +100,14 @@ Provides details to an Action to access raw files.</p></div><dl class="paramcmts
         <span class="kind">new</span>
       </span>
       <span class="symbol">
-        <span class="name">RawFileDataObject</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="saveMode">saveMode: <span class="extype" name="org.apache.spark.sql.SaveMode">SaveMode</span> = <span class="symbol">SaveMode.Overwrite</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<a href="../../util/misc/AclDef.html" class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</a>] = <span class="symbol">None</span></span>, <span name="connectionId">connectionId: <span class="extype" name="scala.Option">Option</span>[<a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="DataObjectMetadata.html" class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span>
+        <span class="name">RawFileDataObject</span><span class="params">(<span name="id">id: <a href="../../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="path">path: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="fileName">fileName: <span class="extype" name="scala.Predef.String">String</span> = <span class="symbol">&quot;*&quot;</span></span>, <span name="partitions">partitions: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">Seq()</span></span>, <span name="saveMode">saveMode: <span class="extype" name="org.apache.spark.sql.SaveMode">SaveMode</span> = <span class="symbol">SaveMode.Overwrite</span></span>, <span name="acl">acl: <span class="extype" name="scala.Option">Option</span>[<a href="../../util/misc/AclDef.html" class="extype" name="io.smartdatalake.util.misc.AclDef">AclDef</a>] = <span class="symbol">None</span></span>, <span name="connectionId">connectionId: <span class="extype" name="scala.Option">Option</span>[<a href="../../config/SdlConfigObject$$ConnectionId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.ConnectionId">ConnectionId</a>] = <span class="symbol">None</span></span>, <span name="metadata">metadata: <span class="extype" name="scala.Option">Option</span>[<a href="DataObjectMetadata.html" class="extype" name="io.smartdatalake.workflow.dataobject.DataObjectMetadata">DataObjectMetadata</a>] = <span class="symbol">None</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>)</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.RawFileDataObject@&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.DataObjectId,path:String,partitions:Seq[String],saveMode:org.apache.spark.sql.SaveMode,acl:Option[io.smartdatalake.util.misc.AclDef],connectionId:Option[io.smartdatalake.config.SdlConfigObject.ConnectionId],metadata:Option[io.smartdatalake.workflow.dataobject.DataObjectMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.dataobject.RawFileDataObject" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.RawFileDataObject@&lt;init&gt;(id:io.smartdatalake.config.SdlConfigObject.DataObjectId,path:String,fileName:String,partitions:Seq[String],saveMode:org.apache.spark.sql.SaveMode,acl:Option[io.smartdatalake.util.misc.AclDef],connectionId:Option[io.smartdatalake.config.SdlConfigObject.ConnectionId],metadata:Option[io.smartdatalake.workflow.dataobject.DataObjectMetadata])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry):io.smartdatalake.workflow.dataobject.RawFileDataObject" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">saveMode</dt><dd class="cmt"><p>Overwrite or Append new data.</p></dd></dl></div>
+      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">fileName</dt><dd class="cmt"><p>Definition of fileName. This is concatenated with path and partition layout to search for files. Default is an asterix to match everything.</p></dd><dt class="param">saveMode</dt><dd class="cmt"><p>Overwrite or Append new data.</p></dd></dl></div>
     </li></ol>
             </div>
 
@@ -501,7 +501,7 @@ The companion object in turn should implement <span class="extype" name="FromCon
 on the file system.</p><div class="fullcomment"><div class="comment cmt"><p>Configure whether <span class="extype" name="io.smartdatalake.workflow.action.Action">io.smartdatalake.workflow.action.Action</span>s should fail if the input file(s) are missing
 on the file system.</p><p>Default is false.
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>HadoopFileDataObject</dd></dl></div>
-    </li><li name="io.smartdatalake.workflow.dataobject.FileRefDataObject#fileName" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+    </li><li name="io.smartdatalake.workflow.dataobject.RawFileDataObject#fileName" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="fileName:String"></a>
       <a id="fileName:String"></a>
       <h4 class="signature">
@@ -510,16 +510,14 @@ on the file system.</p><p>Default is false.
         <span class="kind">val</span>
       </span>
       <span class="symbol">
-        <span class="name">fileName</span><span class="result">: <span class="extype" name="java.lang.String">String</span></span>
+        <span class="name">fileName</span><span class="result">: <span class="extype" name="scala.Predef.String">String</span></span>
       </span>
       </h4><span class="permalink">
       <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.RawFileDataObject@fileName:String" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt">Definition of fileName.</p><div class="fullcomment"><div class="comment cmt"><p>Definition of fileName. Default is an asterix to match everything.
-This is concatenated with the partition layout to search for files.
-</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>FileRefDataObject</dd></dl></div>
+      <p class="shortcomment cmt">Definition of fileName.</p><div class="fullcomment"><div class="comment cmt"><p>Definition of fileName. This is concatenated with path and partition layout to search for files. Default is an asterix to match everything.</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.RawFileDataObject">RawFileDataObject</a> → FileRefDataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.HadoopFileDataObject#filesystem" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="filesystem(implicitsession:org.apache.spark.sql.SparkSession):org.apache.hadoop.fs.FileSystem"></a>
       <a id="filesystem(SparkSession):FileSystem"></a>
@@ -652,6 +650,24 @@ This is concatenated with the partition layout to search for files.
       <p class="shortcomment cmt">get partition values formatted by partition layout
 </p><div class="fullcomment"><div class="comment cmt"><p>get partition values formatted by partition layout
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>FileRefDataObject</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.dataobject.HadoopFileDataObject#getPath" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="getPath:String"></a>
+      <a id="getPath:String"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">getPath</span><span class="result">: <span class="extype" name="scala.Predef.String">String</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.RawFileDataObject@getPath:String" title="Permalink" target="_top">
+        <img src="../../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Method for subclasses to override the base path for this DataObject.</p><div class="fullcomment"><div class="comment cmt"><p>Method for subclasses to override the base path for this DataObject.
+This is for instance needed if pathPrefix is defined in a connection.</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>HadoopFileDataObject → FileRefDataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.FileRefDataObject#getSearchPaths" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="getSearchPaths(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession):Seq[(io.smartdatalake.util.hdfs.PartitionValues,String)]"></a>
       <a id="getSearchPaths(Seq[PartitionValues])(SparkSession):Seq[(PartitionValues,String)]"></a>
@@ -886,18 +902,18 @@ This is concatenated with the partition layout to search for files.
       <p class="shortcomment cmt">The root path of the files that are handled by this DataObject.</p><div class="fullcomment"><div class="comment cmt"><p>The root path of the files that are handled by this DataObject.
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.dataobject.RawFileDataObject">RawFileDataObject</a> → FileDataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.DataObject#postRead" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="postRead(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
-      <a id="postRead(SparkSession):Unit"></a>
+      <a id="postRead(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
+      <a id="postRead(Seq[PartitionValues])(SparkSession,ActionPipelineContext):Unit"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">postRead</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">postRead</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.RawFileDataObject@postRead(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.RawFileDataObject@postRead(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -905,18 +921,18 @@ This is concatenated with the partition layout to search for files.
 </p><div class="fullcomment"><div class="comment cmt"><p>Runs operations after reading from <span class="extype" name="DataObject">DataObject</span>
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>DataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.HadoopFileDataObject#postWrite" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="postWrite(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
-      <a id="postWrite(SparkSession):Unit"></a>
+      <a id="postWrite(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
+      <a id="postWrite(Seq[PartitionValues])(SparkSession,ActionPipelineContext):Unit"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">postWrite</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">postWrite</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.RawFileDataObject@postWrite(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.RawFileDataObject@postWrite(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -924,18 +940,18 @@ This is concatenated with the partition layout to search for files.
 </p><div class="fullcomment"><div class="comment cmt"><p>Runs operations after writing to <span class="extype" name="DataObject">DataObject</span>
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>HadoopFileDataObject → DataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.DataObject#preRead" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="preRead(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
-      <a id="preRead(SparkSession):Unit"></a>
+      <a id="preRead(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
+      <a id="preRead(Seq[PartitionValues])(SparkSession,ActionPipelineContext):Unit"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">preRead</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">preRead</span><span class="params">(<span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.RawFileDataObject@preRead(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.RawFileDataObject@preRead(partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues])(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -943,23 +959,25 @@ This is concatenated with the partition layout to search for files.
 </p><div class="fullcomment"><div class="comment cmt"><p>Runs operations before reading from <span class="extype" name="DataObject">DataObject</span>
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>DataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.HadoopFileDataObject#preWrite" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="preWrite(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>
-      <a id="preWrite(SparkSession):Unit"></a>
+      <a id="preWrite(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit"></a>
+      <a id="preWrite(SparkSession,ActionPipelineContext):Unit"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">preWrite</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
+        <span class="name">preWrite</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <span class="extype" name="scala.Unit">Unit</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.RawFileDataObject@preWrite(implicitsession:org.apache.spark.sql.SparkSession):Unit" title="Permalink" target="_top">
+      <a href="../../../../index.html#io.smartdatalake.workflow.dataobject.RawFileDataObject@preWrite(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):Unit" title="Permalink" target="_top">
         <img src="../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
       <p class="shortcomment cmt">Runs operations before writing to <span class="extype" name="DataObject">DataObject</span>
+Note: As the transformed SubFeed doesnt yet exist in Action.preWrite, no partition values can be passed as parameters as in preRead
 </p><div class="fullcomment"><div class="comment cmt"><p>Runs operations before writing to <span class="extype" name="DataObject">DataObject</span>
+Note: As the transformed SubFeed doesnt yet exist in Action.preWrite, no partition values can be passed as parameters as in preRead
 </p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd>HadoopFileDataObject → DataObject</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.dataobject.DataObject#prepare" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="prepare(implicitsession:org.apache.spark.sql.SparkSession):Unit"></a>

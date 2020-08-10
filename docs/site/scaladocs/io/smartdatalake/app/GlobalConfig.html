@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>GlobalConfig - Smart Data Lake 1.0.6 API - io.smartdatalake.app.GlobalConfig</title>
-          <meta name="description" content="GlobalConfig - Smart Data Lake 1.0.6 API - io.smartdatalake.app.GlobalConfig" />
-          <meta name="keywords" content="GlobalConfig Smart Data Lake 1.0.6 API io.smartdatalake.app.GlobalConfig" />
+          <title>GlobalConfig - Smart Data Lake 1.1.0 API - io.smartdatalake.app.GlobalConfig</title>
+          <meta name="description" content="GlobalConfig - Smart Data Lake 1.1.0 API - io.smartdatalake.app.GlobalConfig" />
+          <meta name="keywords" content="GlobalConfig Smart Data Lake 1.1.0 API io.smartdatalake.app.GlobalConfig" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -47,7 +47,7 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <span class="name">GlobalConfig</span><span class="params">(<span name="kryoClasses">kryoClasses: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="sparkOptions">sparkOptions: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="enableHive">enableHive: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">true</span></span>, <span name="memoryLogTimer">memoryLogTimer: <span class="extype" name="scala.Option">Option</span>[<a href="MemoryLogTimerConfig.html" class="extype" name="io.smartdatalake.app.MemoryLogTimerConfig">MemoryLogTimerConfig</a>] = <span class="symbol">None</span></span>, <span name="shutdownHookLogger">shutdownHookLogger: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <span class="name">GlobalConfig</span><span class="params">(<span name="kryoClasses">kryoClasses: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="sparkOptions">sparkOptions: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="enableHive">enableHive: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">true</span></span>, <span name="memoryLogTimer">memoryLogTimer: <span class="extype" name="scala.Option">Option</span>[<a href="MemoryLogTimerConfig.html" class="extype" name="io.smartdatalake.app.MemoryLogTimerConfig">MemoryLogTimerConfig</a>] = <span class="symbol">None</span></span>, <span name="shutdownHookLogger">shutdownHookLogger: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="stateListeners">stateListeners: <span class="extype" name="scala.Seq">Seq</span>[<a href="StateListenerConfig.html" class="extype" name="io.smartdatalake.app.StateListenerConfig">StateListenerConfig</a>] = <span class="symbol">Seq()</span></span>)</span><span class="result"> extends <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4>
       
@@ -92,7 +92,7 @@
         <div id="constructors" class="members">
               <h3>Instance Constructors</h3>
               <ol><li name="io.smartdatalake.app.GlobalConfig#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="&lt;init&gt;(kryoClasses:Option[Seq[String]],sparkOptions:Option[Map[String,String]],enableHive:Boolean,memoryLogTimer:Option[io.smartdatalake.app.MemoryLogTimerConfig],shutdownHookLogger:Boolean):io.smartdatalake.app.GlobalConfig"></a>
+      <a id="&lt;init&gt;(kryoClasses:Option[Seq[String]],sparkOptions:Option[Map[String,String]],enableHive:Boolean,memoryLogTimer:Option[io.smartdatalake.app.MemoryLogTimerConfig],shutdownHookLogger:Boolean,stateListeners:Seq[io.smartdatalake.app.StateListenerConfig]):io.smartdatalake.app.GlobalConfig"></a>
       <a id="&lt;init&gt;:GlobalConfig"></a>
       <h4 class="signature">
       <span class="modifier_kind">
@@ -100,10 +100,10 @@
         <span class="kind">new</span>
       </span>
       <span class="symbol">
-        <span class="name">GlobalConfig</span><span class="params">(<span name="kryoClasses">kryoClasses: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="sparkOptions">sparkOptions: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="enableHive">enableHive: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">true</span></span>, <span name="memoryLogTimer">memoryLogTimer: <span class="extype" name="scala.Option">Option</span>[<a href="MemoryLogTimerConfig.html" class="extype" name="io.smartdatalake.app.MemoryLogTimerConfig">MemoryLogTimerConfig</a>] = <span class="symbol">None</span></span>, <span name="shutdownHookLogger">shutdownHookLogger: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>)</span>
+        <span class="name">GlobalConfig</span><span class="params">(<span name="kryoClasses">kryoClasses: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="sparkOptions">sparkOptions: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]] = <span class="symbol">None</span></span>, <span name="enableHive">enableHive: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">true</span></span>, <span name="memoryLogTimer">memoryLogTimer: <span class="extype" name="scala.Option">Option</span>[<a href="MemoryLogTimerConfig.html" class="extype" name="io.smartdatalake.app.MemoryLogTimerConfig">MemoryLogTimerConfig</a>] = <span class="symbol">None</span></span>, <span name="shutdownHookLogger">shutdownHookLogger: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="stateListeners">stateListeners: <span class="extype" name="scala.Seq">Seq</span>[<a href="StateListenerConfig.html" class="extype" name="io.smartdatalake.app.StateListenerConfig">StateListenerConfig</a>] = <span class="symbol">Seq()</span></span>)</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.app.GlobalConfig@&lt;init&gt;(kryoClasses:Option[Seq[String]],sparkOptions:Option[Map[String,String]],enableHive:Boolean,memoryLogTimer:Option[io.smartdatalake.app.MemoryLogTimerConfig],shutdownHookLogger:Boolean):io.smartdatalake.app.GlobalConfig" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.app.GlobalConfig@&lt;init&gt;(kryoClasses:Option[Seq[String]],sparkOptions:Option[Map[String,String]],enableHive:Boolean,memoryLogTimer:Option[io.smartdatalake.app.MemoryLogTimerConfig],shutdownHookLogger:Boolean,stateListeners:Seq[io.smartdatalake.app.StateListenerConfig]):io.smartdatalake.app.GlobalConfig" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -453,6 +453,23 @@
       </a>
     </span>
       <p class="shortcomment cmt">spark options</p>
+    </li><li name="io.smartdatalake.app.GlobalConfig#stateListeners" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="stateListeners:Seq[io.smartdatalake.app.StateListenerConfig]"></a>
+      <a id="stateListeners:Seq[StateListenerConfig]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">stateListeners</span><span class="result">: <span class="extype" name="scala.Seq">Seq</span>[<a href="StateListenerConfig.html" class="extype" name="io.smartdatalake.app.StateListenerConfig">StateListenerConfig</a>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.app.GlobalConfig@stateListeners:Seq[io.smartdatalake.app.StateListenerConfig]" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
     </li><li name="scala.AnyRef#synchronized" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="synchronized[T0](x$1:=&gt;T0):T0"></a>
       <a id="synchronized[T0](⇒T0):T0"></a>

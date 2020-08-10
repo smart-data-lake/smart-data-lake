@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>CustomDfTransformer - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.action.customlogic.CustomDfTransformer</title>
-          <meta name="description" content="CustomDfTransformer - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.action.customlogic.CustomDfTransformer" />
-          <meta name="keywords" content="CustomDfTransformer Smart Data Lake 1.0.6 API io.smartdatalake.workflow.action.customlogic.CustomDfTransformer" />
+          <title>CustomDfTransformer - Smart Data Lake 1.1.0 API - io.smartdatalake.workflow.action.customlogic.CustomDfTransformer</title>
+          <meta name="description" content="CustomDfTransformer - Smart Data Lake 1.1.0 API - io.smartdatalake.workflow.action.customlogic.CustomDfTransformer" />
+          <meta name="keywords" content="CustomDfTransformer Smart Data Lake 1.1.0 API io.smartdatalake.workflow.action.customlogic.CustomDfTransformer" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -49,7 +49,7 @@
       </span>
       </h4>
       
-          <div id="comment" class="fullcommenttop"><div class="comment cmt"><p>Interface to define custom logic for a DataFrame
+          <div id="comment" class="fullcommenttop"><div class="comment cmt"><p>Interface to define a custom Spark-DataFrame transformation (1:1)
 </p></div><div class="toggleContainer block">
           <span class="toggle">Linear Supertypes</span>
           <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
@@ -109,9 +109,9 @@
         <img src="../../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt">Functions provided by the creator, used to transform a DataFrame
-</p><div class="fullcomment"><div class="comment cmt"><p>Functions provided by the creator, used to transform a DataFrame
-</p></div><dl class="paramcmts block"><dt class="param">session</dt><dd class="cmt"><p>Spark Session</p></dd><dt class="param">options</dt><dd class="cmt"><p>additional options</p></dd><dt class="param">df</dt><dd class="cmt"><p>DataFrames to be transformed</p></dd><dt class="param">dataObjectId</dt><dd class="cmt"><p>Id of DataObject of SubFeed</p></dd><dt>returns</dt><dd class="cmt"><p>Transformed DataFrame</p></dd></dl></div>
+      <p class="shortcomment cmt">Function to be implemented to define the transformation between an input and output DataFrame (1:1)
+</p><div class="fullcomment"><div class="comment cmt"><p>Function to be implemented to define the transformation between an input and output DataFrame (1:1)
+</p></div><dl class="paramcmts block"><dt class="param">session</dt><dd class="cmt"><p>Spark Session</p></dd><dt class="param">options</dt><dd class="cmt"><p>Options specified in the configuration for this transformation</p></dd><dt class="param">df</dt><dd class="cmt"><p>DataFrames to be transformed</p></dd><dt class="param">dataObjectId</dt><dd class="cmt"><p>Id of DataObject of SubFeed</p></dd><dt>returns</dt><dd class="cmt"><p>Transformed DataFrame</p></dd></dl></div>
     </li></ol>
             </div>
 

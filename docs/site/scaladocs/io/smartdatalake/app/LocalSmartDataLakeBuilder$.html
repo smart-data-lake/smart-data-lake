@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>LocalSmartDataLakeBuilder - Smart Data Lake 1.0.6 API - io.smartdatalake.app.LocalSmartDataLakeBuilder</title>
-          <meta name="description" content="LocalSmartDataLakeBuilder - Smart Data Lake 1.0.6 API - io.smartdatalake.app.LocalSmartDataLakeBuilder" />
-          <meta name="keywords" content="LocalSmartDataLakeBuilder Smart Data Lake 1.0.6 API io.smartdatalake.app.LocalSmartDataLakeBuilder" />
+          <title>LocalSmartDataLakeBuilder - Smart Data Lake 1.1.0 API - io.smartdatalake.app.LocalSmartDataLakeBuilder</title>
+          <meta name="description" content="LocalSmartDataLakeBuilder - Smart Data Lake 1.1.0 API - io.smartdatalake.app.LocalSmartDataLakeBuilder" />
+          <meta name="keywords" content="LocalSmartDataLakeBuilder Smart Data Lake 1.1.0 API io.smartdatalake.app.LocalSmartDataLakeBuilder" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -334,7 +334,7 @@
       <a id="instanceRegistry:InstanceRegistry"></a>
       <h4 class="signature">
       <span class="modifier_kind">
-        <span class="modifier">implicit </span>
+        <span class="modifier"></span>
         <span class="kind">val</span>
       </span>
       <span class="symbol">
@@ -489,23 +489,43 @@
 Subclasses SmartDataLakeBuilder can define additional options to be extracted.
 </p></div><dl class="attributes block"> <dt>Attributes</dt><dd>protected </dd><dt>Definition Classes</dt><dd><a href="SmartDataLakeBuilder.html" class="extype" name="io.smartdatalake.app.SmartDataLakeBuilder">SmartDataLakeBuilder</a></dd></dl></div>
     </li><li name="io.smartdatalake.app.SmartDataLakeBuilder#run" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="run(appConfig:io.smartdatalake.app.SmartDataLakeBuilderConfig):String"></a>
-      <a id="run(SmartDataLakeBuilderConfig):String"></a>
+      <a id="run(appConfig:io.smartdatalake.app.SmartDataLakeBuilderConfig):Map[io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState,Int]"></a>
+      <a id="run(SmartDataLakeBuilderConfig):Map[RuntimeEventState,Int]"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">run</span><span class="params">(<span name="appConfig">appConfig: <a href="SmartDataLakeBuilderConfig.html" class="extype" name="io.smartdatalake.app.SmartDataLakeBuilderConfig">SmartDataLakeBuilderConfig</a></span>)</span><span class="result">: <span class="extype" name="scala.Predef.String">String</span></span>
+        <span class="name">run</span><span class="params">(<span name="appConfig">appConfig: <a href="SmartDataLakeBuilderConfig.html" class="extype" name="io.smartdatalake.app.SmartDataLakeBuilderConfig">SmartDataLakeBuilderConfig</a></span>)</span><span class="result">: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState">RuntimeEventState</span>, <span class="extype" name="scala.Int">Int</span>]</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.app.LocalSmartDataLakeBuilder$@run(appConfig:io.smartdatalake.app.SmartDataLakeBuilderConfig):String" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.app.LocalSmartDataLakeBuilder$@run(appConfig:io.smartdatalake.app.SmartDataLakeBuilderConfig):Map[io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState,Int]" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
       <p class="shortcomment cmt">Run the application with the provided configuration.</p><div class="fullcomment"><div class="comment cmt"><p>Run the application with the provided configuration.
 </p></div><dl class="paramcmts block"><dt class="param">appConfig</dt><dd class="cmt"><p>Application configuration (parsed from command line).</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="SmartDataLakeBuilder.html" class="extype" name="io.smartdatalake.app.SmartDataLakeBuilder">SmartDataLakeBuilder</a></dd></dl></div>
+    </li><li name="io.smartdatalake.app.SmartDataLakeBuilder#startSimulation" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="startSimulation(appConfig:io.smartdatalake.app.SmartDataLakeBuilderConfig,initialSubFeeds:Seq[io.smartdatalake.workflow.SparkSubFeed])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry,implicitsession:org.apache.spark.sql.SparkSession):(Seq[io.smartdatalake.workflow.SparkSubFeed],Map[io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState,Int])"></a>
+      <a id="startSimulation(SmartDataLakeBuilderConfig,Seq[SparkSubFeed])(InstanceRegistry,SparkSession):(Seq[SparkSubFeed],Map[RuntimeEventState,Int])"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">startSimulation</span><span class="params">(<span name="appConfig">appConfig: <a href="SmartDataLakeBuilderConfig.html" class="extype" name="io.smartdatalake.app.SmartDataLakeBuilderConfig">SmartDataLakeBuilderConfig</a></span>, <span name="initialSubFeeds">initialSubFeeds: <span class="extype" name="scala.Seq">Seq</span>[<a href="../workflow/SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a>]</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="instanceRegistry">instanceRegistry: <span class="extype" name="io.smartdatalake.config.InstanceRegistry">InstanceRegistry</span></span>, <span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: (<span class="extype" name="scala.Seq">Seq</span>[<a href="../workflow/SparkSubFeed.html" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a>], <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState">RuntimeEventState</span>, <span class="extype" name="scala.Int">Int</span>])</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.app.LocalSmartDataLakeBuilder$@startSimulation(appConfig:io.smartdatalake.app.SmartDataLakeBuilderConfig,initialSubFeeds:Seq[io.smartdatalake.workflow.SparkSubFeed])(implicitinstanceRegistry:io.smartdatalake.config.InstanceRegistry,implicitsession:org.apache.spark.sql.SparkSession):(Seq[io.smartdatalake.workflow.SparkSubFeed],Map[io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState,Int])" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Start a simulation run.</p><div class="fullcomment"><div class="comment cmt"><p>Start a simulation run.
+This executes the DAG and returns all subfeeds including the transformed DataFrames.
+Only prepare and init are executed.
+All initial subfeeds must be provided as input.</p><p>Note: this only works with SparkActions for now</p></div><dl class="paramcmts block"><dt class="param">appConfig</dt><dd class="cmt"><p>application configuration</p></dd><dt class="param">initialSubFeeds</dt><dd class="cmt"><p>initial subfeeds for DataObjects at the beginning of the DAG</p></dd><dt>returns</dt><dd class="cmt"><p>tuple of list of final subfeeds and statistics (action count per RuntimeEventState)</p></dd></dl><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="SmartDataLakeBuilder.html" class="extype" name="io.smartdatalake.app.SmartDataLakeBuilder">SmartDataLakeBuilder</a></dd></dl></div>
     </li><li name="scala.AnyRef#synchronized" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="synchronized[T0](x$1:=&gt;T0):T0"></a>
       <a id="synchronized[T0](⇒T0):T0"></a>

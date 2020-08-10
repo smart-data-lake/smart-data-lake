@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>CustomFileTransformer - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.action.customlogic.CustomFileTransformer</title>
-          <meta name="description" content="CustomFileTransformer - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.action.customlogic.CustomFileTransformer" />
-          <meta name="keywords" content="CustomFileTransformer Smart Data Lake 1.0.6 API io.smartdatalake.workflow.action.customlogic.CustomFileTransformer" />
+          <title>CustomFileTransformer - Smart Data Lake 1.1.0 API - io.smartdatalake.workflow.action.customlogic.CustomFileTransformer</title>
+          <meta name="description" content="CustomFileTransformer - Smart Data Lake 1.1.0 API - io.smartdatalake.workflow.action.customlogic.CustomFileTransformer" />
+          <meta name="keywords" content="CustomFileTransformer Smart Data Lake 1.1.0 API io.smartdatalake.workflow.action.customlogic.CustomFileTransformer" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -97,23 +97,24 @@
         <div id="values" class="values members">
               <h3>Abstract Value Members</h3>
               <ol><li name="io.smartdatalake.workflow.action.customlogic.CustomFileTransformer#transform" visbl="pub" data-isabs="true" fullComment="yes" group="Ungrouped">
-      <a id="transform(input:org.apache.hadoop.fs.FSDataInputStream,output:org.apache.hadoop.fs.FSDataOutputStream):Option[Exception]"></a>
-      <a id="transform(FSDataInputStream,FSDataOutputStream):Option[Exception]"></a>
+      <a id="transform(options:Map[String,String],input:org.apache.hadoop.fs.FSDataInputStream,output:org.apache.hadoop.fs.FSDataOutputStream):Option[Exception]"></a>
+      <a id="transform(Map[String,String],FSDataInputStream,FSDataOutputStream):Option[Exception]"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier">abstract </span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">transform</span><span class="params">(<span name="input">input: <span class="extype" name="org.apache.hadoop.fs.FSDataInputStream">FSDataInputStream</span></span>, <span name="output">output: <span class="extype" name="org.apache.hadoop.fs.FSDataOutputStream">FSDataOutputStream</span></span>)</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Exception">Exception</span>]</span>
+        <span class="name">transform</span><span class="params">(<span name="options">options: <span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]</span>, <span name="input">input: <span class="extype" name="org.apache.hadoop.fs.FSDataInputStream">FSDataInputStream</span></span>, <span name="output">output: <span class="extype" name="org.apache.hadoop.fs.FSDataOutputStream">FSDataOutputStream</span></span>)</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Exception">Exception</span>]</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../../../index.html#io.smartdatalake.workflow.action.customlogic.CustomFileTransformer@transform(input:org.apache.hadoop.fs.FSDataInputStream,output:org.apache.hadoop.fs.FSDataOutputStream):Option[Exception]" title="Permalink" target="_top">
+      <a href="../../../../../index.html#io.smartdatalake.workflow.action.customlogic.CustomFileTransformer@transform(options:Map[String,String],input:org.apache.hadoop.fs.FSDataInputStream,output:org.apache.hadoop.fs.FSDataOutputStream):Option[Exception]" title="Permalink" target="_top">
         <img src="../../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt">This method has to be implemented by the custom transformer to define the transformation.</p><div class="fullcomment"><div class="comment cmt"><p>This method has to be implemented by the custom transformer to define the transformation.
-</p></div><dl class="paramcmts block"><dt class="param">input</dt><dd class="cmt"><p>Hadoop Input Stream of the file to be read</p></dd><dt class="param">output</dt><dd class="cmt"><p>Hadoop Output Stream of the file to be written</p></dd><dt>returns</dt><dd class="cmt"><p>exception if something goes wrong and processing should not be stopped for all files</p></dd></dl></div>
+      <p class="shortcomment cmt">Function to be implemented to define the transformation between an input and output stream
+</p><div class="fullcomment"><div class="comment cmt"><p>Function to be implemented to define the transformation between an input and output stream
+</p></div><dl class="paramcmts block"><dt class="param">options</dt><dd class="cmt"><p>Options specified in the configuration for this transformation</p></dd><dt class="param">input</dt><dd class="cmt"><p>Hadoop Input Stream of the file to be read</p></dd><dt class="param">output</dt><dd class="cmt"><p>Hadoop Output Stream of the file to be written</p></dd><dt>returns</dt><dd class="cmt"><p>exception if something goes wrong and processing should not be stopped for all files</p></dd></dl></div>
     </li></ol>
             </div>
 

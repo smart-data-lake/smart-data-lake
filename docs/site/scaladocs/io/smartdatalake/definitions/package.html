@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>definitions - Smart Data Lake 1.0.6 API - io.smartdatalake.definitions</title>
-          <meta name="description" content="definitions - Smart Data Lake 1.0.6 API - io.smartdatalake.definitions" />
-          <meta name="keywords" content="definitions Smart Data Lake 1.0.6 API io.smartdatalake.definitions" />
+          <title>definitions - Smart Data Lake 1.1.0 API - io.smartdatalake.definitions</title>
+          <meta name="description" content="definitions - Smart Data Lake 1.1.0 API - io.smartdatalake.definitions" />
+          <meta name="keywords" content="definitions Smart Data Lake 1.1.0 API io.smartdatalake.definitions" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -66,7 +66,7 @@
 
         <div id="types" class="types members">
               <h3>Type Members</h3>
-              <ol><li name="io.smartdatalake.definitions.AuthMode" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
+              <ol><li name="io.smartdatalake.definitions.AuthMode" visbl="pub" data-isabs="true" fullComment="yes" group="Ungrouped">
       <a id="AuthModeextendsAnyRef"></a>
       <a id="AuthMode:AuthMode"></a>
       <h4 class="signature">
@@ -83,7 +83,12 @@
       </a>
     </span>
       <p class="shortcomment cmt">Authentication modes define how an application authenticates itself
-to a given data object/connection</p>
+to a given data object/connection</p><div class="fullcomment"><div class="comment cmt"><p>Authentication modes define how an application authenticates itself
+to a given data object/connection</p><p>You need to define one of the AuthModes (subclasses) as type, i.e.</p><pre>authMode {
+  <span class="kw">type</span> = BasicAuthMode
+  user = myUser
+  password = myPassword
+}</pre></div></div>
     </li><li name="io.smartdatalake.definitions.BasicAuthMode" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="BasicAuthModeextendsAuthModewithProductwithSerializable"></a>
       <a id="BasicAuthMode:BasicAuthMode"></a>
@@ -102,8 +107,25 @@ to a given data object/connection</p>
     </span>
       <p class="shortcomment cmt">Derive options for various connection types to connect by basic authentication
 </p>
-    </li><li name="io.smartdatalake.definitions.ExecutionMode" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
-      <a id="ExecutionModeextendsAnyRef"></a>
+    </li><li name="io.smartdatalake.definitions.DefaultExecutionModeExpressionData" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="DefaultExecutionModeExpressionDataextendsProductwithSerializable"></a>
+      <a id="DefaultExecutionModeExpressionData:DefaultExecutionModeExpressionData"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="DefaultExecutionModeExpressionData.html"><span class="name">DefaultExecutionModeExpressionData</span></a><span class="params">(<span name="feed">feed: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="application">application: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="runId">runId: <span class="extype" name="scala.Int">Int</span></span>, <span name="attemptId">attemptId: <span class="extype" name="scala.Int">Int</span></span>, <span name="referenceTimestamp">referenceTimestamp: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="java.sql.Timestamp">Timestamp</span>]</span>, <span name="runStartTime">runStartTime: <span class="extype" name="java.sql.Timestamp">Timestamp</span></span>, <span name="attemptStartTime">attemptStartTime: <span class="extype" name="java.sql.Timestamp">Timestamp</span></span>, <span name="givenPartitionValues">givenPartitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]]</span>, <span name="isStartNode">isStartNode: <span class="extype" name="scala.Boolean">Boolean</span></span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.package@DefaultExecutionModeExpressionDataextendsProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Attributes definition for spark expressions used as ExecutionMode conditions.</p><div class="fullcomment"><div class="comment cmt"><p>Attributes definition for spark expressions used as ExecutionMode conditions.</p></div><dl class="paramcmts block"><dt class="param">givenPartitionValues</dt><dd class="cmt"><p>Partition values specified with command line (start action) or passed from previous action</p></dd><dt class="param">isStartNode</dt><dd class="cmt"><p>True if the current action is a start node of the DAG.</p></dd></dl></div>
+    </li><li name="io.smartdatalake.definitions.ExecutionMode" visbl="pub" data-isabs="true" fullComment="yes" group="Ungrouped">
+      <a id="ExecutionModeextendsSmartDataLakeLogger"></a>
       <a id="ExecutionMode:ExecutionMode"></a>
       <h4 class="signature">
       <span class="modifier_kind">
@@ -111,31 +133,37 @@ to a given data object/connection</p>
         <span class="kind">trait</span>
       </span>
       <span class="symbol">
-        <a href="ExecutionMode.html"><span class="name">ExecutionMode</span></a><span class="result"> extends <span class="extype" name="scala.AnyRef">AnyRef</span></span>
+        <a href="ExecutionMode.html"><span class="name">ExecutionMode</span></a><span class="result"> extends <span class="extype" name="io.smartdatalake.util.misc.SmartDataLakeLogger">SmartDataLakeLogger</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.definitions.package@ExecutionModeextendsAnyRef" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.definitions.package@ExecutionModeextendsSmartDataLakeLogger" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt">Execution mode's defines how data is selected when running a data pipeline.</p>
-    </li><li name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
-      <a id="ExecutionModeWithMainInputOutputextendsAnyRef"></a>
-      <a id="ExecutionModeWithMainInputOutput:ExecutionModeWithMainInputOutput"></a>
+      <p class="shortcomment cmt">Execution mode defines how data is selected when running a data pipeline.</p><div class="fullcomment"><div class="comment cmt"><p>Execution mode defines how data is selected when running a data pipeline.
+You need to select one of the subclasses by defining type, i.e.</p><pre>executionMode = {
+  <span class="kw">type</span> = SparkIncrementalMode
+  compareCol = <span class="lit">"id"</span>
+}</pre></div></div>
+    </li><li name="io.smartdatalake.definitions.FailIfNoPartitionValuesMode" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="FailIfNoPartitionValuesModeextendsExecutionModewithProductwithSerializable"></a>
+      <a id="FailIfNoPartitionValuesMode:FailIfNoPartitionValuesMode"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
-        <span class="kind">trait</span>
+        <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <a href="ExecutionModeWithMainInputOutput.html"><span class="name">ExecutionModeWithMainInputOutput</span></a><span class="result"> extends <span class="extype" name="scala.AnyRef">AnyRef</span></span>
+        <a href="FailIfNoPartitionValuesMode.html"><span class="name">FailIfNoPartitionValuesMode</span></a><span class="params">()</span><span class="result"> extends <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.definitions.package@ExecutionModeWithMainInputOutputextendsAnyRef" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.definitions.package@FailIfNoPartitionValuesModeextendsExecutionModewithProductwithSerializable" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
+      <p class="shortcomment cmt">An execution mode which just validates that partition values are given.</p><div class="fullcomment"><div class="comment cmt"><p>An execution mode which just validates that partition values are given.
+Note: For start nodes of the DAG partition values can be defined by command line, for subsequent nodes partition values are passed on from previous nodes.
+</p></div></div>
     </li><li name="io.smartdatalake.definitions.PartitionDiffMode" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="PartitionDiffModeextendsExecutionModewithExecutionModeWithMainInputOutputwithProductwithSerializable"></a>
       <a id="PartitionDiffMode:PartitionDiffMode"></a>
@@ -145,15 +173,38 @@ to a given data object/connection</p>
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <a href="PartitionDiffMode.html"><span class="name">PartitionDiffMode</span></a><span class="params">(<span name="partitionColNb">partitionColNb: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="mainInputId">mainInputId: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="mainOutputId">mainOutputId: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="nbOfPartitionValuesPerRun">nbOfPartitionValuesPerRun: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a> with <a href="ExecutionModeWithMainInputOutput.html" class="extype" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput">ExecutionModeWithMainInputOutput</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <a href="PartitionDiffMode.html"><span class="name">PartitionDiffMode</span></a><span class="params">(<span name="partitionColNb">partitionColNb: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="alternativeOutputId">alternativeOutputId: <span class="extype" name="scala.Option">Option</span>[<a href="../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a>] = <span class="symbol">None</span></span>, <span name="nbOfPartitionValuesPerRun">nbOfPartitionValuesPerRun: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Int">Int</span>] = <span class="symbol">None</span></span>, <span name="applyCondition">applyCondition: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>, <span name="failCondition">failCondition: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a> with <span class="extype" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput">ExecutionModeWithMainInputOutput</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4><span class="permalink">
       <a href="../../../index.html#io.smartdatalake.definitions.package@PartitionDiffModeextendsExecutionModewithExecutionModeWithMainInputOutputwithProductwithSerializable" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt">Partition difference execution mode lists partitions on input &amp; output DataObject and starts loading all missing partitions.</p><div class="fullcomment"><div class="comment cmt"><p>Partition difference execution mode lists partitions on input &amp; output DataObject and starts loading all missing partitions.
-Partition columns to be used for comparision need to be a common 'init' of input and output partition columns.</p></div><dl class="paramcmts block"><dt class="param">partitionColNb</dt><dd class="cmt"><p>optional number of partition columns to use as a common 'init'.</p></dd><dt class="param">mainInputId</dt><dd class="cmt"><p>optional selection of inputId to be used for partition comparision. Only needed if there are multiple input DataObject's.</p></dd><dt class="param">mainOutputId</dt><dd class="cmt"><p>optional selection of outputId to be used for partition comparision. Only needed if there are multiple output DataObject's.</p></dd><dt class="param">nbOfPartitionValuesPerRun</dt><dd class="cmt"><p>optional restriction of the number of partition values per run.</p></dd></dl></div>
+      <p class="shortcomment cmt">Partition difference execution mode lists partitions on mainInput &amp; mainOutput DataObject and starts loading all missing partitions.</p><div class="fullcomment"><div class="comment cmt"><p>Partition difference execution mode lists partitions on mainInput &amp; mainOutput DataObject and starts loading all missing partitions.
+Partition columns to be used for comparision need to be a common 'init' of input and output partition columns.
+This mode needs mainInput/Output DataObjects which CanHandlePartitions to list partitions.
+Partition values are passed to following actions, if for partition columns which they have in common.
+</p></div><dl class="paramcmts block"><dt class="param">partitionColNb</dt><dd class="cmt"><p>optional number of partition columns to use as a common 'init'.</p></dd><dt class="param">alternativeOutputId</dt><dd class="cmt"><p>optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
+                                 It can be used to ensure processing all partitions over multiple actions in case of errors.</p></dd><dt class="param">nbOfPartitionValuesPerRun</dt><dd class="cmt"><p>optional restriction of the number of partition values per run.</p></dd><dt class="param">applyCondition</dt><dd class="cmt"><p>Condition to decide if execution mode should be applied or not. Define a spark sql expression working with attributes of <a href="DefaultExecutionModeExpressionData.html" class="extype" name="io.smartdatalake.definitions.DefaultExecutionModeExpressionData">DefaultExecutionModeExpressionData</a> returning a boolean.
+                                 Default is to apply the execution mode if given partition values (partition values from command line or passed from previous action) are not empty.</p></dd><dt class="param">failCondition</dt><dd class="cmt"><p>Condition to fail application of execution mode if true. Define a spark sql expression working with attributes of <a href="PartitionDiffModeExpressionData.html" class="extype" name="io.smartdatalake.definitions.PartitionDiffModeExpressionData">PartitionDiffModeExpressionData</a> returning a boolean.
+                                 Default is that the application of the PartitionDiffMode does not fail the action. If there is no data to process, the following actions are skipped.</p></dd></dl></div>
+    </li><li name="io.smartdatalake.definitions.PartitionDiffModeExpressionData" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="PartitionDiffModeExpressionDataextendsProductwithSerializable"></a>
+      <a id="PartitionDiffModeExpressionData:PartitionDiffModeExpressionData"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="PartitionDiffModeExpressionData.html"><span class="name">PartitionDiffModeExpressionData</span></a><span class="params">(<span name="feed">feed: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="application">application: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="runId">runId: <span class="extype" name="scala.Int">Int</span></span>, <span name="attemptId">attemptId: <span class="extype" name="scala.Int">Int</span></span>, <span name="referenceTimestamp">referenceTimestamp: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="java.sql.Timestamp">Timestamp</span>]</span>, <span name="runStartTime">runStartTime: <span class="extype" name="java.sql.Timestamp">Timestamp</span></span>, <span name="attemptStartTime">attemptStartTime: <span class="extype" name="java.sql.Timestamp">Timestamp</span></span>, <span name="inputPartitionValues">inputPartitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]]</span>, <span name="outputPartitionValues">outputPartitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]]</span>, <span name="selectedPartitionValues">selectedPartitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="scala.Predef.Map">Map</span>[<span class="extype" name="scala.Predef.String">String</span>, <span class="extype" name="scala.Predef.String">String</span>]]</span>)</span><span class="result"> extends <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.package@PartitionDiffModeExpressionDataextendsProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
     </li><li name="io.smartdatalake.definitions.PublicKeyAuthMode" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="PublicKeyAuthModeextendsAuthModewithProductwithSerializable"></a>
       <a id="PublicKeyAuthMode:PublicKeyAuthMode"></a>
@@ -192,6 +243,25 @@ Private key is read from .ssh
       <p class="shortcomment cmt">Validate by SSL Certificates : Only location an credentials.</p><div class="fullcomment"><div class="comment cmt"><p>Validate by SSL Certificates : Only location an credentials. Additional attributes should be
 supplied via options map
 </p></div></div>
+    </li><li name="io.smartdatalake.definitions.SparkIncrementalMode" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="SparkIncrementalModeextendsExecutionModewithExecutionModeWithMainInputOutputwithProductwithSerializable"></a>
+      <a id="SparkIncrementalMode:SparkIncrementalMode"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="SparkIncrementalMode.html"><span class="name">SparkIncrementalMode</span></a><span class="params">(<span name="compareCol">compareCol: <span class="extype" name="scala.Predef.String">String</span></span>, <span name="alternativeOutputId">alternativeOutputId: <span class="extype" name="scala.Option">Option</span>[<a href="../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <a href="ExecutionMode.html" class="extype" name="io.smartdatalake.definitions.ExecutionMode">ExecutionMode</a> with <span class="extype" name="io.smartdatalake.definitions.ExecutionModeWithMainInputOutput">ExecutionModeWithMainInputOutput</span> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.package@SparkIncrementalModeextendsExecutionModewithExecutionModeWithMainInputOutputwithProductwithSerializable" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Compares max entry in &quot;compare column&quot; between mainOutput and mainInput and incrementally loads the delta.</p><div class="fullcomment"><div class="comment cmt"><p>Compares max entry in &quot;compare column&quot; between mainOutput and mainInput and incrementally loads the delta.
+This mode works only with SparkSubFeeds. The filter is not propagated to following actions.</p></div><dl class="paramcmts block"><dt class="param">compareCol</dt><dd class="cmt"><p>a comparable column name existing in mainInput and mainOutput used to identify the delta. Column content should be bigger for newer records.</p></dd><dt class="param">alternativeOutputId</dt><dd class="cmt"><p>optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
+                           It can be used to ensure processing all partitions over multiple actions in case of errors.</p></dd></dl></div>
     </li><li name="io.smartdatalake.definitions.SparkStreamingOnceMode" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="SparkStreamingOnceModeextendsExecutionModewithProductwithSerializable"></a>
       <a id="SparkStreamingOnceMode:SparkStreamingOnceMode"></a>
@@ -208,7 +278,8 @@ supplied via options map
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt">Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads (trigger=Trigger.Once) and keep track of processed data.</p><div class="fullcomment"><div class="comment cmt"><p>Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads (trigger=Trigger.Once) and keep track of processed data.</p></div><dl class="paramcmts block"><dt class="param">checkpointLocation</dt><dd class="cmt"><p>location for checkpoints of streaming query to keep state</p></dd><dt class="param">inputOptions</dt><dd class="cmt"><p>additional option to apply when reading streaming source. This overwrites options set by the DataObjects.</p></dd><dt class="param">outputOptions</dt><dd class="cmt"><p>additional option to apply when writing to streaming sink. This overwrites options set by the DataObjects.</p></dd></dl></div>
+      <p class="shortcomment cmt">Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads (trigger=Trigger.Once) and keep track of processed data.</p><div class="fullcomment"><div class="comment cmt"><p>Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads (trigger=Trigger.Once) and keep track of processed data.
+This mode needs a DataObject implementing CanCreateStreamingDataFrame and works only with SparkSubFeeds.</p></div><dl class="paramcmts block"><dt class="param">checkpointLocation</dt><dd class="cmt"><p>location for checkpoints of streaming query to keep state</p></dd><dt class="param">inputOptions</dt><dd class="cmt"><p>additional option to apply when reading streaming source. This overwrites options set by the DataObjects.</p></dd><dt class="param">outputOptions</dt><dd class="cmt"><p>additional option to apply when writing to streaming sink. This overwrites options set by the DataObjects.</p></dd></dl></div>
     </li><li name="io.smartdatalake.definitions.TokenAuthMode" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="TokenAuthModeextendsAuthModewithProductwithSerializable"></a>
       <a id="TokenAuthMode:TokenAuthMode"></a>
@@ -328,6 +399,23 @@ They can be set
     </span>
       <p class="shortcomment cmt">Options for HDFS output
 </p>
+    </li><li name="io.smartdatalake.definitions.SparkIncrementalMode" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="SparkIncrementalMode"></a>
+      <a id="SparkIncrementalMode:SparkIncrementalMode"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="SparkIncrementalMode$.html"><span class="name">SparkIncrementalMode</span></a><span class="result"> extends <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.definitions.package@SparkIncrementalMode" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
     </li><li name="io.smartdatalake.definitions.TechnicalTableColumn" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
       <a id="TechnicalTableColumn"></a>
       <a id="TechnicalTableColumn:TechnicalTableColumn"></a>

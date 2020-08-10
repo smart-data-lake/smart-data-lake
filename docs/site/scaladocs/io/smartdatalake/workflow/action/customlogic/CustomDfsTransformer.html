@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>CustomDfsTransformer - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer</title>
-          <meta name="description" content="CustomDfsTransformer - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer" />
-          <meta name="keywords" content="CustomDfsTransformer Smart Data Lake 1.0.6 API io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer" />
+          <title>CustomDfsTransformer - Smart Data Lake 1.1.0 API - io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer</title>
+          <meta name="description" content="CustomDfsTransformer - Smart Data Lake 1.1.0 API - io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer" />
+          <meta name="keywords" content="CustomDfsTransformer Smart Data Lake 1.1.0 API io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -49,7 +49,8 @@
       </span>
       </h4>
       
-          <div id="comment" class="fullcommenttop"><div class="comment cmt"><p>Same trait as <a href="CustomDfTransformer.html" class="extype" name="io.smartdatalake.workflow.action.customlogic.CustomDfTransformer">CustomDfTransformer</a> but supported multiple input and outputs.
+          <div id="comment" class="fullcommenttop"><div class="comment cmt"><p>Interface to define a custom Spark-DataFrame transformation (n:m)
+Same trait as <a href="CustomDfTransformer.html" class="extype" name="io.smartdatalake.workflow.action.customlogic.CustomDfTransformer">CustomDfTransformer</a>, but multiple input and outputs supported.
 </p></div><div class="toggleContainer block">
           <span class="toggle">Linear Supertypes</span>
           <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
@@ -93,7 +94,7 @@
 
         <div id="values" class="values members">
               <h3>Abstract Value Members</h3>
-              <ol><li name="io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer#transform" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
+              <ol><li name="io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer#transform" visbl="pub" data-isabs="true" fullComment="yes" group="Ungrouped">
       <a id="transform(session:org.apache.spark.sql.SparkSession,options:Map[String,String],dfs:Map[String,org.apache.spark.sql.DataFrame]):Map[String,org.apache.spark.sql.DataFrame]"></a>
       <a id="transform(SparkSession,Map[String,String],Map[String,DataFrame]):Map[String,DataFrame]"></a>
       <h4 class="signature">
@@ -109,7 +110,9 @@
         <img src="../../../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
+      <p class="shortcomment cmt">Function be implemented to define the transformation between several input and output DataFrames (n:m)
+</p><div class="fullcomment"><div class="comment cmt"><p>Function be implemented to define the transformation between several input and output DataFrames (n:m)
+</p></div><dl class="paramcmts block"><dt class="param">session</dt><dd class="cmt"><p>Spark Session</p></dd><dt class="param">options</dt><dd class="cmt"><p>Options specified in the configuration for this transformation</p></dd><dt class="param">dfs</dt><dd class="cmt"><p>DataFrames to be transformed</p></dd><dt>returns</dt><dd class="cmt"><p>Transformed DataFrame</p></dd></dl></div>
     </li></ol>
             </div>
 

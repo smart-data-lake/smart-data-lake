@@ -1,9 +1,9 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>SparkSubFeed - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.SparkSubFeed</title>
-          <meta name="description" content="SparkSubFeed - Smart Data Lake 1.0.6 API - io.smartdatalake.workflow.SparkSubFeed" />
-          <meta name="keywords" content="SparkSubFeed Smart Data Lake 1.0.6 API io.smartdatalake.workflow.SparkSubFeed" />
+          <title>SparkSubFeed - Smart Data Lake 1.1.0 API - io.smartdatalake.workflow.SparkSubFeed</title>
+          <meta name="description" content="SparkSubFeed - Smart Data Lake 1.1.0 API - io.smartdatalake.workflow.SparkSubFeed" />
+          <meta name="keywords" content="SparkSubFeed Smart Data Lake 1.1.0 API io.smartdatalake.workflow.SparkSubFeed" />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
       <link href="../../../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
@@ -47,12 +47,12 @@
         <span class="kind">case class</span>
       </span>
       <span class="symbol">
-        <span class="name">SparkSubFeed</span><span class="params">(<span name="dataFrame">dataFrame: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span>]</span>, <span name="dataObjectId">dataObjectId: <a href="../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>, <span name="isDAGStart">isDAGStart: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="isDummy">isDummy: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>)</span><span class="result"> extends <a href="SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+        <span class="name">SparkSubFeed</span><span class="params">(<span name="dataFrame">dataFrame: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span>]</span>, <span name="dataObjectId">dataObjectId: <a href="../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>, <span name="isDAGStart">isDAGStart: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="isDummy">isDummy: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="filter">filter: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>)</span><span class="result"> extends <a href="SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a> with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
       </span>
       </h4>
       
           <div id="comment" class="fullcommenttop"><div class="comment cmt"><p>A SparkSubFeed is used to transport <span class="extype" name="DataFrame">DataFrame</span>'s between Actions.
-</p></div><dl class="paramcmts block"><dt class="param">dataFrame</dt><dd class="cmt"><p>Spark <span class="extype" name="DataFrame">DataFrame</span> to be processed. DataFrame should not be saved to state (@transient).</p></dd><dt class="param">dataObjectId</dt><dd class="cmt"><p>id of the DataObject this SubFeed corresponds to</p></dd><dt class="param">partitionValues</dt><dd class="cmt"><p>Values of Partitions transported by this SubFeed</p></dd></dl><div class="toggleContainer block">
+</p></div><dl class="paramcmts block"><dt class="param">dataFrame</dt><dd class="cmt"><p>Spark <span class="extype" name="DataFrame">DataFrame</span> to be processed. DataFrame should not be saved to state (@transient).</p></dd><dt class="param">dataObjectId</dt><dd class="cmt"><p>id of the DataObject this SubFeed corresponds to</p></dd><dt class="param">partitionValues</dt><dd class="cmt"><p>Values of Partitions transported by this SubFeed</p></dd><dt class="param">isDAGStart</dt><dd class="cmt"><p>true if this subfeed is a start node of the dag</p></dd><dt class="param">isDummy</dt><dd class="cmt"><p>true if this subfeed only contains a dummy DataFrame. Dummy DataFrames can be used for validating the lineage in init phase, but not for the exec phase.</p></dd><dt class="param">filter</dt><dd class="cmt"><p>a spark sql filter expression. This is used by SparkIncrementalMode.</p></dd></dl><div class="toggleContainer block">
           <span class="toggle">Linear Supertypes</span>
           <div class="superTypes hiddenContent"><span class="extype" name="scala.Serializable">Serializable</span>, <span class="extype" name="java.io.Serializable">Serializable</span>, <span class="extype" name="scala.Product">Product</span>, <span class="extype" name="scala.Equals">Equals</span>, <a href="SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a>, <span class="extype" name="io.smartdatalake.workflow.DAGResult">DAGResult</span>, <span class="extype" name="scala.AnyRef">AnyRef</span>, <span class="extype" name="scala.Any">Any</span></div>
         </div></div>
@@ -92,7 +92,7 @@
         <div id="constructors" class="members">
               <h3>Instance Constructors</h3>
               <ol><li name="io.smartdatalake.workflow.SparkSubFeed#&lt;init&gt;" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="&lt;init&gt;(dataFrame:Option[org.apache.spark.sql.DataFrame],dataObjectId:io.smartdatalake.config.SdlConfigObject.DataObjectId,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues],isDAGStart:Boolean,isDummy:Boolean):io.smartdatalake.workflow.SparkSubFeed"></a>
+      <a id="&lt;init&gt;(dataFrame:Option[org.apache.spark.sql.DataFrame],dataObjectId:io.smartdatalake.config.SdlConfigObject.DataObjectId,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues],isDAGStart:Boolean,isDummy:Boolean,filter:Option[String]):io.smartdatalake.workflow.SparkSubFeed"></a>
       <a id="&lt;init&gt;:SparkSubFeed"></a>
       <h4 class="signature">
       <span class="modifier_kind">
@@ -100,14 +100,14 @@
         <span class="kind">new</span>
       </span>
       <span class="symbol">
-        <span class="name">SparkSubFeed</span><span class="params">(<span name="dataFrame">dataFrame: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span>]</span>, <span name="dataObjectId">dataObjectId: <a href="../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>, <span name="isDAGStart">isDAGStart: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="isDummy">isDummy: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>)</span>
+        <span class="name">SparkSubFeed</span><span class="params">(<span name="dataFrame">dataFrame: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="org.apache.spark.sql.DataFrame">DataFrame</span>]</span>, <span name="dataObjectId">dataObjectId: <a href="../config/SdlConfigObject$$DataObjectId.html" class="extype" name="io.smartdatalake.config.SdlConfigObject.DataObjectId">DataObjectId</a></span>, <span name="partitionValues">partitionValues: <span class="extype" name="scala.Seq">Seq</span>[<span class="extype" name="io.smartdatalake.util.hdfs.PartitionValues">PartitionValues</span>]</span>, <span name="isDAGStart">isDAGStart: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="isDummy">isDummy: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>, <span name="filter">filter: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>] = <span class="symbol">None</span></span>)</span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.workflow.SparkSubFeed@&lt;init&gt;(dataFrame:Option[org.apache.spark.sql.DataFrame],dataObjectId:io.smartdatalake.config.SdlConfigObject.DataObjectId,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues],isDAGStart:Boolean,isDummy:Boolean):io.smartdatalake.workflow.SparkSubFeed" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.workflow.SparkSubFeed@&lt;init&gt;(dataFrame:Option[org.apache.spark.sql.DataFrame],dataObjectId:io.smartdatalake.config.SdlConfigObject.DataObjectId,partitionValues:Seq[io.smartdatalake.util.hdfs.PartitionValues],isDAGStart:Boolean,isDummy:Boolean,filter:Option[String]):io.smartdatalake.workflow.SparkSubFeed" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">dataFrame</dt><dd class="cmt"><p>Spark <span class="extype" name="DataFrame">DataFrame</span> to be processed. DataFrame should not be saved to state (@transient).</p></dd><dt class="param">dataObjectId</dt><dd class="cmt"><p>id of the DataObject this SubFeed corresponds to</p></dd><dt class="param">partitionValues</dt><dd class="cmt"><p>Values of Partitions transported by this SubFeed</p></dd></dl></div>
+      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">dataFrame</dt><dd class="cmt"><p>Spark <span class="extype" name="DataFrame">DataFrame</span> to be processed. DataFrame should not be saved to state (@transient).</p></dd><dt class="param">dataObjectId</dt><dd class="cmt"><p>id of the DataObject this SubFeed corresponds to</p></dd><dt class="param">partitionValues</dt><dd class="cmt"><p>Values of Partitions transported by this SubFeed</p></dd><dt class="param">isDAGStart</dt><dd class="cmt"><p>true if this subfeed is a start node of the dag</p></dd><dt class="param">isDummy</dt><dd class="cmt"><p>true if this subfeed only contains a dummy DataFrame. Dummy DataFrames can be used for validating the lineage in init phase, but not for the exec phase.</p></dd><dt class="param">filter</dt><dd class="cmt"><p>a spark sql filter expression. This is used by SparkIncrementalMode.</p></dd></dl></div>
     </li></ol>
             </div>
 
@@ -186,18 +186,18 @@
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Any</dd></dl></div>
     </li><li name="io.smartdatalake.workflow.SparkSubFeed#breakLineage" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
-      <a id="breakLineage(implicitsession:org.apache.spark.sql.SparkSession):io.smartdatalake.workflow.SparkSubFeed"></a>
-      <a id="breakLineage(SparkSession):SparkSubFeed"></a>
+      <a id="breakLineage(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):io.smartdatalake.workflow.SparkSubFeed"></a>
+      <a id="breakLineage(SparkSession,ActionPipelineContext):SparkSubFeed"></a>
       <h4 class="signature">
       <span class="modifier_kind">
         <span class="modifier"></span>
         <span class="kind">def</span>
       </span>
       <span class="symbol">
-        <span class="name">breakLineage</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>)</span><span class="result">: <a href="" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>
+        <span class="name">breakLineage</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <a href="" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>
       </span>
       </h4><span class="permalink">
-      <a href="../../../index.html#io.smartdatalake.workflow.SparkSubFeed@breakLineage(implicitsession:org.apache.spark.sql.SparkSession):io.smartdatalake.workflow.SparkSubFeed" title="Permalink" target="_top">
+      <a href="../../../index.html#io.smartdatalake.workflow.SparkSubFeed@breakLineage(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):io.smartdatalake.workflow.SparkSubFeed" title="Permalink" target="_top">
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
@@ -221,6 +221,23 @@ This is usable to break long DataFrame Lineages over multiple Actions and instea
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a> → <a href="SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a></dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.SparkSubFeed#clearFilter" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="clearFilter(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):io.smartdatalake.workflow.SparkSubFeed"></a>
+      <a id="clearFilter(SparkSession,ActionPipelineContext):SparkSubFeed"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">clearFilter</span><span class="params">(<span class="implicit">implicit </span><span name="session">session: <span class="extype" name="org.apache.spark.sql.SparkSession">SparkSession</span></span>, <span name="context">context: <span class="extype" name="io.smartdatalake.workflow.ActionPipelineContext">ActionPipelineContext</span></span>)</span><span class="result">: <a href="" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.workflow.SparkSubFeed@clearFilter(implicitsession:org.apache.spark.sql.SparkSession,implicitcontext:io.smartdatalake.workflow.ActionPipelineContext):io.smartdatalake.workflow.SparkSubFeed" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
     </li><li name="io.smartdatalake.workflow.SparkSubFeed#clearPartitionValues" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="clearPartitionValues():io.smartdatalake.workflow.SparkSubFeed"></a>
       <a id="clearPartitionValues():SparkSubFeed"></a>
@@ -312,6 +329,23 @@ This is usable to break long DataFrame Lineages over multiple Actions and instea
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.SparkSubFeed#filter" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="filter:Option[String]"></a>
+      <a id="filter:Option[String]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">filter</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="scala.Predef.String">String</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.workflow.SparkSubFeed@filter:Option[String]" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">a spark sql filter expression.</p><div class="fullcomment"><div class="comment cmt"><p>a spark sql filter expression. This is used by SparkIncrementalMode.</p></div></div>
     </li><li name="scala.AnyRef#finalize" visbl="prt" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="finalize():Unit"></a>
       <a id="finalize():Unit"></a>
@@ -352,6 +386,23 @@ This is usable to break long DataFrame Lineages over multiple Actions and instea
       </a>
     </span>
       <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.SparkSubFeed#getFilterCol" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="getFilterCol:Option[org.apache.spark.sql.Column]"></a>
+      <a id="getFilterCol:Option[Column]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">getFilterCol</span><span class="result">: <span class="extype" name="scala.Option">Option</span>[<span class="extype" name="org.apache.spark.sql.Column">Column</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../../../index.html#io.smartdatalake.workflow.SparkSubFeed@getFilterCol:Option[org.apache.spark.sql.Column]" title="Permalink" target="_top">
+        <img src="../../../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
     </li><li name="io.smartdatalake.workflow.SparkSubFeed#isDAGStart" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="isDAGStart:Boolean"></a>
       <a id="isDAGStart:Boolean"></a>
@@ -368,8 +419,8 @@ This is usable to break long DataFrame Lineages over multiple Actions and instea
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a> → <a href="SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a></dd></dl></div>
-    </li><li name="io.smartdatalake.workflow.SparkSubFeed#isDummy" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <p class="shortcomment cmt">true if this subfeed is a start node of the dag</p><div class="fullcomment"><div class="comment cmt"><p>true if this subfeed is a start node of the dag</p></div><dl class="attributes block"> <dt>Definition Classes</dt><dd><a href="" class="extype" name="io.smartdatalake.workflow.SparkSubFeed">SparkSubFeed</a> → <a href="SubFeed.html" class="extype" name="io.smartdatalake.workflow.SubFeed">SubFeed</a></dd></dl></div>
+    </li><li name="io.smartdatalake.workflow.SparkSubFeed#isDummy" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="isDummy:Boolean"></a>
       <a id="isDummy:Boolean"></a>
       <h4 class="signature">
@@ -385,7 +436,7 @@ This is usable to break long DataFrame Lineages over multiple Actions and instea
         <img src="../../../lib/permalink.png" alt="Permalink" />
       </a>
     </span>
-      
+      <p class="shortcomment cmt">true if this subfeed only contains a dummy DataFrame.</p><div class="fullcomment"><div class="comment cmt"><p>true if this subfeed only contains a dummy DataFrame. Dummy DataFrames can be used for validating the lineage in init phase, but not for the exec phase.</p></div></div>
     </li><li name="scala.Any#isInstanceOf" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
       <a id="isInstanceOf[T0]:Boolean"></a>
       <a id="isInstanceOf[T0]:Boolean"></a>
