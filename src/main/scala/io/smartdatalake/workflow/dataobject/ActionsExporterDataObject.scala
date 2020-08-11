@@ -25,6 +25,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ProductUtil._
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.functions.{split,explode}
 
 /**
  * Exports a util [[DataFrame]] that contains properties and metadata extracted from all [[io.smartdatalake.workflow.action.Action]]s
@@ -127,6 +128,10 @@ case class ActionsExporterDataObject(id: DataObjectId,
       "breakDataFrameLineage",
       "persist"
     )
+    .withColumn("inputId", split($"inputId",","))
+    .withColumn("inputId", explode($"inputId"))
+    .withColumn("outputId", split($"outputId", ","))
+    .withColumn("outputId", explode($"outputId"))
   }
 
   /**
