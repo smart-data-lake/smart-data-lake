@@ -27,7 +27,7 @@ import io.smartdatalake.workflow.DAGHelper._
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{Action, RuntimeEventState, RuntimeInfo}
-import io.smartdatalake.workflow.dataobject.TransactionalSparkTableDataObject
+import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject, TransactionalSparkTableDataObject}
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import org.apache.spark.sql.SparkSession
@@ -169,10 +169,14 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
 
   private def getInitialSubFeed(dataObjectId: DataObjectId)(implicit context: ActionPipelineContext) = {
     initialSubFeeds.find(_.dataObjectId==dataObjectId)
-      .getOrElse(
+      .getOrElse {
+        val partitions = context.instanceRegistry.get[DataObject](dataObjectId) match {
+          case dataObject: CanHandlePartitions => dataObject.partitions
+          case _ => Seq()
+        }
         if (context.simulation) throw new IllegalStateException(s"Initial subfeed for $dataObjectId missing for dry run.")
-        else InitSubFeed(dataObjectId, partitionValues)
-      )
+        else InitSubFeed(dataObjectId, partitionValues).updatePartitionValues(partitions)
+      }
   }
 
   /**
