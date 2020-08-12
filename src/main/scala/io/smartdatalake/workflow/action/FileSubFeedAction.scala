@@ -20,8 +20,8 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.util.misc.PerformanceUtils
-import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRefDataObject}
-import io.smartdatalake.workflow.{ActionMetrics, ActionPipelineContext, FileSubFeed, GenericMetrics, SubFeed}
+import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, CanHandlePartitions, DataObject, FileRefDataObject}
+import io.smartdatalake.workflow.{ActionMetrics, ActionPipelineContext, FileSubFeed, GenericMetrics, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.{SaveMode, SparkSession}
 
 abstract class FileSubFeedAction extends Action {
@@ -64,12 +64,7 @@ abstract class FileSubFeedAction extends Action {
     executionMode.foreach(_.prepare(id))
   }
 
-  /**
-   * Action.init implementation
-   */
-  override final def init(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
-    assert(subFeeds.size == 1, s"Only one subfeed allowed for FileSubFeedAction (Action $id, inputSubfeed's ${subFeeds.map(_.dataObjectId).mkString(",")}")
-    val subFeed = subFeeds.head
+  private def prepareSubFeed(subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
     // convert subfeeds to FileSubFeed type or initialize if not yet existing
     var preparedSubFeed = FileSubFeed.fromSubFeed(subFeed)
     // apply execution mode
@@ -82,11 +77,39 @@ abstract class FileSubFeedAction extends Action {
       case _ => preparedSubFeed
     }
     // break lineage if requested
-    preparedSubFeed = if (breakFileRefLineage) preparedSubFeed.breakLineage else preparedSubFeed
-    // transform
+    if (breakFileRefLineage) preparedSubFeed.breakLineage else preparedSubFeed
+  }
+
+  /**
+   * Updates the partition values of a SubFeed to the partition columns of an output, removing not existing columns from the partition values.
+   * Further the subFeed partition values are validated to have the output's partition columns included.
+   *
+   * @param output output DataObject
+   * @param subFeed transformed SubFeed
+   * @return SubFeed with updated partition values.
+   */
+  private def validateAndUpdateSubFeed(output: DataObject, subFeed: FileSubFeed )(implicit session: SparkSession): FileSubFeed = {
+    val updatedSubFeed = output match {
+      case partitionedDO: CanHandlePartitions =>
+        // validate output partition columns exist in subFeed partition values
+        assert(subFeed.checkPartitionValuesColsExisting(partitionedDO.partitions.toSet), s"($id) Not all partition columns exist in SubFeed partition values for ${subFeed.dataObjectId.id}: partitions=${partitionedDO.partitions} partitionValues=${subFeed.partitionValues}")
+        // remove superfluous partitionValues
+        subFeed.updatePartitionValues(partitionedDO.partitions)
+      case _ => subFeed.clearPartitionValues()
+    }
+    updatedSubFeed.clearDAGStart().copy(dataObjectId = output.id)
+  }
+
+  /**
+   * Action.init implementation
+   */
+  override final def init(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
+    assert(subFeeds.size == 1, s"Only one subfeed allowed for FileSubFeedAction (Action $id, inputSubfeed's ${subFeeds.map(_.dataObjectId).mkString(",")}")
+    val preparedSubFeed = prepareSubFeed(subFeeds.head)
+    // transform (file transformation is limited to initialization in init phase)
     val transformedSubFeed = initSubFeed(preparedSubFeed)
-    // update partition values to output's partition columns and update dataObjectId
-    Seq(transformedSubFeed.updatePartitionValues(output.partitions).copy(dataObjectId = output.id))
+    // update subFeed
+    Seq(validateAndUpdateSubFeed(output,transformedSubFeed))
   }
 
   /**
@@ -94,20 +117,7 @@ abstract class FileSubFeedAction extends Action {
    */
   override final def exec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == 1, s"Only one subfeed allowed for FileSubFeedActions (Action $id, inputSubfeed's ${subFeeds.map(_.dataObjectId).mkString(",")})")
-    val subFeed = subFeeds.head
-    // convert subfeeds to FileSubFeed type or initialize if not yet existing
-    var preparedSubFeed = FileSubFeed.fromSubFeed(subFeed)
-    // apply init execution mode if there are no partition values given in command line
-    preparedSubFeed = executionMode match {
-      case Some(mode) =>
-        mode.apply(id, input, output, preparedSubFeed) match {
-          case Some((partitionValues, _)) => preparedSubFeed.copy(partitionValues = partitionValues)
-          case None => preparedSubFeed
-        }
-      case _ => preparedSubFeed
-    }
-    // break lineage if requested
-    preparedSubFeed = if (breakFileRefLineage) preparedSubFeed.breakLineage else preparedSubFeed
+    val preparedSubFeed = prepareSubFeed(subFeeds.head)
     // delete existing files on overwrite
     if (output.saveMode == SaveMode.Overwrite) {
       if (output.partitions.nonEmpty)
@@ -124,8 +134,8 @@ abstract class FileSubFeedAction extends Action {
     logger.info(s"($id) finished writing files to ${output.id}: duration=$d files_written=$filesWritten")
     // send metric to action (for file subfeeds this has to be done manually while spark subfeeds get's the metrics via a spark events listener)
     onRuntimeMetrics(Some(output.id), GenericMetrics(s"$id-${output.id}", 1, Map("duration"->d, "files_written"->filesWritten)))
-    // update partition values to output's partition columns and update dataObjectId
-    Seq(transformedSubFeed.updatePartitionValues(output.partitions).copy(dataObjectId = output.id))
+    // update subFeed
+    Seq(validateAndUpdateSubFeed(output,transformedSubFeed))
   }
 
   override final def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
