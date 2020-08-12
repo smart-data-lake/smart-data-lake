@@ -140,6 +140,9 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
     val updatedPartitionValues = partitionValues.map( pvs => PartitionValues(pvs.elements.filterKeys(partitions.contains))).filter(_.nonEmpty)
     this.copy(partitionValues = updatedPartitionValues)
   }
+  def checkPartitionValuesColsExisting(partitions: Set[String]): Boolean = {
+    partitionValues.forall( pvs => partitions.diff(pvs.keys).isEmpty)
+  }
   override def clearDAGStart(): FileSubFeed = {
     this.copy(isDAGStart = false)
   }

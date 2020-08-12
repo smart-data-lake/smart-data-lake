@@ -125,7 +125,7 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
             val pattern = PartitionLayout.replaceTokens(partitionLayout, PartitionValues(Map()))
             // list directories and extract partition values
             SshUtil.sftpListFiles(path + separator + pattern)(sftp)
-              .map( f => PartitionLayout.extractPartitionValues(partitionLayout, "", f + separator))
+              .map( f => PartitionLayout.extractPartitionValues(partitionLayout, "", f.stripPrefix(path+separator) + separator))
         }
     }.getOrElse(Seq())
   }
