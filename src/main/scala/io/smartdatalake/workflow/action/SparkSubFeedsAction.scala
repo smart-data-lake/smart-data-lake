@@ -118,7 +118,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
       setSparkJobMetadata()
       val metricsLog = if (noData) ", no data found"
       else getFinalMetrics(output.id).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
-      logger.info(s"($id) finished writing DataFrame to ${output.id}: duration=$d" + metricsLog)
+      logger.info(s"($id) finished writing DataFrame to ${output.id}: jobDuration=$d" + metricsLog)
     }
     // return
     transformedSubFeeds.map( transformedSubFeed => updateSubFeedAfterWrite(transformedSubFeed))

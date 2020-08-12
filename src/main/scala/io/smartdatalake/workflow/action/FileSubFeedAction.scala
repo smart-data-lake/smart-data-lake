@@ -19,9 +19,10 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.definitions.ExecutionMode
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
-import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, CanHandlePartitions, DataObject, FileRefDataObject}
-import io.smartdatalake.workflow.{ActionMetrics, ActionPipelineContext, FileSubFeed, GenericMetrics, SparkSubFeed, SubFeed}
+import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow._
 import org.apache.spark.sql.{SaveMode, SparkSession}
 
 abstract class FileSubFeedAction extends Action {
@@ -76,13 +77,17 @@ abstract class FileSubFeedAction extends Action {
         }
       case _ => preparedSubFeed
     }
+    // validate partition values existing for input
+    if (subFeed.partitionValues.nonEmpty && (context.phase==ExecutionPhase.Exec || subFeed.isDAGStart)) {
+      val missingPartitionValues = PartitionValues.checkExpectedPartitionValues(input.listPartitions, subFeed.partitionValues)
+      assert(missingPartitionValues.isEmpty, s"($id) partitions $missingPartitionValues missing for ${input.id}")
+    }
     // break lineage if requested
     if (breakFileRefLineage) preparedSubFeed.breakLineage else preparedSubFeed
   }
 
   /**
    * Updates the partition values of a SubFeed to the partition columns of an output, removing not existing columns from the partition values.
-   * Further the subFeed partition values are validated to have the output's partition columns included.
    *
    * @param output output DataObject
    * @param subFeed transformed SubFeed
@@ -91,8 +96,6 @@ abstract class FileSubFeedAction extends Action {
   private def validateAndUpdateSubFeed(output: DataObject, subFeed: FileSubFeed )(implicit session: SparkSession): FileSubFeed = {
     val updatedSubFeed = output match {
       case partitionedDO: CanHandlePartitions =>
-        // validate output partition columns exist in subFeed partition values
-        assert(subFeed.checkPartitionValuesColsExisting(partitionedDO.partitions.toSet), s"($id) Not all partition columns exist in SubFeed partition values for ${subFeed.dataObjectId.id}: partitions=${partitionedDO.partitions} partitionValues=${subFeed.partitionValues}")
         // remove superfluous partitionValues
         subFeed.updatePartitionValues(partitionedDO.partitions)
       case _ => subFeed.clearPartitionValues()
