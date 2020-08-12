@@ -87,12 +87,11 @@ private[smartdatalake] abstract class SparkAction extends Action {
         if (phase==ExecutionPhase.Exec && (subFeed.dataFrame.isEmpty || subFeed.isDummy || subFeed.isStreaming.contains(true))) {
           // validate partition values existing for input
           input match {
-            case partitionedInput: DataObject with CanHandlePartitions if subFeed.partitionValues.nonEmpty =>
+            case partitionedInput: DataObject with CanHandlePartitions if subFeed.partitionValues.nonEmpty && (context.phase==ExecutionPhase.Exec || subFeed.isDAGStart) =>
               val missingPartitionValues = PartitionValues.checkExpectedPartitionValues(partitionedInput.listPartitions, subFeed.partitionValues)
               assert(missingPartitionValues.isEmpty, s"($id) partitions $missingPartitionValues missing for ${input.id}")
             case _ => Unit
           }
-          if (subFeed.partitionValues.nonEmpty)
           // recreate DataFrame from DataObject
           logger.info(s"($id) getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
           val df = input.getDataFrame(subFeed.partitionValues)
