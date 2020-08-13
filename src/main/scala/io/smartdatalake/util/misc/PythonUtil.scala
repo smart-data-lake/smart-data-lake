@@ -19,13 +19,9 @@
 
 package io.smartdatalake.util.misc
 
-import java.io.FileNotFoundException
-
 import org.apache.spark.python.PythonHelper
 import org.apache.spark.python.PythonHelper.SparkEntryPoint
 import org.apache.spark.sql.SparkSession
-
-import scala.io.Source
 
 private[smartdatalake] object PythonUtil {
 

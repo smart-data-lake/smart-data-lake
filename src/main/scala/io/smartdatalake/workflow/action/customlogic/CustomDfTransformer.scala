@@ -84,7 +84,7 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
   }.orElse {
     pythonCode.map {
       code =>
-        val fnTransform = createPythonFnTransform(code)
+        val fnTransform = createPythonFnTransform(code.stripMargin)
         new CustomDfTransformerWrapper( fnTransform )
     }
   }
@@ -119,7 +119,7 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
 
   private def createPythonFnTransform(code: String): (SparkSession, Map[String, String], DataFrame, String) => DataFrame = {
     (session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String) => {
-      // python transformation is executed by creating a temp view with the input DataFrame and reading a temp view to get the output DataFrame
+      // python transformation is executed by passing options and input/output DataFrame through entry point
       val objectId = ActionHelper.replaceSpecialCharactersWithUnderscore(dataObjectId)
       try {
         val entryPoint = new DfTransformerPySparkEntryPoint(session, options, df, objectId)
