@@ -23,6 +23,12 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
 
+/**
+ * Configuration to notify interested parties about action results & metric
+ *
+ * @param className fully qualified class name of class implementing StateListener interface. The class needs a constructor with one parameter `options: Map[String,String]`.
+ * @param options Options are passed to StateListener constructor.
+ */
 case class StateListenerConfig(className: String, options: Option[Map[String,String]] = None) {
   // instantiate listener
   private[smartdatalake] val listener: StateListener = try {
@@ -35,10 +41,13 @@ case class StateListenerConfig(className: String, options: Option[Map[String,Str
   }
 }
 
+/**
+ * Interface to notify interested parties about action results & metric
+ */
 trait StateListener {
 
   /**
-   * Notify State
+   * notifyState is called whenever an action is finished (succeeded or failed)
    */
   def notifyState(state: ActionDAGRunState, context: ActionPipelineContext): Unit
 }
