@@ -185,6 +185,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         val latestRunState = stateStore.recoverRunState(latestStateFile)
         if (latestRunState.isFailed) {
           // start recovery
+          assert(appConfig == latestRunState.appConfig, s"There is a failed run to be recovered. Either you clean-up this state fail or the command line parameters given must match the parameters of the run to be recovered (${latestRunState.appConfig}")
           recoverRun(appConfig, stateStore, latestRunState)._2
         } else {
           startRun(appConfig, runId = latestRunState.runId+1, stateStore = Some(stateStore))._2
@@ -239,7 +240,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     appConfig.validate()
 
     // log start parameters
-    logger.info(s"Starting run: runId=$runId attemptId=$attemptId feedSel=${appConfig.feedSel} appName=${appConfig.appName} test=${appConfig.test}")
+    logger.info(s"Starting run: runId=$runId attemptId=$attemptId feedSel=${appConfig.feedSel} appName=${appConfig.appName} test=${appConfig.test} givenPartitionValues=${appConfig.getPartitionValues.map(x => "("+x.mkString(",")+")").getOrElse("None")}")
     logger.debug(s"Environment: " + sys.env.map(x => x._1 + "=" + x._2).mkString(" "))
     logger.debug(s"System properties: " + sys.props.toMap.map(x => x._1 + "=" + x._2).mkString(" "))
 

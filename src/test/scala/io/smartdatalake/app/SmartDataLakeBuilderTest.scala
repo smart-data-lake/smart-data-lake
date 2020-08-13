@@ -97,9 +97,13 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       , transformer = Some(CustomDfTransformerConfig(className = Some(classOf[FailTransformer].getName))))
     instanceRegistry.register(action2fail.copy())
     val selectedPartitions = Seq(PartitionValues(Map("dt"->"20180101")))
-    val configStart = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath)
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath)
       , partitionValues = Some(selectedPartitions))
-    intercept[TaskFailedException](sdlb.run(configStart))
+    intercept[TaskFailedException](sdlb.run(sdlConfig))
+
+    // make sure smart data lake builder cant be started with different config
+    val sdlConfigChanged = sdlConfig.copy(partitionValues = None)
+    intercept[AssertionError](sdlb.run(sdlConfigChanged))
 
     // check failed results
     assert(tgt1DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(5))
@@ -131,8 +135,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // this should execute action b with partition 20180101 only!
     val action2success = CopyAction("b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action2success.copy())
-    val configRecover = SmartDataLakeBuilderConfig(applicationName = Some(appName), statePath = Some(statePath))
-    sdlb.run(configRecover)
+    sdlb.run(sdlConfig)
 
     // check results
     assert(tgt2DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(5))
@@ -185,8 +188,8 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // use only first partition col (dt) for partition diff mode
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action1.copy())
-    val configStart = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
-    sdlb.run(configStart)
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
+    sdlb.run(sdlConfig)
 
     // check results
     assert(tgt1DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(5))
@@ -216,7 +219,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(action1.copy())
 
     // start second run
-    sdlb.run(configStart)
+    sdlb.run(sdlConfig)
 
     // check results
     assert(tgt1DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(5,10))
