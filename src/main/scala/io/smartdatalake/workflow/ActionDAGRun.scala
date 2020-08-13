@@ -96,7 +96,9 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
       case ex: DAGException => ex.getDAGRootExceptions
       case ex => throw ex // this should not happen
     }
-    val dagExceptionsToStop = dagExceptions.filter(_.severity <= ExceptionSeverity.SKIPPED)
+    // only stop on skipped in init phase if there are no succeeded results
+    val stopSeverity = if (phase == ExecutionPhase.Init && result.exists(_.isSuccess)) ExceptionSeverity.CANCELLED else ExceptionSeverity.SKIPPED
+    val dagExceptionsToStop = dagExceptions.filter(_.severity <= stopSeverity)
     // log all exceptions
     dagExceptions.foreach {
       case ex if (ex.severity <= ExceptionSeverity.CANCELLED) => logger.error(s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessage}")

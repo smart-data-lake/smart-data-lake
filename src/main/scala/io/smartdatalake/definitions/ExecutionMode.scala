@@ -24,7 +24,10 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, SparkExpressionUtil}
-import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
+import io.smartdatalake.workflow.DAGHelper.NodeId
+import io.smartdatalake.workflow.ExceptionSeverity.ExceptionSeverity
+import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
+import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.ActionHelper.{getOptionalDataFrame, searchCommonInits}
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject}
@@ -120,7 +123,7 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None, override val al
               // evaluate fail condition
               val data = PartitionDiffModeExpressionData.from(context).copy(inputPartitionValues = inputPartitionValues.map(_.getMapString), outputPartitionValues = outputPartitionValues.map(_.getMapString), selectedPartitionValues = selectedPartitionValues.map(_.getMapString))
               val doFail = failCondition.exists(c => SparkExpressionUtil.evaluateBoolean(actionId, Some("failCondition"), c, data)) // default is to not fail
-              if (doFail) throw ExecutionModeFailedException(s"($actionId) Execution mode failed because of failCondition '${failCondition.get}' for $data")
+              if (doFail) throw ExecutionModeFailedException(actionId.id, context.phase, s"($actionId) Execution mode failed because of failCondition '${failCondition.get}' for $data")
               // stop processing if no new data
               if (partitionValuesToBeProcessed.isEmpty) throw NoDataToProcessWarning(actionId.id, s"($actionId) No partitions to process found for ${input.id}")
               //return
@@ -217,7 +220,7 @@ object SparkIncrementalMode {
 case class FailIfNoPartitionValuesMode() extends ExecutionMode {
   override def apply(actionId: ActionObjectId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Option[(Seq[PartitionValues], Option[String])] = {
     // check if partition values present
-    if (subFeed.partitionValues.isEmpty) throw ExecutionModeFailedException(s"($actionId) Partition values are empty")
+    if (subFeed.partitionValues.isEmpty) throw new IllegalStateException(s"($actionId) Partition values are empty for mainInput ${subFeed.dataObjectId.id}")
     // return
     None
   }
@@ -239,5 +242,9 @@ private[smartdatalake] object DefaultExecutionModeExpressionData {
   }
 }
 
-private[smartdatalake] case class ExecutionModeFailedException(msg: String) extends Exception(msg)
+private[smartdatalake] case class ExecutionModeFailedException(id: NodeId, phase: ExecutionPhase, msg: String) extends DAGException(id) {
+  // don't fail in init phase, but skip action to continue with exec phase
+  override def severity: ExceptionSeverity = if (phase==ExecutionPhase.Init) ExceptionSeverity.SKIPPED else ExceptionSeverity.FAILED
+  override def getDAGRootExceptions: Seq[DAGException] = Seq(this)
+}
 
