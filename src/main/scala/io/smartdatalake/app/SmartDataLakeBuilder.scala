@@ -185,6 +185,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         val latestRunState = stateStore.recoverRunState(latestStateFile)
         if (latestRunState.isFailed) {
           // start recovery
+          assert(appConfig == latestRunState.appConfig, s"There is a failed run to be recovered. Either you clean-up this state fail or the command line parameters given must match the parameters of the run to be recovered (${latestRunState.appConfig}")
           recoverRun(appConfig, stateStore, latestRunState)._2
         } else {
           startRun(appConfig, runId = latestRunState.runId+1, stateStore = Some(stateStore))._2
