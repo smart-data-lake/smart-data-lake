@@ -203,7 +203,12 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
       logger.info(s"${node.toStringShort}: $phase started")
     }
     override def onNodeSuccess(results: Seq[DAGResult])(node: Action): Unit = {
-      node.addRuntimeEvent(phase, RuntimeEventState.SUCCEEDED, results = results.collect{ case x: SubFeed => x })
+      val state = phase match {
+        case ExecutionPhase.Prepare => RuntimeEventState.PREPARED
+        case ExecutionPhase.Init => RuntimeEventState.INITIALIZED
+        case ExecutionPhase.Exec => RuntimeEventState.SUCCEEDED
+      }
+      node.addRuntimeEvent(phase, state, results = results.collect{ case x: SubFeed => x })
       logger.info(s"${node.toStringShort}: $phase: succeeded")
       if (phase==ExecutionPhase.Exec) saveState()
     }
@@ -267,7 +272,7 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
     // create init node from input edges
     val inputEdges = allEdges.filter(_._1.isEmpty)
     logger.info(s"input edges are $inputEdges")
-    val initNodeId = "init"
+    val initNodeId = "start"
     val initAction = InitDAGNode(initNodeId, inputEdges.map(_._3.id))
     val edges = allEdges.map{ case (nodeIdFromOpt, nodeIdTo, resultId) => ActionDAGEdge(nodeIdFromOpt.map(_.id).getOrElse(initNodeId), nodeIdTo.id, resultId.id)}
 
