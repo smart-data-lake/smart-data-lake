@@ -20,6 +20,8 @@ package io.smartdatalake.definitions
 
 import java.net.URI
 
+import io.smartdatalake.app.GlobalConfig
+import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.util.misc.EnvironmentUtil
 import org.apache.spark.sql.SparkSession
 
@@ -137,11 +139,18 @@ object Environment {
   }
 
   // static configurations
-  val configPathsForLocalSubstitution: Seq[String] = Seq("path", "table.name", "create-sql", "createSql", "pre-sql", "preSql", "post-sql", "postSql")
+  val configPathsForLocalSubstitution: Seq[String] = Seq(
+      "path", "table.name"
+    , "create-sql", "createSql", "pre-read-sql", "preReadSql", "post-read-sql", "postReadSql", "pre-write-sql", "preWriteSql", "post-write-sql", "postWriteSql"
+    , "executionMode.checkpointLocation", "execution-mode.checkpoint-location")
   val defaultPathSeparator: Char = '/'
 
   // dynamically shared environment for custom code (see also #106)
   def sparkSession: SparkSession = _sparkSession
   private [smartdatalake] var _sparkSession: SparkSession = _
+  def instanceRegistry: InstanceRegistry = _instanceRegistry
+  private [smartdatalake] var _instanceRegistry: InstanceRegistry = _
+  def globalConfig: GlobalConfig = _globalConfig
+  private [smartdatalake] var _globalConfig: GlobalConfig = _
 
 }

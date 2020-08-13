@@ -22,4 +22,4 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.workflow.DAGHelper.NodeId
 import io.smartdatalake.workflow.TaskSkippedWarning
 
-case class NoDataToProcessWarning(actionId: NodeId, msg: String) extends TaskSkippedWarning(actionId, msg)
+private[smartdatalake] case class NoDataToProcessWarning(actionId: NodeId, msg: String) extends TaskSkippedWarning(actionId, msg)

@@ -22,10 +22,12 @@ import java.time.{Duration, LocalDateTime}
 
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
+import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.dataobject.DataObject
-import io.smartdatalake.workflow._
 import org.apache.spark.sql.SparkSession
 
 import scala.collection.mutable
@@ -56,18 +58,33 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   def inputs: Seq[DataObject]
 
   /**
+   * Recursive Inputs are DataObjects that are used as Output and Input in the same action
+   * This is usually prohibited as it creates loops in the DAG.
+   * In special cases this makes sense, i.e. when building a complex delta logic
+   *
+   * @return
+   */
+  def recursiveInputs: Seq[DataObject]
+
+  /**
    * Output [[DataObject]]s
    * To be implemented by subclasses
    */
   def outputs: Seq[DataObject]
 
   /**
+   * Spark SQL condition evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
+   * If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
+   */
+  def metricsFailCondition: Option[String]
+
+  /**
    * Prepare DataObjects prerequisites.
    * In this step preconditions are prepared & tested:
-   * - directories exists or can be created
    * - connections can be created
+   * - needed structures exist, e.g Kafka topic or Jdbc table
    *
-   * This runs during the "prepare" operation of the DAG.
+   * This runs during the "prepare" phase of the DAG.
    */
   def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     inputs.foreach(_.prepare)
@@ -79,8 +96,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
       dataObj => ActionHelper.replaceSpecialCharactersWithUnderscore(dataObj.id.id)
     }.groupBy(identity).collect { case (x, List(_,_,_*)) => x }.toList
 
-    require(duplicateNames.size==0, s"The names of your DataObjects are not unique when replacing special characters with underscore. Duplicates: ${duplicateNames.mkString(",")}")
-
+    require(duplicateNames.isEmpty, s"The names of your DataObjects are not unique when replacing special characters with underscore. Duplicates: ${duplicateNames.mkString(",")}")
   }
 
   /**
@@ -96,13 +112,13 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
 
   /**
    * Executes operations needed before executing an action.
-   * In this step any operation on Input- or Output-DataObjects needed before the main task is executed,
-   * e.g. JdbcTableDataObjects preSql
+   * In this step any phase on Input- or Output-DataObjects needed before the main task is executed,
+   * e.g. JdbcTableDataObjects preWriteSql
    */
-  def preExec(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  def preExec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     setSparkJobMetadata(None) // init spark jobGroupId to identify metrics
-    inputs.foreach(_.preRead)
-    outputs.foreach(_.preWrite)
+    inputs.foreach( input => input.preRead(findSubFeedPartitionValues(input.id, subFeeds)))
+    outputs.foreach(_.preWrite) // Note: transformed subFeeds don't exist yet, that's why no partition values can be passed as parameters.
   }
 
   /**
@@ -116,12 +132,30 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
 
   /**
    * Executes operations needed after executing an action.
-   * In this step any operation on Input- or Output-DataObjects needed after the main task is executed,
-   * e.g. JdbcTableDataObjects postSql or CopyActions deleteInputData.
+   * In this step any phase on Input- or Output-DataObjects needed after the main task is executed,
+   * e.g. JdbcTableDataObjects postWriteSql or CopyActions deleteInputData.
    */
   def postExec(inputSubFeed: Seq[SubFeed], outputSubFeed: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    inputs.foreach(_.postRead)
-    outputs.foreach(_.postWrite)
+    // evaluate metrics fail condition if defined
+    metricsFailCondition.foreach(evaluateMetricsFailCondition)
+    // process postRead/Write hooks
+    inputs.foreach( input => input.postRead(findSubFeedPartitionValues(input.id, inputSubFeed)))
+    outputs.foreach( output => output.postWrite(findSubFeedPartitionValues(output.id, outputSubFeed)))
+  }
+
+  /**
+   * Evaluates a condition against latest metrics and throws an MetricsCheckFailed if there is a match.
+   */
+  private def evaluateMetricsFailCondition(condition: String)(implicit session: SparkSession): Unit = {
+    import session.implicits._
+    val metrics = getAllLatestMetrics.flatMap{
+      case (dataObjectId, Some(metrics)) => metrics.getMainInfos.map{ case (k,v) => (dataObjectId.id, Some(k), Some(v.toString))}.toSeq
+      case (dataObjectId, _) => Seq((dataObjectId.id, None, None))
+    }.toSeq
+    val failedMetrics = metrics.toDF("dataObjectId", "key", "value")
+      .where(condition)
+      .collect
+    if (failedMetrics.nonEmpty) throw MetricsCheckFailed(s"""($id) metrics check failed: ${failedMetrics.mkString(", ")} matched condition "$condition"""")
   }
 
   /**
@@ -136,11 +170,16 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * We rely on this to match metrics back to Actions and DataObjects.
    * As writing to a DataObject on the Driver happens uninterrupted in the same exclusive thread, this is suitable.
    *
-   * @param operation operation description (be short...)
+   * @param operation phase description (be short...)
    */
   def setSparkJobMetadata(operation: Option[String] = None)(implicit session: SparkSession) : Unit = {
     session.sparkContext.setJobGroup(s"${this.getClass.getSimpleName}.$id", operation.getOrElse("").take(255))
   }
+
+  /**
+   * Helper to find partition values for a specific DataObject in list of subFeeds
+   */
+  private def findSubFeedPartitionValues(dataObjectId: DataObjectId, subFeeds: Seq[SubFeed]): Seq[PartitionValues] = subFeeds.find(_.dataObjectId == dataObjectId).map(_.partitionValues).get
 
   /**
    * Handle class cast exception when getting objects from instance registry
@@ -168,7 +207,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   /**
    * Adds an action event
    */
-  def addRuntimeEvent(phase: String, state: RuntimeEventState, msg: Option[String] = None, results: Seq[SubFeed] = Seq()): Unit = {
+  def addRuntimeEvent(phase: ExecutionPhase, state: RuntimeEventState, msg: Option[String] = None, results: Seq[SubFeed] = Seq()): Unit = {
     runtimeEvents.append(RuntimeEvent(LocalDateTime.now, phase, state, msg, results))
   }
 
@@ -190,7 +229,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * Runtime metrics
    *
    * Note: runtime metrics are disabled by default, because they are only collected when running Actions from an ActionDAG.
-   * This is not the case for Tests other use cases. If enabled exceptions are thrown if metrics are not found.
+   * This is not the case for Tests or other use cases. If enabled exceptions are thrown if metrics are not found.
    */
   def enableRuntimeMetrics(): Unit = runtimeMetricsEnabled = true
   def onRuntimeMetrics(dataObjectId: Option[DataObjectId], metrics: ActionMetrics): Unit = {
@@ -213,16 +252,33 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   }
   def getFinalMetrics(dataObjectId: DataObjectId): Option[ActionMetrics] = {
     if (!runtimeMetricsEnabled) return None
+    // return latest metrics
+    val latestMetrics = getLatestMetrics(dataObjectId)
+      .orElse {
+        // wait some time and retry, because the metrics might be delivered by another thread...
+        Thread.sleep(500)
+        getLatestMetrics(dataObjectId)
+      }
+      .orElse( throw new IllegalStateException(s"($id) Metrics for $dataObjectId not found"))
     // remember for which data object final metrics has been delivered, so that we can warn on late arriving metrics!
     dataObjectRuntimeMetricsDelivered += dataObjectId
-    val latestMetrics = getLatestMetrics(dataObjectId)
-    if (latestMetrics.isEmpty) throw new IllegalStateException(s"($id) Metrics for $dataObjectId not found")
+    // return
     latestMetrics
   }
   def getAllLatestMetrics: Map[DataObjectId, Option[ActionMetrics]] = outputs.map(dataObject => (dataObject.id, getLatestMetrics(dataObject.id))).toMap
   private var runtimeMetricsEnabled = false
   private val dataObjectRuntimeMetricsMap = mutable.Map[DataObjectId,mutable.Buffer[ActionMetrics]]()
   private val dataObjectRuntimeMetricsDelivered = mutable.Set[DataObjectId]()
+
+  /**
+   * Resets the runtime state of this Action
+   * This is mainly used for testing
+   */
+  def reset(): Unit = {
+    runtimeEvents.clear
+    dataObjectRuntimeMetricsDelivered.clear
+    dataObjectRuntimeMetricsMap.clear
+  }
 
   /**
    * This is displayed in ascii graph visualization
@@ -259,7 +315,7 @@ case class ActionMetadata(
 /**
  * A structure to collect runtime information
  */
-private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: String, state: RuntimeEventState, msg: Option[String], results: Seq[SubFeed])
+private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: ExecutionPhase, state: RuntimeEventState, msg: Option[String], results: Seq[SubFeed])
 private[smartdatalake] object RuntimeEventState extends Enumeration {
   type RuntimeEventState = Value
   val STARTED, SUCCEEDED, FAILED, SKIPPED, PENDING = Value

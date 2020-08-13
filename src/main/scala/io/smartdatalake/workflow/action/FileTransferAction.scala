@@ -33,6 +33,8 @@ import org.apache.spark.sql.SparkSession
  * @param inputId inputs DataObject
  * @param outputId output DataObject
  * @param deleteDataAfterRead if the input files should be deleted after processing successfully
+ * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
+ *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  */
 case class FileTransferAction(override val id: ActionObjectId,
                               inputId: DataObjectId,
@@ -40,7 +42,8 @@ case class FileTransferAction(override val id: ActionObjectId,
                               override val deleteDataAfterRead: Boolean = false,
                               overwrite: Boolean = true,
                               override val breakFileRefLineage: Boolean = false,
-                              override val initExecutionMode: Option[ExecutionMode] = None,
+                              override val executionMode: Option[ExecutionMode] = None,
+                              override val metricsFailCondition: Option[String] = None,
                               override val metadata: Option[ActionMetadata] = None)
                              ( implicit instanceRegistry: InstanceRegistry)
   extends FileSubFeedAction {

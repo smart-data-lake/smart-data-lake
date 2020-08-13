@@ -23,13 +23,14 @@ import io.smartdatalake.util.misc.DataFrameUtil.{DataFrameReaderUtils, DataFrame
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.functions.input_file_name
 
 /**
  * A [[DataObject]] backed by a file in HDFS. Can load file contents into an Apache Spark [[DataFrame]]s.
  *
  * Delegates read and write operations to Apache Spark [[DataFrameReader]] and [[DataFrameWriter]] respectively.
  */
-private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject with CanCreateDataFrame with CanWriteDataFrame
+private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject with CanCreateDataFrame with CanWriteDataFrame with CanCreateStreamingDataFrame
   with UserDefinedSchema with SchemaValidation {
 
   /**
@@ -44,6 +45,11 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * @see [[DataFrameWriter]]
    */
   def options: Map[String, String] = Map()
+
+  /**
+   * The name of the (optional) additional column containing the source filename
+   */
+  def filenameColumn: Option[String]
 
   /**
    * Definition of repartition operation before writing DataFrame with Spark to Hadoop.
@@ -92,11 +98,12 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * @return a new [[DataFrame]] containing the data stored in the file at `path`
    */
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession) : DataFrame = {
+    import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+
     val wrongPartitionValues = PartitionValues.checkWrongPartitionValues(partitionValues, partitions)
     assert(wrongPartitionValues.isEmpty, s"getDataFrame got request with PartitionValues keys ${wrongPartitionValues.mkString(",")} not included in $id partition columns ${partitions.mkString(", ")}")
 
     val filesExists = checkFilesExisting
-
     if (!filesExists) {
       //without either schema or data, no data frame can be created
       require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined if there are no existing files.")
@@ -106,7 +113,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
       filesystem.mkdirs(hadoopPath)
     }
 
-    val df = if (partitions.isEmpty || partitionValues.isEmpty) {
+    val dfContent = if (partitions.isEmpty || partitionValues.isEmpty) {
       session.read
         .format(format)
         .options(options)
@@ -123,9 +130,26 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
       pathsToRead.map(reader.load).reduce(_ union _)
     }
 
+    val df = dfContent.withOptionalColumn(filenameColumn, input_file_name)
+
     // finalize & return DataFrame
     afterRead(df)
   }
+
+  override def getStreamingDataFrame(options: Map[String,String], pipelineSchema: Option[StructType])(implicit session: SparkSession): DataFrame = {
+    require(schema.orElse(pipelineSchema).isDefined, s"(${id}) Schema must be defined for streaming SparkFileDataObject")
+    // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
+    if (!filesystem.exists(hadoopPath.getParent)) filesystem.mkdirs(hadoopPath)
+
+    val df = session.readStream
+      .format(format)
+      .options(options)
+      .schema(schema.orElse(pipelineSchema).get)
+      .load(hadoopPath.toString)
+
+    afterRead(df)
+  }
+
 
   /**
    * Writes the provided [[DataFrame]] to the filesystem.

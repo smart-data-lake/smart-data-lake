@@ -18,6 +18,8 @@
  */
 package io.smartdatalake.util.hive
 
+import java.net.URI
+
 import io.smartdatalake.definitions.OutputType.OutputType
 import io.smartdatalake.definitions.{Environment, HiveTableLocationSuffix, OutputType}
 import io.smartdatalake.util.evolution.SchemaEvolution
@@ -574,6 +576,10 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     location22.orElse(location21).getOrElse( throw new TableInformationException( s"Location for table $dbName.$tableName not found"))
   }
 
+  def existingTableLocation(table: Table)(implicit session: SparkSession): URI = {
+    session.sharedState.externalCatalog.getTable(table.db.get,table.name).location
+  }
+
   def existingTickTockLocation(dbName: String, session: SparkSession, tableName: String): String = {
     hiveTableLocation(dbName, session, tableName)
   }
@@ -613,6 +619,21 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       // If the table doesn't exist yet, start with tick
       s"$outputDir/${HiveTableLocationSuffix.Tick.toString}"
     }
+  }
+
+  /**
+   * Normalizes a HDFS path so they can be better compared.
+   * i.e. by replacing \ with / and always pointing to tick
+   *
+   * @param path
+   * @return
+   */
+  def normalizePath(path: String) : String = {
+    path
+      .replaceAll("\\\\", "/")
+      .replaceAll("file:/", "")
+      .replaceAll("/+$", "")
+      .replaceAll("tock$", "tick")
   }
 
   def listPartitions(table: Table, partitions: Seq[String])(implicit session: SparkSession): Seq[PartitionValues] = {

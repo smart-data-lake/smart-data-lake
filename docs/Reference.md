@@ -56,11 +56,11 @@ Data objects are structured in a hierarchy as many attributes are shared between
 Here is an overview of all data objects:
 ![data object hierarchy](images/dataobject_hierarchy.png)
 
-
 ## Actions
 For a list of all available actions, please consult the [API docs](site/scaladocs/io/smartdatalake/workflow/action/package.html) directly.
 
 In the package overview, you can also see the parameters available to each type of action and which parameters are optional.
+
 
 # Command Line
 SmartDataLakeBuilder is a java application. To run on a cluster with spark-submit use **DefaultSmartDataLakeBuilder** application.
@@ -81,12 +81,14 @@ Usage: DefaultSmartDataLakeBuilder [options]
   --parallelism <value>    Parallelism for DAG run.
   --state-path <value>     Path to save run state files. Must be set to enable recovery in case of failures.
   --override-jars <value>  Comma separated list of jars for child-first class loader. The jars must be present in classpath.
+  --test <value>           Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage
   --help                   Display the help text.
   --version                Display version information.
 ```
 There exists the following adapted applications versions:
 - **LocalSmartDataLakeBuilder**:<br>default for Spark master is `local[*]` and it has additional properties to configure Kerberos authentication. Use this application to run in a local environment (e.g. IntelliJ) without cluster deployment.  
 - **DatabricksSmartDataLakeBuilder**:<br>see [MicrosoftAzure](MicrosoftAzure.md)
+
 
 # Concepts
 
@@ -101,19 +103,68 @@ Execution therefore involves the following phases.
 4. DAG exec: Execution of Actions, data is effectively (and only) transferred during this phase.
 
 ## Execution modes
-Execution modes select the data to be processed. By default, if you start SmartDataLakeBuilder, there is no filter applied. This means every Action reads all data from its input DataObjects. 
+Execution modes select the data to be processed. By default, if you start SmartDataLakeBuilder, there is no filter applied. This means every Action reads all data from its input DataObjects.
+
+You can set an execution mode by defining attribute "executionMode" of an Action. Define the chosen ExecutionMode by setting type as follows:
+```
+executionMode {
+  type = PartitionDiffMode
+  attribute1 = ...
+}
+```
 
 ### Fixed partition values filter
 You can apply a filter manually by specifying parameter --partition-values or --multi-partition-values on the command line. The partition values specified are passed to all start-Actions of a DAG and filtered for every input DataObject by its defined partition columns.
 On execution every Action takes the partition values of the input and filters them again for every output DataObject by its defined partition columns, which serve again as partition values for the input of the next Action. 
-Note that during execution of the dag, no new partition values are added, they are only filtered.
+Note that during execution of the dag, no new partition values are added, they are only filtered. An exception is if you place a PartitionDiffMode in the middle of your pipeline, see next section.
 
-### Dynamic partition values filter - PartitionDiffMode
+### PartitionDiffMode: Dynamic partition values filter 
 Alternatively you can let SmartDataLakeBuilder find missing partitions and set partition values automatically by specifying execution mode PartitionDiffMode.
 
-Often this should only happen on the start-Actions of a DAG, so it's clear what partitions are processed through a specific DAG run.
-But its also possible to let every Action in the DAG decide again dynamically, what partitions are missing and should be processed.
-You can configure this by the following attributes of an Action:
-- initExecutionMode: define the execution mode if this Action is a start-Actions of the DAG
-- executionMode: define the execution mode independently of its position is the DAG.
-If both attributes are set, initExecutionMode overrides executionMode if the Action is a a start-Action of the DAG.
+By defining the applyCondition attribute you can give a condition to decide at runtime if the PartitionDiffMode should be applied or not.
+Default is to apply the PartitionDiffMode if the given partition values are empty (partition values from command line or passed from previous action). 
+Define an applyCondition by a spark sql expression working with attributes of DefaultExecutionModeExpressionData returning a boolean.
+
+By defining the failCondition attribute you can give a condition to fail application of execution mode if true.
+It can be used fail a run based on expected partitions, time and so on.
+Default is that the application of the PartitionDiffMode does not fail the action. If there is no data to process, the following actions are skipped.
+Define a failCondition by a spark sql expression working with attributes of PartitionDiffModeExpressionData returning a boolean.
+Example - fail if partitions are not processed in strictly increasing order of partition column "dt":
+```
+  failCondition = "(size(selectedPartitionValues) > 0 and array_min(transform(selectedPartitionValues, x -> x.dt)) < array_max(transform(outputPartitionValues, x -> x.dt)))"
+```
+
+### SparkStreamingOnceMode: Incremental load 
+Some DataObjects are not partitioned, but nevertheless you dont want to read all data from the input on every run. You want to load it incrementally.
+This can be accomplished by specifying execution mode SparkStreamingOnceMode. Under the hood it uses "Spark Structured Streaming" and triggers a single microbatch (Trigger.Once).
+"Spark Structured Streaming" helps keeping state information about processed data. It needs a checkpointLocation configured which can be given as parameter to SparkStreamingOnceMode.
+
+Note that "Spark Structured Streaming" needs an input DataObject supporting the creation of streaming DataFrames. 
+For the time being, only the input sources delivered with Spark Streaming are supported. 
+This are KafkaTopicDataObject and all SparkFileDataObjects, see also [Spark StructuredStreaming](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html#creating-streaming-dataframes-and-streaming-datasets).
+
+### SparkIncrementalMode: Incremental Load
+As not every input DataObject supports the creation of streaming DataFrames, there is an other execution mode called SparkIncrementalMode.
+You configure it by defining the attribute "compareCol" with a column name present in input and output DataObject. 
+SparkIncrementalMode then compares the maximum values between input and output and creates a filter condition.
+On execution the filter condition is applied to the input DataObject to load the missing increment.
+Note that compareCol needs to have a sortable datatype.
+
+By defining the applyCondition attribute you can give a condition to decide at runtime if the SparkIncrementalMode should be applied or not.
+Default is to apply the SparkIncrementalMode. Define an applyCondition by a spark sql expression working with attributes of DefaultExecutionModeExpressionData returning a boolean.
+
+### FailIfNoPartitionValuesMode
+To simply check if partition values are present and fail otherwise, configure execution mode FailIfNoPartitionValuesMode.
+This is useful to prevent potential reprocessing of whole table through wrong usage.
+
+## Metrics
+Metrics are gathered per Action and output-DataObject when running a DAG. They can be found in log statements and are written to the state file.
+
+Sample log message:
+`2020-07-21 11:36:34 INFO  CopyAction:105 - (Action~a) finished writing DataFrame to DataObject~tgt1: duration=PT0.906S records_written=1 bytes_written=1142 num_tasks=1 stage=save`
+
+A fail condition can be specified on Actions to fail execution if a certain condition is not met.
+The condition must be specified as spark sql expression, which is evaluated as where-clause against a dataframe of metrics. Available columns are dataObjectId, key, value. 
+To fail above sample log in case there are no records written, specify `"dataObjectId = 'tgt1' and key = 'records_written' and value = 0"`.
+
+By implementing interface StateListener  you can get notified about action results & metrics. To configure state listeners set config attribute `global.stateListeners = [{className = ...}]`.

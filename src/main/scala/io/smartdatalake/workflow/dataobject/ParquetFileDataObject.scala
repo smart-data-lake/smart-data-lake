@@ -24,6 +24,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SaveMode}
 
@@ -62,9 +63,10 @@ case class ParquetFileDataObject( override val id: DataObjectId,
                                   override val sparkRepartition: Option[SparkRepartitionDef] = None,
                                   override val acl: Option[AclDef] = None,
                                   override val connectionId: Option[ConnectionId] = None,
+                                  override val filenameColumn: Option[String] = None,
                                   override val metadata: Option[DataObjectMetadata] = None
                                 )(@transient implicit override val instanceRegistry: InstanceRegistry)
-  extends SparkFileDataObjectWithEmbeddedSchema with CanCreateDataFrame with CanWriteDataFrame {
+  extends SparkFileDataObjectWithEmbeddedSchema with CanCreateDataFrame with CanWriteDataFrame{
 
   override val format = "parquet"
 

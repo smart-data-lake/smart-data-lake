@@ -54,7 +54,7 @@ private[smartdatalake] object CredentialsUtil extends SmartDataLakeLogger {
   }
 
   def getCredentialsInfo(credentialsConfig: String): (String, String) = {
-    logger.info(s"Parsing variable ${credentialsConfig}")
+    logger.debug(s"Parsing variable ${credentialsConfig}")
     credentialsConfig.split("#") match {
       case Array(x, y) => (x, y)
       case _ => throw new ConfigurationException(s"Credentials config variable $credentialsConfig is invalid, make sure it's of the form CREDENTIALSTYPE#VARIABLENAME")
@@ -62,7 +62,7 @@ private[smartdatalake] object CredentialsUtil extends SmartDataLakeLogger {
   }
 
   def getCredentialsFromEnv(variableName: String): String = {
-    logger.info(s"Trying to get credentials from environment variable $variableName")
+    logger.debug(s"Trying to get credentials from environment variable $variableName")
     sys.env.get(variableName) match {
       case Some(key) => key
       case _ => throw new ConfigurationException(s"Environment variable $variableName not found")
@@ -70,7 +70,7 @@ private[smartdatalake] object CredentialsUtil extends SmartDataLakeLogger {
   }
 
   def getCredentialsFromSecret(variableString: String): String = {
-    logger.info(s"Trying to split variable string $variableString")
+    logger.debug(s"Trying to split variable string $variableString")
     variableString.split("\\.") match {
       case Array(x, y) =>
           try {

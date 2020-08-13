@@ -57,6 +57,7 @@ case class JsonFileDataObject( override val id: DataObjectId,
                                stringify: Boolean = false,
                                override val acl: Option[AclDef] = None,
                                override val connectionId: Option[ConnectionId] = None,
+                               override val filenameColumn: Option[String] = None,
                                override val metadata: Option[DataObjectMetadata] = None
                              )(implicit override val instanceRegistry: InstanceRegistry)
   extends SparkFileDataObject with CanCreateDataFrame with CanWriteDataFrame {

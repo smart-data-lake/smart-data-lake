@@ -47,6 +47,13 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
   }
 
   /**
+   * Method for subclasses to override the base path for this DataObject.
+   * This is for instance needed if pathPrefix is defined in a connection.
+   * @return
+   */
+  def getPath: String = path
+
+  /**
    * List files for given partition values
    *
    * @param partitionValues List of partition values to be filtered. If empty all files in root path of DataObject will be listed.
@@ -66,8 +73,8 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
         else f.fileName + this.fileName.replace("*","")
         // prepend path and partition string before fileName
         val newPath = getPartitionString(f.partitionValues)
-          .map(partitionString => path + separator + partitionString + newFileName)
-          .getOrElse(path + separator + newFileName)
+          .map(partitionString => getPath + separator + partitionString + newFileName)
+          .getOrElse(getPath + separator + newFileName)
         f.copy(fullPath = newPath)
     }
   }
@@ -89,8 +96,8 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
     val partitionValuesPaths = partitionValuesWithDefault.map(v => (v, getPartitionString(v)))
     partitionValuesPaths.map {
       // through concatenating partition path and filename there might be two "*" one after another - we need to clean this after concatenation
-      case (v, Some(partitionPath)) => (v, s"$path$separator$partitionPath$fileName".replace("**","*"))
-      case (v, None) => (v, s"$path$separator$fileName".replace("**","*"))
+      case (v, Some(partitionPath)) => (v, s"$getPath$separator$partitionPath$fileName".replace("**","*"))
+      case (v, None) => (v, s"$getPath$separator$fileName".replace("**","*"))
     }
   }
 

@@ -9,7 +9,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
 
 ##### Support for complex workflows
 * Fork, join, parallel execution, multiple start- & end-nodes possible
-* Future: Recovery of failed runs
+* Recovery of failed runs
 
 ##### Execution Engines
 * Spark (DataFrames)
@@ -25,6 +25,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
 * Spark based: Copy, Historization, Deduplication
 * File based: FileTransfer
 * Easily extendable through implementing predefined scala traits
+* Future: applying MLFlow machine learning models
 
 ##### Customizable Transformations
 * Spark Transformations: 
@@ -43,8 +44,10 @@ The following is a list of implemented and planned (Future) features of Smart Da
 ##### Execution Modes
 * Process all data
 * Partition parameters: give partition values to process for start nodes as parameter
-* Init Partition Diff: search missing partitions on start nodes and use as parameter
-* Future: Partition Diff (every action individually), Incremental (get last processed timestamp from target), Continous (Streaming)
+* Partition Diff: search missing partitions and use as parameter
+* Spark Streaming Once: incremental processing by using Spark Structured Streaming with Trigger=Once mode
+* Spark Incremental: compare sortable column between source and target, load the difference
+* Future: Spark Streaming
 
 ##### Schema Evolution
 * Automatic evolution of data schemas (new column, removed column, changed datatype)
@@ -53,6 +56,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
 ##### Metrics
 * Number of rows written per DataObject
 * Execution duration per Action
+* StateListener interface to get notified about progress & metrics
 
 ##### Data Catalog
 * Report all DataObjects attributes (incl. foreign keys if defined) for visualisation of data catalog in BI tool
@@ -67,3 +71,11 @@ The following is a list of implemented and planned (Future) features of Smart Da
 * Check & report primary key violations by executing primary key checker action
 * Future: Metadata support for arbitrary data quality checks
 * Future: Report data quality (foreign key matching & arbitrary data quality checks) by executing data quality reporter action
+
+##### Testing
+* Support for CI
+  * Config validation
+  * Custom transformation unit tests
+  * Spark data pipeline simulation (acceptance tests)
+* Support for Deployment
+  * Dry-run

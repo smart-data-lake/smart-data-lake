@@ -26,23 +26,32 @@ import org.apache.spark.python.PythonHelper.SparkEntryPoint
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
-  * Interface to define custom logic for a DataFrame
-  */
+ * Interface to define a custom Spark-DataFrame transformation (1:1)
+ */
 trait CustomDfTransformer extends Serializable {
 
   /**
-   * Functions provided by the creator, used to transform a DataFrame
-    *
-    * @param session Spark Session
-    * @param options additional options
-    * @param df DataFrame to be transformed
-    * @param dataObjectId Id of DataObject of SubFeed
-    * @return Transformed DataFrame
-    */
+   * Function to be implemented to define the transformation between an input and output DataFrame (1:1)
+   *
+   * @param session Spark Session
+   * @param options Options specified in the configuration for this transformation
+   * @param df DataFrames to be transformed
+   * @param dataObjectId Id of DataObject of SubFeed
+   * @return Transformed DataFrame
+   */
   def transform(session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String) : DataFrame
 
 }
 
+/**
+ * Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1)
+ *
+ * @param className Optional class name to load transformer code from
+ * @param scalaFile Optional file where scala code for transformation is loaded from
+ * @param scalaCode Optional scala code for transformation
+ * @param sqlCode Optional map of DataObjectId and corresponding SQL Code
+ * @param options Options to pass to the transformation
+ */
 case class CustomDfTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Option[String] = None, pythonFile: Option[String] = None, pythonCode: Option[String] = None, options: Map[String,String] = Map()) {
   require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || sqlCode.isDefined || pythonFile.isDefined || pythonCode.isDefined, "Either className, scalaFile, scalaCode, sqlCode, pythonFile or pythonCode must be defined for CustomDfTransformer")
 

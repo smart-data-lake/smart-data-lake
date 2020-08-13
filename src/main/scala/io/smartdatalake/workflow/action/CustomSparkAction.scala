@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.ExecutionMode
+import io.smartdatalake.definitions.{ExecutionMode, SparkStreamingOnceMode}
 import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
@@ -35,6 +35,13 @@ import org.apache.spark.sql.SparkSession
  * @param inputIds input DataObject's
  * @param outputIds output DataObject's
  * @param transformer Custom Transformer to transform Seq[DataFrames]
+ * @param mainInputId optional selection of main inputId used for execution mode and partition values propagation. Only needed if there are multiple input DataObject's.
+ * @param mainOutputId optional selection of main outputId used for execution mode and partition values propagation. Only needed if there are multiple output DataObject's.
+ * @param executionMode optional execution mode for this Action
+ * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
+ *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
+ * @param metadata
+ * @param recursiveInputIds output of action that are used as input in the same action
  */
 case class CustomSparkAction ( override val id: ActionObjectId,
                                inputIds: Seq[DataObjectId],
@@ -42,33 +49,37 @@ case class CustomSparkAction ( override val id: ActionObjectId,
                                transformer: CustomDfsTransformerConfig,
                                override val breakDataFrameLineage: Boolean = false,
                                override val persist: Boolean = false,
-                               override val initExecutionMode: Option[ExecutionMode] = None,
-                               override val metadata: Option[ActionMetadata] = None
+                               override val mainInputId: Option[DataObjectId] = None,
+                               override val mainOutputId: Option[DataObjectId] = None,
+                               override val executionMode: Option[ExecutionMode] = None,
+                               override val metricsFailCondition: Option[String] = None,
+                               override val metadata: Option[ActionMetadata] = None,
+                               recursiveInputIds: Seq[DataObjectId] = Seq()
 )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedsAction {
 
+  assert(recursiveInputIds.forall(outputIds.contains(_)), "All recursive inputs must be in output of the same action.")
+  override val recursiveInputs: Seq[DataObject with CanCreateDataFrame] = recursiveInputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
   override val inputs: Seq[DataObject with CanCreateDataFrame] = inputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
   override val outputs: Seq[DataObject with CanWriteDataFrame] = outputIds.map(getOutputDataObject[DataObject with CanWriteDataFrame])
+
+  if (executionMode.exists(_.isInstanceOf[SparkStreamingOnceMode]) && transformer.sqlCode.nonEmpty)
+    logger.warn("Defining custom stateful streaming operations with sqlCode is not well supported by Spark and can create strange errors or effects. Use scalaCode to be safe.")
 
   /**
    * @inheritdoc
    */
   override def transform(subFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
-
-    // create input subfeeds if they don't exist yet
-    val enrichedSubfeeds: Seq[SparkSubFeed] = enrichSubFeedsDataFrame(inputs, subFeeds)
-    val mainInputEnrichedSubFeed = mainInput.flatMap( input => enrichedSubfeeds.find(_.dataObjectId==input.id))
+    val mainInputSubFeed = subFeeds.find(_.dataObjectId==mainInput.id)
 
     // Apply custom transformation to all subfeeds
-    transformer.transform(enrichedSubfeeds.map( subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap)
+    transformer.transform(subFeeds.map( subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap)
       .map {
         // create output subfeeds from transformed dataframes
         case (dataObjectId, dataFrame) =>
           val output = outputs.find(_.id.id == dataObjectId)
             .getOrElse(throw ConfigurationException(s"No output found for result ${dataObjectId} in $id. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
-          // if main output, get partition values from main input
-          val partitionValues = if (mainInput.isDefined && mainOutput.exists(_.id.id == dataObjectId)) {
-            mainInputEnrichedSubFeed.map(_.partitionValues).getOrElse(Seq())
-          } else Seq()
+          // get partition values from main input
+          val partitionValues = mainInputSubFeed.map(_.partitionValues).getOrElse(Seq())
           SparkSubFeed(Some(dataFrame),dataObjectId, partitionValues)
       }.toSeq
   }

@@ -21,13 +21,14 @@ package io.smartdatalake
 import com.typesafe.config.ConfigUtil
 import configs.{Configs, Result}
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, ConnectionId, DataObjectId}
+import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.webservice.KeycloakConfig
 import io.smartdatalake.workflow.action.customlogic._
 import io.smartdatalake.workflow.dataobject.{SplunkParams, WebserviceFileDataObject}
 import org.apache.spark.sql.types.StructType
-import scala.collection.JavaConverters._
 
+import scala.collection.JavaConverters._
 import scala.language.implicitConversions
 
 package object config {
@@ -76,6 +77,8 @@ package object config {
   implicit val customFileTransformerConfigReader: Configs[CustomFileTransformerConfig] = Configs.derive[CustomFileTransformerConfig]
 
   implicit val sparkRepartitionDefReader: Configs[SparkRepartitionDef] = Configs.derive[SparkRepartitionDef]
+
+  implicit val executionModeReader: Configs[ExecutionMode] = Configs.derive[ExecutionMode]
 
   // --------------------------------------------------------------------------------
 

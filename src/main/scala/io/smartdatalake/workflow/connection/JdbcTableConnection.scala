@@ -53,17 +53,15 @@ case class JdbcTableConnection( override val id: ConnectionId,
   // prepare catalog implementation
   val catalog: SQLCatalog = SQLCatalog.fromJdbcDriver(driver, this)
 
-  def execJdbcStatement(sql:String ) : Boolean = {
+  def execJdbcStatement(sql:String, logging: Boolean = true) : Boolean = {
     var conn: SqlConnection = null
     var stmt: Statement = null
     try {
-      Class.forName(driver)
       conn = getConnection
       stmt = conn.createStatement
-      logger.info(s"execJdbcStatement: $sql")
+      if (logging) logger.info(s"execJdbcStatement: $sql")
       stmt.execute(sql)
-    }
-    finally {
+    } finally {
       if (stmt!=null) stmt.close()
       if (conn!=null) conn.close()
     }
@@ -74,21 +72,29 @@ case class JdbcTableConnection( override val id: ConnectionId,
     var stmt: Statement = null
     var rs: ResultSet = null
     try {
-      Class.forName(driver)
       conn = getConnection
       stmt = conn.createStatement
       logger.info(s"execJdbcQuery: $sql")
       rs = stmt.executeQuery(sql)
       evalResultSet( rs )
-    }
-    finally {
+    } finally {
       if (rs!=null) rs.close()
       if (stmt!=null) stmt.close()
       if (conn!=null) conn.close()
     }
   }
 
+  def test(): Unit = {
+    var conn: SqlConnection = null
+    try {
+      conn = getConnection
+    } finally {
+      if (conn!=null) conn.close()
+    }
+  }
+
   private def getConnection: SqlConnection = {
+    Class.forName(driver)
     if (authMode.isDefined) authMode.get match {
       case m: BasicAuthMode => DriverManager.getConnection(url, m.user, m.password)
       case _ => throw new IllegalArgumentException(s"${authMode.getClass.getSimpleName} not supported.")

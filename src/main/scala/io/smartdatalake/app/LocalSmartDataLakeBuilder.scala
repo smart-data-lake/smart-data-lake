@@ -88,6 +88,7 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
         // start
         val stats = run(config)
+          .toSeq.sortBy(_._1).map(x => x._1 + "=" + x._2).mkString(" ") // convert stats to string
         logger.info(s"$appType finished successfully: $stats")
       case None =>
         logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))

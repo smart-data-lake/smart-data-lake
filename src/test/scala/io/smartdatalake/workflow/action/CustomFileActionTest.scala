@@ -41,7 +41,6 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
 
   private val tempDir = Files.createTempDirectory("test")
-  private val tempPath = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
@@ -68,7 +67,7 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start load
     implicit val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
-    val fileTransformerConfig = CustomFileTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestFileTransformer"))
+    val fileTransformerConfig = CustomFileTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestFileTransformer"), options = Map("test"->"true"))
     val action1 = CustomFileAction(id = "cfa", srcDO.id, tgtDO.id, fileTransformerConfig, false, 1)
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
@@ -111,8 +110,8 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start load
     implicit val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
-    val fileTransformerConfig = CustomFileTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestFileTransformer"))
-    val action1 = CustomFileAction(id = "cfa", srcDO.id, tgtDO.id, fileTransformerConfig, false, 1, initExecutionMode = Some(PartitionDiffMode()))
+    val fileTransformerConfig = CustomFileTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestFileTransformer"), options = Map("test"->"true"))
+    val action1 = CustomFileAction(id = "cfa", srcDO.id, tgtDO.id, fileTransformerConfig, false, 1, executionMode = Some(PartitionDiffMode()))
     val srcSubFeed = InitSubFeed("src1", srcPartitionValues) // InitSubFeed needed to test initExecutionMode!
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
@@ -135,7 +134,8 @@ object CustomFileActionTest {
 }
 
 class TestFileTransformer extends CustomFileTransformer {
-  override def transform(input: FSDataInputStream, output: FSDataOutputStream): Option[Exception] = {
+  override def transform(options: Map[String,String], input: FSDataInputStream, output: FSDataOutputStream): Option[Exception] = {
+    assert(options("test")=="true")
     TryWithRessource.execSource(Source.fromInputStream(input)) { src =>
       TryWithRessource.exec(new PrintWriter(output)) { os =>
         src.getLines().foreach { l =>
