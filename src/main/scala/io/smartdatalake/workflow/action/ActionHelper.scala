@@ -128,17 +128,17 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
   }
 
   def getMainDataObject[T <: DataObject](mainId: Option[DataObjectId], dataObjects: Seq[T], inputOutput: String, mainNeeded: Boolean, actionId: ActionObjectId): T = {
+    val (partitionedDataObjects,unpartitionedDataObjects) = dataObjects.collect{ case x: T @unchecked with CanHandlePartitions => x }.partition(_.partitions.nonEmpty)
     mainId.map {
       id => dataObjects.find(_.id == id).getOrElse(throw ConfigurationException(s"($actionId) main${inputOutput}Id $id not found in ${inputOutput}s"))
     }.orElse {
-      val partitionedDataObjects = dataObjects.collect{ case x: T @unchecked with CanHandlePartitions => x }.filter(_.partitions.nonEmpty)
       if (partitionedDataObjects.size==1) partitionedDataObjects.headOption
       else None
     }.orElse {
       if (dataObjects.size==1) dataObjects.headOption else None
     }.getOrElse {
       if (mainNeeded) logger.warn(s"($actionId) Could not determine unique main $inputOutput but execution mode might need it. Decided for ${dataObjects.head.id}.")
-      dataObjects.head
+      (partitionedDataObjects ++ unpartitionedDataObjects).head
     }
   }
 }
