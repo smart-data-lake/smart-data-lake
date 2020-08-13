@@ -239,7 +239,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     appConfig.validate()
 
     // log start parameters
-    logger.info(s"Starting run: runId=$runId attemptId=$attemptId feedSel=${appConfig.feedSel} appName=${appConfig.appName} test=${appConfig.test}")
+    logger.info(s"Starting run: runId=$runId attemptId=$attemptId feedSel=${appConfig.feedSel} appName=${appConfig.appName} test=${appConfig.test} givenPartitionValues=${appConfig.getPartitionValues.map(x => "("+x.mkString(",")+")").getOrElse("None")}")
     logger.debug(s"Environment: " + sys.env.map(x => x._1 + "=" + x._2).mkString(" "))
     logger.debug(s"System properties: " + sys.props.toMap.map(x => x._1 + "=" + x._2).mkString(" "))
 
