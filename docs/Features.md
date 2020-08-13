@@ -56,6 +56,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
 ##### Metrics
 * Number of rows written per DataObject
 * Execution duration per Action
+* StateListener interface to get notified about progress & metrics
 
 ##### Data Catalog
 * Report all DataObjects attributes (incl. foreign keys if defined) for visualisation of data catalog in BI tool
@@ -70,3 +71,11 @@ The following is a list of implemented and planned (Future) features of Smart Da
 * Check & report primary key violations by executing primary key checker action
 * Future: Metadata support for arbitrary data quality checks
 * Future: Report data quality (foreign key matching & arbitrary data quality checks) by executing data quality reporter action
+
+##### Testing
+* Support for CI
+  * Config validation
+  * Custom transformation unit tests
+  * Spark data pipeline simulation (acceptance tests)
+* Support for Deployment
+  * Dry-run
