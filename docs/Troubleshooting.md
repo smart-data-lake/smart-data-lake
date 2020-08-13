@@ -17,7 +17,7 @@ Error:
 `winutils.exe - System Error The code execution cannot proceed because MSVCR100.dll was not found. Reinstalling the program may fix this problem.`  
 Other errors are also possible:
 - Similar error message when double clicking on winutils.exe (Popup)
-- Errors when providing a path to the configuraiton instead of a single configuration file
+- Errors when providing a path to the configuration instead of a single configuration file
 - ExitCodeException exitCode=-1073741515 when executing SDL even though everything ran without errors
 
 Solution: 
