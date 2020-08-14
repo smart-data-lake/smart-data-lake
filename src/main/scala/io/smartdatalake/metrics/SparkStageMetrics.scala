@@ -22,7 +22,7 @@ package io.smartdatalake.metrics
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionMetrics
-import org.apache.spark.scheduler.{AccumulableInfo, SparkListener, SparkListenerJobStart, SparkListenerStageCompleted, SparkListenerTaskEnd}
+import org.apache.spark.scheduler.{AccumulableInfo, SparkListener, SparkListenerJobStart, SparkListenerStageCompleted}
 import org.joda.time.format.{DateTimeFormat, DateTimeFormatter, PeriodFormatter, PeriodFormatterBuilder}
 import org.joda.time.{Duration, Instant}
 
