@@ -242,7 +242,7 @@ private[smartdatalake] object DefaultExecutionModeExpressionData {
   }
 }
 
-private[smartdatalake] case class ExecutionModeFailedException(id: NodeId, phase: ExecutionPhase, msg: String) extends DAGException(id) {
+private[smartdatalake] case class ExecutionModeFailedException(id: NodeId, phase: ExecutionPhase, msg: String) extends DAGException(msg) {
   // don't fail in init phase, but skip action to continue with exec phase
   override def severity: ExceptionSeverity = if (phase==ExecutionPhase.Init) ExceptionSeverity.SKIPPED else ExceptionSeverity.FAILED
   override def getDAGRootExceptions: Seq[DAGException] = Seq(this)

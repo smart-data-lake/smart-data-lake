@@ -212,6 +212,11 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   }
 
   /**
+   * get latest runtime state
+   */
+  def getLatestRuntimeState = runtimeEvents.lastOption.map(_.state)
+
+  /**
    * get latest runtime information for this action
    */
   def getRuntimeInfo: Option[RuntimeInfo] = {
