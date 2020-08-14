@@ -28,21 +28,37 @@ private[smartdatalake] object PythonUtil {
   /**
    * Execute python code within a given Spark context/session.
    *
-   * @param pythonCode python code as string.
+   * @param code python code as string.
    *                   The SparkContext is available as "sc" and SparkSession as "session".
    * @param entryPointObj py4j gateway entrypoint java object available in python code as gateway.entry_point.
    *                      This is used to transfer SparkContext to python and can hold additional custom parameters.
    *                      entryPointObj must at least implement trait SparkEntryPoint.
    */
-  def execPythonTransform[T<:SparkEntryPoint](entryPointObj: T, pythonCode: String): Unit = {
-
-    // load python spark init code
-    val initCode = CustomCodeUtil.readResourceFile("pySparkInit.py")
-
-    // exec
-    PythonHelper.exec(entryPointObj, initCode + sys.props("line.separator") + pythonCode)
+  def execPythonTransform[T<:SparkEntryPoint](entryPointObj: T, code: String): Unit = {
+    PythonHelper.exec(entryPointObj, mainInitCode + sys.props("line.separator") + code)
   }
 
+  // python spark gateway init code
+  val mainInitCode =
+    """
+      |from pyspark.java_gateway import launch_gateway
+      |from pyspark.context import SparkContext
+      |from pyspark.conf import SparkConf
+      |from pyspark.sql.session import SparkSession
+      |from pyspark.sql import SQLContext
+      |from pyspark.sql import DataFrame
+      |
+      |# Initialize python spark session from java spark context.
+      |# The java spark context is set as entrypoint for the py4j gateway.
+      |gateway = launch_gateway()
+      |entryPoint = gateway.entry_point
+      |javaSparkContext = entryPoint.getJavaSparkContext()
+      |sparkConf = SparkConf(_jvm=gateway.jvm, _jconf=javaSparkContext.getConf())
+      |sc = SparkContext(conf=sparkConf, gateway=gateway, jsc=javaSparkContext)
+      |session = SparkSession(sc, entryPoint.session())
+      |sqlContext = SQLContext(sc, session, entryPoint.getSQLContext())
+      |print("python spark session initialized (sc, session, sqlContext)")
+      |""".stripMargin
 }
 
 class DfTransformerSparkEntryPoint(override val session: SparkSession, options: Map[String,String] = Map()) extends SparkEntryPoint

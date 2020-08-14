@@ -46,14 +46,20 @@ trait CustomDfTransformer extends Serializable {
 /**
  * Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1)
  *
+ * Note about Python transformation: Environment with Python and PySpark needed.
+ * PySpark session is initialize and available under variables `sc`, `session`, `sqlContext`.
+ * Input DataFrame is available as `inputDf`. Output DataFrame must be set with `setOutputDf(df)`.
+ *
  * @param className Optional class name to load transformer code from
  * @param scalaFile Optional file where scala code for transformation is loaded from
  * @param scalaCode Optional scala code for transformation
- * @param sqlCode Optional map of DataObjectId and corresponding SQL Code
+ * @param sqlCode Optional SQL Code to use as transformation
+ * @param pythonFile Optional pythonFile to use for python transformation
+ * @param pythonCode Optional pythonCode to user for python transformation
  * @param options Options to pass to the transformation
  */
 case class CustomDfTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Option[String] = None, pythonFile: Option[String] = None, pythonCode: Option[String] = None, options: Map[String,String] = Map()) {
-  require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || sqlCode.isDefined || pythonFile.isDefined || pythonCode.isDefined, "Either className, scalaFile, scalaCode, sqlCode, pythonFile or pythonCode must be defined for CustomDfTransformer")
+  require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || sqlCode.isDefined || pythonFile.isDefined || pythonCode.isDefined, "Either className, scalaFile, scalaCode, sqlCode, pythonFile or code must be defined for CustomDfTransformer")
 
   val impl : Option[CustomDfTransformer] = className.map {
     clazz => CustomCodeUtil.getClassInstanceByName[CustomDfTransformer](clazz)
@@ -94,7 +100,7 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
     else if(scalaFile.isDefined)  "scalaFile: " +scalaFile.get
     else if(scalaCode.isDefined)  "scalaCode: " +scalaCode.get
     else if(sqlCode.isDefined)    "sqlCode: "   +sqlCode.get
-    else if(pythonCode.isDefined) "pythonCode: "+pythonCode.get
+    else if(pythonCode.isDefined) "code: "+pythonCode.get
     else if(pythonFile.isDefined) "pythonFile: "+pythonFile.get
     else throw new IllegalStateException("transformation undefined!")
   }
@@ -132,7 +138,7 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
           |def setOutputDf( df ):
           |    entryPoint.setOutputDf(df._jdf)
           """.stripMargin
-        PythonUtil.execPythonTransform( entryPoint, additionalInitCode+"\n"+code)
+        PythonUtil.execPythonTransform( entryPoint, additionalInitCode + sys.props("line.separator") + code)
         entryPoint.outputDf.getOrElse(throw new IllegalStateException("Python transformation must set output DataFrame (call setOutputDf(df))"))
       } catch {
         case e: Throwable => throw new PythonTransformationException(s"Could not execute Python code. Error: ${e.getMessage}", e)
