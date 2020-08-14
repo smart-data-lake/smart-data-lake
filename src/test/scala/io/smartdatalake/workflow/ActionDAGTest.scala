@@ -963,8 +963,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
 
     // first dag run, first file processed
     dag.prepare
-    val ex = intercept[TaskFailedException](dag.init)
-    assert(ex.cause.isInstanceOf[ExecutionModeFailedException])
+    val ex = intercept[ExecutionModeFailedException](dag.init)
   }
 
 }
