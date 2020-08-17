@@ -551,7 +551,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
-    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), table = tgt1Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1, expectedPartitionsCondition = Some("elements['lastname'] != 'xyz'")))
+    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), table = tgt1Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1, expectedPartitionsCondition = Some("elements['lastname'] != 'xyz'"))
     tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
     val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
@@ -592,15 +592,16 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
   test( "validate expected partitions") {
 
     val srcTable = Table(Some("default"), "ap_input")
-    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
     val srcPath = tempPath+s"/${srcTable.fullName}"
     val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, partitions=Seq("lastname"), numInitialHdfsPartitions = 1, expectedPartitionsCondition = Some("elements['lastname'] != 'xyz'"))
+    srcDO.dropTable
+
     instanceRegistry.register(srcDO)
 
     val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgt1Table.db.get, tgt1Table.name )
     val tgt1Path = tempPath+s"/${tgt1Table.fullName}"
     val tgt1DO = HiveTableDataObject("tgt1", Some(tgt1Path), table = tgt1Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
 
     val refTimestamp1 = LocalDateTime.now()
