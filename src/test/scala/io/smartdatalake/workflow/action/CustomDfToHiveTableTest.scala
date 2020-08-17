@@ -52,9 +52,8 @@ class CustomDfToHiveTableTest extends FunSuite with BeforeAndAfter {
     val feed = "customDf2Hive"
     val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some("io.smartdatalake.config.TestCustomDfCreator")))
     val targetTable = Table(db = Some("default"), name = "custom_df_copy", query = None, primaryKey = Some(Seq("line")))
-    HiveUtil.dropTable(session, targetTable.db.get, targetTable.name )
-    val targetTablePath = tempPath+s"/${targetTable.fullName}"
-    val targetDO = HiveTableDataObject(id="target", Some(targetTablePath), table = targetTable, numInitialHdfsPartitions = 1)
+    val targetDO = HiveTableDataObject(id="target", Some(tempPath+s"/${targetTable.fullName}"), table = targetTable, numInitialHdfsPartitions = 1)
+    targetDO.dropTable
     instanceRegistry.register(sourceDO)
     instanceRegistry.register(targetDO)
 
@@ -79,9 +78,8 @@ class CustomDfToHiveTableTest extends FunSuite with BeforeAndAfter {
     val feed = "customDf2Hive_dfManyTypes"
     val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some("io.smartdatalake.config.TestCustomDfManyTypes")))
     val targetTable = Table(db = Some("default"), name = "custom_dfManyTypes_copy")
-    HiveUtil.dropTable(session, targetTable.db.get, targetTable.name )
-    val targetTablePath = tempPath+s"/${targetTable.fullName}"
-    val targetDO = HiveTableDataObject(id="target", Some(targetTablePath), table = targetTable, numInitialHdfsPartitions = 1)
+    val targetDO = HiveTableDataObject(id="target", Some(tempPath+s"/${targetTable.fullName}"), table = targetTable, numInitialHdfsPartitions = 1)
+    targetDO.dropTable
     instanceRegistry.register(sourceDO)
     instanceRegistry.register(targetDO)
 

@@ -50,14 +50,12 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
     // setup DataObjects
     val feed = "historize"
     val srcTable = Table(Some("default"), "historize_input")
-    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
-    val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgtTable = Table(Some("default"), "historize_output", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgtTable.db.get, tgtTable.name )
-    val tgtPath = tempPath+s"/${tgtTable.fullName}"
-    val tgtDO = TickTockHiveTableDataObject("tgt1", Some(tgtPath), table = tgtTable, numInitialHdfsPartitions = 1)
+    val tgtDO = TickTockHiveTableDataObject("tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable, numInitialHdfsPartitions = 1)
+    tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
     // prepare & start 1st load
@@ -65,7 +63,7 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
     val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val action1 = HistorizeAction("ha", srcDO.id, tgtDO.id)
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
-    TestUtil.prepareHiveTable(srcTable, srcPath, l1)
+    srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(session,context1).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
@@ -81,7 +79,7 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
     val context2 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp2), SmartDataLakeBuilderConfig())
     val action2 = HistorizeAction("ha2", srcDO.id, tgtDO.id)
     val l2 = Seq(("doe","john",10)).toDF("lastname", "firstname", "rating")
-    TestUtil.prepareHiveTable(srcTable, srcPath, l2)
+    srcDO.writeDataFrame(l2, Seq())
     val srcSubFeed2 = SparkSubFeed(None, "src1", Seq())
     action2.exec(Seq(srcSubFeed2))(session, context2)
 

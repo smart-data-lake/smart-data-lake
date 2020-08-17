@@ -147,12 +147,12 @@ case class HiveTableDataObject(override val id: DataObjectId,
     val dfPrepared = if (createTableOnly) session.createDataFrame(List[Row]().asJava, df.schema) else df
 
     // write table and fix acls
-    HiveUtil.writeDfToHive( session, dfPrepared, hadoopPath.toString, table.name, table.db.get, partitions, saveMode, numInitialHdfsPartitions=numInitialHdfsPartitions )
+    HiveUtil.writeDfToHive( dfPrepared, hadoopPath.toString, table, partitions, saveMode, numInitialHdfsPartitions=numInitialHdfsPartitions )
     val aclToApply = acl.orElse(connection.flatMap(_.acl))
     if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
     if (analyzeTableAfterWrite && !createTableOnly) {
       logger.info(s"Analyze table ${table.fullName}.")
-      HiveUtil.analyze(session, table.db.get, table.name, partitions, partitionValues)
+      HiveUtil.analyze(table, partitions, partitionValues)
     }
 
     // make sure empty partitions are created as well
@@ -181,7 +181,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
   }
 
   override def dropTable(implicit session: SparkSession): Unit = {
-    HiveUtil.dropTable(session, table.db.get, table.name)
+    HiveUtil.dropTable(table)
   }
 
   /**

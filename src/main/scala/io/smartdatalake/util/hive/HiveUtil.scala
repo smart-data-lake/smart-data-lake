@@ -40,45 +40,33 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
   /**
    * Creates a String by concatenating all column names of a table. 
    * Columns are seperated by ','.
-   *
-   * @param session [[SparkSession]] used
-   * @param tableName Name of table
-   * @return
    */
-  def tableColumnsString(session: SparkSession, dbName: String, tableName: String): String = {
+  def tableColumnsString(table: Table)(implicit session: SparkSession): String = {
     import session.implicits._ // Workaround for
-    val tableSchema = execSqlStmt(session, s"show columns in $dbName.$tableName")
+    val tableSchema = execSqlStmt(s"show columns in ${table.fullName}")
     tableSchema.map(c => c(0).toString.replace(" ","").toLowerCase).collect.mkString(",")
   }
 
   /**
    * Deletes a Hive table
    *
-   * @param session [[SparkSession]] used
-   * @param hiveDb Hive DB to use
-   * @param tableName Name of table
    * @param doPurge Flag to indicate if PURGE should be used when deleting (don't delete to HDFS trash). Default: true
    * @param existingOnly Flag if check "if exists" should be executed. Default: true
    */
-  def dropTable(session: SparkSession, hiveDb: String, tableName: String, doPurge: Boolean = true,
-                existingOnly: Boolean = true): Unit = {
+  def dropTable(table: Table, doPurge: Boolean = true, existingOnly: Boolean = true)(implicit session: SparkSession): Unit = {
     val existsClause = if (existingOnly) "if exists " else ""
     val purgeClause = if (doPurge) " purge" else ""
-    val stmt = s"drop table $existsClause$hiveDb.$tableName$purgeClause"
-    execSqlStmt(session, stmt)
+    val stmt = s"drop table $existsClause${table.fullName}$purgeClause"
+    execSqlStmt(stmt)
   }
 
   /**
    * Collects table-level statistics
-   *
-   * @param session [[SparkSession]] to use
-   * @param hiveDb Hive DB to use
-   * @param hiveTable Hive table for which statistics should get collected
    */
-  def analyzeTable(session: SparkSession, hiveDb: String, hiveTable: String): Unit = {
-    val stmt = s"ANALYZE TABLE $hiveDb.$hiveTable COMPUTE STATISTICS"
-    Try(execSqlStmt(session, stmt)) match {
-      case Success(_) => logger.info(s"Gathered table-level statistics on table $hiveDb.$hiveTable")
+  def analyzeTable(table: Table)(implicit session: SparkSession): Unit = {
+    val stmt = s"ANALYZE TABLE ${table.fullName} COMPUTE STATISTICS"
+    Try(execSqlStmt(stmt)) match {
+      case Success(_) => logger.info(s"Gathered table-level statistics on table ${table.fullName}")
       case Failure(throwable) => logger.error(throwable.getMessage)
         throw new AnalyzeTableException(s"Error running: $stmt")
     }
@@ -86,16 +74,11 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
 
   /**
    * Collects column-level statistics
-   *
-   * @param session [[SparkSession]] to use
-   * @param hiveDb Hive DB to use
-   * @param hiveTable  Hive table for which statistics should get collected
-   * @param columns The column list of the Hive table
    */
-  def analyzeTableColumns(session: SparkSession, hiveDb: String, hiveTable: String, columns: String): Unit = {
-    val stmt = s"ANALYZE TABLE $hiveDb.$hiveTable COMPUTE STATISTICS FOR COLUMNS $columns"
-    Try(execSqlStmt(session, stmt)) match {
-      case Success(_) => logger.info(s"Gathered column-level statistics on table $hiveDb.$hiveTable")
+  def analyzeTableColumns(table: Table, columns: String)(implicit session: SparkSession): Unit = {
+    val stmt = s"ANALYZE TABLE ${table.fullName} COMPUTE STATISTICS FOR COLUMNS $columns"
+    Try(execSqlStmt(stmt)) match {
+      case Success(_) => logger.info(s"Gathered column-level statistics on table ${table.fullName}")
       case Failure(throwable) => logger.error(throwable.getMessage)
         throw new AnalyzeTableException(s"Error running: $stmt")
     }
@@ -107,48 +90,38 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    *
    * We will reduce the number by 2%: If the number is too low, the block is not filled optimally. On the other hand,
    * if the number is too high we end up with an additional (very small) block which is worse.
-   *
-   * @param session
-   * @param hiveDb
-   * @param hiveTable
+
    * @return Desired number of records per file if it can be determined, None otherwise
    */
-  def calculateMaxRecordsPerFileFromStatistics(session: SparkSession, hiveDb: String, hiveTable: String): Option[BigInt] = {
+  def calculateMaxRecordsPerFileFromStatistics(table: Table)(implicit session: SparkSession): Option[BigInt] = {
     val desiredSizePerFile = HdfsUtil.desiredFileSize(session)
     logger.debug("Desired filesize for session is " +desiredSizePerFile +" bytes.")
 
-    session.sharedState.externalCatalog.getTable(hiveDb, hiveTable).stats.flatMap(s =>
+    session.sharedState.externalCatalog.getTable(table.db.get, table.name).stats.flatMap(s =>
       s.rowCount.map(rCount => (desiredSizePerFile / (s.sizeInBytes / rCount))*98/100))
   }
 
   /**
    * Collects column-level statistics for partitions
-   *
-   * @param session [[SparkSession]] to use
-   * @param hiveDb  Hive DB to use
-   * @param hiveTable  Hive table for which statistics should get collected
-   * @param partitions Partitions to collect statistics for
-   * @param partitionValues Seq of PartitionValues of hiveTable (mapping col->value)
    */
-  def analyzeTablePartitions(session: SparkSession, hiveDb: String, hiveTable: String
-                           , partitions: Seq[String], partitionValues: Seq[PartitionValues]): Unit = {
+  def analyzeTablePartitions(table: Table, partitionCols: Seq[String], partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
 
     val preparedPartitionValues = if (partitionValues.nonEmpty) {
       partitionValues.map{
         partitionValue =>
           // extend PartitionValue with defaults for missing partition colums
-          partitionValue.elements.mapValues(Some(_)) ++ partitions.diff(partitionValue.keys.toSeq).map( c => (c, None))
+          partitionValue.elements.mapValues(Some(_)) ++ partitionCols.diff(partitionValue.keys.toSeq).map( c => (c, None))
       }
     } else {
       // create a default entry for every partition column to compute statistics for all partition values existing on the storage
-      Seq(partitions.map(c => (c, None)).toMap)
+      Seq(partitionCols.map(c => (c, None)).toMap)
     }
     preparedPartitionValues.foreach{ p =>
       val partitionSpec = p.map{ case (col, value) => if(value.isDefined) s"$col='${value.get}'" else col}
         .mkString(",")
-      val stmt = s"ANALYZE TABLE $hiveDb.$hiveTable PARTITION($partitionSpec) COMPUTE STATISTICS"
-      Try(execSqlStmt(session, stmt)) match {
-        case Success(_) => logger.info(s"Gathered partition-level statistics for $partitionSpec on table $hiveDb.$hiveTable")
+      val stmt = s"ANALYZE TABLE ${table.fullName} PARTITION($partitionSpec) COMPUTE STATISTICS"
+      Try(execSqlStmt(stmt)) match {
+        case Success(_) => logger.info(s"Gathered partition-level statistics for $partitionSpec on table ${table.fullName}")
         case Failure(throwable) => logger.error(throwable.getMessage)
           throw new AnalyzeTableException(s"Error running: $stmt")
       }
@@ -156,7 +129,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
   }
 
   // get Partitions for specified table from catalog
-  def getTablePartitions(hiveDb:String, tableName:String) (implicit session: SparkSession) : Seq[Map[String,String]] = {
+  def getTablePartitions(table: Table) (implicit session: SparkSession) : Seq[Map[String,String]] = {
     import session.implicits._
 
     // Parse HDFS partitionname into Map
@@ -168,15 +141,15 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
         throw ex
     }
 
-    session.sql(s"show partitions $hiveDb.$tableName").as[String].collect.map( parseHDFSPartitionString).toSeq
+    session.sql(s"show partitions ${table.fullName}").as[String].collect.map( parseHDFSPartitionString).toSeq
   }
 
   // get partition columns for specified table from DDL
-  def getTablePartitionCols(hiveDb:String, tableName:String) (implicit session: SparkSession) : Option[Seq[String]] = {
+  def getTablePartitionCols(table: Table) (implicit session: SparkSession) : Option[Seq[String]] = {
     import session.implicits._
 
     // get ddl and concat into one string without newlines
-    val tableDDL = session.sql(s"show create table $hiveDb.$tableName").as[String].collect.mkString(" ").replace("\n"," ")
+    val tableDDL = session.sql(s"show create table ${table.fullName}").as[String].collect.mkString(" ").replace("\n"," ")
 
     // extract partition by declaration
     val regexPartitionBy = raw"PARTITIONED BY\s+\(([^\)]+)\)".r.unanchored
@@ -208,37 +181,34 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    * @param session SparkSession
    * @param dfNew DataFrame to write
    * @param outputDir Directory to store files for Table
-   * @param hiveTable Tablename
-   * @param hiveDb Hive database name
+   * @param table Table
    * @param partitions Partition column names
    * @param hdfsOutputType tables underlying file format, default = parquet
    * @param numInitialHdfsPartitions the initial number of files created if table does not exist yet, default = -1. Note: the number of files created is controlled by the number of Spark partitions.
    */
-  def writeDfToHive(session: SparkSession, dfNew: DataFrame, outputDir: String, hiveTable: String,
-                    hiveDb: String, partitions: Seq[String], saveMode: SaveMode,
-                    hdfsOutputType: OutputType = OutputType.Parquet, numInitialHdfsPartitions: Int = -1): Unit = {
-    implicit val sss = session
-    logger.info(s"writeDfToHive: starting for table $hiveDb.$hiveTable, outputDir: $outputDir, partitions:$partitions")
+  def writeDfToHive(dfNew: DataFrame, outputDir: String, table: Table, partitions: Seq[String], saveMode: SaveMode,
+                    hdfsOutputType: OutputType = OutputType.Parquet, numInitialHdfsPartitions: Int = -1)(implicit session: SparkSession): Unit = {
+    logger.info(s"writeDfToHive: starting for table ${table.fullName}, outputDir: $outputDir, partitions:$partitions")
 
     // check if all partition cols are present in DataFrame
     val missingPartitionCols = partitions.diff(dfNew.columns)
     require( missingPartitionCols.isEmpty, s"""Partition column(s) ${missingPartitionCols.mkString(",")} are missing in DataFrame columns (${dfNew.columns.mkString(",")}).""" )
 
     // check if table exists and location is correct
-    val tableExists = isHiveTableExisting(hiveTable,session,hiveDb)
-    if (!tableExists) logger.info(s"writeDfToHive: table $hiveDb.$hiveTable doesnt exist yet")
+    val tableExists = isHiveTableExisting(table)
+    if (!tableExists) logger.info(s"writeDfToHive: table ${table.fullName} doesnt exist yet")
 
     // check if partitionsOpt match with existing table definition
     if (tableExists) {
       val configuredCols = partitions.toSet
-      val existingCols = getTablePartitionCols(hiveDb,hiveTable).getOrElse(Seq()).toSet
+      val existingCols = getTablePartitionCols(table).getOrElse(Seq()).toSet
       require( configuredCols==existingCols, s"writeDfToHive: configured are different from tables existing partition columns: configured=$configuredCols, existing=$existingCols" )
     }
 
     // check if this run is with SchemaEvolution and sort columns (partition columns last)
     val (df_newColsSorted, withSchemaEvolution) = if (tableExists) {
       // check if schema evolution
-      val df_existing = session.table(s"$hiveDb.$hiveTable")
+      val df_existing = session.table(table.fullName)
       val withSchemaEvolution = !SchemaEvolution.hasSameColNamesAndTypes(df_existing, dfNew)
       if (withSchemaEvolution) {
         logger.info("writeDfToHive: schema evolution detected")
@@ -273,18 +243,15 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     // Schema evolution with Partitions can only be done with Tick-Tock
     require( !(withSchemaEvolution && partitions.nonEmpty), "Schema evolution with partitions only works with TickTock! Use writeDfToHiveWithTickTock instead." )
 
-    // define table
-    val table = s"$hiveDb.$hiveTable"
-
-    val originalMaxRecordsPerFile = session.conf.get("spark.sql.files.maxRecordsPerFile")
 
     // write to table
+    val originalMaxRecordsPerFile = session.conf.get("spark.sql.files.maxRecordsPerFile")
     if (tableExists && !withSchemaEvolution) {
       // insert into existing table
-      logger.info(s"writeDfToHive: insert into $table")
+      logger.info(s"writeDfToHive: insert into ${table.fullName}")
 
       // Try to determine maximum number of records according to catalog statistics
-      val maxRecordsPerFile: Option[BigInt] = calculateMaxRecordsPerFileFromStatistics(session, hiveDb, hiveTable)
+      val maxRecordsPerFile: Option[BigInt] = calculateMaxRecordsPerFileFromStatistics(table)
       val df_partitioned = if(maxRecordsPerFile.isDefined) {
         // if exact number of records could be determined from Hive statistics, use it to split files
         logger.info(s"writing with maxRecordsPerFile " +maxRecordsPerFile.get.toLong)
@@ -300,7 +267,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       // Write file
       df_partitioned.write
         .mode(saveMode)
-        .insertInto(table)
+        .insertInto(table.fullName)
 
     } else {
       // for new tables:
@@ -311,22 +278,22 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
 
       // create and write to table
       if (partitions.nonEmpty) { // with partitions
-        logger.info(s"writeDfToHive: creating external partitioned table $table at location $outputDir")
+        logger.info(s"writeDfToHive: creating external partitioned table ${table.fullName} at location $outputDir")
         HdfsUtil.deletePath(outputDir, session.sparkContext, doWarn=false) // delete existing data, as all partitions need to be written when table is created.
         df_partitioned.write
           .partitionBy(partitions:_*)
           .format(hdfsOutputType.toString)
           .option("path", outputDir)
           .mode("overwrite")
-          .saveAsTable(table)
+          .saveAsTable(table.fullName)
 
       } else { // without partitions
-        logger.info(s"writeDfToHive: creating table $table at location $outputDir")
+        logger.info(s"writeDfToHive: creating table ${table.fullName} at location $outputDir")
         df_partitioned.write
           .format(hdfsOutputType.toString)
           .option("path", outputDir)
           .mode("overwrite")
-          .saveAsTable(table)
+          .saveAsTable(table.fullName)
       }
     }
     session.conf.set("spark.sql.files.maxRecordsPerFile", originalMaxRecordsPerFile.toLong)
@@ -342,36 +309,33 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    * @param session SparkSession
    * @param df_new DataFrame to write
    * @param outputDir Directory to store files for Table
-   * @param hiveTable Tablename
-   * @param hiveDb Hive database name
+   * @param table Table
    * @param partitions Partitions column name
    * @param hdfsOutputType tables underlying file format, default = parquet
    */
-  def writeDfToHiveWithTickTock(session: SparkSession, df_new: DataFrame, outputDir: String, hiveTable: String,
-                    hiveDb: String, partitions: Seq[String], saveMode: SaveMode,
-                    hdfsOutputType: OutputType = OutputType.Parquet): Unit = {
-    implicit val sss = session
-    logger.info(s"writeDfToHiveWithTickTock: starting for table $hiveDb.$hiveTable, outputDir: $outputDir, partitions:$partitions")
+  def writeDfToHiveWithTickTock(df_new: DataFrame, outputDir: String, table: Table, partitions: Seq[String], saveMode: SaveMode,
+                    hdfsOutputType: OutputType = OutputType.Parquet)(implicit session: SparkSession): Unit = {
+    logger.info(s"writeDfToHiveWithTickTock: starting for table ${table.fullName}, outputDir: $outputDir, partitions:$partitions")
 
     // check if all partition cols are present in DataFrame
     val missingPartitionCols = partitions.diff(df_new.columns)
     require( missingPartitionCols.isEmpty, s"""partition columns ${missingPartitionCols.mkString(",")} not present in DataFrame""" )
 
     // check if table exists and location is correct
-    val tableExists = isHiveTableExisting(hiveTable,session,hiveDb)
-    if (!tableExists) logger.info(s"writeDfToHive: table $hiveDb.$hiveTable doesn't exist yet")
+    val tableExists = isHiveTableExisting(table)
+    if (!tableExists) logger.info(s"writeDfToHive: table ${table.fullName} doesn't exist yet")
 
     // check if partitionsOpt match with existing table definition
     if (tableExists) {
       val configuredCols = partitions.toSet
-      val existingCols = getTablePartitionCols(hiveDb,hiveTable).getOrElse(Seq()).toSet
+      val existingCols = getTablePartitionCols(table).getOrElse(Seq()).toSet
       require( configuredCols==existingCols, s"writeDfToHive: configured are different from tables existing partition columns: configured=$configuredCols, existing=$existingCols" )
     }
 
     // check if this run is with SchemaEvolution and sort columns (partition columns last)
     val (df_newColsSorted, withSchemaEvolution) = if (tableExists) {
       // check if schema evolution
-      val df_existing = session.table(s"$hiveDb.$hiveTable")
+      val df_existing = session.table(table.fullName)
       val withSchemaEvolution = !SchemaEvolution.hasSameColNamesAndTypes(df_existing, df_new)
       if (withSchemaEvolution) {
         logger.info("writeDfToHive: schema evolution detected")
@@ -409,73 +373,67 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     val doTickTock = (partitions.isEmpty || withSchemaEvolution) && tableExists
 
     // define location: use tick-tock path
-    val location = alternatingTickTockLocation2(hiveDb, session, hiveTable, outputDir)
+    val location = alternatingTickTockLocation2(table, outputDir)
 
     // define table: use tmp-table if we need to *do* a tick-tock
-    val table = if (doTickTock) {
+    val tableName = if (doTickTock) {
       logger.info(s"writeDfToHive: tick-tock needed")
-      s"$hiveDb.${hiveTable}_tmp"
-    } else s"$hiveDb.$hiveTable"
+      s"${table.fullName}_tmp"
+    } else table.fullName
 
     // write to table
     if (tableExists && !doTickTock && !withSchemaEvolution) {
       // insert into existing table
-      logger.info(s"writeDfToHive: insert into $table")
-      df_newColsSorted.write.mode(saveMode).insertInto(table)
+      logger.info(s"writeDfToHive: insert into $tableName")
+      df_newColsSorted.write.mode(saveMode).insertInto(tableName)
 
     } else {
       // create and write to table
       if (partitions.nonEmpty) { // with partitions
-        logger.info(s"writeDfToHive: creating external partitioned table $table at location $location")
+        logger.info(s"writeDfToHive: creating external partitioned table $tableName at location $location")
         HdfsUtil.deletePath(location, session.sparkContext, doWarn=false) // delete existing data, as all partitions need to be written when table is created.
         df_newColsSorted.write
           .partitionBy(partitions:_*)
           .format(hdfsOutputType.toString)
           .option("path", location)
           .mode("overwrite")
-          .saveAsTable(table)
+          .saveAsTable(tableName)
 
       } else { // without partitions
-        logger.info(s"writeDfToHive: creating table $table at location $location")
+        logger.info(s"writeDfToHive: creating table $tableName at location $location")
         df_newColsSorted.write
           .format(hdfsOutputType.toString)
           .option("path", location)
           .mode("overwrite")
-          .saveAsTable(table)
+          .saveAsTable(tableName)
       }
     }
 
     // point hiveTable to new data for Tick-Tock table
     if (doTickTock) {
-      val existingTable = s"$hiveDb.$hiveTable"
+      val existingTable = table.fullName
       // drop existing table (schema is outdated), rename tmp table (new schema)
       // Attention: this table is potentially missing for some milliseconds...
       // Note: we could also change location of existing table, but this get's complicated for partitioned tables as all partition locations need to be changed as well, maybe even with multiple partition cols.
-      logger.info(s"writeDfToHive: droping table $existingTable, renaming table $table to $existingTable" )
+      logger.info(s"writeDfToHive: droping table $existingTable, renaming table $tableName to $existingTable" )
       session.sql(s"DROP TABLE IF EXISTS $existingTable")
-      session.sql(s"ALTER TABLE $table RENAME TO $existingTable")
+      session.sql(s"ALTER TABLE $tableName RENAME TO $existingTable")
     }
   }
 
   /**
    * Collects table statistics for table or table with partitions
-   *
-   * @param session [[SparkSession]] to use
-   * @param hiveDb Target Hive DB
-   * @param hiveTable Target Hive table
-   * @param partitions Seq of partitions of hiveTable
-   * @param partitionValues Seq of PartitionValues of hiveTable (mapping col->value)
    */
-  def analyze(session: SparkSession, hiveDb: String, hiveTable: String, partitions: Seq[String], partitionValues: Seq[PartitionValues] = Seq()): Unit = {
+  def analyze(table: Table, partitionCols: Seq[String], partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): Unit = {
     // If partitions are present, statistics can't be collected for the table itself
     // only for partitions or columns
-    val columns = tableColumnsString(session, hiveDb, hiveTable)
-    if (partitions.isEmpty){
-      analyzeTableColumns(session, hiveDb, hiveTable, columns)
-      analyzeTable(session, hiveDb, hiveTable)
+    val columns = tableColumnsString(table)
+    if (partitionCols.isEmpty){
+      analyzeTableColumns(table, columns)
+      analyzeTable(table)
     } else {
-      analyzeTablePartitions(session, hiveDb, hiveTable, partitions, partitionValues)
-      analyzeTableColumns(session, hiveDb, hiveTable, columns)
+      analyzeTablePartitions(table, partitionCols, partitionValues)
+      analyzeTableColumns(table, columns)
     }
   }
 
@@ -486,7 +444,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    * @param stmt statement to be executed
    * @return result DataFrame
    */
-  def execSqlStmt(session: SparkSession, stmt: String): DataFrame = {
+  def execSqlStmt(stmt: String)(implicit session: SparkSession): DataFrame = {
     try {
       logger.info(s"Executing SQL statement: $stmt")
       session.sql(stmt)
@@ -533,17 +491,15 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
   /**
    * Checks if a Hive table exists
    *
-   * @param tableName Name of table
-   * @param session [[SparkSession]] to use
-   * @param hiveDb Hive DB to use
    * @return true if a table exists, otherwise false
    */
-  def isHiveTableExisting(tableName: String, session: SparkSession, hiveDb: String): Boolean = {
-    session.catalog.tableExists(hiveDb, tableName)
+  def isHiveTableExisting(table: Table)(implicit session: SparkSession): Boolean = {
+    if (table.db.isDefined) session.catalog.tableExists(table.db.get, table.name)
+    else session.catalog.tableExists(table.name)
   }
 
-  def hiveTableLocation(dbName: String, session: SparkSession, tableName: String): String = {
-    val extendedDescribe = session.sql(s"describe extended $dbName.$tableName")
+  def hiveTableLocation(table: Table)(implicit session: SparkSession): String = {
+    val extendedDescribe = session.sql(s"describe extended ${table.fullName}")
       .cache
 
     // Spark 2.2, 2.3: Location is found as row with col_name == "Location",
@@ -573,19 +529,19 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       case _ => None
     }
 
-    location22.orElse(location21).getOrElse( throw new TableInformationException( s"Location for table $dbName.$tableName not found"))
+    location22.orElse(location21).getOrElse( throw new TableInformationException( s"Location for table ${table.fullName} not found"))
   }
 
   def existingTableLocation(table: Table)(implicit session: SparkSession): URI = {
     session.sharedState.externalCatalog.getTable(table.db.get,table.name).location
   }
 
-  def existingTickTockLocation(dbName: String, session: SparkSession, tableName: String): String = {
-    hiveTableLocation(dbName, session, tableName)
+  def existingTickTockLocation(table: Table)(implicit session: SparkSession): String = {
+    hiveTableLocation(table)
   }
 
-  def getCurrentTickTockLocationSuffix(dbName: String, session: SparkSession, tableName: String): HiveTableLocationSuffix.Value = {
-    val currentLocation = hiveTableLocation(dbName, session, tableName)
+  def getCurrentTickTockLocationSuffix(table: Table)(implicit session: SparkSession): HiveTableLocationSuffix.Value = {
+    val currentLocation = hiveTableLocation(table)
     logger.debug(s"currentLocation: $currentLocation")
     HiveTableLocationSuffix.withName(currentLocation.split('/').last)
   }
@@ -604,17 +560,17 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     }
   }
 
-  def alternatingTickTockLocation(dbName: String, session: SparkSession, tableName: String): String = {
-    val currentLocation = hiveTableLocation(dbName, session, tableName)
+  def alternatingTickTockLocation(table: Table)(implicit session: SparkSession): String = {
+    val currentLocation = hiveTableLocation(table)
     logger.debug(s"currentLocation: $currentLocation")
     val newLocation = alternateTickTockLocation(currentLocation)
     logger.debug(s"newLocation: $currentLocation")
     newLocation
   }
 
-  def alternatingTickTockLocation2(dbName: String, session: SparkSession, tableName: String, outputDir:String): String = {
-    if (isHiveTableExisting(tableName,session,dbName)) {
-      alternateTickTockLocation(hiveTableLocation(dbName, session, tableName))
+  def alternatingTickTockLocation2(table: Table, outputDir:String)(implicit session: SparkSession): String = {
+    if (isHiveTableExisting(table)) {
+      alternateTickTockLocation(hiveTableLocation(table))
     } else {
       // If the table doesn't exist yet, start with tick
       s"$outputDir/${HiveTableLocationSuffix.Tick.toString}"
@@ -649,6 +605,6 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
 
   def createEmptyPartition(table: Table, partitionValues: PartitionValues)(implicit session: SparkSession): Unit = {
     val partitionDef = partitionValues.elements.map{ case (k,v) => s"$k='$v'"}.mkString(", ")
-    execSqlStmt(session, s"ALTER TABLE ${table.fullName} ADD IF NOT EXISTS PARTITION ($partitionDef)")
+    execSqlStmt(s"ALTER TABLE ${table.fullName} ADD IF NOT EXISTS PARTITION ($partitionDef)")
   }
 }
