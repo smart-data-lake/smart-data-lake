@@ -599,12 +599,12 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     dag.exec
 
     // check
-    val r1 = tgt2DO.getDataFrame()
+    val r2 = tgt2DO.getDataFrame()
       .select($"rating")
       .as[Int].collect().toSeq
-    assert(r1.size == 1)
-    assert(r1.head == 5)
+    assert(r2 == Seq(5))
     assert(tgt2DO.listPartitions == expectedPartitions)
+
 
     // second dag run - skip action execution because there are no new partitions to process
     dag.prepare
@@ -640,7 +640,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     tgt1DO.writeDataFrame(df1, expectedPartitions)
     val actions: Seq[SparkSubFeedAction] = Seq(
       CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(alternativeOutputId = Some(tgt2DO.id))))
-      , CopyAction("b", tgt1DO.id, tgt2DO.id)
+      , CopyAction("b", tgt1DO.id, tgt2DO.id, deleteDataAfterRead = true)
     )
     val dag: ActionDAGRun = ActionDAGRun(actions, 1, 1)
 
@@ -650,11 +650,12 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     dag.exec
 
     // check
-    val r1 = tgt2DO.getDataFrame()
+    assert(tgt1DO.getDataFrame().count == 0) // this should be empty because of tgt2DO.deleteDataAfterRead = true
+    assert(tgt1DO.listPartitions.isEmpty)
+    val r2 = tgt2DO.getDataFrame()
       .select($"rating")
       .as[Int].collect().toSeq
-    assert(r1.size == 1)
-    assert(r1.head == 5)
+    assert(r2 == Seq(5))
     assert(tgt2DO.listPartitions == expectedPartitions)
 
     // second dag run - skip action execution because there are no new partitions to process

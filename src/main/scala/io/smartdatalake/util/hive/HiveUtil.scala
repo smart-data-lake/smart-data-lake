@@ -26,6 +26,7 @@ import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.dataobject.Table
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.{array, col}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
@@ -650,5 +651,13 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
   def createEmptyPartition(table: Table, partitionValues: PartitionValues)(implicit session: SparkSession): Unit = {
     val partitionDef = partitionValues.elements.map{ case (k,v) => s"$k='$v'"}.mkString(", ")
     execSqlStmt(session, s"ALTER TABLE ${table.fullName} ADD IF NOT EXISTS PARTITION ($partitionDef)")
+  }
+
+  def dropPartition(table: Table, tablePath: Path, partition: PartitionValues)(implicit session: SparkSession): Unit = {
+    val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partition.keys.toSeq, Environment.defaultPathSeparator)
+    val partitionPath = new Path(tablePath, partition.getPartitionString(partitionLayout))
+    HdfsUtil.deletePath(partitionPath.toString, session.sparkContext, false)
+    val partitionDef = partition.elements.map{ case (k,v) => s"$k='$v'"}.mkString(", ")
+    execSqlStmt(session, s"ALTER TABLE ${table.fullName} DROP IF EXISTS PARTITION ($partitionDef)")
   }
 }
