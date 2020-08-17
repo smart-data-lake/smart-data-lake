@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.util.hdfs.SparkRepartitionDef
+import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.json.DefaultFlatteningParser
 import io.smartdatalake.util.misc.AclDef
 import org.apache.spark.sql.types.StructType
@@ -40,6 +40,9 @@ import org.apache.spark.sql.{DataFrame, SaveMode}
  * @param xmlOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and
  *                    [[org.apache.spark.sql.DataFrameWriter]].
  * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop.
+ * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
+ *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
+ *                                    Default is to expect all partitions to exist.
  *
  * @see [[org.apache.spark.sql.DataFrameReader]]
  * @see [[org.apache.spark.sql.DataFrameWriter]]
@@ -57,6 +60,7 @@ case class XmlFileDataObject(override val id: DataObjectId,
                              override val acl: Option[AclDef] = None,
                              override val connectionId: Option[ConnectionId] = None,
                              override val filenameColumn: Option[String] = None,
+                             override val expectedPartitionsCondition: Option[String] = None,
                              override val metadata: Option[DataObjectMetadata] = None)
                             (@transient implicit override val instanceRegistry: InstanceRegistry)
   extends SparkFileDataObject with CanCreateDataFrame with CanWriteDataFrame {

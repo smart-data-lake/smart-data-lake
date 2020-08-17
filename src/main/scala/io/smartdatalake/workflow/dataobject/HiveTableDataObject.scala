@@ -53,6 +53,9 @@ import scala.collection.JavaConverters._
  * @param saveMode spark [[SaveMode]] to use when writing files, default is "overwrite"
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
  * @param numInitialHdfsPartitions number of files created when writing into an empty table (otherwise the number will be derived from the existing data)
+ * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
+ *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
+ *                                    Default is to expect all partitions to exist.
  * @param metadata meta data
  */
 case class HiveTableDataObject(override val id: DataObjectId,
@@ -66,6 +69,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
                                saveMode: SaveMode = SaveMode.Overwrite,
                                acl: Option[AclDef] = None,
                                connectionId: Option[ConnectionId] = None,
+                               override val expectedPartitionsCondition: Option[String] = None,
                                override val metadata: Option[DataObjectMetadata] = None)
                               (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TableDataObject with CanWriteDataFrame with CanHandlePartitions with SmartDataLakeLogger {
@@ -113,9 +117,11 @@ case class HiveTableDataObject(override val id: DataObjectId,
   }
 
   override def prepare(implicit session: SparkSession): Unit = {
+    super.prepare
     require(isDbExisting, s"($id) Hive DB ${table.db.get} doesn't exist (needs to be created manually).")
     if (!isTableExisting)
       require(path.isDefined, "If Hive table does not exist yet, the path must be set.")
+    filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
   }
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {

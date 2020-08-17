@@ -45,6 +45,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
                                        numInitialHdfsPartitions: Int = 16,
                                        saveMode: SaveMode = SaveMode.Overwrite,
                                        acl: Option[AclDef] = None,
+                                       override val expectedPartitionsCondition: Option[String] = None,
                                        connectionId: Option[ConnectionId] = None,
                                        override val metadata: Option[DataObjectMetadata] = None)
                                       (@transient implicit val instanceRegistry: InstanceRegistry)
@@ -94,9 +95,11 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   }
 
   override def prepare(implicit session: SparkSession): Unit = {
+    super.prepare
     require(isDbExisting, s"($id) Hive DB ${table.db.get} doesn't exist (needs to be created manually).")
     if (!isTableExisting)
       require(path.isDefined, "If Hive table does not exist yet, the path must be set.")
+    filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
   }
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
