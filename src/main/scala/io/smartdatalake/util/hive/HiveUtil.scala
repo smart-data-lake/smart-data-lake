@@ -40,6 +40,8 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
   /**
    * Creates a String by concatenating all column names of a table. 
    * Columns are seperated by ','.
+   *
+   * @param table Hive table
    */
   def tableColumnsString(table: Table)(implicit session: SparkSession): String = {
     import session.implicits._ // Workaround for
@@ -50,6 +52,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
   /**
    * Deletes a Hive table
    *
+   * @param table Hive table
    * @param doPurge Flag to indicate if PURGE should be used when deleting (don't delete to HDFS trash). Default: true
    * @param existingOnly Flag if check "if exists" should be executed. Default: true
    */
@@ -62,6 +65,8 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
 
   /**
    * Collects table-level statistics
+   *
+   * @param table Hive table
    */
   def analyzeTable(table: Table)(implicit session: SparkSession): Unit = {
     val stmt = s"ANALYZE TABLE ${table.fullName} COMPUTE STATISTICS"
@@ -74,6 +79,9 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
 
   /**
    * Collects column-level statistics
+   *
+   * @param table Hive table
+   * @param columns Columns to collect statistics from
    */
   def analyzeTableColumns(table: Table, columns: String)(implicit session: SparkSession): Unit = {
     val stmt = s"ANALYZE TABLE ${table.fullName} COMPUTE STATISTICS FOR COLUMNS $columns"
@@ -90,7 +98,8 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    *
    * We will reduce the number by 2%: If the number is too low, the block is not filled optimally. On the other hand,
    * if the number is too high we end up with an additional (very small) block which is worse.
-
+   *
+   * @param table Hive Table
    * @return Desired number of records per file if it can be determined, None otherwise
    */
   def calculateMaxRecordsPerFileFromStatistics(table: Table)(implicit session: SparkSession): Option[BigInt] = {
@@ -103,6 +112,10 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
 
   /**
    * Collects column-level statistics for partitions
+   *
+   * @param table Hive table
+   * @param partitionCols Partitioned columns
+   * @param partitionValues Partition values
    */
   def analyzeTablePartitions(table: Table, partitionCols: Seq[String], partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
 
@@ -423,6 +436,10 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
 
   /**
    * Collects table statistics for table or table with partitions
+   *
+   * @param table Hive table
+   * @param partitionCols Partitioned columns
+   * @param partitionValues Partition values
    */
   def analyze(table: Table, partitionCols: Seq[String], partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): Unit = {
     // If partitions are present, statistics can't be collected for the table itself
