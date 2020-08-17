@@ -74,10 +74,10 @@ case class CopyAction(override val id: ActionObjectId,
 
   override def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     // delete input partitions if desired
-    if (deleteDataAfterRead) (input, inputSubFeed) match {
-      case (partitionInput: CanHandlePartitions, sparkSubFeed: SparkSubFeed) =>
-        if (sparkSubFeed.partitionValues.nonEmpty) partitionInput.deletePartitions(sparkSubFeed.partitionValues)
-      case x => throw new IllegalStateException(s"Unmatched case $x")
+    if (deleteDataAfterRead) (input) match {
+      case (partitionInput: CanHandlePartitions) =>
+        if (inputSubFeed.partitionValues.nonEmpty) partitionInput.deletePartitions(inputSubFeed.partitionValues)
+      case x => throw new IllegalStateException(s"($id) Cannot deleteDataAfterRead: input ${input.id} doesn't support partitions")
     }
   }
 
