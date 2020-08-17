@@ -61,6 +61,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
   override val saveMode: SaveMode = SaveMode.Overwrite
 
   override def partitions: Seq[String] = partitionDefs.map(_.name)
+  override def expectedPartitionsCondition: Option[String] = None // all partitions are expected to exist
 
   /**
    * Get Access Token through Keycloak

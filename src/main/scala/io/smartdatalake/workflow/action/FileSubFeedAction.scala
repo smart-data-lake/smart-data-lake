@@ -79,7 +79,8 @@ abstract class FileSubFeedAction extends Action {
     }
     // validate partition values existing for input
     if (subFeed.partitionValues.nonEmpty && (context.phase==ExecutionPhase.Exec || subFeed.isDAGStart)) {
-      val missingPartitionValues = PartitionValues.checkExpectedPartitionValues(input.listPartitions, subFeed.partitionValues)
+      val expectedPartitions = input.filterExpectedPartitionValues(subFeed.partitionValues)
+      val missingPartitionValues = PartitionValues.checkExpectedPartitionValues(input.listPartitions, expectedPartitions)
       assert(missingPartitionValues.isEmpty, s"($id) partitions $missingPartitionValues missing for ${input.id}")
     }
     // break lineage if requested

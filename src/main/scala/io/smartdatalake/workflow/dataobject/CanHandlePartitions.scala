@@ -32,6 +32,14 @@ private[smartdatalake] trait CanHandlePartitions {
   def partitions: Seq[String]
 
   /**
+   * Definition of partitions that are expected to exists.
+   * This is used to validate that partitions being read exists and don't return no data.
+   * Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
+   * @return true if partition is expected to exist.
+   */
+  def expectedPartitionsCondition: Option[String]
+
+  /**
    * Delete given partitions. This is used to cleanup partitions after they are processed.
    */
   def deletePartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = throw new RuntimeException(s"deletePartitions not implemented")
@@ -53,6 +61,20 @@ private[smartdatalake] trait CanHandlePartitions {
     val partitionValuesCols = partitionValues.map(_.keys).fold(Set())(_ ++ _).toSeq
     partitionValues.diff(listPartitions.map(_.filterKeys(partitionValuesCols)))
       .foreach(createEmptyPartition)
+  }
+
+  /**
+   * Filter list of partition values by expected partitions condition
+   */
+  final def filterExpectedPartitionValues(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[PartitionValues] = {
+    import org.apache.spark.sql.functions.expr
+    import session.implicits._
+    expectedPartitionsCondition.map{ condition =>
+      // partition values value type is any, we need to convert it to string and keep the hashCode for filtering afterwards
+      val partitionsValuesStringWithHashCode = partitionValues.map( pv => (pv.elements.mapValues(_.toString), pv.hashCode))
+      val expectedHashCodes = partitionsValuesStringWithHashCode.toDF("elements","hashCode").where(expr(condition)).select($"hashCode").as[Int].collect.toSet
+      partitionValues.filter( pv => expectedHashCodes.contains(pv.hashCode))
+    }.getOrElse(partitionValues)
   }
 }
 

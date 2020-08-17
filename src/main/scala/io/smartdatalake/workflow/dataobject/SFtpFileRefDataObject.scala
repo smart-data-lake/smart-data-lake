@@ -46,6 +46,9 @@ import scala.util.{Failure, Success, Try}
  *                        if there is no char to delimit the last token from the rest of the path or also between
  *                        two tokens.
  * @param saveMode Overwrite or Append new data.
+ * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
+ *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
+ *                                    Default is to expect all partitions to exist.
  */
 case class SFtpFileRefDataObject(override val id: DataObjectId,
                                  override val path: String,
@@ -53,6 +56,7 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
                                  override val partitions: Seq[String] = Seq(),
                                  override val partitionLayout: Option[String] = None,
                                  override val saveMode: SaveMode = SaveMode.Overwrite,
+                                 override val expectedPartitionsCondition: Option[String] = None,
                                  override val metadata: Option[DataObjectMetadata] = None)
                                 (@transient implicit val instanceRegistry: InstanceRegistry)
   extends FileRefDataObject with CanCreateInputStream with CanCreateOutputStream with SmartDataLakeLogger {
