@@ -22,14 +22,14 @@ import java.nio.file.Files
 import java.sql.Timestamp
 import java.time.{Instant, LocalDateTime}
 
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
+import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.{ExecutionModeFailedException, PartitionDiffMode, SparkIncrementalMode, SparkStreamingOnceMode}
+import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.hive.HiveUtil
-import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformerConfig, CustomDfsTransformer, CustomDfsTransformerConfig}
+import io.smartdatalake.workflow.action.{CopyAction, _}
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataobject._
 import net.manub.embeddedkafka.EmbeddedKafka
@@ -203,64 +203,74 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
       assert(r1 == Seq("5"))
 
       // check metrics
-      // note: metrics don't work for KafkaTopicDataObject
+      // note: metrics don't work for Kafka sink in Spark 2.4
       //val action2MainMetrics = action2.getFinalMetrics(action2.outputId).get.getMainInfos
       //assert(action2MainMetrics("records_written") == 1)
     }
   }
 
-  test("action dag with 2 dependent actions from same predecessor") {
+  test("action dag with 2 dependent actions from same predecessor, PartitionDiffMode and another action with no data to process") {
     // Action B and C depend on Action A
 
     // setup DataObjects
     val feed = "actionpipeline"
     val srcTableA = Table(Some("default"), "ap_input")
-    val srcDO = HiveTableDataObject( "A", Some(tempPath+s"/${srcTableA.fullName}"), table = srcTableA, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "A", Some(tempPath+s"/${srcTableA.fullName}"), table = srcTableA, numInitialHdfsPartitions = 1, partitions = Seq("lastname"))
     srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgtATable = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
-    val tgtADO = TickTockHiveTableDataObject("tgt_A", Some(tempPath+s"/${tgtATable.fullName}"), table = tgtATable, numInitialHdfsPartitions = 1)
+    val tgtADO = TickTockHiveTableDataObject("tgt_A", Some(tempPath+s"/${tgtATable.fullName}"), table = tgtATable, numInitialHdfsPartitions = 1, partitions = Seq("lastname"))
     tgtADO.dropTable
     instanceRegistry.register(tgtADO)
 
-    val tgtBTable = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
-    val tgtBDO = HiveTableDataObject( "tgt_B", Some(tempPath+s"/${tgtBTable.fullName}"), table = tgtBTable, numInitialHdfsPartitions = 1)
+    val tgtBTable = Table(Some("default"), "ap_copy1", None, Some(Seq("lastname","firstname")))
+    val tgtBDO = HiveTableDataObject( "tgt_B", Some(tempPath+s"/${tgtBTable.fullName}"), table = tgtBTable, numInitialHdfsPartitions = 1, partitions = Seq("lastname"))
     tgtBDO.dropTable
     instanceRegistry.register(tgtBDO)
 
-    val tgtCTable = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
-    val tgtCDO = HiveTableDataObject( "tgt_C", Some(tempPath+s"/${tgtCTable.fullName}"), table = tgtCTable, numInitialHdfsPartitions = 1)
+    val tgtCTable = Table(Some("default"), "ap_copy2", None, Some(Seq("lastname","firstname")))
+    val tgtCDO = HiveTableDataObject( "tgt_C", Some(tempPath+s"/${tgtCTable.fullName}"), table = tgtCTable, numInitialHdfsPartitions = 1, partitions = Seq("lastname"))
     tgtCDO.dropTable
     instanceRegistry.register(tgtCDO)
+
+    val tgtDTable = Table(Some("default"), "ap_copy3", None, Some(Seq("lastname","firstname")))
+    val tgtDDO = HiveTableDataObject( "tgt_D", Some(tempPath+s"/${tgtDTable.fullName}"), table = tgtDTable, numInitialHdfsPartitions = 1, partitions = Seq("lastname"))
+    tgtDDO.dropTable
+    instanceRegistry.register(tgtDDO)
 
     // prepare DAG
     val refTimestamp1 = LocalDateTime.now()
     implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
-    val actions = Seq(
-      DeduplicateAction("a", srcDO.id, tgtADO.id),
-      CopyAction("b", tgtADO.id, tgtBDO.id),
-      CopyAction("c", tgtADO.id, tgtCDO.id)
-    )
-    val dag = ActionDAGRun(actions, 1, 1)
+    tgtDDO.writeDataFrame(l1, Seq()) // we populate tgtD so there should be no partitions to process
+    instanceRegistry.register(DeduplicateAction("a", srcDO.id, tgtADO.id, executionMode = Some(PartitionDiffMode()), metadata = Some(ActionMetadata(feed = Some(feed)))))
+    instanceRegistry.register(CopyAction("b", tgtADO.id, tgtBDO.id, executionMode = Some(FailIfNoPartitionValuesMode()), metadata = Some(ActionMetadata(feed = Some(feed)))))
+    instanceRegistry.register(CopyAction("c", tgtADO.id, tgtCDO.id, metadata = Some(ActionMetadata(feed = Some(feed)))))
+    instanceRegistry.register(CopyAction("d", srcDO.id, tgtDDO.id, executionMode = Some(PartitionDiffMode()), metadata = Some(ActionMetadata(feed = Some(feed)))))
 
     // exec dag
-    dag.prepare
-    dag.init
-    dag.exec
+    val sdlb = new DefaultSmartDataLakeBuilder
+    val appConfig = SmartDataLakeBuilderConfig(feedSel=feed)
+    sdlb.exec(appConfig, 1, 1, LocalDateTime.now(), LocalDateTime.now(), Seq(), Seq(), None, Seq(), simulation = false)
 
-    val r1 = session.table(s"${tgtBTable.fullName}")
+    val r1 = tgtBDO.getDataFrame()
       .select($"rating")
       .as[Int].collect.toSeq
     assert(r1.size == 1)
     assert(r1.head == 5)
 
-    val r2 = session.table(s"${tgtCTable.fullName}")
+    val r2 = tgtCDO.getDataFrame()
       .select($"rating")
       .as[Int].collect.toSeq
     assert(r2.size == 1)
     assert(r2.head == 5)
+
+    val r3 = tgtDDO.getDataFrame()
+      .select($"rating")
+      .as[Int].collect.toSeq
+    assert(r3.size == 1)
+    assert(r3.head == 5)
   }
 
   test("action dag where first actions has multiple input subfeeds") {
@@ -928,8 +938,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
 
     // first dag run, first file processed
     dag.prepare
-    val ex = intercept[TaskFailedException](dag.init)
-    assert(ex.cause.isInstanceOf[ExecutionModeFailedException])
+    val ex = intercept[ExecutionModeFailedException](dag.init)
   }
 
 }

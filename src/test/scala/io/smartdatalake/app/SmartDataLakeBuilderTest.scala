@@ -276,7 +276,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // check results
     assert(finalSubFeeds.size == 1)
-    assert(stats == Map(RuntimeEventState.SUCCEEDED -> 2))
+    assert(stats == Map(RuntimeEventState.INITIALIZED -> 2))
     assert(finalSubFeeds.head.dataFrame.get.select(dfSrc1.columns.map(col):_*).symmetricDifference(dfSrc1).isEmpty)
   }
 }

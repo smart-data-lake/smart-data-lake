@@ -212,6 +212,11 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   }
 
   /**
+   * get latest runtime state
+   */
+  def getLatestRuntimeState = runtimeEvents.lastOption.map(_.state)
+
+  /**
    * get latest runtime information for this action
    */
   def getRuntimeInfo: Option[RuntimeInfo] = {
@@ -318,7 +323,7 @@ case class ActionMetadata(
 private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: ExecutionPhase, state: RuntimeEventState, msg: Option[String], results: Seq[SubFeed])
 private[smartdatalake] object RuntimeEventState extends Enumeration {
   type RuntimeEventState = Value
-  val STARTED, SUCCEEDED, FAILED, SKIPPED, PENDING = Value
+  val STARTED, PREPARED, INITIALIZED, SUCCEEDED, FAILED, SKIPPED, PENDING = Value
 }
 private[smartdatalake] case class RuntimeInfo(state: RuntimeEventState, startTstmp: Option[LocalDateTime] = None, duration: Option[Duration] = None, msg: Option[String] = None, results: Seq[ResultRuntimeInfo] = Seq()) {
   override def toString: String = {

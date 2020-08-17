@@ -202,7 +202,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   /**
    * Recover previous failed run.
    */
-  private def recoverRun(appConfig: SmartDataLakeBuilderConfig, stateStore: ActionDAGRunStateStore[_ <: StateId], runState: ActionDAGRunState): (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
+  private[smartdatalake] def recoverRun(appConfig: SmartDataLakeBuilderConfig, stateStore: ActionDAGRunStateStore[_ <: StateId], runState: ActionDAGRunState): (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
     logger.info(s"recovering application ${appConfig.applicationName.get} runId=${runState.runId} lastAttemptId=${runState.attemptId}")
     // skip all succeeded actions
     val actionsToSkip = runState.actionsState
@@ -234,7 +234,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * Start run.
    * @return tuple of list of final subfeeds and statistics (action count per RuntimeEventState)
    */
-  private def startRun(appConfig: SmartDataLakeBuilderConfig, runId: Int = 1, attemptId: Int = 1, runStartTime: LocalDateTime = LocalDateTime.now, attemptStartTime: LocalDateTime = LocalDateTime.now, actionIdsToSkip: Seq[ActionObjectId] = Seq(), initialSubFeeds: Seq[SubFeed] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, simulation: Boolean = false) : (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
+  private[smartdatalake] def startRun(appConfig: SmartDataLakeBuilderConfig, runId: Int = 1, attemptId: Int = 1, runStartTime: LocalDateTime = LocalDateTime.now, attemptStartTime: LocalDateTime = LocalDateTime.now, actionIdsToSkip: Seq[ActionObjectId] = Seq(), initialSubFeeds: Seq[SubFeed] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, simulation: Boolean = false) : (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
 
     // validate application config
     appConfig.validate()
@@ -264,7 +264,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     exec(appConfig, runId, attemptId, runStartTime, attemptStartTime, actionIdsToSkip, initialSubFeeds, stateStore, stateListeners, simulation)(Environment._instanceRegistry, session)
   }
 
-  private def exec(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime, actionIdsToSkip: Seq[ActionObjectId], initialSubFeeds: Seq[SubFeed], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener], simulation: Boolean)(implicit instanceRegistry: InstanceRegistry, session: SparkSession) : (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
+  private[smartdatalake] def exec(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime, actionIdsToSkip: Seq[ActionObjectId], initialSubFeeds: Seq[SubFeed], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener], simulation: Boolean)(implicit instanceRegistry: InstanceRegistry, session: SparkSession) : (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
 
     // select actions by feedSel
     val actionsSelected = instanceRegistry.getActions.filter(_.metadata.flatMap(_.feed).exists(_.matches(appConfig.feedSel)))
@@ -296,7 +296,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         actionDAGRun.prepare
         actionDAGRun.init
         if (appConfig.test.contains(TestMode.DryRun)) { // stop here if only dry-run
-          logger.info(s"${appConfig.test.get}-Test successfull")
+          logger.info(s"${appConfig.test.get}-Test successful")
           return (Seq(), Map())
         }
         val subFeeds = actionDAGRun.exec
@@ -304,9 +304,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         subFeeds
       }
     } catch {
-      // don't fail an not severe exceptions like having no data to process
+      // don't fail on not severe exceptions like having no data to process
       case ex: DAGException if (ex.severity == ExceptionSeverity.SKIPPED) =>
-        logger.warn(s"dag run is skipped because of ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+        logger.warn(s"Some actions are skipped because of ${ex.getClass.getSimpleName}: ${ex.getMessage}")
         Seq()
     }
 
