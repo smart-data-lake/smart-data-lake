@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.AclDef
 import org.apache.spark.sql.SaveMode
 
@@ -29,7 +30,9 @@ import org.apache.spark.sql.SaveMode
  * Provides details to an Action to access raw files.
  * @param fileName Definition of fileName. This is concatenated with path and partition layout to search for files. Default is an asterix to match everything.
  * @param saveMode Overwrite or Append new data.
- *
+ * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
+ *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
+ *                                    Default is to expect all partitions to exist.
  */
 case class RawFileDataObject( override val id: DataObjectId,
                               override val path: String,
@@ -38,6 +41,7 @@ case class RawFileDataObject( override val id: DataObjectId,
                               override val saveMode: SaveMode = SaveMode.Overwrite,
                               override val acl: Option[AclDef] = None,
                               override val connectionId: Option[ConnectionId] = None,
+                              override val expectedPartitionsCondition: Option[String] = None,
                               override val metadata: Option[DataObjectMetadata] = None
                             )(@transient implicit override val instanceRegistry: InstanceRegistry)
   extends HadoopFileDataObject {
