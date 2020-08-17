@@ -35,6 +35,7 @@ private[smartdatalake] trait CanHandlePartitions {
    * Definition of partitions that are expected to exists.
    * This is used to validate that partitions being read exists and don't return no data.
    * Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
+   * example: "elements['yourColName'] > 2017"
    * @return true if partition is expected to exist.
    */
   def expectedPartitionsCondition: Option[String]
@@ -77,4 +78,3 @@ private[smartdatalake] trait CanHandlePartitions {
     }.getOrElse(partitionValues)
   }
 }
-
