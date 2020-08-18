@@ -27,7 +27,6 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformerConfig, CustomDfsTransformer, CustomDfsTransformerConfig}
 import io.smartdatalake.workflow.action.{CopyAction, _}
 import io.smartdatalake.workflow.connection.KafkaConnection

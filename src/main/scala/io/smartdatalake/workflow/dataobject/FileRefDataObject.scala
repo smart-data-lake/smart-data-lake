@@ -111,12 +111,12 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
   /**
    * Delete given files. This is used to cleanup files after they are processed.
    */
-  def deleteFileRefs(fileRefs: Seq[FileRef])(implicit session: SparkSession): Unit = throw new RuntimeException(s"deleteFileRefs not implemented for $id")
+  def deleteFileRefs(fileRefs: Seq[FileRef])(implicit session: SparkSession): Unit = throw new RuntimeException(s"($id) deleteFileRefs not implemented")
 
   /**
    * Delete all data. This is used to implement SaveMode.Overwrite.
    */
-  def deleteAll(implicit session: SparkSession): Unit = throw new RuntimeException(s"deleteAll not implemented for $id")
+  def deleteAll(implicit session: SparkSession): Unit = throw new RuntimeException(s"($id) deleteAll not implemented")
 
   /**
    * Overwrite or Append new data.

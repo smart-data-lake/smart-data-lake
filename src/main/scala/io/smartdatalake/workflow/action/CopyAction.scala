@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject, FileRefDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.expr
@@ -73,11 +73,14 @@ case class CopyAction(override val id: ActionObjectId,
   }
 
   override def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    // delete input partitions if desired
-    if (deleteDataAfterRead) (input) match {
-      case (partitionInput: CanHandlePartitions) =>
-        if (inputSubFeed.partitionValues.nonEmpty) partitionInput.deletePartitions(inputSubFeed.partitionValues)
-      case x => throw new IllegalStateException(s"($id) Cannot deleteDataAfterRead: input ${input.id} doesn't support partitions")
+    if (deleteDataAfterRead) input match {
+      // delete input partitions if applicable
+      case (partitionInput: CanHandlePartitions) if partitionInput.partitions.nonEmpty && inputSubFeed.partitionValues.nonEmpty =>
+        partitionInput.deletePartitions(inputSubFeed.partitionValues)
+      // otherwise delete all
+      case (fileInput: FileRefDataObject) =>
+        fileInput.deleteAll
+      case x => throw new IllegalStateException(s"($id) input ${input.id} doesn't support deleting data")
     }
   }
 
