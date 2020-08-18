@@ -147,18 +147,18 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
       if(numInitialHdfsPartitions == -1) df
       // estimate number of partitions from existing data, otherwise use numInitialHdfsPartitions
       else if (isTableExisting) {
-        val currentHdfsPath = HdfsUtil.prefixHadoopPath(HiveUtil.existingTickTockLocation(table.db.get, session, table.name), None)
+        val currentHdfsPath = HdfsUtil.prefixHadoopPath(HiveUtil.existingTickTockLocation(table), None)
         HdfsUtil.repartitionForHdfsFileSize(df, currentHdfsPath.toString)
       } else df.repartition(numInitialHdfsPartitions)
     }
 
     // write table and fix acls
-    HiveUtil.writeDfToHiveWithTickTock(session, dfPrepared, hadoopPath.toString, table.name, table.db.get, partitions, saveMode)
+    HiveUtil.writeDfToHiveWithTickTock(dfPrepared, hadoopPath.toString, table, partitions, saveMode)
     val aclToApply = acl.orElse(connection.flatMap(_.acl))
     if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
     if (analyzeTableAfterWrite && !createTableOnly) {
       logger.info(s"($id) Analyze table ${table.fullName}.")
-      HiveUtil.analyze(session, table.db.get, table.name, partitions, partitionValues)
+      HiveUtil.analyze(table, partitions, partitionValues)
     }
   }
 
@@ -184,7 +184,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   }
 
   override def dropTable(implicit session: SparkSession): Unit = {
-    HiveUtil.dropTable(session, table.db.get, table.name)
+    HiveUtil.dropTable(table)
   }
 
   /**
