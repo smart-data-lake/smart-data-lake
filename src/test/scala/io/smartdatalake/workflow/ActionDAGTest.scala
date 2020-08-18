@@ -56,19 +56,16 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     // setup DataObjects
     val feed = "actionpipeline"
     val srcTable = Table(Some("default"), "ap_input")
-    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
-    val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgt1Table.db.get, tgt1Table.name )
-    val tgt1Path = tempPath+s"/${tgt1Table.fullName}"
-    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tgt1Path), table = tgt1Table, numInitialHdfsPartitions = 1)
+    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
     val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgt2Table.db.get, tgt2Table.name )
-    val tgt2Path = tempPath+s"/${tgt2Table.fullName}"
-    val tgt2DO = HiveTableDataObject( "tgt2", Some(tgt2Path), table = tgt2Table, numInitialHdfsPartitions = 1)
+    val tgt2DO = HiveTableDataObject( "tgt2", Some(tempPath+s"/${tgt2Table.fullName}"), table = tgt2Table, numInitialHdfsPartitions = 1)
+    tgt2DO.dropTable
     instanceRegistry.register(tgt2DO)
 
     // prepare DAG
@@ -77,7 +74,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     val appName = "test"
     implicit val context: ActionPipelineContext = ActionPipelineContext(feed, appName, 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
-    TestUtil.prepareHiveTable(srcTable, srcPath, l1)
+    srcDO.writeDataFrame(l1, Seq())
     val action1 = DeduplicateAction("a", srcDO.id, tgt1DO.id, metricsFailCondition = Some(s"dataObjectId = '${tgt1DO.id.id}' and key = 'records_written' and value = 0"))
     val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id)
     val actions: Seq[SparkSubFeedAction] = Seq(action1, action2)
@@ -119,19 +116,16 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     // setup DataObjects
     val feed = "actionpipeline"
     val srcTable = Table(Some("default"), "ap_input")
-    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
-    val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgt1Table.db.get, tgt1Table.name )
-    val tgt1Path = tempPath+s"/${tgt1Table.fullName}"
-    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tgt1Path), table = tgt1Table, numInitialHdfsPartitions = 1)
+    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
     val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgt2Table.db.get, tgt2Table.name )
-    val tgt2Path = tempPath+s"/${tgt2Table.fullName}"
-    val tgt2DO = HiveTableDataObject( "tgt2", Some(tgt2Path), table = tgt2Table, numInitialHdfsPartitions = 1)
+    val tgt2DO = HiveTableDataObject( "tgt2", Some(tempPath+s"/${tgt2Table.fullName}"), table = tgt2Table, numInitialHdfsPartitions = 1)
+    tgt2DO.dropTable
     instanceRegistry.register(tgt2DO)
 
     // prepare DAG
@@ -139,7 +133,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     val appName = "test"
     implicit val context: ActionPipelineContext = ActionPipelineContext(feed, appName, 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
-    TestUtil.prepareHiveTable(srcTable, srcPath, l1)
+    srcDO.writeDataFrame(l1, Seq())
     val action1 = DeduplicateAction("a", srcDO.id, tgt1DO.id)
     val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, breakDataFrameLineage = true)
     val actions: Seq[SparkSubFeedAction] = Seq(action1, action2)
@@ -285,19 +279,16 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     // setup DataObjects
     val feed = "actionpipeline"
     val srcTable1 = Table(Some("default"), "input1")
-    HiveUtil.dropTable(session, srcTable1.db.get, srcTable1.name )
-    val srcPath1 = tempPath+s"/${srcTable1.fullName}"
-    val srcDO1 = HiveTableDataObject( "src1", Some(srcPath1), table = srcTable1, numInitialHdfsPartitions = 1)
+    val srcDO1 = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable1.fullName}"), table = srcTable1, numInitialHdfsPartitions = 1)
+    srcDO1.dropTable
     instanceRegistry.register(srcDO1)
     val srcTable2 = Table(Some("default"), "input2")
-    HiveUtil.dropTable(session, srcTable2.db.get, srcTable2.name )
-    val srcPath2 = tempPath+s"/${srcTable2.fullName}"
-    val srcDO2 = HiveTableDataObject( "src2", Some(srcPath2), table = srcTable2, numInitialHdfsPartitions = 1)
+    val srcDO2 = HiveTableDataObject( "src2", Some(tempPath+s"/${srcTable2.fullName}"), table = srcTable2, numInitialHdfsPartitions = 1)
+    srcDO2.dropTable
     instanceRegistry.register(srcDO2)
     val tgtTable = Table(Some("default"), "output", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgtTable.db.get, tgtTable.name )
-    val tgtPath = tempPath+s"/${tgtTable.fullName}"
-    val tgtDO = HiveTableDataObject("tgt1", Some(tgtPath), table = tgtTable, numInitialHdfsPartitions = 1)
+    val tgtDO = HiveTableDataObject("tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable, numInitialHdfsPartitions = 1)
+    tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
     // prepare DAG
@@ -329,33 +320,28 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     // setup DataObjects
     val feed = "actionpipeline"
     val srcTable = Table(Some("default"), "ap_input")
-    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
-    val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "A", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "A", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
     instanceRegistry.register(srcDO)
 
     val tgtATable = Table(Some("default"), "tgt_a", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgtATable.db.get, tgtATable.name )
-    val tgtAPath = tempPath+s"/${tgtATable.fullName}"
-    val tgtADO = TickTockHiveTableDataObject("tgt_A", Some(tgtAPath), table = tgtATable, numInitialHdfsPartitions = 1)
+    val tgtADO = TickTockHiveTableDataObject("tgt_A", Some(tempPath+s"/${tgtATable.fullName}"), table = tgtATable, numInitialHdfsPartitions = 1)
+    tgtADO.dropTable
     instanceRegistry.register(tgtADO)
 
     val tgtBTable = Table(Some("default"), "tgt_b", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgtBTable.db.get, tgtBTable.name )
-    val tgtBPath = tempPath+s"/${tgtBTable.fullName}"
-    val tgtBDO = HiveTableDataObject( "tgt_B", Some(tgtBPath), table = tgtBTable, numInitialHdfsPartitions = 1)
+    val tgtBDO = HiveTableDataObject( "tgt_B", Some(tempPath+s"/${tgtBTable.fullName}"), table = tgtBTable, numInitialHdfsPartitions = 1)
+    tgtBDO.dropTable
     instanceRegistry.register(tgtBDO)
 
     val tgtCTable = Table(Some("default"), "tgt_c", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgtCTable.db.get, tgtCTable.name )
-    val tgtCPath = tempPath+s"/${tgtCTable.fullName}"
-    val tgtCDO = HiveTableDataObject( "tgt_C", Some(tgtCPath), table = tgtCTable, numInitialHdfsPartitions = 1)
+    val tgtCDO = HiveTableDataObject( "tgt_C", Some(tempPath+s"/${tgtCTable.fullName}"), table = tgtCTable, numInitialHdfsPartitions = 1)
+    tgtCDO.dropTable
     instanceRegistry.register(tgtCDO)
 
     val tgtDTable = Table(Some("default"), "tgt_d", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgtDTable.db.get, tgtDTable.name )
-    val tgtDPath = tempPath+s"/${tgtDTable.fullName}"
-    val tgtDDO = HiveTableDataObject( "tgt_D", Some(tgtDPath), table = tgtDTable, numInitialHdfsPartitions = 1)
+    val tgtDDO = HiveTableDataObject( "tgt_D", Some(tempPath+s"/${tgtDTable.fullName}"), table = tgtDTable, numInitialHdfsPartitions = 1)
+    tgtDDO.dropTable
     instanceRegistry.register(tgtDDO)
 
     // prepare DAG
@@ -363,7 +349,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val customTransfomer = CustomDfsTransformerConfig(className = Some("io.smartdatalake.workflow.TestActionDagTransformer"))
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
-    TestUtil.prepareHiveTable(srcTable, srcPath, l1)
+    srcDO.writeDataFrame(l1, Seq())
     val actions = Seq(
       DeduplicateAction("A", srcDO.id, tgtADO.id),
       CopyAction("B", tgtADO.id, tgtBDO.id),
@@ -403,22 +389,19 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     // setup DataObjects
     val feed = "actiondag"
     val srcTable = Table(Some("default"), "ap_input")
-    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
-    val srcPath = tempPath+s"/${srcTable.fullName}"
     // source table has partitions columns dt and type
-    val srcDO = HiveTableDataObject( "src1", Some(srcPath), partitions = Seq("dt","type"), table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), partitions = Seq("dt","type"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgt1Table.db.get, tgt1Table.name )
-    val tgt1Path = tempPath+s"/${tgt1Table.fullName}"
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = TickTockHiveTableDataObject( "tgt1", Some(tgt1Path), partitions = Seq("dt","type"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    val tgt1DO = TickTockHiveTableDataObject( "tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), partitions = Seq("dt","type"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
     val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgt2Table.db.get, tgt2Table.name )
-    val tgt2Path = tempPath+s"/${tgt2Table.fullName}"
     // second table has partition columns dt only (reduced)
-    val tgt2DO = HiveTableDataObject( "tgt2", Some(tgt2Path), partitions = Seq("dt"), table = tgt2Table, numInitialHdfsPartitions = 1)
+    val tgt2DO = HiveTableDataObject( "tgt2", Some(tempPath+s"/${tgt2Table.fullName}"), partitions = Seq("dt"), table = tgt2Table, numInitialHdfsPartitions = 1)
+    tgt2DO.dropTable
     instanceRegistry.register(tgt2DO)
 
     // prepare data
@@ -478,9 +461,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
 
     // setup tgt2 Hive DataObject
     val tgt2Table = Table(Some("default"), "ap_copy")
-    HiveUtil.dropTable(session, tgt2Table.db.get, tgt2Table.name )
-    val tgt2Path = tempPath+s"/${tgt2Table.fullName}"
-    val tgt2DO = HiveTableDataObject( "tgt2", Some(tgt2Path), table = tgt2Table, numInitialHdfsPartitions = 1)
+    val tgt2DO = HiveTableDataObject( "tgt2", Some(tempPath+s"/${tgt2Table.fullName}"), table = tgt2Table, numInitialHdfsPartitions = 1)
+    tgt2DO.dropTable
     instanceRegistry.register(tgt2DO)
 
     // prepare ActionPipeline
@@ -521,9 +503,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
 
     // setup tgt1 Hive DataObject
     val tgt1Table = Table(Some("default"), "ap_copy")
-    HiveUtil.dropTable(session, tgt1Table.db.get, tgt1Table.name )
-    val tgt1Path = tempPath+s"/${tgt1Table.fullName}"
-    val tgt1DO = HiveTableDataObject( "tgt1", Some(tgt1Path), table = tgt1Table, numInitialHdfsPartitions = 1)
+    val tgt1DO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
 
     // setup tgt2 CSV DataObject
@@ -566,19 +547,16 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     // setup DataObjects
     val feed = "actionpipeline"
     val srcTable = Table(Some("default"), "ap_input")
-    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
-    val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgt1Table.db.get, tgt1Table.name )
-    val tgt1Path = tempPath+s"/${tgt1Table.fullName}"
-    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tgt1Path), table = tgt1Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), table = tgt1Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1, expectedPartitionsCondition = Some("elements['lastname'] != 'xyz'"))
+    tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
     val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgt2Table.db.get, tgt2Table.name )
-    val tgt2Path = tempPath+s"/${tgt2Table.fullName}"
-    val tgt2DO = HiveTableDataObject( "tgt2", Some(tgt2Path), table = tgt2Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    val tgt2DO = HiveTableDataObject( "tgt2", Some(tempPath+s"/${tgt2Table.fullName}"), table = tgt2Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    tgt2DO.dropTable
     instanceRegistry.register(tgt2DO)
 
     // prepare DAG
@@ -591,7 +569,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
       DeduplicateAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(applyCondition = Some("isStartNode"), failCondition = Some("size(selectedPartitionValues) = 0 and size(outputPartitionValues) = 0"))))
       , CopyAction("b", tgt1DO.id, tgt2DO.id)
     )
-    val dag: ActionDAGRun = ActionDAGRun(actions, 1, 1)
+    val dag = ActionDAGRun(actions, 1, 1)
 
     // first dag run
     dag.prepare
@@ -611,23 +589,55 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     intercept[NoDataToProcessWarning](dag.init)
   }
 
+  test( "validate expected partitions") {
+
+    val srcTable = Table(Some("default"), "ap_input")
+    val srcPath = tempPath+s"/${srcTable.fullName}"
+    val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, partitions=Seq("lastname"), numInitialHdfsPartitions = 1, expectedPartitionsCondition = Some("elements['lastname'] != 'xyz'"))
+    srcDO.dropTable
+
+    instanceRegistry.register(srcDO)
+
+    val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
+    val tgt1Path = tempPath+s"/${tgt1Table.fullName}"
+    val tgt1DO = HiveTableDataObject("tgt1", Some(tgt1Path), table = tgt1Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    tgt1DO.dropTable
+    instanceRegistry.register(tgt1DO)
+
+    val refTimestamp1 = LocalDateTime.now()
+    implicit val context: ActionPipelineContext = ActionPipelineContext("test", "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+    val actions: Seq[SparkSubFeedAction] = Seq(
+      CopyAction("a", srcDO.id, tgt1DO.id)
+    )
+    val df1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
+    srcDO.writeDataFrame(df1, Seq())
+
+    // fail for not existing expected partition abc
+    val dag1 = ActionDAGRun(actions, 1, 1, partitionValues = Seq(PartitionValues(Map("lastname" -> "abc"))))
+    dag1.prepare
+    val e = intercept[TaskFailedException](dag1.exec)
+    assert(e.cause.isInstanceOf[AssertionError])
+
+    // doesnt fail for not existing unexpected partition xyz
+    val dag2 = ActionDAGRun(actions, 1, 1, partitionValues = Seq(PartitionValues(Map("lastname" -> "xyz"))))
+    dag2.prepare
+    dag2.exec
+  }
+
   test("action dag with 2 actions in sequence and executionMode=PartitionDiffMode alternativeOutputId") {
     // setup DataObjects
     val feed = "actionpipeline"
     val srcTable = Table(Some("default"), "ap_input")
-    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
-    val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgt1Table.db.get, tgt1Table.name )
-    val tgt1Path = tempPath+s"/${tgt1Table.fullName}"
-    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tgt1Path), table = tgt1Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), table = tgt1Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
     val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgt2Table.db.get, tgt2Table.name )
-    val tgt2Path = tempPath+s"/${tgt2Table.fullName}"
-    val tgt2DO = HiveTableDataObject( "tgt2", Some(tgt2Path), table = tgt2Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    val tgt2DO = HiveTableDataObject( "tgt2", Some(tempPath+s"/${tgt2Table.fullName}"), table = tgt2Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    tgt2DO.dropTable
     instanceRegistry.register(tgt2DO)
 
     // prepare DAG

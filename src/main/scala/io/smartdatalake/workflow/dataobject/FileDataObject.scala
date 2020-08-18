@@ -19,6 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.definitions.Environment
+import org.apache.spark.sql.SparkSession
 
 private[smartdatalake] trait FileDataObject extends DataObject with CanHandlePartitions {
 
@@ -31,4 +32,9 @@ private[smartdatalake] trait FileDataObject extends DataObject with CanHandlePar
     * default separator for paths
     */
   protected val separator = Environment.defaultPathSeparator
+
+  override def prepare(implicit session: SparkSession): Unit = {
+    super.prepare
+    filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
+  }
 }

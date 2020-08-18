@@ -28,22 +28,25 @@ import org.apache.commons.io.FileUtils
 
 class SparkFileDataObjectTest extends DataObjectTestSuite {
 
-  test("read partitioned data") {
+  test("read partitioned data and filter expected partitions") {
     import testSession.implicits._
 
     // create data object
     val tempDir = Files.createTempDirectory("tempHadoopDO")
-    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, partitions = Seq("p"), csvOptions = Map("header" -> "true") )
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, partitions = Seq("p"), csvOptions = Map("header" -> "true"), expectedPartitionsCondition = Some("elements['p'] != 'A'"))
 
     // write test data - create partition A and B
     val partitionValuesCreated = Seq( PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
     val df1 = Seq(("A",1),("A",2),("B",3),("B",4)).toDF("p", "value")
     dataObject.writeDataFrame(df1, partitionValuesCreated )
 
-    // test
+    // test reading data
     dataObject.getDataFrame().count shouldEqual 4 // four records in total, 2 from partition A and 2 from partition B
     dataObject.getDataFrame(Seq(PartitionValues(Map("p"->"B")))).count shouldEqual 2 // two records in partition B
     dataObject.getDataFrame(Seq(PartitionValues(Map("p"->"A")),PartitionValues(Map("p"->"A","p"->"B")))).count shouldEqual 4
+
+    // test expected partitions
+    assert( dataObject.filterExpectedPartitionValues(partitionValuesCreated) == Seq(PartitionValues(Map("p"->"B"))))
 
     FileUtils.deleteDirectory(tempDir.toFile)
   }

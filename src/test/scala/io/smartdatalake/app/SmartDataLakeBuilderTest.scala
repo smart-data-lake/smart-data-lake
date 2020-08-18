@@ -65,22 +65,19 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // setup DataObjects
     val srcTable = Table(Some("default"), "ap_input")
-    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
-    val srcPath = tempPath+s"/${srcTable.fullName}"
     // source table has partitions columns dt and type
-    val srcDO = HiveTableDataObject( "src1", Some(srcPath), partitions = Seq("dt","type"), table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), partitions = Seq("dt","type"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgt1Table = Table(Some("default"), "ap_copy1", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgt1Table.db.get, tgt1Table.name )
-    val tgt1Path = tempPath+s"/${tgt1Table.fullName}"
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = TickTockHiveTableDataObject( "tgt1", Some(tgt1Path), partitions = Seq("dt","type"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    val tgt1DO = TickTockHiveTableDataObject( "tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), partitions = Seq("dt","type"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
     val tgt2Table = Table(Some("default"), "ap_copy2", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgt2Table.db.get, tgt2Table.name )
-    val tgt2Path = tempPath+s"/${tgt2Table.fullName}"
     // second table has partition columns dt only (reduced)
-    val tgt2DO = HiveTableDataObject( "tgt2", Some(tgt2Path), partitions = Seq("dt"), table = tgt2Table, numInitialHdfsPartitions = 1)
+    val tgt2DO = HiveTableDataObject( "tgt2", Some(tempPath+s"/${tgt2Table.fullName}"), partitions = Seq("dt"), table = tgt2Table, numInitialHdfsPartitions = 1)
+    tgt2DO.dropTable
     instanceRegistry.register(tgt2DO)
 
     // prepare data
@@ -167,16 +164,14 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // setup DataObjects
     val srcTable = Table(Some("default"), "ap_input")
-    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
-    val srcPath = tempPath+s"/${srcTable.fullName}"
     // source table has partitions columns dt and type
-    val srcDO = HiveTableDataObject( "src1", Some(srcPath), partitions = Seq("dt","type"), table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), partitions = Seq("dt","type"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgt1Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgt1Table.db.get, tgt1Table.name )
-    val tgt1Path = tempPath+s"/${tgt1Table.fullName}"
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = TickTockHiveTableDataObject( "tgt1", Some(tgt1Path), partitions = Seq("dt","type"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    val tgt1DO = TickTockHiveTableDataObject( "tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), partitions = Seq("dt","type"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
 
     // fill src table with first partition
