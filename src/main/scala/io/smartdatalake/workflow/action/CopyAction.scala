@@ -36,7 +36,11 @@ import scala.util.{Failure, Success, Try}
  * @param inputId inputs DataObject
  * @param outputId output DataObject
  * @param deleteDataAfterRead a flag to enable deletion of input partitions after copying.
- * @param transformer a custom transformation that is applied to each SubFeed separately
+ * @param transformer optional custom transformation to apply
+ * @param columnBlacklist Remove all columns on blacklist from dataframe
+ * @param columnWhitelist Keep only columns on whitelist in dataframe
+ * @param additionalColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
+ *                          The spark sql expressions are evaluated against an instance of [[DefaultExecutionModeExpressionData]].
  * @param executionMode optional execution mode for this Action
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
@@ -48,6 +52,7 @@ case class CopyAction(override val id: ActionObjectId,
                       transformer: Option[CustomDfTransformerConfig] = None,
                       columnBlacklist: Option[Seq[String]] = None,
                       columnWhitelist: Option[Seq[String]] = None,
+                      additionalColumns: Option[Map[String,String]] = None,
                       filterClause: Option[String] = None,
                       standardizeDatatypes: Boolean = false,
                       override val breakDataFrameLineage: Boolean = false,
@@ -69,7 +74,7 @@ case class CopyAction(override val id: ActionObjectId,
   }
 
   override def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
-    applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, None, filterClauseExpr)
+    applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, Seq(), filterClauseExpr)
   }
 
   override def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {

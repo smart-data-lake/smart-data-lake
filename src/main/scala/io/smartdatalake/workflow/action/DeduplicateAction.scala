@@ -42,6 +42,9 @@ import scala.util.{Failure, Success, Try}
  *
  * @param inputId inputs DataObject
  * @param outputId output DataObject
+ * @param columnBlacklist Remove all columns on blacklist from dataframe
+ * @param columnWhitelist Keep only columns on whitelist in dataframe
+ * @param transformer optional custom transformation to apply
  * @param ignoreOldDeletedColumns if true, remove no longer existing columns in Schema Evolution
  * @param ignoreOldDeletedNestedColumns if true, remove no longer existing columns from nested data types in Schema Evolution.
  *                                      Keeping deleted columns in complex data types has performance impact as all new data
@@ -81,28 +84,30 @@ case class DeduplicateAction(override val id: ActionObjectId,
   }
 
   override def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
-    applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, Some(deduplicateDataFrame(_: SparkSubFeed,_: Option[DataFrame],_:Seq[String],_: LocalDateTime)), filterClauseExpr)
+    val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
+    val pks = output.table.primaryKey
+      .getOrElse( throw new ConfigurationException(s"There is no <primary-keys> defined for table ${output.table.name}."))
+    val existingDf = if (output.isTableExisting) {
+      Some(output.getDataFrame())
+    } else None
+    val deduplicateTransformer = deduplicateDataFrame(existingDf, pks, timestamp) _
+    applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, None, standardizeDatatypes, Seq(deduplicateTransformer), filterClauseExpr)
   }
 
   /**
    * deduplicates a SubFeed.
    */
-  private def deduplicateDataFrame(subFeed: SparkSubFeed,
-                                   existingDf: Option[DataFrame],
-                                   pks: Seq[String],
-                                   refTimestamp: LocalDateTime)
-                                  (implicit session: SparkSession): SparkSubFeed = {
+  private def deduplicateDataFrame(existingDf: Option[DataFrame], pks: Seq[String], refTimestamp: LocalDateTime)(df: DataFrame)(implicit session: SparkSession): DataFrame = {
 
-    val enhancedDf = subFeed.dataFrame.get.withColumn(TechnicalTableColumn.captured.toString, ActionHelper.ts1(refTimestamp))
+    // enhance
+    val enhancedDf = df.withColumn(TechnicalTableColumn.captured.toString, ActionHelper.ts1(refTimestamp))
 
     // deduplicate
-    val deduplicatedDf = if (existingDf.isDefined) {
+    if (existingDf.isDefined) {
       // apply schema evolution
       val (baseDf, newDf) = SchemaEvolution.process(existingDf.get, enhancedDf, ignoreOldDeletedColumns = ignoreOldDeletedColumns, ignoreOldDeletedNestedColumns = ignoreOldDeletedNestedColumns)
       deduplicate(baseDf, newDf, pks)
     } else enhancedDf
-
-    subFeed.copy(dataFrame = Some(deduplicatedDf))
   }
 
   /**

@@ -34,7 +34,7 @@ import org.apache.spark.sql.SparkSession
  * @param id
  * @param inputIds input DataObject's
  * @param outputIds output DataObject's
- * @param transformer Custom Transformer to transform Seq[DataFrames]
+ * @param transformer custom transformation for multiple dataframes to apply
  * @param mainInputId optional selection of main inputId used for execution mode and partition values propagation. Only needed if there are multiple input DataObject's.
  * @param mainOutputId optional selection of main outputId used for execution mode and partition values propagation. Only needed if there are multiple output DataObject's.
  * @param executionMode optional execution mode for this Action

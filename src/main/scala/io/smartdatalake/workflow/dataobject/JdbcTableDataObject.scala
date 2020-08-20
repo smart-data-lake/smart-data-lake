@@ -143,9 +143,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
   private def preparedAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext) = {
     sqlOpt.foreach { sql =>
-      val params = DefaultExpressionData(context.feed, context.application, context.runId, context.attemptId, context.referenceTimestamp.map(Timestamp.valueOf)
-        , Timestamp.valueOf(context.runStartTime), Timestamp.valueOf(context.attemptStartTime), partitionValues.map(_.elements.mapValues(_.toString)))
-      val preparedSql = SparkExpressionUtil.substitute(id, configName, sql, params)
+      val data = DefaultExpressionData.from(context, partitionValues)
+      val preparedSql = SparkExpressionUtil.substitute(id, configName, sql, data)
       logger.info(s"($id) ${configName.getOrElse("SQL")} is being executed: $preparedSql")
       connection.execJdbcStatement(preparedSql, logging = false)
     }
