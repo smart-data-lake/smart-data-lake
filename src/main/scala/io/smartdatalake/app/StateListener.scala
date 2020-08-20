@@ -47,6 +47,11 @@ case class StateListenerConfig(className: String, options: Option[Map[String,Str
 trait StateListener {
 
   /**
+   * Called on initialization to check environment
+   */
+  def init(): Unit = Unit
+
+  /**
    * notifyState is called whenever an action is finished (succeeded or failed)
    */
   def notifyState(state: ActionDAGRunState, context: ActionPipelineContext): Unit
