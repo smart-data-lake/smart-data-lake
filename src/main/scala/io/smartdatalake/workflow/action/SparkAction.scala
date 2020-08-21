@@ -156,8 +156,8 @@ private[smartdatalake] abstract class SparkAction extends Action {
   /**
    * apply custom transformation
    */
-  def applyCustomTransformation(transformer: CustomDfTransformerConfig, dataObjectId: DataObjectId)(df: DataFrame)(implicit session: SparkSession): DataFrame = {
-    transformer.transform(df, dataObjectId)
+  def applyCustomTransformation(transformer: CustomDfTransformerConfig, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues])(df: DataFrame)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+    transformer.transform(id, partitionValues, df, dataObjectId)
   }
 
   /**
@@ -194,9 +194,8 @@ private[smartdatalake] abstract class SparkAction extends Action {
                            additionalTransformers: Seq[(DataFrame => DataFrame)],
                            filterClauseExpr: Option[Column] = None)
                           (implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
-
     val transformers = Seq(
-      transformation.map( t => applyCustomTransformation(t, inputSubFeed.dataObjectId) _),
+      transformation.map( t => applyCustomTransformation(t, inputSubFeed.dataObjectId, inputSubFeed.partitionValues) _),
       columnBlacklist.map(filterBlacklist),
       columnWhitelist.map(filterWhitelist),
       additionalColumns.map( m => applyAdditionalColumns(m, inputSubFeed.partitionValues) _),

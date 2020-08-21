@@ -106,7 +106,7 @@ private[smartdatalake] object SparkExpressionUtil {
     } else None
   }
 
-  def createDataset[T <: Product : TypeTag, R](id: ConfigObjectId, configName: Option[String], expression: String, data: T)(implicit session: SparkSession, encoder: Encoder[Option[R]]): Dataset[Option[R]] = {
+  private def createDataset[T <: Product : TypeTag, R](id: ConfigObjectId, configName: Option[String], expression: String, data: T)(implicit session: SparkSession, encoder: Encoder[Option[R]]): Dataset[Option[R]] = {
     import org.apache.spark.sql.functions.expr
     import session.implicits._
     val dsData = Seq(data).toDS
@@ -118,6 +118,16 @@ private[smartdatalake] object SparkExpressionUtil {
     }
   }
 
+  /**
+   * Substitute tokens with value from options
+   */
+  def substituteOptions(id: ConfigObjectId, configName: Option[String], str: String, options: Map[String,String]): String = {
+    val substituter = (regMatch: Regex.Match) => {
+      val key = regMatch.group(1)
+      options.getOrElse(key, throw ConfigurationException(s"($id) key '$key' not found in options for config $configName"))
+    }
+    tokenExpressionRegex.replaceAllIn(str, substituter)
+  }
 }
 
 case class DefaultExpressionData( feed: String, application: String, runId: Int, attemptId: Int, referenceTimestamp: Option[Timestamp]

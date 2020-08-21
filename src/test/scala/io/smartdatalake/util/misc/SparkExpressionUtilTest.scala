@@ -51,4 +51,9 @@ class SparkExpressionUtilTest extends FunSuite {
     val result = SparkExpressionUtil.substitute(DataObjectId("test"), Some("testCondition"), "hello %{concat(feed, '-', application)}, lets make %{runId + attemptId}", data)
     assert(result.contains("hello testFeed-testApp, lets make 2"))
   }
+
+  test("substitute options") {
+    val result = SparkExpressionUtil.substituteOptions(DataObjectId("test"), Some("testCondition"), "hello %{key1}, lets make %{key2}", Map("key1"->"tester", "key2"->"tests"))
+    assert(result.contains("hello tester, lets make tests"))
+  }
 }

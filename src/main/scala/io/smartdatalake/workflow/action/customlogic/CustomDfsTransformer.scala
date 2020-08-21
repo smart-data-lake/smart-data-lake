@@ -49,7 +49,9 @@ trait CustomDfsTransformer extends Serializable {
  * @param className Optional class name to load transformer code from
  * @param scalaFile Optional file where scala code for transformation is loaded from
  * @param scalaCode Optional scala code for transformation
- * @param sqlCode Optional map of DataObjectId and corresponding SQL Code
+ * @param sqlCode Optional map of DataObjectId and corresponding SQL Code.
+ *                Use tokens %{<key>} to replace with runtimeOptions in SQL code.
+ *                Example: "select * from test where run = %{runId}"
  * @param options Options to pass to the transformation
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
@@ -72,6 +74,31 @@ case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFi
         val fnTransform = CustomCodeUtil.compileCode[(SparkSession, Map[String,String], Map[String,DataFrame]) => Map[String,DataFrame]](code)
         new CustomDfsTransformerWrapper( fnTransform )
     }
+  }.orElse{
+    if (sqlCode.nonEmpty) {
+      def sqlTransform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
+        // register all input DataObjects as temporary table
+        dfs.foreach {
+          case (dataObjectId,df) =>
+            val objectId =  ActionHelper.replaceSpecialCharactersWithUnderscore(dataObjectId)
+            // Using createTempView does not work because the same data object might be created more than once
+            df.createOrReplaceTempView(objectId)
+        }
+        // execute all queries and return them under corresponding dataObjectId
+        sqlCode.map {
+          case (dataObjectId,sql) => {
+            val df = try {
+              val preparedSql = SparkExpressionUtil.substituteOptions(dataObjectId, Some("transformation.sqlCode"), sql, options)
+              session.sql(preparedSql)
+            } catch {
+              case e : Throwable => throw new SQLTransformationException(s"(transformation for $dataObjectId) Could not execute SQL query. Check your query and remember that special characters are replaced by underscores. Error: ${e.getMessage}")
+            }
+            (dataObjectId.id, df)
+          }
+        }
+      }
+      Some(new CustomDfsTransformerWrapper( sqlTransform ))
+    } else None
   }
 
   override def toString: String = {
@@ -88,30 +115,6 @@ case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFi
       expr => SparkExpressionUtil.evaluateString(actionId, Some("transformation.runtimeObjects"), expr, data)
     }.filter(_._2.isDefined).mapValues(_.get)
     // transform
-    if(className.isDefined || scalaFile.isDefined || scalaCode.isDefined) {
-      impl.get.transform(session, options ++ runtimeOptionsReplaced, dfs)
-    }
-    // Work with SQL Transformations
-    else {
-      // register all input DataObjects as temporary table
-      for( (dataObjectId,df) <- dfs) {
-        val objectId =  ActionHelper.replaceSpecialCharactersWithUnderscore(dataObjectId)
-        // Using createTempView does not work because the same data object might be created more than once
-        df.createOrReplaceTempView(objectId)
-      }
-
-      // execute all queries and return them under corresponding dataObjectId
-      sqlCode.map {
-        case (dataObjectId,sqlCode) => {
-          val df = try {
-            session.sql(sqlCode)
-          } catch {
-            case e : Throwable => throw new SQLTransformationException(s"($actionId) Could not execute SQL query. Check your query and remember that special characters are replaced by underscores. Error: ${e.getMessage}")
-          }
-          (dataObjectId.id, df)
-        }
-      }
-
-    }
+    impl.get.transform(session, options ++ runtimeOptionsReplaced, dfs)
   }
 }
