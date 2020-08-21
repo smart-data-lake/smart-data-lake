@@ -246,7 +246,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // prepare & start load
     val refTimestamp1 = LocalDateTime.now()
     implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
-    val customTransformerConfig = CustomDfTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestDfTransformer"), options = Map("test" -> "test"), runtimeOptions = Map("appName" -> "application"))
+    val customTransformerConfig = CustomDfTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestOptionsDfTransformer"), options = Map("test" -> "test"), runtimeOptions = Map("appName" -> "application"))
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformer = Some(customTransformerConfig), filterClause = Some("lastname='jonson'"), additionalColumns = Some(Map("run_id" -> "runId")))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
@@ -263,6 +263,14 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 }
 
 class TestDfTransformer extends CustomDfTransformer {
+  def transform(session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectId: String) : DataFrame = {
+    import session.implicits._
+    import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+    df.withColumn("rating", $"rating" + 1)
+  }
+}
+
+class TestOptionsDfTransformer extends CustomDfTransformer {
   def transform(session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectId: String) : DataFrame = {
     import session.implicits._
     df.withColumn("rating", $"rating" + 1)
