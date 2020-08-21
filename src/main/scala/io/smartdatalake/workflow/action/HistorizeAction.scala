@@ -52,7 +52,7 @@ import scala.util.{Failure, Success, Try}
  * @param columnBlacklist Remove all columns on blacklist from dataframe
  * @param columnWhitelist Keep only columns on whitelist in dataframe
  * @param additionalColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
- *                          The spark sql expressions are evaluated against an instance of [[DefaultExecutionModeExpressionData]].
+ *                          The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  * @param executionMode optional execution mode for this Action
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.

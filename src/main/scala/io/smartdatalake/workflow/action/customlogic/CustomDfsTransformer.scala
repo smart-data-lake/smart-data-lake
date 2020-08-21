@@ -18,8 +18,10 @@
  */
 package io.smartdatalake.workflow.action.customlogic
 
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.util.misc.CustomCodeUtil
+import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionHelper
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -49,8 +51,10 @@ trait CustomDfsTransformer extends Serializable {
  * @param scalaCode Optional scala code for transformation
  * @param sqlCode Optional map of DataObjectId and corresponding SQL Code
  * @param options Options to pass to the transformation
+ * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
+ *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
-case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Map[DataObjectId,String] = Map(), options: Map[String,String] = Map()) {
+case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Map[DataObjectId,String] = Map(), options: Map[String,String] = Map(), runtimeOptions: Map[String,String] = Map()) {
   require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || sqlCode.nonEmpty, "Either className, scalaFile, scalaCode or sqlCode must be defined for CustomDfsTransformer")
 
   // Load Transformer code from appropriate location
@@ -75,12 +79,17 @@ case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFi
     else if(scalaFile.isDefined)  "scalaFile: "+scalaFile.get
     else if(scalaCode.isDefined)  "scalaCode: "+scalaCode.get
     else                          "sqlCode: "+sqlCode
-
   }
 
-  def transform(dfs: Map[String,DataFrame])(implicit session: SparkSession) : Map[String,DataFrame] = {
+  def transform(actionId: ActionObjectId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame])(implicit session: SparkSession, context: ActionPipelineContext) : Map[String,DataFrame] = {
+    // replace runtime options
+    lazy val data = DefaultExpressionData.from(context, partitionValues)
+    val runtimeOptionsReplaced = runtimeOptions.mapValues {
+      expr => SparkExpressionUtil.evaluateString(actionId, Some("transformation.runtimeObjects"), expr, data)
+    }.filter(_._2.isDefined).mapValues(_.get)
+    // transform
     if(className.isDefined || scalaFile.isDefined || scalaCode.isDefined) {
-      impl.get.transform(session, options, dfs)
+      impl.get.transform(session, options ++ runtimeOptionsReplaced, dfs)
     }
     // Work with SQL Transformations
     else {
@@ -97,7 +106,7 @@ case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFi
           val df = try {
             session.sql(sqlCode)
           } catch {
-            case e : Throwable => throw new SQLTransformationException(s"Could not execute SQL query. Check your query and remember that special characters are replaced by underscores. Error: ${e.getMessage}")
+            case e : Throwable => throw new SQLTransformationException(s"($actionId) Could not execute SQL query. Check your query and remember that special characters are replaced by underscores. Error: ${e.getMessage}")
           }
           (dataObjectId.id, df)
         }

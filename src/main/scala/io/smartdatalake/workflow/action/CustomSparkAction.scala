@@ -72,14 +72,14 @@ case class CustomSparkAction ( override val id: ActionObjectId,
     val mainInputSubFeed = subFeeds.find(_.dataObjectId==mainInput.id)
 
     // Apply custom transformation to all subfeeds
-    transformer.transform(subFeeds.map( subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap)
+    val partitionValues = mainInputSubFeed.map(_.partitionValues).getOrElse(Seq())
+    transformer.transform(id, partitionValues, subFeeds.map( subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap)
       .map {
         // create output subfeeds from transformed dataframes
         case (dataObjectId, dataFrame) =>
           val output = outputs.find(_.id.id == dataObjectId)
             .getOrElse(throw ConfigurationException(s"No output found for result ${dataObjectId} in $id. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
           // get partition values from main input
-          val partitionValues = mainInputSubFeed.map(_.partitionValues).getOrElse(Seq())
           SparkSubFeed(Some(dataFrame),dataObjectId, partitionValues)
       }.toSeq
   }

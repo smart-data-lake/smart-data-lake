@@ -46,7 +46,7 @@ import scala.util.{Failure, Success, Try}
  * @param columnBlacklist Remove all columns on blacklist from dataframe
  * @param columnWhitelist Keep only columns on whitelist in dataframe
  * @param additionalColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
- *                          The spark sql expressions are evaluated against an instance of [[DefaultExecutionModeExpressionData]].
+ *                          The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  * @param ignoreOldDeletedColumns if true, remove no longer existing columns in Schema Evolution
  * @param ignoreOldDeletedNestedColumns if true, remove no longer existing columns from nested data types in Schema Evolution.
  *                                      Keeping deleted columns in complex data types has performance impact as all new data
