@@ -42,9 +42,11 @@ import scala.util.{Failure, Success, Try}
  *
  * @param inputId inputs DataObject
  * @param outputId output DataObject
+ * @param transformer optional custom transformation to apply
  * @param columnBlacklist Remove all columns on blacklist from dataframe
  * @param columnWhitelist Keep only columns on whitelist in dataframe
- * @param transformer optional custom transformation to apply
+ * @param additionalColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
+ *                          The spark sql expressions are evaluated against an instance of [[DefaultExecutionModeExpressionData]].
  * @param ignoreOldDeletedColumns if true, remove no longer existing columns in Schema Evolution
  * @param ignoreOldDeletedNestedColumns if true, remove no longer existing columns from nested data types in Schema Evolution.
  *                                      Keeping deleted columns in complex data types has performance impact as all new data
@@ -59,6 +61,7 @@ case class DeduplicateAction(override val id: ActionObjectId,
                              transformer: Option[CustomDfTransformerConfig] = None,
                              columnBlacklist: Option[Seq[String]] = None,
                              columnWhitelist: Option[Seq[String]] = None,
+                             additionalColumns: Option[Map[String,String]] = None,
                              filterClause: Option[String] = None,
                              standardizeDatatypes: Boolean = false,
                              ignoreOldDeletedColumns: Boolean = false,
@@ -91,7 +94,7 @@ case class DeduplicateAction(override val id: ActionObjectId,
       Some(output.getDataFrame())
     } else None
     val deduplicateTransformer = deduplicateDataFrame(existingDf, pks, timestamp) _
-    applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, None, standardizeDatatypes, Seq(deduplicateTransformer), filterClauseExpr)
+    applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, Seq(deduplicateTransformer), filterClauseExpr)
   }
 
   /**

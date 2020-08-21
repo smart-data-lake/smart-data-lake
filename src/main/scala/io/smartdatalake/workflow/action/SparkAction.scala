@@ -167,8 +167,8 @@ private[smartdatalake] abstract class SparkAction extends Action {
     val data = DefaultExpressionData.from(context, partitionValues)
     additionalColumns.foldLeft(df){
       case (df, (colName, expr)) =>
-        SparkExpressionUtil.evaluateString(id, Some("additionalColumns"), expr, data)
-        df.withColumn(colName, lit(1))
+        val value = SparkExpressionUtil.evaluateAny(id, Some("additionalColumns"), expr, data)
+        df.withColumn(colName, lit(value.orNull))
     }
   }
 

@@ -25,6 +25,7 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
+import org.apache.spark.sql.functions.expr
 import org.apache.spark.sql.{Dataset, Encoder, SparkSession}
 
 import scala.reflect.runtime.universe.TypeTag
@@ -84,6 +85,27 @@ private[smartdatalake] object SparkExpressionUtil {
     } else None
   }
 
+  def evaluateAny[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], expression: String, data: T, onlySyntaxCheck: Boolean = false)(implicit session: SparkSession): Option[Any] = {
+    import session.implicits._
+    val dsData = Seq(data).toDS
+    val dfResult = Try {
+      dsData.select(expr(expression))
+    } match {
+      case Success(v) => v
+      case Failure(e) => throw ConfigurationException(s"($id) spark expression evaluation for '$expression' and config $configName not possible", configName, e)
+    }
+    if (!onlySyntaxCheck) {
+      Try {
+        val result = dfResult.head
+        if (!result.isNullAt(0)) Some(dfResult.head.get(0))
+        else None
+      } match {
+        case Success(v) => v
+        case Failure(e) => throw new IllegalStateException(s"($id) spark expression evaluation for '$expression' and config $configName failed", e)
+      }
+    } else None
+  }
+
   def createDataset[T <: Product : TypeTag, R](id: ConfigObjectId, configName: Option[String], expression: String, data: T)(implicit session: SparkSession, encoder: Encoder[Option[R]]): Dataset[Option[R]] = {
     import org.apache.spark.sql.functions.expr
     import session.implicits._
@@ -92,7 +114,7 @@ private[smartdatalake] object SparkExpressionUtil {
       dsData.select(expr(expression).cast(encoder.schema.head.dataType)).as[Option[R]]
     } match {
       case Success(v) => v
-      case Failure(e) => throw ConfigurationException(s"($id) spark expression evaluation for '$expression' not possible", configName, e)
+      case Failure(e) => throw ConfigurationException(s"($id) spark expression evaluation for '$expression' and config $configName not possible", configName, e)
     }
   }
 

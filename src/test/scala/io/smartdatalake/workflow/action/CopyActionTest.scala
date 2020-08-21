@@ -229,7 +229,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet ++ l2PartitionValues.toSet)
   }
 
-  test("copy load with filter") {
+  test("copy load with filter and additional columns") {
 
     // setup DataObjects
     val feed = "copy"
@@ -246,16 +246,16 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val refTimestamp1 = LocalDateTime.now()
     implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val customTransformerConfig = CustomDfTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestDfTransformer"))
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformer = Some(customTransformerConfig), filterClause = Some("lastname='jonson'"))
+    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformer = Some(customTransformerConfig), filterClause = Some("lastname='jonson'"), additionalColumns = Some(Map("run_id" -> "runId")))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
 
-    val r1 = session.table(s"${tgtTable.fullName}")
-      .select($"rating")
-      .as[Int].collect().toSeq
+    val r1 = tgtDO.getDataFrame()
+      .select($"rating", $"run_id")
+      .as[(Int,Int)].collect().toSeq
     assert(r1.size == 1)
   }
 
