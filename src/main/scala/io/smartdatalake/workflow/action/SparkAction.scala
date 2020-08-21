@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.{ExecutionMode, FailIfNoPartitionValuesMode, PartitionDiffMode, SparkIncrementalMode, SparkStreamingOnceMode}
+import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.{DataFrameUtil, DefaultExpressionData, SparkExpressionUtil}
@@ -30,7 +30,7 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.ActionHelper.{filterBlacklist, filterWhitelist}
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataobject._
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed}
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}

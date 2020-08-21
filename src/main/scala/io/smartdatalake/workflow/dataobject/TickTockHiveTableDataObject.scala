@@ -183,6 +183,10 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     else logger.warn(s"($id) No empty partition was created for $partitionValues because there are not all partition columns defined")
   }
 
+  override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+    partitionValues.foreach( pv => HiveUtil.dropPartition(table, hadoopPath, pv))
+  }
+
   override def dropTable(implicit session: SparkSession): Unit = {
     HiveUtil.dropTable(table)
   }
