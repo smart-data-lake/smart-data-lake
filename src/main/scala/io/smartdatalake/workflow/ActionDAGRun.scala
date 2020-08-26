@@ -50,7 +50,7 @@ private[smartdatalake] class ActionEventListener(phase: ExecutionPhase) extends 
   }
   override def onNodeSuccess(results: Seq[DAGResult])(node: Action): Unit = {
     node.addRuntimeEvent(phase, RuntimeEventState.SUCCEEDED)
-    logger.info(s"(${node.id}): $phase: succeeded")
+    logger.info(s"(${node.id}): $phase succeeded")
   }
   override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
     node.addRuntimeEvent(phase, RuntimeEventState.FAILED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
@@ -58,7 +58,7 @@ private[smartdatalake] class ActionEventListener(phase: ExecutionPhase) extends 
   }
   override def onNodeSkipped(exception: Throwable)(node: Action): Unit = {
     node.addRuntimeEvent(phase, RuntimeEventState.SKIPPED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
-    logger.warn(s"(${node.id}): $phase: skipped because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
+    logger.warn(s"(${node.id}): $phase skipped because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
   }
 }
 
@@ -98,7 +98,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
     }
     // only stop on skipped in init phase if there are no succeeded results
     val stopSeverity = if (phase == ExecutionPhase.Init && dag.getNodes.exists(_.getLatestRuntimeState.contains(RuntimeEventState.INITIALIZED))) ExceptionSeverity.CANCELLED else ExceptionSeverity.SKIPPED
-    val dagExceptionsToStop = dagExceptions.filter(_.severity <= stopSeverity)
+    val dagExceptionsToStop = dagExceptions.filter(_.severity <= stopSeverity).sortBy(_.severity)
     // log all exceptions
     dagExceptions.foreach {
       case ex if (ex.severity <= ExceptionSeverity.CANCELLED) => logger.error(s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessageWithCause}")
@@ -107,7 +107,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
     // log dag on error
     if (dagExceptionsToStop.nonEmpty) ActionDAGRun.logDag(s"$phase failed for ${context.application} runId=$runId attemptId=$attemptId", dag)
     // throw most severe exception
-    dagExceptionsToStop.sortBy(_.severity).foreach{ throw _ }
+    dagExceptionsToStop.foreach{ throw _ }
 
     // extract & return subfeeds
     result.filter(_.isSuccess).map(_.get)
