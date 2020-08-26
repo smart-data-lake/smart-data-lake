@@ -101,11 +101,11 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
     val dagExceptionsToStop = dagExceptions.filter(_.severity <= stopSeverity).sortBy(_.severity)
     // log all exceptions
     dagExceptions.foreach {
-      case ex if (ex.severity <= ExceptionSeverity.CANCELLED) => logger.error(s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessageWithCause}")
+      case ex if ex.severity <= ExceptionSeverity.CANCELLED => logger.error(s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessageWithCause}")
       case ex => logger.warn(s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessageWithCause}")
     }
     // log dag on error
-    if (dagExceptionsToStop.nonEmpty) ActionDAGRun.logDag(s"$phase failed for ${context.application} runId=$runId attemptId=$attemptId", dag)
+    if (dagExceptionsToStop.nonEmpty) ActionDAGRun.logDag(s"$phase ${dagExceptionsToStop.head.severity} for ${context.application} runId=$runId attemptId=$attemptId", dag)
     // throw most severe exception
     dagExceptionsToStop.foreach{ throw _ }
 
@@ -165,7 +165,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
       session.sparkContext.removeSparkListener(stageMetricsListener)
     }
     // log dag execution
-    ActionDAGRun.logDag(s"exec result dag $runId", dag)
+    ActionDAGRun.logDag(s"exec SUCCEEDED for dag $runId", dag)
 
     // return
     result
@@ -211,7 +211,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
         case ExecutionPhase.Exec => RuntimeEventState.SUCCEEDED
       }
       node.addRuntimeEvent(phase, state, results = results.collect{ case x: SubFeed => x })
-      logger.info(s"${node.toStringShort}: $phase: succeeded")
+      logger.info(s"${node.toStringShort}: $phase succeeded")
       if (phase==ExecutionPhase.Exec) saveState()
     }
     override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
@@ -221,7 +221,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
     }
     override def onNodeSkipped(exception: Throwable)(node: Action): Unit = {
       node.addRuntimeEvent(phase, RuntimeEventState.SKIPPED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
-      logger.warn(s"${node.toStringShort}: $phase: skipped because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
+      logger.warn(s"${node.toStringShort}: $phase skipped because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
       if (phase==ExecutionPhase.Exec) saveState()
     }
   }
