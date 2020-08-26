@@ -19,12 +19,13 @@
 
 package io.smartdatalake.metrics
 
+import java.time.format.DateTimeFormatter
+import java.time.{Duration, Instant}
+
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionMetrics
 import org.apache.spark.scheduler.{AccumulableInfo, SparkListener, SparkListenerJobStart, SparkListenerStageCompleted}
-import org.joda.time.format.{DateTimeFormat, DateTimeFormatter, PeriodFormatter, PeriodFormatterBuilder}
-import org.joda.time.{Duration, Instant}
 
 import scala.collection.mutable
 
@@ -52,46 +53,29 @@ private[smartdatalake] case class SparkStageMetrics(jobInfo: JobInfo, stageId: I
                                                     accumulables: Seq[AccumulableInfo]
                                                    ) extends ActionMetrics {
 
-  lazy val stageSubmissionTime: Instant  = new Instant(submissionTimestamp)
-  lazy val stageCompletionTime: Instant  = new Instant(completionTimeStamp)
-  lazy val stageRuntime: Duration = Duration.millis(completionTimeStamp - submissionTimestamp)
-  lazy val aggregatedExecutorRuntime: Duration = Duration.millis(executorRuntimeInMillis)
-  lazy val aggregatedExecutorCpuTime: Duration = Duration.millis(executorCpuTimeInNanos / 1000000)
-  lazy val aggregatedExecutorGarbageCollectionTime: Duration = Duration.millis(jvmGarbageCollectionTimeInMillis)
-  lazy val aggregatedExecutorDeserializeTime: Duration = Duration.millis(executorDeserializeTimeInMillis)
-  lazy val aggregatedExecutorDeserializeCpuTime: Duration = Duration.millis(executorDeserializeCpuTimeInNanos / 1000000)
-  lazy val resultSerializationTime: Duration = Duration.millis(resultSerializationTimeInMillis)
-  lazy val shuffleFetchWaitTime: Duration = Duration.millis(shuffleFetchWaitTimeInMillis)
-  lazy val shuffleWriteTime: Duration = Duration.millis(shuffleWriteTimeInNanos / 1000000)
+  lazy val stageSubmissionTime: Instant = Instant.ofEpochMilli(submissionTimestamp)
+  lazy val stageCompletionTime: Instant = Instant.ofEpochMilli(completionTimeStamp)
+  lazy val stageRuntime: Duration = Duration.ofMillis(completionTimeStamp - submissionTimestamp)
+  lazy val aggregatedExecutorRuntime: Duration = Duration.ofMillis(executorRuntimeInMillis)
+  lazy val aggregatedExecutorCpuTime: Duration = Duration.ofMillis(executorCpuTimeInNanos / 1000000)
+  lazy val aggregatedExecutorGarbageCollectionTime: Duration = Duration.ofMillis(jvmGarbageCollectionTimeInMillis)
+  lazy val aggregatedExecutorDeserializeTime: Duration = Duration.ofMillis(executorDeserializeTimeInMillis)
+  lazy val aggregatedExecutorDeserializeCpuTime: Duration = Duration.ofMillis(executorDeserializeCpuTimeInNanos / 1000000)
+  lazy val resultSerializationTime: Duration = Duration.ofMillis(resultSerializationTimeInMillis)
+  lazy val shuffleFetchWaitTime: Duration = Duration.ofMillis(shuffleFetchWaitTimeInMillis)
+  lazy val shuffleWriteTime: Duration = Duration.ofMillis(shuffleWriteTimeInNanos / 1000000)
 
-  /**
-   * Formats [[Duration]]s as human readable strings.
-   */
-  lazy val durationFormatter: PeriodFormatter = new PeriodFormatterBuilder()
-    .appendDays().appendSuffix(" d").appendSeparator(" ")
-    .appendHours().appendSuffix(" hr").appendSeparator( " ")
-    .minimumPrintedDigits(2)
-    .appendMinutes().appendSuffix(" min").appendSeparator(" ")
-    .appendSecondsWithMillis().appendSuffix(" s").toFormatter
-
-  /**
-   * Formats [[org.joda.time.DateTime]]s as human readable strings.
-   */
-  lazy val dateTimeFormat: DateTimeFormatter = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss.SSS ZZ")
-
-
-  private def durationString(valueSeparator: String, formatter: PeriodFormatter)(name: String, duration: Duration): String = {
-    s"${keyValueString(valueSeparator)(name, duration.getMillis.toString)} ms (${formatter.print(duration.toPeriod)})"
-  }
-
+  // foramtters
+  private lazy val dateTimeFormat = DateTimeFormatter.ISO_OFFSET_DATE_TIME
+  private def durationString(valueSeparator: String)(name: String, duration: Duration): String = s"${keyValueString(valueSeparator)(name, duration.toString)}"
   private def keyValueString(valueSeparator: String)(key: String, value: String): String = s"$key$valueSeparator$value"
 
   /**
    * @return A printable string reporting all metrics.
    */
-  def getAsText(): String = {
+  def getAsText: String = {
     val valueSeparator: String = "="
-    val durationStringWithSeparator = durationString(valueSeparator, durationFormatter)(_, _)
+    val durationStringWithSeparator = durationString(valueSeparator)(_, _)
     val keyValueStringWithSeparator = keyValueString(valueSeparator)(_, _)
 
     s"""job_id=${jobInfo.id} stage_id=$stageId:
@@ -99,8 +83,8 @@ private[smartdatalake] case class SparkStageMetrics(jobInfo: JobInfo, stageId: I
        |    ${keyValueStringWithSeparator("job_description", jobInfo.description)}
        |    ${keyValueStringWithSeparator("stage_name", stageName)}
        |    ${keyValueStringWithSeparator("num_tasks", numTasks.toString)}
-       |    ${keyValueStringWithSeparator("submitted", {stageSubmissionTime.toDateTime.toString(dateTimeFormat)})}
-       |    ${keyValueStringWithSeparator("completed", {stageCompletionTime.toDateTime.toString(dateTimeFormat)})}
+       |    ${keyValueStringWithSeparator("submitted", dateTimeFormat.format(stageSubmissionTime))}
+       |    ${keyValueStringWithSeparator("completed", dateTimeFormat.format(stageCompletionTime))}
        |    ${durationStringWithSeparator("runtime", stageRuntime)}
        |    ${durationStringWithSeparator("executor_aggregated_runtime", aggregatedExecutorRuntime)}
        |    ${durationStringWithSeparator("executor_aggregated_cputime", aggregatedExecutorCpuTime)}
