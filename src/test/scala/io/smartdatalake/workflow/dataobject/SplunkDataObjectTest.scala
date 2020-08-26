@@ -25,7 +25,6 @@ import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.definitions.BasicAuthMode
 import io.smartdatalake.workflow.connection.{SplunkConnection, SplunkConnectionService}
-import org.apache.commons.lang3.StringEscapeUtils.escapeJava
 import org.apache.spark.sql.Row
 import org.scalatest.Assertions
 
@@ -125,16 +124,18 @@ class SplunkDataObjectTest extends DataObjectTestSuite {
 
 object SplunkStubQueries {
 
-  val queryRaw: String = escapeJava("search index=p_hafas REQUESTPARAMS \"STATISTICS\" FS12345 OR FS1234_Serv | sort -_time")
+  val queryRaw: String = """search index=p_hafas REQUESTPARAMS \"STATISTICS\" FS12345 OR FS1234_Serv | sort -_time"""
   val responseRaw: Seq[Map[String, String]] = Seq(Map(
     ("_raw", "Tue Jul  9 00:00:59 2019 (5399) [FS1234_Serv] STATISTICS: clientProduct=SDL&REQUESTPARAMS=&startLocation=S1#STA#N:LosAngeles#ID:8502306#X:8449896#Y:47169151#RI:1|&endLocation=Z1#STA#N:Helsinki#ID:8501656#X:7626412#Y:46379790#RI:1|&dateOfTravel=11072019&timeOfTravel=8:11&&requestType=XMLCONRECONSTRUCTION&clientIp=---&language=d&"),
     ("_time", "2019-07-09 00:00:59.000 +02:00")
   ))
 
-  val queryWithTableMapping: String = escapeJava("search index=p_hafas REQUESTPARAMS \"STATISTICS\" FS12345 OR FS1234_Serv " +
-    "| rex field=_raw \"startLocation=S1#STA#N:(?P<startLocation>[^\\#]+).+endLocation=Z1#STA#N:(?P<endLocation>[^\\#]+).+dateOfTravel=(?P<dateOfTravel>[0-9]{8})*.+timeOfTravel=(?P<timeOfTravel>(([0-9]?\\d|2[0-9]):([0-9]?\\d|2[0-9])))\" " +
-    "| table flight_from flight_to startLocation viaLocation endLocation dateOfTravel timeOfTravel _time long_from lat_from long_to lat_to trips_gfid language" +
-    "| sort -_time")
+  val queryWithTableMapping: String = """
+    !search index=p_hafas REQUESTPARAMS \"STATISTICS\" FS12345 OR FS1234_Serv
+    ! | rex field=_raw \"startLocation=S1#STA#N:(?P<startLocation>[^\\#]+).+endLocation=Z1#STA#N:(?P<endLocation>[^\\#]+).+dateOfTravel=(?P<dateOfTravel>[0-9]{8})*.+timeOfTravel=(?P<timeOfTravel>(([0-9]?\\d|2[0-9]):([0-9]?\\d|2[0-9])))\"
+    ! | table flight_from flight_to startLocation viaLocation endLocation dateOfTravel timeOfTravel _time long_from lat_from long_to lat_to trips_gfid language
+    ! | sort -_time
+    !""".stripMargin('!').replaceAll(System.lineSeparator, "")
 
   val responseWithTableMapping: Seq[Map[String, String]] = Seq(Map(
     ("long_from", "8473097"),
@@ -152,14 +153,16 @@ object SplunkStubQueries {
     ("language", "")
   ))
 
+  def escapeJava(str: String): String = str.replace("""\""", """\\""").replace(""""""", """\"""")
+
 }
 
 // instead of using mockito et. al. we're using a "poor man's stub approach" by creating a self-baked trait.
 trait SplunkStub extends SplunkService {
   override def readFromSplunk(query: String, searchArgs: JobExportArgs, splunk: Service): Seq[Map[String, String]] = {
     query match {
-      case q if escapeJava(q).equals(SplunkStubQueries.queryRaw) => SplunkStubQueries.responseRaw
-      case q if escapeJava(q).equals(SplunkStubQueries.queryWithTableMapping) => SplunkStubQueries.responseWithTableMapping
+      case q if SplunkStubQueries.escapeJava(q).equals(SplunkStubQueries.queryRaw) => SplunkStubQueries.responseRaw
+      case q if SplunkStubQueries.escapeJava(q).equals(SplunkStubQueries.queryWithTableMapping) => SplunkStubQueries.responseWithTableMapping
       case _ => super.readFromSplunk(query, searchArgs, splunk) // otherwise, invoke the actual implementation
     }
   }

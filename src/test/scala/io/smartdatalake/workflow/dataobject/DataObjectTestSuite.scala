@@ -22,20 +22,18 @@ import java.nio.file.Files
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.testutils.TestUtil
-import org.apache.commons.lang3.StringUtils.replaceAll
+import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql._
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.StructType
 import org.scalatest.{BeforeAndAfter, FunSuite, Matchers}
 
 trait DataObjectTestSuite extends FunSuite with Matchers with BeforeAndAfter {
 
   protected implicit lazy val testSession: SparkSession = TestUtil.sessionHiveCatalog
 
-  protected val escapedFilePath: String => String = (path: String) => replaceAll(path, "\\\\", "\\\\\\\\")
-  protected val convertFilePath: String => String = (path: String) => replaceAll(path, "\\\\", "/")
+
+  protected val escapedFilePath: String => String = (path: String) => path.replaceAll("\\\\", "\\\\\\\\")
+  protected val convertFilePath: String => String = (path: String) => path.replaceAll("\\\\", "/")
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
