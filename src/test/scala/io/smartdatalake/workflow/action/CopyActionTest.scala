@@ -30,6 +30,7 @@ import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, CustomDfTransformerConfig}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SparkSubFeed}
+import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
@@ -229,7 +230,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet ++ l2PartitionValues.toSet)
   }
 
-  test("copy load with filter") {
+  test("copy load with filter, additional columns and transformer options") {
 
     // setup DataObjects
     val feed = "copy"
@@ -245,18 +246,18 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // prepare & start load
     val refTimestamp1 = LocalDateTime.now()
     implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
-    val customTransformerConfig = CustomDfTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestDfTransformer"))
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformer = Some(customTransformerConfig), filterClause = Some("lastname='jonson'"))
+    val customTransformerConfig = CustomDfTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestOptionsDfTransformer"), options = Map("test" -> "test"), runtimeOptions = Map("appName" -> "application"))
+    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformer = Some(customTransformerConfig), filterClause = Some("lastname='jonson'"), additionalColumns = Some(Map("run_id" -> "runId")))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
 
-    val r1 = session.table(s"${tgtTable.fullName}")
-      .select($"rating")
-      .as[Int].collect().toSeq
-    assert(r1.size == 1)
+    val r1 = tgtDO.getDataFrame()
+      .select($"rating", $"test", $"run_id")
+      .as[(Int,String,Int)].collect().toSeq
+    assert(r1 == Seq((6, "test-test", 1)))
   }
 
 }
@@ -264,6 +265,15 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 class TestDfTransformer extends CustomDfTransformer {
   def transform(session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectId: String) : DataFrame = {
     import session.implicits._
+    import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
     df.withColumn("rating", $"rating" + 1)
+  }
+}
+
+class TestOptionsDfTransformer extends CustomDfTransformer {
+  def transform(session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectId: String) : DataFrame = {
+    import session.implicits._
+    df.withColumn("rating", $"rating" + 1)
+      .withColumn("test", lit(options("test")+"-"+options("appName")))
   }
 }

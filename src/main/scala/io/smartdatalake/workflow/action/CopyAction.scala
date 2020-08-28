@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject, FileRefDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.expr
@@ -36,7 +36,11 @@ import scala.util.{Failure, Success, Try}
  * @param inputId inputs DataObject
  * @param outputId output DataObject
  * @param deleteDataAfterRead a flag to enable deletion of input partitions after copying.
- * @param transformer a custom transformation that is applied to each SubFeed separately
+ * @param transformer optional custom transformation to apply
+ * @param columnBlacklist Remove all columns on blacklist from dataframe
+ * @param columnWhitelist Keep only columns on whitelist in dataframe
+ * @param additionalColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
+ *                          The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  * @param executionMode optional execution mode for this Action
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
@@ -48,6 +52,7 @@ case class CopyAction(override val id: ActionObjectId,
                       transformer: Option[CustomDfTransformerConfig] = None,
                       columnBlacklist: Option[Seq[String]] = None,
                       columnWhitelist: Option[Seq[String]] = None,
+                      additionalColumns: Option[Map[String,String]] = None,
                       filterClause: Option[String] = None,
                       standardizeDatatypes: Boolean = false,
                       override val breakDataFrameLineage: Boolean = false,
@@ -69,15 +74,18 @@ case class CopyAction(override val id: ActionObjectId,
   }
 
   override def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
-    applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, None, filterClauseExpr)
+    applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, Seq(), filterClauseExpr)
   }
 
   override def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    // delete input partitions if desired
-    if (deleteDataAfterRead) (input, inputSubFeed) match {
-      case (partitionInput: CanHandlePartitions, sparkSubFeed: SparkSubFeed) =>
-        if (sparkSubFeed.partitionValues.nonEmpty) partitionInput.deletePartitions(sparkSubFeed.partitionValues)
-      case x => throw new IllegalStateException(s"Unmatched case $x")
+    if (deleteDataAfterRead) input match {
+      // delete input partitions if applicable
+      case (partitionInput: CanHandlePartitions) if partitionInput.partitions.nonEmpty && inputSubFeed.partitionValues.nonEmpty =>
+        partitionInput.deletePartitions(inputSubFeed.partitionValues)
+      // otherwise delete all
+      case (fileInput: FileRefDataObject) =>
+        fileInput.deleteAll
+      case x => throw new IllegalStateException(s"($id) input ${input.id} doesn't support deleting data")
     }
   }
 

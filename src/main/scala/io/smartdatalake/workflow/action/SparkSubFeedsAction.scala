@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.{ExecutionMode, ExecutionModeWithMainInputOutput}
+import io.smartdatalake.definitions.ExecutionModeWithMainInputOutput
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}

@@ -74,7 +74,10 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     // prepare & start load
     val refTimestamp1 = LocalDateTime.now()
     implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
-    val customTransformerConfig = CustomDfsTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestDfsTransformerIncrement"))
+    val customTransformerConfig = CustomDfsTransformerConfig(
+      className = Some("io.smartdatalake.workflow.action.TestDfsTransformerIncrement"),
+      options = Map("increment1" -> "1"), runtimeOptions = Map("increment2" -> "runId")
+    )
 
     val action1 = CustomSparkAction("action1", List(srcDO1.id, srcDO2.id), List(tgtDO1.id, tgtDO2.id), transformer = customTransformerConfig)(context1.instanceRegistry)
 
@@ -86,14 +89,14 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtSubFeeds.size == 2)
     assert(tgtSubFeeds.map(_.dataObjectId) == Seq(tgtDO1.id, tgtDO2.id))
 
-    val r1 = session.table(s"${tgtTable1.fullName}")
+    val r1 = tgtDO1.getDataFrame()
       .select($"rating")
       .as[Int].collect().toSeq
     assert(r1.size == 1)
     assert(r1.head == 6) // should be increased by 1 through TestDfTransformer
 
     // same for the second dataframe
-    val r2 = session.table(s"${tgtTable2.fullName}")
+    val r2 = tgtDO2.getDataFrame()
       .select($"rating")
       .as[Int].collect().toSeq
     assert(r2.size == 1)
@@ -305,8 +308,8 @@ class TestDfsTransformerIncrement extends CustomDfsTransformer {
   override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
     import session.implicits._
     Map(
-      "tgt1" -> dfs("src1").withColumn("rating", $"rating"+1)
-    , "tgt2" -> dfs("src2").withColumn("rating", $"rating"+1)
+      "tgt1" -> dfs("src1").withColumn("rating", $"rating" + options("increment1").toInt)
+    , "tgt2" -> dfs("src2").withColumn("rating", $"rating" + options("increment2").toInt)
     )
   }
 }

@@ -298,4 +298,5 @@ class TestStateListener(options: Map[String,String]) extends StateListener {
     if (firstState.isEmpty) firstState = Some(state)
     finalState = Some(state)
   }
+
 }

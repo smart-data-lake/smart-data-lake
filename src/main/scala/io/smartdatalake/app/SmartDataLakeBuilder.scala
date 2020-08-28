@@ -305,8 +305,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       }
     } catch {
       // don't fail on not severe exceptions like having no data to process
-      case ex: DAGException if (ex.severity == ExceptionSeverity.SKIPPED) =>
-        logger.warn(s"Some actions are skipped because of ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+      case ex: DAGException if (ex.severity >= ExceptionSeverity.SKIPPED) =>
+        logger.warn(s"At least one action is ${ex.severity}")
         Seq()
     }
 
