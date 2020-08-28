@@ -321,6 +321,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
     val readSchema = preparedSubFeed.dataFrame.map(df => input.createReadSchema(df.schema))
     val schemaChanges = writeSchema != readSchema
     preparedSubFeed = if (schemaChanges) preparedSubFeed.convertToDummy(readSchema.get) else preparedSubFeed
+    // TODO ZKU: adapt partition values to input's partition cols!
     // break lineage if requested or if it's a streaming DataFrame or if a filter expression is set
     preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined) preparedSubFeed.breakLineage else preparedSubFeed
     // return

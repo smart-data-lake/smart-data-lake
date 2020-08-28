@@ -68,6 +68,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
 
     if (hadoopPathHolder == null) {
       hadoopPathHolder = {
+        // TODO: remove tick/tock postfix from existing table location
         if (thisIsTableExisting) new Path(HiveUtil.existingTableLocation(table))
         else HdfsUtil.prefixHadoopPath(path.get, connection.map(_.pathPrefix))
       }
@@ -77,7 +78,6 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
         // Normalize both paths before comparing them (remove tick / tock folder and trailing slash)
         val hadoopPathNormalized = HiveUtil.normalizePath(hadoopPathHolder.toString)
         val definedPathNormalized = HiveUtil.normalizePath(path.get)
-
 
         if (definedPathNormalized != hadoopPathNormalized)
           logger.warn(s"Table ${table.fullName} exists already with different path. The table will be written with new path definition ${hadoopPathHolder}!")
@@ -147,6 +147,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
       if(numInitialHdfsPartitions == -1) df
       // estimate number of partitions from existing data, otherwise use numInitialHdfsPartitions
       else if (isTableExisting) {
+        // TODO: use hadoopPath
         val currentHdfsPath = HdfsUtil.prefixHadoopPath(HiveUtil.existingTickTockLocation(table), None)
         HdfsUtil.repartitionForHdfsFileSize(df, currentHdfsPath.toString)
       } else df.repartition(numInitialHdfsPartitions)
