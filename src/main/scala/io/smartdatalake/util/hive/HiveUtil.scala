@@ -387,7 +387,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     val doTickTock = (partitions.isEmpty || withSchemaEvolution) && tableExists
 
     // define location: use tick-tock path
-    val location = alternatingTickTockLocation2(table, outputPath)
+    val location: Path = alternatingTickTockLocation2(table, outputPath)
 
     // define table: use tmp-table if we need to *do* a tick-tock
     val tableName = if (doTickTock) {
