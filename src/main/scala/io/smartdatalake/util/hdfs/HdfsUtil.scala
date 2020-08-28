@@ -38,11 +38,10 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    * @param path Path to files in HDFS
    * @return Amount of files, total size of files in Bytes, average size of files in bytes
    */
-  def sizeInfo(path: Path, sc: SparkContext): (Long, Long, Long) = {
+  def sizeInfo(path: Path, fs: FileSystem): (Long, Long, Long) = {
     try {
-      val hdfs: FileSystem = FileSystem.get(sc.hadoopConfiguration)
       val recursive = false
-      val ri = hdfs.listFiles(path, recursive)
+      val ri = fs.listFiles(path, recursive)
       val it = new Iterator[org.apache.hadoop.fs.LocatedFileStatus]() {
         override def hasNext = ri.hasNext
 
@@ -77,7 +76,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    * @param session
    * @return
    */
-  def desiredFileSize(session:SparkSession): Long = {
+  def desiredFileSize(implicit session:SparkSession): Long = {
     session.sparkContext.hadoopConfiguration.getLong("dfs.blocksize", DefaultBlocksize)
   }
 
@@ -99,12 +98,13 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    *                         small and Spark can't use up the configured boundaries.
    * @return repartitioned [[DataFrame]] (or Input [[DataFrame]] if partitioning is untouched)
    */
-  def repartitionForHdfsFileSize(df: DataFrame, existingFilePath: Path, reducePartitions: Boolean = false): DataFrame = {
+  def repartitionForHdfsFileSize(df: DataFrame, existingFilePath: Path, reducePartitions: Boolean = false)(implicit session:SparkSession): DataFrame = {
 
     // Use the HDFS blocksize as target size or use the default if it can't be evaluated
     val desiredSize = desiredFileSize(df.sparkSession)
 
-    val (numFiles, sumSize, avgSize) = HdfsUtil.sizeInfo(existingFilePath, df.sparkSession.sparkContext)
+    val fs = getHadoopFsFromSpark(existingFilePath)
+    val (numFiles, sumSize, avgSize) = HdfsUtil.sizeInfo(existingFilePath, fs)
     val reduceBy = if(reducePartitions) 2 else 1
     val numPartitionsRequired = Math.max(1,Math.ceil(sumSize.toDouble/desiredSize.toDouble).toInt) / reduceBy
     val currentPartitionNum = df.rdd.getNumPartitions
@@ -125,16 +125,6 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
     logger.info(s"Number of RDD partitions before repartition: ${currentPartitionNum}.")
     logger.info(s"Number of RDD partitions after repartition: ${adjustedPartitionNum}.")
     dfRepartitioned
-  }
-
-  def deletePath( path: Path, sc:SparkContext, doWarn:Boolean ) : Unit = {
-    val hdfs = FileSystem.get(sc.hadoopConfiguration)
-    try {
-      hdfs.delete(path, true) // recursive=true
-      logger.info(s"Hadoop path ${path} deleted.")
-    } catch {
-      case e: Exception => if (doWarn) logger.warn(s"Hadoop path ${path} couldn't be deleted (${e.getMessage})")
-    }
   }
 
   def deletePath( path: Path, fs:FileSystem, doWarn:Boolean ) : Unit = {
@@ -221,6 +211,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   def getHadoopFsFromSpark(path: Path)(implicit session: SparkSession): FileSystem = {
     path.getFileSystem(session.sparkContext.hadoopConfiguration)
   }
+
   def getHadoopFsWithConf(path: Path, hadoopConf: Configuration)(implicit session: SparkSession): FileSystem = {
     path.getFileSystem(hadoopConf)
   }

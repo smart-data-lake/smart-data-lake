@@ -293,7 +293,8 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       // create and write to table
       if (partitions.nonEmpty) { // with partitions
         logger.info(s"writeDfToHive: creating external partitioned table ${table.fullName} at location $outputPath")
-        HdfsUtil.deletePath(outputPath, session.sparkContext, doWarn=false) // delete existing data, as all partitions need to be written when table is created.
+        val fs = HdfsUtil.getHadoopFsFromSpark(outputPath)
+        HdfsUtil.deletePath(outputPath, fs, doWarn=false) // delete existing data, as all partitions need to be written when table is created.
         df_partitioned.write
           .partitionBy(partitions:_*)
           .format(hdfsOutputType.toString)
@@ -405,7 +406,8 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       // create and write to table
       if (partitions.nonEmpty) { // with partitions
         logger.info(s"writeDfToHive: creating external partitioned table $tableName at location $location")
-        HdfsUtil.deletePath(location, session.sparkContext, doWarn=false) // delete existing data, as all partitions need to be written when table is created.
+        val fs = HdfsUtil.getHadoopFsFromSpark(location)
+        HdfsUtil.deletePath(location, fs, doWarn=false) // delete existing data, as all partitions need to be written when table is created.
         df_newColsSorted.write
           .partitionBy(partitions:_*)
           .format(hdfsOutputType.toString)
