@@ -190,7 +190,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    * A missing table gets created. Dynamic partitioning is used to create partitions on the fly by Spark.
    * Existing data of partition is overwritten, if table has no partitions all table-data is overwritten.
    *
-   * Note that you need to use writeDfToHiveWithTickTock FIXME: write this not better so it can be better understood.
+   * Note that you need to use writeDfToHiveWithTickTock to write a hive table in tick-tock mode.
    *
    * @param session SparkSession
    * @param dfNew DataFrame to write
