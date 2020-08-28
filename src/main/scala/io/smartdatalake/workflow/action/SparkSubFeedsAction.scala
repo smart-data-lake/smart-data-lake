@@ -124,20 +124,6 @@ abstract class SparkSubFeedsAction extends SparkAction {
     transformedSubFeeds.map( transformedSubFeed => updateSubFeedAfterWrite(transformedSubFeed))
   }
 
-  /**
-   * Enriches SparkSubFeeds with DataFrame if not existing
-   *
-   * @param inputs input data objects.
-   * @param subFeeds input SubFeeds.
-   */
-  protected def enrichSubFeedsDataFrame(inputs: Seq[DataObject with CanCreateDataFrame], subFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
-    assert(inputs.size+recursiveInputs.size == subFeeds.size, s"Number of inputs must match number of subFeeds given for $id")
-    (inputs ++ recursiveInputs).map { input =>
-      val subFeed = subFeeds.find(_.dataObjectId == input.id).getOrElse(throw new IllegalStateException(s"subFeed for input ${input.id} not found"))
-      enrichSubFeedDataFrame(input, subFeed, context.phase)
-    }
-  }
-
   private def executionModeNeedsMainInputOutput: Boolean = {
     executionMode.exists{_.isInstanceOf[ExecutionModeWithMainInputOutput]}
   }
