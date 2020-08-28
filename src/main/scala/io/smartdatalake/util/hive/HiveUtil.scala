@@ -26,6 +26,7 @@ import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.dataobject.Table
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.{array, col}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
@@ -147,7 +148,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
 
     // Parse HDFS partitionname into Map
     def parseHDFSPartitionString(partitions:String) : Map[String,String] = try {
-      partitions.split("/").map(_.split("=")).map( e => (e(0), e(1))).toMap
+      partitions.split(Environment.defaultPathSeparator).map(_.split("=")).map( e => (e(0), e(1))).toMap
     } catch {
       case ex : Throwable =>
         println(s"partition doesnt follow structure (<key1>=<value1>[/<key2>=<value2>]...): $partitions")
@@ -193,15 +194,15 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    *
    * @param session SparkSession
    * @param dfNew DataFrame to write
-   * @param outputDir Directory to store files for Table
+   * @param outputPath Path to store files for Table
    * @param table Table
    * @param partitions Partition column names
    * @param hdfsOutputType tables underlying file format, default = parquet
    * @param numInitialHdfsPartitions the initial number of files created if table does not exist yet, default = -1. Note: the number of files created is controlled by the number of Spark partitions.
    */
-  def writeDfToHive(dfNew: DataFrame, outputDir: String, table: Table, partitions: Seq[String], saveMode: SaveMode,
+  def writeDfToHive(dfNew: DataFrame, outputPath: Path, table: Table, partitions: Seq[String], saveMode: SaveMode,
                     hdfsOutputType: OutputType = OutputType.Parquet, numInitialHdfsPartitions: Int = -1)(implicit session: SparkSession): Unit = {
-    logger.info(s"writeDfToHive: starting for table ${table.fullName}, outputDir: $outputDir, partitions:$partitions")
+    logger.info(s"writeDfToHive: starting for table ${table.fullName}, outputPath: $outputPath, partitions:$partitions")
 
     // check if all partition cols are present in DataFrame
     val missingPartitionCols = partitions.diff(dfNew.columns)
@@ -271,10 +272,10 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
         // TODO: Check for side effects (df.write.option("maxRecordsPerFile", ... ) does only work for FileWriters, but spark config "spark.sql.files.maxRecordsPerFile" works also for writing tables,
         //       so we're setting it on the current runtime config used by all DFs / RDDs
         session.conf.set("spark.sql.files.maxRecordsPerFile", maxRecordsPerFile.get.toLong)
-        HdfsUtil.repartitionForHdfsFileSize(df_newColsSorted, outputDir, reducePartitions = true)
+        HdfsUtil.repartitionForHdfsFileSize(df_newColsSorted, outputPath, reducePartitions = true)
       }
       else {
-        HdfsUtil.repartitionForHdfsFileSize(df_newColsSorted, outputDir)
+        HdfsUtil.repartitionForHdfsFileSize(df_newColsSorted, outputPath)
       }
 
       // Write file
@@ -291,20 +292,20 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
 
       // create and write to table
       if (partitions.nonEmpty) { // with partitions
-        logger.info(s"writeDfToHive: creating external partitioned table ${table.fullName} at location $outputDir")
-        HdfsUtil.deletePath(outputDir, session.sparkContext, doWarn=false) // delete existing data, as all partitions need to be written when table is created.
+        logger.info(s"writeDfToHive: creating external partitioned table ${table.fullName} at location $outputPath")
+        HdfsUtil.deletePath(outputPath, session.sparkContext, doWarn=false) // delete existing data, as all partitions need to be written when table is created.
         df_partitioned.write
           .partitionBy(partitions:_*)
           .format(hdfsOutputType.toString)
-          .option("path", outputDir)
+          .option("path", outputPath.toString)
           .mode("overwrite")
           .saveAsTable(table.fullName)
 
       } else { // without partitions
-        logger.info(s"writeDfToHive: creating table ${table.fullName} at location $outputDir")
+        logger.info(s"writeDfToHive: creating table ${table.fullName} at location $outputPath")
         df_partitioned.write
           .format(hdfsOutputType.toString)
-          .option("path", outputDir)
+          .option("path", outputPath.toString)
           .mode("overwrite")
           .saveAsTable(table.fullName)
       }
@@ -321,14 +322,14 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    *
    * @param session SparkSession
    * @param df_new DataFrame to write
-   * @param outputDir Directory to store files for Table
+   * @param outputPath Directory to store files for Table
    * @param table Table
    * @param partitions Partitions column name
    * @param hdfsOutputType tables underlying file format, default = parquet
    */
-  def writeDfToHiveWithTickTock(df_new: DataFrame, outputDir: String, table: Table, partitions: Seq[String], saveMode: SaveMode,
-                    hdfsOutputType: OutputType = OutputType.Parquet)(implicit session: SparkSession): Unit = {
-    logger.info(s"writeDfToHiveWithTickTock: starting for table ${table.fullName}, outputDir: $outputDir, partitions:$partitions")
+  def writeDfToHiveWithTickTock(df_new: DataFrame, outputPath: Path, table: Table, partitions: Seq[String], saveMode: SaveMode,
+                                hdfsOutputType: OutputType = OutputType.Parquet)(implicit session: SparkSession): Unit = {
+    logger.info(s"writeDfToHiveWithTickTock: starting for table ${table.fullName}, outputPath: $outputPath, partitions:$partitions")
 
     // check if all partition cols are present in DataFrame
     val missingPartitionCols = partitions.diff(df_new.columns)
@@ -386,7 +387,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     val doTickTock = (partitions.isEmpty || withSchemaEvolution) && tableExists
 
     // define location: use tick-tock path
-    val location = alternatingTickTockLocation2(table, outputDir)
+    val location = alternatingTickTockLocation2(table, outputPath)
 
     // define table: use tmp-table if we need to *do* a tick-tock
     val tableName = if (doTickTock) {
@@ -408,7 +409,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
         df_newColsSorted.write
           .partitionBy(partitions:_*)
           .format(hdfsOutputType.toString)
-          .option("path", location)
+          .option("path", location.toString)
           .mode("overwrite")
           .saveAsTable(tableName)
 
@@ -416,7 +417,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
         logger.info(s"writeDfToHive: creating table $tableName at location $location")
         df_newColsSorted.write
           .format(hdfsOutputType.toString)
-          .option("path", location)
+          .option("path", location.toString)
           .mode("overwrite")
           .saveAsTable(tableName)
       }
@@ -534,7 +535,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     //|Location                    |hdfs://nameservice1/user/... |       |
     //+----------------------------+-----------------------------+-------+
     //
-    val location22 = Try(extendedDescribe.where(col("col_name") === "Location" && col("data_type").contains("/")).select("data_type").first.getString(0)).toOption
+    val location22 = Try(extendedDescribe.where(col("col_name") === "Location" && col("data_type").contains(Environment.defaultPathSeparator)).select("data_type").first.getString(0)).toOption
 
     // Spark 2.1: Location must be parsed from row with col_name == "Detailed Table Information"
     val tableDetails = extendedDescribe.where("col_name like '%Detailed Table Information%'").select("*").first()
@@ -560,37 +561,32 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
   def getCurrentTickTockLocationSuffix(table: Table)(implicit session: SparkSession): HiveTableLocationSuffix.Value = {
     val currentLocation = hiveTableLocation(table)
     logger.debug(s"currentLocation: $currentLocation")
-    HiveTableLocationSuffix.withName(currentLocation.split('/').last)
+    HiveTableLocationSuffix.withName(new Path(currentLocation).getName)
   }
 
-  def alternateTickTockLocation(currentLocation:String): String = {
-    val currentTickTock = currentLocation.split('/').last
-    val baseLocation = currentLocation.substring(0,currentLocation.lastIndexOf('/'))
+  def removeTickTockFromLocation(location: Path): Path = {
+    if (location.getName == HiveTableLocationSuffix.Tock.toString || location.getName == HiveTableLocationSuffix.Tick.toString) location.getParent
+    else location
+  }
 
+  def alternateTickTockLocation(location: Path): Path = {
+    val currentTickTock = location.getName
+    val baseLocation = location.getParent
     currentTickTock match {
-      case tt if tt==HiveTableLocationSuffix.Tick.toString => // Tick -> Tock
-        s"$baseLocation/${HiveTableLocationSuffix.Tock.toString}"
-      case tt if tt==HiveTableLocationSuffix.Tock.toString => // Tock -> Tick
-        s"$baseLocation/${HiveTableLocationSuffix.Tick.toString}"
-      case _ =>
-        throw new IllegalArgumentException(s"Table location $currentLocation doesn't use Tick-Tock")
+      // Tick -> Tock
+      case tt if tt==HiveTableLocationSuffix.Tick.toString => new Path(baseLocation, HiveTableLocationSuffix.Tock.toString)
+      // Tock -> Tick
+      case tt if tt==HiveTableLocationSuffix.Tock.toString => new Path(baseLocation, HiveTableLocationSuffix.Tick.toString)
+      case _ => throw new IllegalArgumentException(s"Table location $location doesn't use Tick-Tock")
     }
   }
 
-  def alternatingTickTockLocation(table: Table)(implicit session: SparkSession): String = {
-    val currentLocation = hiveTableLocation(table)
-    logger.debug(s"currentLocation: $currentLocation")
-    val newLocation = alternateTickTockLocation(currentLocation)
-    logger.debug(s"newLocation: $currentLocation")
-    newLocation
-  }
-
-  def alternatingTickTockLocation2(table: Table, outputDir:String)(implicit session: SparkSession): String = {
+  def alternatingTickTockLocation2(table: Table, basePath: Path)(implicit session: SparkSession): Path = {
     if (isHiveTableExisting(table)) {
-      alternateTickTockLocation(hiveTableLocation(table))
+      alternateTickTockLocation(new Path(hiveTableLocation(table)))
     } else {
       // If the table doesn't exist yet, start with tick
-      s"$outputDir/${HiveTableLocationSuffix.Tick.toString}"
+      new Path(basePath, HiveTableLocationSuffix.Tick.toString)
     }
   }
 
@@ -603,7 +599,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    */
   def normalizePath(path: String) : String = {
     path
-      .replaceAll("\\\\", "/")
+      .replaceAll("\\\\", Environment.defaultPathSeparator.toString)
       .replaceAll("file:/", "")
       .replaceAll("/+$", "")
       .replaceAll("tock$", "tick")

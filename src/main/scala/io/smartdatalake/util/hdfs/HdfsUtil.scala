@@ -35,15 +35,14 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   /**
    * Returns size information about existing files in HDFS
    *
-   * @param parquetPath Path to files in HDFS
+   * @param path Path to files in HDFS
    * @return Amount of files, total size of files in Bytes, average size of files in bytes
    */
-  def sizeInfo(parquetPath: String, sc: SparkContext): (Long, Long, Long) = {
+  def sizeInfo(path: Path, sc: SparkContext): (Long, Long, Long) = {
     try {
       val hdfs: FileSystem = FileSystem.get(sc.hadoopConfiguration)
-      val hadoopPath = new Path(parquetPath)
       val recursive = false
-      val ri = hdfs.listFiles(hadoopPath, recursive)
+      val ri = hdfs.listFiles(path, recursive)
       val it = new Iterator[org.apache.hadoop.fs.LocatedFileStatus]() {
         override def hasNext = ri.hasNext
 
@@ -100,7 +99,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    *                         small and Spark can't use up the configured boundaries.
    * @return repartitioned [[DataFrame]] (or Input [[DataFrame]] if partitioning is untouched)
    */
-  def repartitionForHdfsFileSize(df: DataFrame, existingFilePath: String, reducePartitions: Boolean = false): DataFrame = {
+  def repartitionForHdfsFileSize(df: DataFrame, existingFilePath: Path, reducePartitions: Boolean = false): DataFrame = {
 
     // Use the HDFS blocksize as target size or use the default if it can't be evaluated
     val desiredSize = desiredFileSize(df.sparkSession)
@@ -128,19 +127,19 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
     dfRepartitioned
   }
 
-  def deletePath( path:String, sc:SparkContext, doWarn:Boolean ) : Unit = {
+  def deletePath( path: Path, sc:SparkContext, doWarn:Boolean ) : Unit = {
     val hdfs = FileSystem.get(sc.hadoopConfiguration)
     try {
-      hdfs.delete(new Path(path), true) // recursive=true
+      hdfs.delete(path, true) // recursive=true
       logger.info(s"Hadoop path ${path} deleted.")
     } catch {
       case e: Exception => if (doWarn) logger.warn(s"Hadoop path ${path} couldn't be deleted (${e.getMessage})")
     }
   }
 
-  def deletePath( path:String, fs:FileSystem, doWarn:Boolean ) : Unit = {
+  def deletePath( path: Path, fs:FileSystem, doWarn:Boolean ) : Unit = {
     try {
-      fs.delete(new Path(path), true) // recursive=true
+      fs.delete(path, true) // recursive=true
       logger.info(s"Hadoop path ${path} deleted.")
     } catch {
       case e: Exception => if (doWarn) logger.warn(s"Hadoop path ${path} couldn't be deleted (${e.getMessage})")
@@ -150,9 +149,9 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   /**
    * In contrast to deletePath this supports "globs"
    */
-  def deleteFiles( path:String, fs:FileSystem, doWarn:Boolean ) : Unit = {
+  def deleteFiles( path: Path, fs:FileSystem, doWarn:Boolean ) : Unit = {
     try {
-      val deletePaths = fs.globStatus(new Path(path)).map(_.getPath)
+      val deletePaths = fs.globStatus(path).map(_.getPath)
       deletePaths.foreach{ path => fs.delete(path, true) }
       logger.info(s"${deletePaths.size} files delete for hadoop path ${path}.")
     } catch {
@@ -175,7 +174,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    * @param path path to be extended with authority
    * @return Hadoop Path with authority
    */
-  def addHadoopDefaultSchemaAuthority(path: org.apache.hadoop.fs.Path): org.apache.hadoop.fs.Path = {
+  def addHadoopDefaultSchemaAuthority(path: Path): Path = {
     if (path.isAbsoluteAndSchemeAuthorityNull) path.makeQualified(HdfsUtil.getHadoopDefaultSchemeAuthority, null)
     else path
   }
@@ -191,11 +190,10 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    * @param prefix prefix to be added if path doesn't contain schema and authority
    * @return Hadoop Path with schema and authority
    */
-  def prefixHadoopPath(path: String, prefix: Option[String]): org.apache.hadoop.fs.Path = {
-    import org.apache.hadoop.fs.Path
+  def prefixHadoopPath(path: String, prefix: Option[String]): Path = {
     val hadoopPath = new Path(path)
     if (hadoopPath.isAbsoluteAndSchemeAuthorityNull || !hadoopPath.isAbsolute) {
-      val hadoopPathPrefixed = prefix.map( p => new Path(p + HdfsUtil.addLeadingSeparator(path,Environment.defaultPathSeparator)))
+      val hadoopPathPrefixed = prefix.map( p => new Path(p + HdfsUtil.addLeadingSeparator(path, Environment.defaultPathSeparator)))
         .getOrElse(hadoopPath)
       HdfsUtil.addHadoopDefaultSchemaAuthority( hadoopPathPrefixed )
     }
@@ -210,8 +208,8 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    * @param path
    * @return
    */
-  def getHadoopFs(path: org.apache.hadoop.fs.Path): FileSystem = {
-    path.getFileSystem(new org.apache.hadoop.conf.Configuration())
+  def getHadoopFs(path: Path): FileSystem = {
+    path.getFileSystem(new Configuration())
   }
 
   /**
@@ -220,14 +218,14 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    * @param path
    * @return
    */
-  def getHadoopFsFromSpark(path: org.apache.hadoop.fs.Path)(implicit session: SparkSession): FileSystem = {
+  def getHadoopFsFromSpark(path: Path)(implicit session: SparkSession): FileSystem = {
     path.getFileSystem(session.sparkContext.hadoopConfiguration)
   }
-  def getHadoopFsWithConf(path: org.apache.hadoop.fs.Path, hadoopConf: Configuration)(implicit session: SparkSession): FileSystem = {
+  def getHadoopFsWithConf(path: Path, hadoopConf: Configuration)(implicit session: SparkSession): FileSystem = {
     path.getFileSystem(hadoopConf)
   }
 
-  def addLeadingSeparator(path:String, separator: Char): String = {
+  def addLeadingSeparator(path: String, separator: Char): String = {
     if (path.startsWith(separator.toString)) path else separator + path
   }
 

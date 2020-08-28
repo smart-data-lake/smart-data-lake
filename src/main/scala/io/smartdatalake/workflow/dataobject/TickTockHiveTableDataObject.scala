@@ -68,8 +68,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
 
     if (hadoopPathHolder == null) {
       hadoopPathHolder = {
-        // TODO: remove tick/tock postfix from existing table location
-        if (thisIsTableExisting) new Path(HiveUtil.existingTableLocation(table))
+        if (thisIsTableExisting) HiveUtil.removeTickTockFromLocation(new Path(HiveUtil.existingTableLocation(table)))
         else HdfsUtil.prefixHadoopPath(path.get, connection.map(_.pathPrefix))
       }
 
@@ -147,14 +146,13 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
       if(numInitialHdfsPartitions == -1) df
       // estimate number of partitions from existing data, otherwise use numInitialHdfsPartitions
       else if (isTableExisting) {
-        // TODO: use hadoopPath
         val currentHdfsPath = HdfsUtil.prefixHadoopPath(HiveUtil.existingTickTockLocation(table), None)
-        HdfsUtil.repartitionForHdfsFileSize(df, currentHdfsPath.toString)
+        HdfsUtil.repartitionForHdfsFileSize(df, currentHdfsPath)
       } else df.repartition(numInitialHdfsPartitions)
     }
 
     // write table and fix acls
-    HiveUtil.writeDfToHiveWithTickTock(dfPrepared, hadoopPath.toString, table, partitions, saveMode)
+    HiveUtil.writeDfToHiveWithTickTock(dfPrepared, hadoopPath, table, partitions, saveMode)
     val aclToApply = acl.orElse(connection.flatMap(_.acl))
     if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
     if (analyzeTableAfterWrite && !createTableOnly) {
