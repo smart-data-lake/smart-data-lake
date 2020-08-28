@@ -626,7 +626,8 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
   def dropPartition(table: Table, tablePath: Path, partition: PartitionValues)(implicit session: SparkSession): Unit = {
     val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partition.keys.toSeq, Environment.defaultPathSeparator)
     val partitionPath = new Path(tablePath, partition.getPartitionString(partitionLayout))
-    HdfsUtil.deletePath(partitionPath.toString, session.sparkContext, false)
+    val fs = HdfsUtil.getHadoopFsFromSpark(partitionPath)
+    HdfsUtil.deletePath(partitionPath, fs, false)
     val partitionDef = partition.elements.map{ case (k,v) => s"$k='$v'"}.mkString(", ")
     execSqlStmt(s"ALTER TABLE ${table.fullName} DROP IF EXISTS PARTITION ($partitionDef)")
   }
