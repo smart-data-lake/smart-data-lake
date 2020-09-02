@@ -109,21 +109,20 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
     val numPartitionsRequired = Math.max(1,Math.ceil(sumSize.toDouble/desiredSize.toDouble).toInt) / reduceBy
     val currentPartitionNum = df.rdd.getNumPartitions
 
-    logger.info(s"Current Parquet files: ${numFiles} with a size of ${sumSize}. Requiring ${numPartitionsRequired} partitions now.")
+    logger.debug(s"Current Parquet files: ${numFiles} with a size of ${sumSize}. Requiring ${numPartitionsRequired} partitions now.")
 
     // Repartition is only done if files exist, otherwise you always end up with one partition
     val dfRepartitioned = if (sumSize > 0 && numPartitionsRequired > currentPartitionNum) {
-      logger.info(s"Executing repartition to ${numPartitionsRequired}")
+      logger.debug(s"Executing repartition to ${numPartitionsRequired}")
       df.repartition(numPartitionsRequired)
     } else if(sumSize > 0 && numPartitionsRequired < currentPartitionNum) {
-      logger.info(s"Executing coalesce to ${numPartitionsRequired}")
+      logger.debug(s"Executing coalesce to ${numPartitionsRequired}")
       df.coalesce(numPartitionsRequired)
     }
     else df
 
     val adjustedPartitionNum = dfRepartitioned.rdd.getNumPartitions
-    logger.info(s"Number of RDD partitions before repartition: ${currentPartitionNum}.")
-    logger.info(s"Number of RDD partitions after repartition: ${adjustedPartitionNum}.")
+    logger.debug(s"Repartitioning: Number of RDD partitions before=$currentPartitionNum after=$adjustedPartitionNum")
     dfRepartitioned
   }
 

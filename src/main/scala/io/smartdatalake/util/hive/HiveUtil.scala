@@ -202,21 +202,21 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    */
   def writeDfToHive(dfNew: DataFrame, outputPath: Path, table: Table, partitions: Seq[String], saveMode: SaveMode,
                     hdfsOutputType: OutputType = OutputType.Parquet, numInitialHdfsPartitions: Int = -1)(implicit session: SparkSession): Unit = {
-    logger.info(s"writeDfToHive: starting for table ${table.fullName}, outputPath: $outputPath, partitions:$partitions")
+    logger.info(s"(${table.fullName}) writeDfToHive: starting outputPath=$outputPath partitions=$partitions saveMode=${saveMode.name}")
 
     // check if all partition cols are present in DataFrame
     val missingPartitionCols = partitions.diff(dfNew.columns)
-    require( missingPartitionCols.isEmpty, s"""Partition column(s) ${missingPartitionCols.mkString(",")} are missing in DataFrame columns (${dfNew.columns.mkString(",")}).""" )
+    require( missingPartitionCols.isEmpty, s"(${table.fullName}) Partition column(s) ${missingPartitionCols.mkString(",")} are missing in DataFrame columns (${dfNew.columns.mkString(",")})." )
 
     // check if table exists and location is correct
     val tableExists = isHiveTableExisting(table)
-    if (!tableExists) logger.info(s"writeDfToHive: table ${table.fullName} doesnt exist yet")
+    if (!tableExists) logger.info(s"(${table.fullName}) writeDfToHive: table doesnt exist yet")
 
     // check if partitionsOpt match with existing table definition
     if (tableExists) {
       val configuredCols = partitions.toSet
       val existingCols = getTablePartitionCols(table).getOrElse(Seq()).toSet
-      require( configuredCols==existingCols, s"writeDfToHive: configured are different from tables existing partition columns: configured=$configuredCols, existing=$existingCols" )
+      require( configuredCols==existingCols, s"(${table.fullName}) writeDfToHive: configured vs existing partition columns are different: configured=$configuredCols, existing=$existingCols" )
     }
 
     // check if this run is with SchemaEvolution and sort columns (partition columns last)
@@ -224,32 +224,22 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       // check if schema evolution
       val df_existing = session.table(table.fullName)
       val withSchemaEvolution = !SchemaEvolution.hasSameColNamesAndTypes(df_existing, dfNew)
-      if (withSchemaEvolution) {
-        logger.info("writeDfToHive: schema evolution detected")
-        logger.info("writeDfToHive: existing schema")
-        df_existing.printSchema
-        logger.info("writeDfToHive: new schema")
-        dfNew.printSchema
-      }
+      if (withSchemaEvolution) logger.info(s"(${table.fullName}) writeDfToHive: schema evolution detected\nexisting=${df_existing.schema.treeString}\nnew=${dfNew.schema.treeString}")
 
-      // if schema evolution with partitioning, make sure old partitions data is included within new dataframe
-      if (withSchemaEvolution && partitions.nonEmpty) {
-        val existingPartitions = df_existing.select(array(partitions.map(col): _*)).distinct.collect.map( _.getSeq[String](0))
-        val newPartitions = dfNew.select(array(partitions.map(col): _*)).distinct.collect.map( _.getSeq[String](0))
-        assert(existingPartitions.diff(newPartitions).nonEmpty, "Schema Evolution mit Partitionierung: Bisher vorhandene Partitionen in neuem DataFrame nicht vorhanden!")
-      }
+      // Schema evolution with Partitions can only be done with Tick-Tock
+      require( !(withSchemaEvolution && partitions.nonEmpty), s"(${table.fullName}) Schema evolution with partitions only works with TickTock! Use writeDfToHiveWithTickTock instead." )
 
       // move partition cols last, retain current column ordering if not schema evolution
       // TODO: Do partitions-columns not only need to be at the end, but also in the right order if you have more than one?
       val colsSorted = movePartitionColsLast( if (withSchemaEvolution) dfNew.columns else df_existing.columns, partitions )
-      logger.debug(s"""writeDfToHive: columns sorted to ${colsSorted.mkString(",")}""")
+      logger.debug(s"(${table.fullName}) writeDfToHive: columns sorted to ${colsSorted.mkString(",")}")
       val df_newColsSorted = dfNew.select(colsSorted.map(col):_*)
       (df_newColsSorted, withSchemaEvolution)
 
     } else { // table does not exists
       // move partition cols last
       val colsSorted = movePartitionColsLast( dfNew.columns, partitions )
-      logger.debug(s"""writeDfToHive: columns sorted to ${colsSorted.mkString(",")}""")
+      logger.debug(s"(${table.fullName}) writeDfToHive: columns sorted to ${colsSorted.mkString(",")}")
       val df_newColsSorted = dfNew.select(colsSorted.map(col):_*)
       (df_newColsSorted, false)
     }
@@ -258,13 +248,13 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     val originalMaxRecordsPerFile = session.conf.get("spark.sql.files.maxRecordsPerFile")
     if (tableExists && !withSchemaEvolution) {
       // insert into existing table
-      logger.info(s"writeDfToHive: insert into ${table.fullName}")
+      logger.info(s"(${table.fullName}) writeDfToHive: insert into ${table.fullName}")
 
       // Try to determine maximum number of records according to catalog statistics
       val maxRecordsPerFile: Option[BigInt] = calculateMaxRecordsPerFileFromStatistics(table)
       val df_partitioned = if(maxRecordsPerFile.isDefined) {
         // if exact number of records could be determined from Hive statistics, use it to split files
-        logger.info(s"writing with maxRecordsPerFile " +maxRecordsPerFile.get.toLong)
+        logger.info(s"(${table.fullName}) writing with maxRecordsPerFile " +maxRecordsPerFile.get.toLong)
         // TODO: Check for side effects (df.write.option("maxRecordsPerFile", ... ) does only work for FileWriters, but spark config "spark.sql.files.maxRecordsPerFile" works also for writing tables,
         //       so we're setting it on the current runtime config used by all DFs / RDDs
         session.conf.set("spark.sql.files.maxRecordsPerFile", maxRecordsPerFile.get.toLong)
@@ -288,7 +278,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
 
       // create and write to table
       if (partitions.nonEmpty) { // with partitions
-        logger.info(s"writeDfToHive: creating external partitioned table ${table.fullName} at location $outputPath")
+        logger.info(s"(${table.fullName}) writeDfToHive: creating external partitioned table at location $outputPath")
         val fs = HdfsUtil.getHadoopFsFromSpark(outputPath)
         HdfsUtil.deletePath(outputPath, fs, doWarn=false) // delete existing data, as all partitions need to be written when table is created.
         df_partitioned.write
@@ -299,7 +289,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
           .saveAsTable(table.fullName)
 
       } else { // without partitions
-        logger.info(s"writeDfToHive: creating table ${table.fullName} at location $outputPath")
+        logger.info(s"(${table.fullName}) writeDfToHive: creating table at location $outputPath")
         df_partitioned.write
           .format(hdfsOutputType.toString)
           .option("path", outputPath.toString)
@@ -331,17 +321,17 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
 
     // check if all partition cols are present in DataFrame
     val missingPartitionCols = partitions.diff(df_new.columns)
-    require( missingPartitionCols.isEmpty, s"""partition columns ${missingPartitionCols.mkString(",")} not present in DataFrame""" )
+    require( missingPartitionCols.isEmpty, s"""(${table.fullName}) partition columns ${missingPartitionCols.mkString(",")} not present in DataFrame""" )
 
     // check if table exists and location is correct
     val tableExists = isHiveTableExisting(table)
-    if (!tableExists) logger.info(s"writeDfToHive: table ${table.fullName} doesn't exist yet")
+    if (!tableExists) logger.info(s"(${table.fullName}) writeDfToHive: table doesn't exist yet")
 
     // check if partitionsOpt match with existing table definition
     if (tableExists) {
       val configuredCols = partitions.toSet
       val existingCols = getTablePartitionCols(table).getOrElse(Seq()).toSet
-      require( configuredCols==existingCols, s"writeDfToHive: configured are different from tables existing partition columns: configured=$configuredCols, existing=$existingCols" )
+      require( configuredCols==existingCols, s"(${table.fullName}) writeDfToHive: configured vs existing partition columns are different: configured=$configuredCols, existing=$existingCols" )
     }
 
     // check if this run is with SchemaEvolution and sort columns (partition columns last)
@@ -349,32 +339,26 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       // check if schema evolution
       val df_existing = session.table(table.fullName)
       val withSchemaEvolution = !SchemaEvolution.hasSameColNamesAndTypes(df_existing, df_new)
-      if (withSchemaEvolution) {
-        logger.info("writeDfToHive: schema evolution detected")
-        logger.info("writeDfToHive: existing schema")
-        df_existing.printSchema
-        logger.info("writeDfToHive: new schema")
-        df_new.printSchema
-      }
+      if (withSchemaEvolution) logger.info(s"(${table.fullName}) writeDfToHive: schema evolution detected\nexisting=${df_existing.schema.treeString}\nnew=${df_new.schema.treeString}")
 
       // if schema evolution with partitioning, make sure old partitions data is included within new dataframe
       if (withSchemaEvolution && partitions.nonEmpty) {
         val existingPartitions = df_existing.select(array(partitions.map(col): _*)).distinct.collect.map( _.getSeq[String](0))
         val newPartitions = df_new.select(array(partitions.map(col): _*)).distinct.collect.map( _.getSeq[String](0))
-        assert(existingPartitions.diff(newPartitions).nonEmpty, "Schema Evolution mit Partitionierung: Bisher vorhandene Partitionen in neuem DataFrame nicht vorhanden!")
+        assert(existingPartitions.diff(newPartitions).nonEmpty, "(${table.fullName}) writeDfToHive: schema evolution with partitions needs all existing data in new dataframe, but partition data of existing dataframe is missing in new data frame!")
       }
 
       // move partition cols last, retain current column ordering if not schema evolution
       // TODO: Do partitions-columns not only need to be at the end, but also in the right order if you have more than one?
       val colsSorted = movePartitionColsLast( if (withSchemaEvolution) df_new.columns else df_existing.columns, partitions )
-      logger.debug(s"""writeDfToHive: columns sorted to ${colsSorted.mkString(",")}""")
+      logger.debug(s"(${table.fullName}) writeDfToHive: columns sorted to ${colsSorted.mkString(",")}")
       val df_newColsSorted = df_new.select(colsSorted.map(col):_*)
       (df_newColsSorted, withSchemaEvolution)
 
     } else { // table does not exists
       // move partition cols last
       val colsSorted = movePartitionColsLast( df_new.columns, partitions )
-      logger.debug(s"""writeDfToHive: columns sorted to ${colsSorted.mkString(",")}""")
+      logger.debug(s"(${table.fullName}) writeDfToHive: columns sorted to ${colsSorted.mkString(",")}")
       val df_newColsSorted = df_new.select(colsSorted.map(col):_*)
       (df_newColsSorted, false)
     }
@@ -386,14 +370,14 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
 
     // define table: use tmp-table if we need to *do* a tick-tock
     val tableName = if (doTickTock) {
-      logger.info(s"writeDfToHive: tick-tock needed")
+      logger.info(s"(${table.fullName}) writeDfToHive: tick-tock needed")
       s"${table.fullName}_tmp"
     } else table.fullName
 
     // write to table
     if (tableExists && !doTickTock && !withSchemaEvolution) {
       // insert into existing table
-      logger.info(s"writeDfToHive: insert into $tableName")
+      logger.info(s"(${table.fullName}) writeDfToHive: insert into $tableName")
       df_newColsSorted.write.mode(saveMode).insertInto(tableName)
 
     } else {
@@ -402,7 +386,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
 
       // create and write to table
       if (partitions.nonEmpty) { // with partitions
-        logger.info(s"writeDfToHive: creating external partitioned table $tableName at location $location")
+        logger.info(s"(${table.fullName}) writeDfToHive: creating external partitioned table $tableName at location $location")
         val fs = HdfsUtil.getHadoopFsFromSpark(location)
         HdfsUtil.deletePath(location, fs, doWarn=false) // delete existing data, as all partitions need to be written when table is created.
         df_newColsSorted.write
@@ -413,7 +397,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
           .saveAsTable(tableName)
 
       } else { // without partitions
-        logger.info(s"writeDfToHive: creating table $tableName at location $location")
+        logger.info(s"(${table.fullName}) writeDfToHive: creating table $tableName at location $location")
         df_newColsSorted.write
           .format(hdfsOutputType.toString)
           .option("path", location.toString)
@@ -428,7 +412,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       // drop existing table (schema is outdated), rename tmp table (new schema)
       // Attention: this table is potentially missing for some milliseconds...
       // Note: we could also change location of existing table, but this get's complicated for partitioned tables as all partition locations need to be changed as well, maybe even with multiple partition cols.
-      logger.info(s"writeDfToHive: droping table $existingTable, renaming table $tableName to $existingTable" )
+      logger.info(s"(${table.fullName}) writeDfToHive: droping table $existingTable, renaming table $tableName to $existingTable" )
       session.sql(s"DROP TABLE IF EXISTS $existingTable")
       session.sql(s"ALTER TABLE $tableName RENAME TO $existingTable")
     }
