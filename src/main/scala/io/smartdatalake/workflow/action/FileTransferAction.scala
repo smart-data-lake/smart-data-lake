@@ -54,7 +54,6 @@ case class FileTransferAction(override val id: ActionObjectId,
   override val outputs: Seq[FileRefDataObject] = Seq(output)
 
   // initialize FileTransfer
-  // TODO: move deleteDataAfterRead to postExecSubFeed
   private val fileTransfer = FileTransfer(input, output, deleteDataAfterRead, overwrite)
 
   override def initSubFeed(subFeed: FileSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
