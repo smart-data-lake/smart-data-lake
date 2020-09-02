@@ -109,7 +109,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     df.colNamesLowercase
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession): Unit = {
     require(table.query.isEmpty, s"($id) Cannot write to jdbc DataObject defined by a query.")
     validateSchemaMin(df)
     // write table

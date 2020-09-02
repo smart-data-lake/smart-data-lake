@@ -122,7 +122,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
    * writes subfeed to output respecting given execution mode
    * @return true if no data was transfered, otherwise false
    */
-  def writeSubFeed(subFeed: SparkSubFeed, output: DataObject with CanWriteDataFrame)(implicit session: SparkSession): Boolean = {
+  def writeSubFeed(subFeed: SparkSubFeed, output: DataObject with CanWriteDataFrame, isRecursiveInput: Boolean = false)(implicit session: SparkSession): Boolean = {
     executionMode match {
       case Some(m: SparkStreamingOnceMode) =>
         // Write in streaming mode - use spark streaming with Trigger.Once and awaitTermination
@@ -136,7 +136,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
       case None | Some(_: PartitionDiffMode) | Some(_: SparkIncrementalMode) | Some(_: FailIfNoPartitionValuesMode) =>
         // Write in batch mode
         assert(!subFeed.dataFrame.get.isStreaming, s"($id) Input from ${subFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingOnceMode.getClass.getSimpleName}")
-        output.writeDataFrame(subFeed.dataFrame.get, subFeed.partitionValues)
+        output.writeDataFrame(subFeed.dataFrame.get, subFeed.partitionValues, isRecursiveInput)
         // return noData
         false
       case x => throw new IllegalStateException( s"($id) ExecutionMode $x is not supported")

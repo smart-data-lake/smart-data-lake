@@ -112,8 +112,9 @@ abstract class SparkSubFeedsAction extends SparkAction {
       val msg = s"writing DataFrame to ${output.id}" + (if (subFeed.partitionValues.nonEmpty) s", partitionValues ${subFeed.partitionValues.mkString(" ")}" else "")
       logger.info(s"($id) start " + msg)
       setSparkJobMetadata(Some(msg))
+      val isRecursiveInput = recursiveInputs.exists(_.id == subFeed.dataObjectId)
       val (noData,d) = PerformanceUtils.measureDuration {
-        writeSubFeed(subFeed, output)
+        writeSubFeed(subFeed, output, isRecursiveInput)
       }
       setSparkJobMetadata()
       val metricsLog = if (noData) ", no data found"

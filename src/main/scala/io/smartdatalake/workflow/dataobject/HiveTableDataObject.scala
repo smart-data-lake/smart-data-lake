@@ -138,10 +138,11 @@ case class HiveTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
                              (implicit session: SparkSession): Unit = {
+    require(!isRecursiveInput, "($id) HiveTableDataObject cannot write dataframe when dataobject is also used as recursive input ")
     validateSchemaMin(df)
-    writeDataFrame(df, createTableOnly = false, partitionValues)
+    writeDataFrameInternal(df, createTableOnly = false, partitionValues)
   }
 
    /**
@@ -149,7 +150,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
    * DataFrames are repartitioned in order not to write too many small files
    * or only a few HDFS files that are too large.
    */
-  private def writeDataFrame(df: DataFrame, createTableOnly:Boolean, partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): Unit = {
+  private def writeDataFrameInternal(df: DataFrame, createTableOnly:Boolean, partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): Unit = {
     val dfPrepared = if (createTableOnly) session.createDataFrame(List[Row]().asJava, df.schema) else df
 
     // write table and fix acls

@@ -254,10 +254,6 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       (df_newColsSorted, false)
     }
 
-    // Schema evolution with Partitions can only be done with Tick-Tock
-    require( !(withSchemaEvolution && partitions.nonEmpty), "Schema evolution with partitions only works with TickTock! Use writeDfToHiveWithTickTock instead." )
-
-
     // write to table
     val originalMaxRecordsPerFile = session.conf.get("spark.sql.files.maxRecordsPerFile")
     if (tableExists && !withSchemaEvolution) {
@@ -327,10 +323,11 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    * @param table Table
    * @param partitions Partitions column name
    * @param hdfsOutputType tables underlying file format, default = parquet
+   * @param forceTickTock set to true if you want to always to tick-tock, and avoid the optimization to cancel tick-tock for partitioned tables
    */
-  def writeDfToHiveWithTickTock(df_new: DataFrame, outputPath: Path, table: Table, partitions: Seq[String], saveMode: SaveMode,
-                                hdfsOutputType: OutputType = OutputType.Parquet)(implicit session: SparkSession): Unit = {
-    logger.info(s"writeDfToHiveWithTickTock: starting for table ${table.fullName}, outputPath: $outputPath, partitions:$partitions")
+  def writeDfToHiveWithTickTock(df_new: DataFrame, outputPath: Path, table: Table, partitions: Seq[String], saveMode: SaveMode, hdfsOutputType: OutputType = OutputType.Parquet, forceTickTock: Boolean = false)
+                               (implicit session: SparkSession): Unit = {
+    logger.info(s"(${table.fullName}) writeDfToHiveWithTickTock: start writing outputPath=$outputPath partitions=$partitions saveMode=${saveMode.name} forceTickTock=$forceTickTock")
 
     // check if all partition cols are present in DataFrame
     val missingPartitionCols = partitions.diff(df_new.columns)
@@ -385,10 +382,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     // cancel tick-tock if
     // - partitions without schema evolution to avoid partition migration
     // - table doesnt exists yet
-    val doTickTock = (partitions.isEmpty || withSchemaEvolution) && tableExists
-
-    // define location: use tick-tock path
-    val location: Path = alternatingTickTockLocation2(table, outputPath)
+    val doTickTock = forceTickTock || ((partitions.isEmpty || withSchemaEvolution) && tableExists)
 
     // define table: use tmp-table if we need to *do* a tick-tock
     val tableName = if (doTickTock) {
@@ -403,6 +397,9 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       df_newColsSorted.write.mode(saveMode).insertInto(tableName)
 
     } else {
+      // define location: use tick-tock path
+      val location: Path = alternatingTickTockLocation2(table, outputPath)
+
       // create and write to table
       if (partitions.nonEmpty) { // with partitions
         logger.info(s"writeDfToHive: creating external partitioned table $tableName at location $location")

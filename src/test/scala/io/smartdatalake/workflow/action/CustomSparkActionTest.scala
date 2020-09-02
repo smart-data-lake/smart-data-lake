@@ -113,7 +113,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(srcDO1)
 
     val tgtTable1 = Table(Some("default"), "copy_output1", None, Some(Seq("lastname", "firstname")))
-    val tgtDO1 = TickTockHiveTableDataObject("tgt1", Some(tempPath + s"/${tgtTable1.fullName}"), table = tgtTable1, numInitialHdfsPartitions = 1)
+    val tgtDO1 = TickTockHiveTableDataObject("tgt1", Some(tempPath + s"/${tgtTable1.fullName}"), table = tgtTable1, numInitialHdfsPartitions = 1, partitions = Seq("lastname"))
     tgtDO1.dropTable
     instanceRegistry.register(tgtDO1)
 

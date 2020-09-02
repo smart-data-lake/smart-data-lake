@@ -122,10 +122,10 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
                              (implicit session: SparkSession): Unit = {
     validateSchemaMin(df)
-    writeDataFrame(df, createTableOnly=false, partitionValues)
+    writeDataFrameInternal(df, createTableOnly=false, partitionValues, isRecursiveInput)
 
     // make sure empty partitions are created as well
     createMissingPartitions(partitionValues)
@@ -136,8 +136,8 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
    * DataFrames are repartitioned in order not to write too many small files
    * or only a few HDFS files that are too large.
    */
-  def writeDataFrame(df: DataFrame, createTableOnly: Boolean, partitionValues: Seq[PartitionValues])
-                    (implicit session: SparkSession): Unit = {
+  def writeDataFrameInternal(df: DataFrame, createTableOnly: Boolean, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean)
+                            (implicit session: SparkSession): Unit = {
     val dfPrepared = if (createTableOnly) {
       // create empty df with existing df's schema
       session.createDataFrame(List.empty[Row].asJava, df.schema)
@@ -152,7 +152,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     }
 
     // write table and fix acls
-    HiveUtil.writeDfToHiveWithTickTock(dfPrepared, hadoopPath, table, partitions, saveMode)
+    HiveUtil.writeDfToHiveWithTickTock(dfPrepared, hadoopPath, table, partitions, saveMode, forceTickTock = isRecursiveInput)
     val aclToApply = acl.orElse(connection.flatMap(_.acl))
     if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
     if (analyzeTableAfterWrite && !createTableOnly) {
