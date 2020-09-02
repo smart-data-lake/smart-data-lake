@@ -26,6 +26,7 @@ import io.smartdatalake.workflow.dataobject.Table
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.{AnalysisException, DataFrame, SaveMode, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.apache.hadoop.fs.{Path => HadoopPath}
 
 import scala.util.Try
 
@@ -42,7 +43,7 @@ class HiveUtilTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger
 
   val tmpDirOnFS: Path = Files.createTempDirectory("sdl_test")
   val tableDirOnFS: Path = Paths.get(tmpDirOnFS.toString, hiveTable.name)
-  val hdfsTablePath: String = tableDirOnFS.toUri.toString // we use local filesystem and hive catalog for testing
+  val hdfsTablePath: HadoopPath = new HadoopPath(tableDirOnFS.toUri) // we use local filesystem and hive catalog for testing
 
   before {
     // make sure directory exists for Tick-Tock mode in Windows

@@ -112,8 +112,9 @@ abstract class SparkSubFeedsAction extends SparkAction {
       val msg = s"writing DataFrame to ${output.id}" + (if (subFeed.partitionValues.nonEmpty) s", partitionValues ${subFeed.partitionValues.mkString(" ")}" else "")
       logger.info(s"($id) start " + msg)
       setSparkJobMetadata(Some(msg))
+      val isRecursiveInput = recursiveInputs.exists(_.id == subFeed.dataObjectId)
       val (noData,d) = PerformanceUtils.measureDuration {
-        writeSubFeed(subFeed, output)
+        writeSubFeed(subFeed, output, isRecursiveInput)
       }
       setSparkJobMetadata()
       val metricsLog = if (noData) ", no data found"
@@ -122,20 +123,6 @@ abstract class SparkSubFeedsAction extends SparkAction {
     }
     // return
     transformedSubFeeds.map( transformedSubFeed => updateSubFeedAfterWrite(transformedSubFeed))
-  }
-
-  /**
-   * Enriches SparkSubFeeds with DataFrame if not existing
-   *
-   * @param inputs input data objects.
-   * @param subFeeds input SubFeeds.
-   */
-  protected def enrichSubFeedsDataFrame(inputs: Seq[DataObject with CanCreateDataFrame], subFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
-    assert(inputs.size+recursiveInputs.size == subFeeds.size, s"Number of inputs must match number of subFeeds given for $id")
-    (inputs ++ recursiveInputs).map { input =>
-      val subFeed = subFeeds.find(_.dataObjectId == input.id).getOrElse(throw new IllegalStateException(s"subFeed for input ${input.id} not found"))
-      enrichSubFeedDataFrame(input, subFeed, context.phase)
-    }
   }
 
   private def executionModeNeedsMainInputOutput: Boolean = {

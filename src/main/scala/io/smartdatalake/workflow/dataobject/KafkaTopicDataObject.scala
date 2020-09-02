@@ -267,7 +267,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     )
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession): Unit = {
     convertToWriteDataFrame(df)
       .write
       .format("kafka")

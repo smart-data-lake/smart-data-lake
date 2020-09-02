@@ -59,7 +59,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val appName = "sdlb-recovery"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(statePath, filesystem, false)
+    HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
 
@@ -158,7 +158,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val appName = "sdlb-runId"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(s"$statePath", filesystem, false)
+    HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
 
@@ -243,7 +243,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val appName = "sdlb-simulation"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(s"$statePath", filesystem, false)
+    HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
 

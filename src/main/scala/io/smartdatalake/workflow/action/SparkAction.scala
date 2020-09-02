@@ -122,7 +122,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
    * writes subfeed to output respecting given execution mode
    * @return true if no data was transfered, otherwise false
    */
-  def writeSubFeed(subFeed: SparkSubFeed, output: DataObject with CanWriteDataFrame)(implicit session: SparkSession): Boolean = {
+  def writeSubFeed(subFeed: SparkSubFeed, output: DataObject with CanWriteDataFrame, isRecursiveInput: Boolean = false)(implicit session: SparkSession): Boolean = {
     executionMode match {
       case Some(m: SparkStreamingOnceMode) =>
         // Write in streaming mode - use spark streaming with Trigger.Once and awaitTermination
@@ -136,7 +136,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
       case None | Some(_: PartitionDiffMode) | Some(_: SparkIncrementalMode) | Some(_: FailIfNoPartitionValuesMode) =>
         // Write in batch mode
         assert(!subFeed.dataFrame.get.isStreaming, s"($id) Input from ${subFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingOnceMode.getClass.getSimpleName}")
-        output.writeDataFrame(subFeed.dataFrame.get, subFeed.partitionValues)
+        output.writeDataFrame(subFeed.dataFrame.get, subFeed.partitionValues, isRecursiveInput)
         // return noData
         false
       case x => throw new IllegalStateException( s"($id) ExecutionMode $x is not supported")
@@ -280,6 +280,11 @@ private[smartdatalake] abstract class SparkAction extends Action {
     val readSchema = preparedSubFeed.dataFrame.map(df => input.createReadSchema(df.schema))
     val schemaChanges = writeSchema != readSchema
     preparedSubFeed = if (schemaChanges) preparedSubFeed.convertToDummy(readSchema.get) else preparedSubFeed
+    // adapt partition values (#180)
+    preparedSubFeed = input match {
+      case partitionedInput: CanHandlePartitions => preparedSubFeed.updatePartitionValues(partitionedInput.partitions)
+      case _ => preparedSubFeed.clearPartitionValues()
+    }
     // break lineage if requested or if it's a streaming DataFrame or if a filter expression is set
     preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined) preparedSubFeed.breakLineage else preparedSubFeed
     // return

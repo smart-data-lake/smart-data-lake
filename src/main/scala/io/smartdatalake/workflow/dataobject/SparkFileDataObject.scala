@@ -161,7 +161,8 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * @param partitionValues The partition layout to write.
    * @param session the current [[SparkSession]].
    */
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession): Unit = {
+    require(!isRecursiveInput, "($id) SparkFileDataObject cannot write dataframe when dataobject is also used as recursive input ")
 
     // prepare data
     var dfPrepared = beforeWrite(df)

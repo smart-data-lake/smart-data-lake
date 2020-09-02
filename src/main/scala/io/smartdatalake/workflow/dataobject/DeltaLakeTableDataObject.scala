@@ -109,7 +109,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
                              (implicit session: SparkSession): Unit = {
     validateSchemaMin(df)
     writeDataFrame(df, createTableOnly=false, partitionValues)
