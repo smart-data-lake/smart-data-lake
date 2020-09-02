@@ -279,8 +279,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       // create and write to table
       if (partitions.nonEmpty) { // with partitions
         logger.info(s"(${table.fullName}) writeDfToHive: creating external partitioned table at location $outputPath")
-        val fs = HdfsUtil.getHadoopFsFromSpark(outputPath)
-        HdfsUtil.deletePath(outputPath, fs, doWarn=false) // delete existing data, as all partitions need to be written when table is created.
+        HdfsUtil.deletePath(outputPath, HdfsUtil.getHadoopFsFromSpark(outputPath), doWarn=false) // delete existing data, as all partitions need to be written when table is created.
         df_partitioned.write
           .partitionBy(partitions:_*)
           .format(hdfsOutputType.toString)
@@ -387,8 +386,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       // create and write to table
       if (partitions.nonEmpty) { // with partitions
         logger.info(s"(${table.fullName}) writeDfToHive: creating external partitioned table $tableName at location $location")
-        val fs = HdfsUtil.getHadoopFsFromSpark(location)
-        HdfsUtil.deletePath(location, fs, doWarn=false) // delete existing data, as all partitions need to be written when table is created.
+        HdfsUtil.deletePath(location, HdfsUtil.getHadoopFsFromSpark(location), doWarn=false) // delete existing data, as all partitions need to be written when table is created.
         df_newColsSorted.write
           .partitionBy(partitions:_*)
           .format(hdfsOutputType.toString)
@@ -607,8 +605,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
   def dropPartition(table: Table, tablePath: Path, partition: PartitionValues)(implicit session: SparkSession): Unit = {
     val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partition.keys.toSeq, Environment.defaultPathSeparator)
     val partitionPath = new Path(tablePath, partition.getPartitionString(partitionLayout))
-    val fs = HdfsUtil.getHadoopFsFromSpark(partitionPath)
-    HdfsUtil.deletePath(partitionPath, fs, false)
+    HdfsUtil.deletePath(partitionPath, HdfsUtil.getHadoopFsFromSpark(partitionPath), false)
     val partitionDef = partition.elements.map{ case (k,v) => s"$k='$v'"}.mkString(", ")
     execSqlStmt(s"ALTER TABLE ${table.fullName} DROP IF EXISTS PARTITION ($partitionDef)")
   }
