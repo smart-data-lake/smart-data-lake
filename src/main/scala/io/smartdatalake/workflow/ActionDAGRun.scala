@@ -116,7 +116,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
   def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     context.phase = ExecutionPhase.Prepare
     // run prepare for every node
-    run[DummyDAGResult](context.phase, parallelism) {
+    run[DummyDAGResult](context.phase) {
       case (node: InitDAGNode, _) =>
         node.edges.map(dataObjectId => DummyDAGResult(dataObjectId))
       case (node: Action, _) =>
@@ -149,7 +149,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
     session.sparkContext.addSparkListener(stageMetricsListener)
     val result = try {
       context.phase = ExecutionPhase.Exec
-      run[SubFeed](context.phase) {
+      run[SubFeed](context.phase, parallelism) {
         case (node: InitDAGNode, _) =>
           node.edges.map(dataObjectId => getInitialSubFeed(dataObjectId))
         case (node: Action, subFeeds) =>
