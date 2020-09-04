@@ -74,7 +74,10 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     // prepare & start load
     val refTimestamp1 = LocalDateTime.now()
     implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
-    val customTransformerConfig = CustomDfsTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestDfsTransformerIncrement"))
+    val customTransformerConfig = CustomDfsTransformerConfig(
+      className = Some("io.smartdatalake.workflow.action.TestDfsTransformerIncrement"),
+      options = Map("increment1" -> "1"), runtimeOptions = Map("increment2" -> "runId")
+    )
 
     val action1 = CustomSparkAction("action1", List(srcDO1.id, srcDO2.id), List(tgtDO1.id, tgtDO2.id), transformer = customTransformerConfig)(context1.instanceRegistry)
 
@@ -86,14 +89,14 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtSubFeeds.size == 2)
     assert(tgtSubFeeds.map(_.dataObjectId) == Seq(tgtDO1.id, tgtDO2.id))
 
-    val r1 = session.table(s"${tgtTable1.fullName}")
+    val r1 = tgtDO1.getDataFrame()
       .select($"rating")
       .as[Int].collect().toSeq
     assert(r1.size == 1)
     assert(r1.head == 6) // should be increased by 1 through TestDfTransformer
 
     // same for the second dataframe
-    val r2 = session.table(s"${tgtTable2.fullName}")
+    val r2 = tgtDO2.getDataFrame()
       .select($"rating")
       .as[Int].collect().toSeq
     assert(r2.size == 1)
@@ -110,7 +113,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(srcDO1)
 
     val tgtTable1 = Table(Some("default"), "copy_output1", None, Some(Seq("lastname", "firstname")))
-    val tgtDO1 = TickTockHiveTableDataObject("tgt1", Some(tempPath + s"/${tgtTable1.fullName}"), table = tgtTable1, numInitialHdfsPartitions = 1)
+    val tgtDO1 = TickTockHiveTableDataObject("tgt1", Some(tempPath + s"/${tgtTable1.fullName}"), table = tgtTable1, numInitialHdfsPartitions = 1, partitions = Seq("lastname"))
     tgtDO1.dropTable
     instanceRegistry.register(tgtDO1)
 
@@ -202,40 +205,55 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, partitions = Seq("type"), numInitialHdfsPartitions = 1)
     srcDO.dropTable
     instanceRegistry.register(srcDO)
-    val srcTable2 = Table(Some("default"), "dummy")
+    val srcTable2 = Table(Some("default"), "dummy1")
     val srcDO2 = HiveTableDataObject( "src2", Some(tempPath+s"/${srcTable2.fullName}"), table = srcTable2, partitions = Seq("type"), numInitialHdfsPartitions = 1)
     srcDO2.dropTable
     instanceRegistry.register(srcDO2)
-    val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("type","lastname","firstname")))
+    val srcTable3 = Table(Some("default"), "dummy2")
+    val srcDO3 = HiveTableDataObject( "src3", Some(tempPath+s"/${srcTable3.fullName}"), table = srcTable3, numInitialHdfsPartitions = 1)
+    srcDO3.dropTable
+    instanceRegistry.register(srcDO3)
+    val tgtTable = Table(Some("default"), "copy_output1", None, Some(Seq("type","lastname","firstname")))
     val tgtDO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable, partitions = Seq("type"), numInitialHdfsPartitions = 1)
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
-    val tgtTable2 = Table(Some("default"), "copy_output", None, Some(Seq("type","lastname","firstname")))
+    val tgtTable2 = Table(Some("default"), "copy_output2", None, Some(Seq("type","lastname","firstname")))
     val tgtDO2 = HiveTableDataObject( "tgt2", Some(tempPath+s"/${tgtTable2.fullName}"), table = tgtTable2, partitions = Seq("type"), numInitialHdfsPartitions = 1)
     tgtDO2.dropTable
     instanceRegistry.register(tgtDO2)
+    val tgtTable3 = Table(Some("default"), "copy_output3", None, Some(Seq("type","lastname","firstname")))
+    val tgtDO3 = HiveTableDataObject( "tgt3", Some(tempPath+s"/${tgtTable3.fullName}"), table = tgtTable3, partitions = Seq("type"), numInitialHdfsPartitions = 1)
+    tgtDO3.dropTable
+    instanceRegistry.register(tgtDO3)
 
     // prepare action
     val refTimestamp = LocalDateTime.now()
     implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp), SmartDataLakeBuilderConfig())
     val customTransformerConfig = CustomDfsTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestDfsTransformerDummy"))
-    val action = CustomSparkAction("a1", Seq(srcDO.id, srcDO2.id), Seq(tgtDO.id, tgtDO2.id), transformer = customTransformerConfig
+    val action = CustomSparkAction("a1", Seq(srcDO.id, srcDO2.id, srcDO3.id), Seq(tgtDO.id, tgtDO2.id, tgtDO3.id), transformer = customTransformerConfig
       , mainInputId = Some("src1"), mainOutputId = Some("tgt1"), executionMode = Some(PartitionDiffMode()))
-    val srcSubFeed1 = InitSubFeed("src1", Seq()) // InitSubFeed needed to test initExecutionMode!
+    val srcSubFeed1 = InitSubFeed("src1", Seq())
     val srcSubFeed2 = InitSubFeed("src2", Seq())
+    val srcSubFeed3 = InitSubFeed("src3", Seq())
 
     // prepare & start first load
     val l1 = Seq(("A","doe","john",5)).toDF("type", "lastname", "firstname", "rating")
+    val l2 = Seq(("A","doe","john",5),("B","doe","john",5)).toDF("type", "lastname", "firstname", "rating")
     val l1PartitionValues = Seq(PartitionValues(Map("type"->"A")))
-    srcDO.writeDataFrame(l1, l1PartitionValues) // prepare testdata
-    srcDO2.writeDataFrame(l1, l1PartitionValues)
-    val tgtSubFeed1 = action.exec(Seq(srcSubFeed1, srcSubFeed2)).head
+    val l2PartitionValues = Seq(PartitionValues(Map("type"->"A")),PartitionValues(Map("type"->"B")))
+    srcDO.writeDataFrame(l1, l1PartitionValues)
+    srcDO2.writeDataFrame(l2, l2PartitionValues)
+    srcDO3.writeDataFrame(l2, Seq()) // src3 is not partitioned
+    val tgtSubFeed1 = action.exec(Seq(srcSubFeed1, srcSubFeed2, srcSubFeed3)).head
 
     // check load
     assert(tgtSubFeed1.dataObjectId == tgtDO.id)
     assert(tgtSubFeed1.partitionValues.toSet == l1PartitionValues.toSet)
-    assert(tgtDO.getDataFrame().count == 1)
+    assert(tgtDO.getDataFrame().count == 1) // partition type=A is missing
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet)
+    assert(tgtDO2.getDataFrame().count == 1) // only partitions according to srcDO1 read
+    assert(tgtDO2.listPartitions.toSet == l1PartitionValues.toSet)
+    assert(tgtDO3.getDataFrame().count == 2) // all records read because not partitioned
   }
 
   test("copy load with 2 transformations from sql code") {
@@ -290,8 +308,8 @@ class TestDfsTransformerIncrement extends CustomDfsTransformer {
   override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
     import session.implicits._
     Map(
-      "tgt1" -> dfs("src1").withColumn("rating", $"rating"+1)
-    , "tgt2" -> dfs("src2").withColumn("rating", $"rating"+1)
+      "tgt1" -> dfs("src1").withColumn("rating", $"rating" + options("increment1").toInt)
+    , "tgt2" -> dfs("src2").withColumn("rating", $"rating" + options("increment2").toInt)
     )
   }
 }

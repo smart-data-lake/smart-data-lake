@@ -48,6 +48,11 @@ import scala.util.{Failure, Success, Try}
  * @param ignoreOldDeletedNestedColumns if true, remove no longer existing columns from nested data types in Schema Evolution.
  *                                      Keeping deleted columns in complex data types has performance impact as all new data
  *                                      in the future has to be converted by a complex function.
+ * @param transformer optional custom transformation to apply
+ * @param columnBlacklist Remove all columns on blacklist from dataframe
+ * @param columnWhitelist Keep only columns on whitelist in dataframe
+ * @param additionalColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
+ *                          The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  * @param executionMode optional execution mode for this Action
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
@@ -59,6 +64,7 @@ case class HistorizeAction(
                             transformer: Option[CustomDfTransformerConfig] = None,
                             columnBlacklist: Option[Seq[String]] = None,
                             columnWhitelist: Option[Seq[String]] = None,
+                            additionalColumns: Option[Map[String,String]] = None,
                             standardizeDatatypes: Boolean = false,
                             filterClause: Option[String] = None,
                             historizeBlacklist: Option[Seq[String]] = None,
@@ -89,19 +95,22 @@ case class HistorizeAction(
   }
 
   override def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
-    applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, standardizeDatatypes, output, Some(historizeDataFrame(_: SparkSubFeed,_: Option[DataFrame],_:Seq[String],_: LocalDateTime)), filterClauseExpr)
+    val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
+    val pks = output.table.primaryKey
+      .getOrElse( throw new ConfigurationException(s"There is no <primary-keys> defined for table ${output.table.name}."))
+    val existingDf = if (output.isTableExisting) {
+      Some(output.getDataFrame())
+    } else None
+    val historizeTransformer = historizeDataFrame(existingDf, pks, timestamp) _
+    applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, Seq(historizeTransformer), filterClauseExpr)
   }
 
-  protected def historizeDataFrame( subFeed: SparkSubFeed,
-                                    existingDf: Option[DataFrame],
-                                    pks: Seq[String],
-                                    refTimestamp: LocalDateTime)
-                                  (implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  protected def historizeDataFrame(existingDf: Option[DataFrame], pks: Seq[String], refTimestamp: LocalDateTime)(newDf: DataFrame)(implicit session: SparkSession): DataFrame = {
 
-    val newFeedDf = subFeed.dataFrame.get.dropDuplicates(pks)
+    val newFeedDf = newDf.dropDuplicates(pks)
 
     // if output does not yet exist, we just transform the new data into historized form
-    val historyDf = if (existingDf.isDefined) {
+    if (existingDf.isDefined) {
       ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get.where(filterClauseExpr.getOrElse(lit(true))), TechnicalTableColumn.captured.toString)
       // apply schema evolution
       val (modifiedExistingDf, modifiedNewFeedDf) = SchemaEvolution.process(existingDf.get, newFeedDf, ignoreOldDeletedColumns = ignoreOldDeletedColumns, ignoreOldDeletedNestedColumns = ignoreOldDeletedNestedColumns
@@ -118,8 +127,6 @@ case class HistorizeAction(
       if (filteredExistingRemainingDf.isDefined) historizedDf.union(filteredExistingRemainingDf.get)
       else historizedDf
     } else  Historization.getInitialHistory(newFeedDf, refTimestamp)
-
-    subFeed.copy(dataFrame = Some(historyDf))
   }
 
   /**
