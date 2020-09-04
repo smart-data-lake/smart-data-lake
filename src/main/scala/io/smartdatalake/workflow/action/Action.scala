@@ -95,8 +95,10 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
     val duplicateNames = context.instanceRegistry.getDataObjects.map {
       dataObj => ActionHelper.replaceSpecialCharactersWithUnderscore(dataObj.id.id)
     }.groupBy(identity).collect { case (x, List(_,_,_*)) => x }.toList
-
     require(duplicateNames.isEmpty, s"The names of your DataObjects are not unique when replacing special characters with underscore. Duplicates: ${duplicateNames.mkString(",")}")
+
+    // validate metricsFailCondition
+    metricsFailCondition.foreach(c => evaluateMetricsFailCondition(c, onlySyntaxCheck = true))
   }
 
   /**
@@ -137,7 +139,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    */
   def postExec(inputSubFeed: Seq[SubFeed], outputSubFeed: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     // evaluate metrics fail condition if defined
-    metricsFailCondition.foreach(evaluateMetricsFailCondition)
+    metricsFailCondition.foreach( c => evaluateMetricsFailCondition(c))
     // process postRead/Write hooks
     inputs.foreach( input => input.postRead(findSubFeedPartitionValues(input.id, inputSubFeed)))
     outputs.foreach( output => output.postWrite(findSubFeedPartitionValues(output.id, outputSubFeed)))
@@ -146,16 +148,20 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   /**
    * Evaluates a condition against latest metrics and throws an MetricsCheckFailed if there is a match.
    */
-  private def evaluateMetricsFailCondition(condition: String)(implicit session: SparkSession): Unit = {
+  private def evaluateMetricsFailCondition(condition: String, onlySyntaxCheck: Boolean = false)(implicit session: SparkSession): Unit = {
     import session.implicits._
-    val metrics = getAllLatestMetrics.flatMap{
-      case (dataObjectId, Some(metrics)) => metrics.getMainInfos.map{ case (k,v) => (dataObjectId.id, Some(k), Some(v.toString))}.toSeq
-      case (dataObjectId, _) => Seq((dataObjectId.id, None, None))
-    }.toSeq
-    val failedMetrics = metrics.toDF("dataObjectId", "key", "value")
+    val metrics = if (!onlySyntaxCheck) {
+      getAllLatestMetrics.flatMap{
+        case (dataObjectId, Some(metrics)) => metrics.getMainInfos.map{ case (k,v) => (dataObjectId.id, Some(k), Some(v.toString))}.toSeq
+        case (dataObjectId, _) => Seq((dataObjectId.id, None, None))
+      }.toSeq
+    } else Seq()
+    val dfFailedMetrics = metrics.toDF("dataObjectId", "key", "value")
       .where(condition)
-      .collect
-    if (failedMetrics.nonEmpty) throw MetricsCheckFailed(s"""($id) metrics check failed: ${failedMetrics.mkString(", ")} matched condition "$condition"""")
+    if (!onlySyntaxCheck) {
+      val failedMetrics = dfFailedMetrics.collect
+      if (failedMetrics.nonEmpty) throw MetricsCheckFailed(s"""($id) metrics check failed: ${failedMetrics.mkString(", ")} matched condition "$condition"""")
+    }
   }
 
   /**
@@ -210,6 +216,11 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   def addRuntimeEvent(phase: ExecutionPhase, state: RuntimeEventState, msg: Option[String] = None, results: Seq[SubFeed] = Seq()): Unit = {
     runtimeEvents.append(RuntimeEvent(LocalDateTime.now, phase, state, msg, results))
   }
+
+  /**
+   * get latest runtime state
+   */
+  def getLatestRuntimeState = runtimeEvents.lastOption.map(_.state)
 
   /**
    * get latest runtime information for this action
@@ -318,7 +329,7 @@ case class ActionMetadata(
 private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: ExecutionPhase, state: RuntimeEventState, msg: Option[String], results: Seq[SubFeed])
 private[smartdatalake] object RuntimeEventState extends Enumeration {
   type RuntimeEventState = Value
-  val STARTED, SUCCEEDED, FAILED, SKIPPED, PENDING = Value
+  val STARTED, PREPARED, INITIALIZED, SUCCEEDED, FAILED, SKIPPED, PENDING = Value
 }
 private[smartdatalake] case class RuntimeInfo(state: RuntimeEventState, startTstmp: Option[LocalDateTime] = None, duration: Option[Duration] = None, msg: Option[String] = None, results: Seq[ResultRuntimeInfo] = Seq()) {
   override def toString: String = {

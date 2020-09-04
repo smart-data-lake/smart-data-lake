@@ -45,6 +45,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
                                        numInitialHdfsPartitions: Int = 16,
                                        saveMode: SaveMode = SaveMode.Overwrite,
                                        acl: Option[AclDef] = None,
+                                       override val expectedPartitionsCondition: Option[String] = None,
                                        connectionId: Option[ConnectionId] = None,
                                        override val metadata: Option[DataObjectMetadata] = None)
                                       (@transient implicit val instanceRegistry: InstanceRegistry)
@@ -67,7 +68,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
 
     if (hadoopPathHolder == null) {
       hadoopPathHolder = {
-        if (thisIsTableExisting) new Path(HiveUtil.existingTableLocation(table))
+        if (thisIsTableExisting) HiveUtil.removeTickTockFromLocation(new Path(HiveUtil.existingTableLocation(table)))
         else HdfsUtil.prefixHadoopPath(path.get, connection.map(_.pathPrefix))
       }
 
@@ -76,7 +77,6 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
         // Normalize both paths before comparing them (remove tick / tock folder and trailing slash)
         val hadoopPathNormalized = HiveUtil.normalizePath(hadoopPathHolder.toString)
         val definedPathNormalized = HiveUtil.normalizePath(path.get)
-
 
         if (definedPathNormalized != hadoopPathNormalized)
           logger.warn(s"Table ${table.fullName} exists already with different path. The table will be written with new path definition ${hadoopPathHolder}!")
@@ -94,9 +94,11 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   }
 
   override def prepare(implicit session: SparkSession): Unit = {
+    super.prepare
     require(isDbExisting, s"($id) Hive DB ${table.db.get} doesn't exist (needs to be created manually).")
     if (!isTableExisting)
       require(path.isDefined, "If Hive table does not exist yet, the path must be set.")
+    filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
   }
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
@@ -120,10 +122,10 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
                              (implicit session: SparkSession): Unit = {
     validateSchemaMin(df)
-    writeDataFrame(df, createTableOnly=false, partitionValues)
+    writeDataFrameInternal(df, createTableOnly=false, partitionValues, isRecursiveInput)
 
     // make sure empty partitions are created as well
     createMissingPartitions(partitionValues)
@@ -134,8 +136,8 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
    * DataFrames are repartitioned in order not to write too many small files
    * or only a few HDFS files that are too large.
    */
-  def writeDataFrame(df: DataFrame, createTableOnly: Boolean, partitionValues: Seq[PartitionValues])
-                    (implicit session: SparkSession): Unit = {
+  def writeDataFrameInternal(df: DataFrame, createTableOnly: Boolean, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean)
+                            (implicit session: SparkSession): Unit = {
     val dfPrepared = if (createTableOnly) {
       // create empty df with existing df's schema
       session.createDataFrame(List.empty[Row].asJava, df.schema)
@@ -144,18 +146,18 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
       if(numInitialHdfsPartitions == -1) df
       // estimate number of partitions from existing data, otherwise use numInitialHdfsPartitions
       else if (isTableExisting) {
-        val currentHdfsPath = HdfsUtil.prefixHadoopPath(HiveUtil.existingTickTockLocation(table.db.get, session, table.name), None)
-        HdfsUtil.repartitionForHdfsFileSize(df, currentHdfsPath.toString)
+        val currentHdfsPath = HdfsUtil.prefixHadoopPath(HiveUtil.existingTickTockLocation(table), None)
+        HdfsUtil.repartitionForHdfsFileSize(df, currentHdfsPath)
       } else df.repartition(numInitialHdfsPartitions)
     }
 
     // write table and fix acls
-    HiveUtil.writeDfToHiveWithTickTock(session, dfPrepared, hadoopPath.toString, table.name, table.db.get, partitions, saveMode)
+    HiveUtil.writeDfToHiveWithTickTock(dfPrepared, hadoopPath, table, partitions, saveMode, forceTickTock = isRecursiveInput)
     val aclToApply = acl.orElse(connection.flatMap(_.acl))
     if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
     if (analyzeTableAfterWrite && !createTableOnly) {
       logger.info(s"($id) Analyze table ${table.fullName}.")
-      HiveUtil.analyze(session, table.db.get, table.name, partitions, partitionValues)
+      HiveUtil.analyze(table, partitions, partitionValues)
     }
   }
 
@@ -180,8 +182,12 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     else logger.warn(s"($id) No empty partition was created for $partitionValues because there are not all partition columns defined")
   }
 
+  override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+    partitionValues.foreach( pv => HiveUtil.dropPartition(table, hadoopPath, pv))
+  }
+
   override def dropTable(implicit session: SparkSession): Unit = {
-    HiveUtil.dropTable(session, table.db.get, table.name)
+    HiveUtil.dropTable(table)
   }
 
   /**

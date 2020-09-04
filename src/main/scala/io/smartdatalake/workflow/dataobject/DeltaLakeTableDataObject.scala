@@ -49,6 +49,9 @@ import scala.collection.JavaConverters._
  * @param saveMode spark [[SaveMode]] to use when writing files, default is "overwrite"
  * @param retentionPeriod DeltaLake table retention period of old transactions for time travel feature in hours
  * @param acl override connections permissions for files created tables hadoop directory with this connection
+ * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
+ *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
+ *                                    Default is to expect all partitions to exist.
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
  * @param metadata meta data
  */
@@ -63,6 +66,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     retentionPeriod: Int = 7*24, // hours
                                     acl: Option[AclDef] = None,
                                     connectionId: Option[ConnectionId] = None,
+                                    override val expectedPartitionsCondition: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalSparkTableDataObject with CanHandlePartitions {
@@ -86,6 +90,11 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
   }
 
+  override def prepare(implicit session: SparkSession): Unit = {
+    super.prepare
+    filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
+  }
+
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
     val df = session.read.format("delta").load(hadoopPath.toString)
     validateSchemaMin(df)
@@ -100,7 +109,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
                              (implicit session: SparkSession): Unit = {
     validateSchemaMin(df)
     writeDataFrame(df, createTableOnly=false, partitionValues)

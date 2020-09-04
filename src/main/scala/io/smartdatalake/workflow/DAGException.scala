@@ -24,6 +24,7 @@ import io.smartdatalake.workflow.DAGHelper.NodeId
 private[smartdatalake] abstract class DAGException(msg: String, cause: Throwable = null) extends Exception(msg, cause) {
   def severity: ExceptionSeverity.ExceptionSeverity
   def getDAGRootExceptions: Seq[DAGException]
+  def getMessageWithCause: String = msg + Option(getDAGRootExceptions.head.getCause).map(t => ": " + t.getMessage).getOrElse("")
 }
 
 private[smartdatalake] case class TaskFailedException(id: NodeId, cause: Throwable) extends DAGException(id, cause) {

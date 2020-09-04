@@ -12,6 +12,19 @@ Note that the binary files need to be located at %HADOOP_HOME%\bin!
 ## Windows: `/tmp/hive` is not writable
 Solution: Change to `%HADOOP_HOME%\bin` and execute `winutils chmod 777 /tmp/hive`.
 
+## Windows: winutils.exe is not working correctly
+Error:  
+`winutils.exe - System Error The code execution cannot proceed because MSVCR100.dll was not found. Reinstalling the program may fix this problem.`  
+Other errors are also possible:
+- Similar error message when double clicking on winutils.exe (Popup)
+- Errors when providing a path to the configuration instead of a single configuration file
+- ExitCodeException exitCode=-1073741515 when executing SDL even though everything ran without errors
+
+Solution: 
+Install VC++ Redistributable Package from Microsoft:  
+http://www.microsoft.com/en-us/download/details.aspx?id=5555 (x86)  
+http://www.microsoft.com/en-us/download/details.aspx?id=14632 (x64)
+
 ## Resources not copied
 Symptom: Tests fail due to missing or outdated resources or the execution starts but can not find the feeds specified. IntelliJ might not copy the resource files to the target directory. 
 

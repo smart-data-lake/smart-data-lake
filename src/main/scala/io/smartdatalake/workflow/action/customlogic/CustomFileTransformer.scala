@@ -74,7 +74,6 @@ case class CustomFileTransformerConfig( className: Option[String] = None, scalaF
 class CustomFileTransformerWrapper(val fnExec: (Map[String,String], FSDataInputStream, FSDataOutputStream, Logger) => Option[Exception])
 extends CustomFileTransformer with SmartDataLakeLogger {
   override def transform(options: Map[String,String], input: FSDataInputStream, output: FSDataOutputStream): Option[Exception] = {
-    // TODO: This used to be logger.underlying, is it OK to use logger ?
     fnExec(options, input, output, logger)
   }
 }

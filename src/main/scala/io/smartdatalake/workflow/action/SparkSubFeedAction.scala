@@ -18,7 +18,6 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}

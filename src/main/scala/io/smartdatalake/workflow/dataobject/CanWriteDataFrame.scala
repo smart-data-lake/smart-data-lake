@@ -33,7 +33,7 @@ private[smartdatalake] trait CanWriteDataFrame {
    */
   def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = Unit
 
-  def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit
+  def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession): Unit
 
   /**
    * Write Spark structured streaming DataFrame

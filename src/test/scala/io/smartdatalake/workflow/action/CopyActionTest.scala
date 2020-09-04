@@ -30,6 +30,7 @@ import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, CustomDfTransformerConfig}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SparkSubFeed}
+import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
@@ -52,14 +53,12 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // setup DataObjects
     val feed = "copy"
     val srcTable = Table(Some("default"), "copy_input")
-    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
-    val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgtTable.db.get, tgtTable.name )
-    val tgtPath = tempPath+s"/${tgtTable.fullName}"
-    val tgtDO = HiveTableDataObject( "tgt1", Some(tgtPath), Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable, numInitialHdfsPartitions = 1)
+    val tgtDO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable, numInitialHdfsPartitions = 1)
+    tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
@@ -68,7 +67,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val customTransformerConfig = CustomDfTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestDfTransformer"))
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformer = Some(customTransformerConfig))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
-    TestUtil.prepareHiveTable(srcTable, srcPath, l1)
+    srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe")),PartitionValues(Map("lastname" -> "jonson"))))
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
@@ -97,14 +96,12 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // setup DataObjects
     val feed = "copy"
     val srcTable = Table(Some("default"), "copy_input")
-    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
-    val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "src1", Some(srcPath), analyzeTableAfterWrite=true, table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), analyzeTableAfterWrite=true, table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgtTable.db.get, tgtTable.name )
-    val tgtPath = tempPath+s"/${tgtTable.fullName}"
-    val tgtDO = HiveTableDataObject( "tgt1", Some(tgtPath), analyzeTableAfterWrite=true, table = tgtTable, numInitialHdfsPartitions = 1)
+    val tgtDO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), analyzeTableAfterWrite=true, table = tgtTable, numInitialHdfsPartitions = 1)
+    tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
@@ -112,7 +109,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformer = Some(customTransformerConfig))
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
-    TestUtil.prepareHiveTable(srcTable, srcPath, l1)
+    srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     action1.exec(Seq(srcSubFeed))
 
@@ -128,14 +125,12 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // setup DataObjects
     val feed = "copy"
     val srcTable = Table(Some("default"), "copy_input")
-    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
-    val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgtTable.db.get, tgtTable.name )
-    val tgtPath = tempPath+s"/${tgtTable.fullName}"
-    val tgtDO = HiveTableDataObject( "tgt1", Some(tgtPath), Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable, numInitialHdfsPartitions = 1)
+    val tgtDO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable, numInitialHdfsPartitions = 1)
+    tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
@@ -144,7 +139,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val customTransformerConfig = CustomDfTransformerConfig(sqlCode = Some("select * from copy_input where rating = 5"))
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformer = Some(customTransformerConfig))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
-    TestUtil.prepareHiveTable(srcTable, srcPath, l1)
+    srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
@@ -165,14 +160,12 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // setup DataObjects
     val feed = "notransform"
     val srcTable = Table(Some("default"), "copy_input")
-    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
-    val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgtTable.db.get, tgtTable.name )
-    val tgtPath = tempPath+s"/${tgtTable.fullName}"
-    val tgtDO = HiveTableDataObject( "tgt1", Some(tgtPath), table = tgtTable, numInitialHdfsPartitions = 1)
+    val tgtDO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable, numInitialHdfsPartitions = 1)
+    tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
@@ -180,7 +173,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val action1 = CopyAction("a1", srcDO.id, tgtDO.id, transformer = None)
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
-    TestUtil.prepareHiveTable(srcTable, srcPath, l1)
+    srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
@@ -197,15 +190,13 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // setup DataObjects
     val feed = "partitiondiff"
     val srcTable = Table(Some("default"), "copy_input")
-    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
-    val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, partitions = Seq("type"), numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, partitions = Seq("type"), numInitialHdfsPartitions = 1)
+    srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("type","lastname","firstname")))
-    HiveUtil.dropTable(session, tgtTable.db.get, tgtTable.name )
-    val tgtPath = tempPath+s"/${tgtTable.fullName}"
-    val tgtDO = HiveTableDataObject( "tgt1", Some(tgtPath), table = tgtTable, partitions = Seq("type"), numInitialHdfsPartitions = 1)
+    val tgtDO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable, partitions = Seq("type"), numInitialHdfsPartitions = 1)
     instanceRegistry.register(tgtDO)
+    tgtDO.dropTable
 
     // prepare action
     val refTimestamp = LocalDateTime.now()
@@ -239,36 +230,34 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet ++ l2PartitionValues.toSet)
   }
 
-  test("copy load with filter") {
+  test("copy load with filter, additional columns and transformer options") {
 
     // setup DataObjects
     val feed = "copy"
     val srcTable = Table(Some("default"), "copy_input")
-    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name )
-    val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("lastname","firstname")))
-    HiveUtil.dropTable(session, tgtTable.db.get, tgtTable.name )
-    val tgtPath = tempPath+s"/${tgtTable.fullName}"
-    val tgtDO = HiveTableDataObject( "tgt1", Some(tgtPath), Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable, numInitialHdfsPartitions = 1)
+    val tgtDO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable, numInitialHdfsPartitions = 1)
+    tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
     val refTimestamp1 = LocalDateTime.now()
     implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
-    val customTransformerConfig = CustomDfTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestDfTransformer"))
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformer = Some(customTransformerConfig), filterClause = Some("lastname='jonson'"))
+    val customTransformerConfig = CustomDfTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestOptionsDfTransformer"), options = Map("test" -> "test"), runtimeOptions = Map("appName" -> "application"))
+    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformer = Some(customTransformerConfig), filterClause = Some("lastname='jonson'"), additionalColumns = Some(Map("run_id" -> "runId")))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
-    TestUtil.prepareHiveTable(srcTable, srcPath, l1)
+    srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
 
-    val r1 = session.table(s"${tgtTable.fullName}")
-      .select($"rating")
-      .as[Int].collect().toSeq
-    assert(r1.size == 1)
+    val r1 = tgtDO.getDataFrame()
+      .select($"rating", $"test", $"run_id")
+      .as[(Int,String,Int)].collect().toSeq
+    assert(r1 == Seq((6, "test-test", 1)))
   }
 
 }
@@ -276,6 +265,15 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 class TestDfTransformer extends CustomDfTransformer {
   def transform(session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectId: String) : DataFrame = {
     import session.implicits._
+    import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
     df.withColumn("rating", $"rating" + 1)
+  }
+}
+
+class TestOptionsDfTransformer extends CustomDfTransformer {
+  def transform(session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectId: String) : DataFrame = {
+    import session.implicits._
+    df.withColumn("rating", $"rating" + 1)
+      .withColumn("test", lit(options("test")+"-"+options("appName")))
   }
 }
