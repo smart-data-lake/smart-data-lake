@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.dataobject
 import java.io.File
 
 import com.typesafe.config.ConfigFactory
+import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}

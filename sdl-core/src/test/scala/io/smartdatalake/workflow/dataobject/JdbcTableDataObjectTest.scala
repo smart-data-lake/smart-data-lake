@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.dataobject
 import java.time.LocalDateTime
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}

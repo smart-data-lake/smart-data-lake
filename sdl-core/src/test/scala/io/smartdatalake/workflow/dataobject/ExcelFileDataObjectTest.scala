@@ -24,6 +24,7 @@ import java.text.SimpleDateFormat
 import java.util.{Date, Locale}
 
 import com.typesafe.config.ConfigFactory
+import io.smartdatalake.testutils.DataObjectTestSuite
 import org.apache.commons.io.{FileUtils, IOUtils}
 import org.apache.poi.hssf.usermodel.HSSFWorkbook
 import org.apache.poi.ss.usermodel

@@ -29,15 +29,13 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformerConfig, CustomDfsTransformer, CustomDfsTransformerConfig}
 import io.smartdatalake.workflow.action.{CopyAction, _}
-import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataobject._
-import net.manub.embeddedkafka.EmbeddedKafka
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DataType, StructField, StructType, TimestampType}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
-class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
+class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
   import session.implicits._
@@ -161,51 +159,44 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
     // Note: Some DataObjects remove & add columns on read (e.g. KafkaTopicDataObject, SparkFileDataObject)
     // In this cases we have to break the lineage und create a dummy DataFrame in init phase.
 
-    withRunningKafka {
+    // setup DataObjects
+    val feed = "actionpipeline"
+    val tempDir = Files.createTempDirectory(feed)
+    val srcTable = Table(Some("default"), "ap_input")
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
+    instanceRegistry.register(srcDO)
+    val tgt1DO = CsvFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), filenameColumn=Some("_filename"), csvOptions = Map("header" -> "true", "delimiter" -> ","))
+    instanceRegistry.register(tgt1DO)
+    val tgt2DO = CsvFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","))
+    instanceRegistry.register(tgt2DO)
 
-      // setup DataObjects
-      val feed = "actionpipeline"
-      val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6000")
-      instanceRegistry.register(kafkaConnection)
-      val srcTable = Table(Some("default"), "ap_input")
-      val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
-      srcDO.dropTable
-      instanceRegistry.register(srcDO)
-      createCustomTopic("topic1", Map(), 1, 1)
-      val tgt1DO = KafkaTopicDataObject("kafka1", topicName = "topic1", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"), schemaMin = Some(StructType(Seq(StructField("timestamp", TimestampType)))))
-      instanceRegistry.register(tgt1DO)
-      createCustomTopic("topic2", Map(), 1, 1)
-      val tgt2DO = KafkaTopicDataObject("kafka2", topicName = "topic2", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"), schemaMin = Some(StructType(Seq(StructField("timestamp", TimestampType)))))
-      instanceRegistry.register(tgt2DO)
+    // prepare DAG
+    val refTimestamp1 = LocalDateTime.now()
+    val appName = "test"
+    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, appName, 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+    val l1 = Seq(("doe-john", 5)).toDF("name", "rating")
+    srcDO.writeDataFrame(l1, Seq())
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id)
+    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, transformer = Some(CustomDfTransformerConfig(sqlCode = Some("select _filename, rating from tgt1"))))
+    val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2), 1, 1)
 
-      // prepare DAG
-      val refTimestamp1 = LocalDateTime.now()
-      val appName = "test"
-      implicit val context: ActionPipelineContext = ActionPipelineContext(feed, appName, 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
-      val l1 = Seq(("doe-john", 5)).toDF("key", "value")
-      srcDO.writeDataFrame(l1, Seq())
-      val action1 = CopyAction("a", srcDO.id, tgt1DO.id)
-      val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, transformer = Some(CustomDfTransformerConfig(sqlCode = Some("select 'test' as key, value from kafka1"))))
-      val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2), 1, 1)
+    // exec dag
+    dag.prepare
+    dag.init
+    dag.exec
 
-      // exec dag
-      dag.prepare
-      dag.init
-      dag.exec
+    // check result
+    val dfR1 = tgt2DO.getDataFrame()
+    assert(dfR1.columns.toSet == Set("_filename","rating"))
+    val r1 = dfR1
+      .select($"rating")
+      .as[String].collect().toSeq
+    assert(r1 == Seq("5"))
 
-      // check result
-      val dfR1 = tgt2DO.getDataFrame(Seq())
-      assert(dfR1.columns.toSet == Set("value","timestamp"))
-      val r1 = dfR1
-        .select($"value")
-        .as[String].collect().toSeq
-      assert(r1 == Seq("5"))
-
-      // check metrics
-      // note: metrics don't work for Kafka sink in Spark 2.4
-      //val action2MainMetrics = action2.getFinalMetrics(action2.outputId).get.getMainInfos
-      //assert(action2MainMetrics("records_written") == 1)
-    }
+    // check metrics
+    val action2MainMetrics = action2.getFinalMetrics(action2.outputId).get.getMainInfos
+    assert(action2MainMetrics("records_written") == 1)
   }
 
   test("action dag with 2 dependent actions from same predecessor, PartitionDiffMode and another action with no data to process") {

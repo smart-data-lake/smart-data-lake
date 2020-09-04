@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import io.smartdatalake.testutils.DataObjectTestSuite
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types._
 

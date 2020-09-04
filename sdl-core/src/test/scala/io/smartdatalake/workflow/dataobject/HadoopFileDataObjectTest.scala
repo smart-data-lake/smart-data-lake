@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import java.nio.file.Files
 
+import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.hdfs.PartitionValues
 import org.apache.commons.io.FileUtils
 

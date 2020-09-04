@@ -16,13 +16,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow.dataobject
+package io.smartdatalake.testutils
 
 import java.nio.file.Files
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql._
 import org.scalatest.{BeforeAndAfter, FunSuite, Matchers}

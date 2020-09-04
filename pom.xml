@@ -26,6 +26,7 @@
 
 	<modules>
 		<module>sdl-core</module>
+		<module>sdl-kafka</module>
 	</modules>
 
 	<licenses>
@@ -442,13 +443,6 @@
 					</executions>
 				</plugin>
 
-				<!-- Allows handling of version numbers -->
-				<plugin>
-					<groupId>org.codehaus.mojo</groupId>
-					<artifactId>versions-maven-plugin</artifactId>
-					<version>2.7</version>
-				</plugin>
-
 				<!-- Checks for declared but unused and undeclared but used dependencies in the verify stage -->
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
@@ -494,6 +488,17 @@
 
 			</plugins>
 		</pluginManagement>
+
+		<plugins>
+
+			<!-- Allows handling of version numbers -->
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>versions-maven-plugin</artifactId>
+				<version>2.7</version>
+			</plugin>
+
+		</plugins>
 
 	</build>
 
@@ -542,6 +547,38 @@
 				<groupId>org.scala-lang.modules</groupId>
 				<artifactId>scala-xml_${scala.minor.version}</artifactId>
 				<version>1.0.6</version>
+			</dependency>
+			<!-- adapt zookeeper version for sdl-kafka -->
+			<dependency>
+				<groupId>org.apache.zookeeper</groupId>
+				<artifactId>zookeeper</artifactId>
+				<version>${zookeeper.version}</version>
+			</dependency>
+
+			<!-- TEST dependencies -->
+			<dependency>
+				<groupId>org.scalatest</groupId>
+				<artifactId>scalatest_${scala.minor.version}</artifactId>
+				<version>${scalatest.test.version}</version>
+				<scope>test</scope>
+				<exclusions>
+					<exclusion>
+						<groupId>org.scala-lang.modules</groupId>
+						<artifactId>scala-xml_${scala.minor.version}</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.scalactic</groupId>
+				<artifactId>scalactic_${scala.minor.version}</artifactId>
+				<version>${scalatest.test.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.scalacheck</groupId>
+				<artifactId>scalacheck_${scala.minor.version}</artifactId>
+				<version>1.14.3</version>
+				<scope>test</scope>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>

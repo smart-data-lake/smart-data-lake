@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.dataobject
 
 import java.nio.file.Files
 
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.CustomFileActionTest
 import org.apache.commons.io.FileUtils

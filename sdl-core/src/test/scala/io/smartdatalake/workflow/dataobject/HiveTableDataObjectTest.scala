@@ -23,6 +23,7 @@ import java.time.LocalDateTime
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.workflow.ActionPipelineContext

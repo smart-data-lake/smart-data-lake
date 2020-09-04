@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.dataobject
 import java.nio.file.Files
 import java.time.temporal.ChronoUnit
 
+import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.KafkaConnection
 import net.manub.embeddedkafka.EmbeddedKafka
@@ -30,8 +31,8 @@ import org.scalatest.FunSuite
 
 class KafkaTopicDataObjectTest extends FunSuite with EmbeddedKafka with DataObjectTestSuite with SmartDataLakeLogger {
 
-  import testSession.implicits._
   import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+  import testSession.implicits._
 
   private val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6000")
 

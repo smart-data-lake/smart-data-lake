@@ -22,6 +22,7 @@ import java.io._
 import java.nio.file.Files
 
 import com.typesafe.config.ConfigFactory
+import io.smartdatalake.testutils.DataObjectTestSuite
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.DataFrame
