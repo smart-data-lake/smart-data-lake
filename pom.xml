@@ -20,9 +20,13 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>io.smartdatalake</groupId>
-	<artifactId>smartdatalake_${scala.minor.version}</artifactId>
+	<artifactId>sdl-parent</artifactId>
 	<version>1.1.1-SNAPSHOT</version>
-	<packaging>jar</packaging>
+	<packaging>pom</packaging>
+
+	<modules>
+		<module>sdl-core</module>
+	</modules>
 
 	<licenses>
 		<license>
@@ -97,6 +101,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<skip.assembly>true</skip.assembly>
 		<noLinkWarnings>-unchecked</noLinkWarnings>
+		<license.header.file>src/license/gplv3-header.txt</license.header.file>
 
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>
@@ -107,7 +112,7 @@
 
 		<spark.version>2.4.4</spark.version>
 
-		<!-- SPARK-PARENT start: properties copied from spark-parent pom version 2.4.4 -->
+		<!-- SPARK-PARENT start: properties copied from spark-parent pom version 2.4.4 for spark-parent import in dependencyManagement -->
 		<!-- attention - manually adapted are: zookeeper, scala.version, scala.binary.version -->
 		<slf4j.version>1.7.16</slf4j.version>
 		<log4j.version>1.2.17</log4j.version>
@@ -225,7 +230,6 @@
 	</scm>
 
 	<repositories>
-
 		<repository>
 			<id>spring-plugins</id>
 			<name>Spring Plugins Repository</name>
@@ -239,277 +243,257 @@
 	</repositories>
 
 	<build>
-		<!-- for creating scala docs for workflow objects only, temporarily replace the line below with: <sourceDirectory>src/main/scala/io/smartdatalake/workflow</sourceDirectory> -->
-		<sourceDirectory>src/main/scala</sourceDirectory>
-		<testSourceDirectory>src/test/scala</testSourceDirectory>
-		<resources>
-			<resource>
-				<directory>src/main/resources</directory>
-			</resource>
-			<resource>
-				<targetPath>META-INF</targetPath>
-				<directory>${basedir}</directory>
-				<filtering>false</filtering>
-				<includes>
-					<include>COPYING</include> <!-- the file containing the license text -->
-				</includes>
-			</resource>
-		</resources>
-		<testResources>
-			<testResource>
-				<directory>src/test/resources</directory>
-			</testResource>
-		</testResources>
 
-		<plugins>
-			<!-- Compiles Scala sources. -->
-			<plugin>
-				<groupId>net.alchim31.maven</groupId>
-				<artifactId>scala-maven-plugin</artifactId>
-				<version>4.3.1</version>
-				<executions>
-					<execution>
-						<goals>
-							<goal>compile</goal>
-							<goal>testCompile</goal>
-						</goals>
-					</execution>
-				</executions>
-				<configuration>
-					<scalaCompatVersion>${scala.minor.version}</scalaCompatVersion>
-					<checkMultipleScalaVersions>true</checkMultipleScalaVersions>
-					<failOnMultipleScalaVersions>true</failOnMultipleScalaVersions>
-					<recompileMode>incremental</recompileMode>
-					<args>
-						<arg>-unchecked</arg>
-						<arg>-deprecation</arg>
-						<arg>-feature</arg>
-						<arg>-explaintypes</arg>
-						<arg>-target:jvm-1.8</arg>
-						<arg>${noLinkWarnings}</arg>
-					</args>
-					<jvmArgs>
-						<jvmArg>-Xms64m</jvmArg>
-						<jvmArg>-Xmx1024m</jvmArg>
-					</jvmArgs>
-				</configuration>
-			</plugin>
+		<pluginManagement>
+			<plugins>
+				<!-- Compiles Scala sources. -->
+				<plugin>
+					<groupId>net.alchim31.maven</groupId>
+					<artifactId>scala-maven-plugin</artifactId>
+					<version>4.3.1</version>
+					<executions>
+						<execution>
+							<goals>
+								<goal>compile</goal>
+								<goal>testCompile</goal>
+							</goals>
+						</execution>
+					</executions>
+					<configuration>
+						<scalaCompatVersion>${scala.minor.version}</scalaCompatVersion>
+						<checkMultipleScalaVersions>true</checkMultipleScalaVersions>
+						<failOnMultipleScalaVersions>true</failOnMultipleScalaVersions>
+						<recompileMode>incremental</recompileMode>
+						<args>
+							<arg>-unchecked</arg>
+							<arg>-deprecation</arg>
+							<arg>-feature</arg>
+							<arg>-explaintypes</arg>
+							<arg>-target:jvm-1.8</arg>
+							<arg>${noLinkWarnings}</arg>
+						</args>
+						<jvmArgs>
+							<jvmArg>-Xms64m</jvmArg>
+							<jvmArg>-Xmx1024m</jvmArg>
+						</jvmArgs>
+					</configuration>
+				</plugin>
 
-			<!-- rewrite pom for compiling with different scala version profiles -->
-			<plugin>
-				<groupId>org.spurint.maven.plugins</groupId>
-				<artifactId>scala-cross-maven-plugin</artifactId>
-				<version>0.2.1</version>
-				<executions>
-					<execution>
-						<id>rewrite-pom</id>
-						<goals>
-							<goal>rewrite-pom</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
+				<!-- rewrite pom for compiling with different scala version profiles -->
+				<plugin>
+					<groupId>org.spurint.maven.plugins</groupId>
+					<artifactId>scala-cross-maven-plugin</artifactId>
+					<version>0.2.1</version>
+					<executions>
+						<execution>
+							<id>rewrite-pom</id>
+							<goals>
+								<goal>rewrite-pom</goal>
+							</goals>
+						</execution>
+					</executions>
+				</plugin>
 
-			<!-- Copies files in resources folders to target folder. -->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-resources-plugin</artifactId>
-				<version>3.1.0</version>
-			</plugin>
+				<!-- Copies files in resources folders to target folder. -->
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-resources-plugin</artifactId>
+					<version>3.1.0</version>
+				</plugin>
 
-			<!-- Checks whether source files have the specified license header. -->
-			<plugin>
-				<groupId>com.mycila</groupId>
-				<artifactId>license-maven-plugin</artifactId>
-				<version>3.0</version>
-				<configuration>
-					<header>src/license/gplv3-header.txt</header>
-					<properties>
-						<copyright.name>${project.organization.name}</copyright.name>
-						<copyright.contact>${project.organization.url}</copyright.contact>
-					</properties>
-					<includes>
-						<include>src/**</include>
-					</includes>
-					<excludes>
-						<exclude>**/*.accdb</exclude>
-						<exclude>**/*.mdb</exclude>
-						<exclude>**/*.csv</exclude>
-						<exclude>**/*.keytab</exclude>
-						<exclude>**/*.pkcs12</exclude>
-					</excludes>
-					<mapping>
-						<scala>SLASHSTAR_STYLE</scala>
-						<conf>SCRIPT_STYLE</conf>
-					</mapping>
-					<failIfMissing>false</failIfMissing>
-				</configuration>
-				<dependencies>
-					<dependency>
-						<groupId>com.mycila</groupId>
-						<artifactId>license-maven-plugin-git</artifactId>
-						<version>3.0</version>
-					</dependency>
-				</dependencies>
-				<executions>
-					<execution>
-						<!--<phase>process-sources</phase>-->
-						<goals>
-							<goal>check</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
+				<!-- Checks whether source files have the specified license header. -->
+				<plugin>
+					<groupId>com.mycila</groupId>
+					<artifactId>license-maven-plugin</artifactId>
+					<version>3.0</version>
+					<configuration>
+						<header>${basedir}/${license.header.file}</header>
+						<properties>
+							<copyright.name>${project.organization.name}</copyright.name>
+							<copyright.contact>${project.organization.url}</copyright.contact>
+						</properties>
+						<includes>
+							<include>src/**</include>
+						</includes>
+						<excludes>
+							<exclude>**/*.accdb</exclude>
+							<exclude>**/*.mdb</exclude>
+							<exclude>**/*.csv</exclude>
+							<exclude>**/*.keytab</exclude>
+							<exclude>**/*.pkcs12</exclude>
+						</excludes>
+						<mapping>
+							<scala>SLASHSTAR_STYLE</scala>
+							<conf>SCRIPT_STYLE</conf>
+						</mapping>
+						<failIfMissing>false</failIfMissing>
+					</configuration>
+					<dependencies>
+						<dependency>
+							<groupId>com.mycila</groupId>
+							<artifactId>license-maven-plugin-git</artifactId>
+							<version>3.0</version>
+						</dependency>
+					</dependencies>
+					<executions>
+						<execution>
+							<goals>
+								<goal>check</goal>
+							</goals>
+						</execution>
+					</executions>
+				</plugin>
 
-			<!-- Creates the jar without dependencies -->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-jar-plugin</artifactId>
-				<version>3.1.2</version>
-				<configuration>
-					<archive>
-						<manifest>
-							<addClasspath>true</addClasspath>
-							<mainClass>io.smartdatalake.app.LocalSmartDataLakeBuilder</mainClass>
-						</manifest>
-						<manifestEntries>
-							<Implementation-Version>${project.version}</Implementation-Version>
-						</manifestEntries>
-					</archive>
-					<excludes>
-						<exclude>log4j.properties</exclude> <!-- Logging configuration should be left to user. -->
-					</excludes>
-				</configuration>
-			</plugin>
+				<!-- Creates the jar without dependencies -->
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-jar-plugin</artifactId>
+					<version>3.1.2</version>
+					<configuration>
+						<archive>
+							<manifest>
+								<addClasspath>true</addClasspath>
+								<mainClass>io.smartdatalake.app.LocalSmartDataLakeBuilder</mainClass>
+							</manifest>
+							<manifestEntries>
+								<Implementation-Version>${project.version}</Implementation-Version>
+							</manifestEntries>
+						</archive>
+						<excludes>
+							<exclude>log4j.properties</exclude> <!-- Logging configuration should be left to user. -->
+						</excludes>
+					</configuration>
+				</plugin>
 
-			<!-- Creates a JAR file with the source files of the project. -->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-source-plugin</artifactId>
-				<version>3.1.0</version>
-				<executions>
-					<execution>
-						<id>attach-sources</id>
-						<goals>
-							<goal>jar-no-fork</goal>
-						</goals>
-					</execution>
-				</executions>
-				<configuration>
-					<excludes>
-						<exclude>log4j.properties</exclude> <!-- Logging configuration source should not be distributed. -->
-					</excludes>
-				</configuration>
-			</plugin>
+				<!-- Creates a JAR file with the source files of the project. -->
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-source-plugin</artifactId>
+					<version>3.1.0</version>
+					<executions>
+						<execution>
+							<id>attach-sources</id>
+							<goals>
+								<goal>jar-no-fork</goal>
+							</goals>
+						</execution>
+					</executions>
+					<configuration>
+						<excludes>
+							<exclude>log4j.properties</exclude> <!-- Logging configuration source should not be distributed. -->
+						</excludes>
+					</configuration>
+				</plugin>
 
-			<!-- Builds executable jar that includes all runtime dependencies -->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-assembly-plugin</artifactId>
-				<version>3.1.1</version>
-				<configuration>
-					<descriptorRefs>
-						<descriptorRef>jar-with-dependencies</descriptorRef>
-					</descriptorRefs>
-					<archive>
-						<manifest>
-							<mainClass>io.smartdatalake.app.LocalSmartDataLakeBuilder</mainClass>
-						</manifest>
-						<manifestEntries>
-							<Implementation-Version>${project.version}</Implementation-Version>
-						</manifestEntries>
-					</archive>
-					<skipAssembly>${skip.assembly}</skipAssembly>
-				</configuration>
-				<executions>
-					<execution>
-						<id>make-assembly</id>
-						<phase>package</phase>
-						<goals>
-							<goal>single</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
+				<!-- Builds executable jar that includes all runtime dependencies -->
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-assembly-plugin</artifactId>
+					<version>3.1.1</version>
+					<configuration>
+						<descriptorRefs>
+							<descriptorRef>jar-with-dependencies</descriptorRef>
+						</descriptorRefs>
+						<archive>
+							<manifest>
+								<mainClass>io.smartdatalake.app.LocalSmartDataLakeBuilder</mainClass>
+							</manifest>
+							<manifestEntries>
+								<Implementation-Version>${project.version}</Implementation-Version>
+							</manifestEntries>
+						</archive>
+						<skipAssembly>${skip.assembly}</skipAssembly>
+					</configuration>
+					<executions>
+						<execution>
+							<id>make-assembly</id>
+							<phase>package</phase>
+							<goals>
+								<goal>single</goal>
+							</goals>
+						</execution>
+					</executions>
+				</plugin>
 
-			<!-- Executes units tests with scalatest  -->
-			<plugin>
-				<groupId>org.scalatest</groupId>
-				<artifactId>scalatest-maven-plugin</artifactId>
-				<version>2.0.0</version>
-				<configuration>
-					<reportsDirectory>
-						${project.build.directory}/scalatest-reports
-					</reportsDirectory>
-					<junitxml>.</junitxml>
-					<filereports>
-						${project.artifactId}.txt
-					</filereports>
-					<stdout>WT</stdout>  <!-- without color, show reminder of failed and canceled tests with short stack traces, see: http://www.scalatest.org/user_guide/using_scalatest_with_sbt-->
-					<environmentVariables>
-						<SPARK_LOCAL_IP>127.0.0.1</SPARK_LOCAL_IP> <!-- Suppresses Spark IP discovery during tests (when executed with mvn test) -->
-					</environmentVariables>
-				</configuration>
-				<executions>
-					<execution>
-						<goals>
-							<goal>test</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
+				<!-- Executes units tests with scalatest  -->
+				<plugin>
+					<groupId>org.scalatest</groupId>
+					<artifactId>scalatest-maven-plugin</artifactId>
+					<version>2.0.0</version>
+					<configuration>
+						<reportsDirectory>
+							${project.build.directory}/scalatest-reports
+						</reportsDirectory>
+						<junitxml>.</junitxml>
+						<filereports>
+							${project.artifactId}.txt
+						</filereports>
+						<stdout>WT</stdout>  <!-- without color, show reminder of failed and canceled tests with short stack traces, see: http://www.scalatest.org/user_guide/using_scalatest_with_sbt-->
+						<environmentVariables>
+							<SPARK_LOCAL_IP>127.0.0.1</SPARK_LOCAL_IP> <!-- Suppresses Spark IP discovery during tests (when executed with mvn test) -->
+						</environmentVariables>
+					</configuration>
+					<executions>
+						<execution>
+							<goals>
+								<goal>test</goal>
+							</goals>
+						</execution>
+					</executions>
+				</plugin>
 
-			<!-- Allows handling of version numbers -->
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>versions-maven-plugin</artifactId>
-				<version>2.7</version>
-			</plugin>
+				<!-- Allows handling of version numbers -->
+				<plugin>
+					<groupId>org.codehaus.mojo</groupId>
+					<artifactId>versions-maven-plugin</artifactId>
+					<version>2.7</version>
+				</plugin>
 
-			<!-- Checks for declared but unused and undeclared but used dependencies in the verify stage -->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-dependency-plugin</artifactId>
-				<version>3.1.1</version>
-				<configuration>
-					<failOnWarning>false</failOnWarning>
-					<ignoreNonCompile>true</ignoreNonCompile>
-					<ignoredUsedUndeclaredDependencies>
-						<dependency>org.scalacheck:scalacheck_${scala.minor.version}</dependency>
-					</ignoredUsedUndeclaredDependencies>
-				</configuration>
-				<executions>
-					<execution>
-						<goals>
-							<goal>analyze-only</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
+				<!-- Checks for declared but unused and undeclared but used dependencies in the verify stage -->
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-dependency-plugin</artifactId>
+					<version>3.1.1</version>
+					<configuration>
+						<failOnWarning>false</failOnWarning>
+						<ignoreNonCompile>true</ignoreNonCompile>
+						<ignoredUsedUndeclaredDependencies>
+							<dependency>org.scalacheck:scalacheck_${scala.minor.version}</dependency>
+						</ignoredUsedUndeclaredDependencies>
+					</configuration>
+					<executions>
+						<execution>
+							<goals>
+								<goal>analyze-only</goal>
+							</goals>
+						</execution>
+					</executions>
+				</plugin>
 
-			<!-- check for dependency version conflicts -->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-enforcer-plugin</artifactId>
-				<version>3.0.0-M3</version>
-				<configuration>
-					<rules>
-						<requireMavenVersion>
-							<version>2.0.6</version>
-						</requireMavenVersion>
-						<requireJavaVersion>
-							<version>1.8</version>
-						</requireJavaVersion>
-						<dependencyConvergence/>
-						<requireProperty>
-							<property>scala.minor.version</property>
-							<message>You must setscala.minor.version property by activating profile scala-2.11 or scala-2.12!</message>
-						</requireProperty>
-					</rules>
-				</configuration>
-			</plugin>
+				<!-- check for dependency version conflicts -->
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-enforcer-plugin</artifactId>
+					<version>3.0.0-M3</version>
+					<configuration>
+						<rules>
+							<requireMavenVersion>
+								<version>2.0.6</version>
+							</requireMavenVersion>
+							<requireJavaVersion>
+								<version>1.8</version>
+							</requireJavaVersion>
+							<dependencyConvergence/>
+							<requireProperty>
+								<property>scala.minor.version</property>
+								<message>You must setscala.minor.version property by activating profile scala-2.11 or scala-2.12!</message>
+							</requireProperty>
+						</rules>
+					</configuration>
+				</plugin>
 
-		</plugins>
+			</plugins>
+		</pluginManagement>
 
 	</build>
 
@@ -561,392 +545,4 @@
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
-
-	<dependencies>
-		<dependency>
-			<groupId>com.databricks</groupId>
-			<artifactId>dbutils-api_2.11</artifactId>
-			<version>0.0.4</version>
-		</dependency>
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>com.github.scopt</groupId>
-			<artifactId>scopt_${scala.minor.version}</artifactId>
-			<version>${scopt.version}</version>
-		</dependency>
-
-		<!-- hadoop-common is an used undeclared dependency, but if we would explicitly list it we would need to duplicate the exclusions as in spark-parent.
-		     If we don't declare it, we get the exclusion over import of spark-parent dependencyManagement, which is more valuable -->
-		<!--dependency>
-			<groupId>org.apache.hadoop</groupId>
-			<artifactId>hadoop-common</artifactId>
-			<version>${hadoop.version}</version>
-		</dependency-->
-
-		<dependency>
-			<groupId>org.apache.spark</groupId>
-			<artifactId>spark-core_${scala.minor.version}</artifactId>
-			<version>${spark.version}</version>
-			<scope>${spark.deps.scope}</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>org.apache.spark</groupId>
-			<artifactId>spark-sql_${scala.minor.version}</artifactId>
-			<version>${spark.version}</version>
-			<scope>${spark.deps.scope}</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>org.apache.spark</groupId>
-			<artifactId>spark-hive_${scala.minor.version}</artifactId>
-			<version>${spark.version}</version>
-			<scope>${spark.deps.scope}</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>org.apache.spark</groupId>
-			<artifactId>spark-catalyst_${scala.minor.version}</artifactId>
-			<version>${spark.version}</version>
-			<scope>${spark.deps.scope}</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>io.smartdatalake</groupId>
-			<artifactId>spark-extensions_${scala.minor.version}</artifactId>
-			<version>1.0.0</version>
-		</dependency>
-
-		<dependency>
-			<groupId>org.apache.spark</groupId>
-			<artifactId>spark-sql-kafka-0-10_${scala.minor.version}</artifactId>
-			<version>${spark.version}</version>
-			<scope>runtime</scope>
-			<exclusions>
-				<!-- replace kafka client with newer version -->
-				<exclusion>
-					<groupId>org.apache.kafka</groupId>
-					<artifactId>kafka-clients</artifactId>
-				</exclusion>
-			</exclusions>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.kafka</groupId>
-			<artifactId>kafka-clients</artifactId>
-			<version>${kafka.version}</version>
-		</dependency>
-		<!-- this is for reading from kafka using confluent schema registry with Spark -->
-		<!-- this is an unused declared dependency but needed -->
-		<dependency>
-			<groupId>io.confluent</groupId>
-			<artifactId>kafka-schema-registry-client</artifactId>
-			<version>5.4.1</version>
-			<exclusions>
-				<exclusion>
-					<groupId>org.apache.kafka</groupId>
-					<artifactId>kafka-clients</artifactId>
-				</exclusion>
-				<exclusion>
-					<groupId>org.apache.avro</groupId>
-					<artifactId>avro</artifactId>
-				</exclusion>
-				<exclusion>
-					<groupId>org.slf4j</groupId>
-					<artifactId>slf4j-api</artifactId>
-				</exclusion>
-				<exclusion>
-					<groupId>com.fasterxml.jackson.core</groupId>
-					<artifactId>jackson-databind</artifactId>
-				</exclusion>
-			</exclusions>
-		</dependency>
-
-		<dependency>
-			<groupId>com.databricks</groupId>
-			<artifactId>spark-xml_${scala.minor.version}</artifactId>
-			<version>${databricks.spark-xml.version}</version>
-			<scope>runtime</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>org.apache.spark</groupId>
-			<artifactId>spark-avro_${scala.minor.version}</artifactId>
-			<version>${spark.version}</version>
-			<scope>${spark.deps.scope}</scope>
-		</dependency>
-
-		<!-- this needs to have compile scope, if it's runtime it doesnt compile anymore -->
-		<!-- this is an unused declared dependency, but it's needed to override scope -->
-		<dependency>
-			<groupId>org.apache.spark</groupId>
-			<artifactId>spark-tags_${scala.minor.version}</artifactId>
-			<version>${spark.version}</version>
-			<scope>compile</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>commons-io</groupId>
-			<artifactId>commons-io</artifactId>
-			<version>${commons-io.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>com.healthmarketscience.jackcess</groupId>
-			<artifactId>jackcess</artifactId>
-			<version>2.1.11</version>
-		</dependency>
-
-		<dependency>
-			<groupId>com.crealytics</groupId>
-			<artifactId>spark-excel_${scala.minor.version}</artifactId>
-			<version>${spark.excel.version}</version>
-			<scope>runtime</scope>
-			<exclusions>
-				<exclusion>
-					<groupId>com.ibm.icu</groupId>
-					<artifactId>icu4j</artifactId>
-				</exclusion>
-				<exclusion>
-					<groupId>org.scala-lang.modules</groupId>
-					<artifactId>scala-xml_${scala.minor.version}</artifactId>
-				</exclusion>
-			</exclusions>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.poi</groupId>
-			<artifactId>poi</artifactId>
-			<version>${poi.version}</version>
-			<scope>runtime</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.poi</groupId>
-			<artifactId>poi-ooxml</artifactId>
-			<version>${poi.version}</version>
-			<scope>runtime</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>net.sf.ucanaccess</groupId>
-			<artifactId>ucanaccess</artifactId>
-			<version>${ucanaccess.version}</version>
-			<scope>runtime</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>com.hierynomus</groupId>
-			<artifactId>sshj</artifactId>
-			<version>${sshj.version}</version>
-		</dependency>
-
-		<dependency>
-			<groupId>org.scala-lang</groupId>
-			<artifactId>scala-library</artifactId>
-			<version>${scala.version}</version>
-			<scope>${scala.deps.scope}</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.scala-lang</groupId>
-			<artifactId>scala-reflect</artifactId>
-			<version>${scala.version}</version>
-			<scope>${scala.deps.scope}</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.scala-lang</groupId>
-			<artifactId>scala-compiler</artifactId>
-			<version>${scala.version}</version>
-			<scope>${scala.deps.scope}</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.scala-lang.modules</groupId>
-			<artifactId>scala-xml_${scala.minor.version}</artifactId>
-			<scope>${scala.deps.scope}</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>com.typesafe</groupId>
-			<artifactId>config</artifactId>
-			<version>${typesafe.config.version}</version>
-		</dependency>
-
-		<dependency>
-			<groupId>com.jsuereth</groupId>
-			<artifactId>scala-arm_${scala.minor.version}</artifactId>
-			<version>${scala-arm.version}</version>
-		</dependency>
-
-		<dependency>
-			<groupId>com.splunk</groupId>
-			<artifactId>splunk</artifactId>
-			<version>${splunk.version}</version>
-		</dependency>
-
-		<dependency>
-			<groupId>org.scalaj</groupId>
-			<artifactId>scalaj-http_${scala.minor.version}</artifactId>
-			<version>2.3.0</version>
-		</dependency>
-
-		<dependency>
-			<groupId>javax.jms</groupId>
-			<artifactId>jms</artifactId>
-			<version>1.1</version>
-		</dependency>
-
-		<!-- Start Keycloak dependencies -->
-		<dependency>
-			<groupId>org.keycloak</groupId>
-			<artifactId>keycloak-core</artifactId>
-			<version>${keycloak.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.keycloak</groupId>
-			<artifactId>keycloak-admin-client</artifactId>
-			<version>${keycloak.version}</version>
-		</dependency>
-
-		<!--  only used for keycloak admin api -->
-		<dependency>
-			<groupId>org.jboss.resteasy</groupId>
-			<artifactId>resteasy-client</artifactId>
-			<version>3.1.3.Final</version>
-			<scope>runtime</scope>
-		</dependency>
-		<!-- End Keycloak dependencies -->
-
-		<dependency>
-			<groupId>com.github.kxbmap</groupId>
-			<artifactId>configs_${scala.minor.version}</artifactId>
-			<version>0.4.4</version>
-			<exclusions>
-				<exclusion>
-					<groupId>com.typesafe</groupId>
-					<artifactId>config</artifactId>
-				</exclusion>
-			</exclusions>
-		</dependency>
-
-		<dependency>
-			<groupId>org.apache.kafka</groupId>
-			<artifactId>kafka_${scala.minor.version}</artifactId>
-			<version>${kafka.version}</version>
-			<exclusions>
-				<exclusion>
-					<groupId>commons-cli</groupId>
-					<artifactId>commons-cli</artifactId>
-				</exclusion>
-				<exclusion>
-					<groupId>org.scala-lang.modules</groupId>
-					<artifactId>scala-java8-compat_${scala.minor.version}</artifactId>
-				</exclusion>
-			</exclusions>
-		</dependency>
-
-		<dependency>
-			<groupId>io.monix</groupId>
-			<artifactId>monix-eval_${scala.minor.version}</artifactId>
-			<version>${monix.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>io.monix</groupId>
-			<artifactId>monix-execution_${scala.minor.version}</artifactId>
-			<version>${monix.version}</version>
-		</dependency>
-
-		<dependency>
-			<groupId>com.github.mutcianm</groupId>
-			<artifactId>ascii-graphs_${scala.minor.version}</artifactId>
-			<version>0.0.6</version>
-		</dependency>
-
-		<dependency>
-			<groupId>org.apache.commons</groupId>
-			<artifactId>commons-pool2</artifactId>
-			<version>2.8.0</version>
-		</dependency>
-
-		<dependency>
-			<groupId>io.delta</groupId>
-			<artifactId>delta-core_${scala.minor.version}</artifactId>
-			<version>${deltaTable.version}</version>
-		</dependency>
-
-
-		<!-- TEST dependencies -->
-		<dependency>
-			<groupId>org.scalatest</groupId>
-			<artifactId>scalatest_${scala.minor.version}</artifactId>
-			<version>${scalatest.test.version}</version>
-			<scope>test</scope>
-			<exclusions>
-				<exclusion>
-					<groupId>org.scala-lang.modules</groupId>
-					<artifactId>scala-xml_${scala.minor.version}</artifactId>
-				</exclusion>
-			</exclusions>
-		</dependency>
-		<dependency>
-			<groupId>org.scalactic</groupId>
-			<artifactId>scalactic_${scala.minor.version}</artifactId>
-			<version>${scalatest.test.version}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.scalacheck</groupId>
-			<artifactId>scalacheck_${scala.minor.version}</artifactId>
-			<version>1.14.3</version>
-			<scope>test</scope>
-		</dependency>
-		<!-- Log4j is used in some unit tests to disable some exception logging -->
-		<dependency>
-			<groupId>log4j</groupId>
-			<artifactId>log4j</artifactId>
-			<scope>test</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>org.apache.sshd</groupId>
-			<artifactId>sshd-sftp</artifactId>
-			<version>${sshd.test.version}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.sshd</groupId>
-			<artifactId>sshd-common</artifactId>
-			<version>${sshd.test.version}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.sshd</groupId>
-			<artifactId>sshd-core</artifactId>
-			<version>${sshd.test.version}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>com.github.tomakehurst</groupId>
-			<artifactId>wiremock-standalone</artifactId>
-			<version>2.25.1</version>
-			<scope>test</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>net.i2p.crypto</groupId>
-			<artifactId>eddsa</artifactId>
-			<version>0.1.0</version>
-			<scope>test</scope>
-		</dependency>
-
-		<!-- https://mvnrepository.com/artifact/net.manub/scalatest-embedded-kafka -->
-		<!--- This is old and unmaintained, but supports up to kafka 0.10 which is what
-		 the spark libraries are based on and also Scala 2.11. There is a replacement which we should
-		 use once 2.11 is dead, including Schema Registry-->
-		<dependency>
-			<groupId>io.github.embeddedkafka</groupId>
-			<artifactId>embedded-kafka_${scala.minor.version}</artifactId>
-			<version>${kafka.version}</version>
-			<scope>test</scope>
-		</dependency>
-
-	</dependencies>
 </project>
