@@ -22,7 +22,7 @@ import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{StringType, StructType}
 import org.apache.spark.sql.functions.input_file_name
 
 /**
@@ -150,6 +150,11 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     afterRead(df)
   }
 
+  override def createReadSchema(writeSchema: StructType)(implicit session: SparkSession): StructType = {
+    // add additional columns created by SparkFileDataObject
+    filenameColumn.map(colName => writeSchema.add(colName, StringType))
+      .getOrElse(writeSchema)
+  }
 
   /**
    * Writes the provided [[DataFrame]] to the filesystem.
