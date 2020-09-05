@@ -117,6 +117,7 @@
 			<artifactId>commons-io</artifactId>
 			<version>${commons-io.version}</version>
 		</dependency>
+
 		<dependency>
 			<groupId>com.healthmarketscience.jackcess</groupId>
 			<artifactId>jackcess</artifactId>
@@ -163,6 +164,11 @@
 			<groupId>com.hierynomus</groupId>
 			<artifactId>sshj</artifactId>
 			<version>${sshj.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>net.i2p.crypto</groupId>
+			<artifactId>eddsa</artifactId>
+			<version>0.3.0</version>
 		</dependency>
 
 		<dependency>
@@ -308,13 +314,6 @@
 			<groupId>com.github.tomakehurst</groupId>
 			<artifactId>wiremock-standalone</artifactId>
 			<version>2.25.1</version>
-			<scope>test</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>net.i2p.crypto</groupId>
-			<artifactId>eddsa</artifactId>
-			<version>0.1.0</version>
 			<scope>test</scope>
 		</dependency>
 
