@@ -23,7 +23,6 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions._
-import io.smartdatalake.util.misc.CredentialsUtil
 
 /**
  * Connection information for splunk queries

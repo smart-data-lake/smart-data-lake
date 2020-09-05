@@ -18,17 +18,15 @@
  */
 package io.smartdatalake
 
-import com.typesafe.config.ConfigUtil
-import configs.{Configs, Result}
+import configs.Configs
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.webservice.KeycloakConfig
 import io.smartdatalake.workflow.action.customlogic._
-import io.smartdatalake.workflow.dataobject.{SplunkParams, WebserviceFileDataObject}
+import io.smartdatalake.workflow.dataobject.WebserviceFileDataObject
 import org.apache.spark.sql.types.StructType
 
-import scala.collection.JavaConverters._
 import scala.language.implicitConversions
 
 package object config {
@@ -87,15 +85,6 @@ package object config {
    */
   implicit val keyCloakConfigReader: Configs[Option[KeycloakConfig]] = Configs.fromConfigTry { c =>
     WebserviceFileDataObject.getKeyCloakConfig(c)
-  }
-
-  /**
-   * A [[Configs]] reader that reads [[SplunkParams]] values.
-   *
-   * SplunkParams have special semantics for Duration which are covered with this reader.
-   */
-  implicit val splunkParamsReader: Configs[SplunkParams] = Configs.fromConfigTry { c =>
-    SplunkParams.fromConfig(c)
   }
 
   /**

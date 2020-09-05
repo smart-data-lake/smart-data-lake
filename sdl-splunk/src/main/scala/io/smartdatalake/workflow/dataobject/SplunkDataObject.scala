@@ -164,6 +164,15 @@ object SplunkDataObject extends FromConfigFactory[DataObject] {
   }
 
   /**
+   * A [[Configs]] reader that reads [[SplunkParams]] values.
+   *
+   * SplunkParams have special semantics for Duration which are covered with this reader.
+   */
+  implicit val splunkParamsReader: Configs[SplunkParams] = Configs.fromConfigTry { c =>
+    SplunkParams.fromConfig(c)
+  }
+
+  /**
    * @inheritdoc
    */
   override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): SplunkDataObject = {

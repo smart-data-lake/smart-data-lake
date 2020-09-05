@@ -18,15 +18,12 @@
  */
 package io.smartdatalake.config
 
-import java.time.format.DateTimeFormatter
-import java.time.{Duration, LocalDateTime}
-
 import com.typesafe.config.{ConfigException, ConfigFactory}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.{DateColumnType, BasicAuthMode}
+import io.smartdatalake.definitions.DateColumnType
 import io.smartdatalake.util.misc.{AclDef, AclElement}
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
-import io.smartdatalake.workflow.connection.{JdbcTableConnection, SplunkConnection}
+import io.smartdatalake.workflow.connection.JdbcTableConnection
 import io.smartdatalake.workflow.dataobject.{Table, _}
 import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
@@ -283,59 +280,6 @@ class DataObjectImplTests extends FlatSpec with Matchers {
       path = "/path/to/foo",
       partitions = Seq("one", "two")
     )
-  }
-
-  "SplunkDataObject" should "be parsable" in {
-    val fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-    val from = LocalDateTime.parse("1970-01-01 00:00", fmt)
-    val to = LocalDateTime.parse("1970-01-01 00:01", fmt)
-    val duration = Duration.ofMinutes(1)
-
-    val config = ConfigFactory.parseString(
-      s"""
-        |connections = {
-        | con123 = {
-        |   type = SplunkConnection
-        |   host = test.host
-        |   port = 8080
-        |   auth-mode = {
-        |        type = BasicAuthMode
-        |        user-variable = "CLEAR#testuser"
-        |        password-variable = "CLEAR#secret"
-        |    }
-        | }
-        |}
-        |
-        |dataObjects = {
-        | 123 = {
-        |   type = SplunkDataObject
-        |   connectionId = con123
-        |   params = {
-        |     query = "round(3.5)"
-        |     queryFrom = "${from.format(fmt)}"
-        |     queryTo = "${to.format(fmt)}"
-        |     queryTimeInterval = 1
-        |     columnNames = [val1, val2]
-        |     parallelRequests = 100
-        |   }
-        | }
-        |}
-        |""".stripMargin).resolve
-    implicit val registry: InstanceRegistry = ConfigParser.parse(config)
-    val registry2 = new InstanceRegistry()
-    registry2.register(SplunkConnection("con123","test.host", 8080, BasicAuthMode("CLEAR#testuser", "CLEAR#secret")))
-    registry.getDataObjects.head shouldBe SplunkDataObject(
-      id = "123",
-      connectionId = "con123",
-      params = SplunkParams(
-        query = "round(3.5)",
-        queryFrom = from,
-        queryTo = to,
-        queryTimeInterval = duration,
-        columnNames = Seq("val1", "val2"),
-        parallelRequests = 100
-      )
-    )(registry2)
   }
 
   "CustomDfDataObject" should "be parsable" in {
