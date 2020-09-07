@@ -395,7 +395,7 @@
 				<artifactId>maven-source-plugin</artifactId>
 			</plugin>
 
-			<!-- Builds executable jar that includes all runtime dependencies -->
+			<!-- Builds executable fat-jar that includes all dependencies -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-assembly-plugin</artifactId>

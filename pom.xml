@@ -364,6 +364,7 @@
 						</archive>
 						<excludes>
 							<exclude>log4j.properties</exclude> <!-- Logging configuration should be left to user. -->
+							<exclude>${project.artifactId}*.jar</exclude> <!-- avoid "Error assembling JAR" because of already existing artifact jar -->
 						</excludes>
 					</configuration>
 				</plugin>
@@ -388,7 +389,7 @@
 					</configuration>
 				</plugin>
 
-				<!-- Builds executable jar that includes all runtime dependencies -->
+				<!-- Builds executable fat-jar that includes all dependencies -->
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-assembly-plugin</artifactId>
