@@ -561,6 +561,11 @@
 				<artifactId>scala-xml_${scala.minor.version}</artifactId>
 				<version>1.0.6</version>
 			</dependency>
+			<dependency>
+				<groupId>com.google.guava</groupId>
+				<artifactId>guava</artifactId>
+				<scope>${spark.deps.scope}</scope>
+			</dependency>
 			<!-- adapt zookeeper version for sdl-kafka -->
 			<dependency>
 				<groupId>org.apache.zookeeper</groupId>
