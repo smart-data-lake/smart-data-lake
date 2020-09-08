@@ -116,6 +116,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   extends DataObject with CanCreateDataFrame with CanCreateStreamingDataFrame with CanWriteDataFrame with CanHandlePartitions with SchemaValidation {
 
   override val partitions: Seq[String] = datePartitionCol.map(_.colName).toSeq
+  override val expectedPartitionsCondition: Option[String] = None // expect all partitions to exist
   private val udfFormatPartition = udf((ts:Timestamp) => ts.toLocalDateTime.truncatedTo(datePartitionCol.get.chronoUnit).format(datePartitionCol.get.formatter))
 
   private val connection = getConnection[KafkaConnection](connectionId)
@@ -138,11 +139,12 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   override def prepare(implicit session: SparkSession): Unit = {
+    super.prepare
     // test schema registry connection
     connection.testSchemaRegistry()
     // test kafka connection and topic existing
-    // TODO: einkommentieren!
-    //require(connection.topicExists(topicName), s"($id) topic $topicName doesn't exist")
+    require(connection.topicExists(topicName), s"($id) topic $topicName doesn't exist")
+    filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
   }
 
   override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
@@ -265,7 +267,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     )
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession): Unit = {
     convertToWriteDataFrame(df)
       .write
       .format("kafka")

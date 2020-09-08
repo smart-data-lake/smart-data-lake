@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.{ExecutionMode, ExecutionModeWithMainInputOutput}
+import io.smartdatalake.definitions.ExecutionModeWithMainInputOutput
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
@@ -112,30 +112,17 @@ abstract class SparkSubFeedsAction extends SparkAction {
       val msg = s"writing DataFrame to ${output.id}" + (if (subFeed.partitionValues.nonEmpty) s", partitionValues ${subFeed.partitionValues.mkString(" ")}" else "")
       logger.info(s"($id) start " + msg)
       setSparkJobMetadata(Some(msg))
+      val isRecursiveInput = recursiveInputs.exists(_.id == subFeed.dataObjectId)
       val (noData,d) = PerformanceUtils.measureDuration {
-        writeSubFeed(subFeed, output)
+        writeSubFeed(subFeed, output, isRecursiveInput)
       }
       setSparkJobMetadata()
       val metricsLog = if (noData) ", no data found"
       else getFinalMetrics(output.id).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
-      logger.info(s"($id) finished writing DataFrame to ${output.id}: duration=$d" + metricsLog)
+      logger.info(s"($id) finished writing DataFrame to ${output.id}: jobDuration=$d" + metricsLog)
     }
     // return
     transformedSubFeeds.map( transformedSubFeed => updateSubFeedAfterWrite(transformedSubFeed))
-  }
-
-  /**
-   * Enriches SparkSubFeeds with DataFrame if not existing
-   *
-   * @param inputs input data objects.
-   * @param subFeeds input SubFeeds.
-   */
-  protected def enrichSubFeedsDataFrame(inputs: Seq[DataObject with CanCreateDataFrame], subFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
-    assert(inputs.size+recursiveInputs.size == subFeeds.size, s"Number of inputs must match number of subFeeds given for $id")
-    (inputs ++ recursiveInputs).map { input =>
-      val subFeed = subFeeds.find(_.dataObjectId == input.id).getOrElse(throw new IllegalStateException(s"subFeed for input ${input.id} not found"))
-      enrichSubFeedDataFrame(input, subFeed, context.phase)
-    }
   }
 
   private def executionModeNeedsMainInputOutput: Boolean = {

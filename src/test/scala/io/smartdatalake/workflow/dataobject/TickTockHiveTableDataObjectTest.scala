@@ -52,16 +52,14 @@ class TickTockHiveTableDataObjectTest extends FunSuite with BeforeAndAfter {
 
     // create source dataobject
     val srcTable = Table(Some("default"), "input")
-    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name)
-    val srcPath = tempPath + s"/${srcTable.fullName}"
-    val srcDO = TickTockHiveTableDataObject("input", Some(srcPath), table = srcTable, partitions = Seq(), numInitialHdfsPartitions = 1)
+    val srcDO = TickTockHiveTableDataObject("input", Some(tempPath + s"/${srcTable.fullName}"), table = srcTable, partitions = Seq(), numInitialHdfsPartitions = 1)
+    srcDO.dropTable
     instanceRegistry.register(srcDO)
 
     // create target
     val tgtTable = Table(Some("default"),"output")
-    HiveUtil.dropTable(session, srcTable.db.get, srcTable.name)
-    val tgtPath = tempPath + s"/${tgtTable.fullName}"
-    val tgtDO = TickTockHiveTableDataObject("output", Some(tgtPath), table = tgtTable, partitions = Seq(), numInitialHdfsPartitions = 1, schemaMin=Some(schemaMin))
+    val tgtDO = TickTockHiveTableDataObject("output", Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, partitions = Seq(), numInitialHdfsPartitions = 1, schemaMin=Some(schemaMin))
+    tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
     val refTimestamp1 = LocalDateTime.now()
@@ -72,7 +70,7 @@ class TickTockHiveTableDataObjectTest extends FunSuite with BeforeAndAfter {
 
     // write test files
     val l1 = Seq((1, "john", 5)).toDF("id", "name", "rating")
-    TestUtil.prepareHiveTable(srcTable, srcPath, l1)
+    srcDO.writeDataFrame(l1, Seq())
 
     val tgtSubFeeds = action.exec(Seq(SparkSubFeed(None, "input", Seq()), SparkSubFeed(None, "output", Seq())))
 

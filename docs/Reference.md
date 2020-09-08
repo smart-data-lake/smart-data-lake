@@ -165,4 +165,24 @@ Sample log message:
 
 A fail condition can be specified on Actions to fail execution if a certain condition is not met.
 The condition must be specified as spark sql expression, which is evaluated as where-clause against a dataframe of metrics. Available columns are dataObjectId, key, value. 
-To fail above sample log in case there are no records written, specify `"dataObjectId = 'tgt1' and key = 'records_written' and value = 0"`. 
+To fail above sample log in case there are no records written, specify `"dataObjectId = 'tgt1' and key = 'records_written' and value = 0"`.
+
+By implementing interface StateListener  you can get notified about action results & metrics. To configure state listeners set config attribute `global.stateListeners = [{className = ...}]`.
+
+## Custom Spark Transformations
+
+### Scala
+TODO
+
+### SQL
+TODO
+
+### Python
+It's possible to use Python to define a custom Spark transformation. Input is a PySpark DataFrame and the transformation must return again a PySpark DataFrame.
+
+Requirements: Python version >= 3.4 an <= 3.7 (for Spark 2.4), PySpark package.
+See Readme of [sdl-examples](https://github.com/smart-data-lake/sdl-examples) for a working example and instructions to setup environment for IntelliJ  
+
+How it works: under the hood a PySpark DataFrame is a proxy for a Java Spark DataFrame. PySpark uses Py4j to access Java objects in the JVM.
+
+  

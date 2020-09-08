@@ -53,6 +53,9 @@ import scala.collection.JavaConverters._
  * @param saveMode spark [[SaveMode]] to use when writing files, default is "overwrite"
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
  * @param numInitialHdfsPartitions number of files created when writing into an empty table (otherwise the number will be derived from the existing data)
+ * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
+ *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
+ *                                    Default is to expect all partitions to exist.
  * @param metadata meta data
  */
 case class HiveTableDataObject(override val id: DataObjectId,
@@ -66,6 +69,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
                                saveMode: SaveMode = SaveMode.Overwrite,
                                acl: Option[AclDef] = None,
                                connectionId: Option[ConnectionId] = None,
+                               override val expectedPartitionsCondition: Option[String] = None,
                                override val metadata: Option[DataObjectMetadata] = None)
                               (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TableDataObject with CanWriteDataFrame with CanHandlePartitions with SmartDataLakeLogger {
@@ -113,9 +117,11 @@ case class HiveTableDataObject(override val id: DataObjectId,
   }
 
   override def prepare(implicit session: SparkSession): Unit = {
+    super.prepare
     require(isDbExisting, s"($id) Hive DB ${table.db.get} doesn't exist (needs to be created manually).")
     if (!isTableExisting)
       require(path.isDefined, "If Hive table does not exist yet, the path must be set.")
+    filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
   }
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
@@ -132,10 +138,11 @@ case class HiveTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues])
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
                              (implicit session: SparkSession): Unit = {
+    require(!isRecursiveInput, "($id) HiveTableDataObject cannot write dataframe when dataobject is also used as recursive input ")
     validateSchemaMin(df)
-    writeDataFrame(df, createTableOnly = false, partitionValues)
+    writeDataFrameInternal(df, createTableOnly = false, partitionValues)
   }
 
    /**
@@ -143,16 +150,16 @@ case class HiveTableDataObject(override val id: DataObjectId,
    * DataFrames are repartitioned in order not to write too many small files
    * or only a few HDFS files that are too large.
    */
-  private def writeDataFrame(df: DataFrame, createTableOnly:Boolean, partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): Unit = {
+  private def writeDataFrameInternal(df: DataFrame, createTableOnly:Boolean, partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): Unit = {
     val dfPrepared = if (createTableOnly) session.createDataFrame(List[Row]().asJava, df.schema) else df
 
     // write table and fix acls
-    HiveUtil.writeDfToHive( session, dfPrepared, hadoopPath.toString, table.name, table.db.get, partitions, saveMode, numInitialHdfsPartitions=numInitialHdfsPartitions )
+    HiveUtil.writeDfToHive( dfPrepared, hadoopPath, table, partitions, saveMode, numInitialHdfsPartitions=numInitialHdfsPartitions )
     val aclToApply = acl.orElse(connection.flatMap(_.acl))
     if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
     if (analyzeTableAfterWrite && !createTableOnly) {
       logger.info(s"Analyze table ${table.fullName}.")
-      HiveUtil.analyze(session, table.db.get, table.name, partitions, partitionValues)
+      HiveUtil.analyze(table, partitions, partitionValues)
     }
 
     // make sure empty partitions are created as well
@@ -175,13 +182,17 @@ case class HiveTableDataObject(override val id: DataObjectId,
     else Seq()
   }
 
+  override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+    partitionValues.foreach( pv => HiveUtil.dropPartition(table, hadoopPath, pv))
+  }
+
   override def createEmptyPartition(partitionValues: PartitionValues)(implicit session: SparkSession): Unit = {
     if (partitionValues.keys == partitions.toSet) HiveUtil.createEmptyPartition(table, partitionValues)
     else logger.warn(s"($id) No empty partition was created for $partitionValues because there are not all partition columns defined")
   }
 
   override def dropTable(implicit session: SparkSession): Unit = {
-    HiveUtil.dropTable(session, table.db.get, table.name)
+    HiveUtil.dropTable(table)
   }
 
   /**

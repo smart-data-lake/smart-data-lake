@@ -23,9 +23,11 @@ import java.net.URI
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.{FileSystem, FileUtil, Path}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.{DataFrame, SparkSession}
+
+import scala.io.Source
 
 /**
  * Provides utility functions for HDFS.
@@ -35,15 +37,13 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   /**
    * Returns size information about existing files in HDFS
    *
-   * @param parquetPath Path to files in HDFS
+   * @param path Path to files in HDFS
    * @return Amount of files, total size of files in Bytes, average size of files in bytes
    */
-  def sizeInfo(parquetPath: String, sc: SparkContext): (Long, Long, Long) = {
+  def sizeInfo(path: Path, fs: FileSystem): (Long, Long, Long) = {
     try {
-      val hdfs: FileSystem = FileSystem.get(sc.hadoopConfiguration)
-      val hadoopPath = new Path(parquetPath)
       val recursive = false
-      val ri = hdfs.listFiles(hadoopPath, recursive)
+      val ri = fs.listFiles(path, recursive)
       val it = new Iterator[org.apache.hadoop.fs.LocatedFileStatus]() {
         override def hasNext = ri.hasNext
 
@@ -78,7 +78,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    * @param session
    * @return
    */
-  def desiredFileSize(session:SparkSession): Long = {
+  def desiredFileSize(implicit session:SparkSession): Long = {
     session.sparkContext.hadoopConfiguration.getLong("dfs.blocksize", DefaultBlocksize)
   }
 
@@ -100,47 +100,37 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    *                         small and Spark can't use up the configured boundaries.
    * @return repartitioned [[DataFrame]] (or Input [[DataFrame]] if partitioning is untouched)
    */
-  def repartitionForHdfsFileSize(df: DataFrame, existingFilePath: String, reducePartitions: Boolean = false): DataFrame = {
+  def repartitionForHdfsFileSize(df: DataFrame, existingFilePath: Path, reducePartitions: Boolean = false)(implicit session:SparkSession): DataFrame = {
 
     // Use the HDFS blocksize as target size or use the default if it can't be evaluated
     val desiredSize = desiredFileSize(df.sparkSession)
 
-    val (numFiles, sumSize, avgSize) = HdfsUtil.sizeInfo(existingFilePath, df.sparkSession.sparkContext)
+    val fs = getHadoopFsFromSpark(existingFilePath)
+    val (numFiles, sumSize, avgSize) = HdfsUtil.sizeInfo(existingFilePath, fs)
     val reduceBy = if(reducePartitions) 2 else 1
     val numPartitionsRequired = Math.max(1,Math.ceil(sumSize.toDouble/desiredSize.toDouble).toInt) / reduceBy
     val currentPartitionNum = df.rdd.getNumPartitions
 
-    logger.info(s"Current Parquet files: ${numFiles} with a size of ${sumSize}. Requiring ${numPartitionsRequired} partitions now.")
+    logger.debug(s"Current Parquet files: ${numFiles} with a size of ${sumSize}. Requiring ${numPartitionsRequired} partitions now.")
 
     // Repartition is only done if files exist, otherwise you always end up with one partition
     val dfRepartitioned = if (sumSize > 0 && numPartitionsRequired > currentPartitionNum) {
-      logger.info(s"Executing repartition to ${numPartitionsRequired}")
+      logger.debug(s"Executing repartition to ${numPartitionsRequired}")
       df.repartition(numPartitionsRequired)
     } else if(sumSize > 0 && numPartitionsRequired < currentPartitionNum) {
-      logger.info(s"Executing coalesce to ${numPartitionsRequired}")
+      logger.debug(s"Executing coalesce to ${numPartitionsRequired}")
       df.coalesce(numPartitionsRequired)
     }
     else df
 
     val adjustedPartitionNum = dfRepartitioned.rdd.getNumPartitions
-    logger.info(s"Number of RDD partitions before repartition: ${currentPartitionNum}.")
-    logger.info(s"Number of RDD partitions after repartition: ${adjustedPartitionNum}.")
+    logger.debug(s"Repartitioning: Number of RDD partitions before=$currentPartitionNum after=$adjustedPartitionNum")
     dfRepartitioned
   }
 
-  def deletePath( path:String, sc:SparkContext, doWarn:Boolean ) : Unit = {
-    val hdfs = FileSystem.get(sc.hadoopConfiguration)
+  def deletePath( path: Path, fs:FileSystem, doWarn:Boolean ) : Unit = {
     try {
-      hdfs.delete(new Path(path), true) // recursive=true
-      logger.info(s"Hadoop path ${path} deleted.")
-    } catch {
-      case e: Exception => if (doWarn) logger.warn(s"Hadoop path ${path} couldn't be deleted (${e.getMessage})")
-    }
-  }
-
-  def deletePath( path:String, fs:FileSystem, doWarn:Boolean ) : Unit = {
-    try {
-      fs.delete(new Path(path), true) // recursive=true
+      fs.delete(path, true) // recursive=true
       logger.info(s"Hadoop path ${path} deleted.")
     } catch {
       case e: Exception => if (doWarn) logger.warn(s"Hadoop path ${path} couldn't be deleted (${e.getMessage})")
@@ -150,9 +140,9 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   /**
    * In contrast to deletePath this supports "globs"
    */
-  def deleteFiles( path:String, fs:FileSystem, doWarn:Boolean ) : Unit = {
+  def deleteFiles( path: Path, fs:FileSystem, doWarn:Boolean ) : Unit = {
     try {
-      val deletePaths = fs.globStatus(new Path(path)).map(_.getPath)
+      val deletePaths = fs.globStatus(path).map(_.getPath)
       deletePaths.foreach{ path => fs.delete(path, true) }
       logger.info(s"${deletePaths.size} files delete for hadoop path ${path}.")
     } catch {
@@ -175,7 +165,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    * @param path path to be extended with authority
    * @return Hadoop Path with authority
    */
-  def addHadoopDefaultSchemaAuthority(path: org.apache.hadoop.fs.Path): org.apache.hadoop.fs.Path = {
+  def addHadoopDefaultSchemaAuthority(path: Path): Path = {
     if (path.isAbsoluteAndSchemeAuthorityNull) path.makeQualified(HdfsUtil.getHadoopDefaultSchemeAuthority, null)
     else path
   }
@@ -191,11 +181,10 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    * @param prefix prefix to be added if path doesn't contain schema and authority
    * @return Hadoop Path with schema and authority
    */
-  def prefixHadoopPath(path: String, prefix: Option[String]): org.apache.hadoop.fs.Path = {
-    import org.apache.hadoop.fs.Path
+  def prefixHadoopPath(path: String, prefix: Option[String]): Path = {
     val hadoopPath = new Path(path)
     if (hadoopPath.isAbsoluteAndSchemeAuthorityNull || !hadoopPath.isAbsolute) {
-      val hadoopPathPrefixed = prefix.map( p => new Path(p + HdfsUtil.addLeadingSeparator(path,Environment.defaultPathSeparator)))
+      val hadoopPathPrefixed = prefix.map( p => new Path(p + HdfsUtil.addLeadingSeparator(path, Environment.defaultPathSeparator)))
         .getOrElse(hadoopPath)
       HdfsUtil.addHadoopDefaultSchemaAuthority( hadoopPathPrefixed )
     }
@@ -210,8 +199,8 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    * @param path
    * @return
    */
-  def getHadoopFs(path: org.apache.hadoop.fs.Path): FileSystem = {
-    path.getFileSystem(new org.apache.hadoop.conf.Configuration())
+  def getHadoopFs(path: Path): FileSystem = {
+    path.getFileSystem(new Configuration())
   }
 
   /**
@@ -220,18 +209,26 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    * @param path
    * @return
    */
-  def getHadoopFsFromSpark(path: org.apache.hadoop.fs.Path)(implicit session: SparkSession): FileSystem = {
+  def getHadoopFsFromSpark(path: Path)(implicit session: SparkSession): FileSystem = {
     path.getFileSystem(session.sparkContext.hadoopConfiguration)
   }
-  def getHadoopFsWithConf(path: org.apache.hadoop.fs.Path, hadoopConf: Configuration)(implicit session: SparkSession): FileSystem = {
+
+  def getHadoopFsWithConf(path: Path, hadoopConf: Configuration)(implicit session: SparkSession): FileSystem = {
     path.getFileSystem(hadoopConf)
   }
 
-  def addLeadingSeparator(path:String, separator: Char): String = {
+  def addLeadingSeparator(path: String, separator: Char): String = {
     if (path.startsWith(separator.toString)) path else separator + path
   }
 
   def getHadoopPartitionLayout(partitionCols: Seq[String], separator: Char): String = {
     partitionCols.map(col => s"$col=%$col%$separator").mkString
+  }
+
+  def readHadoopFile( file: String ): String = {
+    val path = addHadoopDefaultSchemaAuthority(new Path(file))
+    val fileSystem: FileSystem = getHadoopFs(path)
+    val is = fileSystem.open(path)
+    Source.fromInputStream(is).getLines.mkString(sys.props("line.separator"))
   }
 }

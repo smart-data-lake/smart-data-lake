@@ -2,9 +2,9 @@ data/output
 .cache-*
 lib
 target
+venv
 /.externalToolBuilders/
 *.html
-*.iml
 *.js
 *.log
 

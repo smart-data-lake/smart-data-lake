@@ -16,25 +16,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.definitions.Environment
-import org.apache.spark.sql.SparkSession
+package io.smartdatalake.workflow.action.customlogic
 
-private[smartdatalake] trait FileDataObject extends DataObject with CanHandlePartitions {
-
-  /**
-   * The root path of the files that are handled by this DataObject.
-   */
-  def path: String
-
-  /**
-    * default separator for paths
-    */
-  protected val separator = Environment.defaultPathSeparator
-
-  override def prepare(implicit session: SparkSession): Unit = {
-    super.prepare
-    filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
-  }
-}
+/**
+ * Exception is thrown if the Python transformation can not be executed correctly
+ */
+private[smartdatalake] class PythonTransformationException(msg: String, throwable: Throwable) extends RuntimeException(msg, throwable)

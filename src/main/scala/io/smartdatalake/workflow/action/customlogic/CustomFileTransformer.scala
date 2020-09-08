@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.workflow.action.customlogic
 
+import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.{CustomCodeUtil, SmartDataLakeLogger}
 import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
 import org.slf4j.Logger
@@ -54,7 +55,7 @@ case class CustomFileTransformerConfig( className: Option[String] = None, scalaF
   }.orElse{
     scalaFile.map {
       file =>
-        val fnTransform = CustomCodeUtil.compileFromFile[(Map[String,String], FSDataInputStream, FSDataOutputStream, Logger) => Option[Exception]](file)
+        val fnTransform = CustomCodeUtil.compileCode[(Map[String,String], FSDataInputStream, FSDataOutputStream, Logger) => Option[Exception]](HdfsUtil.readHadoopFile(file))
         new CustomFileTransformerWrapper( fnTransform )
     }
   }.orElse{
@@ -73,7 +74,6 @@ case class CustomFileTransformerConfig( className: Option[String] = None, scalaF
 class CustomFileTransformerWrapper(val fnExec: (Map[String,String], FSDataInputStream, FSDataOutputStream, Logger) => Option[Exception])
 extends CustomFileTransformer with SmartDataLakeLogger {
   override def transform(options: Map[String,String], input: FSDataInputStream, output: FSDataOutputStream): Option[Exception] = {
-    // TODO: This used to be logger.underlying, is it OK to use logger ?
     fnExec(options, input, output, logger)
   }
 }
