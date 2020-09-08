@@ -29,11 +29,11 @@ The following is a list of implemented and planned (Future) features of Smart Da
 
 ##### Customizable Transformations
 * Spark Transformations: 
-  * Languages: SQL, Scala (Class, compile from config), Future: Python
+  * Languages: SQL, Scala (Class, compile from config), Python
   * Many input DataFrames to many outputs DataFrames (but only one output recommended normally, in order to define dependencies as detailed as possible (lineage))
 * File Transformations: 
   * Language: Scala
-  * Only one to one (one Input Stream to one OutputStream)
+  * Only one to one (one InputStream to one OutputStream)
 
 ##### Early Validation
 * Execution in 3 phases before execution
