@@ -142,13 +142,13 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
       try {
         val entryPoint = new DfTransformerPySparkEntryPoint(session, options, df, objectId)
         val additionalInitCode = """
-          |# prepare input parameters
-          |options = entryPoint.options
-          |inputDf = DataFrame(entryPoint.getInputDf(), sqlContext) # convert input dataframe to pyspark
-          |dataObjectId = entryPoint.getDataObjectId()
-          |# helper function to return output dataframe
-          |def setOutputDf( df ):
-          |    entryPoint.setOutputDf(df._jdf)
+                                   |# prepare input parameters
+                                   |options = entryPoint.options
+                                   |inputDf = DataFrame(entryPoint.getInputDf(), sqlContext) # convert input dataframe to pyspark
+                                   |dataObjectId = entryPoint.getDataObjectId()
+                                   |# helper function to return output dataframe
+                                   |def setOutputDf( df ):
+                                   |    entryPoint.setOutputDf(df._jdf)
           """.stripMargin
         PythonUtil.execPythonTransform( entryPoint, additionalInitCode + sys.props("line.separator") + code)
         entryPoint.outputDf.getOrElse(throw new IllegalStateException("Python transformation must set output DataFrame (call setOutputDf(df))"))
