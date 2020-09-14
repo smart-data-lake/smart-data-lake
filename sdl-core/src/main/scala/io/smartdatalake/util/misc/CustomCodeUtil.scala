@@ -18,9 +18,12 @@
  */
 package io.smartdatalake.util.misc
 
-import java.io.InputStream
+import java.io.{FileNotFoundException, InputStream}
 
+import io.smartdatalake.config.ConfigLoader.logger
 import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.util.hdfs.HdfsUtil
+import org.apache.hadoop.fs.{FileSystem, Path}
 
 import scala.tools.reflect.ToolBox
 import scala.util.{Failure, Success, Try}
@@ -33,20 +36,6 @@ private[smartdatalake] object CustomCodeUtil {
 
   // get Scala Toolbox to compile code at runtime
   private lazy val tb = scala.reflect.runtime.currentMirror.mkToolBox()
-
-  /**
-    * Compiling Scala Source Code from a file into Object of Type T
-    *
-    * @param file Resource filename with scala code
-    * @tparam T Type of object returned by code (typically a function)
-    * @return object returned by code
-    */
-  def compileFromFile[T](file: String): T = {
-    // read local file
-    val code = readResourceFile(file)
-    // compile and execute
-    compileCode[T](code)
-  }
 
   /**
    * Compiling Scala Source Code into Object of Type T
@@ -74,9 +63,10 @@ private[smartdatalake] object CustomCodeUtil {
     clazz.newInstance().asInstanceOf[T]
   }
 
-  private def readResourceFile( filename:String ) : String = {
-    val stream : InputStream = ClassLoader.getSystemClassLoader.getResourceAsStream(filename)
-    val source = scala.io.Source.fromInputStream( stream )
+  def readResourceFile( filename:String ) : String = {
+    val stream : InputStream = Option(ClassLoader.getSystemClassLoader.getResourceAsStream(filename))
+      .getOrElse(throw new FileNotFoundException(filename))
+    val source = scala.io.Source.fromInputStream(stream)
     val content = source.getLines.mkString(sys.props("line.separator"))
     source.close
     // return value
