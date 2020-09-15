@@ -150,6 +150,12 @@
 			<groupId>org.scala-lang</groupId>
 			<artifactId>scala-reflect</artifactId>
 		</dependency>
+		<!-- this is needed for running kafka/scala_2.12 on java8, unit tests fail otherwise -->
+		<dependency>
+			<groupId>org.scala-lang.modules</groupId>
+			<artifactId>scala-java8-compat_${scala.minor.version}</artifactId>
+			<version>0.9.1</version>
+		</dependency>
 
 		<!-- TEST dependencies -->
 		<dependency>
