@@ -174,25 +174,18 @@
 		<dependency>
 			<groupId>org.scala-lang</groupId>
 			<artifactId>scala-library</artifactId>
-			<version>${scala.version}</version>
-			<scope>${scala.deps.scope}</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.scala-lang</groupId>
 			<artifactId>scala-reflect</artifactId>
-			<version>${scala.version}</version>
-			<scope>${scala.deps.scope}</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.scala-lang</groupId>
 			<artifactId>scala-compiler</artifactId>
-			<version>${scala.version}</version>
-			<scope>${scala.deps.scope}</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.scala-lang.modules</groupId>
 			<artifactId>scala-xml_${scala.minor.version}</artifactId>
-			<scope>${scala.deps.scope}</scope>
 		</dependency>
 
 		<dependency>

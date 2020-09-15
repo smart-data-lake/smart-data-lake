@@ -560,6 +560,7 @@
 				<groupId>org.scala-lang.modules</groupId>
 				<artifactId>scala-xml_${scala.minor.version}</artifactId>
 				<version>1.0.6</version>
+				<scope>${scala.deps.scope}</scope>
 			</dependency>
 			<dependency>
 				<groupId>com.google.guava</groupId>
@@ -571,6 +572,31 @@
 				<groupId>org.apache.zookeeper</groupId>
 				<artifactId>zookeeper</artifactId>
 				<version>${zookeeper.version}</version>
+			</dependency>
+			<!-- fix scala.version not properly replaced when importing from spark-parent and override scope -->
+			<dependency>
+				<groupId>org.scala-lang</groupId>
+				<artifactId>scala-compiler</artifactId>
+				<version>${scala.version}</version>
+				<scope>${scala.deps.scope}</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.scala-lang</groupId>
+				<artifactId>scala-reflect</artifactId>
+				<version>${scala.version}</version>
+				<scope>${scala.deps.scope}</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.scala-lang</groupId>
+				<artifactId>scala-library</artifactId>
+				<version>${scala.version}</version>
+				<scope>${scala.deps.scope}</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.scala-lang</groupId>
+				<artifactId>scala-actors</artifactId>
+				<version>${scala.version}</version>
+				<scope>${scala.deps.scope}</scope>
 			</dependency>
 
 			<!-- TEST dependencies -->
