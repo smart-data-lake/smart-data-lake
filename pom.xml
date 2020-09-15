@@ -21,7 +21,7 @@
 
 	<groupId>io.smartdatalake</groupId>
 	<artifactId>sdl-parent</artifactId>
-	<version>1.2.0-SNAPSHOT</version>
+	<version>2.0.0-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
 	<modules>
@@ -83,19 +83,21 @@
 				<noLinkWarnings>-no-link-warnings</noLinkWarnings>
 			</properties>
 		</profile>
+		<!-- only scala 2.12 supported in spark 3.0 -->
 		<profile>
 			<id>scala-2.12</id>
-			<properties>
-				<scala.minor.version>2.12</scala.minor.version>
-				<scala.version>${scala.minor.version}.10</scala.version>
-			</properties>
-		</profile>
-		<profile>
-			<id>scala-2.11</id>
 			<activation><activeByDefault>true</activeByDefault></activation>
 			<properties>
-				<scala.minor.version>2.11</scala.minor.version>
+				<scala.minor.version>2.12</scala.minor.version>
 				<scala.version>${scala.minor.version}.12</scala.version>
+			</properties>
+		</profile>
+		<!-- default is hadoop 2.7 in spark 3.0, to build for hadoop 3 activate this profile -->
+		<profile>
+			<id>hadoop-3.2</id>
+			<properties>
+				<hadoop.version>3.2.0</hadoop.version>
+				<curator.version>2.13.0</curator.version>
 			</properties>
 		</profile>
 	</profiles>
@@ -113,87 +115,100 @@
 		<scala.deps.scope>compile</scala.deps.scope>
 		<spark.deps.scope>compile</spark.deps.scope>
 
-		<spark.version>2.4.7</spark.version>
+		<spark.version>3.0.1</spark.version>
 
 		<!-- SPARK-PARENT start: properties copied from spark-parent pom version 2.4.7 for spark-parent import in dependencyManagement -->
 		<!-- attention - manually adapted are: zookeeper, scala.version, scala.binary.version -->
-		<slf4j.version>1.7.16</slf4j.version>
+		<slf4j.version>1.7.30</slf4j.version>
 		<log4j.version>1.2.17</log4j.version>
 		<!-- hadoop version must match the hadoop version included by spark-core -->
 		<!-- could be better to use cloudera version of hadoop because they backported many bugfixes from later versions -->
 		<!--hadoop.version>2.6.0-cdh5.16.1</hadoop.version-->
-		<hadoop.version>2.6.5</hadoop.version>
+		<hadoop.version>2.7.4</hadoop.version>
 		<protobuf.version>2.5.0</protobuf.version>
 		<yarn.version>${hadoop.version}</yarn.version>
-		<flume.version>1.6.0</flume.version>
-		<zookeeper.version>3.4.13</zookeeper.version><!--Overrides version 3.4.6 in spark core/hadoop in order to support kafka tests-->
-		<curator.version>2.6.0</curator.version>
-		<hive.group>org.spark-project.hive</hive.group>
+		<zookeeper.version>3.4.14</zookeeper.version>
+		<curator.version>2.7.1</curator.version>
+		<hive.group>org.apache.hive</hive.group>
+		<hive.classifier>core</hive.classifier>
 		<!--  Version used in Maven Hive dependency  -->
-		<hive.version>1.2.1.spark2</hive.version>
-		<!--  Version used for internal directory structure  -->
-		<hive.version.short>1.2.1</hive.version.short>
+		<hive.version>2.3.7</hive.version>
+		<hive23.version>2.3.7</hive23.version>
+		<!-- Version used for internal directory structure -->
+		<hive.version.short>2.3</hive.version.short>
 		<derby.version>10.12.1.1</derby.version>
 		<parquet.version>1.10.1</parquet.version>
-		<orc.version>1.5.5</orc.version>
-		<orc.classifier>nohive</orc.classifier>
+		<orc.version>1.5.10</orc.version>
+		<orc.classifier/>
+		<hive.parquet.group>com.twitter</hive.parquet.group>
 		<hive.parquet.version>1.6.0</hive.parquet.version>
-		<jetty.version>9.3.24.v20180605</jetty.version>
+		<jetty.version>9.4.18.v20190429</jetty.version>
 		<javaxservlet.version>3.1.0</javaxservlet.version>
-		<chill.version>0.9.3</chill.version>
+		<chill.version>0.9.5</chill.version>
 		<ivy.version>2.4.0</ivy.version>
 		<oro.version>2.0.8</oro.version>
-		<codahale.metrics.version>3.1.5</codahale.metrics.version>
+		<!--
+        If you changes codahale.metrics.version, you also need to change
+        the link to metrics.dropwizard.io in docs/monitoring.md.
+        -->
+		<codahale.metrics.version>4.1.1</codahale.metrics.version>
 		<avro.version>1.8.2</avro.version>
 		<avro.mapred.classifier>hadoop2</avro.mapred.classifier>
-		<aws.kinesis.client.version>1.8.10</aws.kinesis.client.version>
-		<!--  Should be consistent with Kinesis client dependency  -->
-		<aws.java.sdk.version>1.11.271</aws.java.sdk.version>
-		<!--  the producer is used in tests  -->
+		<aws.kinesis.client.version>1.12.0</aws.kinesis.client.version>
+		<!-- Should be consistent with Kinesis client dependency -->
+		<aws.java.sdk.version>1.11.655</aws.java.sdk.version>
+		<!-- the producer is used in tests -->
 		<aws.kinesis.producer.version>0.12.8</aws.kinesis.producer.version>
-		<!--   org.apache.httpcomponents/httpclient -->
+		<!--  org.apache.httpcomponents/httpclient-->
 		<commons.httpclient.version>4.5.6</commons.httpclient.version>
-		<commons.httpcore.version>4.4.10</commons.httpcore.version>
-		<!--   commons-httpclient/commons-httpclient -->
+		<commons.httpcore.version>4.4.12</commons.httpcore.version>
+		<!--  commons-httpclient/commons-httpclient-->
 		<httpclient.classic.version>3.1</httpclient.classic.version>
 		<commons.math3.version>3.4.1</commons.math3.version>
-		<!--  managed up from 3.2.1 for SPARK-11652  -->
+		<!-- managed up from 3.2.1 for SPARK-11652 -->
 		<commons.collections.version>3.2.2</commons.collections.version>
-		<scala.version>${scala.version}</scala.version>
 		<scala.binary.version>${scala.minor.version}</scala.binary.version>
+		<scalatest-maven-plugin.version>2.0.0</scalatest-maven-plugin.version>
+		<scalafmt.parameters>--test</scalafmt.parameters>
+		<!-- for now, not running scalafmt as part of default verify pipeline -->
+		<scalafmt.skip>true</scalafmt.skip>
 		<codehaus.jackson.version>1.9.13</codehaus.jackson.version>
-		<fasterxml.jackson.version>2.6.7</fasterxml.jackson.version>
-		<fasterxml.jackson.databind.version>2.6.7.1</fasterxml.jackson.databind.version>
-		<snappy.version>1.1.7.3</snappy.version>
+		<fasterxml.jackson.version>2.10.0</fasterxml.jackson.version>
+		<snappy.version>1.1.7.5</snappy.version>
 		<netlib.java.version>1.1.2</netlib.java.version>
-		<calcite.version>1.2.0-incubating</calcite.version>
 		<commons-codec.version>1.10</commons-codec.version>
 		<commons-io.version>2.4</commons-io.version>
-		<!--  org.apache.commons/commons-lang/ -->
+		<!-- org.apache.commons/commons-lang/-->
 		<commons-lang2.version>2.6</commons-lang2.version>
-		<!--  org.apache.commons/commons-lang3/ -->
-		<commons-lang3.version>3.5</commons-lang3.version>
-		<datanucleus-core.version>3.2.10</datanucleus-core.version>
-		<janino.version>3.0.9</janino.version>
-		<jersey.version>2.22.2</jersey.version>
-		<joda.version>2.9.3</joda.version>
+		<!-- org.apache.commons/commons-lang3/-->
+		<commons-lang3.version>3.9</commons-lang3.version>
+		<!-- org.apache.commons/commons-pool2/-->
+		<commons-pool2.version>2.6.2</commons-pool2.version>
+		<datanucleus-core.version>4.1.17</datanucleus-core.version>
+		<guava.version>14.0.1</guava.version>
+		<janino.version>3.0.16</janino.version>
+		<jersey.version>2.30</jersey.version>
+		<joda.version>2.10.5</joda.version>
 		<jodd.version>3.5.2</jodd.version>
-		<jsr305.version>1.3.9</jsr305.version>
-		<libthrift.version>0.9.3</libthrift.version>
-		<antlr4.version>4.7</antlr4.version>
+		<jsr305.version>3.0.0</jsr305.version>
+		<libthrift.version>0.12.0</libthrift.version>
+		<antlr4.version>4.7.1</antlr4.version>
 		<jpam.version>1.1</jpam.version>
 		<selenium.version>2.52.0</selenium.version>
+		<htmlunit.version>2.22</htmlunit.version>
 		<!--
-            Managed up from older version from Avro; sync with jackson-module-paranamer dependency version
-             -->
+        Managed up from older version from Avro; sync with jackson-module-paranamer dependency version
+        -->
 		<paranamer.version>2.8</paranamer.version>
 		<maven-antrun.version>1.8</maven-antrun.version>
 		<commons-crypto.version>1.0.0</commons-crypto.version>
 		<!--
-            If you are changing Arrow version specification, please check ./python/pyspark/sql/utils.py,
-            ./python/run-tests.py and ./python/setup.py too.
-             -->
-		<arrow.version>0.10.0</arrow.version>
+        If you are changing Arrow version specification, please check ./python/pyspark/sql/utils.py,
+        and ./python/setup.py too.
+        -->
+		<arrow.version>0.15.1</arrow.version>
+		<!-- org.fusesource.leveldbjni will be used except on arm64 platform. -->
+		<leveldbjni.group>org.fusesource.leveldbjni</leveldbjni.group>
 		<!-- SPARK-PARENT finished -->
 
 

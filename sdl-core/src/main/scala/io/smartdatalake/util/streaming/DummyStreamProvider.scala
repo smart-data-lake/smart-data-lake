@@ -19,18 +19,19 @@
 
 package io.smartdatalake.util.streaming
 
-import java.util.Optional
+import java.util
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.UnsafeRow
+import org.apache.spark.sql.connector.catalog.{SupportsRead, Table, TableCapability, TableProvider}
+import org.apache.spark.sql.connector.expressions.Transform
+import org.apache.spark.sql.connector.read._
+import org.apache.spark.sql.connector.read.streaming.{MicroBatchStream, Offset}
 import org.apache.spark.sql.execution.streaming.LongOffset
-import org.apache.spark.sql.sources.DataSourceRegister
-import org.apache.spark.sql.sources.v2.reader.InputPartition
-import org.apache.spark.sql.sources.v2.reader.streaming.{MicroBatchReader, Offset}
-import org.apache.spark.sql.sources.v2.{DataSourceOptions, DataSourceV2, MicroBatchReadSupport}
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.util.CaseInsensitiveStringMap
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import scala.collection.JavaConverters._
 
@@ -38,25 +39,53 @@ import scala.collection.JavaConverters._
  * Dummy spark streaming source
  * It is used to create a streaming DataFrame to transport the schema between spark streaming queries in init-phase.
  */
-private[smartdatalake] class DummyStreamProvider extends DataSourceV2
-  with MicroBatchReadSupport with DataSourceRegister {
-  override def createMicroBatchReader( schema: Optional[StructType], checkpointLocation: String, options: DataSourceOptions): MicroBatchReader = {
-    assert(schema.isPresent, "DummyStreamProvider must be initialized with a schema.")
-    new DummyMicroBatchReader(schema.get)
-  }
-  override def shortName(): String = "dummy"
+private[smartdatalake] class DummyStream(schema: StructType) extends MicroBatchStream {
 
-  class DummyMicroBatchReader(schema: StructType)
-    extends MicroBatchReader with Logging {
-    override def readSchema(): StructType = schema
-    override def setOffsetRange(start: Optional[Offset], end: Optional[Offset]): Unit = Unit
-    override def getStartOffset(): Offset = LongOffset(0)
-    override def getEndOffset(): Offset = LongOffset(0)
-    override def deserializeOffset(json: String): Offset = LongOffset(json.toLong)
-    override def planInputPartitions(): java.util.List[InputPartition[InternalRow]] = throw new NotImplementedError("DummyMicroBatchReader cannot deliver data")
-    override def commit(end: Offset): Unit = Unit
-    override def stop(): Unit = Unit
-    override def toString: String = s"DummyStreamV2"
+  def getSchema: StructType = schema
+
+  override def deserializeOffset(json: String): Offset = LongOffset(json.toLong)
+  override def planInputPartitions(start: Offset, end: Offset): Array[InputPartition] = throw new NotImplementedError("DummyStream cannot deliver data")
+  override def commit(end: Offset): Unit = Unit
+  override def stop(): Unit = Unit
+  override def toString: String = s"DummyStream"
+  override def initialOffset(): Offset = LongOffset(0)
+  override def latestOffset(): Offset = LongOffset(0)
+  override def createReaderFactory(): PartitionReaderFactory = DummyStreamReaderFactory
+
+  private object DummyStreamReaderFactory extends PartitionReaderFactory {
+    override def createReader(partition: InputPartition): PartitionReader[InternalRow] = {
+      new PartitionReader[InternalRow] {
+        override def next(): Boolean = false
+        override def get(): UnsafeRow = throw new NotImplementedError("DummyStream cannot deliver data")
+        override def close(): Unit = Unit
+      }
+    }
+  }
+}
+
+class MemoryStreamTable(val stream: DummyStream) extends Table with SupportsRead {
+  override def name(): String = "DummyStreamDataSource"
+  override def schema(): StructType = stream.getSchema
+  override def capabilities(): util.Set[TableCapability] = {
+    Set(TableCapability.MICRO_BATCH_READ).asJava
+  }
+  override def newScanBuilder(options: CaseInsensitiveStringMap): ScanBuilder = {
+    new DummyStreamScanBuilder(stream)
+  }
+}
+
+class DummyStreamScanBuilder(stream: DummyStream) extends ScanBuilder with Scan {
+  override def build(): Scan = this
+  override def description(): String = "DummyStreamDataSource"
+  override def readSchema(): StructType = stream.getSchema
+  override def toMicroBatchStream(checkpointLocation: String): MicroBatchStream = stream
+}
+
+class DummyStreamProvider extends TableProvider {
+  override def supportsExternalMetadata() = true
+  override def inferSchema(options: CaseInsensitiveStringMap): StructType = throw new NotImplementedError("DummyStreamProvider cannot infer schema")
+  override def getTable(schema: StructType, partitioning: Array[Transform], properties: util.Map[String, String]): Table = {
+    new MemoryStreamTable( new DummyStream(schema))
   }
 }
 
@@ -66,5 +95,3 @@ object DummyStreamProvider extends SmartDataLakeLogger {
     session.readStream.schema(schema).format(classOf[DummyStreamProvider].getName).load
   }
 }
-
-
