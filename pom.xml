@@ -113,9 +113,9 @@
 		<scala.deps.scope>compile</scala.deps.scope>
 		<spark.deps.scope>compile</spark.deps.scope>
 
-		<spark.version>2.4.4</spark.version>
+		<spark.version>2.4.7</spark.version>
 
-		<!-- SPARK-PARENT start: properties copied from spark-parent pom version 2.4.4 for spark-parent import in dependencyManagement -->
+		<!-- SPARK-PARENT start: properties copied from spark-parent pom version 2.4.7 for spark-parent import in dependencyManagement -->
 		<!-- attention - manually adapted are: zookeeper, scala.version, scala.binary.version -->
 		<slf4j.version>1.7.16</slf4j.version>
 		<log4j.version>1.2.17</log4j.version>
