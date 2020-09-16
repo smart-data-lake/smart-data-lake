@@ -4,9 +4,11 @@ on:
   push:
     branches: 
       - develop
+      - develop-spark3
   pull_request:
     branches: 
       - develop
+      - develop-spark3
 
 jobs:
   build:
