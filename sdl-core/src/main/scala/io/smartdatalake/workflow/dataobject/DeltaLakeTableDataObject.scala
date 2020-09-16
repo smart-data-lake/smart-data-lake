@@ -25,7 +25,7 @@ import io.smartdatalake.definitions.{DateColumnType, Environment}
 import io.smartdatalake.util.misc.DataFrameUtil.arrayToSeq
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
-import io.smartdatalake.util.misc.{AclDef, AclUtil}
+import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.HiveTableConnection
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -47,7 +47,7 @@ import scala.collection.JavaConverters._
  * @param table DeltaLake table to be written by this output
  * @param numInitialHdfsPartitions number of files created when writing into an empty table (otherwise the number will be derived from the existing data)
  * @param saveMode spark [[SaveMode]] to use when writing files, default is "overwrite"
- * @param retentionPeriod DeltaLake table retention period of old transactions for time travel feature in hours
+ * @param retentionPeriod Optional delta lake retention threshold in hours. Files required by the table for reading versions earlier than this will be preserved and the rest of them will be deleted.
  * @param acl override connections permissions for files created tables hadoop directory with this connection
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
@@ -63,7 +63,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override var table: Table,
                                     numInitialHdfsPartitions: Int = 16,
                                     saveMode: SaveMode = SaveMode.Overwrite,
-                                    retentionPeriod: Int = 7*24, // hours
+                                    retentionPeriod: Option[Int] = None, // hours
                                     acl: Option[AclDef] = None,
                                     connectionId: Option[ConnectionId] = None,
                                     override val expectedPartitionsCondition: Option[String] = None,
@@ -127,18 +127,27 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       session.createDataFrame(List.empty[Row].asJava, df.schema)
     } else df.repartition(Math.max(1,numInitialHdfsPartitions))
 
-    val deltaTableWriter: DataFrameWriter[Row] = dfPrepared.write.format("delta")
 
     // write table
+    val deltaTableWriter = dfPrepared.write.format("delta")
     if (partitions.isEmpty) deltaTableWriter.mode(saveMode).save(hadoopPath.toString) else {
       deltaTableWriter.partitionBy(partitions:_*).mode(saveMode).save(hadoopPath.toString)
     }
 
-    // vacuum table to delete files and directories in the table that are not needed
-    DeltaTable.forPath(session, hadoopPath.toString).vacuum(retentionPeriod)
+    // vacuum delta lake table
+    vacuum
 
     // fix acls
     if (acl.isDefined) AclUtil.addACLs(acl.get, hadoopPath)(filesystem)
+  }
+
+  def vacuum(implicit session: SparkSession): Unit = {
+    retentionPeriod.foreach { period =>
+      val (_, d) = PerformanceUtils.measureDuration {
+        DeltaTable.forPath(session, hadoopPath.toString).vacuum(period)
+      }
+      logger.info(s"($id) vacuumed delta lake table: duration=$d")
+    }
   }
 
   // Delta Lake is not connected to Hive Metastore. It is a file based Spark API.
