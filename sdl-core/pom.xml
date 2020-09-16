@@ -128,29 +128,15 @@
 			<groupId>com.crealytics</groupId>
 			<artifactId>spark-excel_${scala.minor.version}</artifactId>
 			<version>${spark.excel.version}</version>
-			<scope>runtime</scope>
-			<exclusions>
-				<exclusion>
-					<groupId>com.ibm.icu</groupId>
-					<artifactId>icu4j</artifactId>
-				</exclusion>
-				<exclusion>
-					<groupId>org.scala-lang.modules</groupId>
-					<artifactId>scala-xml_${scala.minor.version}</artifactId>
-				</exclusion>
-			</exclusions>
+			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.poi</groupId>
 			<artifactId>poi</artifactId>
-			<version>${poi.version}</version>
-			<scope>runtime</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.poi</groupId>
 			<artifactId>poi-ooxml</artifactId>
-			<version>${poi.version}</version>
-			<scope>runtime</scope>
 		</dependency>
 
 		<dependency>

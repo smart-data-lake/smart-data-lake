@@ -215,7 +215,7 @@
 		<!-- other dependency versions -->
 		<scopt.version>3.7.1</scopt.version>
 		<databricks.spark-xml.version>0.9.0</databricks.spark-xml.version>
-		<spark.excel.version>0.12.0</spark.excel.version>
+		<spark.excel.version>0.13.5</spark.excel.version>
 		<ucanaccess.version>4.0.4</ucanaccess.version>
 		<!-- when changing config version, remember to update it in DatabricksSmartDataLakeBuilder main method -->
 		<typesafe.config.version>1.3.4</typesafe.config.version>
@@ -227,7 +227,7 @@
 		<kafka.version>2.4.1</kafka.version>
 		<keycloak.version>4.5.0.Final</keycloak.version>
 		<deltaTable.version>0.7.0</deltaTable.version>
-		<poi.version>4.0.0</poi.version>
+		<poi.version>4.1.2</poi.version>
 
 		<scalatest.test.version>3.0.1</scalatest.test.version>
 		<sshd.test.version>2.3.0</sshd.test.version>
@@ -576,6 +576,18 @@
 				<groupId>org.antlr</groupId>
 				<artifactId>antlr-runtime</artifactId>
 				<version>3.4</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.poi</groupId>
+				<artifactId>poi</artifactId>
+				<version>${poi.version}</version>
+				<scope>runtime</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.poi</groupId>
+				<artifactId>poi-ooxml</artifactId>
+				<version>${poi.version}</version>
+				<scope>runtime</scope>
 			</dependency>
 			<dependency>
 				<groupId>org.tukaani</groupId>
