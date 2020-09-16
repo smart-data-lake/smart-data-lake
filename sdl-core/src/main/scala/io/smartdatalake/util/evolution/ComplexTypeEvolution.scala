@@ -19,10 +19,8 @@
 package io.smartdatalake.util.evolution
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import org.apache.spark.sql.Row
-import org.apache.spark.sql.expressions.UserDefinedFunction
-import org.apache.spark.sql.functions.udf
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.{Column, Row}
 
 /**
  * Implementation of schema evolution for complex types as struct, array and map.
@@ -54,9 +52,9 @@ private[smartdatalake] object ComplexTypeEvolution extends SmartDataLakeLogger {
    * @return udf to convert a [[org.apache.spark.sql.Column]] to the target DataType
    * @throws SchemaEvolutionException if conversion is not possible
    */
-  def schemaEvolutionUdf(srcType: DataType, tgtType: DataType): UserDefinedFunction = {
+  def schemaEvolutionUdf(srcType: DataType, tgtType: DataType): (Column => Column) = {
     val projector = ValueProjector.getProjection(srcType, tgtType, Seq())
-    udf((row: Any) => projector.getWithCast(row), tgtType)
+    UnsafeUnaryUdf((row: Any) => projector.getWithCast(row), srcType, tgtType)
   }
 
   /**
