@@ -204,6 +204,7 @@
 		<ucanaccess.version>4.0.4</ucanaccess.version>
 		<!-- when changing config version, remember to update it in DatabricksSmartDataLakeBuilder main method -->
 		<typesafe.config.version>1.3.4</typesafe.config.version>
+		<kxbmap.configs.version>0.4.4</kxbmap.configs.version>
 		<monix.version>3.1.0</monix.version>
 		<scala-arm.version>2.0</scala-arm.version>
 		<splunk.version>1.6.5.0</splunk.version>
@@ -535,6 +536,16 @@
 				<groupId>org.apache.commons</groupId>
 				<artifactId>commons-compress</artifactId>
 				<version>1.4.1</version>
+			</dependency>
+			<dependency>
+				<groupId>com.typesafe</groupId>
+				<artifactId>config</artifactId>
+				<version>${typesafe.config.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.github.kxbmap</groupId>
+				<artifactId>configs_${scala.minor.version}</artifactId>
+				<version>${kxbmap.configs.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>io.swagger</groupId>
