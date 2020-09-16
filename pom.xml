@@ -211,7 +211,7 @@
 		<sshj.version>0.21.1</sshj.version>
 		<kafka.version>2.4.1</kafka.version>
 		<keycloak.version>4.5.0.Final</keycloak.version>
-		<deltaTable.version>0.5.0</deltaTable.version>
+		<deltaTable.version>0.7.0</deltaTable.version>
 		<poi.version>4.0.0</poi.version>
 
 		<scalatest.test.version>3.0.1</scalatest.test.version>
