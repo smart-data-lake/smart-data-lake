@@ -244,7 +244,7 @@
 		<deltaTable.version>0.7.0</deltaTable.version>
 		<poi.version>4.1.2</poi.version>
 
-		<scalatest.test.version>3.0.1</scalatest.test.version>
+		<scalatest.test.version>3.0.8</scalatest.test.version>
 		<sshd.test.version>2.3.0</sshd.test.version>
 
 	</properties>
