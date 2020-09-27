@@ -158,9 +158,9 @@ private[smartdatalake] class DefaultSQLCatalog(connection: JdbcTableConnection) 
   override def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean = {
     val cntTableInCatalog =
       if (Environment.enableJdbcCaseSensitivity)
-        s"select count(*) from INFORMATION_SCHEMA.TABLES where TABLE_NAME='$table' and TABLE_SCHEMA='$db'"
+        s"select count(*) from ((select TABLE_NAME as name from INFORMATION_SCHEMA.TABLES where TABLE_NAME='$table' and TABLE_SCHEMA='$db') union all (select VIEW_NAME as name from INFORMATION_SCHEMA.VIEWS where VIEW_NAME='$table' and VIEW_SCHEMA='$db'))"
       else
-        s"select count(*) from INFORMATION_SCHEMA.TABLES where upper(TABLE_NAME)=upper('$table') and upper(TABLE_SCHEMA)=upper('$db')"
+        s"select count(*) from ((select TABLE_NAME as name from INFORMATION_SCHEMA.TABLES where TABLE_NAME=upper('$table') and TABLE_SCHEMA=upper('$db')) union all (select VIEW_NAME as name from INFORMATION_SCHEMA.VIEWS where VIEW_NAME=upper('$table') and VIEW_SCHEMA=upper('$db')))"
     connection.execJdbcQuery( cntTableInCatalog, evalRecordExists )
   }
 }
@@ -180,9 +180,9 @@ private[smartdatalake] class OracleSQLCatalog(connection: JdbcTableConnection) e
   override def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean = {
     val cntTableInCatalog =
       if (Environment.enableJdbcCaseSensitivity)
-        s"select count(*) from ALL_TABLES where TABLE_NAME='$table' and OWNER='$db'"
+        s"select count(*) from ((select TABLE_NAME as name from ALL_TABLES where TABLE_NAME='$table' and OWNER='$db') union all (select VIEW_NAME as name from ALL_VIEWS where VIEW_NAME='$table' and OWNER='$db'))"
       else
-        s"select count(*) from ALL_TABLES where upper(TABLE_NAME)=upper('$table') and upper(OWNER)=upper('$db')"
+        s"select count(*) from ((select TABLE_NAME as name from ALL_TABLES where TABLE_NAME=upper('$table') and OWNER=upper('$db')) union all (select VIEW_NAME as name from ALL_VIEWS where VIEW_NAME=upper('$table') and OWNER=upper('$db')))"
     connection.execJdbcQuery( cntTableInCatalog, evalRecordExists )
   }
 }
