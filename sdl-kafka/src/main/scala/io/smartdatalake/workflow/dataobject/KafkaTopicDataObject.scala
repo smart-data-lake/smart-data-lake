@@ -134,7 +134,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false")
     props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, classOf[ByteArrayDeserializer].getName)
     props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, classOf[ByteArrayDeserializer].getName)
-    props.putAll(connection.authProps)
+    connection.authProps.asScala.foreach{ case (k,v) => props.put(k,v)}
     new KafkaConsumer(props)
   }
 
