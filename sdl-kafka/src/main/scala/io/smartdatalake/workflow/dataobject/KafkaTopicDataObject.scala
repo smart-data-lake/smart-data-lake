@@ -290,7 +290,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   private def getTopicPartitionsAtTstmp(topicPartitions: Seq[TopicPartition], localDateTime: LocalDateTime) = {
-    val topicPartitionsStart = topicPartitions.map( p => (p, new java.lang.Long(localDateTime.atZone(datePartitionCol.get.zoneId).toInstant.toEpochMilli))).toMap.asJava
+    val topicPartitionsStart = topicPartitions.map( p => (p, java.lang.Long.valueOf(localDateTime.atZone(datePartitionCol.get.zoneId).toInstant.toEpochMilli))).toMap.asJava
     consumer.offsetsForTimes(topicPartitionsStart).asScala.toSeq.sortBy(_._1.partition)
   }
 
