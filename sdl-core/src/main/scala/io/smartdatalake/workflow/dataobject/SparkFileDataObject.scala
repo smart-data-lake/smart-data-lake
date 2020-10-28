@@ -152,7 +152,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
 
   override def createReadSchema(writeSchema: StructType)(implicit session: SparkSession): StructType = {
     // add additional columns created by SparkFileDataObject
-    filenameColumn.map(colName => writeSchema.add(colName, StringType))
+    filenameColumn.map(colName => addFieldIfNotExisting(writeSchema, colName, StringType))
       .getOrElse(writeSchema)
   }
 
