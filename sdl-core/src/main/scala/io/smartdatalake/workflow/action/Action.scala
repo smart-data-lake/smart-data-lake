@@ -228,10 +228,11 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   def getRuntimeInfo: Option[RuntimeInfo] = {
     if (runtimeEvents.nonEmpty) {
       val lastEvent = runtimeEvents.last
+      val lastResults = runtimeEvents.reverseIterator.map(_.results).find(_.nonEmpty) // on failed actions we take the results from initialization to store what partition values have been tried to process
       val startEvent = runtimeEvents.reverse.find( event => event.state == RuntimeEventState.STARTED && event.phase == lastEvent.phase )
       val duration = startEvent.map( start => Duration.between(start.tstmp, lastEvent.tstmp))
       val mainMetrics = getAllLatestMetrics.map{ case (id, metrics) => (id, metrics.map(_.getMainInfos).getOrElse(Map()))}
-      val results = lastEvent.results.map( subFeed => ResultRuntimeInfo(subFeed, mainMetrics(subFeed.dataObjectId)))
+      val results = lastResults.toSeq.flatMap(_.map( subFeed => ResultRuntimeInfo(subFeed, mainMetrics(subFeed.dataObjectId))))
       Some(RuntimeInfo(lastEvent.state, startTstmp = startEvent.map(_.tstmp), duration = duration, msg = lastEvent.msg, results = results))
     } else None
   }
