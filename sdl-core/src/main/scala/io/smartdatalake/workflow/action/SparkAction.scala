@@ -19,7 +19,6 @@
 
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -279,6 +278,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
     val writeSchema = preparedSubFeed.dataFrame.map(_.schema)
     val readSchema = preparedSubFeed.dataFrame.map(df => input.createReadSchema(df.schema))
     val schemaChanges = writeSchema != readSchema
+    require(!context.simulation || !schemaChanges, s"($id) write & read schema is not the same for ${input.id}. Need to create a dummy DataFrame, but this is not allowed in simulation!")
     preparedSubFeed = if (schemaChanges) preparedSubFeed.convertToDummy(readSchema.get) else preparedSubFeed
     // adapt partition values (#180)
     preparedSubFeed = input match {
