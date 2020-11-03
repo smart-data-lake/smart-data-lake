@@ -158,8 +158,8 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
         // notify that task is skipped
         notify(node, eventListener.onNodeSkipped(ex))
         Success(ex.getResults.get)
-      case Failure(ex: TaskSkippedWarning) =>
-        // notify that task is skipped
+      case Failure(ex: DAGException) if ex.severity >= ExceptionSeverity.SKIPPED =>
+        // if severity is low, notify that task is skipped
         notify(node, eventListener.onNodeSkipped(ex))
         resultRaw
       case Failure(ex) =>
