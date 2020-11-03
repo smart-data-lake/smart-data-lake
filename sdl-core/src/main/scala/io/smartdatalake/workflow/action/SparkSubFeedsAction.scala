@@ -36,6 +36,8 @@ abstract class SparkSubFeedsAction extends SparkAction {
   def mainInputId: Option[DataObjectId]
   def mainOutputId: Option[DataObjectId]
 
+  def inputIdsToIgnoreFilter: Seq[DataObjectId]
+
   // prepare main input / output
   // this must be lazy because inputs / outputs is evaluated later in subclasses
   lazy val mainInput: DataObject with CanCreateDataFrame = ActionHelper.getMainDataObject[DataObject with CanCreateDataFrame](mainInputId, inputs, "input", executionModeNeedsMainInputOutput, id)
@@ -99,6 +101,22 @@ abstract class SparkSubFeedsAction extends SparkAction {
         val output = outputMap.getOrElse(subFeed.dataObjectId, throw ConfigurationException(s"No output found for result ${subFeed.dataObjectId} in $id. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
         validateAndUpdateSubFeed(output, subFeed)
     }
+  // TODO: Check
+  /*
+  } catch {
+    // return empty output subfeeds if "no data dont stop"
+    case ex: NoDataToProcessDontStopWarning =>
+      val outputSubFeeds = outputs.map {
+        output =>
+          val subFeed = SparkSubFeed(dataFrame = None, dataObjectId = output.id, partitionValues = Seq())
+          // update partition values to output's partition columns and update dataObjectId
+          validateAndUpdateSubFeedPartitionValues(output, subFeed)
+      }
+      // rethrow exception with fake results added. The DAG will pass the fake results to further actions.
+      throw ex.copy(results = Some(outputSubFeeds))
+  }
+  */
+
   }
 
   /**
