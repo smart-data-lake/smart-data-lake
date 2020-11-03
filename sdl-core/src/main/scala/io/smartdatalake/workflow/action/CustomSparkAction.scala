@@ -60,7 +60,10 @@ case class CustomSparkAction ( override val id: ActionObjectId,
                                override val inputIdsToIgnoreFilter: Seq[DataObjectId] = Seq()
 )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedsAction {
 
-  assert(recursiveInputIds.forall(outputIds.contains(_)), "All recursive inputs must be in output of the same action.")
+  // checks
+  recursiveInputIds.foreach(inputId => assert(outputIds.contains(inputId), s"($id) $inputId from recursiveInputIds is not listed in outputIds of the same action."))
+  inputIdsToIgnoreFilter.foreach(inputId => assert((inputIds++recursiveInputIds).contains(inputId), s"($id) $inputId from inputIdsToIgnoreFilter is not listed in inputIds of the same action."))
+
   override val recursiveInputs: Seq[DataObject with CanCreateDataFrame] = recursiveInputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
   override val inputs: Seq[DataObject with CanCreateDataFrame] = inputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
   override val outputs: Seq[DataObject with CanWriteDataFrame] = outputIds.map(getOutputDataObject[DataObject with CanWriteDataFrame])
