@@ -917,6 +917,66 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(action2MainMetrics("records_written")==2) // without execution mode always the whole table is processed
   }
 
+  test("action dag with 2 actions in sequence, first is executionMode=SparkIncrementalMode stopIfNoData=false, second is normal") {
+    // setup DataObjects
+    val feed = "actionpipeline"
+    val tempDir = Files.createTempDirectory(feed)
+    val schema = DataType.fromDDL("lastname string, firstname string, rating int, tstmp timestamp").asInstanceOf[StructType]
+    val srcDO = JsonFileDataObject( "src1", tempDir.resolve("src1").toString.replace('\\', '/'), schema = Some(schema))
+    instanceRegistry.register(srcDO)
+    val schema2 = DataType.fromDDL("lastname string, firstname string, address string").asInstanceOf[StructType]
+    val src2DO = JsonFileDataObject( "src2", tempDir.resolve("src2").toString.replace('\\', '/'), schema = Some(schema2))
+    instanceRegistry.register(src2DO)
+    val tgt1DO = ParquetFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SaveMode.Append)
+    instanceRegistry.register(tgt1DO)
+    val tgt2DO = ParquetFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'))
+    instanceRegistry.register(tgt2DO)
+
+    // prepare DAG
+    val refTimestamp1 = LocalDateTime.now()
+    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+    val df1 = Seq(("doe","john",5, Timestamp.from(Instant.now))).toDF("lastname", "firstname", "rating", "tstmp")
+    srcDO.writeDataFrame(df1, Seq())
+    val df2 = Seq(("doe","john","waikiki beach")).toDF("lastname", "firstname", "address")
+    src2DO.writeDataFrame(df2, Seq())
+
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkIncrementalMode(compareCol = "tstmp", stopIfNoData = false)))
+    val action2 = CustomSparkAction("b", Seq(tgt1DO.id,src2DO.id), Seq(tgt2DO.id)
+      , CustomDfsTransformerConfig.apply(sqlCode = Map(tgt2DO.id -> "select * from src2 join tgt1 using (lastname, firstname)")))
+    val dag: ActionDAGRun = ActionDAGRun(Seq(action1,action2), 1, 1)
+
+    // first dag run, first file processed
+    dag.prepare
+    dag.init
+    dag.exec
+
+    // check
+    val r1 = tgt2DO.getDataFrame()
+      .select($"rating", $"address")
+      .as[(Int,String)].collect().toSet
+    assert(r1 == Set((5,"waikiki beach")))
+
+    // second dag run - no data to process in action a
+    // there should be no exception and action b should run with updated data of src2 and existing data of tgt1
+    val df3 = Seq(("doe","john","honolulu")).toDF("lastname", "firstname", "address")
+    src2DO.writeDataFrame(df3, Seq())
+    dag.reset
+    dag.prepare
+    dag.init
+    dag.exec
+
+    // check
+    val r2 = tgt2DO.getDataFrame()
+      .select($"rating", $"address")
+      .as[(Int,String)].collect().toSet
+    assert(r2 == Set((5,"honolulu")))
+
+    // check metrics
+    val action2MainMetrics = action2.getFinalMetrics(action2.outputIds.head).get.getMainInfos
+    assert(action2MainMetrics("records_written")==1)
+  }
+
+
   test("action dag failes because of metricsFailCondition") {
     // setup DataObjects
     val feed = "actionpipeline"

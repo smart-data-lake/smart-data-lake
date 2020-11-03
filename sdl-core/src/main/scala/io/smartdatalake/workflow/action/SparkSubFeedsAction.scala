@@ -53,32 +53,47 @@ abstract class SparkSubFeedsAction extends SparkAction {
     // convert subfeeds to SparkSubFeed type or initialize if not yet existing
     var preparedSubFeeds = subFeeds.map( SparkSubFeed.fromSubFeed )
     // apply execution mode
-    preparedSubFeeds = executionMode match {
-      case Some(mode) =>
-        val mainSubFeed = preparedSubFeeds.find(_.dataObjectId == mainInput.id).get
-        mode.apply(id, mainInput, mainOutput, mainSubFeed) match {
-          case Some((newPartitionValues, newFilter)) =>
-            preparedSubFeeds.map( subFeed => subFeed.copy(partitionValues = newPartitionValues, filter = newFilter))
-          case None => preparedSubFeeds
+    try {
+      preparedSubFeeds = executionMode match {
+        case Some(mode) =>
+          val mainSubFeed = preparedSubFeeds.find(_.dataObjectId == mainInput.id).get
+          mode.apply(id, mainInput, mainOutput, mainSubFeed) match {
+            case Some((newPartitionValues, newFilter)) =>
+              preparedSubFeeds.map( subFeed => subFeed.copy(partitionValues = newPartitionValues, filter = newFilter))
+            case None => preparedSubFeeds
+          }
+        case _ => preparedSubFeeds
+      }
+      preparedSubFeeds = preparedSubFeeds.map{ subFeed =>
+        val input = (inputs ++ recursiveInputs).find(_.id == subFeed.dataObjectId).get
+        // prepare as input SubFeed
+        val preparedSubFeed = prepareInputSubFeed(subFeed, input)
+        // enrich with fresh DataFrame if needed
+        enrichSubFeedDataFrame(input, preparedSubFeed, context.phase)
+      }
+      // transform
+      val transformedSubFeeds = transform(preparedSubFeeds)
+      // update partition values to output's partition columns and update dataObjectId
+      transformedSubFeeds.map {
+        subFeed =>
+          val output = outputs.find(_.id == subFeed.dataObjectId)
+            .getOrElse(throw ConfigurationException(s"No output found for result ${subFeed.dataObjectId} in $id. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
+          validateAndUpdateSubFeedPartitionValues(output, subFeed)
+      }
+    } catch {
+      // return empty output subfeeds if "no data dont stop"
+      case ex: NoDataToProcessDontStopWarning =>
+        val outputSubFeeds = outputs.map {
+          output =>
+            val subFeed = SparkSubFeed(dataFrame = None, dataObjectId = output.id, partitionValues = Seq())
+            // update partition values to output's partition columns and update dataObjectId
+            validateAndUpdateSubFeedPartitionValues(output, subFeed)
         }
-      case _ => preparedSubFeeds
+        // rethrow exception with fake results added. The DAG will pass the fake results to further actions.
+        throw ex.copy(results = Some(outputSubFeeds))
     }
-    preparedSubFeeds = preparedSubFeeds.map{ subFeed =>
-      val input = (inputs ++ recursiveInputs).find(_.id == subFeed.dataObjectId).get
-      // prepare as input SubFeed
-      val preparedSubFeed = prepareInputSubFeed(subFeed, input)
-      // enrich with fresh DataFrame if needed
-      enrichSubFeedDataFrame(input, preparedSubFeed, context.phase)
-    }
-    // transform
-    val transformedSubFeeds = transform(preparedSubFeeds)
-    // update partition values to output's partition columns and update dataObjectId
-    transformedSubFeeds.map {
-      subFeed =>
-        val output = outputs.find(_.id == subFeed.dataObjectId)
-          .getOrElse(throw ConfigurationException(s"No output found for result ${subFeed.dataObjectId} in $id. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
-        validateAndUpdateSubFeedPartitionValues(output, subFeed)
-    }
+
+
   }
 
   /**

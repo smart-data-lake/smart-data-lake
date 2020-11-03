@@ -54,22 +54,32 @@ abstract class SparkSubFeedAction extends SparkAction {
     // convert subfeed to SparkSubFeed type or initialize if not yet existing
     var preparedSubFeed = SparkSubFeed.fromSubFeed(subFeed)
     // apply execution mode
-    preparedSubFeed = executionMode match {
-      case Some(mode) =>
-        mode.apply(id, input, output, preparedSubFeed) match {
-          case Some((newPartitionValues, newFilter)) => preparedSubFeed.copy(partitionValues = newPartitionValues, filter = newFilter)
-          case None => preparedSubFeed
-        }
-      case _ => preparedSubFeed
+    try {
+      preparedSubFeed = executionMode match {
+        case Some(mode) =>
+          mode.apply(id, input, output, preparedSubFeed) match {
+            case Some((newPartitionValues, newFilter)) => preparedSubFeed.copy(partitionValues = newPartitionValues, filter = newFilter)
+            case None => preparedSubFeed
+          }
+        case _ => preparedSubFeed
+      }
+      // prepare as input SubFeed
+      preparedSubFeed = prepareInputSubFeed(preparedSubFeed, input)
+      // enrich with fresh DataFrame if needed
+      preparedSubFeed = enrichSubFeedDataFrame(input, preparedSubFeed, context.phase)
+      // transform and update dataObjectId
+      val transformedSubFeed = transform(preparedSubFeed).copy(dataObjectId = output.id)
+      // update partition values to output's partition columns
+      validateAndUpdateSubFeedPartitionValues(output, transformedSubFeed)
+    } catch {
+      case ex: NoDataToProcessDontStopWarning =>
+        // return empty output subfeed if "no data dont stop"
+        val outputSubFeed = SparkSubFeed(dataFrame = None, dataObjectId = output.id, partitionValues = Seq())
+        // update partition values to output's partition columns and update dataObjectId
+        validateAndUpdateSubFeedPartitionValues(output, outputSubFeed)
+        // rethrow exception with fake results added. The DAG will pass the fake results to further actions.
+        throw ex.copy(results = Some(Seq(outputSubFeed)))
     }
-    // prepare as input SubFeed
-    preparedSubFeed = prepareInputSubFeed(preparedSubFeed, input)
-    // enrich with fresh DataFrame if needed
-    preparedSubFeed = enrichSubFeedDataFrame(input, preparedSubFeed, context.phase)
-    // transform
-    val transformedSubFeed = transform(preparedSubFeed)
-    // update partition values to output's partition columns and update dataObjectId
-    validateAndUpdateSubFeedPartitionValues(output, transformedSubFeed).copy(dataObjectId = output.id)
   }
 
   /**
