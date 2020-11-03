@@ -70,7 +70,15 @@ abstract class SparkSubFeedAction extends SparkAction {
     if (context.phase == ExecutionPhase.Init) {
       executionModeResult = Try(
         executionMode.flatMap(_.apply(id, input, output, inputSubFeed, transformPartitionValues))
-      )
+      ).recover{
+        case ex: NoDataToProcessDontStopWarning =>
+          // return empty output subfeed if "no data dont stop"
+          val outputSubFeed = SparkSubFeed(dataFrame = None, dataObjectId = output.id, partitionValues = Seq())
+          // update partition values to output's partition columns and update dataObjectId
+          validateAndUpdateSubFeed(output, outputSubFeed)
+          // rethrow exception with fake results added. The DAG will pass the fake results to further actions.
+          throw ex.copy(results = Some(Seq(outputSubFeed)))
+      }
     }
     executionModeResult match {
       case Success(Some((inputPartitionValues, outputPartitionValues, newFilter))) =>

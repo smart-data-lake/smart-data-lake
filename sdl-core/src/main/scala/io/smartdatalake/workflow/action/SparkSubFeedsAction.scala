@@ -75,7 +75,18 @@ abstract class SparkSubFeedsAction extends SparkAction {
     if (context.phase == ExecutionPhase.Init) {
       executionModeResult = Try(
         executionMode.flatMap(_.apply(id, mainInput, mainOutput, mainInputSubFeed, transformPartitionValues))
-      )
+      ).recover {
+        // return empty output subfeeds if "no data dont stop"
+        case ex: NoDataToProcessDontStopWarning =>
+          val outputSubFeeds = outputs.map {
+            output =>
+              val subFeed = SparkSubFeed(dataFrame = None, dataObjectId = output.id, partitionValues = Seq())
+              // update partition values to output's partition columns and update dataObjectId
+              validateAndUpdateSubFeed(output, subFeed)
+          }
+          // rethrow exception with fake results added. The DAG will pass the fake results to further actions.
+          throw ex.copy(results = Some(outputSubFeeds))
+      }
     }
     // apply execution mode
     executionModeResult match {
@@ -105,21 +116,6 @@ abstract class SparkSubFeedsAction extends SparkAction {
         val output = outputMap.getOrElse(subFeed.dataObjectId, throw ConfigurationException(s"No output found for result ${subFeed.dataObjectId} in $id. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
         validateAndUpdateSubFeed(output, subFeed)
     }
-  // TODO: Check
-  /*
-  } catch {
-    // return empty output subfeeds if "no data dont stop"
-    case ex: NoDataToProcessDontStopWarning =>
-      val outputSubFeeds = outputs.map {
-        output =>
-          val subFeed = SparkSubFeed(dataFrame = None, dataObjectId = output.id, partitionValues = Seq())
-          // update partition values to output's partition columns and update dataObjectId
-          validateAndUpdateSubFeedPartitionValues(output, subFeed)
-      }
-      // rethrow exception with fake results added. The DAG will pass the fake results to further actions.
-      throw ex.copy(results = Some(outputSubFeeds))
-  }
-  */
 
   }
 
