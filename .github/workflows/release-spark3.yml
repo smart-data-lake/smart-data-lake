@@ -50,7 +50,7 @@ jobs:
       run: |
         mkdir -p ~/.m2
         echo "<settings><servers><server><id>bintray-smart-data-lake-smart-data-lake</id><username>smartdatalake</username><password>${BINTRAY_API_KEY}</password></server></servers></settings>" > ~/.m2/settings.xml
-        mvn -P scala-2.12 clean scala:doc-jar deploy -f pom.xml
+        mvn -B -P scala-2.12 clean scala:doc-jar deploy -f pom.xml
         
     - name: Git Commit and Tag Release
       run: |
@@ -67,6 +67,7 @@ jobs:
     - name: Git Push Master-spark3
       uses: ad-m/github-push-action@master
       with:
+        branch: master-spark3
         github_token: ${{ secrets.PAT_ACTIONS }}
         
                   
