@@ -271,7 +271,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
   /**
    * Applies changes to a SubFeed from a previous action in order to be used as input for this actions transformation.
    */
-  def prepareInputSubFeed(subFeed: SparkSubFeed, input: DataObject with CanCreateDataFrame)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  def prepareInputSubFeed(subFeed: SparkSubFeed, input: DataObject with CanCreateDataFrame, ignoreFilters: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // persist if requested
     var preparedSubFeed = if (persist) subFeed.persist else subFeed
     // create dummy DataFrame if read schema is different from write schema on this DataObject
@@ -282,11 +282,12 @@ private[smartdatalake] abstract class SparkAction extends Action {
     preparedSubFeed = if (schemaChanges) preparedSubFeed.convertToDummy(readSchema.get) else preparedSubFeed
     // adapt partition values (#180)
     preparedSubFeed = input match {
+      case _ if ignoreFilters => preparedSubFeed.clearFilter.clearPartitionValues()
       case partitionedInput: CanHandlePartitions => preparedSubFeed.updatePartitionValues(partitionedInput.partitions)
       case _ => preparedSubFeed.clearPartitionValues()
     }
-    // break lineage if requested or if it's a streaming DataFrame or if a filter expression is set
-    preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined) preparedSubFeed.breakLineage else preparedSubFeed
+    // break lineage if requested or if it's a streaming DataFrame or if a filter expression is set or if ignoreFilters
+    preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined || ignoreFilters) preparedSubFeed.breakLineage else preparedSubFeed
     // return
     preparedSubFeed
   }

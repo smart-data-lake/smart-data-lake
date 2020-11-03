@@ -35,6 +35,8 @@ abstract class SparkSubFeedsAction extends SparkAction {
   def mainInputId: Option[DataObjectId]
   def mainOutputId: Option[DataObjectId]
 
+  def inputIdsToIgnoreFilter: Seq[DataObjectId]
+
   // prepare main input / output
   // this must be lazy because inputs / outputs is evaluated later in subclasses
   lazy val mainInput: DataObject with CanCreateDataFrame = ActionHelper.getMainDataObject[DataObject with CanCreateDataFrame](mainInputId, inputs, "input", executionModeNeedsMainInputOutput, id)
@@ -66,8 +68,9 @@ abstract class SparkSubFeedsAction extends SparkAction {
       }
       preparedSubFeeds = preparedSubFeeds.map{ subFeed =>
         val input = (inputs ++ recursiveInputs).find(_.id == subFeed.dataObjectId).get
+        val ignoreFilter = inputIdsToIgnoreFilter.contains(input.id)
         // prepare as input SubFeed
-        val preparedSubFeed = prepareInputSubFeed(subFeed, input)
+        val preparedSubFeed = prepareInputSubFeed(subFeed, input, ignoreFilter)
         // enrich with fresh DataFrame if needed
         enrichSubFeedDataFrame(input, preparedSubFeed, context.phase)
       }
