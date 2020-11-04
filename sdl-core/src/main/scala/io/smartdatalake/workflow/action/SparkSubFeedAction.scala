@@ -24,7 +24,7 @@ import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFra
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 abstract class SparkSubFeedAction extends SparkAction {
 
@@ -80,8 +80,8 @@ abstract class SparkSubFeedAction extends SparkAction {
           throw ex.copy(results = Some(Seq(outputSubFeed)))
       }
     }
-    executionModeResult match {
-      case Success(Some((inputPartitionValues, outputPartitionValues, newFilter))) =>
+    executionModeResult.get match { // throws exception if execution mode is Failure
+      case Some((inputPartitionValues, outputPartitionValues, newFilter)) =>
         inputSubFeed = inputSubFeed.copy(partitionValues = inputPartitionValues, filter = newFilter).breakLineage
         outputSubFeed = outputSubFeed.copy(partitionValues = outputPartitionValues, filter = newFilter).breakLineage
       case _ => Unit
