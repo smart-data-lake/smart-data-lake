@@ -49,11 +49,6 @@ private[smartdatalake] abstract class SparkAction extends Action {
    */
   def persist: Boolean
 
-  /**
-   * execution mode for this action.
-   */
-  def executionMode: Option[ExecutionMode]
-
   override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.prepare
     executionMode.foreach(_.prepare(id))

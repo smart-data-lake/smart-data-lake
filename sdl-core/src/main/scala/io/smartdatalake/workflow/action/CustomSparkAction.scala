@@ -40,9 +40,9 @@ import org.apache.spark.sql.SparkSession
  * @param executionMode optional execution mode for this Action
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
+ * @param recursiveInputIds output of action that are used as input in the same action
  * @param inputIdsToIgnoreFilter optional list of input ids to ignore filter (partition values & filter clause)
  * @param metadata
- * @param recursiveInputIds output of action that are used as input in the same action
  */
 case class CustomSparkAction ( override val id: ActionObjectId,
                                inputIds: Seq[DataObjectId],
