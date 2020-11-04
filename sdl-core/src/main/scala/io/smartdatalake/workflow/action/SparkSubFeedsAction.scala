@@ -27,7 +27,7 @@ import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFra
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 abstract class SparkSubFeedsAction extends SparkAction {
 
@@ -89,13 +89,11 @@ abstract class SparkSubFeedsAction extends SparkAction {
       }
     }
     // apply execution mode
-    executionModeResult match {
-      case Success(Some((inputPartitionValues, outputPartitionValues, newFilter))) =>
+    executionModeResult.get match { // throws exception if execution mode is Failure
+      case Some((inputPartitionValues, outputPartitionValues, newFilter)) =>
         inputSubFeeds = inputSubFeeds.map { subFeed =>
-          val ignoreFilter = inputIdsToIgnoreFilter.contains(subFeed.dataObjectId)
-          val inputFilter = if (subFeed.dataObjectId == mainInput.id || !ignoreFilter) newFilter else None
-          val inputPartitionValuesWithIgnore = if (!ignoreFilter) inputPartitionValues else Seq()
-          ActionHelper.updatePartitionValues(inputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = inputPartitionValuesWithIgnore, filter = inputFilter).breakLineage)
+          val inputFilter = if (subFeed.dataObjectId == mainInput.id) newFilter else None
+          ActionHelper.updatePartitionValues(inputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = inputPartitionValues, filter = inputFilter).breakLineage)
         }
         outputSubFeeds = outputSubFeeds.map(subFeed =>
           ActionHelper.updatePartitionValues(outputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = outputPartitionValues, filter = newFilter).breakLineage)
@@ -105,7 +103,8 @@ abstract class SparkSubFeedsAction extends SparkAction {
     inputSubFeeds = inputSubFeeds.map{ subFeed =>
       val input = inputMap(subFeed.dataObjectId)
       // prepare input SubFeed
-      val preparedSubFeed = prepareInputSubFeed(input, subFeed)
+      val ignoreFilter = inputIdsToIgnoreFilter.contains(subFeed.dataObjectId)
+      val preparedSubFeed = prepareInputSubFeed(input, subFeed, ignoreFilter)
       // enrich with fresh DataFrame if needed
       enrichSubFeedDataFrame(input, preparedSubFeed, context.phase)
     }

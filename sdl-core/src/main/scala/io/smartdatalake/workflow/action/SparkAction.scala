@@ -230,7 +230,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
    * @param subFeed SubFeed with transformed DataFrame
    * @return validated and updated SubFeed
    */
-  def validateAndUpdateSubFeed(output: DataObject, subFeed: SparkSubFeed )(implicit session: SparkSession): SparkSubFeed = {
+  def validateAndUpdateSubFeed(output: DataObject, subFeed: SparkSubFeed )(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     output match {
       case partitionedDO: CanHandlePartitions =>
         // validate output partition columns exist in DataFrame
@@ -239,7 +239,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
         subFeed
           .updatePartitionValues(partitionedDO.partitions)
           .movePartitionColumnsLast(partitionedDO.partitions)
-      case _ => subFeed.clearPartitionValues()
+      case _ => subFeed.clearPartitionValues
     }
   }
 
@@ -294,7 +294,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
     require(!context.simulation || !schemaChanges, s"($id) write & read schema is not the same for ${input.id}. Need to create a dummy DataFrame, but this is not allowed in simulation!")
     preparedSubFeed = if (schemaChanges) preparedSubFeed.convertToDummy(readSchema.get) else preparedSubFeed
     // remove filters if requested
-    if (ignoreFilters) preparedSubFeed = preparedSubFeed.clearFilter.clearPartitionValues()
+    if (ignoreFilters) preparedSubFeed = preparedSubFeed.clearFilter.clearPartitionValues
     // break lineage if requested or if it's a streaming DataFrame or if a filter expression is set or if ignoreFilters
     if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined || ignoreFilters) preparedSubFeed = preparedSubFeed.breakLineage
     // return

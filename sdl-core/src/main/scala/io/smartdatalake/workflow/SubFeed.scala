@@ -45,7 +45,7 @@ trait SubFeed extends DAGResult {
    */
   def breakLineage(implicit session: SparkSession, context: ActionPipelineContext): SubFeed
 
-  def clearPartitionValues(): SubFeed
+  def clearPartitionValues(implicit session: SparkSession, context: ActionPipelineContext): SubFeed
 
   def updatePartitionValues(partitions: Seq[String], newPartitionValues: Option[Seq[PartitionValues]] = None): SubFeed
 
@@ -86,8 +86,8 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
     // dummy DataFrames must be exchanged to real DataFrames before reading in exec-phase.
     if(dataFrame.isDefined && !isDummy && !context.simulation) convertToDummy(dataFrame.get.schema) else this
   }
-  override def clearPartitionValues(): SparkSubFeed = {
-    this.copy(partitionValues = Seq())
+  override def clearPartitionValues(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+    this.copy(partitionValues = Seq()).breakLineage
   }
   override def updatePartitionValues(partitions: Seq[String], newPartitionValues: Option[Seq[PartitionValues]] = None): SparkSubFeed = {
     val updatedPartitionValues = newPartitionValues.getOrElse(partitionValues)
@@ -163,8 +163,8 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
   override def breakLineage(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
     this.copy(fileRefs = None, processedInputFileRefs = None)
   }
-  override def clearPartitionValues(): FileSubFeed = {
-    this.copy(partitionValues = Seq())
+  override def clearPartitionValues(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
+    this.copy(partitionValues = Seq()).breakLineage
   }
   override def updatePartitionValues(partitions: Seq[String], newPartitionValues: Option[Seq[PartitionValues]] = None): FileSubFeed = {
     val updatedPartitionValues = newPartitionValues.getOrElse(partitionValues)
@@ -210,7 +210,7 @@ case class InitSubFeed(override val dataObjectId: DataObjectId, override val par
   extends SubFeed {
   override def isDAGStart: Boolean = true
   override def breakLineage(implicit session: SparkSession, context: ActionPipelineContext): InitSubFeed = this
-  override def clearPartitionValues(): InitSubFeed = {
+  override def clearPartitionValues(implicit session: SparkSession, context: ActionPipelineContext): InitSubFeed = {
     this.copy(partitionValues = Seq())
   }
   override def updatePartitionValues(partitions: Seq[String], newPartitionValues: Option[Seq[PartitionValues]] = None): InitSubFeed = {
