@@ -153,12 +153,17 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
       case Success(r) =>
         notify(node, eventListener.onNodeSuccess(r))
         resultRaw
+      case Failure(ex: TaskSkippedDontStopWarning[A @unchecked]) if ex.getResults.isDefined =>
+        // Current Node is skipped, but further actions should run -> convert the failure into a success with fake results delivered by the exception
+        // notify that task is skipped
+        notify(node, eventListener.onNodeSkipped(ex))
+        Success(ex.getResults.get)
       case Failure(ex: DAGException) if ex.severity >= ExceptionSeverity.SKIPPED =>
-        // notify only if severity is low
+        // if severity is low, notify that task is skipped
         notify(node, eventListener.onNodeSkipped(ex))
         resultRaw
       case Failure(ex) =>
-        // pass Failure if severity is high
+        // pass Failure for all other exceptions
         notify(node, eventListener.onNodeFailure(ex))
         logger.error(s"Task ${node.nodeId} failed: $ex")
         Failure(TaskFailedException(node.nodeId, ex))

@@ -165,11 +165,6 @@ abstract class FileSubFeedAction extends Action {
   def breakFileRefLineage: Boolean
 
   /**
-   * Execution mode if this Action is a start node of a DAG run
-   */
-  def executionMode: Option[ExecutionMode]
-
-  /**
    * If true delete files after they are successfully processed.
    */
   def deleteDataAfterRead(): Boolean
