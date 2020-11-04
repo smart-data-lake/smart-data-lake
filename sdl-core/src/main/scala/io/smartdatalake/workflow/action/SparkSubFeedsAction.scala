@@ -24,8 +24,10 @@ import io.smartdatalake.definitions.ExecutionModeWithMainInputOutput
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
+
+import scala.util.{Success, Try}
 
 abstract class SparkSubFeedsAction extends SparkAction {
 
@@ -69,22 +71,24 @@ abstract class SparkSubFeedsAction extends SparkAction {
     val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id).get
     // create output subfeeds with transformed partition values from main input
     var outputSubFeeds = outputs.map(output => ActionHelper.updatePartitionValues(output, mainInputSubFeed.toOutput(output.id), Some(transformPartitionValues)))
+    // apply execution mode in init phase and store result
+    if (context.phase == ExecutionPhase.Init) {
+      executionModeResult = Try(
+        executionMode.flatMap(_.apply(id, mainInput, mainOutput, mainInputSubFeed, transformPartitionValues))
+      )
+    }
     // apply execution mode
-    executionMode match {
-      case Some(mode) =>
-        mode.apply(id, mainInput, mainOutput, mainInputSubFeed, transformPartitionValues) match {
-          case Some((inputPartitionValues, outputPartitionValues, newFilter)) =>
-            inputSubFeeds = inputSubFeeds.map { subFeed =>
-              val ignoreFilter = inputIdsToIgnoreFilter.contains(subFeed.dataObjectId)
-              val inputFilter = if (subFeed.dataObjectId == mainInput.id || !ignoreFilter) newFilter else None
-              val inputPartitionValuesWithIgnore = if (!ignoreFilter) inputPartitionValues else Seq()
-              ActionHelper.updatePartitionValues(inputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = inputPartitionValuesWithIgnore, filter = inputFilter).breakLineage)
-            }
-            outputSubFeeds = outputSubFeeds.map(subFeed =>
-              ActionHelper.updatePartitionValues(outputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = outputPartitionValues, filter = newFilter).breakLineage)
-            )
-          case None => Unit
+    executionModeResult match {
+      case Success(Some((inputPartitionValues, outputPartitionValues, newFilter))) =>
+        inputSubFeeds = inputSubFeeds.map { subFeed =>
+          val ignoreFilter = inputIdsToIgnoreFilter.contains(subFeed.dataObjectId)
+          val inputFilter = if (subFeed.dataObjectId == mainInput.id || !ignoreFilter) newFilter else None
+          val inputPartitionValuesWithIgnore = if (!ignoreFilter) inputPartitionValues else Seq()
+          ActionHelper.updatePartitionValues(inputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = inputPartitionValuesWithIgnore, filter = inputFilter).breakLineage)
         }
+        outputSubFeeds = outputSubFeeds.map(subFeed =>
+          ActionHelper.updatePartitionValues(outputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = outputPartitionValues, filter = newFilter).breakLineage)
+        )
       case _ => Unit
     }
     inputSubFeeds = inputSubFeeds.map{ subFeed =>
