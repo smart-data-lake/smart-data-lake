@@ -29,7 +29,8 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.dataobject.DataObject
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.expr
+import org.apache.spark.sql.{ExpressionEvaluator, SparkSession}
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
@@ -107,7 +108,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
     require(duplicateNames.isEmpty, s"The names of your DataObjects are not unique when replacing special characters with underscore. Duplicates: ${duplicateNames.mkString(",")}")
 
     // validate metricsFailCondition
-    metricsFailCondition.foreach(c => evaluateMetricsFailCondition(c, onlySyntaxCheck = true))
+    metricsFailCondition.foreach(c => evaluateMetricsFailCondition(c))
   }
 
   /**
@@ -161,20 +162,16 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   /**
    * Evaluates a condition against latest metrics and throws an MetricsCheckFailed if there is a match.
    */
-  private def evaluateMetricsFailCondition(condition: String, onlySyntaxCheck: Boolean = false)(implicit session: SparkSession): Unit = {
-    import session.implicits._
-    val metrics = if (!onlySyntaxCheck) {
+  private def evaluateMetricsFailCondition(condition: String)(implicit session: SparkSession): Unit = {
+    val conditionEvaluator = new ExpressionEvaluator[Metric,Boolean](expr(condition))
+    val metrics = {
       getAllLatestMetrics.flatMap{
-        case (dataObjectId, Some(metrics)) => metrics.getMainInfos.map{ case (k,v) => (dataObjectId.id, Some(k), Some(v.toString))}.toSeq
-        case (dataObjectId, _) => Seq((dataObjectId.id, None, None))
+        case (dataObjectId, Some(metrics)) => metrics.getMainInfos.map{ case (k,v) => Metric(dataObjectId.id, Some(k), Some(v.toString))}.toSeq
+        case (dataObjectId, _) => Seq(Metric(dataObjectId.id, None, None))
       }.toSeq
-    } else Seq()
-    val dfFailedMetrics = metrics.toDF("dataObjectId", "key", "value")
-      .where(condition)
-    if (!onlySyntaxCheck) {
-      val failedMetrics = dfFailedMetrics.collect
-      if (failedMetrics.nonEmpty) throw MetricsCheckFailed(s"""($id) metrics check failed: ${failedMetrics.mkString(", ")} matched condition "$condition"""")
     }
+    metrics.filter( metric => Option(conditionEvaluator(metric)).getOrElse(false))
+      .foreach( failedMetric => throw MetricsCheckFailed(s"""($id) metrics check failed: $failedMetric matched condition "$condition""""))
   }
 
   /**
