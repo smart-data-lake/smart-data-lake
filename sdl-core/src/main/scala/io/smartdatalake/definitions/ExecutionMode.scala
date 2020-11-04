@@ -196,15 +196,24 @@ case class SparkIncrementalMode(compareCol: String, override val alternativeOutp
               val inputLatestValue = dfInput.agg(max(col(compareCol)).cast(StringType)).as[String].head
               val outputLatestValue = dfOutput.agg(max(col(compareCol)).cast(StringType)).as[String].head
               // skip processing if no new data
-              if (outputLatestValue == inputLatestValue) {
-                val warnMsg = s"($actionId) No increment to process found for ${output.id} column ${compareCol} (lastestValue=$outputLatestValue)"
-                if (stopIfNoData) throw NoDataToProcessWarning(actionId.id, warnMsg)
-                else throw NoDataToProcessDontStopWarning(actionId.id, warnMsg)
+              val warnMsg = if (inputLatestValue == null) {
+                Some(s"($actionId) No increment to process found for ${output.id}: ${input.id} is empty")
+              } else if (outputLatestValue == inputLatestValue) {
+                Some(s"($actionId) No increment to process found for ${output.id} column ${compareCol} (lastestValue=$outputLatestValue)")
+              } else None
+              warnMsg.foreach { msg =>
+                if (stopIfNoData) throw NoDataToProcessWarning(actionId.id, msg)
+                else throw NoDataToProcessDontStopWarning(actionId.id, msg)
               }
-              logger.info(s"($actionId) SparkIncrementalMode selected increment for writing to ${output.id}: column ${compareCol} from $outputLatestValue to $inputLatestValue to process")
               // prepare filter
-              val selectedData = s"${compareCol} > cast('$outputLatestValue' as ${inputColType.sql})"
-              Some((Seq(), Some(selectedData)))
+              val dataFilter = if (outputLatestValue != null) {
+                logger.info(s"($actionId) SparkIncrementalMode selected increment for writing to ${output.id}: column ${compareCol} from $outputLatestValue to $inputLatestValue to process")
+                Some(s"${compareCol} > cast('$outputLatestValue' as ${inputColType.sql})")
+              } else {
+                logger.info(s"($actionId) SparkIncrementalMode selected all data for writing to ${output.id}: output table is currently empty")
+                None
+              }
+              Some((Seq(), dataFilter))
             // otherwise don't filter
             case _ =>
               logger.info(s"($actionId) SparkIncrementalMode selected all records for writing to ${output.id}, because input or output DataObject is still empty.")
