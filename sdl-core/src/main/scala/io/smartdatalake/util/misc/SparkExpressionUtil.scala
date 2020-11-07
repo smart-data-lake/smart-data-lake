@@ -25,8 +25,8 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
+import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions.expr
-import org.apache.spark.sql.{ExpressionEvaluator, SparkSession}
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
@@ -37,8 +37,8 @@ import scala.util.matching.Regex
  */
 private[smartdatalake] object SparkExpressionUtil {
 
-  val tokenStartChar = "%"
-  val tokenExpressionRegex = (tokenStartChar + """\{(.*?)\}""").r
+  private val tokenStartChar = "%"
+  private val tokenExpressionRegex = (tokenStartChar + """\{(.*?)\}""").r
 
   /**
    * Substitutes all tokens in a string by the expression defined by the token evaluated against the given case class instance.
@@ -48,7 +48,7 @@ private[smartdatalake] object SparkExpressionUtil {
    * @param str String with tokens to replace
    * @param data Case class instance with data to be used as replacement
    */
-  def substitute[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], str: String, data: T)(implicit session: SparkSession): String = {
+  def substitute[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], str: String, data: T): String = {
     val substituter = (regMatch: Regex.Match) => {
       val expression = regMatch.group(1)
       val value = evaluate[T, Any](id, configName, expression, data)
@@ -58,11 +58,11 @@ private[smartdatalake] object SparkExpressionUtil {
     tokenExpressionRegex.replaceAllIn(str, substituter)
   }
 
-  def evaluateBoolean[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], expression: String, data: T, onlySyntaxCheck: Boolean = false)(implicit session: SparkSession): Boolean =
+  def evaluateBoolean[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], expression: String, data: T): Boolean =
     evaluate[T, Boolean](id, configName, expression, data)
       .getOrElse(false)
 
-  def evaluateString[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], expression: String, data: T, onlySyntaxCheck: Boolean = false): Option[String] =
+  def evaluateString[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], expression: String, data: T): Option[String] =
     evaluate[T, Any](id, configName, expression, data)
       .map(_.toString)
 

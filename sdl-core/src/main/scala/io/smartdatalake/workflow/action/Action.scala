@@ -25,12 +25,13 @@ import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, Parsab
 import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
+import io.smartdatalake.workflow.ExecutionPhase.{ExecutionPhase, Value}
 import io.smartdatalake.workflow._
-import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
+import io.smartdatalake.workflow.action.RuntimeEventState.{RuntimeEventState, Value}
 import io.smartdatalake.workflow.dataobject.DataObject
 import org.apache.spark.sql.functions.expr
-import org.apache.spark.sql.{ExpressionEvaluator, SparkSession}
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.custom.ExpressionEvaluator
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
@@ -171,7 +172,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
       }.toSeq
     }
     metrics.filter( metric => Option(conditionEvaluator(metric)).getOrElse(false))
-      .foreach( failedMetric => throw MetricsCheckFailed(s"""($id) metrics check failed: $failedMetric matched condition "$condition""""))
+      .foreach( failedMetric => throw MetricsCheckFailed(s"""($id) metrics check failed: $failedMetric matched expression "$condition""""))
   }
 
   /**
@@ -206,7 +207,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
       // force class cast on generic type (otherwise the ClassCastException is thrown later)
       ct.runtimeClass.cast(dataObject).asInstanceOf[T]
     } catch {
-      case e: ClassCastException =>
+      case _: ClassCastException =>
         val objClass = dataObject.getClass.getSimpleName
         val expectedClass = tt.tpe.toString.replaceAll(classOf[DataObject].getPackage.getName+".", "")
         throw ConfigurationException(s"$toStringShort needs $expectedClass as $role but $dataObjectId is of type $objClass")
@@ -230,7 +231,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   /**
    * get latest runtime state
    */
-  def getLatestRuntimeState = runtimeEvents.lastOption.map(_.state)
+  def getLatestRuntimeState: Option[RuntimeEventState] = runtimeEvents.lastOption.map(_.state)
 
   /**
    * get latest runtime information for this action
@@ -262,7 +263,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
         if (dataObjectRuntimeMetricsDelivered.contains(dataObjectId.get)) {
           logger.error(s"($id) Late arriving metrics for ${dataObjectId.get} detected. Final metrics have already been delivered. Statistics in previous logs might be wrong.")
         }
-      } else logger.warn(s"($id) Metrics received for ${dataObjectId.get} which doesn't belong to outputs (${metrics}")
+      } else logger.warn(s"($id) Metrics received for ${dataObjectId.get} which doesn't belong to outputs ($metrics")
     } else logger.debug(s"($id) Metrics received for unspecified DataObject (${metrics.getId})")
     if (logger.isDebugEnabled) logger.debug(s"($id) Metrics received:\n" + metrics.getAsText)
   }
