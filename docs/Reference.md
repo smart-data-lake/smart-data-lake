@@ -21,7 +21,7 @@ DBSECRET#scope.pd|Used in a Databricks environment, i.e. Microsoft Azure. Expect
 ### Local substitution
 Local substitution allows to reuse the id of a configuration object inside its attribute definitions by the special token "~{id}". See the following example:
 ```
-dataObjects [
+dataObjects {
   dataXY {
     type = HiveTableDataObject
     path = "/data/~{id}"
