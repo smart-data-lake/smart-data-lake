@@ -23,7 +23,7 @@ import java.sql.Timestamp
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{ProductUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{ProductUtil, SmartDataLakeLogger, SparkExpressionUtil}
 import io.smartdatalake.workflow.DAGHelper.NodeId
 import io.smartdatalake.workflow.ExceptionSeverity.ExceptionSeverity
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
@@ -106,6 +106,8 @@ private[smartdatalake] trait ExecutionModeWithMainInputOutput {
  * @param failConditions            List of conditions to fail application of execution mode if true. Define as spark sql expressions working with attributes of [[PartitionDiffModeExpressionData]] returning a boolean.
  *                                  Default is that the application of the PartitionDiffMode does not fail the action. If there is no data to process, the following actions are skipped.
  *                                  Multiple conditions are evaluated individually and every condition may fail the execution mode (or-logic)
+ * @param selectExpression          optional expression to define or refine the list of selected partitions. Define a spark sql expression working with the attributes of [[PartitionDiffModeExpressionData]] returning a list<map<string,string>>.
+ *                                  Default is to return the originally selected partitions found in attribute selectedPartitions.
  */
 case class PartitionDiffMode( partitionColNb: Option[Int] = None
                             , override val alternativeOutputId: Option[DataObjectId] = None
@@ -113,14 +115,15 @@ case class PartitionDiffMode( partitionColNb: Option[Int] = None
                             , applyCondition: Option[String] = None
                             , failCondition: Option[String] = None
                             , failConditions: Seq[Condition] = Seq()
+                            , selectExpression: Option[String] = None
                             ) extends ExecutionMode with ExecutionModeWithMainInputOutput {
   private[smartdatalake] override val applyConditionsDef = applyCondition.toSeq.map(Condition(_))
   private[smartdatalake] override val failConditionsDef = failCondition.toSeq.map(Condition(_)) ++ failConditions
   private[smartdatalake] override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
   private[smartdatalake] override def prepare(actionId: ActionObjectId)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.prepare(actionId)
-    // validate condition syntax
-    failConditionsDef.foreach(_.syntaxCheck(actionId, Some("failCondition")))
+    // validate selectExpression syntax
+    selectExpression.foreach(expression => SparkExpressionUtil.syntaxCheck[PartitionDiffModeExpressionData, Seq[Map[String,String]]](actionId, Some("selectExpression"), expression))
     // check alternativeOutput exists
     alternativeOutput
   }
@@ -152,14 +155,19 @@ case class PartitionDiffMode( partitionColNb: Option[Int] = None
                 case Some(n) => partitionValuesToBeProcessed.sorted(ordering).take(n)
                 case None => partitionValuesToBeProcessed.sorted(ordering)
               }
-              // evaluate fail conditions
+              // apply optional select expression
               val data = PartitionDiffModeExpressionData.from(context).copy(inputPartitionValues = inputPartitionValues.map(_.getMapString), outputPartitionValues = outputPartitionValues.map(_.getMapString), selectedPartitionValues = selectedPartitionValues.map(_.getMapString))
-              evaluateFailConditions(actionId, data) // throws exception on failed condition
+              val refinedSelectedPartitionValues1 = selectExpression.flatMap(expression => SparkExpressionUtil.evaluate[PartitionDiffModeExpressionData, Seq[Map[String,String]]](actionId, Some("selectExpression"), expression, data))
+              val refinedSelectedPartitionValues = refinedSelectedPartitionValues1.map(partitionValuesString => partitionValuesString.map(PartitionValues(_)))
+                .getOrElse(selectedPartitionValues)
+              // evaluate fail conditions
+              val refinedData = data.copy(selectedPartitionValues = refinedSelectedPartitionValues.map(_.getMapString))
+              evaluateFailConditions(actionId, refinedData) // throws exception on failed condition
               // skip processing if no new data
               if (partitionValuesToBeProcessed.isEmpty) throw NoDataToProcessWarning(actionId.id, s"($actionId) No partitions to process found for ${input.id}")
               //return
-              logger.info(s"($actionId) PartitionDiffMode selected partition values ${selectedPartitionValues.mkString(", ")} to process")
-              Some((selectedPartitionValues, None))
+              logger.info(s"($actionId) PartitionDiffMode selected partition values ${refinedSelectedPartitionValues.mkString(", ")} to process")
+              Some((refinedSelectedPartitionValues, None))
             } else throw ConfigurationException(s"$actionId has set executionMode = PartitionDiffMode but $output has no partition columns defined!")
           } else throw ConfigurationException(s"$actionId has set executionMode = PartitionDiffMode but $input has no partition columns defined!")
         case (_: CanHandlePartitions, _) => throw ConfigurationException(s"$actionId has set executionMode = PartitionDiffMode but $output does not support partitions!")
@@ -224,10 +232,10 @@ case class SparkIncrementalMode(compareCol: String, override val alternativeOutp
             // if both DataFrames exist, compare and create filter
             case (Some(dfInput), Some(dfOutput)) =>
               val inputColType = dfInput.schema(compareCol).dataType
-              require(SparkIncrementalMode.allowedDataTypes.contains(inputColType), s"($actionId) Type of compare column ${compareCol} must be one of ${SparkIncrementalMode.allowedDataTypes.mkString(", ")} in ${sparkInput.id}")
+              require(SparkIncrementalMode.allowedDataTypes.contains(inputColType), s"($actionId) Type of compare column $compareCol must be one of ${SparkIncrementalMode.allowedDataTypes.mkString(", ")} in ${sparkInput.id}")
               val outputColType = dfOutput.schema(compareCol).dataType
-              require(SparkIncrementalMode.allowedDataTypes.contains(outputColType), s"($actionId) Type of compare column ${compareCol} must be one of ${SparkIncrementalMode.allowedDataTypes.mkString(", ")} in ${sparkOutput.id}")
-              require(inputColType == outputColType, s"($actionId) Type of compare column ${compareCol} is different between ${sparkInput.id} ($inputColType) and ${sparkOutput.id} ($outputColType)")
+              require(SparkIncrementalMode.allowedDataTypes.contains(outputColType), s"($actionId) Type of compare column $compareCol must be one of ${SparkIncrementalMode.allowedDataTypes.mkString(", ")} in ${sparkOutput.id}")
+              require(inputColType == outputColType, s"($actionId) Type of compare column $compareCol is different between ${sparkInput.id} ($inputColType) and ${sparkOutput.id} ($outputColType)")
               // get latest values
               val inputLatestValue = dfInput.agg(max(col(compareCol)).cast(StringType)).as[String].head
               val outputLatestValue = dfOutput.agg(max(col(compareCol)).cast(StringType)).as[String].head
@@ -235,7 +243,7 @@ case class SparkIncrementalMode(compareCol: String, override val alternativeOutp
               val warnMsg = if (inputLatestValue == null) {
                 Some(s"($actionId) No increment to process found for ${output.id}: ${input.id} is empty")
               } else if (outputLatestValue == inputLatestValue) {
-                Some(s"($actionId) No increment to process found for ${output.id} column ${compareCol} (lastestValue=$outputLatestValue)")
+                Some(s"($actionId) No increment to process found for ${output.id} column $compareCol (lastestValue=$outputLatestValue)")
               } else None
               warnMsg.foreach { msg =>
                 if (stopIfNoData) throw NoDataToProcessWarning(actionId.id, msg)
@@ -243,8 +251,8 @@ case class SparkIncrementalMode(compareCol: String, override val alternativeOutp
               }
               // prepare filter
               val dataFilter = if (outputLatestValue != null) {
-                logger.info(s"($actionId) SparkIncrementalMode selected increment for writing to ${output.id}: column ${compareCol} from $outputLatestValue to $inputLatestValue to process")
-                Some(s"${compareCol} > cast('$outputLatestValue' as ${inputColType.sql})")
+                logger.info(s"($actionId) SparkIncrementalMode selected increment for writing to ${output.id}: column $compareCol} from $outputLatestValue to $inputLatestValue to process")
+                Some(s"$compareCol > cast('$outputLatestValue' as ${inputColType.sql})")
               } else {
                 logger.info(s"($actionId) SparkIncrementalMode selected all data for writing to ${output.id}: output table is currently empty")
                 None
@@ -290,7 +298,7 @@ case class DefaultExecutionModeExpressionData( feed: String, application: String
 private[smartdatalake] object DefaultExecutionModeExpressionData {
   def from(context: ActionPipelineContext): DefaultExecutionModeExpressionData = {
     DefaultExecutionModeExpressionData(context.feed, context.application, context.runId, context.attemptId, context.referenceTimestamp.map(Timestamp.valueOf)
-      , Timestamp.valueOf(context.runStartTime), Timestamp.valueOf(context.attemptStartTime), Seq(), false)
+      , Timestamp.valueOf(context.runStartTime), Timestamp.valueOf(context.attemptStartTime), Seq(), isStartNode = false)
   }
 }
 

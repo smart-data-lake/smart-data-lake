@@ -58,20 +58,61 @@ private[smartdatalake] object SparkExpressionUtil {
     tokenExpressionRegex.replaceAllIn(str, substituter)
   }
 
-  def evaluateBoolean[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], expression: String, data: T): Boolean =
+  /**
+   * Evaluate an expression with boolean return type against a given case class instance
+   * @param id id of the config object for meaningful exception text
+   * @param configName optional configuration name for meaningful exception text
+   * @param expression expression to be evaluated
+   * @param data case class instance
+   * @tparam T class of object the expression should be evaluated on
+   */
+  def evaluateBoolean[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], expression: String, data: T, syntaxCheckOnly: Boolean = false): Boolean =
     evaluate[T, Boolean](id, configName, expression, data)
       .getOrElse(false)
 
+  /**
+   * Evaluate an expression with string return type against a given case class instance
+   * @param id id of the config object for meaningful exception text
+   * @param configName optional configuration name for meaningful exception text
+   * @param expression expression to be evaluated
+   * @param data case class instance
+   * @tparam T class of object the expression should be evaluated on
+   */
   def evaluateString[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], expression: String, data: T): Option[String] =
     evaluate[T, Any](id, configName, expression, data)
       .map(_.toString)
 
+  /**
+   * Evaluate an expression against a given case class instance
+   * @param id id of the config object for meaningful exception text
+   * @param configName optional configuration name for meaningful exception text
+   * @param expression expression to be evaluated
+   * @param data case class instance
+   * @tparam T class of object the expression should be evaluated on
+   * @tparam R class of expressions expected return type
+   */
   def evaluate[T <: Product : TypeTag, R : TypeTag : ClassTag](id: ConfigObjectId, configName: Option[String], expression: String, data: T): Option[R] = {
     try {
       val evaluator = new ExpressionEvaluator[T,R](expr(expression))
       Option(evaluator(data))
     } catch {
       case e: Exception => throw ConfigurationException(s"($id) spark expression evaluation for '$expression' and config $configName failed: ${e.getMessage}", configName, e)
+    }
+  }
+
+  /**
+   * Check syntax of an expression against a given case class
+   * @param id id of the config object for meaningful exception text
+   * @param configName optional configuration name for meaningful exception text
+   * @param expression expression to be evaluated
+   * @tparam T class of object the expression should be evaluated on
+   * @tparam R class of expressions expected return type
+   */
+  def syntaxCheck[T <: Product : TypeTag, R : TypeTag : ClassTag](id: ConfigObjectId, configName: Option[String], expression: String): Unit = {
+    try {
+      new ExpressionEvaluator[T,R](expr(expression))
+    } catch {
+      case e: Exception => throw ConfigurationException(s"($id) spark expression syntax check for '$expression' and config $configName failed: ${e.getMessage}", configName, e)
     }
   }
 

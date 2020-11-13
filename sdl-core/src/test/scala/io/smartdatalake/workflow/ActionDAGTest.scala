@@ -539,7 +539,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(action2MainMetrics("num_tasks")==1)
   }
 
-  test("action dag with 2 actions in sequence and executionMode=PartitionDiffMode") {
+  test("action dag with 2 actions in sequence and executionMode=PartitionDiffMode and selectExpression") {
     // setup DataObjects
     val feed = "actionpipeline"
     val srcTable = Table(Some("default"), "ap_input")
@@ -558,16 +558,33 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // prepare DAG
     val refTimestamp1 = LocalDateTime.now()
     implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
-    val df1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
-    val expectedPartitions = Seq(PartitionValues(Map("lastname"->"doe")))
-    srcDO.writeDataFrame(df1, expectedPartitions)
+    val df1 = Seq(("doe","john",5),("einstein","albert",2)).toDF("lastname", "firstname", "rating")
+    val expectedPartitions = Seq(PartitionValues(Map("lastname"->"doe", "lastname"->"einstein")))
+    srcDO.writeDataFrame(df1, Seq())
+    val partitionDiffMode = PartitionDiffMode(
+      applyCondition = Some("isStartNode"),
+      selectExpression = Some("slice(selectedPartitionValues,-1,1)"), // only one partition: last partition first
+      failCondition = Some("size(selectedPartitionValues) = 0 and size(outputPartitionValues) = 0")
+    )
     val actions: Seq[SparkSubFeedAction] = Seq(
-      DeduplicateAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(applyCondition = Some("isStartNode"), failCondition = Some("size(selectedPartitionValues) = 0 and size(outputPartitionValues) = 0"))))
+      DeduplicateAction("a", srcDO.id, tgt1DO.id, executionMode = Some(partitionDiffMode))
       , CopyAction("b", tgt1DO.id, tgt2DO.id)
     )
     val dag = ActionDAGRun(actions, 1, 1)
 
-    // first dag run
+    // first dag run: partition lastname=einstein
+    dag.prepare
+    dag.init
+    dag.exec
+
+    // check
+    val r1 = tgt2DO.getDataFrame()
+      .select($"rating")
+      .as[Int].collect().toSeq
+    assert(r1 == Seq(2))
+    assert(tgt2DO.listPartitions ==  Seq(PartitionValues(Map("lastname"->"einstein"))))
+
+    // second dag run: partition lastname=doe
     dag.prepare
     dag.init
     dag.exec
@@ -575,12 +592,11 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // check
     val r2 = tgt2DO.getDataFrame()
       .select($"rating")
-      .as[Int].collect().toSeq
-    assert(r2 == Seq(5))
-    assert(tgt2DO.listPartitions == expectedPartitions)
+      .as[Int].collect().toSet
+    assert(r2 == Set(2,5))
+    assert(tgt2DO.listPartitions ==  Seq(PartitionValues(Map("lastname"->"doe", "lastname"->"einstein"))))
 
-
-    // second dag run - skip action execution because there are no new partitions to process
+    // third dag run - skip action execution because there are no new partitions to process
     dag.prepare
     intercept[NoDataToProcessWarning](dag.init)
   }
