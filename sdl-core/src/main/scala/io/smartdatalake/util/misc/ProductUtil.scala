@@ -18,6 +18,8 @@
  */
 package io.smartdatalake.util.misc
 
+import java.time.format.DateTimeFormatter
+
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
 
@@ -117,6 +119,10 @@ private[smartdatalake] object ProductUtil {
         case javaD: java.math.BigDecimal => msg.append(javaD.stripTrailingZeros.toPlainString)
         // java maps from Hocon Config land here... we route them again through addObjToBuilder as scala sequence
         case javaMap: java.util.Map[_, _] => addObjToBuilder(msg, javaMap.asScala.toSeq, spacing = false)
+        // date & time
+        case d: java.time.LocalDate => msg.append(d.format(DateTimeFormatter.ISO_DATE))
+        case dt: java.time.LocalDateTime => msg.append(dt.format(DateTimeFormatter.ISO_DATE_TIME))
+        case ts: java.sql.Timestamp => msg.append(ts.toLocalDateTime.format(DateTimeFormatter.ISO_DATE_TIME))
         // strings
         case str: String => msg.append(str)
         // other types are just converted to string

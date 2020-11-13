@@ -1025,12 +1025,13 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val df1 = Seq(("doe","john",5, Timestamp.from(Instant.now))).toDF("lastname", "firstname", "rating", "tstmp")
     srcDO.writeDataFrame(df1, Seq())
 
-    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode=Some(PartitionDiffMode(failCondition = Some("year(runStartTime) > 2000"))))
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode=Some(PartitionDiffMode(failConditions = Seq(Condition(expression = "year(runStartTime) > 2000", Some("testing"))))))
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1), 1, 1)
 
     // first dag run, first file processed
     dag.prepare
     val ex = intercept[ExecutionModeFailedException](dag.init)
+    assert(ex.msg.contains("testing"))
   }
 
 }
