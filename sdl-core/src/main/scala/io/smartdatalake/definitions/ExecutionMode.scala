@@ -51,9 +51,8 @@ import scala.reflect.runtime.universe.TypeTag
  */
 sealed trait ExecutionMode extends SmartDataLakeLogger {
   private[smartdatalake] def prepare(actionId: ActionObjectId)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    // validate conditions
-    applyConditionsDef.foreach(_.syntaxCheck(actionId, Some("applyCondition")))
-    failConditionsDef.foreach(_.syntaxCheck(actionId, Some("failCondition")))
+    // validate apply conditions
+    applyConditionsDef.foreach(_.syntaxCheck[DefaultExecutionModeExpressionData](actionId, Some("applyCondition")))
   }
   private[smartdatalake] def apply(actionId: ActionObjectId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Option[(Seq[PartitionValues], Option[String])] = None
   private[smartdatalake] def mainInputOutputNeeded: Boolean = false
@@ -122,7 +121,9 @@ case class PartitionDiffMode( partitionColNb: Option[Int] = None
   private[smartdatalake] override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
   private[smartdatalake] override def prepare(actionId: ActionObjectId)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.prepare(actionId)
-    // validate selectExpression syntax
+    // validate fail condition
+    failConditionsDef.foreach(_.syntaxCheck[PartitionDiffModeExpressionData](actionId, Some("failCondition")))
+    // validate select expression
     selectExpression.foreach(expression => SparkExpressionUtil.syntaxCheck[PartitionDiffModeExpressionData, Seq[Map[String,String]]](actionId, Some("selectExpression"), expression))
     // check alternativeOutput exists
     alternativeOutput
