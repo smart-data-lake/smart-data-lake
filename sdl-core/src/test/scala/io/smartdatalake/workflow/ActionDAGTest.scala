@@ -559,7 +559,6 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val refTimestamp1 = LocalDateTime.now()
     implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val df1 = Seq(("doe","john",5),("einstein","albert",2)).toDF("lastname", "firstname", "rating")
-    val expectedPartitions = Seq(PartitionValues(Map("lastname"->"doe", "lastname"->"einstein")))
     srcDO.writeDataFrame(df1, Seq())
     val partitionDiffMode = PartitionDiffMode(
       applyCondition = Some("isStartNode"),
@@ -594,7 +593,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
       .select($"rating")
       .as[Int].collect().toSet
     assert(r2 == Set(2,5))
-    assert(tgt2DO.listPartitions ==  Seq(PartitionValues(Map("lastname"->"doe", "lastname"->"einstein"))))
+    assert(tgt2DO.listPartitions ==  Seq(PartitionValues(Map("lastname"->"doe")), PartitionValues(Map("lastname"->"einstein"))))
 
     // third dag run - skip action execution because there are no new partitions to process
     dag.prepare

@@ -208,10 +208,11 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("A","doe","john",5)).toDF("type", "lastname", "firstname", "rating")
     val l1PartitionValues = Seq(PartitionValues(Map("type"->"A")))
     srcDO.writeDataFrame(l1, l1PartitionValues) // prepare testdata
-    action.init(Seq(srcSubFeed))
+    val initOutputSubFeeds = action.init(Seq(srcSubFeed))
     val tgtSubFeed1 = action.exec(Seq(srcSubFeed)).head
 
     // check first load
+    assert(initOutputSubFeeds.head.asInstanceOf[SparkSubFeed].dataFrame.get.columns.last == "type", "partition columns must be moved last already in init phase")
     assert(tgtSubFeed1.dataObjectId == tgtDO.id)
     assert(tgtSubFeed1.partitionValues.toSet == l1PartitionValues.toSet)
     assert(tgtDO.getDataFrame().count == 1)

@@ -186,6 +186,14 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
   }
 
   /**
+   * Move partition columns at end of DataFrame as required when writing to Hive in Spark > 2.x
+   */
+  def movePartitionColsLast( df: DataFrame, partitions:Seq[String] ): DataFrame = {
+    val newColOrder = movePartitionColsLast(df.columns, partitions)
+    df.select(newColOrder.map(col):_*)
+  }
+
+  /**
    * Writes DataFrame to Hive table by using DataFrameWriter.
    * A missing table gets created. Dynamic partitioning is used to create partitions on the fly by Spark.
    * Existing data of partition is overwritten, if table has no partitions all table-data is overwritten.

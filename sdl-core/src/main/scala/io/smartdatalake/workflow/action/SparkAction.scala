@@ -203,7 +203,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
 
   /**
    * Updates the partition values of a SubFeed to the partition columns of an output, removing not existing columns from the partition values.
-   * Further the transformed DataFrame is validated to have the output's partition columns included.
+   * Further the transformed DataFrame is validated to have the output's partition columns included and partition columns are moved to the end.
    *
    * @param output output DataObject
    * @param subFeed SubFeed with transformed DataFrame
@@ -215,7 +215,9 @@ private[smartdatalake] abstract class SparkAction extends Action {
         // validate output partition columns exist in DataFrame
         subFeed.dataFrame.foreach(df => validateDataFrameContainsCols(df, partitionedDO.partitions, s"for ${output.id}"))
         // adapt subfeed
-        subFeed.updatePartitionValues(partitionedDO.partitions)
+        subFeed
+          .updatePartitionValues(partitionedDO.partitions)
+          .movePartitionColumnsLast(partitionedDO.partitions)
       case _ => subFeed.clearPartitionValues()
     }
     updatedSubFeed.clearDAGStart()
