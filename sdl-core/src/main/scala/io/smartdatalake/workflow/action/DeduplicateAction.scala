@@ -132,7 +132,7 @@ case class DeduplicateAction(override val id: ActionObjectId,
     import session.implicits._
     import udfs._
 
-    baseDf.union(newDf)
+    baseDf.unionByName(newDf)
       .groupBy(keyColumns.map(col):_*)
       .agg(collect_list(struct("*")).as("rows"))
       .withColumn("latestRowIndex", udf_getLatestRowIndex($"rows"))
