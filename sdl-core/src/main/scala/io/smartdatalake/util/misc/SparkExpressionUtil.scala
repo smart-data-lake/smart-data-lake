@@ -51,8 +51,7 @@ private[smartdatalake] object SparkExpressionUtil {
   def substitute[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], str: String, data: T): String = {
     val substituter = (regMatch: Regex.Match) => {
       val expression = regMatch.group(1)
-      val value = evaluate[T, Any](id, configName, expression, data)
-        .map(_.toString)
+      val value = evaluate[T, String](id, configName, expression, data)
       value.getOrElse(throw new IllegalStateException(s"($id) spark expression evaluation for '$expression' and config $configName not defined by $data"))
     }
     tokenExpressionRegex.replaceAllIn(str, substituter)
@@ -79,8 +78,7 @@ private[smartdatalake] object SparkExpressionUtil {
    * @tparam T class of object the expression should be evaluated on
    */
   def evaluateString[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], expression: String, data: T): Option[String] =
-    evaluate[T, Any](id, configName, expression, data)
-      .map(_.toString)
+    evaluate[T, String](id, configName, expression, data)
 
   /**
    * Evaluate an expression against a given case class instance

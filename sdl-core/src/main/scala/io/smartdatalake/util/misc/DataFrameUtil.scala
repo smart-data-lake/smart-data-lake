@@ -239,8 +239,9 @@ private[smartdatalake] object DataFrameUtil {
     def isEqual(df2: DataFrame): Boolean = {
       // As a set-theoretic function symmetricDifference ignores multiple occurences of the same row.
       // Thus we need also to compare the cardinalities and the schemata of the two data frames.
+      // For the schema the order of columns doesnt need to much.
       // Note that two schemata equal only if they agree on nullability of their columns.
-      symmetricDifference(df2).isEmpty && df.schema == df2.schema && df.count == df2.count
+      df.schema.fields.toSet == df2.schema.fields.toSet && symmetricDifference(df2).isEmpty && df.count == df2.count
     }
 
     /**
@@ -259,7 +260,10 @@ private[smartdatalake] object DataFrameUtil {
      * @return data frame
      */
     def symmetricDifference(df2: DataFrame, diffColName: String = "_in_first_df"): DataFrame = {
-      df.except(df2).withColumn(diffColName,lit(true)).union(df2.except(df).withColumn(diffColName,lit(false)))
+      require(df.columns.toSet == df2.columns.toSet, "Must DataFrames must have the same columns for symmetricDifference calculation")
+      // reorder columns according to the other DataFrame for calculating symmetricDifference
+      df.except(df2.select(df.columns.map(col):_*)).withColumn(diffColName,lit(true))
+      .unionByName(df2.except(df).select(df.columns.map(col):_*).withColumn(diffColName,lit(false)))
     }
 
     /**
