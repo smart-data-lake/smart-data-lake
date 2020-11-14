@@ -27,7 +27,7 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions.{ExecutionMode, TechnicalTableColumn}
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, TransactionalSparkTableDataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject, TransactionalSparkTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions._
@@ -88,10 +88,18 @@ case class DeduplicateAction(override val id: ActionObjectId,
 
   override def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
+    // primary key needed
     val pks = output.table.primaryKey
       .getOrElse( throw new ConfigurationException(s"There is no <primary-keys> defined for table ${output.table.name}."))
+    // assert that if output has partition columns, they are included in primary key
+    output match {
+      case partitionedDO: CanHandlePartitions =>
+        if (partitionedDO.partitions.diff(pks).nonEmpty) throw new ConfigurationException(s"($id) Output ${output.id} partition columns need to be included in output tables primary key for DeduplicateAction. partitions=${partitionedDO.partitions.mkString(",")} primaryKeys=${pks.mkString(",")}")
+      case _ => Unit
+    }
+    // get existing data. If only a set of partition values are processed, this must be filtered accordingly
     val existingDf = if (output.isTableExisting) {
-      Some(output.getDataFrame())
+      Some(output.getDataFrame(subFeed.partitionValues))
     } else None
     val deduplicateTransformer = deduplicateDataFrame(existingDf, pks, timestamp) _
     applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, Seq(deduplicateTransformer), filterClauseExpr)
