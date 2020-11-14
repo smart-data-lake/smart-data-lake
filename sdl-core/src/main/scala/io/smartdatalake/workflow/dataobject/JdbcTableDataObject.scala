@@ -28,6 +28,7 @@ import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.JdbcTableConnection
+import org.apache.spark.sql.jdbc.JdbcDialects
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
@@ -151,7 +152,11 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
 
   override def isDbExisting(implicit session: SparkSession): Boolean = connection.catalog.isDbExisting(table.db.get)
-  override def isTableExisting(implicit session: SparkSession): Boolean = connection.catalog.isTableExisting(table.db.get, table.name)
+  override def isTableExisting(implicit session: SparkSession): Boolean = {
+    val dbPrefix = if(table.db.isDefined) table.db.get+"." else ""
+    val s = JdbcDialects.get(connection.url).getTableExistsQuery(dbPrefix+table.name)
+    connection.execJdbcStatement(s)
+  }
 
   override def dropTable(implicit session: SparkSession): Unit = {
     connection.execJdbcStatement(s"drop table if exists ${table.fullName}")

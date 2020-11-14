@@ -26,6 +26,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{AuthMode, BasicAuthMode, Environment}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.jdbc.JdbcDialects
 
 /**
  * Connection information for jdbc tables.
@@ -156,12 +157,9 @@ private[smartdatalake] class DefaultSQLCatalog(connection: JdbcTableConnection) 
     connection.execJdbcQuery(cntTableInCatalog, evalRecordExists )
   }
   override def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean = {
-    val cntTableInCatalog =
-      if (Environment.enableJdbcCaseSensitivity)
-        s"select count(*) from INFORMATION_SCHEMA.TABLES where TABLE_NAME='$table' and TABLE_SCHEMA='$db'"
-      else
-        s"select count(*) from INFORMATION_SCHEMA.TABLES where upper(TABLE_NAME)=upper('$table') and upper(TABLE_SCHEMA)=upper('$db')"
-    connection.execJdbcQuery( cntTableInCatalog, evalRecordExists )
+    val dbPrefix = if(table.equals("")) "" else table+"."
+    val existsQuery = JdbcDialects.get(connection.url).getTableExistsQuery(dbPrefix+table)
+    connection.execJdbcStatement(existsQuery)
   }
 }
 
