@@ -259,10 +259,16 @@ case class SparkIncrementalMode(compareCol: String, override val alternativeOutp
                 None
               }
               Some((Seq(), dataFilter))
-            // otherwise don't filter
-            case _ =>
-              logger.info(s"($actionId) SparkIncrementalMode selected all records for writing to ${output.id}, because input or output DataObject is still empty.")
+            // select all if output is empty
+            case (Some(_),None) =>
+              logger.info(s"($actionId) SparkIncrementalMode selected all records for writing to ${output.id}, because output DataObject is still empty.")
               Some((Seq(), None))
+            // otherwise no data to process
+            case _ =>
+              logger.info(s"($actionId) SparkIncrementalMode selected all records for writing to ${output.id}, because output DataObject is still empty.")
+              val warnMsg = s"($actionId) No increment to process found for ${output.id}, because ${input.id} is still empty."
+              if (stopIfNoData) throw NoDataToProcessWarning(actionId.id, warnMsg)
+              else throw NoDataToProcessDontStopWarning(actionId.id, warnMsg)
           }
         case _ => throw ConfigurationException(s"$actionId has set executionMode = $SparkIncrementalMode but $input or $output does not support creating Spark DataFrames!")
       }
