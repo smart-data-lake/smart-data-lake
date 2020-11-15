@@ -157,7 +157,7 @@ private[smartdatalake] class DefaultSQLCatalog(connection: JdbcTableConnection) 
     connection.execJdbcQuery(cntTableInCatalog, evalRecordExists )
   }
   override def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean = {
-    val dbPrefix = if(table.equals("")) "" else table+"."
+    val dbPrefix = if(db.equals("")) "" else db+"."
     val existsQuery = JdbcDialects.get(connection.url).getTableExistsQuery(dbPrefix+table)
     connection.execJdbcStatement(existsQuery)
   }
