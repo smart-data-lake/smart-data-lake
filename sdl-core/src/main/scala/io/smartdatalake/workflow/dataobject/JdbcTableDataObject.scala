@@ -18,8 +18,6 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.sql.Timestamp
-
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
@@ -28,7 +26,6 @@ import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.JdbcTableConnection
-import org.apache.spark.sql.jdbc.JdbcDialects
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
@@ -96,7 +93,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
-    val queryOrTable = Map(table.query.map(q => ("query",q)).getOrElse(("dbtable"->table.fullName)))
+    val queryOrTable = Map(table.query.map(q => ("query",q)).getOrElse("dbtable"->table.fullName))
     val df = session.read.format("jdbc")
       .options(jdbcOptions)
       .options(
@@ -142,7 +139,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     super.postWrite(partitionValues)
     preparedAndExecSql(postWriteSql, Some("postWriteSql"), partitionValues)
   }
-  private def preparedAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext) = {
+  private def preparedAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     sqlOpt.foreach { sql =>
       val data = DefaultExpressionData.from(context, partitionValues)
       val preparedSql = SparkExpressionUtil.substitute(id, configName, sql, data)
@@ -152,11 +149,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
 
   override def isDbExisting(implicit session: SparkSession): Boolean = connection.catalog.isDbExisting(table.db.get)
-  override def isTableExisting(implicit session: SparkSession): Boolean = {
-    val dbPrefix = if(table.db.isDefined) table.db.get+"." else ""
-    val s = JdbcDialects.get(connection.url).getTableExistsQuery(dbPrefix+table.name)
-    connection.execJdbcStatement(s)
-  }
+  override def isTableExisting(implicit session: SparkSession): Boolean = connection.catalog.isTableExisting(table.db.get, table.name)
 
   override def dropTable(implicit session: SparkSession): Unit = {
     connection.execJdbcStatement(s"drop table if exists ${table.fullName}")

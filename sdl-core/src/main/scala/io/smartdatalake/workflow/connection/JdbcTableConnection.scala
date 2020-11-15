@@ -26,7 +26,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{AuthMode, BasicAuthMode, Environment}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.jdbc.JdbcDialects
+import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 
 /**
  * Connection information for jdbc tables.
@@ -128,6 +128,8 @@ object JdbcTableConnection extends FromConfigFactory[Connection] {
  * Implementations may vary depending on the concrete DB system.
  */
 private[smartdatalake] abstract class SQLCatalog(connection: JdbcTableConnection) {
+  // get spark jdbc dialect definitions
+  protected val jdbcDialect: JdbcDialect = JdbcDialects.get(connection.url)
   def isDbExisting(db: String)(implicit session: SparkSession): Boolean
   def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean
   protected def evalRecordExists( rs:ResultSet ) : Boolean = {
@@ -158,7 +160,7 @@ private[smartdatalake] class DefaultSQLCatalog(connection: JdbcTableConnection) 
   }
   override def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean = {
     val dbPrefix = if(db.equals("")) "" else db+"."
-    val existsQuery = JdbcDialects.get(connection.url).getTableExistsQuery(dbPrefix+table)
+    val existsQuery = jdbcDialect.getTableExistsQuery(dbPrefix+table)
     connection.execJdbcStatement(existsQuery)
   }
 }
