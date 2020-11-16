@@ -2172,6 +2172,18 @@
 				<version>1.14.3</version>
 				<scope>test</scope>
 			</dependency>
+			<dependency>
+				<groupId>io.circe</groupId>
+				<artifactId>circe-yaml_${scala.minor.version}</artifactId>
+				<version>0.10.1</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>io.circe</groupId>
+				<artifactId>circe-generic_${scala.minor.version}</artifactId>
+				<version>0.12.0-M3</version>
+				<scope>test</scope>
+			</dependency>
 		</dependencies>
 	</dependencyManagement>
 </project>
