@@ -20,12 +20,13 @@ package io.smartdatalake.workflow.action
 
 import java.nio.file.Files
 import java.sql.Timestamp
-import java.time.LocalDateTime
+import java.time.{LocalDateTime, Month}
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.definitions.TechnicalTableColumn
+import io.smartdatalake.testutils.DataFrameTestHelper._
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
 import org.apache.spark.sql.SparkSession
@@ -34,6 +35,7 @@ import org.scalatest.{BeforeAndAfter, FunSuite}
 class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+
   import session.implicits._
 
   private val tempDir = Files.createTempDirectory("test")
@@ -133,4 +135,51 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
       .as[Int].collect().toSeq
     assert(r1.size == 1)
   }
+
+  test("deduplicate with schema evolution") {
+    val idColumn = "id"
+    val colValueOld = "old_value_column_string"
+    val colValueNew = "new_value_column_decimal"
+
+    // initial deduplication while adding new column
+    val df1 = createDf(Map(
+      idColumn -> 1,
+      colValueOld -> "X",
+      TechnicalTableColumn.captured.toString -> ts("2020-07-01 10:00")
+    ))
+
+    val df2 = createDf(Map(
+      idColumn -> 1,
+      colValueOld -> "A",
+      colValueNew -> dec(100),
+    ))
+
+    val dateTime1 = LocalDateTime.of(2020, Month.AUGUST, 15, 10, 0, 0)
+    val dfResult1 = DeduplicateAction
+      .deduplicateDataFrame(Option(df1), Seq(idColumn), dateTime1,
+        ignoreOldDeletedColumns = false, ignoreOldDeletedNestedColumns = true)(df2)
+
+    // deduplicate again, using the new column
+    val df3 = createDf(Map(
+      idColumn -> 1,
+      colValueOld -> "B",
+      colValueNew -> dec(200),
+    ))
+
+    val dateTime2 = LocalDateTime.of(2020, Month.AUGUST, 16, 10, 0, 0)
+    val dfResult2 = DeduplicateAction
+      .deduplicateDataFrame(Option(dfResult1), Seq(idColumn), dateTime2,
+        ignoreOldDeletedColumns = false, ignoreOldDeletedNestedColumns = true)(df3)
+
+    // the expected result is the final passed value with a captured column
+    val dfExpected = createDf(Map(
+      idColumn -> 1,
+      colValueOld -> "B",
+      colValueNew -> dec(200),
+      TechnicalTableColumn.captured.toString -> ts("2020-08-16 10:00")
+    ))
+
+    assertDataFramesEqual(dfExpected, dfResult2)
+  }
+
 }
