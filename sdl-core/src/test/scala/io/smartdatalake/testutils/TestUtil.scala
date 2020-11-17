@@ -27,12 +27,10 @@ import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration._
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.util.hive.HiveUtil.dropTable
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
 import org.apache.commons.io.FileUtils
-import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 import org.apache.sshd.common.NamedFactory
@@ -153,11 +151,15 @@ object TestUtil extends SmartDataLakeLogger {
           .port(port)
           .httpsPort(httpsPort)
           .bindAddress(host)
-          .keystorePath("src/test/resources/test_keystore.pkcs12")
+          .keystorePath("sdl-core/src/test/resources/test_keystore.pkcs12")
           .keystorePassword("mytruststorepassword")
       )
     wireMockServer
       .start()
+
+    stubFor(post(urlEqualTo("/good/post/no_auth"))
+      .willReturn(aResponse().withBody("{{request.path.[0]}}"))
+    )
 
     stubFor(get(urlEqualTo("/good/no_auth/"))
       .willReturn(aResponse().withStatus(200))

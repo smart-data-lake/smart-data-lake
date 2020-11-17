@@ -18,8 +18,9 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.io.{ByteArrayInputStream, InputStream}
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
@@ -27,6 +28,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{CredentialsUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.webservice._
 import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.tika.Tika
 import org.keycloak.admin.client.Keycloak
 import org.keycloak.representations.AccessTokenResponse
 
@@ -48,7 +50,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
                                     override val partitionLayout: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends FileRefDataObject with CanCreateInputStream with SmartDataLakeLogger {
+  extends FileRefDataObject with CanCreateInputStream with CanCreateOutputStream with SmartDataLakeLogger {
 
   private val webServiceClientId = webserviceOptions.clientIdVariable.map(CredentialsUtil.getCredentials)
   private val webServiceClientSecret = webserviceOptions.clientSecretVariable.map(CredentialsUtil.getCredentials)
@@ -57,8 +59,11 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
 
   val keycloak: Option[Keycloak] = webserviceOptions.keycloakAuth.map(_.prepare(webServiceClientId.get, webServiceClientSecret.get))
 
-  // not used for now as writing data is not yet implemented
-  override val saveMode: SaveMode = SaveMode.Overwrite
+  // Used to determine mimetype of post data
+  val tika = new Tika
+
+  // Always set to Append as we use Webservice to push files
+  override val saveMode: SaveMode = SaveMode.Append
 
   override def partitions: Seq[String] = partitionDefs.map(_.name)
   override def expectedPartitionsCondition: Option[String] = None // all partitions are expected to exist
@@ -116,15 +121,59 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
   }
 
   /**
+   * Calls webservice POST method with binary data as body
+   * @param query URL to call
+   * @param body post body as Byte Array, type will be determined by Tika
+   * @return
+   */
+  def postResponse(query: String, body: Array[Byte]) : Array[Byte] = {
+    val webserviceClient = prepareWebservice(query)
+
+    // Try to extract Mime Type
+    // JSON is detected as text/plain, try to parse it as JSON to more precisely define it as
+    // application/json
+    val mimetype:String = tika.detect(body) match {
+      case "text/plain" => try {
+        new ObjectMapper().readTree(body)
+        "application/json"
+      } catch {
+        case _ : Throwable => "text/plain"
+      }
+      case s => s
+    }
+    webserviceClient.post(body, mimetype) match {
+      case Success(c) => c
+      case Failure(e) => logger.error(e.getMessage, e)
+        throw new WebserviceException(e.getMessage)
+    }
+  }
+
+  /**
    * Same as getResponse, but returns response as InputStream
    *
    * @param query it should be possible to define the partition to read as query string, but this is not yet implemented
    */
   override def createInputStream(query: String)(implicit session: SparkSession): InputStream = {
-    val webserviceClient = prepareWebservice(query)
-    webserviceClient.get() match {
-      case Success(c) => new ByteArrayInputStream(c)
-      case Failure(e) => throw new WebserviceException(s"Could not create InputStream for $id and $query: ${e.getClass.getSimpleName} - ${e.getMessage}")
+    new ByteArrayInputStream(getResponse(query))
+  }
+
+  /**
+   *
+   * @param path is ignored for webservices
+   * @param overwrite is ignored for webservices
+   * @param session implicit spark session
+   * @return outputstream that writes to WebService once it's closed
+   */
+  override def createOutputStream(path: String, overwrite: Boolean)(implicit session: SparkSession): OutputStream = {
+    new ByteArrayOutputStream() {
+      override def close(): Unit = Try {
+        super.close()
+        val bytes = this.toByteArray
+        postResponse(webserviceOptions.url, bytes)
+      } match {
+        case Success(s) => s
+        case Failure(e) => throw new RuntimeException(s"Can't create OutputStream for $id and $path: ${e.getClass.getSimpleName} - ${e.getMessage}", e)
+      }
     }
   }
 
@@ -218,6 +267,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
    * @inheritdoc
    */
   override def factory: FromConfigFactory[DataObject] = WebserviceFileDataObject
+
 }
 
 object WebserviceFileDataObject extends FromConfigFactory[DataObject] with SmartDataLakeLogger {
