@@ -53,8 +53,7 @@ private[smartdatalake] object SparkExpressionUtil {
       val expression = regMatch.group(1)
       val value = evaluateString[T](id, configName, expression, data)
       value.getOrElse {
-        val configNameMsg = configName.map(" from config "+_).getOrElse("")
-        throw new IllegalStateException(s"($id) spark expression evaluation for '$expression'$configNameMsg not defined by $data")
+        throw new IllegalStateException(s"($id) spark expression evaluation for '$expression'${getConfigNameMsg(configName)} not defined by $data")
       }
     }
     tokenExpressionRegex.replaceAllIn(str, substituter)
@@ -99,8 +98,7 @@ private[smartdatalake] object SparkExpressionUtil {
       Option(evaluator(data))
     } catch {
       case e: Exception =>
-        val configNameMsg = configName.map(" from config "+_).getOrElse("")
-        throw ConfigurationException(s"($id) spark expression evaluation for '$expression'$configNameMsg failed: ${e.getMessage}", configName, e)
+        throw ConfigurationException(s"($id) spark expression evaluation for '$expression'${getConfigNameMsg(configName)} failed: ${e.getMessage}", configName, e)
     }
   }
 
@@ -117,8 +115,7 @@ private[smartdatalake] object SparkExpressionUtil {
       new ExpressionEvaluator[T,R](expr(expression))
     } catch {
       case e: Exception =>
-        val configNameMsg = configName.map(" from config "+_).getOrElse("")
-        throw ConfigurationException(s"($id) spark expression syntax check for '$expression'$configNameMsg failed: ${e.getMessage}", configName, e)
+        throw ConfigurationException(s"($id) spark expression syntax check for '$expression'${getConfigNameMsg(configName)} failed: ${e.getMessage}", configName, e)
     }
   }
 
@@ -129,12 +126,13 @@ private[smartdatalake] object SparkExpressionUtil {
     val substituter = (regMatch: Regex.Match) => {
       val key = regMatch.group(1)
       options.getOrElse(key, {
-        val configNameMsg = configName.map(" for config "+_).getOrElse("")
-        throw ConfigurationException(s"($id) key '$key' not found in options$configNameMsg")
+        throw ConfigurationException(s"($id) key '$key' not found in options${getConfigNameMsg(configName)}")
       })
     }
     tokenExpressionRegex.replaceAllIn(str, substituter)
   }
+
+  private def getConfigNameMsg(configName: Option[String]) = configName.map(" from config "+_).getOrElse("")
 }
 
 case class DefaultExpressionData( feed: String, application: String, runId: Int, attemptId: Int, executionPhase:String, referenceTimestamp: Option[Timestamp]
