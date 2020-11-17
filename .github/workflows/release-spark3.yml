@@ -33,12 +33,12 @@ jobs:
     - name: Maven Get Version
       run: |
         echo 'MVN_CURRENT_VERSION<<EOF' >> $GITHUB_ENV
-        mvn -B -f /home/runner/work/spark-extensions/smart-data-lake/pom.xml -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec >> $GITHUB_ENV
+        mvn -B -f /home/runner/work/smart-data-lake/smart-data-lake/pom.xml -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec >> $GITHUB_ENV
         echo 'EOF' >> $GITHUB_ENV
     - name: Set Release Version
       run: |
         echo 'MVN_RELEASE_VERSION<<EOF' >> $GITHUB_ENV
-        mvn -B -f /home/runner/work/spark-extensions/smart-data-lake/pom.xml -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec | sed 's/-SNAPSHOT//g' >> $GITHUB_ENV
+        mvn -B -f /home/runner/work/smart-data-lake/smart-data-lake/pom.xml -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec | sed 's/-SNAPSHOT//g' >> $GITHUB_ENV
         echo 'EOF' >> $GITHUB_ENV
     #- name: Printenv
     #  run: |
@@ -48,21 +48,14 @@ jobs:
     - name: Maven Set Release Version
       run: sed -i "/${MVN_CURRENT_VERSION}/{s//${MVN_RELEASE_VERSION}/;:p;n;bp}" pom.xml
       
-    - name: Maven Deploy to Bintray for Scala 2.11
-      env:
-        BINTRAY_API_KEY: ${{ secrets.BINTRAY_API_KEY }}
-      run: |
-        mkdir -p ~/.m2
-        echo "<settings><servers><server><id>bintray-smart-data-lake-smart-data-lake</id><username>smartdatalake</username><password>${BINTRAY_API_KEY}</password></server></servers></settings>" > ~/.m2/settings.xml
-        mvn clean scala:doc-jar deploy -f pom.xml
     - name: Maven Deploy to Bintray for Scala 2.12
       env:
         BINTRAY_API_KEY: ${{ secrets.BINTRAY_API_KEY }}
       run: |
         mkdir -p ~/.m2
         echo "<settings><servers><server><id>bintray-smart-data-lake-smart-data-lake</id><username>smartdatalake</username><password>${BINTRAY_API_KEY}</password></server></servers></settings>" > ~/.m2/settings.xml
-        mvn -P scala-2.12 clean scala:doc-jar deploy -f pom.xml
-        
+        mvn -B -P scala-2.12 clean scala:doc-jar deploy -f pom.xml
+
     - name: Git Commit and Tag Release
       run: |
         git config --local user.email "action@github.com"
