@@ -18,7 +18,6 @@
  */
 package io.smartdatalake.util.misc
 
-import io.smartdatalake.util.streaming.DummyStreamProvider
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
