@@ -151,7 +151,7 @@ object TestUtil extends SmartDataLakeLogger {
           .port(port)
           .httpsPort(httpsPort)
           .bindAddress(host)
-          .keystorePath("sdl-core/src/test/resources/test_keystore.pkcs12")
+          .keystorePath("src/test/resources/test_keystore.pkcs12")
           .keystorePassword("mytruststorepassword")
       )
     wireMockServer
