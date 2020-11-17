@@ -201,7 +201,7 @@ object TestUtil extends SmartDataLakeLogger {
     printDf(actual)
     logger.error("   Expected ")
     printDf(expected)
-    logger.error(s"  Do schemata equal? ${actual.schema == expected.schema}")
+    logger.error(s"  Do schemata equal? ${actual.schema.fields.toSet == expected.schema.fields.toSet}")
     logger.error(s"  Do cardinalities equal? ${actual.count() == expected.count()}")
     logger.error("   symmetric Difference ")
     actual.symmetricDifference(expected, "actual").show(false)

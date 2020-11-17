@@ -255,15 +255,16 @@ private[smartdatalake] object DataFrameUtil {
     /**
      * symmetric difference of two data frames: (df∪df2)∖(df∩df2) = (df∖df2)∪(df2∖df)
      *
-     * @param df2 : data frame to comapre with
+     * @param df2 : data frame to compare with
      * @param diffColName : name of boolean column which indicates whether the row belongs to df
      * @return data frame
      */
     def symmetricDifference(df2: DataFrame, diffColName: String = "_in_first_df"): DataFrame = {
-      require(df.columns.toSet == df2.columns.toSet, "Must DataFrames must have the same columns for symmetricDifference calculation")
-      // reorder columns according to the other DataFrame for calculating symmetricDifference
-      df.except(df2.select(df.columns.map(col):_*)).withColumn(diffColName,lit(true))
-      .unionByName(df2.except(df).select(df.columns.map(col):_*).withColumn(diffColName,lit(false)))
+      require(df.columns.toSet == df2.columns.toSet, "DataFrames must have the same columns for symmetricDifference calculation")
+      // reorder columns according to the original df for calculating symmetricDifference
+      val colOrder = df.columns.map(col)
+      df.except(df2.select(colOrder:_*)).withColumn(diffColName,lit(true))
+      .unionByName(df2.select(colOrder:_*).except(df).withColumn(diffColName,lit(false)))
     }
 
     /**
