@@ -127,19 +127,8 @@ object DeduplicateAction extends FromConfigFactory[Action] {
       // apply schema evolution
       val (baseDf, newDf) = SchemaEvolution.process(existingDf.get, enhancedDf, ignoreOldDeletedColumns = ignoreOldDeletedColumns, ignoreOldDeletedNestedColumns = ignoreOldDeletedNestedColumns)
       // Schema evolution puts new columns at the end of the column list, so we need to move the technical captured column back to the end
-      deduplicate(moveCapturedColumnToEnd(baseDf), moveCapturedColumnToEnd(newDf), pks)
+      deduplicate(baseDf, newDf, pks)
     } else enhancedDf
-  }
-
-  /**
-   * The techincal "captured" column needs to be the last column in the DataFrame so that the union in the deduplicate method words
-   * In Spark, unions do not work by column name but by column index, so the column order of the dataframes to be unioned needs to be equal
-   * @param df A DataFrame
-   * @return A DataFrame where the techinical "captured" column is the last column
-   */
-  def moveCapturedColumnToEnd(df: DataFrame) : DataFrame = {
-    val newColumns = df.schema.map(_.name).filter(!_.equals(TechnicalTableColumn.captured.toString)) :+ TechnicalTableColumn.captured.toString
-    df.select(newColumns.head, newColumns.tail: _*)
   }
 
   /**
@@ -153,7 +142,7 @@ object DeduplicateAction extends FromConfigFactory[Action] {
     import session.implicits._
     import udfs._
 
-    baseDf.union(newDf)
+    baseDf.unionByName(newDf)
       .groupBy(keyColumns.map(col):_*)
       .agg(collect_list(struct("*")).as("rows"))
       .withColumn("latestRowIndex", udf_getLatestRowIndex($"rows"))
