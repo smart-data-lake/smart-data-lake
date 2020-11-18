@@ -48,8 +48,9 @@ private[smartdatalake] class TaskSkippedWarning(id: NodeId, msg: String) extends
   override def getDAGRootExceptions: Seq[DAGException] = Seq(this)
 }
 
-private[smartdatalake] class TaskSkippedDontStopWarning(id: NodeId, msg: String) extends TaskSkippedWarning(id, msg) {
+private[smartdatalake] class TaskSkippedDontStopWarning[R <: DAGResult](id: NodeId, msg: String, results: Option[Seq[R]]) extends TaskSkippedWarning(id, msg) {
   override val severity: ExceptionSeverity.ExceptionSeverity = ExceptionSeverity.SKIPPED_DONT_STOP
+  def getResults: Option[Seq[R]] = results
 }
 
 private[smartdatalake] case class TaskPredecessorFailureWarning(id: NodeId, cause: DAGException, allCauses: Seq[DAGException]) extends DAGException(id, cause) {
