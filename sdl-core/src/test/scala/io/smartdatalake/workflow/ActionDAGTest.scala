@@ -31,7 +31,7 @@ import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformerConfig, 
 import io.smartdatalake.workflow.action.{CopyAction, _}
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{DataType, StructField, StructType, TimestampType}
+import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
@@ -1033,6 +1033,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(srcDO)
     val tgt1DO = ParquetFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), partitions = Seq("lastname"), saveMode = SaveMode.Append)
     instanceRegistry.register(tgt1DO)
+    val tgt2DO = ParquetFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'), partitions = Seq("lastname"), saveMode = SaveMode.Append)
+    instanceRegistry.register(tgt2DO)
 
     // prepare DAG
     val refTimestamp1 = LocalDateTime.now()
@@ -1040,13 +1042,30 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val df1 = Seq(("doe","john",5, Timestamp.from(Instant.now))).toDF("lastname", "firstname", "rating", "tstmp")
     srcDO.writeDataFrame(df1, Seq())
 
+    // dag1 run fails in init-phase because action1 fails and there is no other action to execute
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode=Some(PartitionDiffMode(failConditions = Seq(Condition(expression = "year(runStartTime) > 2000", Some("testing"))))))
-    val dag: ActionDAGRun = ActionDAGRun(Seq(action1), 1, 1)
+    val dag1: ActionDAGRun = ActionDAGRun(Seq(action1), 1, 1)
+    dag1.prepare
+    val ex1 = intercept[TaskFailedException](dag1.init)
+    assert(ex1.cause.isInstanceOf[ExecutionModeFailedException])
+    assert(ex1.cause.getMessage.contains("testing"))
 
-    // first dag run, first file processed
-    dag.prepare
-    val ex = intercept[ExecutionModeFailedException](dag.init)
-    assert(ex.msg.contains("testing"))
+    // dag2 run fails in exec-phase because action1 fails but there is another action to execute
+    val action2 = CopyAction("b", srcDO.id, tgt2DO.id)
+    val dag2: ActionDAGRun = ActionDAGRun(Seq(action1,action2), 1, 1)
+    dag2.reset
+    dag2.prepare
+    dag2.init
+    val ex2 = intercept[TaskFailedException](dag2.exec)
+    assert(ex2.cause.isInstanceOf[ExecutionModeFailedException])
+    assert(ex2.cause.getMessage.contains("testing"))
+
+    // check tgt2, it should be written by dag2
+    val r2 = tgt2DO.getDataFrame()
+      .select($"rating")
+      .as[Int].collect().toSet
+    assert(r2 == Set(5))
+
   }
 
 }
