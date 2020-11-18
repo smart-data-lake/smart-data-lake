@@ -21,49 +21,31 @@ package io.smartdatalake.testutils
 
 import io.circe.yaml
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{Column, DataFrame, DataFrameHelpers, Row, SparkSession}
+import org.apache.spark.sql._
 import org.apache.spark.sql.functions.{col, count, to_timestamp}
-import org.apache.spark.sql.types.{ArrayType, BooleanType, DataType, DecimalType, IntegerType, MapType, StringType, StructField, StructType, TimestampType}
+import org.apache.spark.sql.types._
 import org.slf4j.LoggerFactory
 
 object DataFrameTestHelper {
 
-  lazy val emptyDf: DataFrame = createDf(Map[String, TypedValue]())
   val ts: String => TypedValue = formattedTimeStamp => TypedValue(formattedTimeStamp, TimestampType)
   val str: String => TypedValue = str => TypedValue(str, StringType)
   val int: Integer => TypedValue = int => TypedValue(int, IntegerType)
   val dec: Integer => TypedValue = dec => TypedValue(dec, DecimalType(38, 0))
   val bool: Boolean => TypedValue = bool => TypedValue(bool, BooleanType)
-
   val strMapArray: Array[Map[String, String]] => TypedValue = strMap => TypedValue(strMap, ArrayType(MapType(StringType, StringType)))
   val strArray: Array[String] => TypedValue = strArray => TypedValue(strArray, ArrayType(StringType))
-
   val typedNull: DataType => TypedValue = dataType => TypedValue(null, dataType)
+
   private val logger = LoggerFactory.getLogger(this.getClass)
 
-  def createDfFromYaml(yamlString: String): DataFrame = {
-    createDfFromJson(createJsonFromYaml(yamlString))
+  def emptyDf()(implicit session: SparkSession): DataFrame = createDf(Map[String, TypedValue]())
+
+  def createDf(input: Map[String, TypedValue]*)(implicit session: SparkSession): DataFrame = {
+    createDfWithDefaultValues(input: _*)()
   }
 
-  def createDfFromJson(json: String): DataFrame = {
-    val spark = SparkSession.builder().master("local").getOrCreate()
-    import spark.implicits._
-
-    spark.read.json(Seq(json).toDS)
-  }
-
-  def createJsonFromYaml(yamlString: String): String = {
-    yaml.parser.parse(yamlString) match {
-      case Left(error) => throw new Exception("Unable to parse YAML: " + error)
-      case Right(json) => json.spaces2
-    }
-  }
-
-  def createDefaultDf(defaultValues: Map[String, TypedValue] = Map())(input: Map[String, TypedValue]*): DataFrame = {
-    createDfWithDefaultValues(input: _*)(defaultValues)
-  }
-
-  private def createDfWithDefaultValues(input: Map[String, TypedValue]*)(defaultValues: Map[String, TypedValue] = Map()): DataFrame = {
+  private def createDfWithDefaultValues(input: Map[String, TypedValue]*)(defaultValues: Map[String, TypedValue] = Map())(implicit session: SparkSession): DataFrame = {
 
     // check for null values passed in as typed value
     for (
@@ -130,9 +112,8 @@ object DataFrameTestHelper {
       rowValues.map(row => Row(row: _*))
 
     // Initialize test spark session and create DataFrame with the values and schema
-    val spark = SparkSession.builder().master("local").getOrCreate()
-    val rdd: RDD[Row] = spark.sparkContext.parallelize(rowData)
-    val df = spark.createDataFrame(rdd, schema)
+    val rdd: RDD[Row] = session.sparkContext.parallelize(rowData)
+    val df = session.createDataFrame(rdd, schema)
 
     // Special handling of Timestamp and Decimal columns: Steps 2 and 3
     val castTimestampColumn: (DataFrame, String) => DataFrame = (df, columnName) =>
@@ -154,8 +135,25 @@ object DataFrameTestHelper {
     dfResult
   }
 
-  def createDf(input: Map[String, TypedValue]*): DataFrame = {
-    createDfWithDefaultValues(input: _*)()
+  def createDfFromYaml(yamlString: String)(implicit session: SparkSession): DataFrame = {
+    createDfFromJson(createJsonFromYaml(yamlString))
+  }
+
+  def createDfFromJson(json: String)(implicit session: SparkSession): DataFrame = {
+    import session.implicits._
+
+    session.read.json(Seq(json).toDS)
+  }
+
+  def createJsonFromYaml(yamlString: String): String = {
+    yaml.parser.parse(yamlString) match {
+      case Left(error) => throw new Exception("Unable to parse YAML: " + error)
+      case Right(json) => json.spaces2
+    }
+  }
+
+  def createDefaultDf(defaultValues: Map[String, TypedValue] = Map())(input: Map[String, TypedValue]*)(implicit session: SparkSession): DataFrame = {
+    createDfWithDefaultValues(input: _*)(defaultValues)
   }
 
   implicit def valueToTypedValue[T](value: T): TypedValue = value match {
@@ -167,20 +165,14 @@ object DataFrameTestHelper {
     case _ => throw new Exception("Unable to convert to TypedValue")
   }
 
-  def assertSchemasEqual(expected: StructType, actual: StructType): Unit = {
-    val sameSchema = expected.mkString(" ").split(" ").sorted sameElements actual.mkString(" ").split(" ").sorted
-
-    assert(sameSchema, s"schema differs: \nexpected: \n${expected.mkString("\n")}, \nactual: \n${actual.mkString("\n")}")
-  }
-
   /**
    *
    * Check that two DataFrames are equal. This includes
    *  - the schema is equal
    *  - the content is equal
    *
-   * @param dfExpected              the expected dataframe
-   * @param dfActual             the actual dataframe
+   * @param dfExpected        the expected dataframe
+   * @param dfActual          the actual dataframe
    * @param ignoreColumnOrder whether or not to ignore the order of columns
    * @param ignoreNullability whether or not to ignore nullability of fields
    * @return whether or not the dataframes are equal
@@ -197,38 +189,14 @@ object DataFrameTestHelper {
       assert(colsRightButNotLeft.isEmpty, s"These columns are only present in the actual DataFrame: \n$colsRightButNotLeft")
     }
 
+    // compare schema
     val (expectedPrime, actualPrime) = if (ignoreColumnOrder) {
       (dfExpected, dfActual.select(dfExpected.columns.map(col): _*))
     } else {
       (dfExpected, dfActual)
     }
 
-    val sameSchema = if (ignoreNullability) {
-      // in this case we can compare the simple-string which does include types, but
-      // not nullability. This is easier than traversing the schema recursively.
-      val expectedSimpleSchema = expectedPrime.schema.simpleString
-      val actualSimpleSchema = actualPrime.schema.simpleString
-      expectedSimpleSchema == actualSimpleSchema
-    } else {
-      // compare full schema
-      expectedPrime.schema == actualPrime.schema
-    }
-
-    if (!sameSchema) {
-      val expectedTypes = dfExpected.schema map (structType => structType.name -> structType.dataType) toMap
-      val actualTypes = dfActual.schema map (structType => structType.name -> structType.dataType) toMap
-      val differentTypes = (dfExpected.schema toSet) diff (dfActual.schema toSet)
-      val differentTypesString = differentTypes.map(structType => {
-        val treeStringExpected = new StructType(Array(StructField(structType.name, expectedTypes(structType.name), structType.nullable))).treeString
-        val treeStringActual = new StructType(Array(StructField(structType.name, actualTypes(structType.name), structType.nullable))).treeString
-        s"Actual schema differs from expected schema.\n" +
-          s"Column: ${structType.name}\n" +
-          s"Expected type: $treeStringExpected,\n" +
-          s"Actual type:   $treeStringActual" +
-          (if (treeStringActual.length > 20 && treeStringExpected.length > 20) s"In expected but not actual:    ${treeStringExpected diff treeStringActual}\nIn actual but not expected:   ${treeStringActual diff treeStringExpected}" else "")
-      }).mkString("\n\n")
-      assert(differentTypes.isEmpty, differentTypesString)
-    }
+    assertSchemasEqual(expectedPrime.schema, actualPrime.schema)
 
     // now compare data
     val expectedPrimeCount = expectedPrime.groupBy(expectedPrime.columns.map(col): _*).agg(count("*").as("rowcount"))
@@ -255,11 +223,40 @@ object DataFrameTestHelper {
     }
   }
 
+  def assertSchemasEqual(expected: StructType, actual: StructType, ignoreNullability: Boolean = false): Unit = {
+    val sameSchema = if (ignoreNullability) {
+      // in this case we can compare the simple-string which does include types, but
+      // not nullability. This is easier than traversing the schema recursively.
+      val expectedSimpleSchema = expected.simpleString
+      val actualSimpleSchema = actual.simpleString
+      expectedSimpleSchema == actualSimpleSchema
+    } else {
+      // compare full schema
+      expected == actual
+    }
+
+    if (!sameSchema) {
+      val expectedTypes = expected map (structType => structType.name -> structType.dataType) toMap
+      val actualTypes = actual map (structType => structType.name -> structType.dataType) toMap
+      val differentTypes = (expected toSet) diff (actual toSet)
+      val differentTypesString = differentTypes.map(structType => {
+        val treeStringExpected = new StructType(Array(StructField(structType.name, expectedTypes(structType.name), structType.nullable))).treeString
+        val treeStringActual = new StructType(Array(StructField(structType.name, actualTypes(structType.name), structType.nullable))).treeString
+        s"Actual schema differs from expected schema.\n" +
+          s"Column: ${structType.name}\n" +
+          s"Expected type: $treeStringExpected,\n" +
+          s"Actual type:   $treeStringActual" +
+          (if (treeStringActual.length > 20 && treeStringExpected.length > 20) s"In expected but not actual:    ${treeStringExpected diff treeStringActual}\nIn actual but not expected:   ${treeStringActual diff treeStringExpected}" else "")
+      }).mkString("\n\n")
+      assert(differentTypes.isEmpty, differentTypesString)
+    }
+  }
+
   /**
    * Computes the non-equal rows of 2 dataframes, must have same number of columns
    *
-   * @param df1 A DataFrame to compare
-   * @param df2 A DataFrame to compare
+   * @param df1     A DataFrame to compare
+   * @param df2     A DataFrame to compare
    * @param columns the columns to include in the check, if none are given, take all columns
    * @return (rows from df1 not in df2, rows from df2 not in df1)
    */
