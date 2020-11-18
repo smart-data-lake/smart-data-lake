@@ -208,7 +208,6 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("A","doe","john",5)).toDF("type", "lastname", "firstname", "rating")
     val l1PartitionValues = Seq(PartitionValues(Map("type"->"A")))
     srcDO.writeDataFrame(l1, l1PartitionValues) // prepare testdata
-    action.init(Seq(srcSubFeed))
     val tgtSubFeed1 = action.exec(Seq(srcSubFeed)).head
 
     // check first load
@@ -222,7 +221,6 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val l2PartitionValues = Seq(PartitionValues(Map("type"->"B")))
     srcDO.writeDataFrame(l2, l2PartitionValues) // prepare testdata
     assert(srcDO.getDataFrame().count == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
-    action.init(Seq(srcSubFeed))
     val tgtSubFeed2 = action.exec(Seq(srcSubFeed)).head
 
     // check 2nd load

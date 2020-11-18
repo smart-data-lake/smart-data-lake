@@ -29,7 +29,7 @@ import io.smartdatalake.workflow.ExceptionSeverity.ExceptionSeverity
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.ActionHelper.{getOptionalDataFrame, searchCommonInits}
-import io.smartdatalake.workflow.action.{NoDataToProcessDontStopWarning, NoDataToProcessWarning}
+import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, max}
@@ -124,7 +124,7 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None, override val al
               val data = PartitionDiffModeExpressionData.from(context).copy(inputPartitionValues = inputPartitionValues.map(_.getMapString), outputPartitionValues = outputPartitionValues.map(_.getMapString), selectedPartitionValues = selectedPartitionValues.map(_.getMapString))
               val doFail = failCondition.exists(c => SparkExpressionUtil.evaluateBoolean(actionId, Some("failCondition"), c, data)) // default is to not fail
               if (doFail) throw ExecutionModeFailedException(actionId.id, context.phase, s"($actionId) Execution mode failed because of failCondition '${failCondition.get}' for $data")
-              // skip processing if no new data
+              // stop processing if no new data
               if (partitionValuesToBeProcessed.isEmpty) throw NoDataToProcessWarning(actionId.id, s"($actionId) No partitions to process found for ${input.id}")
               //return
               logger.info(s"($actionId) PartitionDiffMode selected partition values ${selectedPartitionValues.mkString(", ")} to process")
@@ -162,10 +162,8 @@ case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[
  * @param compareCol a comparable column name existing in mainInput and mainOutput used to identify the delta. Column content should be bigger for newer records.
  * @param alternativeOutputId optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
  *                            It can be used to ensure processing all partitions over multiple actions in case of errors.
- * @param stopIfNoData optional setting if further actions should be skipped if this action has no data to process (default).
- *                     Set stopIfNoData=false if you want to run further actions nevertheless. They will receive output dataObject unfiltered as input.
  */
-case class SparkIncrementalMode(compareCol: String, override val alternativeOutputId: Option[DataObjectId] = None, stopIfNoData: Boolean = true) extends ExecutionMode with ExecutionModeWithMainInputOutput {
+case class SparkIncrementalMode(compareCol: String, override val alternativeOutputId: Option[DataObjectId] = None) extends ExecutionMode with ExecutionModeWithMainInputOutput {
   override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
   override def prepare(actionId: ActionObjectId)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.prepare(actionId)
@@ -195,25 +193,12 @@ case class SparkIncrementalMode(compareCol: String, override val alternativeOutp
               // get latest values
               val inputLatestValue = dfInput.agg(max(col(compareCol)).cast(StringType)).as[String].head
               val outputLatestValue = dfOutput.agg(max(col(compareCol)).cast(StringType)).as[String].head
-              // skip processing if no new data
-              val warnMsg = if (inputLatestValue == null) {
-                Some(s"($actionId) No increment to process found for ${output.id}: ${input.id} is empty")
-              } else if (outputLatestValue == inputLatestValue) {
-                Some(s"($actionId) No increment to process found for ${output.id} column ${compareCol} (lastestValue=$outputLatestValue)")
-              } else None
-              warnMsg.foreach { msg =>
-                if (stopIfNoData) throw NoDataToProcessWarning(actionId.id, msg)
-                else throw NoDataToProcessDontStopWarning(actionId.id, msg)
-              }
+              // stop processing if no new data
+              if (outputLatestValue == inputLatestValue) throw NoDataToProcessWarning(actionId.id, s"($actionId) No increment to process found for ${output.id} column ${compareCol} (lastestValue=$outputLatestValue)")
+              logger.info(s"($actionId) SparkIncrementalMode selected increment for writing to ${output.id}: column ${compareCol} from $outputLatestValue to $inputLatestValue to process")
               // prepare filter
-              val dataFilter = if (outputLatestValue != null) {
-                logger.info(s"($actionId) SparkIncrementalMode selected increment for writing to ${output.id}: column ${compareCol} from $outputLatestValue to $inputLatestValue to process")
-                Some(s"${compareCol} > cast('$outputLatestValue' as ${inputColType.sql})")
-              } else {
-                logger.info(s"($actionId) SparkIncrementalMode selected all data for writing to ${output.id}: output table is currently empty")
-                None
-              }
-              Some((Seq(), dataFilter))
+              val selectedData = s"${compareCol} > cast('$outputLatestValue' as ${inputColType.sql})"
+              Some((Seq(), Some(selectedData)))
             // otherwise don't filter
             case _ =>
               logger.info(s"($actionId) SparkIncrementalMode selected all records for writing to ${output.id}, because input or output DataObject is still empty.")

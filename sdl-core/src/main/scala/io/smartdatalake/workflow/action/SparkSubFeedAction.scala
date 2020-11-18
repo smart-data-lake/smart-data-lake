@@ -23,8 +23,6 @@ import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFra
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 
-import scala.util.Try
-
 abstract class SparkSubFeedAction extends SparkAction {
 
   /**
@@ -52,20 +50,26 @@ abstract class SparkSubFeedAction extends SparkAction {
    */
   def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed
 
-  private def doTransform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  private def doTransform(subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+    // convert subfeed to SparkSubFeed type or initialize if not yet existing
+    var preparedSubFeed = SparkSubFeed.fromSubFeed(subFeed)
     // apply execution mode
-    var preparedSubFeed = executionModeResult.get match {
-      case Some((newPartitionValues, newFilter)) => subFeed.copy(partitionValues = newPartitionValues, filter = newFilter)
-      case None => subFeed
+    preparedSubFeed = executionMode match {
+      case Some(mode) =>
+        mode.apply(id, input, output, preparedSubFeed) match {
+          case Some((newPartitionValues, newFilter)) => preparedSubFeed.copy(partitionValues = newPartitionValues, filter = newFilter)
+          case None => preparedSubFeed
+        }
+      case _ => preparedSubFeed
     }
     // prepare as input SubFeed
     preparedSubFeed = prepareInputSubFeed(preparedSubFeed, input)
     // enrich with fresh DataFrame if needed
     preparedSubFeed = enrichSubFeedDataFrame(input, preparedSubFeed, context.phase)
-    // transform and update dataObjectId
-    val transformedSubFeed = transform(preparedSubFeed).copy(dataObjectId = output.id)
-    // update partition values to output's partition columns
-    validateAndUpdateSubFeedPartitionValues(output, transformedSubFeed)
+    // transform
+    val transformedSubFeed = transform(preparedSubFeed)
+    // update partition values to output's partition columns and update dataObjectId
+    validateAndUpdateSubFeedPartitionValues(output, transformedSubFeed).copy(dataObjectId = output.id)
   }
 
   /**
@@ -73,20 +77,7 @@ abstract class SparkSubFeedAction extends SparkAction {
    */
   override final def init(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == 1, s"Only one subfeed allowed for SparkSubFeedActions (Action $id, inputSubfeed's ${subFeeds.map(_.dataObjectId).mkString(",")})")
-    // convert subfeed to SparkSubFeed type or initialize if not yet existing
-    val subFeed = SparkSubFeed.fromSubFeed(subFeeds.head)
-    // evaluate execution mode and store result
-    executionModeResult = Try(
-      executionMode.flatMap(_.apply(id, input, output, subFeed))
-    ).recover {
-      case ex: NoDataToProcessDontStopWarning =>
-        // return empty output subfeed if "no data dont stop"
-        val outputSubFeed = SparkSubFeed(dataFrame = None, dataObjectId = output.id, partitionValues = Seq())
-        // update partition values to output's partition columns and update dataObjectId
-        validateAndUpdateSubFeedPartitionValues(output, outputSubFeed)
-        // rethrow exception with fake results added. The DAG will pass the fake results to further actions.
-        throw ex.copy(results = Some(Seq(outputSubFeed)))
-    }
+    val subFeed = subFeeds.head
     // transform
     val transformedSubFeed = doTransform(subFeed)
     // check output
@@ -100,8 +91,7 @@ abstract class SparkSubFeedAction extends SparkAction {
    */
   override final def exec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == 1, s"Only one subfeed allowed for SparkSubFeedActions (Action $id, inputSubfeed's ${subFeeds.map(_.dataObjectId).mkString(",")})")
-    // convert subfeed to SparkSubFeed type or initialize if not yet existing
-    val subFeed = SparkSubFeed.fromSubFeed(subFeeds.head)
+    val subFeed = subFeeds.head
     // transform
     val transformedSubFeed = doTransform(subFeed)
     // write output

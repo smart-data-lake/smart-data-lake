@@ -26,7 +26,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.connection.{DefaultSQLCatalog, JdbcTableConnection}
+import io.smartdatalake.workflow.connection.JdbcTableConnection
 
 class JdbcTableDataObjectTest extends DataObjectTestSuite {
 
@@ -106,30 +106,5 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
 
     // assert cannot write to DataObject with query defined
     intercept[IllegalArgumentException](dataObject2.writeDataFrame(df, Seq()))
-  }
-
-  test("isTableExisting should return not only the table but also the view - read jdbc:hsqldb view and table") {
-    import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
-    instanceRegistry.register(jdbcConnection)
-    try {
-      jdbcConnection.execJdbcStatement(sql = "create view test_view_191 as (SELECT 'test_data' AS test_column from (values(0)));")
-      jdbcConnection.execJdbcStatement(sql = "create table test_table_191 (test_column char(9));")
-      jdbcConnection.execJdbcStatement(sql = "insert into test_table_191 (test_column) VALUES ('test_data');")
-      val db = "public"
-      val view = Table(Some(db), "test_view_191")
-      val table = Table(Some(db), "test_table_191")
-      val dataObjectView = JdbcTableDataObject("jdbcDO1", table = view, connectionId = "jdbcCon1")
-      val dataObjectTable = JdbcTableDataObject("jdbcDO1", table = table, connectionId = "jdbcCon1")
-      val df = Seq(("test_data")).toDF("test_column")
-      val dfReadView = dataObjectView.getDataFrame(Seq())
-      val dfReadTable = dataObjectTable.getDataFrame(Seq())
-      assert(jdbcConnection.catalog.asInstanceOf[DefaultSQLCatalog].isTableExisting(db, view.name))
-      assert(jdbcConnection.catalog.asInstanceOf[DefaultSQLCatalog].isTableExisting(db, table.name))
-      assert(dfReadView.symmetricDifference(df).isEmpty)
-      assert(dfReadTable.symmetricDifference(df).isEmpty)
-    } finally {
-      jdbcConnection.execJdbcStatement(sql = "DROP view if exists test_view_191;")
-      jdbcConnection.execJdbcStatement(sql = "DROP table if exists test_table_191;")
-    }
   }
 }
