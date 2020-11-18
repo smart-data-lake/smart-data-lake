@@ -172,7 +172,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
         postResponse(webserviceOptions.url, bytes)
       } match {
         case Success(s) => s
-        case Failure(e) => throw new RuntimeException(s"Can't create OutputStream for $id and $path: ${e.getClass.getSimpleName} - ${e.getMessage}", e)
+        case Failure(e) => throw new RuntimeException(s"Could not post to webservice for $id - ${e.getMessage}", e)
       }
     }
   }
