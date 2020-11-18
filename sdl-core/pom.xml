@@ -301,7 +301,12 @@
 			<version>2.25.1</version>
 			<scope>test</scope>
 		</dependency>
-
+		<dependency>
+			<groupId>org.apache.tika</groupId>
+			<artifactId>tika-core</artifactId>
+			<version>1.24.1</version>
+			<scope>compile</scope>
+		</dependency>
 	</dependencies>
 
 	<build>
