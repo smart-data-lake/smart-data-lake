@@ -132,15 +132,19 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
     // Try to extract Mime Type
     // JSON is detected as text/plain, try to parse it as JSON to more precisely define it as
     // application/json
-    val mimetype:String = tika.detect(body) match {
-      case "text/plain" => try {
-        new ObjectMapper().readTree(body)
-        "application/json"
-      } catch {
-        case _ : Throwable => "text/plain"
+    val mimetype:String =
+    if(webserviceOptions.mimeType.isDefined)
+      webserviceOptions.mimeType.get
+    else
+      tika.detect(body) match {
+        case "text/plain" => try {
+          new ObjectMapper().readTree(body)
+          "application/json"
+        } catch {
+          case _ : Throwable => "text/plain"
+        }
+        case s => s
       }
-      case s => s
-    }
     webserviceClient.post(body, mimetype) match {
       case Success(c) => c
       case Failure(e) => logger.error(e.getMessage, e)
@@ -311,5 +315,6 @@ case class WebserviceOptions (url: String,
                               keycloakAuth: Option[KeycloakConfig] = None,
                               userVariable: Option[String] = None,
                               passwordVariable: Option[String] = None,
-                              token: Option[String] = None)
+                              token: Option[String] = None,
+                              mimeType: Option[String] = None)
 
