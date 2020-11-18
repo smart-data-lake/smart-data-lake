@@ -43,25 +43,6 @@ private[smartdatalake] case class InitDAGNode(override val nodeId: NodeId, edges
 
 private[smartdatalake] case class DummyDAGResult(override val resultId: String) extends DAGResult
 
-private[smartdatalake] class ActionEventListener(phase: ExecutionPhase) extends DAGEventListener[Action] with SmartDataLakeLogger {
-  override def onNodeStart(node: Action): Unit = {
-    node.addRuntimeEvent(phase, RuntimeEventState.STARTED)
-    logger.info(s"(${node.id}): $phase started")
-  }
-  override def onNodeSuccess(results: Seq[DAGResult])(node: Action): Unit = {
-    node.addRuntimeEvent(phase, RuntimeEventState.SUCCEEDED)
-    logger.info(s"(${node.id}): $phase succeeded")
-  }
-  override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
-    node.addRuntimeEvent(phase, RuntimeEventState.FAILED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
-    logger.error(s"(${node.id}): $phase failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
-  }
-  override def onNodeSkipped(exception: Throwable)(node: Action): Unit = {
-    node.addRuntimeEvent(phase, RuntimeEventState.SKIPPED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
-    logger.warn(s"(${node.id}): $phase skipped because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
-  }
-}
-
 private[smartdatalake] trait ActionMetrics {
   def getId: String
   def getOrder: Long
@@ -96,12 +77,13 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
       case ex: DAGException => ex.getDAGRootExceptions
       case ex => throw ex // this should not happen
     }
-    // only stop on skipped in init phase if there are no succeeded results
-    val stopSeverity = if (phase == ExecutionPhase.Init && dag.getNodes.exists(_.getLatestRuntimeState.contains(RuntimeEventState.INITIALIZED))) ExceptionSeverity.CANCELLED else ExceptionSeverity.SKIPPED
+    // only stop on skipped in init phase if there are no succeeded results, otherwise we want to have those actions run.
+    lazy val existsInitializedActions = dag.getNodes.exists(_.getLatestRuntimeState.contains(RuntimeEventState.INITIALIZED))
+    val stopSeverity = if (phase == ExecutionPhase.Init && existsInitializedActions) ExceptionSeverity.CANCELLED else ExceptionSeverity.SKIPPED
     val dagExceptionsToStop = dagExceptions.filter(_.severity <= stopSeverity).sortBy(_.severity)
     // log all exceptions
     dagExceptions.distinct.foreach {
-      case ex if ex.severity <= ExceptionSeverity.CANCELLED => logger.error(s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessageWithCause}")
+      case ex if ex.severity <= ExceptionSeverity.FAILED_DONT_STOP => logger.error(s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessageWithCause}")
       case ex => logger.warn(s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessageWithCause}")
     }
     // log dag on error
@@ -216,12 +198,12 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
     }
     override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
       node.addRuntimeEvent(phase, RuntimeEventState.FAILED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
-      logger.error(s"${node.toStringShort}: $phase failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
+      logger.warn(s"${node.toStringShort}: $phase failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
       if (phase==ExecutionPhase.Exec) saveState()
     }
     override def onNodeSkipped(exception: Throwable)(node: Action): Unit = {
       node.addRuntimeEvent(phase, RuntimeEventState.SKIPPED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
-      logger.warn(s"${node.toStringShort}: $phase skipped because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
+      logger.info(s"${node.toStringShort}: $phase skipped because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
       if (phase==ExecutionPhase.Exec) saveState()
     }
   }
