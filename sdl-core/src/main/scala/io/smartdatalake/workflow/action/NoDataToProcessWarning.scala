@@ -20,8 +20,6 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.workflow.DAGHelper.NodeId
-import io.smartdatalake.workflow.{SubFeed, TaskSkippedDontStopWarning, TaskSkippedWarning}
+import io.smartdatalake.workflow.TaskSkippedWarning
 
 private[smartdatalake] case class NoDataToProcessWarning(actionId: NodeId, msg: String) extends TaskSkippedWarning(actionId, msg)
-
-private[smartdatalake] case class NoDataToProcessDontStopWarning(actionId: NodeId, msg: String, results: Option[Seq[SubFeed]] = None) extends TaskSkippedDontStopWarning(actionId, msg, results)

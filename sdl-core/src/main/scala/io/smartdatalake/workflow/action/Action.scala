@@ -22,7 +22,6 @@ import java.time.{Duration, LocalDateTime}
 
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
-import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ExecutionPhase.{ExecutionPhase, Value}
@@ -36,7 +35,7 @@ import org.apache.spark.sql.custom.ExpressionEvaluator
 import scala.collection.mutable
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
-import scala.util.{Success, Try}
+import scala.util.Try
 
 /**
  * An action defines a [[DAGNode]], that is, a transformation from input [[DataObject]]s to output [[DataObject]]s in
@@ -76,14 +75,6 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   def outputs: Seq[DataObject]
 
   /**
-   * execution mode for this action.
-   */
-  def executionMode: Option[ExecutionMode]
-
-  // execution mode is evaluated in init phase and result must be stored for exec phase
-  protected var executionModeResult: Try[Option[(Seq[PartitionValues], Option[String])]] = Success(None)
-
-  /**
    * Spark SQL condition evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
    * If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
    */
@@ -115,7 +106,6 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
 
   /**
    * Initialize Action with [[SubFeed]]'s to be processed.
-   * In this step the execution mode is evaluated and the result stored for the exec phase.
    * If successful
    * - the DAG can be built
    * - Spark DataFrame lineage can be built
@@ -131,9 +121,6 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * e.g. JdbcTableDataObjects preWriteSql
    */
   def preExec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    //  if execution mode result from init phase is failure, throw corresponding exception
-    if (executionModeResult.isFailure) executionModeResult.get
-    // otherwise continue processing
     setSparkJobMetadata(None) // init spark jobGroupId to identify metrics
     inputs.foreach( input => input.preRead(findSubFeedPartitionValues(input.id, subFeeds)))
     outputs.foreach(_.preWrite) // Note: transformed subFeeds don't exist yet, that's why no partition values can be passed as parameters.

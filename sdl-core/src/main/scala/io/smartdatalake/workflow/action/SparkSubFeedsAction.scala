@@ -26,8 +26,6 @@ import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFra
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 
-import scala.util.Try
-
 abstract class SparkSubFeedsAction extends SparkAction {
 
   override def inputs: Seq[DataObject with CanCreateDataFrame]
@@ -36,8 +34,6 @@ abstract class SparkSubFeedsAction extends SparkAction {
 
   def mainInputId: Option[DataObjectId]
   def mainOutputId: Option[DataObjectId]
-
-  def inputIdsToIgnoreFilter: Seq[DataObjectId]
 
   // prepare main input / output
   // this must be lazy because inputs / outputs is evaluated later in subclasses
@@ -53,18 +49,24 @@ abstract class SparkSubFeedsAction extends SparkAction {
    */
   def transform(subFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed]
 
-  private def doTransform(subFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
+  private def doTransform(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
+    // convert subfeeds to SparkSubFeed type or initialize if not yet existing
+    var preparedSubFeeds = subFeeds.map( SparkSubFeed.fromSubFeed )
     // apply execution mode
-    var preparedSubFeeds = executionModeResult.get match {
-      case Some((newPartitionValues, newFilter)) =>
-        subFeeds.map( subFeed => subFeed.copy(partitionValues = newPartitionValues, filter = newFilter))
-      case None => subFeeds
+    preparedSubFeeds = executionMode match {
+      case Some(mode) =>
+        val mainSubFeed = preparedSubFeeds.find(_.dataObjectId == mainInput.id).get
+        mode.apply(id, mainInput, mainOutput, mainSubFeed) match {
+          case Some((newPartitionValues, newFilter)) =>
+            preparedSubFeeds.map( subFeed => subFeed.copy(partitionValues = newPartitionValues, filter = newFilter))
+          case None => preparedSubFeeds
+        }
+      case _ => preparedSubFeeds
     }
     preparedSubFeeds = preparedSubFeeds.map{ subFeed =>
       val input = (inputs ++ recursiveInputs).find(_.id == subFeed.dataObjectId).get
-      val ignoreFilter = inputIdsToIgnoreFilter.contains(input.id)
       // prepare as input SubFeed
-      val preparedSubFeed = prepareInputSubFeed(subFeed, input, ignoreFilter)
+      val preparedSubFeed = prepareInputSubFeed(subFeed, input)
       // enrich with fresh DataFrame if needed
       enrichSubFeedDataFrame(input, preparedSubFeed, context.phase)
     }
@@ -84,26 +86,8 @@ abstract class SparkSubFeedsAction extends SparkAction {
    * */
   override final def init(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == inputs.size + recursiveInputs.size, s"Number of subFeed's must match number of inputs for SparkSubFeedActions (Action $id, subfeed's ${subFeeds.map(_.dataObjectId).mkString(",")}, inputs ${inputs.map(_.id).mkString(",")})")
-    // convert subfeeds to SparkSubFeed type or initialize if not yet existing
-    val preparedSubFeeds = subFeeds.map( SparkSubFeed.fromSubFeed )
-    val mainInputSubFeed = subFeeds.find(_.dataObjectId == mainInput.id).getOrElse(throw new IllegalStateException(s"subFeed for main input ${mainInput.id} not found"))
-    // evaluate execution mode and store result
-    executionModeResult = Try(
-      executionMode.flatMap(_.apply(id, mainInput, mainOutput, mainInputSubFeed))
-    ).recover {
-      case ex: NoDataToProcessDontStopWarning =>
-        // return empty output subfeeds if "no data dont stop"
-        val outputSubFeeds = outputs.map {
-          output =>
-            val subFeed = SparkSubFeed(dataFrame = None, dataObjectId = output.id, partitionValues = Seq())
-            // update partition values to output's partition columns and update dataObjectId
-            validateAndUpdateSubFeedPartitionValues(output, subFeed)
-        }
-        // rethrow exception with fake results added. The DAG will pass the fake results to further actions.
-        throw ex.copy(results = Some(outputSubFeeds))
-    }
     // transform
-    val transformedSubFeeds = doTransform(preparedSubFeeds)
+    val transformedSubFeeds = doTransform(subFeeds)
     // check output
     outputs.foreach{
       output =>
@@ -119,10 +103,9 @@ abstract class SparkSubFeedsAction extends SparkAction {
    */
   override final def exec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == inputs.size + recursiveInputs.size, s"Number of subFeed's must match number of inputs for SparkSubFeedActions (Action $id, subfeed's ${subFeeds.map(_.dataObjectId).mkString(",")}, inputs ${inputs.map(_.id).mkString(",")})")
-    // convert subfeeds to SparkSubFeed type or initialize if not yet existing
-    val preparedSubFeeds = subFeeds.map( SparkSubFeed.fromSubFeed )
+    val mainInputSubFeed = subFeeds.find(_.dataObjectId == mainInput.id).getOrElse(throw new IllegalStateException(s"subFeed for main input ${mainInput.id} not found"))
     // transform
-    val transformedSubFeeds = doTransform(preparedSubFeeds)
+    val transformedSubFeeds = doTransform(subFeeds)
     // write output
     outputs.foreach { output =>
       val subFeed = transformedSubFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"subFeed for output ${output.id} not found"))

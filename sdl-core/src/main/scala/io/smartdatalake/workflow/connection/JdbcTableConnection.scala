@@ -180,9 +180,9 @@ private[smartdatalake] class OracleSQLCatalog(connection: JdbcTableConnection) e
   override def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean = {
     val cntTableInCatalog =
       if (Environment.enableJdbcCaseSensitivity)
-        s"select count(*) from ((select TABLE_NAME as name from ALL_TABLES where TABLE_NAME='$table' and OWNER='$db') union all (select VIEW_NAME as name from ALL_VIEWS where VIEW_NAME='$table' and OWNER='$db'))"
+        s"select count(*) from ALL_TABLES where TABLE_NAME='$table' and OWNER='$db'"
       else
-        s"select count(*) from ((select TABLE_NAME as name from ALL_TABLES where TABLE_NAME=upper('$table') and OWNER=upper('$db')) union all (select VIEW_NAME as name from ALL_VIEWS where VIEW_NAME=upper('$table') and OWNER=upper('$db')))"
+        s"select count(*) from ALL_TABLES where upper(TABLE_NAME)=upper('$table') and upper(OWNER)=upper('$db')"
     connection.execJdbcQuery( cntTableInCatalog, evalRecordExists )
   }
 }

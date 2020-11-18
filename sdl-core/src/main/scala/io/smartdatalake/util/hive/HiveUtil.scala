@@ -586,14 +586,12 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    * @param path
    * @return
    */
-  def normalizePath(path: String, prefix: Option[String]=None) : String = {
+  def normalizePath(path: String) : String = {
     path
       .replaceAll("\\\\", Environment.defaultPathSeparator.toString)
       .replaceAll("file:/", "")
-      .replaceAll("/+$", "") // remove trailing slash
+      .replaceAll("/+$", "")
       .replaceAll("tock$", "tick")
-      .replaceAll(s"^${prefix.getOrElse("")}", "")
-      .replaceAll("^/*", "/") // exactly 1 leading slash
   }
 
   def listPartitions(table: Table, partitions: Seq[String])(implicit session: SparkSession): Seq[PartitionValues] = {

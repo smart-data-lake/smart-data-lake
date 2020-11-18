@@ -175,7 +175,6 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("A","doe","john",5)).toDF("type", "lastname", "firstname", "rating")
     val l1PartitionValues = Seq(PartitionValues(Map("type"->"A")))
     srcDO.writeDataFrame(l1, l1PartitionValues) // prepare testdata
-    action.init(Seq(srcSubFeed))
     val tgtSubFeed1 = action.exec(Seq(srcSubFeed)).head
 
     // check first load
@@ -189,7 +188,6 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val l2PartitionValues = Seq(PartitionValues(Map("type"->"B")))
     srcDO.writeDataFrame(l2, l2PartitionValues) // prepare testdata
     assert(srcDO.getDataFrame().count == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
-    action.init(Seq(srcSubFeed))
     val tgtSubFeed2 = action.exec(Seq(srcSubFeed)).head
 
     // check 2nd load
@@ -246,7 +244,6 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     srcDO.writeDataFrame(l1, l1PartitionValues)
     srcDO2.writeDataFrame(l2, l2PartitionValues)
     srcDO3.writeDataFrame(l2, Seq()) // src3 is not partitioned
-    action.init(Seq(srcSubFeed1, srcSubFeed2, srcSubFeed3))
     val tgtSubFeed1 = action.exec(Seq(srcSubFeed1, srcSubFeed2, srcSubFeed3)).head
 
     // check load
@@ -340,5 +337,12 @@ class TestDfsTransformerDummy extends CustomDfsTransformer {
   override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
     // one to one...
     dfs.map{ case (id, df) => (id.replaceFirst("src","tgt"), df) }
+  }
+}
+
+class TestDfsTransformerFilterDummy extends CustomDfsTransformer {
+  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
+    // return only the first df sorted by ID
+    dfs.toSeq.sortBy(_._1).take(1).map{ case (id, df) => (id.replaceFirst("src","tgt"), df) }.toMap
   }
 }
