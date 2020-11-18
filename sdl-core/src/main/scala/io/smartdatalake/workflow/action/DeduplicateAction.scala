@@ -126,7 +126,6 @@ object DeduplicateAction extends FromConfigFactory[Action] {
     if (existingDf.isDefined) {
       // apply schema evolution
       val (baseDf, newDf) = SchemaEvolution.process(existingDf.get, enhancedDf, ignoreOldDeletedColumns = ignoreOldDeletedColumns, ignoreOldDeletedNestedColumns = ignoreOldDeletedNestedColumns)
-      // Schema evolution puts new columns at the end of the column list, so we need to move the technical captured column back to the end
       deduplicate(baseDf, newDf, pks)
     } else enhancedDf
   }
