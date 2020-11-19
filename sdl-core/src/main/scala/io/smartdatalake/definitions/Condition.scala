@@ -26,7 +26,8 @@ import io.smartdatalake.util.misc.SparkExpressionUtil
 import scala.reflect.runtime.universe.TypeTag
 
 /**
- * Definition of a condition.
+ * Definition of a Spark SQL condition with description.
+ * This is used for example to define failConditions of [[PartitionDiffMode]].
  *
  * @param expression Condition formulated as Spark SQL. The attributes available are dependent on the context.
  * @param description A textual description of the condition to be shown in error messages.
