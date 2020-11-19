@@ -206,8 +206,8 @@ object DataFrameTestHelper {
 
     if (!sameData) {
       val messageRows = s"non-equal rows\nrows which appear in expected but not in actual:\n " +
-        s"${DataFrameHelpers.showString(expectedMinusActual, 100)}\n" +
-        s"rows which appear in actual but not in expected:\n ${DataFrameHelpers.showString(actualMinusExpected, 100)}"
+        s"${DatasetHelper.showString(expectedMinusActual, 100)}\n" +
+        s"rows which appear in actual but not in expected:\n ${DatasetHelper.showString(actualMinusExpected, 100)}"
 
       // compute difference at column-level. This is tricky because the equality of rows involve all columns
       // What we can do is to take the rows which show a difference at row-level, and check whether we have columns
