@@ -151,7 +151,7 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
     val df2 = createDf(Map(
       colId -> 1,
       colValueOld -> "A",
-      colValueNew -> dec(100),
+      colValueNew -> dec(100)
     ))
 
     val dateTime1 = LocalDateTime.of(2020, Month.AUGUST, 15, 10, 0, 0)
@@ -163,7 +163,7 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
     val df3 = createDf(Map(
       colId -> 1,
       colValueOld -> "B",
-      colValueNew -> dec(200),
+      colValueNew -> dec(200)
     ))
 
     val dateTime2 = LocalDateTime.of(2020, Month.AUGUST, 16, 10, 0, 0)
