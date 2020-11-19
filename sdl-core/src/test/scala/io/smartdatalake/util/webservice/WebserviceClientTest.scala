@@ -120,4 +120,13 @@ class WebserviceClientTest extends FunSuite with BeforeAndAfterEach  {
     assert(check.isFailure)
   }
 
+  test("Check posting JSON") {
+    val webserviceClient = DefaultWebserviceClient(Some(s"http://$host:$port/good/post/no_auth"))
+    val testJson = s"""{name: "Samantha", age: 31, city: "San Francisco"};""".getBytes
+    webserviceClient.post(testJson, "application/json")
+    val response = HttpResponse(body=testJson, code = 200, headers= Map())
+    val check = webserviceClient.checkResponse(response)
+    assert(check.isSuccess)
+  }
+
 }

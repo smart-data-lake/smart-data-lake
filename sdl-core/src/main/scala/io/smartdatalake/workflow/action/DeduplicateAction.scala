@@ -101,15 +101,32 @@ case class DeduplicateAction(override val id: ActionObjectId,
     val existingDf = if (output.isTableExisting) {
       Some(output.getDataFrame(subFeed.partitionValues))
     } else None
-    val deduplicateTransformer = deduplicateDataFrame(existingDf, pks, timestamp) _
+    val deduplicateTransformer = DeduplicateAction.deduplicateDataFrame(existingDf, pks, timestamp, ignoreOldDeletedColumns, ignoreOldDeletedNestedColumns) _
     applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, Seq(deduplicateTransformer), filterClauseExpr)
+  }
+
+  /**
+   * @inheritdoc
+   */
+  override def factory: FromConfigFactory[Action] = DeduplicateAction
+}
+
+object DeduplicateAction extends FromConfigFactory[Action] {
+
+  /**
+   * @inheritdoc
+   */
+  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): DeduplicateAction = {
+    import configs.syntax.ConfigOps
+    import io.smartdatalake.config._
+    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
+    config.extract[DeduplicateAction].value
   }
 
   /**
    * deduplicates a SubFeed.
    */
-  private def deduplicateDataFrame(existingDf: Option[DataFrame], pks: Seq[String], refTimestamp: LocalDateTime)(df: DataFrame)(implicit session: SparkSession): DataFrame = {
-
+  def deduplicateDataFrame(existingDf: Option[DataFrame], pks: Seq[String], refTimestamp: LocalDateTime, ignoreOldDeletedColumns: Boolean, ignoreOldDeletedNestedColumns: Boolean)(df: DataFrame)(implicit session: SparkSession): DataFrame = {
     // enhance
     val enhancedDf = df.withColumn(TechnicalTableColumn.captured.toString, ActionHelper.ts1(refTimestamp))
 
@@ -146,23 +163,5 @@ case class DeduplicateAction(override val id: ActionObjectId,
       rows.map(_.getAs[Timestamp](TechnicalTableColumn.captured.toString)).zipWithIndex.maxBy(_._1.getTime)._2
     }
     val udf_getLatestRowIndex: UserDefinedFunction = udf(getLatestRowIndex _)
-  }
-
-  /**
-   * @inheritdoc
-   */
-  override def factory: FromConfigFactory[Action] = DeduplicateAction
-}
-
-object DeduplicateAction extends FromConfigFactory[Action] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): DeduplicateAction = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[DeduplicateAction].value
   }
 }
