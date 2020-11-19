@@ -262,11 +262,11 @@
 			<artifactId>scalacheck_${scala.minor.version}</artifactId>
 			<scope>test</scope>
 		</dependency>
-		<!-- Log4j is used in some unit tests to disable some exception logging -->
+		<!-- Log4j is used in some unit tests to disable some exception logging, but also indirectly from SmartDataLakeLogger. Thats why we should not put scope=test-->
 		<dependency>
 			<groupId>log4j</groupId>
 			<artifactId>log4j</artifactId>
-			<scope>test</scope>
+			<!--scope>test</scope-->
 		</dependency>
 
 		<dependency>
