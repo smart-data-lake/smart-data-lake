@@ -30,4 +30,7 @@ private[smartdatalake] trait Webservice {
     */
   def get(): Try[Array[Byte]]
 
+
+  def post(body: Array[Byte], mimeType: String): Try[Array[Byte]]
+
 }

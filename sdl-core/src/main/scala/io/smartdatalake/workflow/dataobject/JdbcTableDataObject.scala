@@ -18,8 +18,6 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.sql.Timestamp
-
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
@@ -95,7 +93,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
-    val queryOrTable = Map(table.query.map(q => ("query",q)).getOrElse(("dbtable"->table.fullName)))
+    val queryOrTable = Map(table.query.map(q => ("query",q)).getOrElse("dbtable"->table.fullName))
     val df = session.read.format("jdbc")
       .options(jdbcOptions)
       .options(
@@ -141,7 +139,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     super.postWrite(partitionValues)
     preparedAndExecSql(postWriteSql, Some("postWriteSql"), partitionValues)
   }
-  private def preparedAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext) = {
+  private def preparedAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     sqlOpt.foreach { sql =>
       val data = DefaultExpressionData.from(context, partitionValues)
       val preparedSql = SparkExpressionUtil.substitute(id, configName, sql, data)

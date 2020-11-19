@@ -52,6 +52,20 @@ private[smartdatalake] class DefaultWebserviceClient(httpRequest: HttpRequest) e
   }
 
   /**
+   * Sends a POST request with a body in the given mimetype
+   * @param body body
+   * @param mimeType mimetype to use for the body
+   * @return
+   */
+  override def post(body: Array[Byte], mimeType: String): Try[Array[Byte]] = {
+    logger.info("Sending POST request with content-type: " +mimeType)
+     Try(httpRequest.method("POST").header("content-type",mimeType).postData(body).asBytes) match {
+       case Success(httpResponse) => checkResponse(httpResponse)
+       case Failure(exception) => Failure(exception)
+     }
+  }
+
+  /**
    *
    * Check response of webservice call
    *

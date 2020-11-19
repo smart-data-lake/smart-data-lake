@@ -160,7 +160,6 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
       case Failure(ex) =>
         // pass Failure if severity is high
         notify(node, eventListener.onNodeFailure(ex))
-        logger.error(s"Task ${node.nodeId} failed: $ex")
         Failure(TaskFailedException(node.nodeId, ex))
     }
     // return
