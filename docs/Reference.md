@@ -121,18 +121,33 @@ Note that during execution of the dag, no new partition values are added, they a
 ### PartitionDiffMode: Dynamic partition values filter 
 Alternatively you can let SmartDataLakeBuilder find missing partitions and set partition values automatically by specifying execution mode PartitionDiffMode.
 
-By defining the applyCondition attribute you can give a condition to decide at runtime if the PartitionDiffMode should be applied or not.
+By defining the **applyCondition** attribute you can give a condition to decide at runtime if the PartitionDiffMode should be applied or not.
 Default is to apply the PartitionDiffMode if the given partition values are empty (partition values from command line or passed from previous action). 
 Define an applyCondition by a spark sql expression working with attributes of DefaultExecutionModeExpressionData returning a boolean.
 
-By defining the failCondition attribute you can give a condition to fail application of execution mode if true.
-It can be used fail a run based on expected partitions, time and so on.
+By defining the **failCondition** attribute you can give a condition to fail application of execution mode if true. 
+It can be used to fail a run based on expected partitions, time and so on.
+The expression is evaluated after execution of PartitionDiffMode, amongst others there are attributes inputPartitionValues, outputPartitionValues and selectedPartitionValues to make the decision.
 Default is that the application of the PartitionDiffMode does not fail the action. If there is no data to process, the following actions are skipped.
 Define a failCondition by a spark sql expression working with attributes of PartitionDiffModeExpressionData returning a boolean.
 Example - fail if partitions are not processed in strictly increasing order of partition column "dt":
 ```
   failCondition = "(size(selectedPartitionValues) > 0 and array_min(transform(selectedPartitionValues, x -> x.dt)) < array_max(transform(outputPartitionValues, x -> x.dt)))"
 ```
+
+Sometimes the failCondition can become quite complex with multiple terms concatenated by or-logic. 
+To improve interpretabily of error messages, multiple fail conditions can be configured as array with attribute **failConditions**. For every condition you can also define a description which will be inserted into the error message. 
+
+Finally By defining **selectExpression** you can customize which partitions are selected.
+Define a spark sql expression working with attributes of PartitionDiffModeExpressionData returning a Seq(Map(String,String)).
+Example - only process the last selected partition: 
+```
+  selectExpression = "slice(selectedPartitionValues,-1,1)"
+```
+
+By defining **alternativeOutputId** attribute you can define another DataObject which will be used to check for already existing data.
+This can be used to select data to process against a DataObject later in the pipeline.
+
 
 ### SparkStreamingOnceMode: Incremental load 
 Some DataObjects are not partitioned, but nevertheless you dont want to read all data from the input on every run. You want to load it incrementally.
@@ -145,13 +160,20 @@ This are KafkaTopicDataObject and all SparkFileDataObjects, see also [Spark Stru
 
 ### SparkIncrementalMode: Incremental Load
 As not every input DataObject supports the creation of streaming DataFrames, there is an other execution mode called SparkIncrementalMode.
-You configure it by defining the attribute "compareCol" with a column name present in input and output DataObject. 
+You configure it by defining the attribute **compareCol** with a column name present in input and output DataObject. 
 SparkIncrementalMode then compares the maximum values between input and output and creates a filter condition.
 On execution the filter condition is applied to the input DataObject to load the missing increment.
 Note that compareCol needs to have a sortable datatype.
 
-By defining the applyCondition attribute you can give a condition to decide at runtime if the SparkIncrementalMode should be applied or not.
+By defining **applyCondition** attribute you can give a condition to decide at runtime if the SparkIncrementalMode should be applied or not.
 Default is to apply the SparkIncrementalMode. Define an applyCondition by a spark sql expression working with attributes of DefaultExecutionModeExpressionData returning a boolean.
+
+By defining **alternativeOutputId** attribute you can define another DataObject which will be used to check for already existing data.
+This can be used to select data to process against a DataObject later in the pipeline.
+
+By defining **stopIfNoData** attribute you can customize if dependent actions should be executed also if the current action has no data selected by the execution mode.
+Default is stopIfNoData = true.
+
 
 ### FailIfNoPartitionValuesMode
 To simply check if partition values are present and fail otherwise, configure execution mode FailIfNoPartitionValuesMode.
@@ -172,10 +194,12 @@ By implementing interface StateListener  you can get notified about action resul
 ## Custom Spark Transformations
 
 ### Scala
-TODO
+You can use Spark Dataset API in Scala to define custom transformation. See [sdl-examples](https://github.com/smart-data-lake/sdl-examples) for details.
+TODO: explain more detailed
 
 ### SQL
-TODO
+You can use Spark SQL to define custom transformations. See [sdl-examples](https://github.com/smart-data-lake/sdl-examples) for details.
+TODO: explain more detailed
 
 ### Python
 It's possible to use Python to define a custom Spark transformation. Input is a PySpark DataFrame and the transformation must return again a PySpark DataFrame.
