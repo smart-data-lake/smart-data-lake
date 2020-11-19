@@ -238,7 +238,7 @@ private[smartdatalake] object DataFrameUtil {
     def isEqual(df2: DataFrame): Boolean = {
       // As a set-theoretic function symmetricDifference ignores multiple occurences of the same row.
       // Thus we need also to compare the cardinalities and the schemata of the two data frames.
-      // For the schema the order of columns doesnt need to much.
+      // For the schema, the order of columns doesn't need to match.
       // Note that two schemata equal only if they agree on nullability of their columns.
       df.schema.fields.toSet == df2.schema.fields.toSet && symmetricDifference(df2).isEmpty && df.count == df2.count
     }
