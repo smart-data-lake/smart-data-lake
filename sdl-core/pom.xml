@@ -402,7 +402,7 @@
 			<!-- Builds executable fat-jar that includes all dependencies -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-assembly-plugin</artifactId>
+				<artifactId>maven-shade-plugin</artifactId>
 			</plugin>
 
 			<!-- Executes units tests with scalatest  -->
