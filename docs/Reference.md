@@ -130,6 +130,7 @@ It can be used to fail a run based on expected partitions, time and so on.
 The expression is evaluated after execution of PartitionDiffMode, amongst others there are attributes inputPartitionValues, outputPartitionValues and selectedPartitionValues to make the decision.
 Default is that the application of the PartitionDiffMode does not fail the action. If there is no data to process, the following actions are skipped.
 Define a failCondition by a spark sql expression working with attributes of PartitionDiffModeExpressionData returning a boolean.
+
 Example - fail if partitions are not processed in strictly increasing order of partition column "dt":
 ```
   failCondition = "(size(selectedPartitionValues) > 0 and array_min(transform(selectedPartitionValues, x -> x.dt)) < array_max(transform(outputPartitionValues, x -> x.dt)))"
@@ -140,6 +141,7 @@ To improve interpretabily of error messages, multiple fail conditions can be con
 
 Finally By defining **selectExpression** you can customize which partitions are selected.
 Define a spark sql expression working with attributes of PartitionDiffModeExpressionData returning a Seq(Map(String,String)).
+
 Example - only process the last selected partition: 
 ```
   selectExpression = "slice(selectedPartitionValues,-1,1)"
@@ -192,21 +194,85 @@ To fail above sample log in case there are no records written, specify `"dataObj
 By implementing interface StateListener  you can get notified about action results & metrics. To configure state listeners set config attribute `global.stateListeners = [{className = ...}]`.
 
 ## Custom Spark Transformations
+To implement custom transformation logic, define the **transformer** attribute of an Action. 
+Note that the definition of the transformation looks different for:
+* **1-to-1** transformations: One input DataFrame is transformed into one output DataFrame. This is the case for CopyAction, DeduplicateAction and HistorizeAction. 
+* **many-to-many** transformations: Many input DataFrames are transformed into many output DataFrames. This is the case for CustomSparkAction. Configuration is defined by a CustomDfsTransformerConfig.
 
-### Scala
-You can use Spark Dataset API in Scala to define custom transformation. See [sdl-examples](https://github.com/smart-data-lake/sdl-examples) for details.
-TODO: explain more detailed
+The config allows you to define the transformation in various languages and passing static **options** and **runtimeOptions** to the transformation. runtimeOptions are extracted at runtime from the context.
+Specifying options allows to reuse a transformation in different settings. 
+ 
+### Java/Scala
+You can use Spark Dataset API in Java/Scala to define custom transformations. 
+If you have a Java project, create a class that extends CustomDfTransformer or CustomDfsTransformer and implement `transform` method
+
+If you work without Java project, it's still possible to define your transformation in Java/Scala and compile it at runtime.
+For a 1-to-1 transformation you have to write a function that takes `session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectName: String` as parameters and returns a `DataFrame`. 
+Use **scalaFile** or **scalaCode** attribute to configure this.
+
+For many-to-many transformations you get a Map[String,DataFrame] with the DataFrames per input DataObject as parameter, and have to return a Map[String,DataFrame] with the DataFrame per output DataObject.
+
+See [sdl-examples](https://github.com/smart-data-lake/sdl-examples) for details.
 
 ### SQL
-You can use Spark SQL to define custom transformations. See [sdl-examples](https://github.com/smart-data-lake/sdl-examples) for details.
-TODO: explain more detailed
+You can use Spark SQL to define custom transformations by defining **sqlCode** attribute.
+Input dataObjects are available as tables to select from. Use tokens %{<key>} to replace with runtimeOptions in SQL code.
+
+Example - using options in sql code for 1-to-1 transformation:
+```
+transformer {
+  sqlCode = "select id, cnt, '%{test}' as test, %{run_id} as last_run_id from dataObject1"
+  options = {
+    test = "test run"
+  }
+  runtimeOptions = {
+    last_run_id = "runId - 1" // runtime options are evaluated as spark SQL expressions against DefaultExpressionData
+  }
+}
+```
+
+Example - defining a many-to-many transformation:
+```
+transformer.sqlCode {
+  dataObjectOut1 = "select id,cnt from dataObjectIn1 where group = 'test1'",
+  dataObjectOut2 = "select id,cnt from dataObjectIn1 where group = 'test2'"
+}
+```
+
+See [sdl-examples](https://github.com/smart-data-lake/sdl-examples) for details.
 
 ### Python
-It's possible to use Python to define a custom Spark transformation. Input is a PySpark DataFrame and the transformation must return again a PySpark DataFrame.
+It's also possible to use Python to define a custom Spark transformation. 
+Use **pythonFile** or **pythonCode** attribute to define your transformation. 
+PySpark session is initialize and available under variables `sc`, `session`, `sqlContext`.
+Other variables available are
+* `inputDf`: Input DataFrame
+* `options`: Transformation options as Map[String,String]
+* `dataObjectId`: Id of input dataObject as String
 
-Requirements: Python version >= 3.4 an <= 3.7 (for Spark 2.4), PySpark package.
-See Readme of [sdl-examples](https://github.com/smart-data-lake/sdl-examples) for a working example and instructions to setup environment for IntelliJ  
+Output DataFrame must be set with `setOutputDf(df)`.
+
+For now using Python for many-to-many transformations is not possible, although it would be not so hard to implement.
+
+Example - apply some python calculation as udf:
+```
+transformer.pythonCode = """
+  |from pyspark.sql.functions import *
+  |udf_multiply = udf(lambda x, y: x * y, "int")
+  |dfResult = inputDf.select(col("name"), col("cnt"))\
+  |  .withColumn("test", udf_multiply(col("cnt").cast("int"), lit(2)))
+  |setOutputDf(dfResult)
+"""
+```
+
+Requirements: 
+* Spark 2.4.x: 
+  * Python version >= 3.4 an <= 3.7
+  * PySpark package matching your spark version
+* Spark 3.x:
+  * Python version >= 3.4
+  * PySpark package matching your spark version
+
+See Readme of [sdl-examples](https://github.com/smart-data-lake/sdl-examples) for a working example and instructions to setup python environment for IntelliJ  
 
 How it works: under the hood a PySpark DataFrame is a proxy for a Java Spark DataFrame. PySpark uses Py4j to access Java objects in the JVM.
-
-  

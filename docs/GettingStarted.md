@@ -16,6 +16,7 @@ Version 1.x
 - JDK 8 (Spark 2 doesn't support JDK 9 or higher)
 - Scala 2.11 or 2.12
 - Maven 3.0 (or higher)
+
 Version 2.x
 - *Spark 3.x*
 - JDK >= 8

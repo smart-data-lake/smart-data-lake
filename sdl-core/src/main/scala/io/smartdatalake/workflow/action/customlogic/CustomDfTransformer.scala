@@ -50,7 +50,11 @@ trait CustomDfTransformer extends Serializable {
  *
  * Note about Python transformation: Environment with Python and PySpark needed.
  * PySpark session is initialize and available under variables `sc`, `session`, `sqlContext`.
- * Input DataFrame is available as `inputDf`. Output DataFrame must be set with `setOutputDf(df)`.
+ * Other variables available are
+ * - `inputDf`: Input DataFrame
+ * - `options`: Transformation options as Map[String,String]
+ * - `dataObjectId`: Id of input dataObject as String
+ * Output DataFrame must be set with `setOutputDf(df)`.
  *
  * @param className Optional class name to load transformer code from
  * @param scalaFile Optional file where scala code for transformation is loaded from
