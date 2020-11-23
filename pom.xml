@@ -112,7 +112,7 @@
 			<activation><activeByDefault>true</activeByDefault></activation>
 			<properties>
 				<scala.minor.version>2.12</scala.minor.version>
-				<scala.version>${scala.minor.version}.10</scala.version>
+				<scala.version>${scala.minor.version}.12</scala.version>
 			</properties>
 		</profile>
 		<!-- default is hadoop 2.7 in spark 3.0, to build for hadoop 3 activate this profile -->
