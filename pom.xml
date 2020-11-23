@@ -61,18 +61,41 @@
 		<profile>
 			<id>fat-jar</id>
 			<properties>
-				<skip.assembly>false</skip.assembly>
 				<scala.deps.scope>provided</scala.deps.scope>
 				<spark.deps.scope>provided</spark.deps.scope>
+				<hadoop.deps.scope>provided</hadoop.deps.scope>
+				<flume.deps.scope>provided</flume.deps.scope>
+				<hive.deps.scope>provided</hive.deps.scope>
+				<hive.parquet.scope>provided</hive.parquet.scope>
+				<hive.storage.scope>provided</hive.storage.scope>
+				<hive.common.scope>provided</hive.common.scope>
+				<hive.llap.scope>provided</hive.llap.scope>
+				<hive.serde.scope>provided</hive.serde.scope>
+				<hive.shims.scope>provided</hive.shims.scope>
+				<orc.deps.scope>provided</orc.deps.scope>
+				<parquet.deps.scope>provided</parquet.deps.scope>
 			</properties>
+			<build>
+				<plugins>
+					<!-- Builds executable fat-jar that includes all dependencies -->
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-shade-plugin</artifactId>
+					</plugin>
+				</plugins>
+			</build>
 		</profile>
 		<profile>
 			<id>fat-jar-with-spark</id>
-			<properties>
-				<skip.assembly>false</skip.assembly>
-				<scala.deps.scope>compile</scala.deps.scope>
-				<spark.deps.scope>compile</spark.deps.scope>
-			</properties>
+			<build>
+				<plugins>
+					<!-- Builds executable fat-jar that includes all dependencies -->
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-shade-plugin</artifactId>
+					</plugin>
+				</plugins>
+			</build>
 		</profile>
 		<profile>
 			<!-- do not use this profile if you want to see warnings about missing links
@@ -89,7 +112,7 @@
 			<activation><activeByDefault>true</activeByDefault></activation>
 			<properties>
 				<scala.minor.version>2.12</scala.minor.version>
-				<scala.version>${scala.minor.version}.12</scala.version>
+				<scala.version>${scala.minor.version}.10</scala.version>
 			</properties>
 		</profile>
 		<!-- default is hadoop 2.7 in spark 3.0, to build for hadoop 3 activate this profile -->
@@ -104,7 +127,6 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<skip.assembly>true</skip.assembly>
 		<noLinkWarnings>-unchecked</noLinkWarnings>
 		<license.header.file>src/license/gplv3-header.txt</license.header.file>
 
@@ -112,12 +134,11 @@
 		<maven.compiler.target>1.8</maven.compiler.target>
 		<maven.compiler.release>8</maven.compiler.release>
 
-		<scala.minor.version>2.12</scala.minor.version>
-		<scala.version>${scala.minor.version}.12</scala.version>
-
 		<scala.deps.scope>compile</scala.deps.scope>
 		<spark.deps.scope>compile</spark.deps.scope>
 		<hadoop.deps.scope>compile</hadoop.deps.scope>
+
+		<flume.deps.scope>compile</flume.deps.scope>
 		<hive.deps.scope>compile</hive.deps.scope>
 		<hive.parquet.scope>provided</hive.parquet.scope>
 		<hive.storage.version>2.7.1</hive.storage.version>
@@ -129,6 +150,9 @@
 		<orc.deps.scope>compile</orc.deps.scope>
 		<parquet.deps.scope>compile</parquet.deps.scope>
 		<parquet.test.deps.scope>test</parquet.test.deps.scope>
+
+		<scala.minor.version>2.12</scala.minor.version>
+		<scala.version>${scala.minor.version}.12</scala.version>
 
 		<spark.version>3.0.1</spark.version>
 
@@ -428,29 +452,67 @@
 				<!-- Builds executable fat-jar that includes all dependencies -->
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
-					<artifactId>maven-assembly-plugin</artifactId>
-					<version>3.1.1</version>
-					<configuration>
-						<descriptorRefs>
-							<descriptorRef>jar-with-dependencies</descriptorRef>
-						</descriptorRefs>
-						<archive>
-							<manifest>
-								<mainClass>io.smartdatalake.app.LocalSmartDataLakeBuilder</mainClass>
-							</manifest>
-							<manifestEntries>
-								<Implementation-Version>${project.version}</Implementation-Version>
-							</manifestEntries>
-						</archive>
-						<skipAssembly>${skip.assembly}</skipAssembly>
-					</configuration>
+					<artifactId>maven-shade-plugin</artifactId>
+					<version>3.2.4</version>
 					<executions>
 						<execution>
-							<id>make-assembly</id>
 							<phase>package</phase>
 							<goals>
-								<goal>single</goal>
+								<goal>shade</goal>
 							</goals>
+							<configuration>
+								<filters>
+									<filter>
+										<artifact>*:*</artifact>
+										<excludes>
+											<exclude>META-INF/*.SF</exclude>
+											<exclude>META-INF/*.DSA</exclude>
+											<exclude>META-INF/*.RSA</exclude>
+											<!-- handle some duplicate warnings: these files are not needed -->
+											<exclude>META-INF/DEPENDENCIES</exclude>
+											<exclude>META-INF/LICENSE</exclude>
+											<exclude>META-INF/LICENSE.txt</exclude>
+											<exclude>META-INF/NOTICE</exclude>
+											<exclude>META-INF/NOTICE.txt</exclude>
+											<exclude>META-INF/ASL2.0</exclude>
+											<exclude>META-INF/NOTICE</exclude>
+											<exclude>META-INF/MANIFEST.MF</exclude>
+											<exclude>META-INF/maven/**/*</exclude>
+											<exclude>META-INF/README.txt</exclude>
+											<exclude>LICENSE</exclude>
+											<exclude>LICENSE.txt</exclude>
+											<exclude>NOTICE.txt</exclude>
+											<!-- shading doesnt respect Java Modularisation (>JDK9) -->
+											<exclude>module-info.class</exclude>
+										</excludes>
+									</filter>
+								</filters>
+								<shadedArtifactAttached>true</shadedArtifactAttached>
+								<shadedClassifierName>jar-with-dependencies</shadedClassifierName>
+								<artifactSet>
+									<includes>
+										<include>*:*</include>
+									</includes>
+								</artifactSet>
+								<transformers>
+									<transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+										<resource>reference.conf</resource>
+									</transformer>
+									<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+									</transformer>
+									<transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer">
+									</transformer>
+								</transformers>
+								<archive>
+									<compress>false</compress>
+									<manifest>
+										<mainClass>io.smartdatalake.app.LocalSmartDataLakeBuilder</mainClass>
+									</manifest>
+									<manifestEntries>
+										<Implementation-Version>${project.version}</Implementation-Version>
+									</manifestEntries>
+								</archive>
+							</configuration>
 						</execution>
 					</executions>
 				</plugin>
@@ -574,6 +636,12 @@
 				<artifactId>chill-java</artifactId>
 				<version>${chill.version}</version>
 			</dependency>
+			<dependency>
+				<groupId>org.spark-project.spark</groupId>
+				<artifactId>unused</artifactId>
+				<version>1.0.0</version>
+				<scope>${spark.deps.scope}</scope>
+			</dependency>
 			<!-- This artifact is a shaded version of ASM 7.x. The POM that was used to produce this
                  is at https://github.com/apache/geronimo-xbean/tree/trunk/xbean-asm7-shaded
                  For context on why we shade ASM, see SPARK-782 and SPARK-6152. -->
@@ -581,8 +649,8 @@
 				<groupId>org.apache.xbean</groupId>
 				<artifactId>xbean-asm7-shaded</artifactId>
 				<version>4.15</version>
+				<scope>${spark.deps.scope}</scope>
 			</dependency>
-
 			<!-- Shaded deps marked as provided. These are promoted to compile scope
                  in the modules where we want the shaded classes to appear in the
                  associated jar. -->
