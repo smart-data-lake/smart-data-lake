@@ -61,18 +61,35 @@
 		<profile>
 			<id>fat-jar</id>
 			<properties>
-				<skip.assembly>false</skip.assembly>
 				<scala.deps.scope>provided</scala.deps.scope>
 				<spark.deps.scope>provided</spark.deps.scope>
+				<hadoop.deps.scope>provided</hadoop.deps.scope>
+				<flume.deps.scope>provided</flume.deps.scope>
+				<hive.deps.scope>provided</hive.deps.scope>
+				<orc.deps.scope>provided</orc.deps.scope>
+				<parquet.deps.scope>provided</parquet.deps.scope>
 			</properties>
+			<build>
+				<plugins>
+					<!-- Builds executable fat-jar that includes all dependencies -->
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-shade-plugin</artifactId>
+					</plugin>
+				</plugins>
+			</build>
 		</profile>
 		<profile>
 			<id>fat-jar-with-spark</id>
-			<properties>
-				<skip.assembly>false</skip.assembly>
-				<scala.deps.scope>compile</scala.deps.scope>
-				<spark.deps.scope>compile</spark.deps.scope>
-			</properties>
+			<build>
+				<plugins>
+					<!-- Builds executable fat-jar that includes all dependencies -->
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-shade-plugin</artifactId>
+					</plugin>
+				</plugins>
+			</build>
 		</profile>
 		<profile>
 			<!-- do not use this profile if you want to see warnings about missing links
@@ -102,7 +119,6 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<skip.assembly>true</skip.assembly>
 		<noLinkWarnings>-unchecked</noLinkWarnings>
 		<license.header.file>src/license/gplv3-header.txt</license.header.file>
 
@@ -112,12 +128,16 @@
 
 		<scala.deps.scope>compile</scala.deps.scope>
 		<spark.deps.scope>compile</spark.deps.scope>
-		<flume.deps.scope>compile</flume.deps.scope>
 		<hadoop.deps.scope>compile</hadoop.deps.scope>
+
+		<flume.deps.scope>compile</flume.deps.scope>
 		<hive.deps.scope>compile</hive.deps.scope>
 		<orc.deps.scope>compile</orc.deps.scope>
 		<parquet.deps.scope>compile</parquet.deps.scope>
 		<parquet.test.deps.scope>test</parquet.test.deps.scope>
+
+		<scala.minor.version>2.12</scala.minor.version>
+		<scala.version>${scala.minor.version}.10</scala.version>
 
 		<spark.version>2.4.7</spark.version>
 
@@ -165,7 +185,6 @@
 		<commons.math3.version>3.4.1</commons.math3.version>
 		<!--  managed up from 3.2.1 for SPARK-11652  -->
 		<commons.collections.version>3.2.2</commons.collections.version>
-		<scala.version>${scala.version}</scala.version>
 		<scala.binary.version>${scala.minor.version}</scala.binary.version>
 		<codehaus.jackson.version>1.9.13</codehaus.jackson.version>
 		<fasterxml.jackson.version>2.6.7</fasterxml.jackson.version>
@@ -401,7 +420,7 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-shade-plugin</artifactId>
-					<version>1.5</version>
+					<version>3.2.4</version>
 					<executions>
 						<execution>
 							<phase>package</phase>
@@ -416,6 +435,22 @@
 											<exclude>META-INF/*.SF</exclude>
 											<exclude>META-INF/*.DSA</exclude>
 											<exclude>META-INF/*.RSA</exclude>
+											<!-- handle some duplicate warnings: these files are not needed -->
+											<exclude>META-INF/DEPENDENCIES</exclude>
+											<exclude>META-INF/LICENSE</exclude>
+											<exclude>META-INF/LICENSE.txt</exclude>
+											<exclude>META-INF/NOTICE</exclude>
+											<exclude>META-INF/NOTICE.txt</exclude>
+											<exclude>META-INF/ASL2.0</exclude>
+											<exclude>META-INF/NOTICE</exclude>
+											<exclude>META-INF/MANIFEST.MF</exclude>
+											<exclude>META-INF/maven/**/*</exclude>
+											<exclude>META-INF/README.txt</exclude>
+											<exclude>LICENSE</exclude>
+											<exclude>LICENSE.txt</exclude>
+											<exclude>NOTICE.txt</exclude>
+											<!-- shading doesnt respect Java Modularisation (>JDK9) -->
+											<exclude>module-info.class</exclude>
 										</excludes>
 									</filter>
 								</filters>
@@ -435,6 +470,15 @@
 									<transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer">
 									</transformer>
 								</transformers>
+								<archive>
+									<compress>false</compress>
+									<manifest>
+										<mainClass>io.smartdatalake.app.LocalSmartDataLakeBuilder</mainClass>
+									</manifest>
+									<manifestEntries>
+										<Implementation-Version>${project.version}</Implementation-Version>
+									</manifestEntries>
+								</archive>
 							</configuration>
 						</execution>
 					</executions>
@@ -559,6 +603,12 @@
 				<artifactId>chill-java</artifactId>
 				<version>${chill.version}</version>
 			</dependency>
+			<dependency>
+				<groupId>org.spark-project.spark</groupId>
+				<artifactId>unused</artifactId>
+				<version>1.0.0</version>
+				<scope>${spark.deps.scope}</scope>
+			</dependency>
 			<!-- This artifact is a shaded version of ASM 6.x. The POM that was used to produce this
                  is at https://github.com/apache/geronimo-xbean/tree/trunk/xbean-asm6-shaded
                  For context on why we shade ASM, see SPARK-782 and SPARK-6152. -->
@@ -566,6 +616,7 @@
 				<groupId>org.apache.xbean</groupId>
 				<artifactId>xbean-asm6-shaded</artifactId>
 				<version>4.8</version>
+				<scope>${spark.deps.scope}</scope>
 			</dependency>
 			<!-- Shaded deps marked as provided. These are promoted to compile scope
                  in the modules where we want the shaded classes to appear in the
@@ -1908,7 +1959,7 @@
 				<groupId>com.twitter</groupId>
 				<artifactId>parquet-hadoop-bundle</artifactId>
 				<version>${hive.parquet.version}</version>
-				<scope>compile</scope>
+				<scope>${hive.deps.scope}</scope>
 			</dependency>
 			<dependency>
 				<groupId>org.apache.flume</groupId>
