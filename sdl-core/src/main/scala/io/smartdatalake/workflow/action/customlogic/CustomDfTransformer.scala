@@ -119,7 +119,7 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
     // replace runtime options
     lazy val data = DefaultExpressionData.from(context, partitionValues)
     val runtimeOptionsReplaced = runtimeOptions.mapValues {
-      expr => SparkExpressionUtil.evaluateString(actionId, Some("transformation.runtimeObjects"), expr, data)
+      expr => SparkExpressionUtil.evaluateString(actionId, Some("transformation.runtimeOptions"), expr, data)
     }.filter(_._2.isDefined).mapValues(_.get)
     // transform
     impl.get.transform(session, options ++ runtimeOptionsReplaced, df, dataObjectId.id)
