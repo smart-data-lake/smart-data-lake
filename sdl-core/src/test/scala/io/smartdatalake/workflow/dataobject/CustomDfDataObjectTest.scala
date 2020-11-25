@@ -27,9 +27,12 @@ import org.scalatest.Matchers
 
 class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
 
+  private val customDfCreatorClassName = "io.smartdatalake.config.TestCustomDfCreator"
+  private val customDfCreatorWithSchemaClassName = "io.smartdatalake.config.TestCustomDfCreatorWithSchema"
+
   test("During init where a schema method is provided, the schema of the schema method should be returned") {
     // prepare
-    val config = CustomDfCreatorConfig(Option("io.smartdatalake.config.TestCustomDfCreatorWithSchema"))
+    val config = CustomDfCreatorConfig(Option(customDfCreatorWithSchemaClassName))
     val customDfDataObject = CustomDfDataObject("testId", config)
     val context: ActionPipelineContext =
       ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Init)
@@ -43,7 +46,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
 
   test("During exec, the schema of the exec method should be returned") {
     // prepare
-    val config = CustomDfCreatorConfig(Option("io.smartdatalake.config.TestCustomDfCreatorWithSchema"))
+    val config = CustomDfCreatorConfig(Option(customDfCreatorWithSchemaClassName))
     val customDfDataObject = CustomDfDataObject("testId", config)
     val context: ActionPipelineContext =
       ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
@@ -57,7 +60,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
 
   test("During init where a schema method is provided, a DataFrame with no rows should be returned") {
     // prepare
-    val config = CustomDfCreatorConfig(Option("io.smartdatalake.config.TestCustomDfCreatorWithSchema"))
+    val config = CustomDfCreatorConfig(Option(customDfCreatorWithSchemaClassName))
     val customDfDataObject = CustomDfDataObject("testId", config)
     val context: ActionPipelineContext =
       ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Init)
@@ -71,7 +74,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
 
   test("During exec where a schema method is provided, a DataFrame with the rows from exec should be returned") {
     // prepare
-    val config = CustomDfCreatorConfig(Option("io.smartdatalake.config.TestCustomDfCreatorWithSchema"))
+    val config = CustomDfCreatorConfig(Option(customDfCreatorWithSchemaClassName))
     val customDfDataObject = CustomDfDataObject("testId", config)
     val context: ActionPipelineContext =
       ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
@@ -85,7 +88,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
 
   test("During init where no schema method is provided, a DataFrame with the rows from exec should be returned") {
     // prepare
-    val config = CustomDfCreatorConfig(Option("io.smartdatalake.config.TestCustomDfCreator"))
+    val config = CustomDfCreatorConfig(Option(customDfCreatorClassName))
     val customDfDataObject = CustomDfDataObject("testId", config)
     val context: ActionPipelineContext =
       ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Init)
@@ -99,7 +102,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
 
   test("During exec where no schema method is provided, a DataFrame with the rows from exec should be returned") {
     // prepare
-    val config = CustomDfCreatorConfig(Option("io.smartdatalake.config.TestCustomDfCreator"))
+    val config = CustomDfCreatorConfig(Option(customDfCreatorClassName))
     val customDfDataObject = CustomDfDataObject("testId", config)
     val context: ActionPipelineContext =
       ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
