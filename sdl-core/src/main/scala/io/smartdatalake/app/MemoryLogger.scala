@@ -19,11 +19,8 @@
 
 package io.smartdatalake.app
 
-import java.util
-
 import io.smartdatalake.util.misc.{MemoryUtils, SmartDataLakeLogger}
-import org.apache.spark.api.plugin.{ExecutorPlugin, PluginContext}
-import org.apache.spark.{SparkConf, SparkEnv}
+import org.apache.spark.{ExecutorPlugin, SparkConf, SparkEnv}
 
 /**
  * Configuration for periodic memory usage logging
@@ -50,9 +47,8 @@ private[smartdatalake] object MemoryLogTimerConfig{
  * Executor plugin to start memory usage logging on executors
  */
 private[smartdatalake] class MemoryLoggerExecutorPlugin extends ExecutorPlugin with SmartDataLakeLogger {
-  override def init(ctx: PluginContext, extraConf: util.Map[String, String]): Unit = {
+  override def init(): Unit = {
     // config can only be transferred to ExecutorPlugin by spark-options
-    // TODO: it might be possible to transfer configuration differently in Spark 3.0
     val sparkConf = SparkEnv.get.conf
     logger.debug("sparkConf: " + sparkConf.getAll.map{ case (k,v) => s"$k=$v"}.mkString(" "))
     try {
