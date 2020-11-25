@@ -20,17 +20,13 @@ package io.smartdatalake.config
 
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreator
 import io.smartdatalake.testutils.TestUtil.dfNonUniqueWithNull
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 class TestCustomDfNonUniqueWithNullCreator extends CustomDfCreator {
-  /**
-   * function to create a dataFrame
-   *
-   * @param session : the Spark Session
-   * @param config  Input Config of action
-   * @return Map outputID -> dataFrame
-   */
   override def exec(session: SparkSession, config: Map[String, String]): DataFrame = dfNonUniqueWithNull
+
+  override def schema(session: SparkSession, config: Map[String, String]): Option[StructType] = Option(dfNonUniqueWithNull.schema)
 
   override def equals(obj: Any): Boolean = getClass.equals(obj.getClass)
 }
