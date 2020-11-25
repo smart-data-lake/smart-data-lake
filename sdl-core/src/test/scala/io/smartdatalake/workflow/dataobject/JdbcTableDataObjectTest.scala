@@ -71,8 +71,6 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
-    val refTimestamp1 = LocalDateTime.now()
-    implicit val context1: ActionPipelineContext = ActionPipelineContext("jdbcTest", "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id)
     val srcSubFeed = SparkSubFeed(None, srcDO.id, Seq())
     action1.preExec(Seq(srcSubFeed))

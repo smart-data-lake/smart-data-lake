@@ -29,6 +29,7 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType
 import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer}
@@ -180,7 +181,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     df
   }
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
 
     // get DataFrame from topic
     val dfRaw = if (partitionValues.nonEmpty) {

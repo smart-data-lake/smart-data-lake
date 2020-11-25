@@ -62,6 +62,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+    implicit val actionPipelineContext : ActionPipelineContext = ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
 
     // setup DataObjects
     val srcTable = Table(Some("default"), "ap_input")
@@ -161,6 +162,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+    implicit val actionPipelineContext : ActionPipelineContext = ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
 
     // setup DataObjects
     val srcTable = Table(Some("default"), "ap_input")

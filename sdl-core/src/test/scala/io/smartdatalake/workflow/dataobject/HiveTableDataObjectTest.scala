@@ -249,7 +249,6 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
 
       // write test files
       val df = Seq(("A", "L2A", 1), ("A", "L2B", 2), ("B", "L2B", 3), ("B", "L2C", 4)).toDF("p1", "p2", "value")
-      implicit val context: ActionPipelineContext = ActionPipelineContext("hiveTest", "test", 1, 1, instanceRegistry, Some(LocalDateTime.now), SmartDataLakeBuilderConfig())
       intercept[IllegalArgumentException](srcDO.preWrite)
 
     } finally {
