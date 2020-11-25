@@ -35,9 +35,7 @@ trait DataObjectTestSuite extends FunSuite with Matchers with BeforeAndAfter {
   protected val convertFilePath: String => String = (path: String) => path.replaceAll("\\\\", "/")
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val actionPipelineContext : ActionPipelineContext = ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
-
-  protected lazy val testContext: ActionPipelineContext = ActionPipelineContext("testFeed", "testSource", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
+  implicit val testContext: ActionPipelineContext = ActionPipelineContext("testFeed", "testSource", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
 
   protected def createTempDir = Files.createTempDirectory("test")
 
