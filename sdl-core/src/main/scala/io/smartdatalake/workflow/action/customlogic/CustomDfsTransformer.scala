@@ -23,6 +23,7 @@ import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionHelper
+import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig.fnTransformType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -65,13 +66,13 @@ case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFi
   }.orElse{
     scalaFile.map {
       file =>
-        val fnTransform = CustomCodeUtil.compileCode[(SparkSession, Map[String,String], Map[String,DataFrame]) => Map[String,DataFrame]](HdfsUtil.readHadoopFile(file))
+        val fnTransform = CustomCodeUtil.compileCode[fnTransformType](HdfsUtil.readHadoopFile(file))
         new CustomDfsTransformerWrapper( fnTransform )
     }
   }.orElse{
     scalaCode.map {
       code =>
-        val fnTransform = CustomCodeUtil.compileCode[(SparkSession, Map[String,String], Map[String,DataFrame]) => Map[String,DataFrame]](code)
+        val fnTransform = CustomCodeUtil.compileCode[fnTransformType](code)
         new CustomDfsTransformerWrapper( fnTransform )
     }
   }.orElse{
@@ -117,4 +118,8 @@ case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFi
     // transform
     impl.get.transform(session, options ++ runtimeOptionsReplaced, dfs)
   }
+}
+
+object CustomDfsTransformerConfig {
+  type fnTransformType = (SparkSession, Map[String,String], Map[String,DataFrame]) => Map[String,DataFrame]
 }

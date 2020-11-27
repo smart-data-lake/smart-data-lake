@@ -24,6 +24,7 @@ import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData, PythonUtil, SparkExpressionUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionHelper
+import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig.fnTransformType
 import org.apache.spark.python.PythonHelper.SparkEntryPoint
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -72,13 +73,13 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
   }.orElse {
     scalaFile.map {
       file =>
-        val fnTransform = CustomCodeUtil.compileCode[(SparkSession, Map[String,String], DataFrame, String) => DataFrame](HdfsUtil.readHadoopFile(file))
+        val fnTransform = CustomCodeUtil.compileCode[fnTransformType](HdfsUtil.readHadoopFile(file))
         new CustomDfTransformerWrapper( fnTransform )
     }
   }.orElse {
     scalaCode.map {
       code =>
-        val fnTransform = CustomCodeUtil.compileCode[(SparkSession, Map[String,String], DataFrame, String) => DataFrame](code)
+        val fnTransform = CustomCodeUtil.compileCode[fnTransformType](code)
         new CustomDfTransformerWrapper( fnTransform )
     }
   }.orElse {
@@ -121,7 +122,7 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
     impl.get.transform(session, options ++ runtimeOptionsReplaced, df, dataObjectId.id)
   }
 
-  private def createSqlFnTransform(sql: String): (SparkSession, Map[String, String], DataFrame, String) => DataFrame = {
+  private def createSqlFnTransform(sql: String): fnTransformType = {
     (session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectIdStr: String) => {
       val dataObjectId = DataObjectId(dataObjectIdStr)
       val objectId = ActionHelper.replaceSpecialCharactersWithUnderscore(dataObjectIdStr)
@@ -135,7 +136,7 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
     }
   }
 
-  private def createPythonFnTransform(code: String): (SparkSession, Map[String, String], DataFrame, String) => DataFrame = {
+  private def createPythonFnTransform(code: String): fnTransformType = {
     (session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String) => {
       // python transformation is executed by passing options and input/output DataFrame through entry point
       val objectId = ActionHelper.replaceSpecialCharactersWithUnderscore(dataObjectId)
@@ -157,6 +158,10 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
       }
     }
   }
+}
+
+object CustomDfTransformerConfig {
+  type fnTransformType = (SparkSession, Map[String, String], DataFrame, String) => DataFrame
 }
 
 private[smartdatalake] class DfTransformerPySparkEntryPoint(override val session: SparkSession, options: Map[String,String], inputDf: DataFrame, dataObjectId: String, var outputDf: Option[DataFrame] = None) extends SparkEntryPoint {

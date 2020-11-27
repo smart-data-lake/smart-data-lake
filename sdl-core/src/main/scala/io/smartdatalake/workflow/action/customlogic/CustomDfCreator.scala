@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.action.customlogic
 
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.CustomCodeUtil
+import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig.{fnExecType, fnSchemaType}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -55,21 +56,22 @@ case class CustomDfCreatorConfig(className: Option[String] = None,
                                 ) {
   require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined, "Either className, scalaFile or scalaCode must be defined for CustomDfCreator")
 
-  val fnEmptySchema: (SparkSession, Map[String, String]) => Option[StructType] = (a, b) => None
+
+  val fnEmptySchema: CustomDfCreatorConfig.fnSchemaType = (a, b) => None
 
   val impl : CustomDfCreator = className.map {
     clazz => CustomCodeUtil.getClassInstanceByName[CustomDfCreator](clazz)
   }.orElse{
     scalaFile.map {
       file =>
-        val fnTransform = CustomCodeUtil.compileCode[(SparkSession, Map[String, String]) => DataFrame](HdfsUtil.readHadoopFile(file))
-        new CustomDfCreatorWrapper(fnTransform, fnEmptySchema)
+        val fnExec = CustomCodeUtil.compileCode[fnExecType](HdfsUtil.readHadoopFile(file))
+        new CustomDfCreatorWrapper(fnExec, fnEmptySchema)
     }
   }.orElse{
     scalaCode.map {
       code =>
-        val fnTransform = CustomCodeUtil.compileCode[(SparkSession, Map[String, String]) => DataFrame](code)
-        new CustomDfCreatorWrapper(fnTransform, fnEmptySchema)
+        val fnExec = CustomCodeUtil.compileCode[fnExecType](code)
+        new CustomDfCreatorWrapper(fnExec, fnEmptySchema)
     }
   }.get
 
@@ -89,8 +91,13 @@ case class CustomDfCreatorConfig(className: Option[String] = None,
   }
 }
 
-class CustomDfCreatorWrapper(val fnExec: (SparkSession, Map[String,String]) => DataFrame,
-                             val fnSchema: (SparkSession, Map[String, String]) => Option[StructType]) extends CustomDfCreator {
+object CustomDfCreatorConfig {
+  type fnSchemaType = (SparkSession, Map[String, String]) => Option[StructType]
+  type fnExecType = (SparkSession, Map[String, String]) => DataFrame
+}
+
+class CustomDfCreatorWrapper(val fnExec: fnExecType,
+                             val fnSchema: fnSchemaType) extends CustomDfCreator {
 
   override def exec(session: SparkSession, config: Map[String, String]): DataFrame = fnExec(session, config)
 
