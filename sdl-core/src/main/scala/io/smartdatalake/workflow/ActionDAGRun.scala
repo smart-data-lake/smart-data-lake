@@ -26,7 +26,7 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.DAGHelper._
 import io.smartdatalake.workflow.ExecutionPhase.{ExecutionPhase, Value}
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
-import io.smartdatalake.workflow.action.{Action, RuntimeEventState, RuntimeInfo}
+import io.smartdatalake.workflow.action.{Action, RuntimeEventState, RuntimeInfo, SparkSubFeedsAction}
 import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject, TransactionalSparkTableDataObject}
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
@@ -117,9 +117,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
       case (node: InitDAGNode, _) =>
         node.edges.map(dataObjectId => getInitialSubFeed(dataObjectId))
       case (node: Action, subFeeds) =>
-        assert(node.recursiveInputs.map(_.isInstanceOf[TransactionalSparkTableDataObject]).forall(_==true),"Recursive inputs only work for TransactionalSparkTableDataObjects.")
-        val recursiveSubFeeds = node.recursiveInputs.map(dataObject => getInitialSubFeed(dataObject.id))
-        node.init(subFeeds ++ recursiveSubFeeds)
+        node.init(subFeeds ++ getRecursiveSubFeeds(node))
       case x => throw new IllegalStateException(s"Unmatched case $x")
     }
     t
@@ -136,8 +134,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
           node.edges.map(dataObjectId => getInitialSubFeed(dataObjectId))
         case (node: Action, subFeeds) =>
           node.preExec(subFeeds)
-          val recursiveSubFeeds = node.recursiveInputs.map(dataObject => getInitialSubFeed(dataObject.id))
-          val resultSubFeeds = node.exec(subFeeds ++ recursiveSubFeeds)
+          val resultSubFeeds = node.exec(subFeeds ++ getRecursiveSubFeeds(node))
           node.postExec(subFeeds, resultSubFeeds)
           //return
           resultSubFeeds
@@ -151,6 +148,16 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
 
     // return
     result
+  }
+
+  private def getRecursiveSubFeeds(node: Action)(implicit context: ActionPipelineContext): Seq[SubFeed] = {
+    assert(node.recursiveInputs.map(_.isInstanceOf[TransactionalSparkTableDataObject]).forall(_==true), "Recursive inputs only work for TransactionalSparkTableDataObjects.")
+    // recursive inputs are only passed as input SubFeeds for SparkSubFeedsAction, which can take more than one input SubFeed
+    // for SparkSubFeedAction (e.g. Deduplicate and HistorizeAction) which implicitly use a recursive input, the Action is responsible the get the SubFeed.
+    node match {
+      case _: SparkSubFeedsAction => node.recursiveInputs.map(dataObject => getInitialSubFeed(dataObject.id))
+      case _ => Seq()
+    }
   }
 
   private def getInitialSubFeed(dataObjectId: DataObjectId)(implicit context: ActionPipelineContext) = {

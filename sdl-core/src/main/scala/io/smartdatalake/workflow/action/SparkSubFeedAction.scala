@@ -36,8 +36,9 @@ abstract class SparkSubFeedAction extends SparkAction {
   def output:  DataObject with CanWriteDataFrame
 
   /**
-   * Recursive Inputs are not supported on SparkSubFeedAction (only on SparkSubFeedsAction) so set to empty Seq
-   *  @return
+   * Recursive Inputs cannot be set by configuration for SparkSubFeedActions, but they are implicitly used in
+   * DeduplicateAction and HistorizeAction for existing data.
+   * Default is empty.
    */
   override def recursiveInputs: Seq[DataObject with CanCreateDataFrame] = Seq()
 
@@ -98,8 +99,9 @@ abstract class SparkSubFeedAction extends SparkAction {
     val msg = s"writing to ${output.id}" + (if (transformedSubFeed.partitionValues.nonEmpty) s", partitionValues ${transformedSubFeed.partitionValues.mkString(" ")}" else "")
     logger.info(s"($id) start " + msg)
     setSparkJobMetadata(Some(msg))
+    val isRecursiveInput = recursiveInputs.exists(_.id == output.id)
     val (noData,d) = PerformanceUtils.measureDuration {
-      writeSubFeed(transformedSubFeed, output)
+      writeSubFeed(transformedSubFeed, output, isRecursiveInput)
     }
     setSparkJobMetadata()
     val metricsLog = if (noData) ", no data found"

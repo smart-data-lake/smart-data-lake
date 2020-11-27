@@ -78,6 +78,10 @@ case class DeduplicateAction(override val id: ActionObjectId,
   override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
   override val outputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
 
+  // Output is used as recursive input in DeduplicateAction to get existing data. This override is needed to force tick-tock write operation.
+  override val recursiveInputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
+
+  // assert primary key is defined
   require(output.table.primaryKey.isDefined, s"(${id}) Primary key must be defined for output DataObject")
 
   // parse filter clause
@@ -88,19 +92,11 @@ case class DeduplicateAction(override val id: ActionObjectId,
 
   override def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
-    // primary key needed
-    val pks = output.table.primaryKey
-      .getOrElse( throw new ConfigurationException(s"There is no <primary-keys> defined for table ${output.table.name}."))
-    // assert that if output has partition columns, they are included in primary key
-    output match {
-      case partitionedDO: CanHandlePartitions =>
-        if (partitionedDO.partitions.diff(pks).nonEmpty) throw new ConfigurationException(s"($id) Output ${output.id} partition columns need to be included in output tables primary key for DeduplicateAction. partitions=${partitionedDO.partitions.mkString(",")} primaryKeys=${pks.mkString(",")}")
-      case _ => Unit
-    }
-    // get existing data. If only a set of partition values are processed, this must be filtered accordingly
-    val existingDf = if (output.isTableExisting) {
-      Some(output.getDataFrame(subFeed.partitionValues))
-    } else None
+    val pks = output.table.primaryKey.get // existance is validated earlier
+    // get existing data
+    // Note that DeduplicateAction needs to read/write all existing data for tick-tock operation, even if only specific partitions have changed
+    val existingDf = if (output.isTableExisting) Some(output.getDataFrame())
+    else None
     val deduplicateTransformer = DeduplicateAction.deduplicateDataFrame(existingDf, pks, timestamp, ignoreOldDeletedColumns, ignoreOldDeletedNestedColumns) _
     applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, Seq(deduplicateTransformer), filterClauseExpr)
   }
