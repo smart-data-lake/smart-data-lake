@@ -109,7 +109,6 @@
 		</profile>
 		<profile>
 			<id>scala-2.11</id>
-			<activation><activeByDefault>true</activeByDefault></activation>
 			<properties>
 				<scala.minor.version>2.11</scala.minor.version>
 				<scala.version>${scala.minor.version}.12</scala.version>
@@ -135,9 +134,6 @@
 		<orc.deps.scope>compile</orc.deps.scope>
 		<parquet.deps.scope>compile</parquet.deps.scope>
 		<parquet.test.deps.scope>test</parquet.test.deps.scope>
-
-		<scala.minor.version>2.11</scala.minor.version>
-		<scala.version>${scala.minor.version}.12</scala.version>
 
 		<spark.version>2.4.7</spark.version>
 
