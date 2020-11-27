@@ -20,6 +20,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
+import io.smartdatalake.config.{TestCustomDfCreator, TestCustomDfCreatorWithSchema}
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
@@ -27,8 +28,8 @@ import org.scalatest.Matchers
 
 class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
 
-  private val customDfCreatorClassName = "io.smartdatalake.config.TestCustomDfCreator"
-  private val customDfCreatorWithSchemaClassName = "io.smartdatalake.config.TestCustomDfCreatorWithSchema"
+  private val customDfCreatorClassName = classOf[TestCustomDfCreator].getName
+  private val customDfCreatorWithSchemaClassName = classOf[TestCustomDfCreatorWithSchema].getName
 
   test("During init where a schema method is provided, the schema of the schema method should be returned") {
     // prepare
