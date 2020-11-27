@@ -92,7 +92,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
     val queryOrTable = Map(table.query.map(q => ("query",q)).getOrElse("dbtable"->table.fullName))
     val df = session.read.format("jdbc")
       .options(jdbcOptions)

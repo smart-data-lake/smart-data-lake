@@ -54,7 +54,7 @@ jobs:
       run: |
         mkdir -p ~/.m2
         echo "<settings><servers><server><id>bintray-smart-data-lake-smart-data-lake</id><username>smartdatalake</username><password>${BINTRAY_API_KEY}</password></server></servers></settings>" > ~/.m2/settings.xml
-        mvn -B clean scala:doc-jar deploy -f pom.xml
+        mvn -B -P scala-2.11 clean scala:doc-jar deploy -f pom.xml
     - name: Maven Deploy to Bintray for Scala 2.12
       env:
         BINTRAY_API_KEY: ${{ secrets.BINTRAY_API_KEY }}

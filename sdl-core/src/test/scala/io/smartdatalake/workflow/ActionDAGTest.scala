@@ -437,6 +437,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val resourceFile = "AB_NYC_2019.csv"
     val tempDir = Files.createTempDirectory(feed)
 
+    val refTimestamp1 = LocalDateTime.now()
+    implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+
     // copy data file
     TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile).toFile)
 
@@ -456,8 +459,6 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgt2DO)
 
     // prepare ActionPipeline
-    val refTimestamp1 = LocalDateTime.now()
-    implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val action1 = FileTransferAction("fta", srcDO.id, tgt1DO.id)
     val action2 = CopyAction("ca", tgt1DO.id, tgt2DO.id)
     val dag = ActionDAGRun(Seq(action1, action2), 1, 1)
@@ -484,6 +485,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val resourceFile = "AB_NYC_2019.csv"
     val tempDir = Files.createTempDirectory(feed)
 
+    val refTimestamp1 = LocalDateTime.now()
+    implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+
     // copy data file
     TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile).toFile)
 
@@ -507,8 +511,6 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgt3DO)
 
     // prepare ActionPipeline
-    val refTimestamp1 = LocalDateTime.now()
-    implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val action1 = CopyAction("ca1", srcDO.id, tgt1DO.id)
     val action2 = CopyAction("ca2", tgt1DO.id, tgt2DO.id)
     val action3 = FileTransferAction("fta", tgt2DO.id, tgt3DO.id)

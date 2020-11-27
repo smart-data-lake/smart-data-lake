@@ -19,6 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -35,21 +36,21 @@ private[smartdatalake] trait TableDataObject extends DataObject with CanCreateDa
 
   def dropTable(implicit session: SparkSession): Unit
 
-  def getPKduplicates(implicit session: SparkSession): DataFrame = if (table.primaryKey.isEmpty) {
+  def getPKduplicates(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = if (table.primaryKey.isEmpty) {
     getDataFrame().where(lit(false))
   } else {
     getDataFrame().getNonuniqueRows(table.primaryKey.get.toArray)
   }
 
-  def getPKnulls(implicit session: SparkSession): DataFrame = {
+  def getPKnulls(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
     getDataFrame().getNulls(table.primaryKey.get.toArray)
   }
 
-  def getPKviolators(implicit session: SparkSession): DataFrame = {
+  def getPKviolators(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
     getPKduplicates.union(getPKnulls)
   }
 
-  def isPKcandidateKey(implicit session: SparkSession): Boolean =  {
+  def isPKcandidateKey(implicit session: SparkSession, context: ActionPipelineContext): Boolean =  {
     table.primaryKey.isEmpty || getDataFrame().isCandidateKey(table.primaryKey.get.toArray)
   }
 }
