@@ -4,9 +4,11 @@ on:
   push:
     branches: 
       - develop
+      - develop-spark3
   pull_request:
     branches: 
       - develop
+      - develop-spark3
 
 jobs:
   build:
@@ -20,7 +22,7 @@ jobs:
       with:
         java-version: 1.8
     - name: Cache Maven
-      uses: actions/cache@v1.1.2
+      uses: actions/cache@v2
       with:
         path: ~/.m2/repository
         key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}

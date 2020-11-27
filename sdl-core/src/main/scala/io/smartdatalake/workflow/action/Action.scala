@@ -24,11 +24,13 @@ import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
+import io.smartdatalake.workflow.ExecutionPhase.{ExecutionPhase, Value}
 import io.smartdatalake.workflow._
-import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
+import io.smartdatalake.workflow.action.RuntimeEventState.{RuntimeEventState, Value}
 import io.smartdatalake.workflow.dataobject.DataObject
+import org.apache.spark.sql.functions.expr
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.custom.ExpressionEvaluator
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
@@ -87,6 +89,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * This runs during the "prepare" phase of the DAG.
    */
   def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    reset() // reset statistics, this is especially needed in unit tests when the same action is started multiple times
     inputs.foreach(_.prepare)
     outputs.foreach(_.prepare)
 
@@ -98,7 +101,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
     require(duplicateNames.isEmpty, s"The names of your DataObjects are not unique when replacing special characters with underscore. Duplicates: ${duplicateNames.mkString(",")}")
 
     // validate metricsFailCondition
-    metricsFailCondition.foreach(c => evaluateMetricsFailCondition(c, onlySyntaxCheck = true))
+    metricsFailCondition.foreach(c => evaluateMetricsFailCondition(c))
   }
 
   /**
@@ -148,20 +151,16 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   /**
    * Evaluates a condition against latest metrics and throws an MetricsCheckFailed if there is a match.
    */
-  private def evaluateMetricsFailCondition(condition: String, onlySyntaxCheck: Boolean = false)(implicit session: SparkSession): Unit = {
-    import session.implicits._
-    val metrics = if (!onlySyntaxCheck) {
+  private def evaluateMetricsFailCondition(condition: String)(implicit session: SparkSession): Unit = {
+    val conditionEvaluator = new ExpressionEvaluator[Metric,Boolean](expr(condition))
+    val metrics = {
       getAllLatestMetrics.flatMap{
-        case (dataObjectId, Some(metrics)) => metrics.getMainInfos.map{ case (k,v) => (dataObjectId.id, Some(k), Some(v.toString))}.toSeq
-        case (dataObjectId, _) => Seq((dataObjectId.id, None, None))
+        case (dataObjectId, Some(metrics)) => metrics.getMainInfos.map{ case (k,v) => Metric(dataObjectId.id, Some(k), Some(v.toString))}.toSeq
+        case (dataObjectId, _) => Seq(Metric(dataObjectId.id, None, None))
       }.toSeq
-    } else Seq()
-    val dfFailedMetrics = metrics.toDF("dataObjectId", "key", "value")
-      .where(condition)
-    if (!onlySyntaxCheck) {
-      val failedMetrics = dfFailedMetrics.collect
-      if (failedMetrics.nonEmpty) throw MetricsCheckFailed(s"""($id) metrics check failed: ${failedMetrics.mkString(", ")} matched condition "$condition"""")
     }
+    metrics.filter( metric => Option(conditionEvaluator(metric)).getOrElse(false))
+      .foreach( failedMetric => throw MetricsCheckFailed(s"""($id) metrics check failed: $failedMetric matched expression "$condition""""))
   }
 
   /**
@@ -196,7 +195,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
       // force class cast on generic type (otherwise the ClassCastException is thrown later)
       ct.runtimeClass.cast(dataObject).asInstanceOf[T]
     } catch {
-      case e: ClassCastException =>
+      case _: ClassCastException =>
         val objClass = dataObject.getClass.getSimpleName
         val expectedClass = tt.tpe.toString.replaceAll(classOf[DataObject].getPackage.getName+".", "")
         throw ConfigurationException(s"$toStringShort needs $expectedClass as $role but $dataObjectId is of type $objClass")
@@ -220,7 +219,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   /**
    * get latest runtime state
    */
-  def getLatestRuntimeState = runtimeEvents.lastOption.map(_.state)
+  def getLatestRuntimeState: Option[RuntimeEventState] = runtimeEvents.lastOption.map(_.state)
 
   /**
    * get latest runtime information for this action
@@ -228,10 +227,11 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   def getRuntimeInfo: Option[RuntimeInfo] = {
     if (runtimeEvents.nonEmpty) {
       val lastEvent = runtimeEvents.last
+      val lastResults = runtimeEvents.reverseIterator.map(_.results).find(_.nonEmpty) // on failed actions we take the results from initialization to store what partition values have been tried to process
       val startEvent = runtimeEvents.reverse.find( event => event.state == RuntimeEventState.STARTED && event.phase == lastEvent.phase )
       val duration = startEvent.map( start => Duration.between(start.tstmp, lastEvent.tstmp))
       val mainMetrics = getAllLatestMetrics.map{ case (id, metrics) => (id, metrics.map(_.getMainInfos).getOrElse(Map()))}
-      val results = lastEvent.results.map( subFeed => ResultRuntimeInfo(subFeed, mainMetrics(subFeed.dataObjectId)))
+      val results = lastResults.toSeq.flatMap(_.map( subFeed => ResultRuntimeInfo(subFeed, mainMetrics(subFeed.dataObjectId))))
       Some(RuntimeInfo(lastEvent.state, startTstmp = startEvent.map(_.tstmp), duration = duration, msg = lastEvent.msg, results = results))
     } else None
   }
@@ -251,7 +251,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
         if (dataObjectRuntimeMetricsDelivered.contains(dataObjectId.get)) {
           logger.error(s"($id) Late arriving metrics for ${dataObjectId.get} detected. Final metrics have already been delivered. Statistics in previous logs might be wrong.")
         }
-      } else logger.warn(s"($id) Metrics received for ${dataObjectId.get} which doesn't belong to outputs (${metrics}")
+      } else logger.warn(s"($id) Metrics received for ${dataObjectId.get} which doesn't belong to outputs ($metrics")
     } else logger.debug(s"($id) Metrics received for unspecified DataObject (${metrics.getId})")
     if (logger.isDebugEnabled) logger.debug(s"($id) Metrics received:\n" + metrics.getAsText)
   }

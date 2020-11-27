@@ -22,6 +22,7 @@ import java.io.File
 import java.math.BigDecimal
 import java.nio.file.Files
 import java.sql.{Date, Timestamp}
+import java.time.Instant
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -41,7 +42,7 @@ import org.apache.sshd.server.command.Command
 import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider
 import org.apache.sshd.server.session.ServerSession
 import org.apache.sshd.server.subsystem.sftp.SftpSubsystemFactory
-import org.scalacheck.Arbitrary
+import org.scalacheck.{Arbitrary, Gen}
 
 import scala.collection.JavaConverters._
 import scala.util.Try
@@ -202,7 +203,7 @@ object TestUtil extends SmartDataLakeLogger {
     printDf(actual)
     logger.error("   Expected ")
     printDf(expected)
-    logger.error(s"  Do schemata equal? ${actual.schema == expected.schema}")
+    logger.error(s"  Do schemata equal? ${actual.schema.fields.toSet == expected.schema.fields.toSet}")
     logger.error(s"  Do cardinalities equal? ${actual.count() == expected.count()}")
     logger.error("   symmetric Difference ")
     actual.symmetricDifference(expected, "actual").show(false)
@@ -384,7 +385,7 @@ object TestUtil extends SmartDataLakeLogger {
         case StringType => Arbitrary.arbString.arbitrary.sample.get
         case FloatType => Arbitrary.arbFloat.arbitrary.sample.get
         case DoubleType => Arbitrary.arbDouble.arbitrary.sample.get
-        case TimestampType => Timestamp.from(Arbitrary.arbDate.arbitrary.sample.get.toInstant)
+        case TimestampType => new Timestamp(Gen.choose(0L, Instant.now().toEpochMilli).sample.get) // arbDate creates dates too far in the past (negative millis), we use a custom generator therefore...
         case d: StructType => arbitraryRow(d.fields)
         case d: ArrayType => (1 to nbOfArrayRecords).map( x => arbitraryValue(d.elementType))
       }
@@ -393,9 +394,9 @@ object TestUtil extends SmartDataLakeLogger {
       val colValues = fields.map( f => arbitraryValue(f.dataType))
       Row.fromSeq(colValues)
     }
-    session.createDataFrame((1 to nbRecords).map( x => arbitraryRow(schema.fields)).asJava, schema)
+    val rows = (1 to nbRecords).map( x => arbitraryRow(schema.fields)).asJava
+    session.createDataFrame(rows, schema)
   }
-
 }
 
 

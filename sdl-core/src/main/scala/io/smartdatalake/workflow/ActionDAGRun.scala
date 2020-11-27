@@ -24,9 +24,9 @@ import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.DAGHelper._
-import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
+import io.smartdatalake.workflow.ExecutionPhase.{ExecutionPhase, Value}
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
-import io.smartdatalake.workflow.action.{Action, RuntimeEventState, RuntimeInfo}
+import io.smartdatalake.workflow.action.{Action, RuntimeEventState, RuntimeInfo, SparkSubFeedsAction}
 import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject, TransactionalSparkTableDataObject}
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
@@ -42,25 +42,6 @@ private[smartdatalake] case class InitDAGNode(override val nodeId: NodeId, edges
 }
 
 private[smartdatalake] case class DummyDAGResult(override val resultId: String) extends DAGResult
-
-private[smartdatalake] class ActionEventListener(phase: ExecutionPhase) extends DAGEventListener[Action] with SmartDataLakeLogger {
-  override def onNodeStart(node: Action): Unit = {
-    node.addRuntimeEvent(phase, RuntimeEventState.STARTED)
-    logger.info(s"(${node.id}): $phase started")
-  }
-  override def onNodeSuccess(results: Seq[DAGResult])(node: Action): Unit = {
-    node.addRuntimeEvent(phase, RuntimeEventState.SUCCEEDED)
-    logger.info(s"(${node.id}): $phase succeeded")
-  }
-  override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
-    node.addRuntimeEvent(phase, RuntimeEventState.FAILED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
-    logger.error(s"(${node.id}): $phase failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
-  }
-  override def onNodeSkipped(exception: Throwable)(node: Action): Unit = {
-    node.addRuntimeEvent(phase, RuntimeEventState.SKIPPED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
-    logger.warn(s"(${node.id}): $phase skipped because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
-  }
-}
 
 private[smartdatalake] trait ActionMetrics {
   def getId: String
@@ -96,12 +77,13 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
       case ex: DAGException => ex.getDAGRootExceptions
       case ex => throw ex // this should not happen
     }
-    // only stop on skipped in init phase if there are no succeeded results
-    val stopSeverity = if (phase == ExecutionPhase.Init && dag.getNodes.exists(_.getLatestRuntimeState.contains(RuntimeEventState.INITIALIZED))) ExceptionSeverity.CANCELLED else ExceptionSeverity.SKIPPED
+    // only stop on skipped in init phase if there are no succeeded results, otherwise we want to have those actions run.
+    lazy val existsInitializedActions = dag.getNodes.exists(_.getLatestRuntimeState.contains(RuntimeEventState.INITIALIZED))
+    val stopSeverity = if (phase == ExecutionPhase.Init && existsInitializedActions) ExceptionSeverity.CANCELLED else ExceptionSeverity.SKIPPED
     val dagExceptionsToStop = dagExceptions.filter(_.severity <= stopSeverity).sortBy(_.severity)
     // log all exceptions
-    dagExceptions.foreach {
-      case ex if ex.severity <= ExceptionSeverity.CANCELLED => logger.error(s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessageWithCause}")
+    dagExceptions.distinct.foreach {
+      case ex if ex.severity <= ExceptionSeverity.FAILED_DONT_STOP => logger.error(s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessageWithCause}")
       case ex => logger.warn(s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessageWithCause}")
     }
     // log dag on error
@@ -135,9 +117,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
       case (node: InitDAGNode, _) =>
         node.edges.map(dataObjectId => getInitialSubFeed(dataObjectId))
       case (node: Action, subFeeds) =>
-        assert(node.recursiveInputs.map(_.isInstanceOf[TransactionalSparkTableDataObject]).forall(_==true),"Recursive inputs only work for TransactionalSparkTableDataObjects.")
-        val recursiveSubFeeds = node.recursiveInputs.map(dataObject => getInitialSubFeed(dataObject.id))
-        node.init(subFeeds ++ recursiveSubFeeds)
+        node.init(subFeeds ++ getRecursiveSubFeeds(node))
       case x => throw new IllegalStateException(s"Unmatched case $x")
     }
     t
@@ -154,8 +134,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
           node.edges.map(dataObjectId => getInitialSubFeed(dataObjectId))
         case (node: Action, subFeeds) =>
           node.preExec(subFeeds)
-          val recursiveSubFeeds = node.recursiveInputs.map(dataObject => getInitialSubFeed(dataObject.id))
-          val resultSubFeeds = node.exec(subFeeds ++ recursiveSubFeeds)
+          val resultSubFeeds = node.exec(subFeeds ++ getRecursiveSubFeeds(node))
           node.postExec(subFeeds, resultSubFeeds)
           //return
           resultSubFeeds
@@ -169,6 +148,16 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
 
     // return
     result
+  }
+
+  private def getRecursiveSubFeeds(node: Action)(implicit context: ActionPipelineContext): Seq[SubFeed] = {
+    assert(node.recursiveInputs.map(_.isInstanceOf[TransactionalSparkTableDataObject]).forall(_==true), "Recursive inputs only work for TransactionalSparkTableDataObjects.")
+    // recursive inputs are only passed as input SubFeeds for SparkSubFeedsAction, which can take more than one input SubFeed
+    // for SparkSubFeedAction (e.g. Deduplicate and HistorizeAction) which implicitly use a recursive input, the Action is responsible the get the SubFeed.
+    node match {
+      case _: SparkSubFeedsAction => node.recursiveInputs.map(dataObject => getInitialSubFeed(dataObject.id))
+      case _ => Seq()
+    }
   }
 
   private def getInitialSubFeed(dataObjectId: DataObjectId)(implicit context: ActionPipelineContext) = {
@@ -216,12 +205,12 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
     }
     override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
       node.addRuntimeEvent(phase, RuntimeEventState.FAILED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
-      logger.error(s"${node.toStringShort}: $phase failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
+      logger.warn(s"${node.toStringShort}: $phase failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
       if (phase==ExecutionPhase.Exec) saveState()
     }
     override def onNodeSkipped(exception: Throwable)(node: Action): Unit = {
       node.addRuntimeEvent(phase, RuntimeEventState.SKIPPED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
-      logger.warn(s"${node.toStringShort}: $phase skipped because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
+      logger.info(s"${node.toStringShort}: $phase skipped because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
       if (phase==ExecutionPhase.Exec) saveState()
     }
   }

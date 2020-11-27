@@ -130,6 +130,7 @@ object JdbcTableConnection extends FromConfigFactory[Connection] {
 private[smartdatalake] abstract class SQLCatalog(connection: JdbcTableConnection) {
   // get spark jdbc dialect definitions
   protected val jdbcDialect: JdbcDialect = JdbcDialects.get(connection.url)
+  protected val isNoopDialect: Boolean = jdbcDialect.getClass.getSimpleName.startsWith("NoopDialect") // The default implementation is used for unknown url types
   def isDbExisting(db: String)(implicit session: SparkSession): Boolean
   def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean
   protected def evalRecordExists( rs:ResultSet ) : Boolean = {
@@ -159,9 +160,17 @@ private[smartdatalake] class DefaultSQLCatalog(connection: JdbcTableConnection) 
     connection.execJdbcQuery(cntTableInCatalog, evalRecordExists )
   }
   override def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean = {
-    val dbPrefix = if(db.equals("")) "" else db+"."
-    val existsQuery = jdbcDialect.getTableExistsQuery(dbPrefix+table)
-    connection.execJdbcStatement(existsQuery)
+    if (!isNoopDialect) {
+      val dbPrefix = if (db.equals("")) "" else db + "."
+      val existsQuery = jdbcDialect.getTableExistsQuery(dbPrefix + table)
+      connection.execJdbcStatement(existsQuery)
+    } else {
+      val cntTableInCatalog = if (Environment.enableJdbcCaseSensitivity)
+        s"select count(*) from INFORMATION_SCHEMA.TABLES where TABLE_NAME='$table' and TABLE_SCHEMA='$db'"
+      else
+        s"select count(*) from INFORMATION_SCHEMA.TABLES where upper(TABLE_NAME)=upper('$table') and upper(TABLE_SCHEMA)=upper('$db')"
+      connection.execJdbcQuery(cntTableInCatalog, evalRecordExists)
+    }
   }
 }
 

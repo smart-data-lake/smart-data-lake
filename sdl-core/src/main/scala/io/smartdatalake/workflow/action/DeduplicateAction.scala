@@ -27,7 +27,7 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions.{ExecutionMode, TechnicalTableColumn}
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, TransactionalSparkTableDataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject, TransactionalSparkTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions._
@@ -78,6 +78,10 @@ case class DeduplicateAction(override val id: ActionObjectId,
   override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
   override val outputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
 
+  // Output is used as recursive input in DeduplicateAction to get existing data. This override is needed to force tick-tock write operation.
+  override val recursiveInputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
+
+  // assert primary key is defined
   require(output.table.primaryKey.isDefined, s"(${id}) Primary key must be defined for output DataObject")
 
   // parse filter clause
@@ -88,11 +92,11 @@ case class DeduplicateAction(override val id: ActionObjectId,
 
   override def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
-    val pks = output.table.primaryKey
-      .getOrElse( throw new ConfigurationException(s"There is no <primary-keys> defined for table ${output.table.name}."))
-    val existingDf = if (output.isTableExisting) {
-      Some(output.getDataFrame())
-    } else None
+    val pks = output.table.primaryKey.get // existance is validated earlier
+    // get existing data
+    // Note that DeduplicateAction needs to read/write all existing data for tick-tock operation, even if only specific partitions have changed
+    val existingDf = if (output.isTableExisting) Some(output.getDataFrame())
+    else None
     val deduplicateTransformer = DeduplicateAction.deduplicateDataFrame(existingDf, pks, timestamp, ignoreOldDeletedColumns, ignoreOldDeletedNestedColumns) _
     applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, Seq(deduplicateTransformer), filterClauseExpr)
   }

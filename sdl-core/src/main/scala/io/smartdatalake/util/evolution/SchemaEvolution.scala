@@ -158,8 +158,15 @@ private[smartdatalake] object SchemaEvolution extends SmartDataLakeLogger {
 
     // check if schema is identical
     if (hasSameColNamesAndTypes(oldDf.select(oldColsWithoutTechCols.map(col): _*), newDf.select(newColsWithoutTechCols.map(col): _*))) {
-      logger.info("Schemas are identical: no evolution needed")
-      (oldDf, newDf)
+      // check column order
+      if (oldColsWithoutTechCols == newColsWithoutTechCols) {
+        logger.info("Schemas are identical: no evolution needed")
+        (oldDf, newDf)
+      } else {
+        logger.info("Schemas are identical but column order differs: columns of newDf are sorted according to oldDf")
+        val newSchemaOnlyCols = newDf.columns.diff(oldColsWithoutTechCols)
+        (oldDf, newDf.select((oldColsWithoutTechCols ++ newSchemaOnlyCols).map(col): _*))
+      }
     } else {
 
       // prepare target column names

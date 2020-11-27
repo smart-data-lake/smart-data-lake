@@ -24,12 +24,17 @@ import io.smartdatalake.workflow.DAGHelper.NodeId
 private[smartdatalake] abstract class DAGException(msg: String, cause: Throwable = null) extends Exception(msg, cause) {
   def severity: ExceptionSeverity.ExceptionSeverity
   def getDAGRootExceptions: Seq[DAGException]
-  def getMessageWithCause: String = msg + Option(getDAGRootExceptions.head.getCause).map(t => ": " + t.getMessage).getOrElse("")
+  def getMessageWithCause: String = msg + Option(getDAGRootExceptions.head.getCause).map(t => s": ${t.getClass.getSimpleName}: ${t.getMessage}").getOrElse("")
 }
 
-private[smartdatalake] case class TaskFailedException(id: NodeId, cause: Throwable) extends DAGException(id, cause) {
-  override val severity: ExceptionSeverity.ExceptionSeverity = ExceptionSeverity.FAILED
+private[smartdatalake] case class TaskFailedException(id: NodeId, cause: Throwable, override val severity: ExceptionSeverity.ExceptionSeverity) extends DAGException(id, cause) {
   override def getDAGRootExceptions: Seq[DAGException] = Seq(this)
+}
+private[smartdatalake] object TaskFailedException {
+  def apply(id: NodeId, cause: Throwable): TaskFailedException = cause match {
+    case ex: DAGException => TaskFailedException(id, cause, ex.severity)
+    case _ => TaskFailedException(id, cause, ExceptionSeverity.FAILED)
+  }
 }
 
 private[smartdatalake] case class TaskCancelledException(id: NodeId) extends DAGException(id) {
@@ -43,8 +48,9 @@ private[smartdatalake] class TaskSkippedWarning(id: NodeId, msg: String) extends
   override def getDAGRootExceptions: Seq[DAGException] = Seq(this)
 }
 
-private[smartdatalake] class TaskSkippedDontStopWarning(id: NodeId, msg: String) extends TaskSkippedWarning(id, msg) {
+private[smartdatalake] class TaskSkippedDontStopWarning[R <: DAGResult](id: NodeId, msg: String, results: Option[Seq[R]]) extends TaskSkippedWarning(id, msg) {
   override val severity: ExceptionSeverity.ExceptionSeverity = ExceptionSeverity.SKIPPED_DONT_STOP
+  def getResults: Option[Seq[R]] = results
 }
 
 private[smartdatalake] case class TaskPredecessorFailureWarning(id: NodeId, cause: DAGException, allCauses: Seq[DAGException]) extends DAGException(id, cause) {
@@ -54,5 +60,10 @@ private[smartdatalake] case class TaskPredecessorFailureWarning(id: NodeId, caus
 
 private[smartdatalake] object ExceptionSeverity extends Enumeration {
   type ExceptionSeverity = Value
-  val FAILED, CANCELLED, SKIPPED, SKIPPED_DONT_STOP = Value
+  val FAILED, // Execution of action failed, dependent actions are not executed, next phase is not started
+      CANCELLED, // Execution of action got cancelled, dependent actions are not executed, next phase is not started
+      FAILED_DONT_STOP, // Execution of action failed, dependent actions are not executed, but next phase is started
+      SKIPPED, // Execution of action is skipped because of ExecutionMode, dependent actions are not executed, next phase is started
+      SKIPPED_DONT_STOP // Execution of action is skipped because of ExecutionMode, dependent actions are executed, next phase is started
+      = Value
 }

@@ -67,7 +67,6 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     require(thisIsTableExisting || path.isDefined, s"TickTockHiveTable ${table.fullName} does not exist, so path must be set.")
 
     if (hadoopPathHolder == null) {
-      val pathPrefix: Option[String] = connection.map(_.pathPrefix)
       hadoopPathHolder = {
         if (thisIsTableExisting) HiveUtil.removeTickTockFromLocation(new Path(HiveUtil.existingTableLocation(table)))
         else HdfsUtil.prefixHadoopPath(path.get, connection.map(_.pathPrefix))
@@ -76,11 +75,11 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
       // For existing tables, check to see if we write to the same directory. If not, issue a warning.
       if(thisIsTableExisting && path.isDefined) {
         // Normalize both paths before comparing them (remove tick / tock folder and trailing slash)
-        val hadoopPathNormalized = HiveUtil.normalizePath(hadoopPathHolder.toString,pathPrefix)
-        val definedPathNormalized = HiveUtil.normalizePath(path.get,pathPrefix)
+        val hadoopPathNormalized = HiveUtil.normalizePath(hadoopPathHolder.toString)
+        val definedPathNormalized = HiveUtil.normalizePath(path.get)
 
         if (definedPathNormalized != hadoopPathNormalized)
-          logger.warn(s"Table ${table.fullName} exists already with different path $definedPathNormalized. The table will be written with new path definition $hadoopPathHolder!")
+          logger.warn(s"Table ${table.fullName} exists already with different path. The table will be written with new path definition ${hadoopPathHolder}!")
       }
     }
     hadoopPathHolder
