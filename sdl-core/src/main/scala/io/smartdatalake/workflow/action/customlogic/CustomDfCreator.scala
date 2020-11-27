@@ -21,11 +21,12 @@ package io.smartdatalake.workflow.action.customlogic
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig.{fnExecType, fnSchemaType}
+import io.smartdatalake.workflow.dataobject.CustomDfDataObject
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
- * Interface to define custom logic for DataFrame transformations
+ * Interface to define custom logic for DataFrame creation
  */
 trait CustomDfCreator extends Serializable {
 
@@ -49,13 +50,25 @@ trait CustomDfCreator extends Serializable {
   def schema(session: SparkSession, config: Map[String,String]): Option[StructType] = None
 }
 
+/**
+ * Configuration of a custom Spark-DataFrame creator as part of [[CustomDfDataObject]]
+ * Define a exec function which receives a map of options and returns a DataFrame to be used as input.
+ * Optionally define a schema function to return a StructType used as schema in init-phase.
+ * See also trait [[CustomDfCreator]].
+ *
+ * Note that for now implementing CustomDfCreator.schema method is only possible with className configuration attribute.
+ *
+ * @param className Optional class name implementing trait [[CustomDfCreator]]
+ * @param scalaFile Optional file where scala code for creator is loaded from. The scala code in the file needs to be a function of type [[fnExecType]].
+ * @param scalaCode Optional scala code for creator. The scala code needs to be a function of type [[fnExecType]].
+ * @param options Options to pass to the creator
+ */
 case class CustomDfCreatorConfig(className: Option[String] = None,
                                  scalaFile: Option[String] = None,
                                  scalaCode: Option[String] = None,
                                  options: Option[Map[String,String]] = None
                                 ) {
   require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined, "Either className, scalaFile or scalaCode must be defined for CustomDfCreator")
-
 
   val fnEmptySchema: CustomDfCreatorConfig.fnSchemaType = (a, b) => None
 
@@ -74,7 +87,6 @@ case class CustomDfCreatorConfig(className: Option[String] = None,
         new CustomDfCreatorWrapper(fnExec, fnEmptySchema)
     }
   }.get
-
 
   def exec(implicit session: SparkSession): DataFrame = {
     impl.exec(session, options.getOrElse(Map()))

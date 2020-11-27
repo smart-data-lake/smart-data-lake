@@ -45,11 +45,13 @@ trait CustomDfsTransformer extends Serializable {
 }
 
 /**
- * Configuration of a custom Spark-DataFrame transformation between several inputs and outputs (n:m)
+ * Configuration of a custom Spark-DataFrame transformation between several inputs and outputs (n:m).
+ * Define a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and as
+ * to return a map of output DataObjectIds with DataFrames, see also trait [[CustomDfsTransformer]].
  *
- * @param className Optional class name to load transformer code from
- * @param scalaFile Optional file where scala code for transformation is loaded from
- * @param scalaCode Optional scala code for transformation
+ * @param className Optional class name implementing trait [[CustomDfsTransformer]]
+ * @param scalaFile Optional file where scala code for transformation is loaded from. The scala code in the file needs to be a function of type [[fnTransformType]].
+ * @param scalaCode Optional scala code for transformation. The scala code needs to be a function of type [[fnTransformType]].
  * @param sqlCode Optional map of DataObjectId and corresponding SQL Code.
  *                Use tokens %{<key>} to replace with runtimeOptions in SQL code.
  *                Example: "select * from test where run = %{runId}"
