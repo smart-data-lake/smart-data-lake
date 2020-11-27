@@ -204,17 +204,17 @@ private[smartdatalake] class SapHanaSQLCatalog(connection: JdbcTableConnection) 
   override def isDbExisting(db: String)(implicit session: SparkSession): Boolean = {
     val cntTableInCatalog =
       if (Environment.enableJdbcCaseSensitivity)
-        s"select count(*) from \"PUBLIC\".\"SCHEMAS\" where SCHEMA_NAME='$db'"
+        s"select count(*) from PUBLIC.SCHEMAS where SCHEMA_NAME='$db'"
       else
-        s"select count(*) from \"PUBLIC\".\"SCHEMAS\" where upper(SCHEMA_NAME)=upper('$db')"
+        s"select count(*) from PUBLIC.SCHEMAS where upper(SCHEMA_NAME)=upper('$db')"
     connection.execJdbcQuery(cntTableInCatalog, evalRecordExists)
   }
   override def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean = {
     val cntTableInCatalog =
       if (Environment.enableJdbcCaseSensitivity)
-        s"select count(*) from ((select TABLE_NAME as name from \"PUBLIC\".\"TABLES\" where TABLE_NAME='$table' and SCHEMA_NAME='$db') union all (select VIEW_NAME as name from \"PUBLIC\".\"VIEWS\" where VIEW_NAME='$table' and SCHEMA_NAME='$db'))"
+        s"select count(*) from ((select TABLE_NAME as name from PUBLIC.TABLES where TABLE_NAME='$table' and SCHEMA_NAME='$db') union all (select VIEW_NAME as name from PUBLIC.VIEWS where VIEW_NAME='$table' and SCHEMA_NAME='$db'))"
       else
-        s"select count(*) from ((select TABLE_NAME as name from \"PUBLIC\".\"TABLES\" where TABLE_NAME=upper('$table') and SCHEMA_NAME=upper('$db')) union all (select VIEW_NAME as name from \"PUBLIC\".\"VIEWS\" where VIEW_NAME=upper('$table') and SCHEMA_NAME=upper('$db')))"
+        s"select count(*) from ((select TABLE_NAME as name from PUBLIC.TABLES where upper(TABLE_NAME)=upper('$table') and upper(SCHEMA_NAME)=upper('$db')) union all (select VIEW_NAME as name from PUBLIC.VIEWS where upper(VIEW_NAME)=upper('$table') and upper(SCHEMA_NAME)=upper('$db')))"
     connection.execJdbcQuery( cntTableInCatalog, evalRecordExists )
   }
 }
