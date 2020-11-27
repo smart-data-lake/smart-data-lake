@@ -186,6 +186,14 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
   }
 
   /**
+   * Move partition columns at end of DataFrame as required when writing to Hive in Spark > 2.x
+   */
+  def movePartitionColsLast( df: DataFrame, partitions:Seq[String] ): DataFrame = {
+    val newColOrder = movePartitionColsLast(df.columns, partitions)
+    df.select(newColOrder.map(col):_*)
+  }
+
+  /**
    * Writes DataFrame to Hive table by using DataFrameWriter.
    * A missing table gets created. Dynamic partitioning is used to create partitions on the fly by Spark.
    * Existing data of partition is overwritten, if table has no partitions all table-data is overwritten.
@@ -578,14 +586,12 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    * @param path
    * @return
    */
-  def normalizePath(path: String, prefix: Option[String]=None) : String = {
+  def normalizePath(path: String) : String = {
     path
       .replaceAll("\\\\", Environment.defaultPathSeparator.toString)
       .replaceAll("file:/", "")
-      .replaceAll("/+$", "") // remove trailing slash
+      .replaceAll("/+$", "")
       .replaceAll("tock$", "tick")
-      .replaceAll(s"^${prefix.getOrElse("")}", "")
-      .replaceAll("^/*", "/") // exactly 1 leading slash
   }
 
   def listPartitions(table: Table, partitions: Seq[String])(implicit session: SparkSession): Seq[PartitionValues] = {

@@ -19,7 +19,6 @@
 
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -167,7 +166,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
     val data = DefaultExpressionData.from(context, partitionValues)
     additionalColumns.foldLeft(df){
       case (df, (colName, expr)) =>
-        val value = SparkExpressionUtil.evaluateAny(id, Some("additionalColumns"), expr, data)
+        val value = SparkExpressionUtil.evaluate[DefaultExpressionData,Any](id, Some("additionalColumns"), expr, data)
         df.withColumn(colName, lit(value.orNull))
     }
   }
@@ -209,7 +208,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
 
   /**
    * Updates the partition values of a SubFeed to the partition columns of an output, removing not existing columns from the partition values.
-   * Further the transformed DataFrame is validated to have the output's partition columns included.
+   * Further the transformed DataFrame is validated to have the output's partition columns included and partition columns are moved to the end.
    *
    * @param output output DataObject
    * @param subFeed SubFeed with transformed DataFrame
@@ -221,7 +220,9 @@ private[smartdatalake] abstract class SparkAction extends Action {
         // validate output partition columns exist in DataFrame
         validateDataFrameContainsCols(subFeed.dataFrame.get, partitionedDO.partitions, s"for ${output.id}")
         // adapt subfeed
-        subFeed.updatePartitionValues(partitionedDO.partitions)
+        subFeed
+          .updatePartitionValues(partitionedDO.partitions)
+          .movePartitionColumnsLast(partitionedDO.partitions)
       case _ => subFeed.clearPartitionValues()
     }
     updatedSubFeed.clearDAGStart()
@@ -279,6 +280,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
     val writeSchema = preparedSubFeed.dataFrame.map(_.schema)
     val readSchema = preparedSubFeed.dataFrame.map(df => input.createReadSchema(df.schema))
     val schemaChanges = writeSchema != readSchema
+    require(!context.simulation || !schemaChanges, s"($id) write & read schema is not the same for ${input.id}. Need to create a dummy DataFrame, but this is not allowed in simulation!")
     preparedSubFeed = if (schemaChanges) preparedSubFeed.convertToDummy(readSchema.get) else preparedSubFeed
     // adapt partition values (#180)
     preparedSubFeed = input match {

@@ -160,7 +160,6 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
       case Failure(ex) =>
         // pass Failure if severity is high
         notify(node, eventListener.onNodeFailure(ex))
-        logger.error(s"Task ${node.nodeId} failed: $ex")
         Failure(TaskFailedException(node.nodeId, ex))
     }
     // return
@@ -172,9 +171,9 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
       case ex: DAGException => ex
       case ex => throw ex // this should not happen
     }
-    val mostSeverPredecessoException = predecessorExceptions.minBy(_.severity)
+    val mostSeverePredecessorException = predecessorExceptions.minBy(_.severity)
     logger.debug(s"Task ${node.nodeId} is not executed because some predecessor had error $predecessorExceptions")
-    val exception = TaskPredecessorFailureWarning(node.nodeId, mostSeverPredecessoException, predecessorExceptions)
+    val exception = TaskPredecessorFailureWarning(node.nodeId, mostSeverePredecessorException, predecessorExceptions)
     notify(node, eventListener.onNodeSkipped(exception))
     Failure(exception)
   }

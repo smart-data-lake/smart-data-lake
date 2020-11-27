@@ -300,7 +300,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
           return (Seq(), Map())
         }
         val subFeeds = actionDAGRun.exec
-        actionDAGRun.saveState(true)
         subFeeds
       }
     } catch {
@@ -308,6 +307,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       case ex: DAGException if (ex.severity >= ExceptionSeverity.SKIPPED) =>
         logger.warn(s"At least one action is ${ex.severity}")
         Seq()
+    } finally {
+      actionDAGRun.saveState(true)
     }
 
     // return result statistics as string

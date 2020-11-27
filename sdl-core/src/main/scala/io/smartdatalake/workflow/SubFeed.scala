@@ -20,6 +20,7 @@ package io.smartdatalake.workflow
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.util.streaming.DummyStreamProvider
 import io.smartdatalake.workflow.dataobject.FileRef
@@ -82,6 +83,9 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
   override def updatePartitionValues(partitions: Seq[String]): SparkSubFeed = {
     val updatedPartitionValues = partitionValues.map( pvs => PartitionValues(pvs.elements.filterKeys(partitions.contains))).filter(_.nonEmpty)
     this.copy(partitionValues = updatedPartitionValues)
+  }
+  def movePartitionColumnsLast(partitions: Seq[String]): SparkSubFeed = {
+    this.copy(dataFrame = this.dataFrame.map( df => HiveUtil.movePartitionColsLast(df, partitions)))
   }
   override def clearDAGStart(): SparkSubFeed = {
     this.copy(isDAGStart = false)

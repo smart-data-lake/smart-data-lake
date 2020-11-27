@@ -26,6 +26,8 @@ import io.smartdatalake.util.misc.{AclDef, DataFrameUtil}
 import org.apache.spark.sql.types.{LongType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SaveMode}
 
+import com.crealytics.spark.excel.DefaultSource
+
 /**
  * A [[DataObject]] backed by an Microsoft Excel data source.
  *
@@ -70,8 +72,6 @@ case class ExcelFileDataObject(override val id: DataObjectId,
                               )(@transient implicit override val instanceRegistry: InstanceRegistry)
   extends SparkFileDataObject with CanCreateDataFrame with CanWriteDataFrame {
 
-  excelOptions.validate(id)
-
   override val format = "com.crealytics.spark.excel"
 
   // this is only needed for FileRef actions
@@ -89,28 +89,10 @@ case class ExcelFileDataObject(override val id: DataObjectId,
    */
   override def afterRead(df: DataFrame): DataFrame = {
     val dfSuper = super.afterRead(df)
-    val ss = df.sparkSession
-
-    // TODO: instead of startColumn/numLinesToSkip/sheetname, the current version of spark-excel has a 'dataAddress' option.
-    //filter the first `numLinesToSkip` rows.
-    val filteredDf = if (excelOptions.numLinesToSkip.isEmpty) {
-      dfSuper
-    } else {
-      val rddWithId = dfSuper.rdd.zipWithIndex().map {
-        case (row, id) => Row.fromSeq(row.toSeq :+ (id + 1))
-      }
-      ss.createDataFrame(rddWithId, StructType(dfSuper.schema.fields :+ StructField("id", LongType, nullable = false)))
-        .filter(row => row.getAs[Long]("id") > excelOptions.numLinesToSkip.get)
-        .drop("id")
-    }
-
-    //limit number of returned rows
-    val limitedDf = excelOptions.rowLimit.map(limit => filteredDf.limit(limit)).getOrElse(filteredDf)
 
     // cleanup header names
-    val oldNames = limitedDf.schema.map(_.name)
-    val newNames = oldNames.map(name => DataFrameUtil.strCamelCase2LowerCaseWithUnderscores(cleanHeaderName(name)))
-    limitedDf.toDF(newNames: _ *)
+    val newNames = dfSuper.columns.map(name => DataFrameUtil.strCamelCase2LowerCaseWithUnderscores(cleanHeaderName(name)))
+    dfSuper.toDF(newNames: _ *)
   }
 
   /**
@@ -118,13 +100,11 @@ case class ExcelFileDataObject(override val id: DataObjectId,
    */
   override def beforeWrite(df: DataFrame): DataFrame = {
     val dfSuper = super.beforeWrite(df)
+
     // check for unsupported write options
-    if (excelOptions.startColumn.exists(_ > 0)) {
-      throw new UnsupportedOperationException(s"($id) Writing Excel Files with startColumn defined is not supported.")
-    }
-    if (excelOptions.numLinesToSkip.exists(_ > 0)) {
-      throw new UnsupportedOperationException(s"($id) Writing Excel Files with numLinesToSkip defined is not supported.")
-    }
+    require(excelOptions.startColumn.isEmpty, s"($id) Writing Excel Files with startColumn defined is not supported.")
+    require(excelOptions.numLinesToSkip.isEmpty, s"($id) Writing Excel Files with numLinesToSkip defined is not supported.")
+
     // return
     dfSuper
   }
@@ -161,17 +141,15 @@ object ExcelFileDataObject extends FromConfigFactory[DataObject] {
  * Options passed to [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]] for
  * reading and writing Microsoft Excel files. Excel support is provided by the spark-excel project (see link below).
  *
- * @param sheetName the name of the Excel Sheet to read from/write to.
- *                  This option is required.
- * @param numLinesToSkip the number of rows in the excel spreadsheet to skip before any data is read.
+ * @param sheetName Optional name of the Excel Sheet to read from/write to.
+ * @param numLinesToSkip Optional number of rows in the excel spreadsheet to skip before any data is read.
  *                       This option must not be set for writing.
- * @param startColumn the first column in the specified Excel Sheet to read from (1-based indexing).
+ * @param startColumn Optional first column in the specified Excel Sheet to read from (as string, e.g B).
  *                    This option must not be set for writing.
- * @param endColumn TODO: this is not used anymore as far as I can tell --> crealytics now uses dataAddress.
- * @param rowLimit Limit the number of rows being returned on read to the first `rowLimit` rows.
+ * @param endColumn Optional last column in the specified Excel Sheet to read from (as string, e.g. F).
+ * @param rowLimit Optional limit of the number of rows being returned on read.
  *                 This is applied after `numLinesToSkip`.
- * @param useHeader If `true`, the first row of the excel sheet specifies the column names.
- *                  This option is required (default: true).
+ * @param useHeader If `true`, the first row of the excel sheet specifies the column names (default: true).
  * @param treatEmptyValuesAsNulls Empty cells are parsed as `null` values (default: true).
  * @param inferSchema Infer the schema of the excel sheet automatically (default: true).
  * @param timestampFormat A format string specifying the format to use when writing timestamps (default: dd-MM-yyyy HH:mm:ss).
@@ -182,10 +160,10 @@ object ExcelFileDataObject extends FromConfigFactory[DataObject] {
  * @see [[https://github.com/crealytics/spark-excel]]
  */
 case class ExcelOptions(
-                         sheetName: String,
+                         sheetName: Option[String] = None,
                          numLinesToSkip: Option[Int] = None,
-                         startColumn: Option[Int] = None,
-                         endColumn: Option[Int] = None,
+                         startColumn: Option[String] = None,
+                         endColumn: Option[String] = None,
                          rowLimit: Option[Int] = None,
                          useHeader: Boolean = true,
                          treatEmptyValuesAsNulls: Option[Boolean] = Some(true),
@@ -196,17 +174,27 @@ case class ExcelOptions(
                          excerptSize: Option[Int] = None
                        ) {
 
-  def validate(id: DataObjectId): Unit = {
-    require(sheetName != null && sheetName.trim().nonEmpty, s"($id) The sheetName option is required and must not be empty for Excel files.")
-    require(!startColumn.exists(_ <= 0), s"($id) Invalid startColumn index $startColumn. The index of the first column of an excel sheet is 1 and not 0!")
+  require(!startColumn.exists(_.exists(c => !c.isLetter)), s"ExcelOptions.startColumn must contain only letters (A-Z)+, but is ${startColumn.get}")
+  require(!endColumn.exists(_.exists(c => !c.isLetter)), s"ExcelOptions.endColumn must contain only letters (A-Z)+, but is ${endColumn.get}")
+
+  def getDataAddress: Option[String] = {
+    if (sheetName.isDefined || startColumn.isDefined || endColumn.isDefined || numLinesToSkip.isDefined || rowLimit.isDefined) {
+      val startLine = numLinesToSkip.map(_+1)
+      val endLine = rowLimit.map(_+startLine.getOrElse(1))
+      val xSheet = sheetName.map(name => s"'${name.trim}'!")
+      val startAreaDefined = xSheet.orElse(startColumn).orElse(startLine).orElse(endColumn).orElse(endLine).isDefined
+      val xStartArea = if (startAreaDefined) Some(startColumn.getOrElse("A") + startLine.getOrElse(1)) else None
+      val endAreaDefined = endColumn.orElse(endLine).isDefined
+      val xEndArea = if (endAreaDefined) Some(":" + endColumn.getOrElse("ZZ") + endLine.getOrElse(100000)) else None
+      Some( xSheet.getOrElse("") + xStartArea.getOrElse("") + xEndArea.getOrElse(""))
+    } else None
   }
 
+
   def toMap(schema: Option[StructType]): Map[String, Option[Any]] = Map(
-      "sheetName" -> Some(sheetName.trim()),
+      "dataAddress" -> getDataAddress,
       "treatEmptyValuesAsNulls" -> treatEmptyValuesAsNulls,
-      "startColumn" -> startColumn.map(_ - 1), // start columns are 0 based in the library, but 1 based in SDL
-      "endColumn" -> endColumn,
-      "useHeader" -> Some(useHeader),
+      "header" -> Some(useHeader),
       "inferSchema" -> Some(schema.isEmpty && inferSchema.getOrElse(true)),
       "treatEmptyValuesAsNulls" -> treatEmptyValuesAsNulls,
       "timestampFormat" -> timestampFormat,

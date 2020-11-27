@@ -221,13 +221,4 @@ class HiveUtilTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger
     assert(HiveUtil.normalizePath(inputText) == expectedNormalization)
   }
 
-  test("Normalize Paths with prefix") {
-    // Make sure only the last tock is switched
-    val pathPrefix = "hdfs://nameservice1/user/hansi"
-    val inputText = s"${pathPrefix}file:\\\\some\\tock\\path\\tock\\"
-    val expectedNormalization = "/some/tock/path/tick"
-
-    assert(HiveUtil.normalizePath(inputText,Some(pathPrefix)) == expectedNormalization)
-  }
-
 }

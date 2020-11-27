@@ -50,7 +50,11 @@ trait CustomDfTransformer extends Serializable {
  *
  * Note about Python transformation: Environment with Python and PySpark needed.
  * PySpark session is initialize and available under variables `sc`, `session`, `sqlContext`.
- * Input DataFrame is available as `inputDf`. Output DataFrame must be set with `setOutputDf(df)`.
+ * Other variables available are
+ * - `inputDf`: Input DataFrame
+ * - `options`: Transformation options as Map[String,String]
+ * - `dataObjectId`: Id of input dataObject as String
+ * Output DataFrame must be set with `setOutputDf(df)`.
  *
  * @param className Optional class name to load transformer code from
  * @param scalaFile Optional file where scala code for transformation is loaded from
@@ -115,7 +119,7 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
     // replace runtime options
     lazy val data = DefaultExpressionData.from(context, partitionValues)
     val runtimeOptionsReplaced = runtimeOptions.mapValues {
-      expr => SparkExpressionUtil.evaluateString(actionId, Some("transformation.runtimeObjects"), expr, data)
+      expr => SparkExpressionUtil.evaluateString(actionId, Some("transformation.runtimeOptions"), expr, data)
     }.filter(_._2.isDefined).mapValues(_.get)
     // transform
     impl.get.transform(session, options ++ runtimeOptionsReplaced, df, dataObjectId.id)

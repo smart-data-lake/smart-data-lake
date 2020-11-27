@@ -166,7 +166,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
       id = "123",
       path = "/path/to/foo",
       ExcelOptions(
-        sheetName = "testSheet"
+        sheetName = Some("testSheet")
       )
     )
   }
