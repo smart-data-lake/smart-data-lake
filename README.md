@@ -10,7 +10,7 @@ It is implemented in Scala and builds on top of open-source big data technologie
 * enables topnotch artificial intelligence (AI) and machine learning (ML) technologies for data-driven enterprises
 
 ### The Smart Data Lake adds
-* a layered data architecture to provide not only raw data, but prepared, secured, high quality data according to business entities, ready to use for analytical use cases, also called «Smart Data»
+* a layered data architecture to provide not only raw data, but prepared, secured, high quality data according to business entities, ready to use for analytical use cases, also called «Smart Data». This is comparable to Databricks Lake House architecture, in fact Smart Data Lake Builder is a very good choice to automate a Lake House, also on Databricks.
 * a declarative, configuration-driven approach to creating data pipelines. Metadata about data pipelines allows for efficient operations, maintenance and more business self-service.
 
 ### Benefits of Smart Data Lake Builder
