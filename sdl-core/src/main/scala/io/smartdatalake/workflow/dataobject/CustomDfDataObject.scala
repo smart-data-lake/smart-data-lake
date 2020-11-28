@@ -22,9 +22,11 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.DataFrameUtil
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
 /**
  * Generic [[DataObject]] containing a config object.
@@ -37,8 +39,16 @@ case class CustomDfDataObject(override val id: DataObjectId,
                              )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with SchemaValidation {
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession) : DataFrame = {
-    val df = creator.exec
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+
+    // During the init phase, we want to enable getting the schema without creating the entire DataFrame
+    // Because during the exec phase, the DataFrame will be created again anyway, leading to multiple calls to creator.exec
+    // If the CustomDfDataObject reads lots of data from e.g. a webservice, this might be expensive
+    val df = creator.schema match {
+      case Some(schema) if context.phase != ExecutionPhase.Exec => DataFrameUtil.getEmptyDataFrame(schema)
+      case _ => creator.exec
+    }
+
     validateSchemaMin(df)
     df
   }

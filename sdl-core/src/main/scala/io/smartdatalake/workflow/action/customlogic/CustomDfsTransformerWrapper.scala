@@ -20,9 +20,9 @@ package io.smartdatalake.workflow.action.customlogic
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-private[smartdatalake] class CustomDfsTransformerWrapper(val fnExec: (SparkSession, Map[String,String], Map[String,DataFrame]) => Map[String,DataFrame])
+private[smartdatalake] class CustomDfsTransformerWrapper(fnTransform: CustomDfsTransformerConfig.fnTransformType)
   extends CustomDfsTransformer {
   def transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]) : Map[String,DataFrame] = {
-    fnExec(session, options, dfs)
+    fnTransform(session, options, dfs)
   }
 }

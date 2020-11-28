@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.dataobject
 import java.io.File
 
 import io.smartdatalake.util.misc.DataFrameUtil
-import io.smartdatalake.workflow.SchemaViolationException
+import io.smartdatalake.workflow.{ActionPipelineContext, SchemaViolationException}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.sql.{AnalysisException, DataFrame, SparkSession}
@@ -32,7 +32,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
 
   def readNonExistingSources(createDataObject: (String, Option[StructType]) => DataObject with CanCreateDataFrame with UserDefinedSchema,
                                      fileExtension: String = null)
-                                         (implicit session: SparkSession): Unit = {
+                                         (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
 
     test("It is not possible to read from an non-existing file without user-defined-schema.") {
       val path = tempFilePath(fileExtension)
@@ -43,7 +43,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
 
   def readEmptySources(createDataObject: (String, Option[StructType]) => DataObject with CanCreateDataFrame with UserDefinedSchema,
                        fileExtension: String = null)
-                      (implicit session: SparkSession): Unit = {
+                      (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
 
     test("Reading from an empty file with user-defined schema results in an empty data frame.") {
       val schema = Seq(
@@ -71,7 +71,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
 
   def readEmptySourcesWithEmbeddedSchema(createDataObject: (String, Option[StructType]) => DataObject with CanCreateDataFrame with UserDefinedSchema,
                        fileExtension: String = null)
-                      (implicit session: SparkSession): Unit = {
+                      (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
 
     test("Reading an empty file creates an empty data frame with the embedded schema and ignores user-defined schema.") {
       val embeddedSchema = Seq(
@@ -262,7 +262,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
 
   def validateSchemaMinOnRead(createDataObject: (String, Option[StructType], Option[StructType]) => DataObject with CanCreateDataFrame,
                                fileExtension: String = null)
-                              (implicit session: SparkSession) : Unit = {
+                              (implicit session: SparkSession, context: ActionPipelineContext) : Unit = {
 
     val schemaMin = Seq(
       StructField("id", StringType, nullable = true),

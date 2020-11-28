@@ -23,6 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, FromConfigFactory, InstanceRegistry, ParsableFromConfig}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{ArrayType, MapType, StringType, StructField, StructType}
@@ -59,7 +60,7 @@ case class PKViolatorsDataObject(id: DataObjectId,
                                 (@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with ParsableFromConfig[PKViolatorsDataObject] {
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
 
     import PKViolatorsDataObject.{colListType, columnNameName, columnValueName}
     // Get all DataObjects from registry
