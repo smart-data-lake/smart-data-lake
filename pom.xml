@@ -245,7 +245,7 @@
 		<repository>
 			<id>bintray-smart-data-lake-smart-data-lake</id>
 			<name>smart-data-lake-smart-data-lake</name>
-			<url>https://api.bintray.com/maven/smart-data-lake/smart-data-lake/${project.artifactId}/;publish=1</url>
+			<url>https://api.bintray.com/maven/smart-data-lake/smart-data-lake/${project.name}/;publish=1</url>
 		</repository>
 	</distributionManagement>
 
