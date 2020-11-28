@@ -31,10 +31,6 @@
 
 	<name>sdl-splunk</name>
 
-	<properties>
-		<bintray.package.name>${project.name}</bintray.package.name>
-	</properties>
-
 	<dependencies>
 		<dependency>
 			<groupId>io.smartdatalake</groupId>
