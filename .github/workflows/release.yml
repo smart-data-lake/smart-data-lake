@@ -32,18 +32,12 @@ jobs:
         
     - name: Maven Get Version
       run: |
-        echo 'MVN_CURRENT_VERSION<<EOF' >> $GITHUB_ENV
-        mvn -B -f /home/runner/work/smart-data-lake/smart-data-lake/pom.xml -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec >> $GITHUB_ENV
-        echo 'EOF' >> $GITHUB_ENV
+        echo MVN_CURRENT_VERSION=$(mvn -B -P scala-2.12 -f /home/runner/work/smart-data-lake/smart-data-lake/pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
     - name: Set Release Version
       run: |
-        echo 'MVN_RELEASE_VERSION<<EOF' >> $GITHUB_ENV
-        mvn -B -f /home/runner/work/smart-data-lake/smart-data-lake/pom.xml -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec | sed 's/-SNAPSHOT//g' >> $GITHUB_ENV
-        echo 'EOF' >> $GITHUB_ENV
+        echo MVN_RELEASE_VERSION=${MVN_CURRENT_VERSION/-SNAPSHOT/} >> $GITHUB_ENV
     #- name: Printenv
     #  run: |
-    #    echo "MVN_CURRENT_VERSION=${MVN_CURRENT_VERSION}
-    #    echo "MVN_RELEASE_VERSION=${MVN_RELEASE_VERSION}
     #    printenv
     - name: Maven Set Release Version
       run: sed -i "/${MVN_CURRENT_VERSION}/{s//${MVN_RELEASE_VERSION}/;:p;n;bp}" pom.xml
