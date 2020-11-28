@@ -120,7 +120,6 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<noLinkWarnings>-unchecked</noLinkWarnings>
 		<license.header.file>src/license/gplv3-header.txt</license.header.file>
-		<bintray.package.name>${project.artifactId}</bintray.package.name>
 
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>
@@ -246,7 +245,7 @@
 		<repository>
 			<id>bintray-smart-data-lake-smart-data-lake</id>
 			<name>smart-data-lake-smart-data-lake</name>
-			<url>https://api.bintray.com/maven/smart-data-lake/smart-data-lake/${bintray.package.name}/;publish=1</url>
+			<url>https://api.bintray.com/maven/smart-data-lake/smart-data-lake/smart-data-lake/;publish=1</url>
 		</repository>
 	</distributionManagement>
 
