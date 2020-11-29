@@ -97,7 +97,7 @@
             warnings for external libraries which is why we deactivate them -->
 			<id>scala-doc-nolinkwarnings</id>
 			<properties>
-				<noLinkWarnings>-no-link-warnings</noLinkWarnings>
+				<scaladoc.nolinkwarnings>-no-link-warnings</scaladoc.nolinkwarnings>
 			</properties>
 		</profile>
 		<profile>
@@ -118,7 +118,7 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<noLinkWarnings>-unchecked</noLinkWarnings>
+		<scaladoc.nolinkwarnings>-unchecked</scaladoc.nolinkwarnings>
 		<license.header.file>src/license/gplv3-header.txt</license.header.file>
 
 		<maven.compiler.source>1.8</maven.compiler.source>
@@ -289,6 +289,17 @@
 								<goal>testCompile</goal>
 							</goals>
 						</execution>
+						<execution>
+							<id>scala-doc</id>
+							<goals>
+								<goal>doc-jar</goal>
+							</goals>
+							<configuration>
+								<args>
+									<arg>${scaladoc.nolinkwarnings}</arg>
+								</args>
+							</configuration>
+						</execution>
 					</executions>
 					<configuration>
 						<scalaCompatVersion>${scala.minor.version}</scalaCompatVersion>
@@ -301,7 +312,6 @@
 							<arg>-feature</arg>
 							<arg>-explaintypes</arg>
 							<arg>-target:jvm-1.8</arg>
-							<arg>${noLinkWarnings}</arg>
 						</args>
 						<jvmArgs>
 							<jvmArg>-Xms64m</jvmArg>
