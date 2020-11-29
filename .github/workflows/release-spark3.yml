@@ -49,10 +49,10 @@ jobs:
         mkdir -p ~/.m2
         echo "<settings><servers><server><id>bintray-smart-data-lake-smart-data-lake</id><username>smartdatalake</username><password>${BINTRAY_API_KEY}</password></server></servers></settings>" > ~/.m2/settings.xml
     - name: Maven Deploy to Bintray for Scala 2.12
-      # separate package and deploy because of authentication timeout at bintray between processing different modules!
+      # separate compile/test and deploy because of authentication timeout at bintray between processing different modules!
       run: |
-        mvn -B -P scala-2.12,scala-doc-nolinkwarnings clean package -f pom.xml
-        mvn -B -P scala-2.12,scala-doc-nolinkwarnings scala:doc-jar@scala-doc deploy -f pom.xml
+        mvn -B -P scala-2.12,scala-doc-nolinkwarnings clean test -f pom.xml
+        mvn -B -P scala-2.12,scala-doc-nolinkwarnings -DskipTests deploy -f pom.xml
 
     - name: Git Commit and Tag Release
       run: |
