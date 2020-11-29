@@ -51,8 +51,8 @@ jobs:
     - name: Maven Deploy to Bintray for Scala 2.12
       # separate package and deploy because of authentication timeout at bintray between processing different modules!
       run: |
-        mvn -B -P scala-2.12,scala-doc-nolinkwarnings clean scala:doc-jar package -f pom.xml
-        mvn -B -P scala-2.12,scala-doc-nolinkwarnings scala:doc-jar deploy -f pom.xml
+        mvn -B -P scala-2.12,scala-doc-nolinkwarnings clean package -f pom.xml
+        mvn -B -P scala-2.12,scala-doc-nolinkwarnings scala:doc-jar@scala-doc deploy -f pom.xml
 
     - name: Git Commit and Tag Release
       run: |
