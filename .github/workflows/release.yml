@@ -42,23 +42,27 @@ jobs:
         sed -i "/${MVN_CURRENT_VERSION}/{s//${MVN_RELEASE_VERSION}/;:p;n;bp}" pom.xml
         sed -i "/${MVN_CURRENT_VERSION}/{s//${MVN_RELEASE_VERSION}/;:p;n;bp}" */pom.xml
 
-    - name: Prepare Maven Settings
-      env:
-        BINTRAY_API_KEY: ${{ secrets.BINTRAY_API_KEY }}
-      run: |
-        mkdir -p ~/.m2
-        echo "<settings><servers><server><id>bintray-smart-data-lake-smart-data-lake</id><username>smartdatalake</username><password>${BINTRAY_API_KEY}</password></server></servers></settings>" > ~/.m2/settings.xml
-    - name: Maven Deploy to Bintray for Scala 2.11
-      # separate compile/test and deploy because of authentication timeout at bintray between processing different modules!
-      run: |
-        mvn -B -P scala-2.11,scala-doc-nolinkwarnings clean test -f pom.xml
-        mvn -B -P scala-2.11,scala-doc-nolinkwarnings -DskipTests deploy -f pom.xml
-    - name: Maven Deploy to Bintray for Scala 2.12
-      # exclude sdl-parent as it is already build uploaded with previous deploy, stays the same and can not be replaced in bintray!
-      run:
-        mvn -B -P scala-2.12,scala-doc-nolinkwarnings -pl '!.' clean test -f pom.xml
-        mvn -B -P scala-2.12,scala-doc-nolinkwarnings -DskipTests -pl '!.' deploy -f pom.xml
-        
+    - name: Maven deploy to sonatype for Scala 2.11
+      uses: samuelmeuli/action-maven-publish@v1
+      with:
+        gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+        gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+        nexus_username: ${{ secrets.SONATYPE_USERNAME }}
+        nexus_password: ${{ secrets.SONATYPE_PASSWORD }}
+        maven_profiles: scala-2.11,scala-doc-nolinkwarnings
+        maven_args: -B -f pom.xml
+
+    - name: Maven deploy to sonatype for Scala 2.12
+      uses: samuelmeuli/action-maven-publish@v1
+      with:
+        gpg_private_key: ${{ secrets.gpg_private_key }}
+        gpg_passphrase: ${{ secrets.gpg_passphrase }}
+        nexus_username: ${{ secrets.sonatype_username }}
+        nexus_password: ${{ secrets.sonatype_password }}
+        maven_profiles: scala-2.12,scala-doc-nolinkwarnings
+        # exclude sdl-parent as it is already uploaded with previous deploy, stays the same and cannot be replaced in remote repository
+        maven_args: -B -pl '!' -f pom.xml
+
     - name: Git Commit and Tag Release
       run: |
         git config --local user.email "action@github.com"
