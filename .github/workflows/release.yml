@@ -55,20 +55,20 @@ jobs:
     - name: Maven deploy to sonatype for Scala 2.12
       uses: samuelmeuli/action-maven-publish@v1
       with:
-        gpg_private_key: ${{ secrets.gpg_private_key }}
-        gpg_passphrase: ${{ secrets.gpg_passphrase }}
-        nexus_username: ${{ secrets.sonatype_username }}
-        nexus_password: ${{ secrets.sonatype_password }}
+        gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+        gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+        nexus_username: ${{ secrets.SONATYPE_USERNAME }}
+        nexus_password: ${{ secrets.SONATYPE_PASSWORD }}
         maven_profiles: scala-2.12,scala-doc-nolinkwarnings
         # exclude sdl-parent as it is already uploaded with previous deploy, stays the same and cannot be replaced in remote repository
-        maven_args: -B -pl '!' -f pom.xml
+        maven_args: -B -pl '!.' -f pom.xml
 
     - name: Git Commit and Tag Release
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add -A
-        git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to committ
+        git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
         git tag -f ${MVN_RELEASE_VERSION} -m "Release ${MVN_RELEASE_VERSION}"
     - name: Git Pull Master
       run: |
@@ -96,7 +96,7 @@ jobs:
         git branch
         git checkout develop
         git merge origin/master
-        git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to committ
+        git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
     
     - name: Develop Git Push Release
       uses: ad-m/github-push-action@master
