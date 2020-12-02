@@ -103,7 +103,7 @@
             warnings for external libraries which is why we deactivate them -->
 			<id>scala-doc-nolinkwarnings</id>
 			<properties>
-				<noLinkWarnings>-no-link-warnings</noLinkWarnings>
+				<scaladoc.nolinkwarnings>-no-link-warnings</scaladoc.nolinkwarnings>
 			</properties>
 		</profile>
 		<!-- only scala 2.12 supported in spark 3.0 -->
@@ -127,7 +127,7 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<noLinkWarnings>-unchecked</noLinkWarnings>
+		<scaladoc.nolinkwarnings>-unchecked</scaladoc.nolinkwarnings>
 		<license.header.file>src/license/gplv3-header.txt</license.header.file>
 
 		<maven.compiler.source>1.8</maven.compiler.source>
@@ -275,9 +275,9 @@
 
 	<distributionManagement>
 		<repository>
-			<id>bintray-smart-data-lake-smart-data-lake</id>
-			<name>smart-data-lake-smart-data-lake</name>
-			<url>https://api.bintray.com/maven/smart-data-lake/smart-data-lake/smart-data-lake/;publish=1</url>
+			<id>ossrh</id>
+			<name>Central Repository OSSRH</name>
+			<url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
 		</repository>
 	</distributionManagement>
 
@@ -300,7 +300,7 @@
 		</repository>
 		<repository>
 			<id>confluent</id>
-			<name>Confluent Schema  Repository</name>
+			<name>Confluent Schema Repository</name>
 			<url>https://packages.confluent.io/maven/</url>
 		</repository>
 	</repositories>
@@ -321,6 +321,17 @@
 								<goal>testCompile</goal>
 							</goals>
 						</execution>
+						<execution>
+							<id>scala-doc</id>
+							<goals>
+								<goal>doc-jar</goal>
+							</goals>
+							<configuration>
+								<args>
+									<arg>${scaladoc.nolinkwarnings}</arg>
+								</args>
+							</configuration>
+						</execution>
 					</executions>
 					<configuration>
 						<scalaCompatVersion>${scala.minor.version}</scalaCompatVersion>
@@ -333,7 +344,6 @@
 							<arg>-feature</arg>
 							<arg>-explaintypes</arg>
 							<arg>-target:jvm-1.8</arg>
-							<arg>${noLinkWarnings}</arg>
 						</args>
 						<jvmArgs>
 							<jvmArg>-Xms64m</jvmArg>
@@ -503,6 +513,7 @@
 									<transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer">
 									</transformer>
 								</transformers>
+								<!-- the following archiv tag might show as error in IntelliJ, but it's ok for maven and works! -->
 								<archive>
 									<compress>false</compress>
 									<manifest>
@@ -606,6 +617,42 @@
 				<version>2.12.4</version>
 				<configuration>
 					<skip>true</skip>
+				</configuration>
+			</plugin>
+
+			<!-- sign artifacts with gpg -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-gpg-plugin</artifactId>
+				<version>1.6</version>
+				<executions>
+					<execution>
+						<id>sign-artifacts</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>sign</goal>
+						</goals>
+						<configuration>
+							<!-- Prevent `gpg` from using pinentry programs -->
+							<gpgArguments>
+								<arg>--pinentry-mode</arg>
+								<arg>loopback</arg>
+							</gpgArguments>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- deploy to sonatype / maven central -->
+			<plugin>
+				<groupId>org.sonatype.plugins</groupId>
+				<artifactId>nexus-staging-maven-plugin</artifactId>
+				<version>1.6.7</version>
+				<extensions>true</extensions>
+				<configuration>
+					<serverId>ossrh</serverId>
+					<nexusUrl>https://oss.sonatype.org/</nexusUrl>
+					<autoReleaseAfterClose>false</autoReleaseAfterClose>
 				</configuration>
 			</plugin>
 
