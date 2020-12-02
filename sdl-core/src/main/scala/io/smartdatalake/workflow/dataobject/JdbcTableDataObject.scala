@@ -20,6 +20,8 @@ package io.smartdatalake.workflow.dataobject
 
 import java.sql.Timestamp
 
+import java.sql.ResultSet
+
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
@@ -50,6 +52,12 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
  * @param connectionId Id of JdbcConnection configuration
  * @param jdbcOptions Any jdbc options according to [[https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html]].
  *                    Note that some options above set and override some of this options explicitly.
+ * @param partitions Virtual partition columns. Note that this doesn't need to be the same as the database partition
+ *                   columns for this table. But it is important that there is an index on these columns to efficiently
+ *                   list existing "partitions".
+ * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
+ *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
+ *                                    Default is to expect all partitions to exist.
  */
 case class JdbcTableDataObject(override val id: DataObjectId,
                                createSql: Option[String] = None,
@@ -62,9 +70,11 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                jdbcFetchSize: Int = 1000,
                                connectionId: ConnectionId,
                                jdbcOptions: Map[String, String] = Map(),
+                               override val partitions: Seq[String] = Seq(),
+                               override val expectedPartitionsCondition: Option[String] = None,
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject {
+  extends TransactionalSparkTableDataObject with CanHandlePartitions {
 
   /**
    * Connection defines driver, url and db in central location
@@ -91,6 +101,17 @@ case class JdbcTableDataObject(override val id: DataObjectId,
         connection.execJdbcStatement(sql)
       }
       assert(isTableExisting, s"($id) Table ${table.fullName} doesn't exist. Define createSQL to create table automatically.")
+    }
+
+    // test partition columns exist
+    if (partitions.nonEmpty) {
+      val metadataQuery = table.query.getOrElse(s"select * from ${table.fullName}") + " where 1=0"
+      def evalColumnNames(rs: ResultSet): Seq[String] = {
+        (1 to rs.getMetaData.getColumnCount).map( i => rs.getMetaData.getColumnName(i))
+      }
+      val columnNames = connection.execJdbcQuery(metadataQuery, evalColumnNames)
+      val missingPartitionColumns = partitions.diff(columnNames)
+      assert(missingPartitionColumns.isEmpty, s"($id) Virtual partition columns ${missingPartitionColumns.mkString(",")} missing in table definition")
     }
   }
 
@@ -158,6 +179,22 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
 
   override def factory: FromConfigFactory[DataObject] = JdbcTableDataObject
+
+  /**
+   * Listing virtual partitions by a "select distinct partition-columns" query
+   */
+  override def listPartitions(implicit session: SparkSession): Seq[PartitionValues] = {
+    if (partitions.nonEmpty) {
+      val tableClause = table.query.map( q => s"($q)").getOrElse(table.fullName)
+      val partitionListQuery = s"select distinct ${partitions.mkString(", ")} from $tableClause"
+      def evalPartitions(rs: ResultSet): Seq[PartitionValues] = {
+        Iterator.continually(rs.next).takeWhile(identity).map {
+          _ => PartitionValues(partitions.map(col => col -> rs.getObject(col)).toMap)
+        }.toSeq
+      }
+      connection.execJdbcQuery(partitionListQuery, evalPartitions)
+    } else Seq()
+  }
 }
 
 object JdbcTableDataObject extends FromConfigFactory[DataObject] {

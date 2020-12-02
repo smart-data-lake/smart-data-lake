@@ -160,6 +160,7 @@ object MemoryUtils extends SmartDataLakeLogger {
         logHeapInfo(true, false, false)
       }
     })
+
   }
 
   def formatBytesMB(bytes:Long): String = {
