@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2020 Schweizerische Bundesbahnen SBB (<https://www.sbb.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,14 +19,23 @@
 package io.smartdatalake.config
 
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreator
-import io.smartdatalake.testutils.TestUtil.dfNonUniqueWithNull
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-class TestCustomDfNonUniqueWithNullCreator extends CustomDfCreator {
-  override def exec(session: SparkSession, config: Map[String, String]): DataFrame = dfNonUniqueWithNull
+class TestCustomDfCreatorWithSchema extends CustomDfCreator {
 
-  override def schema(session: SparkSession, config: Map[String, String]): Option[StructType] = Option(dfNonUniqueWithNull.schema)
+  override def exec(session: SparkSession, config: Map[String, String]): DataFrame = {
+      import session.implicits._
+      val rows: Seq[(Some[Int], String)] = Seq((Some(0),"Foo!"),(Some(1),"Bar!"))
+      val myDf: DataFrame = rows.toDF("num","text")
+      myDf.show(false)
+      myDf
+  }
+
+  override def schema(session: SparkSession, config: Map[String, String]): Option[StructType] = {
+    // this schema does not match the schema of the DataFrame returned by exec
+    Option(new StructType(Array(new StructField("num", IntegerType))))
+  }
 
   override def equals(obj: Any): Boolean = getClass.equals(obj.getClass)
 }

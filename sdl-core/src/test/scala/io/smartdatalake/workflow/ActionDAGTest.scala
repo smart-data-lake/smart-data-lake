@@ -31,7 +31,7 @@ import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformerConfig, 
 import io.smartdatalake.workflow.action.{CopyAction, _}
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{DataType, StructField, StructType, TimestampType}
+import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
@@ -383,12 +383,12 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), partitions = Seq("dt","type"), table = srcTable, numInitialHdfsPartitions = 1)
     srcDO.dropTable
     instanceRegistry.register(srcDO)
-    val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
+    val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("dt","type","lastname","firstname")))
     // first table has partitions columns dt and type (same as source)
     val tgt1DO = TickTockHiveTableDataObject( "tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), partitions = Seq("dt","type"), table = tgt1Table, numInitialHdfsPartitions = 1)
     tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
-    val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
+    val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("dt","lastname","firstname")))
     // second table has partition columns dt only (reduced)
     val tgt2DO = HiveTableDataObject( "tgt2", Some(tempPath+s"/${tgt2Table.fullName}"), partitions = Seq("dt"), table = tgt2Table, numInitialHdfsPartitions = 1)
     tgt2DO.dropTable
@@ -437,6 +437,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val resourceFile = "AB_NYC_2019.csv"
     val tempDir = Files.createTempDirectory(feed)
 
+    val refTimestamp1 = LocalDateTime.now()
+    implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+
     // copy data file
     TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile).toFile)
 
@@ -456,8 +459,6 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgt2DO)
 
     // prepare ActionPipeline
-    val refTimestamp1 = LocalDateTime.now()
-    implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val action1 = FileTransferAction("fta", srcDO.id, tgt1DO.id)
     val action2 = CopyAction("ca", tgt1DO.id, tgt2DO.id)
     val dag = ActionDAGRun(Seq(action1, action2), 1, 1)
@@ -484,6 +485,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val resourceFile = "AB_NYC_2019.csv"
     val tempDir = Files.createTempDirectory(feed)
 
+    val refTimestamp1 = LocalDateTime.now()
+    implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+
     // copy data file
     TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile).toFile)
 
@@ -507,8 +511,6 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgt3DO)
 
     // prepare ActionPipeline
-    val refTimestamp1 = LocalDateTime.now()
-    implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val action1 = CopyAction("ca1", srcDO.id, tgt1DO.id)
     val action2 = CopyAction("ca2", tgt1DO.id, tgt2DO.id)
     val action3 = FileTransferAction("fta", tgt2DO.id, tgt3DO.id)
@@ -533,7 +535,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(action2MainMetrics("num_tasks")==1)
   }
 
-  test("action dag with 2 actions in sequence and executionMode=PartitionDiffMode") {
+  test("action dag with 2 actions in sequence and executionMode=PartitionDiffMode and selectExpression") {
     // setup DataObjects
     val feed = "actionpipeline"
     val srcTable = Table(Some("default"), "ap_input")
@@ -552,16 +554,32 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // prepare DAG
     val refTimestamp1 = LocalDateTime.now()
     implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
-    val df1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
-    val expectedPartitions = Seq(PartitionValues(Map("lastname"->"doe")))
-    srcDO.writeDataFrame(df1, expectedPartitions)
+    val df1 = Seq(("doe","john",5),("einstein","albert",2)).toDF("lastname", "firstname", "rating")
+    srcDO.writeDataFrame(df1, Seq())
+    val partitionDiffMode = PartitionDiffMode(
+      applyCondition = Some("isStartNode"),
+      selectExpression = Some("slice(selectedPartitionValues,-1,1)"), // only one partition: last partition first
+      failCondition = Some("size(selectedPartitionValues) = 0 and size(outputPartitionValues) = 0")
+    )
     val actions: Seq[SparkSubFeedAction] = Seq(
-      DeduplicateAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(applyCondition = Some("isStartNode"), failCondition = Some("size(selectedPartitionValues) = 0 and size(outputPartitionValues) = 0"))))
+      DeduplicateAction("a", srcDO.id, tgt1DO.id, executionMode = Some(partitionDiffMode))
       , CopyAction("b", tgt1DO.id, tgt2DO.id)
     )
     val dag = ActionDAGRun(actions, 1, 1)
 
-    // first dag run
+    // first dag run: partition lastname=einstein
+    dag.prepare
+    dag.init
+    dag.exec
+
+    // check
+    val r1 = tgt2DO.getDataFrame()
+      .select($"rating")
+      .as[Int].collect().toSeq
+    assert(r1 == Seq(2))
+    assert(tgt2DO.listPartitions ==  Seq(PartitionValues(Map("lastname"->"einstein"))))
+
+    // second dag run: partition lastname=doe
     dag.prepare
     dag.init
     dag.exec
@@ -569,12 +587,11 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // check
     val r2 = tgt2DO.getDataFrame()
       .select($"rating")
-      .as[Int].collect().toSeq
-    assert(r2 == Seq(5))
-    assert(tgt2DO.listPartitions == expectedPartitions)
+      .as[Int].collect().toSet
+    assert(r2 == Set(2,5))
+    assert(tgt2DO.listPartitions ==  Seq(PartitionValues(Map("lastname"->"doe")), PartitionValues(Map("lastname"->"einstein"))))
 
-
-    // second dag run - skip action execution because there are no new partitions to process
+    // third dag run - skip action execution because there are no new partitions to process
     dag.prepare
     intercept[NoDataToProcessWarning](dag.init)
   }
@@ -952,6 +969,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(srcDO)
     val tgt1DO = ParquetFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), partitions = Seq("lastname"), saveMode = SaveMode.Append)
     instanceRegistry.register(tgt1DO)
+    val tgt2DO = ParquetFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'), partitions = Seq("lastname"), saveMode = SaveMode.Append)
+    instanceRegistry.register(tgt2DO)
 
     // prepare DAG
     val refTimestamp1 = LocalDateTime.now()
@@ -959,12 +978,30 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val df1 = Seq(("doe","john",5, Timestamp.from(Instant.now))).toDF("lastname", "firstname", "rating", "tstmp")
     srcDO.writeDataFrame(df1, Seq())
 
-    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode=Some(PartitionDiffMode(failCondition = Some("year(runStartTime) > 2000"))))
-    val dag: ActionDAGRun = ActionDAGRun(Seq(action1), 1, 1)
+    // dag1 run fails in init-phase because action1 fails and there is no other action to execute
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode=Some(PartitionDiffMode(failConditions = Seq(Condition(expression = "year(runStartTime) > 2000", Some("testing"))))))
+    val dag1: ActionDAGRun = ActionDAGRun(Seq(action1), 1, 1)
+    dag1.prepare
+    val ex1 = intercept[TaskFailedException](dag1.init)
+    assert(ex1.cause.isInstanceOf[ExecutionModeFailedException])
+    assert(ex1.cause.getMessage.contains("testing"))
 
-    // first dag run, first file processed
-    dag.prepare
-    val ex = intercept[ExecutionModeFailedException](dag.init)
+    // dag2 run fails in exec-phase because action1 fails but there is another action to execute
+    val action2 = CopyAction("b", srcDO.id, tgt2DO.id)
+    val dag2: ActionDAGRun = ActionDAGRun(Seq(action1,action2), 1, 1)
+    dag2.reset
+    dag2.prepare
+    dag2.init
+    val ex2 = intercept[TaskFailedException](dag2.exec)
+    assert(ex2.cause.isInstanceOf[ExecutionModeFailedException])
+    assert(ex2.cause.getMessage.contains("testing"))
+
+    // check tgt2, it should be written by dag2
+    val r2 = tgt2DO.getDataFrame()
+      .select($"rating")
+      .as[Int].collect().toSet
+    assert(r2 == Set(5))
+
   }
 
 }

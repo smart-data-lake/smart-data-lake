@@ -27,7 +27,7 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions.{ExecutionMode, TechnicalTableColumn}
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, TransactionalSparkTableDataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject, TransactionalSparkTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions._
@@ -78,6 +78,10 @@ case class DeduplicateAction(override val id: ActionObjectId,
   override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
   override val outputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
 
+  // Output is used as recursive input in DeduplicateAction to get existing data. This override is needed to force tick-tock write operation.
+  override val recursiveInputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
+
+  // assert primary key is defined
   require(output.table.primaryKey.isDefined, s"(${id}) Primary key must be defined for output DataObject")
 
   // parse filter clause
@@ -88,20 +92,37 @@ case class DeduplicateAction(override val id: ActionObjectId,
 
   override def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
-    val pks = output.table.primaryKey
-      .getOrElse( throw new ConfigurationException(s"There is no <primary-keys> defined for table ${output.table.name}."))
-    val existingDf = if (output.isTableExisting) {
-      Some(output.getDataFrame())
-    } else None
-    val deduplicateTransformer = deduplicateDataFrame(existingDf, pks, timestamp) _
+    val pks = output.table.primaryKey.get // existance is validated earlier
+    // get existing data
+    // Note that DeduplicateAction needs to read/write all existing data for tick-tock operation, even if only specific partitions have changed
+    val existingDf = if (output.isTableExisting) Some(output.getDataFrame())
+    else None
+    val deduplicateTransformer = DeduplicateAction.deduplicateDataFrame(existingDf, pks, timestamp, ignoreOldDeletedColumns, ignoreOldDeletedNestedColumns) _
     applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, Seq(deduplicateTransformer), filterClauseExpr)
+  }
+
+  /**
+   * @inheritdoc
+   */
+  override def factory: FromConfigFactory[Action] = DeduplicateAction
+}
+
+object DeduplicateAction extends FromConfigFactory[Action] {
+
+  /**
+   * @inheritdoc
+   */
+  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): DeduplicateAction = {
+    import configs.syntax.ConfigOps
+    import io.smartdatalake.config._
+    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
+    config.extract[DeduplicateAction].value
   }
 
   /**
    * deduplicates a SubFeed.
    */
-  private def deduplicateDataFrame(existingDf: Option[DataFrame], pks: Seq[String], refTimestamp: LocalDateTime)(df: DataFrame)(implicit session: SparkSession): DataFrame = {
-
+  def deduplicateDataFrame(existingDf: Option[DataFrame], pks: Seq[String], refTimestamp: LocalDateTime, ignoreOldDeletedColumns: Boolean, ignoreOldDeletedNestedColumns: Boolean)(df: DataFrame)(implicit session: SparkSession): DataFrame = {
     // enhance
     val enhancedDf = df.withColumn(TechnicalTableColumn.captured.toString, ActionHelper.ts1(refTimestamp))
 
@@ -124,7 +145,7 @@ case class DeduplicateAction(override val id: ActionObjectId,
     import session.implicits._
     import udfs._
 
-    baseDf.union(newDf)
+    baseDf.unionByName(newDf)
       .groupBy(keyColumns.map(col):_*)
       .agg(collect_list(struct("*")).as("rows"))
       .withColumn("latestRowIndex", udf_getLatestRowIndex($"rows"))
@@ -138,23 +159,5 @@ case class DeduplicateAction(override val id: ActionObjectId,
       rows.map(_.getAs[Timestamp](TechnicalTableColumn.captured.toString)).zipWithIndex.maxBy(_._1.getTime)._2
     }
     val udf_getLatestRowIndex: UserDefinedFunction = udf(getLatestRowIndex _)
-  }
-
-  /**
-   * @inheritdoc
-   */
-  override def factory: FromConfigFactory[Action] = DeduplicateAction
-}
-
-object DeduplicateAction extends FromConfigFactory[Action] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): DeduplicateAction = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[DeduplicateAction].value
   }
 }

@@ -33,7 +33,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{StructField, StructType, TimestampType}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
-class ActionDAGTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
+class ActionDAGKafkaTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
 
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
   import session.implicits._

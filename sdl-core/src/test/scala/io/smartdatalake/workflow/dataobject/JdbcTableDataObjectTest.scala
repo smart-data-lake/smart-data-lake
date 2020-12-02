@@ -71,17 +71,15 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
-    val refTimestamp1 = LocalDateTime.now()
-    implicit val context1: ActionPipelineContext = ActionPipelineContext("jdbcTest", "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id)
     val srcSubFeed = SparkSubFeed(None, srcDO.id, Seq())
     action1.preExec(Seq(srcSubFeed))
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
     action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed))
 
-    val dfSrcExpected = Seq(("ext","doe","john",5)
-      ,("preRead","smith","jdbcTest",3),("preWrite","emma","jdbcTest",3)
-      ,("postRead","smith","jdbcTest",3),("postWrite","emma","jdbcTest",3)
+    val dfSrcExpected = Seq(("ext", "doe", "john", 5)
+      , ("preRead", "smith", "testFeed", 3), ("preWrite", "emma", "testFeed", 3)
+      , ("postRead", "smith", "testFeed", 3), ("postWrite", "emma", "testFeed", 3)
     ).toDF("type", "lastname", "firstname", "rating")
     assert(srcDO.getDataFrame().symmetricDifference(dfSrcExpected).isEmpty)
   }

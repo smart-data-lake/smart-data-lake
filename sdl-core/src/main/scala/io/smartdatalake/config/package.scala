@@ -20,7 +20,7 @@ package io.smartdatalake
 
 import configs.Configs
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, ConnectionId, DataObjectId}
-import io.smartdatalake.definitions.ExecutionMode
+import io.smartdatalake.definitions.{Condition, ExecutionMode}
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.webservice.KeycloakConfig
 import io.smartdatalake.workflow.action.customlogic._
@@ -77,6 +77,8 @@ package object config {
   implicit val sparkRepartitionDefReader: Configs[SparkRepartitionDef] = Configs.derive[SparkRepartitionDef]
 
   implicit val executionModeReader: Configs[ExecutionMode] = Configs.derive[ExecutionMode]
+
+  implicit val conditionReader: Configs[Condition] = Configs.derive[Condition]
 
   // --------------------------------------------------------------------------------
 

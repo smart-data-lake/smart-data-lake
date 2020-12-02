@@ -101,7 +101,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
   }
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
     val df = if(!isTableExisting && schemaMin.isDefined) {
       logger.info(s"Table ${table.fullName} does not exist but schemaMin was provided. Creating empty DataFrame.")
       DataFrameUtil.getEmptyDataFrame(schemaMin.get)

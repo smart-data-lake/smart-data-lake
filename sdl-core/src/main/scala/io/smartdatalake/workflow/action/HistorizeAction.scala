@@ -83,6 +83,9 @@ case class HistorizeAction(
   override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
   override val outputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
 
+  // Output is used as recursive input in DeduplicateAction to get existing data. This override is needed to force tick-tock write operation.
+  override val recursiveInputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
+
   // historize black/white list
   require(historizeWhitelist.isEmpty || historizeBlacklist.isEmpty, s"(${id}) HistorizeWhitelist and historizeBlacklist mustn't be used at the same time")
   // primary key
@@ -96,11 +99,11 @@ case class HistorizeAction(
 
   override def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
-    val pks = output.table.primaryKey
-      .getOrElse( throw new ConfigurationException(s"There is no <primary-keys> defined for table ${output.table.name}."))
-    val existingDf = if (output.isTableExisting) {
-      Some(output.getDataFrame())
-    } else None
+    val pks = output.table.primaryKey.get // existance is validated earlier
+    // get existing data
+    // Note that HistorizeAction needs to read/write all existing data for tick-tock operation, even if only specific partitions have changed
+    val existingDf = if (output.isTableExisting) Some(output.getDataFrame())
+    else None
     val historizeTransformer = historizeDataFrame(existingDf, pks, timestamp) _
     applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, Seq(historizeTransformer), filterClauseExpr)
   }

@@ -32,6 +32,7 @@ import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed}
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.streaming.Trigger
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
 private[smartdatalake] abstract class SparkAction extends Action {
@@ -166,7 +167,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
     val data = DefaultExpressionData.from(context, partitionValues)
     additionalColumns.foldLeft(df){
       case (df, (colName, expr)) =>
-        val value = SparkExpressionUtil.evaluateAny(id, Some("additionalColumns"), expr, data)
+        val value = SparkExpressionUtil.evaluate[DefaultExpressionData,Any](id, Some("additionalColumns"), expr, data)
         df.withColumn(colName, lit(value.orNull))
     }
   }
@@ -208,7 +209,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
 
   /**
    * Updates the partition values of a SubFeed to the partition columns of an output, removing not existing columns from the partition values.
-   * Further the transformed DataFrame is validated to have the output's partition columns included.
+   * Further the transformed DataFrame is validated to have the output's partition columns included and partition columns are moved to the end.
    *
    * @param output output DataObject
    * @param subFeed SubFeed with transformed DataFrame
@@ -220,7 +221,9 @@ private[smartdatalake] abstract class SparkAction extends Action {
         // validate output partition columns exist in DataFrame
         validateDataFrameContainsCols(subFeed.dataFrame.get, partitionedDO.partitions, s"for ${output.id}")
         // adapt subfeed
-        subFeed.updatePartitionValues(partitionedDO.partitions)
+        subFeed
+          .updatePartitionValues(partitionedDO.partitions)
+          .movePartitionColumnsLast(partitionedDO.partitions)
       case _ => subFeed.clearPartitionValues()
     }
     updatedSubFeed.clearDAGStart()
