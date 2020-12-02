@@ -114,17 +114,21 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
       jdbcConnection.execJdbcStatement(sql = "create table test_table_191 (test_column char(9));")
       jdbcConnection.execJdbcStatement(sql = "insert into test_table_191 (test_column) VALUES ('test_data');")
       val db = "public"
+
       val view = Table(Some(db), "test_view_191")
-      val table = Table(Some(db), "test_table_191")
       val dataObjectView = JdbcTableDataObject("jdbcDO1", table = view, connectionId = "jdbcCon1")
-      val dataObjectTable = JdbcTableDataObject("jdbcDO1", table = table, connectionId = "jdbcCon1")
-      val df = Seq(("test_data")).toDF("test_column")
       val dfReadView = dataObjectView.getDataFrame(Seq())
+
+      val table = Table(Some(db), "test_table_191")
+      val dataObjectTable = JdbcTableDataObject("jdbcDO1", table = table, connectionId = "jdbcCon1")
       val dfReadTable = dataObjectTable.getDataFrame(Seq())
+
+      val df = Seq(("test_data")).toDF("test_column")
       assert(jdbcConnection.catalog.asInstanceOf[DefaultSQLCatalog].isTableExisting(db, view.name))
       assert(jdbcConnection.catalog.asInstanceOf[DefaultSQLCatalog].isTableExisting(db, table.name))
       assert(dfReadView.symmetricDifference(df).isEmpty)
       assert(dfReadTable.symmetricDifference(df).isEmpty)
+
     } finally {
       jdbcConnection.execJdbcStatement(sql = "DROP view if exists test_view_191;")
       jdbcConnection.execJdbcStatement(sql = "DROP table if exists test_table_191;")
@@ -132,14 +136,32 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
   }
 
   test("list jdbc table virtual partitions") {
-    import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
     instanceRegistry.register(jdbcConnection)
     val table = Table(Some("public"), "table1")
-    val dataObject = JdbcTableDataObject( "jdbcDO1", table = table, connectionId = "jdbcCon1", partitions = Seq("type"), jdbcOptions = Map("createTableColumnTypes"->"type varchar(255), lastname varchar(255), firstname varchar(255)"))
+    val dataObject = JdbcTableDataObject( "jdbcDO1", table = table, connectionId = "jdbcCon1", virtualPartitions = Seq("abc"), jdbcOptions = Map("createTableColumnTypes"->"abc varchar(255), lastname varchar(255), firstname varchar(255)"))
     dataObject.dropTable
-    val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
+    // Be careful when writing lower case column names over Jdbc with Spark. When creating the table through Spark they will be surrounded with quotes and become case-sensitiv!
+    // In consequence the virtual partition has to be surrounded with quotes as well, see next test case.
+    val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("ABC", "lastname", "firstname", "rating")
     dataObject.writeDataFrame(df, Seq())
+    dataObject.getDataFrame(Seq()).show
+    assert(dataObject.isTableExisting)
     val partitionValues = dataObject.listPartitions
-    assert(partitionValues.map(_.elements("type")).toSet == Set("ext","int"))
+    assert(partitionValues.size == 2)
+    assert(partitionValues.map(_.elements("abc")).toSet == Set("ext","int"))
+  }
+
+  test("list jdbc table virtual partitions case sensitive") {
+    instanceRegistry.register(jdbcConnection)
+    val table = Table(Some("public"), "table1")
+    val dataObject = JdbcTableDataObject( "jdbcDO1", table = table, connectionId = "jdbcCon1", virtualPartitions = Seq("\"abc\""), jdbcOptions = Map("createTableColumnTypes"->"abc varchar(255), lastname varchar(255), firstname varchar(255)"))
+    dataObject.dropTable
+    val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("abc", "lastname", "firstname", "rating")
+    dataObject.writeDataFrame(df, Seq())
+    dataObject.getDataFrame(Seq()).show
+    assert(dataObject.isTableExisting)
+    val partitionValues = dataObject.listPartitions
+    assert(partitionValues.size == 2)
+    assert(partitionValues.map(_.elements("abc")).toSet == Set("ext","int"))
   }
 }

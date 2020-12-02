@@ -18,8 +18,6 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.sql.Timestamp
-
 import java.sql.ResultSet
 
 import com.typesafe.config.Config
@@ -52,7 +50,7 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
  * @param connectionId Id of JdbcConnection configuration
  * @param jdbcOptions Any jdbc options according to [[https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html]].
  *                    Note that some options above set and override some of this options explicitly.
- * @param partitions Virtual partition columns. Note that this doesn't need to be the same as the database partition
+ * @param virtualPartitions Virtual partition columns. Note that this doesn't need to be the same as the database partition
  *                   columns for this table. But it is important that there is an index on these columns to efficiently
  *                   list existing "partitions".
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
@@ -70,7 +68,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                jdbcFetchSize: Int = 1000,
                                connectionId: ConnectionId,
                                jdbcOptions: Map[String, String] = Map(),
-                               override val partitions: Seq[String] = Seq(),
+                               virtualPartitions: Seq[String] = Seq(),
                                override val expectedPartitionsCondition: Option[String] = None,
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
@@ -80,6 +78,10 @@ case class JdbcTableDataObject(override val id: DataObjectId,
    * Connection defines driver, url and db in central location
    */
   private val connection = getConnection[JdbcTableConnection](connectionId)
+
+  // Define partition columns
+  // Virtual partition column name might be quoted to force case sensitivity in database queries
+  override val partitions: Seq[String] = virtualPartitions.map(prepareCaseSensitiveName).map(_._1)
 
   // prepare final table
   table = table.overrideDb(connection.db)
@@ -104,13 +106,15 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
 
     // test partition columns exist
-    if (partitions.nonEmpty) {
+    if (virtualPartitions.nonEmpty) {
       val metadataQuery = table.query.getOrElse(s"select * from ${table.fullName}") + " where 1=0"
       def evalColumnNames(rs: ResultSet): Seq[String] = {
         (1 to rs.getMetaData.getColumnCount).map( i => rs.getMetaData.getColumnName(i))
       }
       val columnNames = connection.execJdbcQuery(metadataQuery, evalColumnNames)
-      val missingPartitionColumns = partitions.diff(columnNames)
+      val missingPartitionColumns = virtualPartitions.map(prepareCaseSensitiveName)
+        .filterNot{ case (name, _, compareFn) => columnNames.exists(c => compareFn(c, name))}
+        .map(_._1)
       assert(missingPartitionColumns.isEmpty, s"($id) Virtual partition columns ${missingPartitionColumns.mkString(",")} missing in table definition")
     }
   }
@@ -186,14 +190,23 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   override def listPartitions(implicit session: SparkSession): Seq[PartitionValues] = {
     if (partitions.nonEmpty) {
       val tableClause = table.query.map( q => s"($q)").getOrElse(table.fullName)
-      val partitionListQuery = s"select distinct ${partitions.mkString(", ")} from $tableClause"
+      val partitionListQuery = s"select distinct ${virtualPartitions.mkString(", ")} from $tableClause;"
+      val partitionsWithIdx = partitions.zipWithIndex
       def evalPartitions(rs: ResultSet): Seq[PartitionValues] = {
         Iterator.continually(rs.next).takeWhile(identity).map {
-          _ => PartitionValues(partitions.map(col => col -> rs.getObject(col)).toMap)
-        }.toSeq
+          _ => PartitionValues(partitionsWithIdx.map{ case (col,idx) => col -> rs.getObject(idx+1)}.toMap)
+        }.toVector
       }
       connection.execJdbcQuery(partitionListQuery, evalPartitions)
     } else Seq()
+  }
+
+  private def prepareCaseSensitiveName(name: String): (String, Boolean, (String, String) => Boolean) = {
+    val caseSensitiveNamePattern = "^[\"'](.*)[\"']$".r
+    name match {
+      case caseSensitiveNamePattern(nameOnly) => (nameOnly, true, (s1,s2) => s1.equals(s2))
+      case _ => (name, false, (s1,s2) => s1.equalsIgnoreCase(s2))
+    }
   }
 }
 
