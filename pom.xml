@@ -153,8 +153,9 @@
 									<goal>sign</goal>
 								</goals>
 								<configuration>
+									<!-- Prevent `gpg` from using pinentry programs -->
 									<gpgArguments>
-										<arg>pinentry-mode</arg>
+										<arg>--pinentry-mode</arg>
 										<arg>loopback</arg>
 									</gpgArguments>
 								</configuration>
