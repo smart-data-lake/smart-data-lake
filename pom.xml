@@ -92,15 +92,6 @@
 			</build>
 		</profile>
 		<profile>
-			<!-- do not use this profile if you want to see warnings about missing links
-            it makes sense to check warnings about internal (public) members, but we will always have
-            warnings for external libraries which is why we deactivate them -->
-			<id>scala-doc-nolinkwarnings</id>
-			<properties>
-				<scaladoc.nolinkwarnings>-no-link-warnings</scaladoc.nolinkwarnings>
-			</properties>
-		</profile>
-		<profile>
 			<id>scala-2.12</id>
 			<properties>
 				<scala.minor.version>2.12</scala.minor.version>
@@ -117,6 +108,11 @@
 		<profile>
 			<id>release-sonatype</id>
 			<distributionManagement>
+				<snapshotRepository>
+					<id>ossrh</id>
+					<name>Central Repository OSSRH</name>
+					<url>https://oss.sonatype.org/content/repositories/snapshots</url>
+				</snapshotRepository>
 				<repository>
 					<id>ossrh</id>
 					<name>Central Repository OSSRH</name>
@@ -125,6 +121,25 @@
 			</distributionManagement>
 			<build>
 				<plugins>
+					<!-- create scala-doc -->
+					<plugin>
+						<groupId>net.alchim31.maven</groupId>
+						<artifactId>scala-maven-plugin</artifactId>
+						<version>4.3.1</version>
+						<executions>
+							<execution>
+								<id>scala-doc</id>
+								<goals>
+									<goal>doc-jar</goal>
+								</goals>
+								<configuration>
+									<args>
+										<arg>-no-link-warnings</arg>
+									</args>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
 					<!-- sign artifacts with gpg -->
 					<plugin>
 						<groupId>org.apache.maven.plugins</groupId>
@@ -166,7 +181,6 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<scaladoc.nolinkwarnings>-unchecked</scaladoc.nolinkwarnings>
 		<license.header.file>src/license/gplv3-header.txt</license.header.file>
 
 		<maven.compiler.source>1.8</maven.compiler.source>
@@ -328,17 +342,6 @@
 								<goal>compile</goal>
 								<goal>testCompile</goal>
 							</goals>
-						</execution>
-						<execution>
-							<id>scala-doc</id>
-							<goals>
-								<goal>doc-jar</goal>
-							</goals>
-							<configuration>
-								<args>
-									<arg>${scaladoc.nolinkwarnings}</arg>
-								</args>
-							</configuration>
 						</execution>
 					</executions>
 					<configuration>
