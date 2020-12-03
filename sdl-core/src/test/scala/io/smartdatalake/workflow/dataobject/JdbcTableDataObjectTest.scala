@@ -105,17 +105,19 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
     instanceRegistry.register(jdbcConnection)
     try {
+      val db = "public"
+      val view = Table(Some(db), "test_view_191")
+      val dataObjectView = JdbcTableDataObject("jdbcDO1", table = view, connectionId = "jdbcCon1")
+      dataObjectView.dropTable
+      val table = Table(Some(db), "test_table_191")
+      val dataObjectTable = JdbcTableDataObject("jdbcDO1", table = table, connectionId = "jdbcCon1")
+      dataObjectTable.dropTable
+
       jdbcConnection.execJdbcStatement(sql = "create view test_view_191 as (SELECT 'test_data' AS test_column from (values(0)));")
       jdbcConnection.execJdbcStatement(sql = "create table test_table_191 (test_column char(9));")
       jdbcConnection.execJdbcStatement(sql = "insert into test_table_191 (test_column) VALUES ('test_data');")
-      val db = "public"
 
-      val view = Table(Some(db), "test_view_191")
-      val dataObjectView = JdbcTableDataObject("jdbcDO1", table = view, connectionId = "jdbcCon1")
       val dfReadView = dataObjectView.getDataFrame(Seq())
-
-      val table = Table(Some(db), "test_table_191")
-      val dataObjectTable = JdbcTableDataObject("jdbcDO1", table = table, connectionId = "jdbcCon1")
       val dfReadTable = dataObjectTable.getDataFrame(Seq())
 
       val df = Seq(("test_data")).toDF("test_column")
@@ -139,6 +141,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     // In consequence the virtual partition has to be surrounded with quotes as well, see next test case.
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("ABC", "lastname", "firstname", "rating")
     dataObject.writeDataFrame(df, Seq())
+    dataObject.prepare
     dataObject.getDataFrame(Seq()).show
     assert(dataObject.isTableExisting)
     val partitionValues = dataObject.listPartitions
@@ -153,6 +156,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     dataObject.dropTable
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("abc", "lastname", "firstname", "rating")
     dataObject.writeDataFrame(df, Seq())
+    dataObject.prepare
     dataObject.getDataFrame(Seq()).show
     assert(dataObject.isTableExisting)
     val partitionValues = dataObject.listPartitions
