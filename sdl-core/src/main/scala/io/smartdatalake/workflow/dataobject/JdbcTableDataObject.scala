@@ -223,7 +223,7 @@ private[smartdatalake] case class JdbcColumn(name: String, isNameCaseSensitiv: B
 private[smartdatalake] object JdbcColumn {
   def from(metadata: ResultSetMetaData, colIdx: Int): JdbcColumn = {
     val name = metadata.getColumnName(colIdx)
-    val isNameCaseSensitiv = name == name.toUpperCase
+    val isNameCaseSensitiv = name != name.toUpperCase
     JdbcColumn(name, isNameCaseSensitiv, Option(metadata.getColumnType(colIdx)), Option(metadata.getColumnTypeName(colIdx)), Option(metadata.getPrecision(colIdx)), Option(metadata.getScale(colIdx)))
   }
 }
