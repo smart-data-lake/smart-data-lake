@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.sql.ResultSet
+import java.sql.{ResultSet, ResultSetMetaData}
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
@@ -81,7 +81,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
   // Define partition columns
   // Virtual partition column name might be quoted to force case sensitivity in database queries
-  override val partitions: Seq[String] = virtualPartitions.map(prepareCaseSensitiveName).map(_._1)
+  override val partitions: Seq[String] = virtualPartitions.map(prepareCaseSensitiveName).map(_.name)
 
   // prepare final table
   table = table.overrideDb(connection.db)
@@ -107,14 +107,10 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
     // test partition columns exist
     if (virtualPartitions.nonEmpty) {
-      val metadataQuery = table.query.getOrElse(s"select * from ${table.fullName}") + " where 1=0"
-      def evalColumnNames(rs: ResultSet): Seq[String] = {
-        (1 to rs.getMetaData.getColumnCount).map( i => rs.getMetaData.getColumnName(i))
-      }
-      val columnNames = connection.execJdbcQuery(metadataQuery, evalColumnNames)
+      val columns = getJdbcColumnMetadata
       val missingPartitionColumns = virtualPartitions.map(prepareCaseSensitiveName)
-        .filterNot{ case (name, _, compareFn) => columnNames.exists(c => compareFn(c, name))}
-        .map(_._1)
+        .filterNot( partition => columns.exists(c => partition.nameEquals(c)))
+        .map(_.name)
       assert(missingPartitionColumns.isEmpty, s"($id) Virtual partition columns ${missingPartitionColumns.mkString(",")} missing in table definition")
     }
   }
@@ -201,12 +197,34 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     } else Seq()
   }
 
-  private def prepareCaseSensitiveName(name: String): (String, Boolean, (String, String) => Boolean) = {
+  private def prepareCaseSensitiveName(name: String): JdbcColumn= {
     val caseSensitiveNamePattern = "^[\"'](.*)[\"']$".r
     name match {
-      case caseSensitiveNamePattern(nameOnly) => (nameOnly, true, (s1,s2) => s1.equals(s2))
-      case _ => (name, false, (s1,s2) => s1.equalsIgnoreCase(s2))
+      case caseSensitiveNamePattern(nameOnly) => JdbcColumn(nameOnly, isNameCaseSensitiv = true)
+      case _ => JdbcColumn(name, isNameCaseSensitiv = false)
     }
+  }
+
+  def getJdbcColumnMetadata: Seq[JdbcColumn] = {
+    val metadataQuery = table.query.getOrElse(s"select * from ${table.fullName}") + " where 1=0"
+    def evalColumnNames(rs: ResultSet): Seq[JdbcColumn] = {
+      (1 to rs.getMetaData.getColumnCount).map( i => JdbcColumn.from(rs.getMetaData, i))
+    }
+    connection.execJdbcQuery(metadataQuery, evalColumnNames)
+  }
+}
+
+private[smartdatalake] case class JdbcColumn(name: String, isNameCaseSensitiv: Boolean, jdbcType: Option[Int] = None, dbTypeName: Option[String] = None, precision: Option[Int] = None, scale: Option[Int] = None) {
+  def nameEquals(other: JdbcColumn): Boolean = {
+    if (this.isNameCaseSensitiv || other.isNameCaseSensitiv) this.name.equals(other.name)
+    else this.name.equalsIgnoreCase(other.name)
+  }
+}
+private[smartdatalake] object JdbcColumn {
+  def from(metadata: ResultSetMetaData, colIdx: Int): JdbcColumn = {
+    val name = metadata.getColumnName(colIdx)
+    val isNameCaseSensitiv = name == name.toUpperCase
+    JdbcColumn(name, isNameCaseSensitiv, Option(metadata.getColumnType(colIdx)), Option(metadata.getColumnTypeName(colIdx)), Option(metadata.getPrecision(colIdx)), Option(metadata.getScale(colIdx)))
   }
 }
 
