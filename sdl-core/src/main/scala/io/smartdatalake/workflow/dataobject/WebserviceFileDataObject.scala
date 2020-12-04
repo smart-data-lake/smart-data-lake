@@ -52,6 +52,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends FileRefDataObject with CanCreateInputStream with CanCreateOutputStream with SmartDataLakeLogger {
 
+  private val authHeader: Option[String] = webserviceOptions.authHeader.map(CredentialsUtil.getCredentials)
   private val webServiceClientId = webserviceOptions.clientIdVariable.map(CredentialsUtil.getCredentials)
   private val webServiceClientSecret = webserviceOptions.clientSecretVariable.map(CredentialsUtil.getCredentials)
   private val webServiceUser = webserviceOptions.userVariable.map(CredentialsUtil.getCredentials)
@@ -91,15 +92,14 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
 
       // Call webservice with token
       initWebservice(webserviceOptions.url + query, webserviceOptions.connectionTimeoutMs, webserviceOptions.readTimeoutMs
-        , webserviceOptions.authHeader, webServiceClientId, webServiceClientSecret, webServiceUser
+        , authHeader, webServiceClientId, webServiceClientSecret, webServiceUser
         , webServicePassword, Some(token.getToken))
     }
     // Call webservice without token
     else {
       initWebservice(webserviceOptions.url + query, webserviceOptions.connectionTimeoutMs, webserviceOptions.readTimeoutMs
-        , webserviceOptions.authHeader, None, None, webServiceUser, webServicePassword, None)
+        , authHeader, None, None, webServiceUser, webServicePassword, None)
     }
-
   }
 
   /**
