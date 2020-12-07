@@ -24,7 +24,9 @@ import configs.Configs
 import configs.syntax._
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.{MemoryUtils, SmartDataLakeLogger}
+import io.smartdatalake.workflow.action.customlogic.SparkUDFCreatorConfig
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.custom.ExpressionEvaluator
 
 /**
  * Global configuration options
@@ -32,12 +34,15 @@ import org.apache.spark.sql.SparkSession
  * @param kryoClasses classes to register for spark kryo serialization
  * @param sparkOptions spark options
  * @param enableHive enable hive for spark session
- * @param memoryLogTimer enable periodic memory usage logging, see detailled configuration [[MemoryLogTimerConfig]]
+ * @param memoryLogTimer enable periodic memory usage logging, see detailed configuration [[MemoryLogTimerConfig]]
  * @param shutdownHookLogger enable shutdown hook logger to trace shutdown cause
+ * @param stateListeners Define state listeners to be registered for receiving events of the execution of SmartDataLake job
+ * @param sparkUDFs Define UDFs to be registered in spark session. The registered UDFs are available in Spark SQL transformations
+ *                  and expression evaluation, e.g. configuration of ExecutionModes.
  */
 case class GlobalConfig( kryoClasses: Option[Seq[String]] = None, sparkOptions: Option[Map[String,String]] = None, enableHive: Boolean = true
                        , memoryLogTimer: Option[MemoryLogTimerConfig] = None, shutdownHookLogger: Boolean = false
-                       , stateListeners: Seq[StateListenerConfig] = Seq())
+                       , stateListeners: Seq[StateListenerConfig] = Seq(), sparkUDFs: Option[Map[String,SparkUDFCreatorConfig]] = None)
 extends SmartDataLakeLogger {
 
   // start memory logger, else log memory once
@@ -61,6 +66,13 @@ extends SmartDataLakeLogger {
     val memoryLogOptions = memoryLogTimer.map(_.getAsMap).getOrElse(Map())
     val sparkOptionsExtended = sparkOptions.getOrElse(Map()) ++ memoryLogOptions ++ (if (executorPlugins.nonEmpty) Map("spark.executor.plugins" -> executorPlugins.mkString(",")) else Map())
     Environment._sparkSession = AppUtil.createSparkSession(appName, master, deployMode, kryoClasses, sparkOptionsExtended, enableHive)
+    sparkUDFs.getOrElse(Map()).foreach { case (name,creator) =>
+      val udf = creator.get
+      // register in SDL spark session
+      Environment._sparkSession.udf.register(name, udf)
+      // register for use in expression evaluation
+      ExpressionEvaluator.registerUdf(name, udf)
+    }
     // return
     Environment._sparkSession
   }
