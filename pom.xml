@@ -21,7 +21,7 @@
 
 	<groupId>io.smartdatalake</groupId>
 	<artifactId>sdl-parent</artifactId>
-	<version>2.0.0</version>
+	<version>2.0.1-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
 	<modules>
@@ -97,15 +97,6 @@
 				</plugins>
 			</build>
 		</profile>
-		<profile>
-			<!-- do not use this profile if you want to see warnings about missing links
-            it makes sense to check warnings about internal (public) members, but we will always have
-            warnings for external libraries which is why we deactivate them -->
-			<id>scala-doc-nolinkwarnings</id>
-			<properties>
-				<scaladoc.nolinkwarnings>-no-link-warnings</scaladoc.nolinkwarnings>
-			</properties>
-		</profile>
 		<!-- only scala 2.12 supported in spark 3.0 -->
 		<profile>
 			<id>scala-2.12</id>
@@ -123,11 +114,82 @@
 				<curator.version>2.13.0</curator.version>
 			</properties>
 		</profile>
+		<profile>
+			<id>release-sonatype</id>
+			<distributionManagement>
+				<snapshotRepository>
+					<id>ossrh</id>
+					<name>Central Repository OSSRH</name>
+					<url>https://oss.sonatype.org/content/repositories/snapshots</url>
+				</snapshotRepository>
+				<repository>
+					<id>ossrh</id>
+					<name>Central Repository OSSRH</name>
+					<url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+				</repository>
+			</distributionManagement>
+			<build>
+				<plugins>
+					<!-- create scala-doc -->
+					<plugin>
+						<groupId>net.alchim31.maven</groupId>
+						<artifactId>scala-maven-plugin</artifactId>
+						<version>4.3.1</version>
+						<executions>
+							<execution>
+								<id>scala-doc</id>
+								<goals>
+									<goal>doc-jar</goal>
+								</goals>
+								<configuration>
+									<args>
+										<arg>-no-link-warnings</arg>
+									</args>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+					<!-- sign artifacts with gpg -->
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-gpg-plugin</artifactId>
+						<version>1.6</version>
+						<executions>
+							<execution>
+								<id>sign-artifacts</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>sign</goal>
+								</goals>
+								<configuration>
+									<!-- Prevent `gpg` from using pinentry programs -->
+									<gpgArguments>
+										<arg>--pinentry-mode</arg>
+										<arg>loopback</arg>
+									</gpgArguments>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+					<!-- deploy to sonatype / maven central -->
+					<plugin>
+						<groupId>org.sonatype.plugins</groupId>
+						<artifactId>nexus-staging-maven-plugin</artifactId>
+						<version>1.6.7</version>
+						<extensions>true</extensions>
+						<configuration>
+							<serverId>ossrh</serverId>
+							<nexusUrl>https://oss.sonatype.org/</nexusUrl>
+							<autoReleaseAfterClose>false</autoReleaseAfterClose>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
 	</profiles>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<scaladoc.nolinkwarnings>-unchecked</scaladoc.nolinkwarnings>
 		<license.header.file>src/license/gplv3-header.txt</license.header.file>
 
 		<maven.compiler.source>1.8</maven.compiler.source>
@@ -273,14 +335,6 @@
 
 	</properties>
 
-	<distributionManagement>
-		<repository>
-			<id>ossrh</id>
-			<name>Central Repository OSSRH</name>
-			<url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-		</repository>
-	</distributionManagement>
-
 	<scm>
 		<connection>scm:git:git://github.com/smart-data-lake/smart-data-lake.git</connection>
 		<developerConnection>scm:git:ssh://github.com/smart-data-lake/smart-data-lake.git</developerConnection>
@@ -320,17 +374,6 @@
 								<goal>compile</goal>
 								<goal>testCompile</goal>
 							</goals>
-						</execution>
-						<execution>
-							<id>scala-doc</id>
-							<goals>
-								<goal>doc-jar</goal>
-							</goals>
-							<configuration>
-								<args>
-									<arg>${scaladoc.nolinkwarnings}</arg>
-								</args>
-							</configuration>
 						</execution>
 					</executions>
 					<configuration>
@@ -617,42 +660,6 @@
 				<version>2.12.4</version>
 				<configuration>
 					<skip>true</skip>
-				</configuration>
-			</plugin>
-
-			<!-- sign artifacts with gpg -->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-gpg-plugin</artifactId>
-				<version>1.6</version>
-				<executions>
-					<execution>
-						<id>sign-artifacts</id>
-						<phase>verify</phase>
-						<goals>
-							<goal>sign</goal>
-						</goals>
-						<configuration>
-							<!-- Prevent `gpg` from using pinentry programs -->
-							<gpgArguments>
-								<arg>--pinentry-mode</arg>
-								<arg>loopback</arg>
-							</gpgArguments>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-
-			<!-- deploy to sonatype / maven central -->
-			<plugin>
-				<groupId>org.sonatype.plugins</groupId>
-				<artifactId>nexus-staging-maven-plugin</artifactId>
-				<version>1.6.7</version>
-				<extensions>true</extensions>
-				<configuration>
-					<serverId>ossrh</serverId>
-					<nexusUrl>https://oss.sonatype.org/</nexusUrl>
-					<autoReleaseAfterClose>false</autoReleaseAfterClose>
 				</configuration>
 			</plugin>
 

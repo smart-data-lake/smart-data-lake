@@ -49,7 +49,7 @@ jobs:
         gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
         nexus_username: ${{ secrets.SONATYPE_USERNAME }}
         nexus_password: ${{ secrets.SONATYPE_PASSWORD }}
-        maven_profiles: scala-2.11,scala-doc-nolinkwarnings
+        maven_profiles: scala-2.11,release-sonatype
         maven_args: -B -f pom.xml
 
     - name: Maven deploy to sonatype for Scala 2.12
@@ -59,7 +59,7 @@ jobs:
         gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
         nexus_username: ${{ secrets.SONATYPE_USERNAME }}
         nexus_password: ${{ secrets.SONATYPE_PASSWORD }}
-        maven_profiles: scala-2.12,scala-doc-nolinkwarnings
+        maven_profiles: scala-2.12,release-sonatype
         # exclude sdl-parent as it is already uploaded with previous deploy, stays the same and cannot be replaced in remote repository
         maven_args: -B -pl '!.' -f pom.xml
 
