@@ -26,6 +26,8 @@ import io.smartdatalake.definitions.DefaultExecutionModeExpressionData
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.custom.ExpressionEvaluator
+import org.apache.spark.sql.functions.udf
 import org.scalatest.FunSuite
 
 class SparkExpressionUtilTest extends FunSuite {
@@ -55,5 +57,11 @@ class SparkExpressionUtilTest extends FunSuite {
   test("substitute options") {
     val result = SparkExpressionUtil.substituteOptions(DataObjectId("test"), Some("testCondition"), "hello %{key1}, lets make %{key2}", Map("key1"->"tester", "key2"->"tests"))
     assert(result.contains("hello tester, lets make tests"))
+  }
+
+  test("register & apply udf") {
+    ExpressionEvaluator.registerUdf("udfAdd1", udf((v: Int) => v + 1))
+    val result = SparkExpressionUtil.evaluate[DefaultExecutionModeExpressionData,Int](DataObjectId("test"), Some("testCondition"), "udfAdd1(runId)", data)
+    assert(result.contains(2))
   }
 }
