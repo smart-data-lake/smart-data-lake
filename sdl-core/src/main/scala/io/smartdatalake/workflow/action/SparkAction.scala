@@ -143,21 +143,28 @@ private[smartdatalake] abstract class SparkAction extends Action {
     }
   }
 
+  /**
+   * Transform the DataFrame of a SubFeed
+   */
+  def subFeedDfTransformer(fnTransform: DataFrame => DataFrame)(subFeed: SparkSubFeed): SparkSubFeed = {
+    subFeed.copy(dataFrame = subFeed.dataFrame.map(fnTransform))
+  }
 
   /**
-   * applies multiple transformations to a sequence of subfeeds
+   * applies multiple transformations to a SubFeed
    */
-  def multiTransformSubfeed( subFeed: SparkSubFeed, transformers: Seq[DataFrame => DataFrame]): SparkSubFeed = {
+  def multiTransformSubfeed( subFeed: SparkSubFeed, transformers: Seq[SparkSubFeed => SparkSubFeed]): SparkSubFeed = {
     transformers.foldLeft( subFeed ){
-      case (subFeed, transform) => subFeed.copy( dataFrame = Some(transform(subFeed.dataFrame.get )))
+      case (subFeed, transform) => transform(subFeed)
     }
   }
 
   /**
    * apply custom transformation
    */
-  def applyCustomTransformation(transformer: CustomDfTransformerConfig, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues])(df: DataFrame)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
-    transformer.transform(id, partitionValues, df, dataObjectId)
+  def applyCustomTransformation(transformer: CustomDfTransformerConfig)(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+    val (outputDf, outputPartitionValues) = transformer.transform(id, subFeed.partitionValues, subFeed.dataFrame.get, subFeed.dataObjectId)
+    subFeed.copy(dataFrame = Some(outputDf), partitionValues = outputPartitionValues)
   }
 
   /**
@@ -194,14 +201,15 @@ private[smartdatalake] abstract class SparkAction extends Action {
                            additionalTransformers: Seq[(DataFrame => DataFrame)],
                            filterClauseExpr: Option[Column] = None)
                           (implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+
     val transformers = Seq(
-      transformation.map( t => applyCustomTransformation(t, inputSubFeed.dataObjectId, inputSubFeed.partitionValues) _),
-      columnBlacklist.map(filterBlacklist),
-      columnWhitelist.map(filterWhitelist),
-      additionalColumns.map( m => applyAdditionalColumns(m, inputSubFeed.partitionValues) _),
-      filterClauseExpr.map(applyFilter),
-      if (standardizeDatatypes) Some(applyCastDecimal2IntegralFloat _) else None // currently we cast decimals away only but later we may add further type casts
-    ).flatten ++ additionalTransformers
+      transformation.map( t => applyCustomTransformation(t) _),
+      columnBlacklist.map(filterBlacklist).map(subFeedDfTransformer),
+      columnWhitelist.map(filterWhitelist).map(subFeedDfTransformer),
+      additionalColumns.map( m => applyAdditionalColumns(m, inputSubFeed.partitionValues) _).map(subFeedDfTransformer),
+      filterClauseExpr.map(applyFilter).map(subFeedDfTransformer),
+      (if (standardizeDatatypes) Some(applyCastDecimal2IntegralFloat _) else None).map(subFeedDfTransformer) // currently we cast decimals away only but later we may add further type casts
+    ).flatten ++ additionalTransformers.map(subFeedDfTransformer)
 
     // return
     multiTransformSubfeed(inputSubFeed, transformers)
