@@ -285,7 +285,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
 
-    session.table(s"${tgtTable1.fullName}").show
+    //session.table(s"${tgtTable1.fullName}").show
 
     val r1 = session.table(s"${tgtTable1.fullName}")
       .select($"lastname")
@@ -301,6 +301,35 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
 
   }
 
+  test("date to month aggregation with partition value transformation") {
+
+    // setup DataObjects
+    val feed = "copy"
+    val srcTable = Table(Some("default"), "copy_input")
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, partitions = Seq("dt"), numInitialHdfsPartitions = 1)
+    srcDO.dropTable
+    instanceRegistry.register(srcDO)
+
+    val tgtTable1 = Table(Some("default"), "copy_output", None, Some(Seq("lastname","firstname")))
+    val tgtDO1 = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable1.fullName}"), Seq("mt"), analyzeTableAfterWrite=true, table = tgtTable1, numInitialHdfsPartitions = 1)
+    tgtDO1.dropTable
+    instanceRegistry.register(tgtDO1)
+
+    // prepare & simulate load (init only)
+    val refTimestamp1 = LocalDateTime.now()
+    implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+    val customTransformerConfig = CustomDfsTransformerConfig(className = Some(classOf[TestDfsTransformerPartitionValues].getName))
+    val action1 = CustomSparkAction("ca", List(srcDO.id), List(tgtDO1.id), transformer = customTransformerConfig)
+    val l1 = Seq(("20100101","jonson","rob",5),("20100103","doe","bob",3)).toDF("dt", "lastname", "firstname", "rating")
+    val srcPartitionValues = Seq(PartitionValues(Map("dt" -> "20100101")), PartitionValues(Map("dt" -> "20100103")))
+    srcDO.writeDataFrame(l1, Seq())
+    val srcSubFeed = SparkSubFeed(None, "src1", srcPartitionValues)
+    val tgtSubFeed = action1.init(Seq(srcSubFeed)).head.asInstanceOf[SparkSubFeed]
+
+    val expectedPartitionValues = Seq(PartitionValues(Map("mt" -> "201001")))
+    assert(tgtSubFeed.partitionValues == expectedPartitionValues)
+    assert(tgtSubFeed.dataFrame.get.columns.contains("mt"))
+  }
 }
 
 
@@ -339,6 +368,20 @@ class TestDfsTransformerDummy extends CustomDfsTransformer {
     dfs.map{ case (id, df) => (id.replaceFirst("src","tgt"), df) }
   }
 }
+
+// aggregate date partitions to month partitions
+class TestDfsTransformerPartitionValues extends CustomDfsTransformer {
+  import org.apache.spark.sql.functions._
+  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
+    import session.implicits._
+    val dfTgt = dfs("src1").withColumn("mt", substring($"dt",1,6))
+    Map("tgt1" -> dfTgt)
+  }
+  override def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Seq[PartitionValues] = {
+    partitionValues.map(pv => PartitionValues(Map("mt" -> pv("dt").toString.take(6)))).distinct
+  }
+}
+
 
 class TestDfsTransformerFilterDummy extends CustomDfsTransformer {
   override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
