@@ -25,11 +25,11 @@ import java.time.LocalDateTime
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ActionObjectId
-import io.smartdatalake.definitions.{Condition, ExecutionModeFailedException, PartitionDiffMode, SparkIncrementalMode}
+import io.smartdatalake.definitions.{Condition, CustomPartitionMode, CustomPartitionModeLogic, ExecutionModeFailedException, PartitionDiffMode, SparkIncrementalMode}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
-import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
+import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject, HiveTableDataObject, Table, TickTockHiveTableDataObject}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
@@ -163,4 +163,18 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
     intercept[NoDataToProcessDontStopWarning](executionMode.apply(ActionObjectId("test"), tgt2DO, tgt2DO, subFeed))
   }
 
+  test("CustomPartitionMode alternativeOutputId") {
+    val executionMode = CustomPartitionMode(className = classOf[TestCustomPartitionMode].getName, alternativeOutputId = Some("tgt2"))
+    executionMode.prepare(ActionObjectId("test"))
+    val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
+    val (partitionValues, filter) = executionMode.apply(ActionObjectId("test"), srcDO, tgt1DO, subFeed).get
+    assert(partitionValues == Seq(PartitionValues(Map("lastname" -> "doe")))) // partition lastname=einstein is already loaded into tgt2
+  }
+}
+
+class TestCustomPartitionMode() extends CustomPartitionModeLogic {
+  override def apply(session: SparkSession, options: Map[String, String], input: DataObject with CanHandlePartitions, output: DataObject with CanHandlePartitions, givenPartitionValues: Seq[Map[String, String]], context: ActionPipelineContext): Option[Seq[Map[String, String]]] = {
+    val partitionValuesToProcess = input.listPartitions(session).diff(output.listPartitions(session))
+    Some(partitionValuesToProcess.map(_.getMapString))
+  }
 }
