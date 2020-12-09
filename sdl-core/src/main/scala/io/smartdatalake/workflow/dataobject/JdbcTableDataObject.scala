@@ -28,6 +28,7 @@ import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.JdbcTableConnection
+import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
@@ -77,7 +78,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   /**
    * Connection defines driver, url and db in central location
    */
-  private val connection = getConnection[JdbcTableConnection](connectionId)
+  @DeveloperApi
+  val connection: JdbcTableConnection = getConnection[JdbcTableConnection](connectionId)
 
   // Define partition columns
   // Virtual partition column name might be quoted to force case sensitivity in database queries
