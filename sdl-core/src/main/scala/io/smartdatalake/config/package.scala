@@ -74,6 +74,8 @@ package object config {
 
   implicit val customFileTransformerConfigReader: Configs[CustomFileTransformerConfig] = Configs.derive[CustomFileTransformerConfig]
 
+  implicit val sparkUdfCreatorConfigReader: Configs[SparkUDFCreatorConfig] = Configs.derive[SparkUDFCreatorConfig]
+
   implicit val sparkRepartitionDefReader: Configs[SparkRepartitionDef] = Configs.derive[SparkRepartitionDef]
 
   implicit val executionModeReader: Configs[ExecutionMode] = Configs.derive[ExecutionMode]
