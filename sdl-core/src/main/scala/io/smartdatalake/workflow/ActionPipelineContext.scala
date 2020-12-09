@@ -23,8 +23,25 @@ import java.time.LocalDateTime
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
+import org.apache.spark.annotation.DeveloperApi
 
-private[smartdatalake] case class ActionPipelineContext(
+/**
+ * ActionPipelineContext contains start and runtime information about a SmartDataLake run.
+ *
+ * @param feed feed selector of the run
+ * @param application application name of the run
+ * @param runId runId of the run. Stays 1 if recovery is not enabled.
+ * @param attemptId attemptId of the run. Stays 1 if recovery is not enabled.
+ * @param instanceRegistry registry of all SmartDataLake objects parsed from the config
+ * @param referenceTimestamp timestamp used as reference in certain actions (e.g. HistorizeAction)
+ * @param appConfig the command line parameters parsed into a [[SmartDataLakeBuilderConfig]] object
+ * @param runStartTime start time of the run
+ * @param attemptStartTime start time of attempt
+ * @param simulation true if this is a simulation run
+ * @param phase current execution phase
+ */
+@DeveloperApi
+case class ActionPipelineContext(
                                                          feed: String,
                                                          application: String,
                                                          runId: Int,
@@ -37,5 +54,5 @@ private[smartdatalake] case class ActionPipelineContext(
                                                          simulation: Boolean = false,
                                                          var phase: ExecutionPhase = ExecutionPhase.Prepare
 ) {
-  def getReferenceTimestampOrNow: LocalDateTime = referenceTimestamp.getOrElse(LocalDateTime.now)
+  private[smartdatalake] def getReferenceTimestampOrNow: LocalDateTime = referenceTimestamp.getOrElse(LocalDateTime.now)
 }
