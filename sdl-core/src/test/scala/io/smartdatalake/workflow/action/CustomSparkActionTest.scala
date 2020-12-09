@@ -285,8 +285,6 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
 
-    //session.table(s"${tgtTable1.fullName}").show
-
     val r1 = session.table(s"${tgtTable1.fullName}")
       .select($"lastname")
       .as[String].collect().toSeq
