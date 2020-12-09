@@ -309,7 +309,7 @@ extends ExecutionMode with ExecutionModeWithMainInputOutput {
     val output = alternativeOutput.getOrElse(mainOutput)
     (mainInput, output) match {
       case (input: CanHandlePartitions, output: CanHandlePartitions) =>
-        val partitionValuesOpt = impl.apply(session, options, input, output, subFeed.partitionValues.map(_.getMapString), context)
+        val partitionValuesOpt = impl.apply(session, options, actionId, input, output, subFeed.partitionValues.map(_.getMapString), context)
           .map(_.map( pv => PartitionValues(pv)))
         partitionValuesOpt.map(pvs => (pvs, None))
       case (_: CanHandlePartitions, _) =>
@@ -320,7 +320,7 @@ extends ExecutionMode with ExecutionModeWithMainInputOutput {
   }
 }
 trait CustomPartitionModeLogic {
-  def apply(session: SparkSession, options: Map[String,String], input: DataObject with CanHandlePartitions, output: DataObject with CanHandlePartitions, givenPartitionValues: Seq[Map[String,String]], context: ActionPipelineContext): Option[Seq[Map[String,String]]]
+  def apply(session: SparkSession, options: Map[String,String], actionId: ActionObjectId, input: DataObject with CanHandlePartitions, output: DataObject with CanHandlePartitions, givenPartitionValues: Seq[Map[String,String]], context: ActionPipelineContext): Option[Seq[Map[String,String]]]
 }
 
 /**
