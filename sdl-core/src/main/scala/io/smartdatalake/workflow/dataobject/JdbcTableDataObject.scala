@@ -234,8 +234,12 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       val partitionsColss = partitionValues.map(_.keys).distinct
       assert(partitionsColss.size == 1, "All partition values must have the same set of partition columns defined!")
       val partitionCols = partitionsColss.head
-      val partitionValuesStr = partitionValues.map(pv => s"(${partitionCols.map(pv(_).toString).mkString(",")})")
-      val deletePartitionQuery = s"delete from ${table.fullName} where (${partitionCols.mkString(",")}) in (${partitionValuesStr.mkString(",")})"
+      val deletePartitionQuery = if (partitionCols.size == 1) {
+        s"delete from ${table.fullName} where ${partitionCols.head} in (${partitionValues.map(pv => pv(partitionCols.head)).mkString(",")})"
+      } else {
+        val partitionValuesStr = partitionValues.map(pv => s"(${partitionCols.map(pv(_).toString).mkString(",")})")
+        s"delete from ${table.fullName} where (${partitionCols.mkString(",")}) in (${partitionValuesStr.mkString(",")})"
+      }
       connection.execJdbcStatement(deletePartitionQuery)
     }
   }
