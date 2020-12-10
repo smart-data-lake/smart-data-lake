@@ -29,6 +29,7 @@ import io.smartdatalake.util.misc.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.JdbcTableConnection
 import org.apache.spark.annotation.DeveloperApi
+import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
@@ -93,6 +94,9 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
   assert(saveMode==SaveMode.Append || saveMode==SaveMode.Overwrite, s"($id) Only saveMode append and overwrite supported.")
 
+  // jdbc column metadata
+  lazy val columns = getJdbcColumnMetadata
+
   override def prepare(implicit session: SparkSession): Unit = {
 
     // test connection
@@ -113,7 +117,6 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
     // test partition columns exist
     if (virtualPartitions.nonEmpty) {
-      val columns = getJdbcColumnMetadata
       val missingPartitionColumns = virtualPartitions.map(prepareCaseSensitiveName)
         .filterNot( partition => columns.exists(c => partition.nameEquals(c)))
         .map(_.name)
@@ -139,6 +142,17 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession): Unit = {
     require(table.query.isEmpty, s"($id) Cannot write to jdbc DataObject defined by a query.")
     validateSchemaMin(df)
+
+    // validate columns exists
+    val dfColumns = df.columns.map(c => JdbcColumn(c, isNameCaseSensitiv =  false))
+    val colsMissingInTable = dfColumns.filter(c => !columns.exists(c.nameEquals))
+    assert(colsMissingInTable.isEmpty, s"Columns ${colsMissingInTable.mkString(", ")} missing in $id")
+    val colsMissingInDataFrame = columns.filter(c => !dfColumns.exists(c.nameEquals))
+    assert(colsMissingInTable.isEmpty, s"Columns ${colsMissingInDataFrame.mkString(", ")} exist in $id but not in DataFrame")
+
+    // order DataFrame columns according to table metadata
+    val dfWrite = df.select(columns.map(c => col(c.name)):_*)
+
     // cleanup existing data if saveMode=overwrite
     if (saveMode == SaveMode.Overwrite) {
       if (partitionValues.nonEmpty) deletePartitions(partitionValues)
@@ -146,7 +160,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
     // write table
     // No need to define any partitions as parallelization will be defined according to the data frame's partitions
-    df.write.mode(SaveMode.Append).format("jdbc")
+    dfWrite.write.mode(SaveMode.Append).format("jdbc")
       .options(jdbcOptions)
       .options(Map(
         "url" -> connection.url,
