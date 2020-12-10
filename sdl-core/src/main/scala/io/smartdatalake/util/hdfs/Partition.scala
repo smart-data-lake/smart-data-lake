@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.util.hdfs
 
+import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.functions._
 
@@ -34,11 +35,12 @@ private[smartdatalake] object Partition {
  * A partition is defined by values for its partition columns.
  * It can be represented by a Map. The key of the Map are the partition column names.
  */
-private[smartdatalake] case class PartitionValues(elements: Map[String, Any]) {
-  def getPartitionString(partitionLayout: String): String= {
+@DeveloperApi
+case class PartitionValues(elements: Map[String, Any]) {
+  private[smartdatalake] def getPartitionString(partitionLayout: String): String= {
     PartitionLayout.replaceTokens(partitionLayout, this)
   }
-  def getSparkExpr: Column = {
+  private[smartdatalake] def getSparkExpr: Column = {
     // "and" filter concatenation of each element
     elements.map {case (k,v) => col(k) === lit(v)}.reduce( (a,b) => a and b)
   }
