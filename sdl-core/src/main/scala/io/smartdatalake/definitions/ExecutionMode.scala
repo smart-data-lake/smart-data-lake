@@ -94,7 +94,7 @@ private[smartdatalake] trait ExecutionModeWithMainInputOutput {
  * Partition difference execution mode lists partitions on mainInput & mainOutput DataObject and starts loading all missing partitions.
  * Partition columns to be used for comparision need to be a common 'init' of input and output partition columns.
  * This mode needs mainInput/Output DataObjects which CanHandlePartitions to list partitions.
- * Partition values are passed to following actions, if for partition columns which they have in common.
+ * Partition values are passed to following actions for partition columns which they have in common.
  *
  * @param partitionColNb            optional number of partition columns to use as a common 'init'.
  * @param alternativeOutputId       optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
@@ -158,14 +158,16 @@ case class PartitionDiffMode( partitionColNb: Option[Int] = None
               }
               // apply optional select expression
               val data = PartitionDiffModeExpressionData.from(context).copy(givenPartitionValues = subFeed.partitionValues.map(_.getMapString), inputPartitionValues = inputPartitionValues.map(_.getMapString), outputPartitionValues = outputPartitionValues.map(_.getMapString), selectedPartitionValues = selectedPartitionValues.map(_.getMapString))
-              val refinedSelectedPartitionValues1 = selectExpression.flatMap(expression => SparkExpressionUtil.evaluate[PartitionDiffModeExpressionData, Seq[Map[String,String]]](actionId, Some("selectExpression"), expression, data))
-              val refinedSelectedPartitionValues = refinedSelectedPartitionValues1.map(partitionValuesString => partitionValuesString.map(PartitionValues(_)))
-                .getOrElse(selectedPartitionValues)
+              val refinedSelectedPartitionValues = if (selectExpression.isDefined) {
+                SparkExpressionUtil.evaluate[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectExpression"), selectExpression.get, data)
+                  .map(_.map(PartitionValues(_)))
+                  .getOrElse(selectedPartitionValues)
+              } else selectedPartitionValues
               // evaluate fail conditions
               val refinedData = data.copy(selectedPartitionValues = refinedSelectedPartitionValues.map(_.getMapString))
               evaluateFailConditions(actionId, refinedData) // throws exception on failed condition
               // skip processing if no new data
-              if (partitionValuesToBeProcessed.isEmpty) throw NoDataToProcessWarning(actionId.id, s"($actionId) No partitions to process found for ${input.id}")
+              if (refinedSelectedPartitionValues.isEmpty) throw NoDataToProcessWarning(actionId.id, s"($actionId) No partitions to process found for ${input.id}")
               //return
               logger.info(s"($actionId) PartitionDiffMode selected partition values ${refinedSelectedPartitionValues.mkString(", ")} to process")
               Some((refinedSelectedPartitionValues, None))
