@@ -68,6 +68,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
    */
   def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, phase: ExecutionPhase)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     assert(input.id == subFeed.dataObjectId, s"($id) DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
+    assert(phase!=ExecutionPhase.Prepare, "Strangely enrichSubFeedDataFrame got called in phase prepare. It should only be called in Init and Exec.")
     executionMode match {
       case Some(m: SparkStreamingOnceMode) if !context.simulation =>
         if (subFeed.dataFrame.isEmpty || phase==ExecutionPhase.Exec) { // in exec phase we always needs a fresh streaming DataFrame
@@ -89,7 +90,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
             case partitionedInput: DataObject with CanHandlePartitions if subFeed.partitionValues.nonEmpty && (context.phase==ExecutionPhase.Exec || subFeed.isDAGStart) =>
               val expectedPartitions = partitionedInput.filterExpectedPartitionValues(subFeed.partitionValues)
               val missingPartitionValues = if (expectedPartitions.nonEmpty) PartitionValues.checkExpectedPartitionValues(partitionedInput.listPartitions, expectedPartitions) else Seq()
-              assert(missingPartitionValues.isEmpty, s"($id) partitions $missingPartitionValues missing for ${input.id}")
+              assert(missingPartitionValues.isEmpty, s"($id) partitions ${missingPartitionValues.mkString(", ")} missing for ${input.id}")
             case _ => Unit
           }
           // recreate DataFrame from DataObject
@@ -153,18 +154,17 @@ private[smartdatalake] abstract class SparkAction extends Action {
   /**
    * applies multiple transformations to a SubFeed
    */
-  def multiTransformSubfeed( subFeed: SparkSubFeed, transformers: Seq[SparkSubFeed => SparkSubFeed]): SparkSubFeed = {
-    transformers.foldLeft( subFeed ){
-      case (subFeed, transform) => transform(subFeed)
+  def multiTransformDataFrame(inputDf: DataFrame, transformers: Seq[DataFrame => DataFrame]): DataFrame = {
+    transformers.foldLeft(inputDf){
+      case (df, transform) => transform(df)
     }
   }
 
   /**
    * apply custom transformation
    */
-  def applyCustomTransformation(transformer: CustomDfTransformerConfig)(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
-    val (outputDf, outputPartitionValues) = transformer.transform(id, subFeed.partitionValues, subFeed.dataFrame.get, subFeed.dataObjectId)
-    subFeed.copy(dataFrame = Some(outputDf), partitionValues = outputPartitionValues)
+  def applyCustomTransformation(transformer: CustomDfTransformerConfig, subFeed: SparkSubFeed)(df: DataFrame)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+    transformer.transform(id, subFeed.partitionValues, df, subFeed.dataObjectId)
   }
 
   /**
@@ -200,31 +200,30 @@ private[smartdatalake] abstract class SparkAction extends Action {
                            standardizeDatatypes: Boolean,
                            additionalTransformers: Seq[(DataFrame => DataFrame)],
                            filterClauseExpr: Option[Column] = None)
-                          (implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+                          (implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
 
     val transformers = Seq(
-      transformation.map( t => applyCustomTransformation(t) _),
-      columnBlacklist.map(filterBlacklist).map(subFeedDfTransformer),
-      columnWhitelist.map(filterWhitelist).map(subFeedDfTransformer),
-      additionalColumns.map( m => applyAdditionalColumns(m, inputSubFeed.partitionValues) _).map(subFeedDfTransformer),
-      filterClauseExpr.map(applyFilter).map(subFeedDfTransformer),
-      (if (standardizeDatatypes) Some(applyCastDecimal2IntegralFloat _) else None).map(subFeedDfTransformer) // currently we cast decimals away only but later we may add further type casts
-    ).flatten ++ additionalTransformers.map(subFeedDfTransformer)
+      transformation.map( t => applyCustomTransformation(t, inputSubFeed) _),
+      columnBlacklist.map(filterBlacklist),
+      columnWhitelist.map(filterWhitelist),
+      additionalColumns.map( m => applyAdditionalColumns(m, inputSubFeed.partitionValues) _),
+      filterClauseExpr.map(applyFilter),
+      (if (standardizeDatatypes) Some(applyCastDecimal2IntegralFloat _) else None) // currently we cast decimals away only but later we may add further type casts
+    ).flatten ++ additionalTransformers
 
     // return
-    multiTransformSubfeed(inputSubFeed, transformers)
+    multiTransformDataFrame(inputSubFeed.dataFrame.get, transformers)
   }
 
   /**
-   * Updates the partition values of a SubFeed to the partition columns of an output, removing not existing columns from the partition values.
-   * Further the transformed DataFrame is validated to have the output's partition columns included and partition columns are moved to the end.
+   * The transformed DataFrame is validated to have the output's partition columns included, partition columns are moved to the end and SubFeeds partition values updated.
    *
    * @param output output DataObject
    * @param subFeed SubFeed with transformed DataFrame
-   * @return SubFeed with updated partition values.
+   * @return validated and updated SubFeed
    */
-  def validateAndUpdateSubFeedPartitionValues(output: DataObject, subFeed: SparkSubFeed )(implicit session: SparkSession): SparkSubFeed = {
-    val updatedSubFeed = output match {
+  def validateAndUpdateSubFeed(output: DataObject, subFeed: SparkSubFeed )(implicit session: SparkSession): SparkSubFeed = {
+    output match {
       case partitionedDO: CanHandlePartitions =>
         // validate output partition columns exist in DataFrame
         validateDataFrameContainsCols(subFeed.dataFrame.get, partitionedDO.partitions, s"for ${output.id}")
@@ -234,11 +233,6 @@ private[smartdatalake] abstract class SparkAction extends Action {
           .movePartitionColumnsLast(partitionedDO.partitions)
       case _ => subFeed.clearPartitionValues()
     }
-    updatedSubFeed.clearDAGStart()
-  }
-
-  def updateSubFeedAfterWrite(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
-    subFeed.clearFilter // clear filter must be applied after write, because it includes removing the DataFrame
   }
 
   /**
@@ -282,7 +276,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
   /**
    * Applies changes to a SubFeed from a previous action in order to be used as input for this actions transformation.
    */
-  def prepareInputSubFeed(subFeed: SparkSubFeed, input: DataObject with CanCreateDataFrame)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  def prepareInputSubFeed(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // persist if requested
     var preparedSubFeed = if (persist) subFeed.persist else subFeed
     // create dummy DataFrame if read schema is different from write schema on this DataObject
@@ -291,13 +285,8 @@ private[smartdatalake] abstract class SparkAction extends Action {
     val schemaChanges = writeSchema != readSchema
     require(!context.simulation || !schemaChanges, s"($id) write & read schema is not the same for ${input.id}. Need to create a dummy DataFrame, but this is not allowed in simulation!")
     preparedSubFeed = if (schemaChanges) preparedSubFeed.convertToDummy(readSchema.get) else preparedSubFeed
-    // adapt partition values (#180)
-    preparedSubFeed = input match {
-      case partitionedInput: CanHandlePartitions => preparedSubFeed.updatePartitionValues(partitionedInput.partitions)
-      case _ => preparedSubFeed.clearPartitionValues()
-    }
-    // break lineage if requested or if it's a streaming DataFrame or if a filter expression is set
-    preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined) preparedSubFeed.breakLineage else preparedSubFeed
+    // break lineage if requested or if it's a streaming DataFrame
+    preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true)) preparedSubFeed.breakLineage else preparedSubFeed
     // return
     preparedSubFeed
   }

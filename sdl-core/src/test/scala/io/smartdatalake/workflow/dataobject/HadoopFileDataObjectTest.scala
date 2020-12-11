@@ -30,7 +30,7 @@ import scala.util.Try
  * Unit tests for [[HadoopFileDataObjectTest]].
  */
 class HadoopFileDataObjectTest extends DataObjectTestSuite {
-  import testSession.implicits._
+  import session.implicits._
 
   test("overwrite only one partition") {
 
