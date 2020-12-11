@@ -29,7 +29,7 @@ import org.apache.commons.io.FileUtils
 class SparkFileDataObjectTest extends DataObjectTestSuite {
 
   test("read partitioned data and filter expected partitions") {
-    import testSession.implicits._
+    import session.implicits._
 
     // create data object
     val tempDir = Files.createTempDirectory("tempHadoopDO")
@@ -52,7 +52,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
   }
 
   test("append filename") {
-    import testSession.implicits._
+    import session.implicits._
 
     // create data object
 

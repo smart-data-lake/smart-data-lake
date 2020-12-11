@@ -18,10 +18,16 @@
  */
 package io.smartdatalake.workflow
 
+import io.smartdatalake.app.SmartDataLakeBuilderConfig
+import io.smartdatalake.definitions.Environment.instanceRegistry
+import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import org.scalatest.FunSuite
 
 class SubFeedTest extends FunSuite {
+
+  implicit val session = TestUtil.sessionHiveCatalog
+  implicit val context1: ActionPipelineContext = ActionPipelineContext("testfeed", "testapp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
 
   test("FileSubFeed to SparkSubFeed") {
     val fileSubFeed = FileSubFeed(None, "test1", Seq(PartitionValues(Map("dt"->"20190101"))))

@@ -32,7 +32,7 @@ import org.apache.spark.sql.{DataFrame, Row, SaveMode}
  */
 class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjectSchemaBehavior {
 
-  import testSession.implicits._
+  import session.implicits._
 
   test("Reading from an empty file with header=true and inferSchema=false results in an empty, schema-less data frame.") {
     val tempFile = File.createTempFile("temp", "csv")
@@ -116,7 +116,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     tempFile.deleteOnExit()
 
 
-    testSession.createDataFrame(testSession.sparkContext.makeRDD(Seq(
+    session.createDataFrame(session.sparkContext.makeRDD(Seq(
       Row.fromTuple("A", "B"),
       Row.fromTuple("B", "1")
     )),
@@ -165,7 +165,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     tempFile.deleteOnExit()
 
 
-    testSession.createDataFrame(testSession.sparkContext.makeRDD(Seq(
+    session.createDataFrame(session.sparkContext.makeRDD(Seq(
       Row.fromTuple("A", "B"),
       Row.fromTuple("B", "1")
     )),

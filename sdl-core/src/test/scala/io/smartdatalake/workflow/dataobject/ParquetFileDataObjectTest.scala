@@ -29,7 +29,7 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
   private val tempDir = createTempDir
   private val tempPath = tempDir.toAbsolutePath.toString
 
-  import testSession.implicits._
+  import session.implicits._
 
   private val testDf = Seq(
     ("string1",1,Seq(1,2,3)),

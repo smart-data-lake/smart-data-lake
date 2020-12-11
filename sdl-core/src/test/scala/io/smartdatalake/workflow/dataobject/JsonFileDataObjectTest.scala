@@ -30,7 +30,7 @@ import org.apache.spark.sql.types._
 
 class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjectSchemaBehavior {
 
-  val hdfs = FileSystem.get(testSession.sparkContext.hadoopConfiguration)
+  val hdfs = FileSystem.get(session.sparkContext.hadoopConfiguration)
 
   case class Data(name: String, age: Int)
 
