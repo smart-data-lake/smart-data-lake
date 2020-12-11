@@ -88,7 +88,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
           input match {
             case partitionedInput: DataObject with CanHandlePartitions if subFeed.partitionValues.nonEmpty && (context.phase==ExecutionPhase.Exec || subFeed.isDAGStart) =>
               val expectedPartitions = partitionedInput.filterExpectedPartitionValues(subFeed.partitionValues)
-              val missingPartitionValues = PartitionValues.checkExpectedPartitionValues(partitionedInput.listPartitions, expectedPartitions)
+              val missingPartitionValues = if (expectedPartitions.nonEmpty) PartitionValues.checkExpectedPartitionValues(partitionedInput.listPartitions, expectedPartitions) else Seq()
               assert(missingPartitionValues.isEmpty, s"($id) partitions $missingPartitionValues missing for ${input.id}")
             case _ => Unit
           }
@@ -133,7 +133,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
         if (noData) logger.info(s"($id) no data to process for ${output.id} in streaming mode")
         // return
         noData
-      case None | Some(_: PartitionDiffMode) | Some(_: SparkIncrementalMode) | Some(_: FailIfNoPartitionValuesMode) =>
+      case None | Some(_: PartitionDiffMode) | Some(_: SparkIncrementalMode) | Some(_: FailIfNoPartitionValuesMode) | Some(_: CustomPartitionMode) =>
         // Write in batch mode
         assert(!subFeed.dataFrame.get.isStreaming, s"($id) Input from ${subFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingOnceMode.getClass.getSimpleName}")
         output.writeDataFrame(subFeed.dataFrame.get, subFeed.partitionValues, isRecursiveInput)

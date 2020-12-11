@@ -45,7 +45,7 @@ trait CustomDfsTransformer extends Serializable {
   /**
    * Optional function to define the transformation of input to output partition values.
    * For example this enables to implement aggregations where multiple input partitions are combined into one output partition.
-   * Note that the default value is input = output partition values, which correct for most use cases.
+   * Note that the default value is input = output partition values, which should be correct for most use cases.
    *
    * @param partitionValues partition values to be transformed
    * @param options Options specified in the configuration for this transformation
