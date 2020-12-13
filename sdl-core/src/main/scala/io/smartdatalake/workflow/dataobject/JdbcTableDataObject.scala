@@ -144,20 +144,23 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     validateSchemaMin(df)
 
     // validate columns exists
-    val dfColumns = df.columns.map(c => JdbcColumn(c, isNameCaseSensitiv =  false))
-    val colsMissingInTable = dfColumns.filter(c => !columns.exists(c.nameEquals))
-    assert(colsMissingInTable.isEmpty, s"Columns ${colsMissingInTable.mkString(", ")} missing in $id")
-    val colsMissingInDataFrame = columns.filter(c => !dfColumns.exists(c.nameEquals))
-    assert(colsMissingInTable.isEmpty, s"Columns ${colsMissingInDataFrame.mkString(", ")} exist in $id but not in DataFrame")
+    val dfWrite = if (isTableExisting) {
+      val dfColumns = df.columns.map(c => JdbcColumn(c, isNameCaseSensitiv = false))
+      val colsMissingInTable = dfColumns.filter(c => !columns.exists(c.nameEquals))
+      assert(colsMissingInTable.isEmpty, s"Columns ${colsMissingInTable.mkString(", ")} missing in $id")
+      val colsMissingInDataFrame = columns.filter(c => !dfColumns.exists(c.nameEquals))
+      assert(colsMissingInTable.isEmpty, s"Columns ${colsMissingInDataFrame.mkString(", ")} exist in $id but not in DataFrame")
 
-    // order DataFrame columns according to table metadata
-    val dfWrite = df.select(columns.map(c => col(c.name)):_*)
+      // cleanup existing data if saveMode=overwrite
+      if (saveMode == SaveMode.Overwrite) {
+        if (partitionValues.nonEmpty) deletePartitions(partitionValues)
+        else deleteTable
+      }
 
-    // cleanup existing data if saveMode=overwrite
-    if (saveMode == SaveMode.Overwrite) {
-      if (partitionValues.nonEmpty) deletePartitions(partitionValues)
-      else deleteTable
-    }
+      // order DataFrame columns according to table metadata
+      df.select(columns.map(c => col(c.name)): _*)
+    } else df
+
     // write table
     // No need to define any partitions as parallelization will be defined according to the data frame's partitions
     dfWrite.write.mode(SaveMode.Append).format("jdbc")
