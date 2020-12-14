@@ -107,6 +107,8 @@ private[smartdatalake] trait ExecutionModeWithMainInputOutput {
  * @param failConditions            List of conditions to fail application of execution mode if true. Define as spark sql expressions working with attributes of [[PartitionDiffModeExpressionData]] returning a boolean.
  *                                  Default is that the application of the PartitionDiffMode does not fail the action. If there is no data to process, the following actions are skipped.
  *                                  Multiple conditions are evaluated individually and every condition may fail the execution mode (or-logic)
+ * @param stopIfNoData optional setting if further actions should be skipped if this action has no data to process (default).
+ *                     Set stopIfNoData=false if you want to run further actions nevertheless. They will receive output dataObject unfiltered as input.
  * @param selectExpression          optional expression to define or refine the list of selected output partitions. Define a spark sql expression working with the attributes of [[PartitionDiffModeExpressionData]] returning a list<map<string,string>>.
  *                                  Default is to return the originally selected output partitions found in attribute selectedPartitionValues.
  * @param applyPartitionValuesTransform If true applies the partition values transform of custom transformations on input partition values before comparision with output partition values.
@@ -123,6 +125,7 @@ case class PartitionDiffMode( partitionColNb: Option[Int] = None
                             , applyCondition: Option[String] = None
                             , failCondition: Option[String] = None
                             , failConditions: Seq[Condition] = Seq()
+                            , stopIfNoData: Boolean = true
                             , selectExpression: Option[String] = None
                             , applyPartitionValuesTransform: Boolean = false
                             , selectAdditionalInputExpression: Option[String] = None
@@ -199,7 +202,11 @@ case class PartitionDiffMode( partitionColNb: Option[Int] = None
               // evaluate fail conditions
               evaluateFailConditions(actionId, data) // throws exception on failed condition
               // skip processing if no new data
-              if (selectedOutputPartitionValues.isEmpty) throw NoDataToProcessWarning(actionId.id, s"($actionId) No partitions to process found for ${input.id}")
+              val warnMsg = if (selectedOutputPartitionValues.isEmpty) Some(s"($actionId) No partitions to process found for ${input.id}") else None
+              warnMsg.foreach { msg =>
+                if (stopIfNoData) throw NoDataToProcessWarning(actionId.id, msg)
+                else throw NoDataToProcessDontStopWarning(actionId.id, msg)
+              }
               //return
               val inputPartitionLog = if (selectedInputPartitionValues != selectedOutputPartitionValues) s" by using input partitions ${selectedInputPartitionValues.mkString(", ")}" else ""
               logger.info(s"($actionId) PartitionDiffMode selected output partition values ${selectedOutputPartitionValues.mkString(", ")} to process$inputPartitionLog.")
