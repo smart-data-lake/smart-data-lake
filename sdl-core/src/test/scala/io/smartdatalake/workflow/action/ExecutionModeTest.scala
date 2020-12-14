@@ -20,17 +20,19 @@
 package io.smartdatalake.workflow.action
 
 import java.nio.file.Files
-import java.time.LocalDateTime
 
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ActionObjectId
-import io.smartdatalake.definitions.{Condition, CustomPartitionMode, CustomPartitionModeLogic, ExecutionModeFailedException, PartitionDiffMode, SparkIncrementalMode}
+import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.customlogic.{SparkUDFCreator, SparkUDFCreatorConfig}
+import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
-import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject, HiveTableDataObject, Table, TickTockHiveTableDataObject}
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.custom.ExpressionEvaluator
+import org.apache.spark.sql.expressions.UserDefinedFunction
+import org.apache.spark.sql.functions.udf
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
 class ExecutionModeTest extends FunSuite with BeforeAndAfter {
@@ -112,6 +114,17 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
     assert(partitionValues == Seq(PartitionValues(Map("lastname" -> "einstein"))))
   }
 
+  test("PartitionDiffMode selectAdditionalInputExpression with udf") {
+    val udfConfig = SparkUDFCreatorConfig(classOf[TestUdfAddLastnameEinstein].getName)
+    ExpressionEvaluator.registerUdf("testUdfAddLastNameEinstein", udfConfig.get)
+    val executionMode = PartitionDiffMode(selectAdditionalInputExpression = Some("testUdfAddLastNameEinstein(selectedInputPartitionValues,inputPartitionValues)"))
+    executionMode.prepare(ActionObjectId("test"))
+    val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
+    val (inputPartitionValues, outputPartitionValues, filter) = executionMode.apply(ActionObjectId("test"), srcDO, tgt2DO, subFeed, PartitionValues.oneToOneMapping).get
+    assert(outputPartitionValues == Seq(PartitionValues(Map("lastname" -> "doe")))) // Einstein already exists in tgt2
+    assert(inputPartitionValues.toSet == Set(PartitionValues(Map("lastname" -> "einstein")), PartitionValues(Map("lastname" -> "doe")))) // but Einstein is added as additional input partition
+  }
+
   test("PartitionDiffMode alternativeOutputId") {
     val executionMode = PartitionDiffMode(alternativeOutputId = Some("tgt2"))
     executionMode.prepare(ActionObjectId("test"))
@@ -185,4 +198,14 @@ class TestCustomPartitionMode() extends CustomPartitionModeLogic {
     val partitionValuesToProcess = input.listPartitions(session).diff(output.listPartitions(session))
     Some(partitionValuesToProcess.map(_.getMapString))
   }
+}
+
+class TestUdfAddLastnameEinstein() extends SparkUDFCreator {
+  val partitionValueToAdd = Map("lastname" -> "einstein")
+  def addLastnameEinstein(selectedInputPartitionValues: Seq[Map[String,String]], inputPartitionValues: Seq[Map[String,String]]): Seq[Map[String,String]] = {
+    if (selectedInputPartitionValues.isEmpty) return Seq()
+    if (!selectedInputPartitionValues.contains(partitionValueToAdd) && inputPartitionValues.contains(partitionValueToAdd)) selectedInputPartitionValues :+ partitionValueToAdd
+    else selectedInputPartitionValues
+  }
+  override def get(options: Map[String, String]): UserDefinedFunction = udf(addLastnameEinstein _)
 }
