@@ -25,7 +25,7 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, SubFeed}
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.TimestampType
@@ -146,6 +146,21 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
       // 4. mainInput is not unique, we log a warning and favor partitioned dataObjects over others.
       if (mainNeeded) logger.warn(s"($actionId) Could not determine unique main $inputOutput but execution mode might need it. Decided for ${dataObjects.head.id}.")
       (partitionedDataObjects ++ unpartitionedDataObjects).head
+    }
+  }
+
+  /**
+   * Updates the partition values of a SubFeed to the partition columns of the given data object, removing not existing columns from the partition values.
+   */
+  def updatePartitionValues[T <: SubFeed](dataObject: DataObject, subFeed: T, partitionValuesTransform: Option[Seq[PartitionValues] => Map[PartitionValues,PartitionValues]] = None)(implicit session: SparkSession): T = {
+    dataObject match {
+      case partitionedDO: CanHandlePartitions =>
+        // transform partition values
+        val newPartitionValues = partitionValuesTransform.map(fn => fn(subFeed.partitionValues).values.toSeq.distinct)
+          .getOrElse(subFeed.partitionValues)
+        // remove superfluous partitionValues
+        subFeed.updatePartitionValues(partitionedDO.partitions, Some(newPartitionValues)).asInstanceOf[T]
+      case _ => subFeed.clearPartitionValues().asInstanceOf[T]
     }
   }
 }

@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.workflow.action
 
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
@@ -46,31 +47,42 @@ abstract class SparkSubFeedAction extends SparkAction {
    * Transform a [[SparkSubFeed]].
    * To be implemented by subclasses.
    *
-   * @param subFeed [[SparkSubFeed]] to be transformed
-   * @return transformed [[SparkSubFeed]]
+   * @param inputSubFeed [[SparkSubFeed]] to be transformed
+   * @param outputSubFeed [[SparkSubFeed]] to be enriched with transformed result
+   * @return transformed output [[SparkSubFeed]]
    */
-  def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed
+  def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed
+
+  /**
+   * Transform partition values
+   */
+  def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues]
 
   private def doTransform(subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // convert subfeed to SparkSubFeed type or initialize if not yet existing
-    var preparedSubFeed = SparkSubFeed.fromSubFeed(subFeed)
+    var inputSubFeed = ActionHelper.updatePartitionValues(input, SparkSubFeed.fromSubFeed(subFeed))
+      .clearFilter // subFeed filter is not passed to the next action
+    // create output subfeed with transformed partition values
+    var outputSubFeed = ActionHelper.updatePartitionValues(output, inputSubFeed.toOutput(output.id), Some(transformPartitionValues))
     // apply execution mode
-    preparedSubFeed = executionMode match {
+    executionMode match {
       case Some(mode) =>
-        mode.apply(id, input, output, preparedSubFeed) match {
-          case Some((newPartitionValues, newFilter)) => preparedSubFeed.copy(partitionValues = newPartitionValues, filter = newFilter)
-          case None => preparedSubFeed
+        mode.apply(id, input, output, inputSubFeed, transformPartitionValues) match {
+          case Some((inputPartitionValues, outputPartitionValues, filter)) =>
+            inputSubFeed = inputSubFeed.copy(partitionValues = inputPartitionValues, filter=filter).breakLineage
+            outputSubFeed = outputSubFeed.copy(partitionValues = outputPartitionValues, filter=filter).breakLineage
+          case None => Unit
         }
-      case _ => preparedSubFeed
+      case _ => Unit
     }
-    // prepare as input SubFeed
-    preparedSubFeed = prepareInputSubFeed(preparedSubFeed, input)
+    // prepare input SubFeed
+    inputSubFeed = prepareInputSubFeed(input, inputSubFeed)
     // enrich with fresh DataFrame if needed
-    preparedSubFeed = enrichSubFeedDataFrame(input, preparedSubFeed, context.phase)
+    inputSubFeed = enrichSubFeedDataFrame(input, inputSubFeed, context.phase)
     // transform
-    val transformedSubFeed = transform(preparedSubFeed)
+    outputSubFeed = transform(inputSubFeed, outputSubFeed)
     // update partition values to output's partition columns and update dataObjectId
-    validateAndUpdateSubFeedPartitionValues(output, transformedSubFeed).copy(dataObjectId = output.id)
+    validateAndUpdateSubFeed(output, outputSubFeed)
   }
 
   /**
@@ -84,7 +96,7 @@ abstract class SparkSubFeedAction extends SparkAction {
     // check output
     output.init(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
     // return
-    Seq(updateSubFeedAfterWrite(transformedSubFeed))
+    Seq(transformedSubFeed)
   }
 
   /**
@@ -108,7 +120,7 @@ abstract class SparkSubFeedAction extends SparkAction {
     else getFinalMetrics(output.id).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
     logger.info(s"($id) finished writing DataFrame to ${output.id}: jobDuration=$d" + metricsLog)
     // return
-    Seq(updateSubFeedAfterWrite(transformedSubFeed))
+    Seq(transformedSubFeed)
   }
 
   override final def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {

@@ -22,20 +22,21 @@ import java.nio.file.Files
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql._
 import org.scalatest.{BeforeAndAfter, FunSuite, Matchers}
 
 trait DataObjectTestSuite extends FunSuite with Matchers with BeforeAndAfter {
 
-  protected implicit lazy val testSession: SparkSession = TestUtil.sessionHiveCatalog
+  protected implicit lazy val session: SparkSession = TestUtil.sessionHiveCatalog
 
 
   protected val escapedFilePath: String => String = (path: String) => path.replaceAll("\\\\", "\\\\\\\\")
   protected val convertFilePath: String => String = (path: String) => path.replaceAll("\\\\", "/")
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val testContext: ActionPipelineContext = ActionPipelineContext("testFeed", "testSource", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
+  implicit val contextInit: ActionPipelineContext = ActionPipelineContext("testFeed", "testSource", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Init)
+  val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
   protected def createTempDir = Files.createTempDirectory("test")
 

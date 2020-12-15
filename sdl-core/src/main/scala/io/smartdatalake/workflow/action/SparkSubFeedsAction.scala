@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.ExecutionModeWithMainInputOutput
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
@@ -44,40 +45,56 @@ abstract class SparkSubFeedsAction extends SparkAction {
    * Transform [[SparkSubFeed]]'s.
    * To be implemented by subclasses.
    *
-   * @param subFeeds [[SparkSubFeed]]'s to be transformed
-   * @return transformed [[SparkSubFeed]]'s
+   * @param inputSubFeeds [[SparkSubFeed]]s to be transformed
+   * @param outputSubFeeds [[SparkSubFeed]]s to be enriched with transformed result
+   * @return transformed [[SparkSubFeed]]s
    */
-  def transform(subFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed]
+  def transform(inputSubFeeds: Seq[SparkSubFeed], outputSubFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed]
+
+  /**
+   * Transform partition values
+   */
+  def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues]
 
   private def doTransform(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
+    val inputMap = (inputs ++ recursiveInputs).map(i => i.id -> i).toMap
+    val outputMap = outputs.map(i => i.id -> i).toMap
     // convert subfeeds to SparkSubFeed type or initialize if not yet existing
-    var preparedSubFeeds = subFeeds.map( SparkSubFeed.fromSubFeed )
+    var inputSubFeeds = subFeeds.map( subFeed =>
+      ActionHelper.updatePartitionValues(inputMap(subFeed.dataObjectId), SparkSubFeed.fromSubFeed(subFeed))
+        .clearFilter // subFeed filter is not passed to the next action
+    )
+    val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id).get
+    // create output subfeeds with transformed partition values from main input
+    var outputSubFeeds = outputs.map(output => ActionHelper.updatePartitionValues(output, mainInputSubFeed.toOutput(output.id), Some(transformPartitionValues)))
     // apply execution mode
-    preparedSubFeeds = executionMode match {
+    executionMode match {
       case Some(mode) =>
-        val mainSubFeed = preparedSubFeeds.find(_.dataObjectId == mainInput.id).get
-        mode.apply(id, mainInput, mainOutput, mainSubFeed) match {
-          case Some((newPartitionValues, newFilter)) =>
-            preparedSubFeeds.map( subFeed => subFeed.copy(partitionValues = newPartitionValues, filter = newFilter))
-          case None => preparedSubFeeds
+        mode.apply(id, mainInput, mainOutput, mainInputSubFeed, transformPartitionValues) match {
+          case Some((inputPartitionValues, outputPartitionValues, newFilter)) =>
+            inputSubFeeds = inputSubFeeds.map(subFeed =>
+              ActionHelper.updatePartitionValues(inputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = inputPartitionValues, filter = (if(subFeed.dataObjectId==mainInput.id) newFilter else None)).breakLineage)
+            )
+            outputSubFeeds = outputSubFeeds.map(subFeed =>
+              ActionHelper.updatePartitionValues(outputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = outputPartitionValues, filter = newFilter).breakLineage)
+            )
+          case None => Unit
         }
-      case _ => preparedSubFeeds
+      case _ => Unit
     }
-    preparedSubFeeds = preparedSubFeeds.map{ subFeed =>
-      val input = (inputs ++ recursiveInputs).find(_.id == subFeed.dataObjectId).get
-      // prepare as input SubFeed
-      val preparedSubFeed = prepareInputSubFeed(subFeed, input)
+    inputSubFeeds = inputSubFeeds.map{ subFeed =>
+      val input = inputMap(subFeed.dataObjectId)
+      // prepare input SubFeed
+      val preparedSubFeed = prepareInputSubFeed(input, subFeed)
       // enrich with fresh DataFrame if needed
       enrichSubFeedDataFrame(input, preparedSubFeed, context.phase)
     }
     // transform
-    val transformedSubFeeds = transform(preparedSubFeeds)
+    outputSubFeeds = transform(inputSubFeeds, outputSubFeeds)
     // update partition values to output's partition columns and update dataObjectId
-    transformedSubFeeds.map {
-      subFeed =>
-        val output = outputs.find(_.id == subFeed.dataObjectId)
-          .getOrElse(throw ConfigurationException(s"No output found for result ${subFeed.dataObjectId} in $id. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
-        validateAndUpdateSubFeedPartitionValues(output, subFeed)
+    outputSubFeeds.map { subFeed =>
+        val output = outputMap.getOrElse(subFeed.dataObjectId, throw ConfigurationException(s"No output found for result ${subFeed.dataObjectId} in $id. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
+        validateAndUpdateSubFeed(output, subFeed)
     }
   }
 
@@ -91,11 +108,12 @@ abstract class SparkSubFeedsAction extends SparkAction {
     // check output
     outputs.foreach{
       output =>
-        val subFeed = transformedSubFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"subFeed for output ${output.id} not found"))
+        val subFeed = transformedSubFeeds.find(_.dataObjectId == output.id)
+          .getOrElse(throw new IllegalStateException(s"subFeed for output ${output.id} not found"))
         output.init(subFeed.dataFrame.get, subFeed.partitionValues)
     }
     // return
-    transformedSubFeeds.map( transformedSubFeed => updateSubFeedAfterWrite(transformedSubFeed))
+    transformedSubFeeds
   }
 
   /**
@@ -122,7 +140,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
       logger.info(s"($id) finished writing DataFrame to ${output.id}: jobDuration=$d" + metricsLog)
     }
     // return
-    transformedSubFeeds.map( transformedSubFeed => updateSubFeedAfterWrite(transformedSubFeed))
+    transformedSubFeeds
   }
 
   private def executionModeNeedsMainInputOutput: Boolean = {

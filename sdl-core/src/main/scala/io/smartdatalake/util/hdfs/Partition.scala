@@ -128,6 +128,8 @@ private[smartdatalake] object PartitionValues {
     }
     diffPartitionValues(existingPartitionValues, expectedPartitionValues, partitionColCombinations)
   }
+
+  def oneToOneMapping(partitionValues: Seq[PartitionValues]): Map[PartitionValues,PartitionValues] = partitionValues.map(x => (x,x)).toMap
 }
 
 /**
