@@ -154,7 +154,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       // cleanup existing data if saveMode=overwrite
       if (saveMode == SaveMode.Overwrite) {
         if (partitionValues.nonEmpty) deletePartitions(partitionValues)
-        else deleteTable
+        else deleteAllData
       }
 
       // order DataFrame columns according to table metadata
@@ -202,7 +202,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   override def isDbExisting(implicit session: SparkSession): Boolean = connection.catalog.isDbExisting(table.db.get)
   override def isTableExisting(implicit session: SparkSession): Boolean = connection.catalog.isTableExisting(table.db.get, table.name)
 
-  def deleteTable(implicit session: SparkSession): Unit = {
+  def deleteAllData(implicit session: SparkSession): Unit = {
     connection.execJdbcStatement(s"delete from ${table.fullName}")
   }
 
