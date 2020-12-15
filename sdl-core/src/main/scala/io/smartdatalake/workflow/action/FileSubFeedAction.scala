@@ -44,7 +44,7 @@ abstract class FileSubFeedAction extends Action {
   override def recursiveInputs: Seq[FileRefDataObject with CanCreateInputStream] = Seq()
 
   /**
-   * "Transformes" a given [[FileSubFeed]]
+   * "Transforms" a given [[FileSubFeed]]
    * Note usage of doExec to choose between initialization or actual execution.
    *
    * @param inputSubFeed subFeed to be processed (referencing files to be read)
