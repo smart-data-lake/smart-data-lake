@@ -111,7 +111,7 @@ private[smartdatalake] trait ExecutionModeWithMainInputOutput {
  *                     Set stopIfNoData=false if you want to run further actions nevertheless. They will receive output dataObject unfiltered as input.
  * @param selectExpression          optional expression to define or refine the list of selected output partitions. Define a spark sql expression working with the attributes of [[PartitionDiffModeExpressionData]] returning a list<map<string,string>>.
  *                                  Default is to return the originally selected output partitions found in attribute selectedPartitionValues.
- * @param applyPartitionValuesTransform If true applies the partition values transform of custom transformations on input partition values before comparision with output partition values.
+ * @param applyPartitionValuesTransform If true applies the partition values transform of custom transformations on input partition values before comparison with output partition values.
  *                                  If enabled input and output partition columns can be different. Default is to disable the transformation of partition values.
  * @param selectAdditionalInputExpression optional expression to refine the list of selected input partitions. Note that primarily output partitions are selected by PartitionDiffMode.
  *                                  The selected output partitions are then transformed back to the input partitions needed to create the selected output partitions. This is one-to-one except if applyPartitionValuesTransform=true.
@@ -393,4 +393,3 @@ private[smartdatalake] case class ExecutionModeFailedException(id: NodeId, phase
   override val severity: ExceptionSeverity = if (phase == ExecutionPhase.Init) ExceptionSeverity.FAILED_DONT_STOP else ExceptionSeverity.FAILED
   override def getDAGRootExceptions: Seq[DAGException] = Seq(this)
 }
-
