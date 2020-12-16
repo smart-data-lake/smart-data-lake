@@ -236,9 +236,9 @@ object DataFrameTestHelper {
     }
 
     if (!sameSchema) {
-      val expectedTypes = expected map (structType => structType.name -> structType.dataType) toMap
-      val actualTypes = actual map (structType => structType.name -> structType.dataType) toMap
-      val differentTypes = (expected toSet) diff (actual toSet)
+      val expectedTypes = expected.map(structType => structType.name -> structType.dataType).toMap
+      val actualTypes = actual.map(structType => structType.name -> structType.dataType).toMap
+      val differentTypes = expected.toSet.diff(actual.toSet)
       val differentTypesString = differentTypes.map(structType => {
         val treeStringExpected = new StructType(Array(StructField(structType.name, expectedTypes(structType.name), structType.nullable))).treeString
         val treeStringActual = new StructType(Array(StructField(structType.name, actualTypes(structType.name), structType.nullable))).treeString
