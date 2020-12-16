@@ -40,7 +40,7 @@ class CustomFileDataObjectTest extends DataObjectTestSuite with Matchers {
       ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
 
     // run
-    val result = customFileDataObject.createInputStream("")(testSession)
+    val result = customFileDataObject.createInputStream("")
 
     // check
     val resultString = fromInputStream(result).mkString
