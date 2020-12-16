@@ -44,7 +44,7 @@ case class CustomFileDataObject(override val id: DataObjectId,
   override def partitionLayout(): Option[String] = None
 
   override def getFileRefs(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[FileRef] = {
-    Seq(FileRef("", "result", PartitionValues(Map())))
+    Seq(FileRef("custom", "custom", PartitionValues(Map())))
   }
 
   override def saveMode: SaveMode =
@@ -73,4 +73,3 @@ object CustomFileDataObject extends FromConfigFactory[DataObject] with SmartData
     config.extract[CustomFileDataObject].value
   }
 }
-
