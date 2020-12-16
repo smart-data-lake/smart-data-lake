@@ -19,11 +19,9 @@
 
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.TestCustomFileCreator
 import io.smartdatalake.testutils.DataObjectTestSuite
-import io.smartdatalake.workflow.action.customlogic.{CustomDfCreatorConfig, CustomFileCreatorConfig}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
+import io.smartdatalake.workflow.action.customlogic.CustomFileCreatorConfig
 import org.scalatest.Matchers
 
 import scala.io.Source.fromInputStream
@@ -36,8 +34,6 @@ class CustomFileDataObjectTest extends DataObjectTestSuite with Matchers {
     // prepare
     val config = CustomFileCreatorConfig(Option(customFileCreatorClassName))
     val customFileDataObject = CustomFileDataObject("testId", config)
-    val context: ActionPipelineContext =
-      ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
 
     // run
     val result = customFileDataObject.createInputStream("")
