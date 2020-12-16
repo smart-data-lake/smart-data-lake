@@ -175,7 +175,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
         val bytes = this.toByteArray
         postResponse(webserviceOptions.url, bytes)
       } match {
-        case Success(s) => s
+        case Success(_) =>
         case Failure(e) => throw new RuntimeException(s"Could not post to webservice for $id - ${e.getMessage}", e)
       }
     }
