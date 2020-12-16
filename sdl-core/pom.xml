@@ -78,7 +78,7 @@
 		<dependency>
 			<groupId>io.smartdatalake</groupId>
 			<artifactId>spark-extensions_${scala.minor.version}</artifactId>
-			<version>1.2.4</version>
+			<version>${spark-extensions.version}</version>
 		</dependency>
 
 		<dependency>
