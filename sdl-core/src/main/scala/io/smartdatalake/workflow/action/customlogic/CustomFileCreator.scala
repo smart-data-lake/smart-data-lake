@@ -19,7 +19,7 @@
 
 package io.smartdatalake.workflow.action.customlogic
 
-import java.io.ByteArrayInputStream
+import java.io.{ByteArrayInputStream, InputStream}
 
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.CustomCodeUtil
@@ -28,13 +28,13 @@ import org.apache.spark.sql.SparkSession
 trait CustomFileCreator extends Serializable {
 
   /**
-   * This function creates a [[ByteArrayInputStream]] based on custom code.
+   * This function creates a [[InputStream]] based on custom code.
    *
    * @param session the Spark Session
    * @param config  input config of the action
    * @return a stream containing the custom file data as a sequence of bytes
    */
-  def exec(session: SparkSession, config: Map[String, String]): ByteArrayInputStream
+  def exec(session: SparkSession, config: Map[String, String]): InputStream
 }
 
 case class CustomFileCreatorConfig(className: Option[String] = None,
@@ -62,7 +62,7 @@ case class CustomFileCreatorConfig(className: Option[String] = None,
     }
   }.get
 
-  def exec(implicit session: SparkSession): ByteArrayInputStream = {
+  def exec(implicit session: SparkSession): InputStream = {
     impl.exec(session, options.getOrElse(Map()))
   }
 
@@ -73,7 +73,6 @@ case class CustomFileCreatorConfig(className: Option[String] = None,
   }
 }
 
-class CustomFileCreatorWrapper(val fnExec: (SparkSession, Map[String, String])
-  => ByteArrayInputStream) extends CustomFileCreator {
-  override def exec(session: SparkSession, config: Map[String, String]): ByteArrayInputStream = fnExec(session, config)
+class CustomFileCreatorWrapper(val fnExec: (SparkSession, Map[String, String]) => InputStream ) extends CustomFileCreator {
+  override def exec(session: SparkSession, config: Map[String, String]): InputStream = fnExec(session, config)
 }
