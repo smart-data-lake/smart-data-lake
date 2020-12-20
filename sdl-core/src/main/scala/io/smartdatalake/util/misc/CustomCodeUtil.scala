@@ -60,7 +60,7 @@ private[smartdatalake] object CustomCodeUtil {
 
   def getClassInstanceByName[T](classname:String): T = {
     val clazz = Class.forName(classname)
-    clazz.newInstance().asInstanceOf[T]
+    clazz.getDeclaredConstructor().newInstance().asInstanceOf[T]
   }
 
   def readResourceFile( filename:String ) : String = {

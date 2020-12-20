@@ -49,7 +49,7 @@ object DatabricksSmartDataLakeBuilder extends SmartDataLakeBuilder {
         val classLoader = AppUtil.getChildFirstClassLoader(jars)
         val className = classOf[DefaultSmartDataLakeBuilder].getName
         val clazz = classLoader.loadClass(className)
-        val smartDataLakeBuilder = clazz.newInstance
+        val smartDataLakeBuilder = clazz.getDeclaredConstructor().newInstance()
         val runMethodName = "parseAndRun"
         val runMethod = clazz.getDeclaredMethods.find (m => m.getName == runMethodName && m.getParameterCount == 2)
         .getOrElse (throw new IllegalStateException(s"'$runMethodName' method not found for class $className") )

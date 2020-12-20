@@ -26,6 +26,8 @@ import org.apache.spark.sql.functions.{col, count, to_timestamp}
 import org.apache.spark.sql.types._
 import org.slf4j.LoggerFactory
 
+import scala.language.implicitConversions
+
 object DataFrameTestHelper {
 
   val ts: String => TypedValue = formattedTimeStamp => TypedValue(formattedTimeStamp, TimestampType)
