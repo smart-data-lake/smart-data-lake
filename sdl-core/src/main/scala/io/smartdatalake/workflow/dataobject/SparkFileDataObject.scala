@@ -177,7 +177,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
 
     // delete concerned partitions if existing
     if (saveMode == SaveMode.Overwrite && partitions.nonEmpty) {
-      val partitionValuesCols = partitionValues.map(_.keys).reduce(_ ++ _).toSeq
+      val partitionValuesCols = partitionValues.map(_.keys).reduceOption(_ ++ _).getOrElse(Set()).toSeq
       val partitionValuesToDelete = partitionValues.intersect(listPartitions.map(_.filterKeys(partitionValuesCols)))
       deletePartitions(partitionValuesToDelete)
     }
