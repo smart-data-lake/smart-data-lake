@@ -108,8 +108,7 @@ private[smartdatalake] object PartitionValues {
    * Return PartitionValues keys which are not included in given partition columns
    */
   def checkWrongPartitionValues(partitionValues: Seq[PartitionValues], partitions: Seq[String]): Seq[String] = {
-    if (partitionValues.nonEmpty) partitionValues.map(_.keys).reduce(_ ++ _).diff(partitions.toSet).toSeq
-    else Seq()
+    partitionValues.map(_.keys).reduceOption(_ ++ _).getOrElse(Set()).diff(partitions.toSet).toSeq
   }
 
   /**
