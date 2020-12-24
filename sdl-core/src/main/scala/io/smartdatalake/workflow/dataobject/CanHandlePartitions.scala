@@ -61,7 +61,7 @@ trait CanHandlePartitions {
    * Create empty partitions for partition values not yet existing
    */
   private[smartdatalake] final def createMissingPartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
-    val partitionValuesCols = partitionValues.map(_.keys).fold(Set())(_ ++ _).toSeq
+    val partitionValuesCols = partitionValues.map(_.keys).reduceOption(_ ++ _).getOrElse(Set()).toSeq
     partitionValues.diff(listPartitions.map(_.filterKeys(partitionValuesCols)))
       .foreach(createEmptyPartition)
   }
