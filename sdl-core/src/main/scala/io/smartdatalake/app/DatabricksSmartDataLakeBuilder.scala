@@ -36,7 +36,7 @@ object DatabricksSmartDataLakeBuilder extends SmartDataLakeBuilder {
     logger.info(s"Start programm $appType")
 
     val config = initConfigFromEnvironment.copy (
-      overrideJars = Some(Seq("config-1.3.4.jar"))
+      overrideJars = Some(Seq("config-1.4.1.jar"))
     )
 
     parseCommandLineArguments(args, config) match {
