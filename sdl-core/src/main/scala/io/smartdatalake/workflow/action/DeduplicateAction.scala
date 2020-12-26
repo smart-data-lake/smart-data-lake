@@ -108,22 +108,13 @@ case class DeduplicateAction(override val id: ActionObjectId,
     else PartitionValues.oneToOneMapping(partitionValues)
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[Action] = DeduplicateAction
 }
 
 object DeduplicateAction extends FromConfigFactory[Action] {
 
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): DeduplicateAction = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[DeduplicateAction].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): DeduplicateAction = {
+    extract[DeduplicateAction](config)
   }
 
   /**

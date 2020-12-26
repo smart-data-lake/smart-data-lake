@@ -32,22 +32,11 @@ case class TestConnection( override val id: ConnectionId,
                          ( implicit val instanceRegistry: InstanceRegistry)
 extends Connection {
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[Connection] = TestConnection
-
 }
 
 object TestConnection extends FromConfigFactory[Connection] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): TestConnection = {
-    import configs.syntax.ConfigOps
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[TestConnection].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): TestConnection = {
+    extract[TestConnection](config)
   }
 }

@@ -230,7 +230,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
          | }
          |}
        """.stripMargin)
-    val dataObj = HiveTableDataObject.fromConfig(config, instanceRegistry)
+    val dataObj = HiveTableDataObject.fromConfig(config)
 
     an [Exception] should be thrownBy dataObj.getDataFrame()
   }

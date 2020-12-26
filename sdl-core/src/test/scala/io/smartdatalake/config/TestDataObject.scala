@@ -35,7 +35,8 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  */
 case class TestDataObject( id: DataObjectId,
                            override val schemaMin: Option[StructType] = None,
-                           arg1: String, args: List[String],
+                           arg1: String,
+                           args: Seq[String],
                            connectionId: Option[ConnectionId] = None,
                            override val metadata: Option[DataObjectMetadata] = None)
                          ( implicit val instanceRegistry: InstanceRegistry)
@@ -59,11 +60,7 @@ case class TestDataObject( id: DataObjectId,
 }
 
 object TestDataObject extends FromConfigFactory[DataObject] {
-
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): TestDataObject = {
-    import configs.syntax.ConfigOps
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[TestDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): TestDataObject = {
+    extract[TestDataObject](config)
   }
 }
