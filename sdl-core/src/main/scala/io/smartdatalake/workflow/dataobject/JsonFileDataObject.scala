@@ -84,23 +84,12 @@ case class JsonFileDataObject( override val id: DataObjectId,
     if (stringify) dfSuper.castAll2String else dfSuper
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[DataObject] = JsonFileDataObject
 }
 
 object JsonFileDataObject extends FromConfigFactory[DataObject] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): JsonFileDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[JsonFileDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): JsonFileDataObject = {
+    extract[JsonFileDataObject](config)
   }
 }
 

@@ -86,18 +86,12 @@ case class CustomSparkAction ( override val id: ActionObjectId,
     transformer.transformPartitionValues(id, partitionValues)
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[Action] = CustomSparkAction
 }
 
 
 object CustomSparkAction extends FromConfigFactory[Action] {
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): CustomSparkAction = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[CustomSparkAction].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CustomSparkAction = {
+    extract[CustomSparkAction](config)
   }
 }
