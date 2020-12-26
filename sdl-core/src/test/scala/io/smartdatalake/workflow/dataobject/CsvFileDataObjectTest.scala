@@ -49,7 +49,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
            | path = "${escapedFilePath(tempFile.getPath)}"
            |}
          """.stripMargin)
-      val dataObj = CsvFileDataObject.fromConfig(config, instanceRegistry)
+      val dataObj = CsvFileDataObject.fromConfig(config)
 
       val df = dataObj.getDataFrame()
       df.schema shouldBe empty
@@ -74,7 +74,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
            | path = "${escapedFilePath(tempFile.getPath)}"
            |}
          """.stripMargin)
-      val dataObj = CsvFileDataObject.fromConfig(config, instanceRegistry)
+      val dataObj = CsvFileDataObject.fromConfig(config)
 
       val df = dataObj.getDataFrame()
       df.schema shouldBe empty
@@ -99,7 +99,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
            | path = "${escapedFilePath(tempFile.getPath)}"
            |}
          """.stripMargin)
-      val dataObj = CsvFileDataObject.fromConfig(config, instanceRegistry)
+      val dataObj = CsvFileDataObject.fromConfig(config)
 
       val df = dataObj.getDataFrame()
       df.schema shouldBe empty
@@ -139,7 +139,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
            |}
          """.stripMargin)
 
-      val dataObj = CsvFileDataObject.fromConfig(config, instanceRegistry)
+      val dataObj = CsvFileDataObject.fromConfig(config)
 
       val df = dataObj.getDataFrame()
 
@@ -188,7 +188,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
            |}
          """.stripMargin)
 
-      val dataObj = CsvFileDataObject.fromConfig(config, instanceRegistry)
+      val dataObj = CsvFileDataObject.fromConfig(config)
 
       val df = dataObj.getDataFrame()
 

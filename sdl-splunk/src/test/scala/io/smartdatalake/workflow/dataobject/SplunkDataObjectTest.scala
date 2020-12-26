@@ -167,7 +167,7 @@ class SplunkDataObjectTest extends DataObjectTestSuite {
          | }
          |}
          """.stripMargin)
-    SplunkDataObject.fromConfig(config, instanceRegistry)
+    SplunkDataObject.fromConfig(config)
   }
 
   private def createSutWithStubs(ais: SplunkDataObject): SplunkDataObject with SplunkStub = {

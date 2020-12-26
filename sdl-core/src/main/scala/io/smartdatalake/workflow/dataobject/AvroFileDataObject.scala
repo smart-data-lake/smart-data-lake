@@ -66,23 +66,12 @@ case class AvroFileDataObject( override val id: DataObjectId,
   // this is only needed for FileRef actions
   override val fileName: String = "*.avro*"
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[DataObject] = AvroFileDataObject
 }
 
 
 object AvroFileDataObject extends FromConfigFactory[DataObject] {
-
-  /**
-   * @inheritdoc
-   */
-  def fromConfig(config: Config, instanceRegistry: InstanceRegistry): AvroFileDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[AvroFileDataObject].value
+  def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): AvroFileDataObject = {
+    extract[AvroFileDataObject](config)
   }
 }

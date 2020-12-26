@@ -48,24 +48,13 @@ case class RawFileDataObject( override val id: DataObjectId,
 
   // reading binary files as DataFrame is supported starting from Spark 3.0, see https://docs.databricks.com/data/data-sources/binary-file.html
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[DataObject] = RawFileDataObject
 
 }
 
 object RawFileDataObject extends FromConfigFactory[DataObject] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): RawFileDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[RawFileDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): RawFileDataObject = {
+    extract[RawFileDataObject](config)
   }
 }
 

@@ -16,10 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.config
+package io.smartdatalake.config.objects
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, TransactionalSparkTableDataObject}
@@ -53,20 +54,11 @@ case class TestAction(override val id: ActionObjectId,
   override val outputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
   override val recursiveInputs:Seq[DataObject with CanCreateDataFrame] = Seq()
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[Action] = TestAction
 }
 
 object TestAction extends FromConfigFactory[Action] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): TestAction = {
-    import configs.syntax.ConfigOps
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[TestAction].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): TestAction = {
+    extract[TestAction](config)
   }
 }

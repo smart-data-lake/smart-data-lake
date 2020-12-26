@@ -101,21 +101,11 @@ case class CustomFileAction(override val id: ActionObjectId,
     outputSubFeed.copy(fileRefs = Some(tgtFileRefs), processedInputFileRefs = Some(inputFileRefs))
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[Action] = CustomFileAction
 }
 
 object CustomFileAction extends FromConfigFactory[Action] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): CustomFileAction = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[CustomFileAction].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CustomFileAction = {
+    extract[CustomFileAction](config)
   }
 }

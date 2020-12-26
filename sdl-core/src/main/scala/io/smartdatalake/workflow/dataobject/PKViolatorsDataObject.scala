@@ -116,23 +116,13 @@ case class PKViolatorsDataObject(id: DataObjectId,
     pkViolatorsDfs.reduce(unionDf)
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[PKViolatorsDataObject] = PKViolatorsDataObject
 }
 
 object PKViolatorsDataObject extends FromConfigFactory[PKViolatorsDataObject] {
 
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): PKViolatorsDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[PKViolatorsDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): PKViolatorsDataObject = {
+    extract[PKViolatorsDataObject](config)
   }
 
   val columnNameName = "column_name"

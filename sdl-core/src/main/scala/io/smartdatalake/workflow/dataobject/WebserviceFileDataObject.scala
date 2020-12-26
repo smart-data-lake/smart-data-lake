@@ -267,24 +267,14 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
    */
   override def path: String = ""
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[DataObject] = WebserviceFileDataObject
 
 }
 
 object WebserviceFileDataObject extends FromConfigFactory[DataObject] with SmartDataLakeLogger {
 
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): WebserviceFileDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[WebserviceFileDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): WebserviceFileDataObject = {
+    extract[WebserviceFileDataObject](config)
   }
 
   def getKeyCloakConfig(webserviceOptions: Config): Option[KeycloakConfig] = {

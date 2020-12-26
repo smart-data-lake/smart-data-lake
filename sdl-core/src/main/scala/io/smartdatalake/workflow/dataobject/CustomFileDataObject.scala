@@ -39,8 +39,6 @@ case class CustomFileDataObject(override val id: DataObjectId,
     creator.exec
   }
 
-  override def factory: FromConfigFactory[DataObject] = CustomFileDataObject
-
   override def partitionLayout(): Option[String] = None
 
   override def getFileRefs(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[FileRef] = {
@@ -58,18 +56,12 @@ case class CustomFileDataObject(override val id: DataObjectId,
   override def expectedPartitionsCondition: Option[String] = None
 
   override def listPartitions(implicit session: SparkSession): Seq[PartitionValues] = Seq()
+
+  override def factory: FromConfigFactory[DataObject] = CustomFileDataObject
 }
 
 object CustomFileDataObject extends FromConfigFactory[DataObject] with SmartDataLakeLogger {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): CustomFileDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[CustomFileDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CustomFileDataObject = {
+    extract[CustomFileDataObject](config)
   }
 }

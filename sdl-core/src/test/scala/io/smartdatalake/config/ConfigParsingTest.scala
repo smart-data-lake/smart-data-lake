@@ -16,14 +16,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.config
+package io.smartdatalake.config.test
 
-import com.typesafe.config.ConfigFactory
-import configs.{Configs, Result}
+import com.typesafe.config.{ConfigException, ConfigFactory}
 import io.smartdatalake.config.ConfigParser.localSubstitution
+import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
+import io.smartdatalake.config.objects.{TestAction, TestConnection, TestDataObject}
+import io.smartdatalake.config.{ConfigParser, ConfigurationException, InstanceRegistry, SdlConfigObject}
 import io.smartdatalake.definitions.{Environment, PartitionDiffMode}
 import io.smartdatalake.workflow.action.{Action, FileTransferAction}
-import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, DataObject, RawFileDataObject}
+import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, DataObject, DataObjectMetadata, RawFileDataObject}
+import org.apache.spark.sql.types.StructType
 import org.scalatest.{FlatSpec, Matchers}
 
 class ConfigParsingTest extends FlatSpec with Matchers {
@@ -45,7 +48,6 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         |   do3 = {
         |     type = CsvFileDataObject
         |     path = /my/path3
-        |     protocol = local-file
         |     csvOptions = {
         |       delimiter = ","
         |       escape = "\\"
@@ -106,7 +108,7 @@ class ConfigParsingTest extends FlatSpec with Matchers {
 
     val registry = ConfigParser.parse(config)
 
-    registry.instances shouldBe empty
+    registry.instances.keys
   }
 
   it must "correctly parse a DataObject and Connection map with a single element" in {
@@ -115,12 +117,12 @@ class ConfigParsingTest extends FlatSpec with Matchers {
       """
         |connections = {
         |   tcon = {
-        |     type = io.smartdatalake.config.TestConnection
+        |     type = io.smartdatalake.config.objects.TestConnection
         |   }
         |}
         |dataObjects = {
         |   tdo = {
-        |     type = io.smartdatalake.config.TestDataObject
+        |     type = io.smartdatalake.config.objects.TestDataObject
         |     arg1 = foo
         |     args = [bar, "!"]
         |     connectionId = tcon
@@ -139,16 +141,17 @@ class ConfigParsingTest extends FlatSpec with Matchers {
 
   it must "correctly parse a DataObject map with multiple elements" in {
 
+
     val config = ConfigFactory.parseString(
       """
         |dataObjects = {
         |   tdo1 = {
-        |     type = io.smartdatalake.config.TestDataObject
+        |     type = io.smartdatalake.config.objects.TestDataObject
         |     arg1 = foo
         |     args = [bar, "!"]
         |   }
         |   tdo2 = {
-        |     type = io.smartdatalake.config.TestDataObject
+        |     type = io.smartdatalake.config.objects.TestDataObject
         |     arg1 = goo
         |     args = [bar]
         |   }
@@ -170,7 +173,7 @@ class ConfigParsingTest extends FlatSpec with Matchers {
 
     val registry = ConfigParser.parse(config)
 
-    registry.instances shouldBe empty
+    registry.instances should have size 0
   }
 
   it must "correctly parse an Action map with a single element" in {
@@ -179,13 +182,13 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         |dataObjects = {
         |   tdo1 = {
         |     id = tdo1
-        |     type = io.smartdatalake.config.TestDataObject
+        |     type = io.smartdatalake.config.objects.TestDataObject
         |     arg1 = foo
         |     args = []
         |   }
         |   tdo2 = {
         |     id = tdo2
-        |     type = io.smartdatalake.config.TestDataObject
+        |     type = io.smartdatalake.config.objects.TestDataObject
         |     arg1 = bar
         |     args = []
         |   }
@@ -193,7 +196,7 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         |
         |actions = {
         |   ta1 = {
-        |     type = io.smartdatalake.config.TestAction
+        |     type = io.smartdatalake.config.objects.TestAction
         |     inputId = tdo1
         |     outputId = tdo2
         |   }
@@ -225,12 +228,12 @@ class ConfigParsingTest extends FlatSpec with Matchers {
       """
         |dataObjects = {
         | tdo1 = {
-        |   type = io.smartdatalake.config.TestDataObject
+        |   type = io.smartdatalake.config.objects.TestDataObject
         |   arg1 = foo
         |   args = [bar, "!"]
         | }
         | tdo2 = {
-        |   type = io.smartdatalake.config.TestDataObject
+        |   type = io.smartdatalake.config.objects.TestDataObject
         |   arg1 = goo
         |   args = [bar]
         | }
@@ -238,12 +241,12 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         |
         |actions = {
         |   ta1 = {
-        |     type = io.smartdatalake.config.TestAction
+        |     type = io.smartdatalake.config.objects.TestAction
         |     inputId = tdo1
         |     outputId = tdo2
         |   }
         |   ta2 = {
-        |     type = io.smartdatalake.config.TestAction
+        |     type = io.smartdatalake.config.objects.TestAction
         |     inputId = tdo2
         |     outputId = tdo1
         |   }
@@ -271,40 +274,78 @@ class ConfigParsingTest extends FlatSpec with Matchers {
       """
         |tdo = {
         | id = tdo
-        | type = io.smartdatalake.config.TestDataObject
         | arg1 = "first"
         | args = [one, two]
         |}
         |
         |""".stripMargin).resolve
 
-    val testDataObject = Configs[TestDataObject].get(config, "tdo")
-    testDataObject.isSuccess shouldBe true
-    testDataObject.value shouldEqual TestDataObject(id = "tdo", arg1 = "first", args = List("one", "two"))
+    val testDataObject = TestDataObject.fromConfig(config.getConfig("tdo"))
+    testDataObject shouldEqual TestDataObject(id = "tdo", arg1 = "first", args = List("one", "two"))
   }
 
   "TestAction" should "be parsable" in {
-
-    val config = ConfigFactory.parseString(
+    val dataObjectsConfig = ConfigFactory.parseString(
       """
         |dataObjects = {
         | tdo1 = {
-        |   type = io.smartdatalake.config.TestDataObject
+        |   type = io.smartdatalake.config.objects.TestDataObject
         |   arg1 = foo
         |   args = [bar, "!"]
         | }
         | tdo2 = {
-        |   type = io.smartdatalake.config.TestDataObject
+        |   type = io.smartdatalake.config.objects.TestDataObject
         |   arg1 = goo
         |   args = [bar]
         | }
         |}
-        |
+      """.stripMargin).resolve
+    val config = ConfigFactory.parseString(
+      """
         |a = {
         | id = a
-        | type = io.smartdatalake.config.TestAction
+        | inputId = tdo1
+        | output-id = tdo2
+        | executionMode = {
+        |  type = PartitionDiffMode
+        |  partitionColNb = 2
+        |  stop-if-no-data = true
+        | }
+        |}
+        |
+        |""".stripMargin).resolve
+
+    implicit val registry: InstanceRegistry = ConfigParser.parse(dataObjectsConfig)
+    val testAction = TestAction.fromConfig(config.getConfig("a"))
+    val expected = TestAction(id = "a", arg1 = None, inputId = "tdo1", outputId = "tdo2", executionMode = Some(PartitionDiffMode(partitionColNb = Some(2))))
+    testAction shouldEqual expected
+
+  }
+
+  /*
+  "TestAction" should "fail on superfluous key" in {
+    val dataObjectsConfig = ConfigFactory.parseString(
+      """
+        |dataObjects = {
+        | tdo1 = {
+        |   type = io.smartdatalake.config.objects.TestDataObject
+        |   arg1 = foo
+        |   args = [bar, "!"]
+        | }
+        | tdo2 = {
+        |   type = io.smartdatalake.config.objects.TestDataObject
+        |   arg1 = goo
+        |   args = [bar]
+        | }
+        |}
+      """.stripMargin).resolve
+    val config = ConfigFactory.parseString(
+      """
+        |a = {
+        | id = a
         | inputId = tdo1
         | outputId = tdo2
+        | test = test
         | executionMode = {
         |  type = PartitionDiffMode
         |  partitionColNb = 2
@@ -313,10 +354,115 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         |
         |""".stripMargin).resolve
 
-    implicit val registry: InstanceRegistry = ConfigParser.parse(config)
+    implicit val registry: InstanceRegistry = ConfigParser.parse(dataObjectsConfig)
+    intercept[ConfigException](TestAction.fromConfig(config.getConfig("a")))
+  }
 
-    val testAction = Configs[TestAction].get(config, "a")
-    testAction shouldEqual Result.Success(TestAction(id = "a", arg1 = None, inputId = "tdo1", outputId = "tdo2", executionMode = Some(PartitionDiffMode(partitionColNb = Some(2)))))
+  "TestAction" should "fail on superfluous key in optional case class" in {
+    val dataObjectsConfig = ConfigFactory.parseString(
+      """
+        |dataObjects = {
+        | tdo1 = {
+        |   type = io.smartdatalake.config.objects.TestDataObject
+        |   arg1 = foo
+        |   args = [bar, "!"]
+        | }
+        | tdo2 = {
+        |   type = io.smartdatalake.config.objects.TestDataObject
+        |   arg1 = goo
+        |   args = [bar]
+        | }
+        |}
+      """.stripMargin).resolve
+    val config = ConfigFactory.parseString(
+      """
+        |a = {
+        | id = a
+        | inputId = tdo1
+        | outputId = tdo2
+        | executionMode = {
+        |  type = PartitionDiffMode
+        |  partitionColNb = 2
+        | }
+        | metadata {
+        |  test = test // doesnt exist
+        | }
+        |}
+        |
+        |""".stripMargin).resolve
+
+    implicit val registry: InstanceRegistry = ConfigParser.parse(dataObjectsConfig)
+    intercept[ConfigException](TestAction.fromConfig(config.getConfig("a")))
+  }
+
+  "TestAction" should "fail on superfluous key in optional sealed trait" in {
+    val dataObjectsConfig = ConfigFactory.parseString(
+      """
+        |dataObjects = {
+        | tdo1 = {
+        |   type = io.smartdatalake.config.objects.TestDataObject
+        |   arg1 = foo
+        |   args = [bar, "!"]
+        | }
+        | tdo2 = {
+        |   type = io.smartdatalake.config.objects.TestDataObject
+        |   arg1 = goo
+        |   args = [bar]
+        | }
+        |}
+      """.stripMargin).resolve
+    val config = ConfigFactory.parseString(
+      """
+        |a = {
+        | id = a
+        | inputId = tdo1
+        | outputId = tdo2
+        | executionMode = {
+        |  type = PartitionDiffMode
+        |  partitionColNb = 2
+        |  test = test // doesnt exist
+        | }
+        |}
+        |
+        |""".stripMargin).resolve
+
+    implicit val registry: InstanceRegistry = ConfigParser.parse(dataObjectsConfig)
+    intercept[ConfigException](TestAction.fromConfig(config.getConfig("a")))
+  }
+  */
+
+  "TestAction" should "fail on unknown type of optional sealed trait" in {
+    val dataObjectsConfig = ConfigFactory.parseString(
+      """
+        |dataObjects = {
+        | tdo1 = {
+        |   type = io.smartdatalake.config.objects.TestDataObject
+        |   arg1 = foo
+        |   args = [bar, "!"]
+        | }
+        | tdo2 = {
+        |   type = io.smartdatalake.config.objects.TestDataObject
+        |   arg1 = goo
+        |   args = [bar]
+        | }
+        |}
+      """.stripMargin).resolve
+    val config = ConfigFactory.parseString(
+      """
+        |a = {
+        | id = a
+        | inputId = tdo1
+        | outputId = tdo2
+        | executionMode = {
+        |  type = UnknownMode
+        |  partitionColNb = 2
+        | }
+        |}
+        |
+        |""".stripMargin).resolve
+
+    implicit val registry: InstanceRegistry = ConfigParser.parse(dataObjectsConfig)
+    intercept[ConfigException](TestAction.fromConfig(config.getConfig("a")))
   }
 
   "single local substitution" should "be processed" in {
@@ -331,7 +477,6 @@ class ConfigParsingTest extends FlatSpec with Matchers {
     val configSubstituted1 = ConfigParser.localSubstitution(config, "path")
     configSubstituted1.getString("path") shouldEqual "test10/abc"
   }
-
 
   "all local substitution" should "be processed" in {
     val config = ConfigFactory.parseString(
@@ -356,3 +501,12 @@ class ConfigParsingTest extends FlatSpec with Matchers {
     refinedConfig.getString("table.name") shouldEqual "test10/abc"
   }
 }
+
+
+case class MyTestDataObject( id: DataObjectId,
+                             schemaMin: Option[StructType] = None,
+                           arg1: String,
+                           args: Seq[String],
+                           connectionId: Option[ConnectionId] = None,
+                           metadata: Option[DataObjectMetadata] = None)
+                         ( implicit val instanceRegistry: InstanceRegistry)

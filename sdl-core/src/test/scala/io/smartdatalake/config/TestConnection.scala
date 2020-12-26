@@ -16,10 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.config
+package io.smartdatalake.config.objects
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 
 /**
@@ -32,22 +33,11 @@ case class TestConnection( override val id: ConnectionId,
                          ( implicit val instanceRegistry: InstanceRegistry)
 extends Connection {
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[Connection] = TestConnection
-
 }
 
 object TestConnection extends FromConfigFactory[Connection] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): TestConnection = {
-    import configs.syntax.ConfigOps
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[TestConnection].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): TestConnection = {
+    extract[TestConnection](config)
   }
 }

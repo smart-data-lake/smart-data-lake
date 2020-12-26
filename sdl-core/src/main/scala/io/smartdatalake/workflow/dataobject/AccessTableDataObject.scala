@@ -118,23 +118,11 @@ case class AccessTableDataObject(override val id: DataObjectId,
 
   override def dropTable(implicit session: SparkSession): Unit = throw new NotImplementedError
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[DataObject] = AccessTableDataObject
 }
 
 object AccessTableDataObject extends FromConfigFactory[DataObject] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): AccessTableDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-
-    config.extract[AccessTableDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): AccessTableDataObject = {
+    extract[AccessTableDataObject](config)
   }
 }

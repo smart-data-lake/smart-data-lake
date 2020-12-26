@@ -16,10 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.config
+package io.smartdatalake.config.objects
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataobject._
@@ -35,7 +36,8 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  */
 case class TestDataObject( id: DataObjectId,
                            override val schemaMin: Option[StructType] = None,
-                           arg1: String, args: List[String],
+                           arg1: String,
+                           args: Seq[String],
                            connectionId: Option[ConnectionId] = None,
                            override val metadata: Option[DataObjectMetadata] = None)
                          ( implicit val instanceRegistry: InstanceRegistry)
@@ -59,11 +61,7 @@ case class TestDataObject( id: DataObjectId,
 }
 
 object TestDataObject extends FromConfigFactory[DataObject] {
-
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): TestDataObject = {
-    import configs.syntax.ConfigOps
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[TestDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): TestDataObject = {
+    extract[TestDataObject](config)
   }
 }

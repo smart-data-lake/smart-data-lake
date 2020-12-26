@@ -420,11 +420,7 @@ object KafkaTopicDataObject extends FromConfigFactory[DataObject] {
   /**
     * @inheritdoc
     */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): KafkaTopicDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[KafkaTopicDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): KafkaTopicDataObject = {
+    extract[KafkaTopicDataObject](config)
   }
 }
