@@ -21,6 +21,7 @@ package io.smartdatalake.config
 import java.io.InputStreamReader
 
 import com.typesafe.config.{Config, ConfigFactory}
+import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, ConnectionId, DataObjectId}
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.{EnvironmentUtil, SmartDataLakeLogger}
 import org.apache.hadoop.fs.permission.FsAction
@@ -90,22 +91,30 @@ object ConfigLoader extends SmartDataLakeLogger {
     val configFileIndex = filesInBfsOrderByExtension(hadoopPaths)
     logger.debug(s"Configuration file index:\n${configFileIndex.map(e => s"\t${e._1} -> ${e._2.mkString(", ")}").mkString("\n")}")
 
-    val confFiles = configFileIndex("conf")
-    val jsonFiles = configFileIndex("json")
-    val propertyFiles = configFileIndex("properties")
-    if (confFiles.isEmpty && jsonFiles.isEmpty && propertyFiles.isEmpty) {
+    //read file extensions in the same order as typesafe config
+    val sortedFileConfigs = (configFileIndex("properties") ++ configFileIndex("json") ++ configFileIndex("conf"))
+      .map(file => (file, parseConfig(file))).reverse
+    if (sortedFileConfigs.isEmpty) {
       logger.error(s"Paths $hadoopPaths do not contain valid configuration files. " +
         s"Ensure the configuration files have one of the following extensions: ${configFileExtensions.map(ext => s".$ext").mkString(", ")}")
     }
-    //read file extensions in the same order as typesafe config
-    //system properties take precedence
-    val config = ConfigFactory.systemProperties()
 
-    mergeWithHdfsFiles(propertyFiles,
-      mergeWithHdfsFiles(jsonFiles,
-        mergeWithHdfsFiles(confFiles, config)
-      )
-    ).resolve()
+    // check for duplicate first class object definitions (connections, data objects, actions)
+    val objectIdLocationMap =
+      sortedFileConfigs.flatMap{ case (file, config) => ConfigParser.getActionConfigMap(config).keys.map(objName => (ActionObjectId(objName), file))} ++
+      sortedFileConfigs.flatMap{ case (file, config) => ConfigParser.getDataObjectConfigMap(config).keys.map(objName => (DataObjectId(objName), file))} ++
+      sortedFileConfigs.flatMap{ case (file, config) => ConfigParser.getConnectionConfigMap(config).keys.map(objName => (ConnectionId(objName), file))}
+    val duplicates = objectIdLocationMap.groupBy(_._1)
+      .filter(_._2.size > 1)
+      .mapValues(_.map(_._2))
+    if (duplicates.nonEmpty) {
+      val duplicatesStr = duplicates.map{ case (id,files) => s"$id=${files.mkString(";")}" }.mkString(" ")
+      throw ConfigurationException(s"Configuration parsing failed because of configuration objects defined in multiple locations: $duplicatesStr")
+    }
+
+    //system properties take precedence
+    val systemPropConfig = ConfigFactory.systemProperties()
+    mergeConfigs(systemPropConfig +: sortedFileConfigs.map(_._2)).resolve()
   } catch {
     // catch if hadoop libraries are missing and output debug informations
     case ex:UnsatisfiedLinkError =>
@@ -121,41 +130,37 @@ object ConfigLoader extends SmartDataLakeLogger {
   }
 
   /**
-   * Parse a [[Config]] using HDFS [[FileSystem]] API.
+   * Merge configurations such that configurations earlier in the list overwrite configurations at the end of the list.
    *
-   * A configuration is parsed from a supplied list of configuration locations such that configurations at the end of the
-   * list overwrite configurations at the beginning of the list.
-   *
-   * The parsed configs are then merged with the supplied `config` and settings in `config` take precendence.
-   *
-   * @param configFilePaths   a list of [[Path]]s corresponding to the HDFS locations of  configuration files.
-   * @param config            a config with which to merge the configs from `configFilePaths`.
-   * @param fs                the configured filesystem handle
-   * @return                  a merged config.
+   * @param configs a list of [[Confgs]]s sorted according to their priority
+   * @return        a merged [[Config]].
    */
-  private def mergeWithHdfsFiles(configFilePaths: Seq[Path], config: Config)(implicit fs: FileSystem): Config = {
-    if (configFilePaths.nonEmpty) {
-      config.withFallback(configFilePaths.map { path =>
-        val reader = new InputStreamReader(fs.open(path))
-        try {
-          val parsedConfig = ConfigFactory.parseReader(reader)
-          if (parsedConfig.isEmpty) {
-            logger.warn(s"Config parsed from ${path.toString} is empty!")
-          }
-          parsedConfig
-        } catch {
-          case exception: Throwable =>
-            logger.error(s"Failed to parse config from ${path.toString}", exception)
-            throw exception
-        } finally {
-          reader.close()
-        }
-      }.reduceRight((c1, c2) => c2.withFallback(c1)))
-    } else {
-      config
+  private def mergeConfigs(configs: Seq[Config]): Config = {
+    configs.reduceLeft((c1, c2) => c1.withFallback(c2))
+  }
+
+  /**
+   * Parse a file as Hocon [[Config]]
+   * @param file: Hadoop file location of Hocon configuration file
+   * @return parsed [[Config]] object
+   */
+  private def parseConfig(file: Path)(implicit fs: FileSystem): Config = {
+    val reader = new InputStreamReader(fs.open(file))
+    try {
+      val parsedConfig = ConfigFactory.parseReader(reader)
+      if (parsedConfig.isEmpty) {
+        logger.warn(s"Config parsed from ${file.toString} is empty!")
+      }
+      parsedConfig
+    } catch {
+      case exception: Throwable =>
+        logger.error(s"Failed to parse config from ${file.toString}", exception)
+        throw exception
+    } finally {
+      reader.close()
     }
   }
-  
+
   /**
    * Collect readable files with valid config file extensions from HDFS in BFS order indexed by file extension.
    *

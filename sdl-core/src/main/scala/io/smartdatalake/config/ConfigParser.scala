@@ -47,22 +47,31 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   def parse(config: Config, instanceRegistry: InstanceRegistry = new InstanceRegistry): InstanceRegistry = {
     implicit val registry: InstanceRegistry = instanceRegistry
 
-    val connections: Map[ConnectionId, Connection] = config.get[Map[String, Config]]("connections")
-      .valueOrElse(Map.empty)
+    val connections: Map[ConnectionId, Connection] = getConnectionConfigMap(config)
       .map{ case (id, config) => (ConnectionId(id), parseConfigObject[Connection](id, config))}
     registry.register(connections)
 
-    val dataObjects: Map[DataObjectId, DataObject] = config.get[Map[String, Config]]("dataObjects")
-      .valueOrElse(Map.empty)
+    val dataObjects: Map[DataObjectId, DataObject] = getDataObjectConfigMap(config)
       .map{ case (id, config) => (DataObjectId(id), parseConfigObject[DataObject](id, config))}
     registry.register(dataObjects)
 
-    val actions: Map[ActionObjectId, Action] = config.get[Map[String, Config]]("actions")
-      .valueOrElse(Map.empty)
+    val actions: Map[ActionObjectId, Action] = getActionConfigMap(config)
       .map{ case (id, config) => (ActionObjectId(id), parseConfigObject[Action](id, config))}
     registry.register(actions)
 
     registry
+  }
+
+  def getConnectionConfigMap(config: Config) = {
+    config.get[Map[String, Config]]("connections").valueOrElse(Map.empty)
+  }
+
+  def getDataObjectConfigMap(config: Config) = {
+    config.get[Map[String, Config]]("dataObjects").valueOrElse(Map.empty)
+  }
+
+  def getActionConfigMap(config: Config) = {
+    config.get[Map[String, Config]]("actions").valueOrElse(Map.empty)
   }
 
   /**
