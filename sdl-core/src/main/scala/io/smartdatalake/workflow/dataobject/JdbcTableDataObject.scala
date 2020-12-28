@@ -279,11 +279,7 @@ private[smartdatalake] object JdbcColumn {
 }
 
 object JdbcTableDataObject extends FromConfigFactory[DataObject] {
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): JdbcTableDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[JdbcTableDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): JdbcTableDataObject = {
+    extract[JdbcTableDataObject](config)
   }
 }

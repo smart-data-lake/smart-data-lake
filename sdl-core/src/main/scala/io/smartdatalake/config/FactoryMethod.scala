@@ -79,9 +79,9 @@ private[smartdatalake] object FactoryMethodExtractor extends SmartDataLakeLogger
       symbol.isPublic
         && symbol.returnType =:= symbol.owner.companion.asType.toType // return type is type of provided FQCN.
         && symbol.name.decodedName.toString.equals("fromConfig")
-        && (symbol.paramLists.size == 1 && symbol.paramLists.head.size == 2
+        && (symbol.paramLists.size == 2 && symbol.paramLists.head.size == 1 && symbol.paramLists.last.size == 1
         && symbol.paramLists.head.head.typeSignature =:= typeOf[Config])
-        && symbol.paramLists.head.tail.head.typeSignature =:= typeOf[InstanceRegistry]
+        && symbol.paramLists.last.head.typeSignature =:= typeOf[InstanceRegistry]
       => symbol
     }.toSeq
 

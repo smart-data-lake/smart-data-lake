@@ -133,9 +133,6 @@ case class SplunkDataObject(override val id: DataObjectId,
     }
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[DataObject] = SplunkDataObject
 }
 
@@ -165,7 +162,7 @@ object SplunkDataObject extends FromConfigFactory[DataObject] {
   }
 
   /**
-   * A [[Configs]] reader that reads [[SplunkParams]] values.
+   * A ConfigReader that reads [[SplunkParams]] values.
    *
    * SplunkParams have special semantics for Duration which are covered with this reader.
    */
@@ -173,15 +170,8 @@ object SplunkDataObject extends FromConfigFactory[DataObject] {
     SplunkParams.fromConfig(c)
   }
 
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): SplunkDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[SplunkDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SplunkDataObject = {
+    extract[SplunkDataObject](config)
   }
 }
 

@@ -53,23 +53,12 @@ case class CustomDfDataObject(override val id: DataObjectId,
     df
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[DataObject] = CustomDfDataObject
 }
 
 object CustomDfDataObject extends FromConfigFactory[DataObject] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): CustomDfDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[CustomDfDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CustomDfDataObject = {
+    extract[CustomDfDataObject](config)
   }
 }
 

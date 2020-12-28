@@ -53,20 +53,11 @@ case class TestAction(override val id: ActionObjectId,
   override val outputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
   override val recursiveInputs:Seq[DataObject with CanCreateDataFrame] = Seq()
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[Action] = TestAction
 }
 
 object TestAction extends FromConfigFactory[Action] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): TestAction = {
-    import configs.syntax.ConfigOps
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[TestAction].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): TestAction = {
+    extract[TestAction](config)
   }
 }
