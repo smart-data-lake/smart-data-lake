@@ -147,6 +147,14 @@ object Environment {
       .map(_.toBoolean).getOrElse(false)
   }
 
+  /**
+   * Set to true if you want to enable automatic caching of DataFrames that are used multiple times (default=true).
+   */
+  var enableAutomaticDataFrameCaching: Boolean = {
+    EnvironmentUtil.getSdlParameter("enableAutomaticDataFrameCaching")
+      .map(_.toBoolean).getOrElse(true)
+  }
+
   // static configurations
   val configPathsForLocalSubstitution: Seq[String] = Seq(
       "path", "table.name"

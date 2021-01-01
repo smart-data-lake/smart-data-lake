@@ -44,10 +44,12 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
   private val tempPath = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-  val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
+  implicit var contextInit: ActionPipelineContext = _
+  var contextExec: ActionPipelineContext = _
 
   before {
+    contextInit = TestUtil.getDefaultActionPipelineContext
+    contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between contextInit & contextExec like this!
     instanceRegistry.clear()
   }
 
@@ -80,7 +82,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // exec dag
     dag.prepare
     dag.init
+    assert(contextInit.dataFrameReuseStatistics((tgt1DO.id,Seq())).size == 1)
     dag.exec(session,contextExec)
+    assert(contextExec.dataFrameReuseStatistics.forall(_._2.isEmpty))
 
     // check result
     val r1 = session.table(s"${tgt2Table.fullName}")
@@ -135,7 +139,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // exec dag
     dag.prepare
     dag.init
+    assert(!contextInit.dataFrameReuseStatistics.contains((tgt1DO.id, Seq()))) // no reuse because of breakDataframeLineage
     dag.exec(session,contextExec)
+    assert(!contextExec.dataFrameReuseStatistics.contains((tgt1DO.id, Seq())))
 
     // check result
     val r1 = session.table(s"${tgt2Table.fullName}")
@@ -177,7 +183,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // exec dag
     dag.prepare
     dag.init
+    assert(!contextInit.dataFrameReuseStatistics.contains((tgt1DO.id, Seq()))) // no reuse because of different schema
     dag.exec(session,contextExec)
+    assert(!contextInit.dataFrameReuseStatistics.contains((tgt1DO.id, Seq())))
 
     // check result
     val dfR1 = tgt2DO.getDataFrame()
@@ -338,7 +346,11 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // exec dag
     dag.prepare
     dag.init
+    assert(contextInit.dataFrameReuseStatistics((tgtADO.id, Seq())).size == 2)
+    assert(contextInit.dataFrameReuseStatistics((tgtBDO.id, Seq())).size == 1)
+    assert(contextInit.dataFrameReuseStatistics((tgtCDO.id, Seq())).size == 1)
     dag.exec(session,contextExec)
+    assert(contextExec.dataFrameReuseStatistics.forall(_._2.isEmpty))
 
     val r1 = session.table(s"${tgtBTable.fullName}")
       .select($"rating")

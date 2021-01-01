@@ -79,3 +79,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
   * Spark data pipeline simulation (acceptance tests)
 * Support for Deployment
   * Dry-run
+
+##### Spark Performance
+* Execute multiple Spark jobs in parallel within the same Spark Session to save resources
+* Automatically cache and release intermediate results (DataFrames)

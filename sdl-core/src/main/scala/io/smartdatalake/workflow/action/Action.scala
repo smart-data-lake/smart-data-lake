@@ -137,7 +137,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
 
   /**
    * Executes operations needed after executing an action.
-   * In this step any phase on Input- or Output-DataObjects needed after the main task is executed,
+   * In this step any task on Input- or Output-DataObjects needed after the main task is executed,
    * e.g. JdbcTableDataObjects postWriteSql or CopyActions deleteInputData.
    */
   def postExec(inputSubFeed: Seq[SubFeed], outputSubFeed: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {

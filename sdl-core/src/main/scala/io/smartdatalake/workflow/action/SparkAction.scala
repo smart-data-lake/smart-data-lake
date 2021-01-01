@@ -29,7 +29,7 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.ActionHelper.{filterBlacklist, filterWhitelist}
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataobject._
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.types.StructType
@@ -45,8 +45,11 @@ private[smartdatalake] abstract class SparkAction extends Action {
   def breakDataFrameLineage: Boolean
 
   /**
-   * Force persisting DataFrame on Disk.
-   * This helps to reduce memory needed for caching the DataFrame content and can serve as a recovery point in case an task get's lost.
+   * Force persisting input DataFrame's on Disk.
+   * This improves performance if dataFrame is used multiple times in the transformation and can serve as a recovery point
+   * in case a task get's lost.
+   * Note that DataFrames are persisted automatically by the previous Action if later Actions need the same data. To avoid this
+   * behaviour set breakDataFrameLineage=false.
    */
   def persist: Boolean
 
@@ -84,6 +87,10 @@ private[smartdatalake] abstract class SparkAction extends Action {
           subFeed.copy(dataFrame = emptyStreamingDataFrame, partitionValues = Seq()) // remove partition values for streaming mode
         } else subFeed
       case _ =>
+        // count reuse of subFeed.dataFrame for caching/release in exec phase
+        if (phase == ExecutionPhase.Init && subFeed.hasReusableDataFrame && Environment.enableAutomaticDataFrameCaching)
+          context.rememberDataFrameReuse(subFeed.dataObjectId, subFeed.partitionValues, id)
+        // process subfeed
         if (phase==ExecutionPhase.Exec && (subFeed.dataFrame.isEmpty || subFeed.isDummy || subFeed.isStreaming.contains(true))) {
           // validate partition values existing for input
           input match {
@@ -123,7 +130,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
    * writes subfeed to output respecting given execution mode
    * @return true if no data was transfered, otherwise false
    */
-  def writeSubFeed(subFeed: SparkSubFeed, output: DataObject with CanWriteDataFrame, isRecursiveInput: Boolean = false)(implicit session: SparkSession): Boolean = {
+  def writeSubFeed(subFeed: SparkSubFeed, output: DataObject with CanWriteDataFrame, isRecursiveInput: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Boolean = {
     executionMode match {
       case Some(m: SparkStreamingOnceMode) =>
         // Write in streaming mode - use spark streaming with Trigger.Once and awaitTermination
@@ -135,9 +142,15 @@ private[smartdatalake] abstract class SparkAction extends Action {
         // return
         noData
       case None | Some(_: PartitionDiffMode) | Some(_: SparkIncrementalMode) | Some(_: FailIfNoPartitionValuesMode) | Some(_: CustomPartitionMode) =>
+        // Auto persist if dataFrame is reused later
+        val preparedSubFeed = if (context.dataFrameReuseStatistics.contains((output.id, subFeed.partitionValues))) {
+          val partitionValuesStr = if (subFeed.partitionValues.nonEmpty) s" and partitionValues ${subFeed.partitionValues.mkString(", ")}" else ""
+          logger.info(s"($id) Caching dataframe for ${output.id}$partitionValuesStr")
+          subFeed.persist
+        } else subFeed
         // Write in batch mode
-        assert(!subFeed.dataFrame.get.isStreaming, s"($id) Input from ${subFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingOnceMode.getClass.getSimpleName}")
-        output.writeDataFrame(subFeed.dataFrame.get, subFeed.partitionValues, isRecursiveInput)
+        assert(!preparedSubFeed.dataFrame.get.isStreaming, s"($id) Input from ${preparedSubFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingOnceMode.getClass.getSimpleName}")
+        output.writeDataFrame(preparedSubFeed.dataFrame.get, preparedSubFeed.partitionValues, isRecursiveInput)
         // return noData
         false
       case x => throw new IllegalStateException( s"($id) ExecutionMode $x is not supported")
@@ -289,6 +302,19 @@ private[smartdatalake] abstract class SparkAction extends Action {
     preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true)) preparedSubFeed.breakLineage else preparedSubFeed
     // return
     preparedSubFeed
+  }
+
+  override def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.postExec(inputSubFeeds, outputSubFeeds)
+    // auto-unpersist DataFrames no longer needed
+    inputSubFeeds
+      .collect { case subFeed: SparkSubFeed => subFeed }
+      .foreach { subFeed =>
+        if (context.forgetDataFrameReuse(subFeed.dataObjectId, subFeed.partitionValues, id).contains(0)) {
+          logger.info(s"($id) Removing cached DataFrame for ${subFeed.dataObjectId} and partitionValues ${subFeed.partitionValues.mkString(", ")}")
+          subFeed.dataFrame.foreach(_.unpersist)
+        }
+    }
   }
 
 }
