@@ -104,6 +104,7 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
     this.copy(dataFrame = this.dataFrame.map(_.persist))
   }
   def isStreaming: Option[Boolean] = dataFrame.map(_.isStreaming)
+  def hasReusableDataFrame: Boolean = dataFrame.isDefined && !isDummy && !isStreaming.getOrElse(false)
   def getFilterCol: Option[Column] = {
     filter.map(functions.expr)
   }
