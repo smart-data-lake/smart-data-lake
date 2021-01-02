@@ -97,6 +97,15 @@ object Environment {
   }
 
   /**
+   * Set to true to enable check for duplicate first class object definitions when loading configuration (default=true).
+   * The check fails if Connections, DataObjects or Actions are defined in multiple locations.
+   */
+  var enableCheckConfigDuplicates: Boolean = {
+    EnvironmentUtil.getSdlParameter("enableCheckConfigDuplicates")
+      .map(_.toBoolean).getOrElse(true)
+  }
+
+  /**
    * ordering of columns in SchemaEvolution result
    * - true: result schema is ordered according to existing schema, new columns are appended
    * - false: result schema is ordered according to new schema, deleted columns are appended
