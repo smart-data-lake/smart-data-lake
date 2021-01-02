@@ -22,6 +22,7 @@ import java.io.InputStreamReader
 
 import com.typesafe.config.{Config, ConfigFactory}
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, ConnectionId, DataObjectId}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.{EnvironmentUtil, SmartDataLakeLogger}
 import org.apache.hadoop.fs.permission.FsAction
@@ -100,16 +101,18 @@ object ConfigLoader extends SmartDataLakeLogger {
     }
 
     // check for duplicate first class object definitions (connections, data objects, actions)
-    val objectIdLocationMap =
-      sortedFileConfigs.flatMap{ case (file, config) => ConfigParser.getActionConfigMap(config).keys.map(objName => (ActionObjectId(objName), file))} ++
-      sortedFileConfigs.flatMap{ case (file, config) => ConfigParser.getDataObjectConfigMap(config).keys.map(objName => (DataObjectId(objName), file))} ++
-      sortedFileConfigs.flatMap{ case (file, config) => ConfigParser.getConnectionConfigMap(config).keys.map(objName => (ConnectionId(objName), file))}
-    val duplicates = objectIdLocationMap.groupBy(_._1)
-      .filter(_._2.size > 1)
-      .mapValues(_.map(_._2))
-    if (duplicates.nonEmpty) {
-      val duplicatesStr = duplicates.map{ case (id,files) => s"$id=${files.mkString(";")}" }.mkString(" ")
-      throw ConfigurationException(s"Configuration parsing failed because of configuration objects defined in multiple locations: $duplicatesStr")
+    if (Environment.enableCheckConfigDuplicates) {
+      val objectIdLocationMap =
+        sortedFileConfigs.flatMap { case (file, config) => ConfigParser.getActionConfigMap(config).keys.map(objName => (ActionObjectId(objName), file)) } ++
+          sortedFileConfigs.flatMap { case (file, config) => ConfigParser.getDataObjectConfigMap(config).keys.map(objName => (DataObjectId(objName), file)) } ++
+          sortedFileConfigs.flatMap { case (file, config) => ConfigParser.getConnectionConfigMap(config).keys.map(objName => (ConnectionId(objName), file)) }
+      val duplicates = objectIdLocationMap.groupBy(_._1)
+        .filter(_._2.size > 1)
+        .mapValues(_.map(_._2))
+      if (duplicates.nonEmpty) {
+        val duplicatesStr = duplicates.map { case (id, files) => s"$id=${files.mkString(";")}" }.mkString(" ")
+        throw ConfigurationException(s"Configuration parsing failed because of configuration objects defined in multiple locations: $duplicatesStr")
+      }
     }
 
     //system properties take precedence
