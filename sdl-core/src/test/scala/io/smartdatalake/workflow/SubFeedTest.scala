@@ -22,6 +22,7 @@ import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.definitions.Environment.instanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.dataobject.FileRef
 import org.scalatest.FunSuite
 
 class SubFeedTest extends FunSuite {
@@ -41,5 +42,46 @@ class SubFeedTest extends FunSuite {
     val fileSubFeed = FileSubFeed.fromSubFeed(sparkSubFeed)
     assert( fileSubFeed.dataObjectId == sparkSubFeed.dataObjectId)
     assert( fileSubFeed.partitionValues == sparkSubFeed.partitionValues)
+  }
+
+  test("SparkSubFeed union without DataFrames, without partitionValues") {
+    val sf1 = SparkSubFeed(None, "test1", Seq())
+    val sf2 = SparkSubFeed(None, "test1", Seq())
+    val sfUnion = sf1.union(sf2).asInstanceOf[SparkSubFeed]
+    assert(sfUnion.partitionValues.isEmpty)
+    assert(sfUnion.dataFrame.isEmpty)
+  }
+
+  test("SparkSubFeed union with one DataFrame, with one partitionValues") {
+    import session.implicits._
+    val df = Seq(1,2,3).toDF("test")
+    val sf1 = SparkSubFeed(None, "test1", Seq())
+    val sf2 = SparkSubFeed(Some(df), "test1", Seq(PartitionValues(Map("dt"->"20200101"))))
+    val sfUnion = sf1.union(sf2).asInstanceOf[SparkSubFeed]
+    assert(sfUnion.partitionValues.isEmpty)
+    assert(sfUnion.dataFrame.get.schema == df.schema)
+    assert(sfUnion.dataFrame.get.isEmpty)
+  }
+
+  test("SparkSubFeed union with DataFrames, with partitionValues") {
+    import session.implicits._
+    val df1 = Seq(1,2,3).toDF("test")
+    val sf1 = SparkSubFeed(Some(df1), "test1", Seq(PartitionValues(Map("dt"->"20190101"))))
+    val df2 = Seq(4,5,6).toDF("test")
+    val sf2 = SparkSubFeed(Some(df2), "test1", Seq(PartitionValues(Map("dt"->"20200101"))))
+    val sfUnion = sf1.union(sf2).asInstanceOf[SparkSubFeed]
+    assert(sfUnion.partitionValues.toSet == Set(PartitionValues(Map("dt"->"20190101")), PartitionValues(Map("dt"->"20200101"))))
+    assert(sfUnion.dataFrame.get.as[Int].collect.toSeq.sorted == Seq(1,2,3,4,5,6))
+  }
+
+  test("FileSubFeed union with FileRefs, with partitionValues") {
+    import session.implicits._
+    val fr1 = Seq("f1","f2","f3").map(f => FileRef(f, f, PartitionValues(Map("dt"->"20190101"))))
+    val sf1 = FileSubFeed(Some(fr1), "test1", Seq(PartitionValues(Map("dt"->"20190101"))))
+    val fr2 = Seq("f4","f5","f6").map(f => FileRef(f, f, PartitionValues(Map("dt"->"20200101"))))
+    val sf2 = FileSubFeed(Some(fr2), "test1", Seq(PartitionValues(Map("dt"->"20200101"))))
+    val sfUnion = sf1.union(sf2).asInstanceOf[FileSubFeed]
+    assert(sfUnion.partitionValues.toSet == Set(PartitionValues(Map("dt"->"20190101")), PartitionValues(Map("dt"->"20200101"))))
+    assert(sfUnion.fileRefs.get.sortBy(_.fileName) == fr1 ++ fr2)
   }
 }
