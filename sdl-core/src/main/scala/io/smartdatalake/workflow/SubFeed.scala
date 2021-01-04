@@ -53,7 +53,14 @@ trait SubFeed extends DAGResult {
 
   def toOutput(dataObjectId: DataObjectId): SubFeed
 
+  def union(other: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SubFeed
+
   override def resultId: String = dataObjectId.id
+
+  def unionPartitionValues(otherPartitionValues: Seq[PartitionValues]): Seq[PartitionValues] = {
+    if (this.partitionValues.nonEmpty && otherPartitionValues.nonEmpty) (this.partitionValues ++ otherPartitionValues).distinct
+    else Seq()
+  }
 }
 
 /**
@@ -95,6 +102,18 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
   }
   override def toOutput(dataObjectId: DataObjectId): SparkSubFeed = {
     this.copy(dataFrame = None, filter=None, isDAGStart = false, isDummy = false, dataObjectId = dataObjectId)
+  }
+  override def union(other: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SubFeed = other match {
+    case sparkSubFeed: SparkSubFeed if this.hasReusableDataFrame && sparkSubFeed.hasReusableDataFrame =>
+      this.copy(dataFrame = Some(this.dataFrame.get.unionByName(sparkSubFeed.dataFrame.get))
+        , partitionValues = unionPartitionValues(sparkSubFeed.partitionValues)
+        , isDAGStart = this.isDAGStart || sparkSubFeed.isDAGStart)
+    case sparkSubFeed: SparkSubFeed if this.dataFrame.isDefined || sparkSubFeed.dataFrame.isDefined =>
+      this.copy(dataFrame = this.dataFrame.orElse(sparkSubFeed.dataFrame)
+        , partitionValues = unionPartitionValues(sparkSubFeed.partitionValues)
+        , isDAGStart = this.isDAGStart || sparkSubFeed.isDAGStart)
+      .convertToDummy(this.dataFrame.orElse(sparkSubFeed.dataFrame).get.schema)
+    case x => this.copy(dataFrame = None, partitionValues = unionPartitionValues(x.partitionValues), isDAGStart = this.isDAGStart || x.isDAGStart)
   }
   def clearFilter(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // if filter is removed, also the DataFrame must be removed so that the next action get's a fresh unfiltered DataFrame
@@ -161,6 +180,16 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
   override def toOutput(dataObjectId: DataObjectId): FileSubFeed = {
     this.copy(fileRefs = None, processedInputFileRefs = None, isDAGStart = false, dataObjectId = dataObjectId)
   }
+  override def union(other: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SubFeed = other match {
+    case fileSubFeed: FileSubFeed if this.fileRefs.isDefined && fileSubFeed.fileRefs.isDefined =>
+      this.copy(fileRefs = this.fileRefs.map(_ ++ fileSubFeed.fileRefs.get)
+        , partitionValues = unionPartitionValues(fileSubFeed.partitionValues)
+        , isDAGStart = this.isDAGStart || fileSubFeed.isDAGStart)
+    case fileSubFeed: FileSubFeed =>
+      this.copy(fileRefs = None, partitionValues = unionPartitionValues(fileSubFeed.partitionValues)
+        , isDAGStart = this.isDAGStart || fileSubFeed.isDAGStart)
+    case x => this.copy(fileRefs = None, partitionValues = unionPartitionValues(x.partitionValues), isDAGStart = this.isDAGStart || x.isDAGStart)
+  }
 }
 object FileSubFeed {
   def fromSubFeed( subFeed: SubFeed ): FileSubFeed = {
@@ -191,4 +220,7 @@ case class InitSubFeed(override val dataObjectId: DataObjectId, override val par
   }
   override def clearDAGStart(): InitSubFeed = throw new NotImplementedException() // calling clearDAGStart makes no sense on InitSubFeed
   override def toOutput(dataObjectId: DataObjectId): FileSubFeed = throw new NotImplementedException()
+  override def union(other: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SubFeed = other match {
+    case x => this.copy(partitionValues = unionPartitionValues(x.partitionValues))
+  }
 }

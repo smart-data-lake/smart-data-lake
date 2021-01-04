@@ -373,6 +373,49 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
   }
 
 
+  test("action dag with two actions writing the same DataObject") {
+    // Action A and B write DataObject tgtA
+    // Action C reads DataObject tgtA
+
+    // setup DataObjects
+    val feed = "actionpipeline"
+    val srcTable = Table(Some("default"), "ap_input")
+    val srcDO = HiveTableDataObject( "src", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
+    instanceRegistry.register(srcDO)
+
+    val tgtATable = Table(Some("default"), "tgt_a", None, Some(Seq("lastname","firstname")))
+    val tgtADO = TickTockHiveTableDataObject("tgt_A", Some(tempPath+s"/${tgtATable.fullName}"), table = tgtATable, numInitialHdfsPartitions = 1)
+    tgtADO.dropTable
+    instanceRegistry.register(tgtADO)
+
+    val tgtCTable = Table(Some("default"), "tgt_c", None, Some(Seq("lastname","firstname")))
+    val tgtCDO = HiveTableDataObject( "tgt_C", Some(tempPath+s"/${tgtCTable.fullName}"), table = tgtCTable, numInitialHdfsPartitions = 1)
+    tgtCDO.dropTable
+    instanceRegistry.register(tgtCDO)
+
+    // prepare DAG
+    val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
+    srcDO.writeDataFrame(l1, Seq())
+    val actions = Seq(
+      CopyAction("A", srcDO.id, tgtADO.id),
+      CopyAction("B", srcDO.id, tgtADO.id),
+      CopyAction("C", tgtADO.id, tgtCDO.id),
+    )
+    val dag = ActionDAGRun(actions, 1, 1)
+
+    // exec dag
+    dag.prepare
+    dag.init
+    dag.exec(session,contextExec)
+
+    val r1 = tgtCDO.getDataFrame()
+      .select($"rating")
+      .as[Int].collect.toSeq
+    assert(r1 == Seq(5,5))
+  }
+
+
   test("action dag with 2 actions and positive top-level partition values filter, ignoring executionMode=PartitionDiffMode") {
 
     // setup DataObjects
