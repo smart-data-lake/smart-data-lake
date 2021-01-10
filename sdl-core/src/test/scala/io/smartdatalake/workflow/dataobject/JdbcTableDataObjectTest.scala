@@ -25,7 +25,7 @@ import io.smartdatalake.workflow.connection.{DefaultSQLCatalog, JdbcTableConnect
 
 class JdbcTableDataObjectTest extends DataObjectTestSuite {
 
-  import testSession.implicits._
+  import session.implicits._
 
   private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:file:target/JdbcTableDataObjectTest/hsqldb", "org.hsqldb.jdbcDriver")
 
@@ -69,7 +69,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id)
     val srcSubFeed = SparkSubFeed(None, srcDO.id, Seq())
     action1.preExec(Seq(srcSubFeed))
-    val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(session,contextExec).head
     action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed))
 
     val dfSrcExpected = Seq(("ext", "doe", "john", 5)

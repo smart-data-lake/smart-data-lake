@@ -44,6 +44,15 @@ trait CustomDfTransformer extends Serializable {
    */
   def transform(session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String) : DataFrame
 
+  /**
+   * Optional function to define the transformation of input to output partition values.
+   * For example this enables to implement aggregations where multiple input partitions are combined into one output partition.
+   * Note that the default value is input = output partition values, which should be correct for most use cases.
+   *
+   * @param partitionValues partition values to be transformed
+   * @param options Options specified in the configuration for this transformation
+   */
+  def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Map[PartitionValues,PartitionValues] = PartitionValues.oneToOneMapping(partitionValues)
 }
 
 /**
@@ -120,12 +129,23 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
 
   def transform(actionId: ActionObjectId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit session: SparkSession, context: ActionPipelineContext) : DataFrame = {
     // replace runtime options
-    lazy val data = DefaultExpressionData.from(context, partitionValues)
-    val runtimeOptionsReplaced = runtimeOptions.mapValues {
-      expr => SparkExpressionUtil.evaluateString(actionId, Some("transformation.runtimeOptions"), expr, data)
-    }.filter(_._2.isDefined).mapValues(_.get)
+    val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
     // transform
     impl.get.transform(session, options ++ runtimeOptionsReplaced, df, dataObjectId.id)
+  }
+
+  def transformPartitionValues(actionId: ActionObjectId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+    // replace runtime options
+    val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
+    // transform
+    impl.get.transformPartitionValues(options ++ runtimeOptionsReplaced, partitionValues)
+  }
+
+  private def prepareRuntimeOptions(actionId: ActionObjectId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[String,String] = {
+    lazy val data = DefaultExpressionData.from(context, partitionValues)
+    runtimeOptions.mapValues {
+      expr => SparkExpressionUtil.evaluateString(actionId, Some("transformation.runtimeOptions"), expr, data)
+    }.filter(_._2.isDefined).mapValues(_.get)
   }
 
   private def createSqlFnTransform(sql: String): fnTransformType = {

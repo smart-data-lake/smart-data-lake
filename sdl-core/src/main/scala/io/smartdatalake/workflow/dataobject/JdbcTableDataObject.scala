@@ -28,6 +28,8 @@ import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.JdbcTableConnection
+import org.apache.spark.annotation.DeveloperApi
+import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
@@ -45,6 +47,7 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
  * @param postWriteSql SQL-statement to be executed in exec phase after writing output table, using output jdbc connection
  *                   Use tokens with syntax %{<spark sql expression>} to substitute with values from [[DefaultExpressionData]].
  * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
+ * @param saveMode spark [[SaveMode]] to use when writing table, default is "overwrite". Only "append" and "overwrite" supported.
  * @param table The jdbc table to be read
  * @param jdbcFetchSize Number of rows to be fetched together by the Jdbc driver
  * @param connectionId Id of JdbcConnection configuration
@@ -66,6 +69,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                override val schemaMin: Option[StructType] = None,
                                override var table: Table,
                                jdbcFetchSize: Int = 1000,
+                               saveMode: SaveMode = SaveMode.Overwrite,
                                connectionId: ConnectionId,
                                jdbcOptions: Map[String, String] = Map(),
                                virtualPartitions: Seq[String] = Seq(),
@@ -77,7 +81,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   /**
    * Connection defines driver, url and db in central location
    */
-  private val connection = getConnection[JdbcTableConnection](connectionId)
+  @DeveloperApi
+  val connection: JdbcTableConnection = getConnection[JdbcTableConnection](connectionId)
 
   // Define partition columns
   // Virtual partition column name might be quoted to force case sensitivity in database queries
@@ -86,6 +91,11 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   // prepare final table
   table = table.overrideDb(connection.db)
   if(table.db.isEmpty) throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
+
+  assert(saveMode==SaveMode.Append || saveMode==SaveMode.Overwrite, s"($id) Only saveMode append and overwrite supported.")
+
+  // jdbc column metadata
+  lazy val columns = getJdbcColumnMetadata
 
   override def prepare(implicit session: SparkSession): Unit = {
 
@@ -107,7 +117,6 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
     // test partition columns exist
     if (virtualPartitions.nonEmpty) {
-      val columns = getJdbcColumnMetadata
       val missingPartitionColumns = virtualPartitions.map(prepareCaseSensitiveName)
         .filterNot( partition => columns.exists(c => partition.nameEquals(c)))
         .map(_.name)
@@ -133,9 +142,28 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession): Unit = {
     require(table.query.isEmpty, s"($id) Cannot write to jdbc DataObject defined by a query.")
     validateSchemaMin(df)
+
+    // validate columns exists
+    val dfWrite = if (isTableExisting) {
+      val dfColumns = df.columns.map(c => JdbcColumn(c, isNameCaseSensitiv = false))
+      val colsMissingInTable = dfColumns.filter(c => !columns.exists(c.nameEquals))
+      assert(colsMissingInTable.isEmpty, s"Columns ${colsMissingInTable.mkString(", ")} missing in $id")
+      val colsMissingInDataFrame = columns.filter(c => !dfColumns.exists(c.nameEquals))
+      assert(colsMissingInTable.isEmpty, s"Columns ${colsMissingInDataFrame.mkString(", ")} exist in $id but not in DataFrame")
+
+      // cleanup existing data if saveMode=overwrite
+      if (saveMode == SaveMode.Overwrite) {
+        if (partitionValues.nonEmpty) deletePartitions(partitionValues)
+        else deleteAllData
+      }
+
+      // order DataFrame columns according to table metadata
+      df.select(columns.map(c => col(c.name)): _*)
+    } else df
+
     // write table
     // No need to define any partitions as parallelization will be defined according to the data frame's partitions
-    df.write.mode(SaveMode.Append).format("jdbc")
+    dfWrite.write.mode(SaveMode.Append).format("jdbc")
       .options(jdbcOptions)
       .options(Map(
         "url" -> connection.url,
@@ -174,6 +202,10 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   override def isDbExisting(implicit session: SparkSession): Boolean = connection.catalog.isDbExisting(table.db.get)
   override def isTableExisting(implicit session: SparkSession): Boolean = connection.catalog.isTableExisting(table.db.get, table.name)
 
+  def deleteAllData(implicit session: SparkSession): Unit = {
+    connection.execJdbcStatement(s"delete from ${table.fullName}")
+  }
+
   override def dropTable(implicit session: SparkSession): Unit = {
     connection.execJdbcStatement(s"drop table if exists ${table.fullName}")
   }
@@ -186,7 +218,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   override def listPartitions(implicit session: SparkSession): Seq[PartitionValues] = {
     if (partitions.nonEmpty) {
       val tableClause = table.query.map( q => s"($q)").getOrElse(table.fullName)
-      val partitionListQuery = s"select distinct ${virtualPartitions.mkString(", ")} from $tableClause;"
+      val partitionListQuery = s"select distinct ${virtualPartitions.mkString(", ")} from $tableClause"
       val partitionsWithIdx = partitions.zipWithIndex
       def evalPartitions(rs: ResultSet): Seq[PartitionValues] = {
         Iterator.continually(rs.next).takeWhile(identity).map {
@@ -195,6 +227,24 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       }
       connection.execJdbcQuery(partitionListQuery, evalPartitions)
     } else Seq()
+  }
+
+  /**
+   * Delete virtual partitions by "delete from" statement
+   */
+  override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+    if (partitionValues.nonEmpty) {
+      val partitionsColss = partitionValues.map(_.keys).distinct
+      assert(partitionsColss.size == 1, "All partition values must have the same set of partition columns defined!")
+      val partitionCols = partitionsColss.head
+      val deletePartitionQuery = if (partitionCols.size == 1) {
+        s"delete from ${table.fullName} where ${partitionCols.head} in (${partitionValues.map(pv => pv(partitionCols.head)).mkString(",")})"
+      } else {
+        val partitionValuesStr = partitionValues.map(pv => s"(${partitionCols.map(pv(_).toString).mkString(",")})")
+        s"delete from ${table.fullName} where (${partitionCols.mkString(",")}) in (${partitionValuesStr.mkString(",")})"
+      }
+      connection.execJdbcStatement(deletePartitionQuery)
+    }
   }
 
   private def prepareCaseSensitiveName(name: String): JdbcColumn= {
@@ -229,11 +279,7 @@ private[smartdatalake] object JdbcColumn {
 }
 
 object JdbcTableDataObject extends FromConfigFactory[DataObject] {
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): JdbcTableDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[JdbcTableDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): JdbcTableDataObject = {
+    extract[JdbcTableDataObject](config)
   }
 }

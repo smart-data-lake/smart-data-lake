@@ -22,14 +22,14 @@ import java.nio.file.Files
 import java.time.LocalDateTime
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
-import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.config.{InstanceRegistry, TestCustomDfCreator, TestCustomDfManyTypes}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.dataobject.{CustomDfDataObject, HiveTableDataObject, Table}
-import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types._
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -43,6 +43,7 @@ class CustomDfToHiveTableTest extends FunSuite with BeforeAndAfter {
   private val tempPath = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+  implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
   before { instanceRegistry.clear() }
 
@@ -50,7 +51,7 @@ class CustomDfToHiveTableTest extends FunSuite with BeforeAndAfter {
 
     // setup DataObjects
     val feed = "customDf2Hive"
-    val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some("io.smartdatalake.config.TestCustomDfCreator")))
+    val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
     val targetTable = Table(db = Some("default"), name = "custom_df_copy", query = None, primaryKey = Some(Seq("line")))
     val targetDO = HiveTableDataObject(id="target", Some(tempPath+s"/${targetTable.fullName}"), table = targetTable, numInitialHdfsPartitions = 1)
     targetDO.dropTable
@@ -58,8 +59,6 @@ class CustomDfToHiveTableTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(targetDO)
 
     // prepare & start load
-    val startTime = LocalDateTime.now()
-    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(startTime), SmartDataLakeBuilderConfig())
     val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id)
     val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
     testAction.exec(Seq(srcSubFeed))
@@ -76,7 +75,7 @@ class CustomDfToHiveTableTest extends FunSuite with BeforeAndAfter {
 
     // setup DataObjects
     val feed = "customDf2Hive_dfManyTypes"
-    val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some("io.smartdatalake.config.TestCustomDfManyTypes")))
+    val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfManyTypes].getName)))
     val targetTable = Table(db = Some("default"), name = "custom_dfManyTypes_copy")
     val targetDO = HiveTableDataObject(id="target", Some(tempPath+s"/${targetTable.fullName}"), table = targetTable, numInitialHdfsPartitions = 1)
     targetDO.dropTable
@@ -84,8 +83,6 @@ class CustomDfToHiveTableTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(targetDO)
 
     // prepare & start load
-    val startTime = LocalDateTime.now()
-    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(startTime), SmartDataLakeBuilderConfig())
     val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id, standardizeDatatypes = true)
     val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
     testAction.exec(Seq(srcSubFeed))

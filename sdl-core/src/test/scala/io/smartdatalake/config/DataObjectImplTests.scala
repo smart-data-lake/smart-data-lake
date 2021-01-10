@@ -29,9 +29,17 @@ import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.scalatest.{FlatSpec, Matchers}
 
+import scala.reflect.runtime.universe.{MethodSymbol, typeOf}
+
 class DataObjectImplTests extends FlatSpec with Matchers {
 
   "AvroFileDataObject" should "be parsable" in {
+
+    val t = typeOf[AvroFileDataObject].members.collect {
+      case (m: MethodSymbol @unchecked) if m.isCaseAccessor => m
+    }
+    val names = t.map(_.name.decodedName)
+
     val config = ConfigFactory.parseString(
       """
         |dataObjects = {
@@ -39,7 +47,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
         |   type = AvroFileDataObject
         |   path = /path/to/foo
         |   partitions = []
-        |   save-mode = Append
+        |   saveMode = Append
         |   acl = {
         |     permission="rwxr-x---"
         |     acls = [
@@ -318,10 +326,10 @@ class DataObjectImplTests extends FlatSpec with Matchers {
          |  type = WebserviceFileDataObject
          |  webservice-options {
          |    url = "http://test"
-         |    client-id-variable = "CLEAR#foo"
-         |    client-secret-variable = "CLEAR#secret"
+         |    clientIdVariable = "CLEAR#foo"
+         |    clientSecretVariable = "CLEAR#secret"
          |  }
-         |  }
+         | }
          |}
          |""".stripMargin).resolve
 

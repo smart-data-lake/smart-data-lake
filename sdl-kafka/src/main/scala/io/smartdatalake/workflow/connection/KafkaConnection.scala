@@ -101,8 +101,7 @@ case class KafkaConnection(override val id: ConnectionId,
 }
 
 object KafkaConnection extends FromConfigFactory[Connection] {
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): KafkaConnection = {
-    import configs.syntax.ConfigOps
-    config.extract[KafkaConnection].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): KafkaConnection = {
+    extract[KafkaConnection](config)
   }
 }

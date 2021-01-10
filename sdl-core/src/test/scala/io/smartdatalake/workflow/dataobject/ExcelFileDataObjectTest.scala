@@ -71,7 +71,7 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
 
   test("reading an XSSF excel sheet with a date should yield a field of type date") {
     // prepare
-    val actionInputExcel = ExcelFileDataObject.fromConfig(xslxSampleConfig, instanceRegistry)
+    val actionInputExcel = ExcelFileDataObject.fromConfig(xslxSampleConfig)
 
     // run
     val df = actionInputExcel.getDataFrame()
@@ -105,7 +105,7 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
          |}
          """.stripMargin)
 
-    val actionInputExcel = ExcelFileDataObject.fromConfig(testConfig, instanceRegistry)
+    val actionInputExcel = ExcelFileDataObject.fromConfig(testConfig)
 
     // run
     val df = actionInputExcel.getDataFrame()

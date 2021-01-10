@@ -22,7 +22,7 @@
 	<parent>
 		<groupId>io.smartdatalake</groupId>
 		<artifactId>sdl-parent</artifactId>
-		<version>1.2.1</version>
+		<version>1.2.2-SNAPSHOT</version>
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
@@ -58,35 +58,27 @@
 		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-core_${scala.minor.version}</artifactId>
-			<version>${spark.version}</version>
-			<scope>${spark.deps.scope}</scope>
 		</dependency>
 
 		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-sql_${scala.minor.version}</artifactId>
-			<version>${spark.version}</version>
-			<scope>${spark.deps.scope}</scope>
 		</dependency>
 
 		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-hive_${scala.minor.version}</artifactId>
-			<version>${spark.version}</version>
-			<scope>${spark.deps.scope}</scope>
 		</dependency>
 
 		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-catalyst_${scala.minor.version}</artifactId>
-			<version>${spark.version}</version>
-			<scope>${spark.deps.scope}</scope>
 		</dependency>
 
 		<dependency>
 			<groupId>io.smartdatalake</groupId>
 			<artifactId>spark-extensions_${scala.minor.version}</artifactId>
-			<version>1.2.3</version>
+			<version>${spark-extensions.version}</version>
 		</dependency>
 
 		<dependency>

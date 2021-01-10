@@ -27,7 +27,7 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.EnvironmentUtil
-import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, CustomDfTransformerConfig}
+import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, CustomDfTransformerConfig, SparkUDFCreator}
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction, DeduplicateAction, RuntimeEventState}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore, SparkSubFeed, TaskFailedException}
@@ -37,6 +37,7 @@ import org.apache.spark.sql.types.StringType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import org.apache.spark.sql.expressions.UserDefinedFunction
 
 /**
  * This tests use configuration test/resources/application.conf
@@ -183,13 +184,14 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // start first dag run
     // use only first partition col (dt) for partition diff mode
-    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName))))
+    val action1 = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
+                            , transformer = Some(CustomDfTransformerConfig(sqlCode = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from src1"))))
     instanceRegistry.register(action1.copy())
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
     sdlb.run(sdlConfig)
 
     // check results
-    assert(tgt1DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(5))
+    assert(tgt1DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6)) // +1 because of udfAddX
 
     // check latest state
     {
@@ -219,7 +221,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     sdlb.run(sdlConfig)
 
     // check results
-    assert(tgt1DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(5,10))
+    assert(tgt1DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6,11)) // +1 because of udfAddX
 
     // check latest state
     {
@@ -271,7 +273,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // start first dag run
     val action1 = DeduplicateAction("a", srcDO.id, tgt1DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action1)
-    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
+    val action2 = CopyAction( "b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action2)
     val configStart = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName))
     val (finalSubFeeds, stats) = sdlb.startSimulation(configStart, Seq(SparkSubFeed(Some(dfSrc1), srcDO.id, Seq())))
@@ -301,4 +303,10 @@ class TestStateListener(options: Map[String,String]) extends StateListener {
     finalState = Some(state)
   }
 
+}
+
+class TestUDFAddXCreator() extends SparkUDFCreator {
+  override def get(options: Map[String, String]): UserDefinedFunction = {
+    udf((v: Int) => v + options("x").toInt)
+  }
 }

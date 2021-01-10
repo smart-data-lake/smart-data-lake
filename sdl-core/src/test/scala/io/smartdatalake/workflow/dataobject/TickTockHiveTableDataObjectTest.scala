@@ -26,7 +26,7 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.workflow.action.CustomSparkAction
 import io.smartdatalake.workflow.action.customlogic.{CustomDfsTransformer, CustomDfsTransformerConfig}
-import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -40,6 +40,8 @@ class TickTockHiveTableDataObjectTest extends FunSuite with BeforeAndAfter {
   private val tempPath = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+  implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
   before {
     instanceRegistry.clear()
@@ -47,7 +49,6 @@ class TickTockHiveTableDataObjectTest extends FunSuite with BeforeAndAfter {
 
   test("Empty dataframe is created if schemaMin is provided") {
 
-    val feed = "autocreate"
     val schemaMin: StructType = StructType(StructField("id", IntegerType, nullable = false) :: StructField("name", StringType, nullable=false) :: StructField("rating", IntegerType, nullable=false) :: Nil)
 
     // create source dataobject
@@ -62,17 +63,15 @@ class TickTockHiveTableDataObjectTest extends FunSuite with BeforeAndAfter {
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
-    val refTimestamp1 = LocalDateTime.now()
-    implicit val context1: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
     val customTransformerConfig = CustomDfsTransformerConfig(className = Some("io.smartdatalake.workflow.dataobject.TestDfsTransformerEmptyDf"))
 
-    val action = CustomSparkAction("action", List(srcDO.id), List(tgtDO.id), transformer = customTransformerConfig, recursiveInputIds = List(tgtDO.id))(context1.instanceRegistry)
+    val action = CustomSparkAction("action", List(srcDO.id), List(tgtDO.id), transformer = customTransformerConfig, recursiveInputIds = List(tgtDO.id))
 
     // write test files
     val l1 = Seq((1, "john", 5)).toDF("id", "name", "rating")
     srcDO.writeDataFrame(l1, Seq())
 
-    val tgtSubFeeds = action.exec(Seq(SparkSubFeed(None, "input", Seq()), SparkSubFeed(None, "output", Seq())))
+    action.exec(Seq(SparkSubFeed(None, "input", Seq()), SparkSubFeed(None, "output", Seq())))(session, contextExec)
 
     val r = session.table(s"${tgtTable.fullName}")
       .select($"rating")

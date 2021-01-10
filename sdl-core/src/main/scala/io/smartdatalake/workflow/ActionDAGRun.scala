@@ -117,10 +117,21 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
       case (node: InitDAGNode, _) =>
         node.edges.map(dataObjectId => getInitialSubFeed(dataObjectId))
       case (node: Action, subFeeds) =>
-        node.init(subFeeds ++ getRecursiveSubFeeds(node))
+        val deduplicatedSubFeeds = unionDuplicateSubFeeds(subFeeds ++ getRecursiveSubFeeds(node), node.id)
+        node.init(deduplicatedSubFeeds)
       case x => throw new IllegalStateException(s"Unmatched case $x")
     }
     t
+  }
+
+  private def unionDuplicateSubFeeds(subFeeds: Seq[SubFeed], actionId: ActionObjectId)(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
+    subFeeds.groupBy(_.dataObjectId).mapValues {
+      subFeeds =>
+        if (subFeeds.size > 1) {
+          logger.info(s"($actionId) Creating union of multiple SubFeeds as input for ${subFeeds.head.dataObjectId}")
+          subFeeds.reduce((s1, s2) => s1.union(s2))
+        } else subFeeds.head
+    }.values.toSeq
   }
 
   def exec(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
@@ -133,9 +144,10 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
         case (node: InitDAGNode, _) =>
           node.edges.map(dataObjectId => getInitialSubFeed(dataObjectId))
         case (node: Action, subFeeds) =>
-          node.preExec(subFeeds)
-          val resultSubFeeds = node.exec(subFeeds ++ getRecursiveSubFeeds(node))
-          node.postExec(subFeeds, resultSubFeeds)
+          val deduplicatedSubFeeds = unionDuplicateSubFeeds(subFeeds ++ getRecursiveSubFeeds(node), node.id)
+          node.preExec(deduplicatedSubFeeds)
+          val resultSubFeeds = node.exec(deduplicatedSubFeeds)
+          node.postExec(deduplicatedSubFeeds, resultSubFeeds)
           //return
           resultSubFeeds
         case x => throw new IllegalStateException(s"Unmatched case $x")
@@ -253,8 +265,10 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
     // prepare edges: list of actions dependencies
     // this can be created by combining input and output ids between actions
     val nodeInputs = actions.map( action => (action.id, action.inputs.map(_.id)))
-    val outputsToNodeMap = actions.flatMap( action => action.outputs.map( output => (output.id, action.id))).toMap
-    val allEdges = nodeInputs.flatMap{ case (nodeIdTo, inputIds) => inputIds.map( inputId => (outputsToNodeMap.get(inputId), nodeIdTo, inputId))}
+    val outputsToNodeMap = actions.flatMap( action => action.outputs.map( output => (output.id, action.id)))
+      .groupBy(_._1).mapValues(_.map(_._2))
+    val allEdges = nodeInputs.flatMap{ case (nodeIdTo, inputIds) => inputIds.flatMap( inputId => outputsToNodeMap.getOrElse(inputId,Seq()).map(action => (Some(action), nodeIdTo, inputId)))} ++
+      nodeInputs.flatMap{ case (nodeIdTo, inputIds) => inputIds.filter( inputId => !outputsToNodeMap.contains(inputId)).map( inputId => (None, nodeIdTo, inputId))}
 
     // test
     val duplicateEdges = allEdges.groupBy(identity).mapValues(_.size).filter(_._2 > 1).keys
