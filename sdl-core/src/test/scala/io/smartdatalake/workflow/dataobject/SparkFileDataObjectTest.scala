@@ -26,10 +26,92 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.CustomFileActionTest
 import org.apache.commons.io.FileUtils
 
+import scala.util.Try
+
 class SparkFileDataObjectTest extends DataObjectTestSuite {
+  import session.implicits._
+
+  test("overwrite only one partition") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, partitions = Seq("p"), csvOptions = Map("header" -> "true") )
+
+    // write test data 1 - create partition A and B
+    val partitionValuesCreated1 = Seq( PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
+    val df1 = Seq(("A",1),("A",2),("B",3),("B",4)).toDF("p", "value")
+    dataObject.writeDataFrame(df1, partitionValuesCreated1 )
+
+    // test 1
+    dataObject.getDataFrame().count shouldEqual 4 // four records should remain, 2 from partition A and 2 from partition B
+    partitionValuesCreated1.toSet shouldEqual dataObject.listPartitions.toSet
+
+    // write test data 2 - overwrite partition B
+    val partitionValuesCreated2 = Seq(PartitionValues(Map("p"->"B")))
+    val df2 = Seq(("B",5)).toDF("p", "value")
+    dataObject.writeDataFrame(df2, partitionValuesCreated2 )
+
+    // test 2
+    dataObject.getDataFrame().count shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
+    partitionValuesCreated1.toSet shouldEqual dataObject.listPartitions.toSet
+
+    Try(FileUtils.deleteDirectory(tempDir.toFile))
+  }
+
+  test("create and list partition one level") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, partitions = Seq("p"), csvOptions = Map("header" -> "true") )
+
+    // write test files
+    val partitionValuesCreated = Seq(PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
+    val df = Seq(("A",1),("B",2)).toDF("p", "value")
+    dataObject.writeDataFrame(df, partitionValuesCreated )
+
+    val partitionValuesListed = dataObject.listPartitions
+    partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
+
+    Try(FileUtils.deleteDirectory(tempDir.toFile))
+  }
+
+  test("create and list partition multi level") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, partitions = Seq("p1","p2"), csvOptions = Map("header" -> "true"))
+
+    // write test files
+    val partitionValuesCreated = Seq( PartitionValues(Map("p1"->"A","p2"->"L2A")), PartitionValues(Map("p1"->"A","p2"->"L2B"))
+      , PartitionValues(Map("p1"->"B","p2"->"L2B")), PartitionValues(Map("p1"->"B","p2"->"L2C")))
+    val df = Seq(("A","L2A",1),("A","L2B",2),("B","L2B",3),("B","L2C",4)).toDF("p1", "p2", "value")
+    dataObject.writeDataFrame(df, partitionValuesCreated)
+
+    val partitionValuesListed = dataObject.listPartitions
+    partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
+
+    Try(FileUtils.deleteDirectory(tempDir.toFile))
+  }
+
+  test("create empty partition") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, partitions = Seq("p1","p2"), csvOptions = Map("header" -> "true"))
+
+    // write test files
+    val partitionValuesCreated = Seq( PartitionValues(Map("p1"->"A","p2"->"L2A")), PartitionValues(Map("p1"->"X","p2"->"L2X")))
+    val df = Seq(("A","L2A",1)).toDF("p1", "p2", "value")
+    dataObject.writeDataFrame(df, partitionValuesCreated)
+
+    val partitionValuesListed = dataObject.listPartitions
+    partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
+
+    Try(FileUtils.deleteDirectory(tempDir.toFile))
+  }
 
   test("read partitioned data and filter expected partitions") {
-    import testSession.implicits._
+    import session.implicits._
 
     // create data object
     val tempDir = Files.createTempDirectory("tempHadoopDO")
@@ -51,8 +133,80 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
     FileUtils.deleteDirectory(tempDir.toFile)
   }
 
+  test("overwrite partitioned data") {
+    import session.implicits._
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, partitions = Seq("p"), csvOptions = Map("header" -> "true"))
+
+    // write test data - create partition A, B, C
+    val partitionValuesCreated1 = Seq( PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
+    val df1 = Seq(("A",1),("A",2),("B",3),("B",4),("C",5),("C",6)).toDF("p", "value")
+    dataObject.writeDataFrame(df1, partitionValuesCreated1)
+
+    // overwrite partition B with new data, overwrite partition C with no data
+    val partitionValuesCreated2 = Seq( PartitionValues(Map("p"->"B")), PartitionValues(Map("p"->"C")))
+    val df2 = Seq(("B",7),("B",8)).toDF("p", "value")
+    dataObject.writeDataFrame(df2, partitionValuesCreated2)
+
+    // test reading data
+    val result = dataObject.getDataFrame()
+      .select($"p",$"value".cast("int"))
+      .as[(String,Int)].collect.toSeq.sorted
+    assert( result == Seq(("A",1),("A",2),("B",7),("B",8)))
+    assert( dataObject.listPartitions.map(pv => pv("p").toString).sorted == Seq("A","B","C"))
+
+    FileUtils.deleteDirectory(tempDir.toFile)
+  }
+
+  test("overwrite all") {
+    import session.implicits._
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, csvOptions = Map("header" -> "true"))
+
+    // write test data
+    val df1 = Seq(("A",1),("A",2)).toDF("p", "value")
+    dataObject.writeDataFrame(df1)
+
+    // overwrite partition B with new data, overwrite partition C with no data
+    val df2 = Seq(("B",3),("B",4)).toDF("p", "value")
+    dataObject.writeDataFrame(df2)
+
+    // test reading data
+    val result = dataObject.getDataFrame()
+      .select($"p",$"value".cast("int"))
+      .as[(String,Int)].collect.toSeq.sorted
+    assert( result == Seq(("B",3),("B",4)))
+
+    FileUtils.deleteDirectory(tempDir.toFile)
+  }
+
+  test("overwrite all empty") {
+    import session.implicits._
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, csvOptions = Map("header" -> "true"))
+
+    // write test data
+    val df1 = Seq(("A",1),("A",2)).toDF("p", "value")
+    dataObject.writeDataFrame(df1)
+
+    // overwrite partition B with new data, overwrite partition C with no data
+    val df2 = Seq[(String,Int)]().toDF("p", "value")
+    dataObject.writeDataFrame(df2)
+
+    // test reading data
+    assert(dataObject.getDataFrame().isEmpty)
+
+    FileUtils.deleteDirectory(tempDir.toFile)
+  }
+
   test("append filename") {
-    import testSession.implicits._
+    import session.implicits._
 
     // create data object
 

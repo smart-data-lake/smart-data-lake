@@ -36,7 +36,7 @@ object DatabricksSmartDataLakeBuilder extends SmartDataLakeBuilder {
     logger.info(s"Start programm $appType")
 
     val config = initConfigFromEnvironment.copy (
-      overrideJars = Some(Seq("config-1.3.4.jar"))
+      overrideJars = Some(Seq("config-1.4.1.jar"))
     )
 
     parseCommandLineArguments(args, config) match {
@@ -49,7 +49,7 @@ object DatabricksSmartDataLakeBuilder extends SmartDataLakeBuilder {
         val classLoader = AppUtil.getChildFirstClassLoader(jars)
         val className = classOf[DefaultSmartDataLakeBuilder].getName
         val clazz = classLoader.loadClass(className)
-        val smartDataLakeBuilder = clazz.newInstance
+        val smartDataLakeBuilder = clazz.getDeclaredConstructor().newInstance()
         val runMethodName = "parseAndRun"
         val runMethod = clazz.getDeclaredMethods.find (m => m.getName == runMethodName && m.getParameterCount == 2)
         .getOrElse (throw new IllegalStateException(s"'$runMethodName' method not found for class $className") )

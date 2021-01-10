@@ -33,7 +33,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
   private val tempDir = createTempDir
   private val tempPath = tempDir.toAbsolutePath.toString
 
-  import testSession.implicits._
+  import session.implicits._
 
   test("write and analyze table without partitions") {
     val srcTable = Table(Some("default"), "input")
@@ -42,7 +42,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
     srcDO.writeDataFrame(df, Seq())
     // check table statistics
-    val statsStr = testSession.sql(s"describe extended ${srcTable.fullName}")
+    val statsStr = session.sql(s"describe extended ${srcTable.fullName}")
       .where($"col_name"==="Statistics").head.getAs[String](1)
     assert(statsStr.contains("3 rows"))
     // check table contents
@@ -56,14 +56,14 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
     srcDO.writeDataFrame(df, Seq(PartitionValues(Map("type"->"ext")),PartitionValues(Map("type"->"int"))))
     // check table statistics
-    val statsStr = testSession.sql(s"describe extended ${srcTable.fullName}")
+    val statsStr = session.sql(s"describe extended ${srcTable.fullName}")
       .where($"col_name"==="Statistics").head.getAs[String](1)
     assert(statsStr.contains("3 rows"))
     // check partition statistics
-    val statsPart1Str = testSession.sql(s"describe extended ${srcTable.fullName} partition(type='ext')")
+    val statsPart1Str = session.sql(s"describe extended ${srcTable.fullName} partition(type='ext')")
       .where($"col_name"==="Partition Statistics").head.getAs[String](1)
     assert(statsPart1Str.contains("2 rows"))
-    val statsPart2Str = testSession.sql(s"describe extended ${srcTable.fullName} partition(type='int')")
+    val statsPart2Str = session.sql(s"describe extended ${srcTable.fullName} partition(type='int')")
       .where($"col_name"==="Partition Statistics").head.getAs[String](1)
     assert(statsPart2Str.contains("1 rows"))
     // check table contents
@@ -77,14 +77,14 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
     srcDO.writeDataFrame(df, Seq())
     // check table statistics
-    val statsStr = testSession.sql(s"describe extended ${srcTable.fullName}")
+    val statsStr = session.sql(s"describe extended ${srcTable.fullName}")
       .where($"col_name"==="Statistics").head.getAs[String](1)
     assert(statsStr.contains("3 rows"))
     // check partition statistics
-    val statsPart1Str = testSession.sql(s"describe extended ${srcTable.fullName} partition(type='ext')")
+    val statsPart1Str = session.sql(s"describe extended ${srcTable.fullName} partition(type='ext')")
       .where($"col_name"==="Partition Statistics").head.getAs[String](1)
     assert(statsPart1Str.contains("2 rows"))
-    val statsPart2Str = testSession.sql(s"describe extended ${srcTable.fullName} partition(type='int')")
+    val statsPart2Str = session.sql(s"describe extended ${srcTable.fullName} partition(type='int')")
       .where($"col_name"==="Partition Statistics").head.getAs[String](1)
     assert(statsPart2Str.contains("1 rows"))
     // check table contents
@@ -98,18 +98,18 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
     srcDO.writeDataFrame(df, Seq(PartitionValues(Map("type"->"ext"))))
     // check table statistics
-    val statsStr = testSession.sql(s"describe extended ${srcTable.fullName}")
+    val statsStr = session.sql(s"describe extended ${srcTable.fullName}")
       .where($"col_name"==="Statistics").head.getAs[String](1)
     assert(statsStr.contains("3 rows"))
     // check partition statistics -> only partition type=ext,name=doe and type=ext,lastname=smith should have been analyzed
-    val statsPart1Str = testSession.sql(s"describe extended ${srcTable.fullName} partition(type='ext',lastname='doe')")
+    val statsPart1Str = session.sql(s"describe extended ${srcTable.fullName} partition(type='ext',lastname='doe')")
       .where($"col_name"==="Partition Statistics").head.getAs[String](1)
     assert(statsPart1Str.contains("1 rows"))
-    val statsPart2Str = testSession.sql(s"describe extended ${srcTable.fullName} partition(type='ext',lastname='smith')")
+    val statsPart2Str = session.sql(s"describe extended ${srcTable.fullName} partition(type='ext',lastname='smith')")
       .where($"col_name"==="Partition Statistics").head.getAs[String](1)
     assert(statsPart2Str.contains("1 rows"))
     // check no partition statistics for type=int,lastname=emma
-    val statsPart3Str = testSession.sql(s"describe extended ${srcTable.fullName} partition(type='int',lastname='emma')")
+    val statsPart3Str = session.sql(s"describe extended ${srcTable.fullName} partition(type='int',lastname='emma')")
       .where($"col_name"==="Partition Statistics").head.getAs[String](1)
     assert(!statsPart3Str.contains("1 rows"))
     // check table contents
@@ -123,18 +123,18 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
     srcDO.writeDataFrame(df, Seq(PartitionValues(Map("type"->"ext", "lastname"->"doe")),PartitionValues(Map("type"->"ext", "lastname"->"smith"))))
     // check table statistics
-    val statsStr = testSession.sql(s"describe extended ${srcTable.fullName}")
+    val statsStr = session.sql(s"describe extended ${srcTable.fullName}")
       .where($"col_name"==="Statistics").head.getAs[String](1)
     assert(statsStr.contains("3 rows"))
     // check partition statistics -> only partition type=ext,name=doe and type=ext,lastname=smith should have been analyzed
-    val statsPart1Str = testSession.sql(s"describe extended ${srcTable.fullName} partition(type='ext',lastname='doe')")
+    val statsPart1Str = session.sql(s"describe extended ${srcTable.fullName} partition(type='ext',lastname='doe')")
       .where($"col_name"==="Partition Statistics").head.getAs[String](1)
     assert(statsPart1Str.contains("1 rows"))
-    val statsPart2Str = testSession.sql(s"describe extended ${srcTable.fullName} partition(type='ext',lastname='smith')")
+    val statsPart2Str = session.sql(s"describe extended ${srcTable.fullName} partition(type='ext',lastname='smith')")
       .where($"col_name"==="Partition Statistics").head.getAs[String](1)
     assert(statsPart2Str.contains("1 rows"))
     // check no partition statistics for type=int,lastname=emma
-    val statsPart3Str = testSession.sql(s"describe extended ${srcTable.fullName} partition(type='int',lastname='emma')")
+    val statsPart3Str = session.sql(s"describe extended ${srcTable.fullName} partition(type='int',lastname='emma')")
       .where($"col_name"==="Partition Statistics").head.getAs[String](1)
     assert(!statsPart3Str.contains("1 rows"))
     // check table contents
@@ -230,7 +230,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
          | }
          |}
        """.stripMargin)
-    val dataObj = HiveTableDataObject.fromConfig(config, instanceRegistry)
+    val dataObj = HiveTableDataObject.fromConfig(config)
 
     an [Exception] should be thrownBy dataObj.getDataFrame()
   }

@@ -97,6 +97,15 @@ object Environment {
   }
 
   /**
+   * Set to true to enable check for duplicate first class object definitions when loading configuration (default=true).
+   * The check fails if Connections, DataObjects or Actions are defined in multiple locations.
+   */
+  var enableCheckConfigDuplicates: Boolean = {
+    EnvironmentUtil.getSdlParameter("enableCheckConfigDuplicates")
+      .map(_.toBoolean).getOrElse(true)
+  }
+
+  /**
    * ordering of columns in SchemaEvolution result
    * - true: result schema is ordered according to existing schema, new columns are appended
    * - false: result schema is ordered according to new schema, deleted columns are appended
@@ -136,6 +145,14 @@ object Environment {
   var enableJdbcCaseSensitivity: Boolean = {
     EnvironmentUtil.getSdlParameter("enableJdbcCaseSensitivity")
       .map(_.toBoolean).getOrElse(false)
+  }
+
+  /**
+   * Set to true if you want to enable automatic caching of DataFrames that are used multiple times (default=true).
+   */
+  var enableAutomaticDataFrameCaching: Boolean = {
+    EnvironmentUtil.getSdlParameter("enableAutomaticDataFrameCaching")
+      .map(_.toBoolean).getOrElse(true)
   }
 
   // static configurations

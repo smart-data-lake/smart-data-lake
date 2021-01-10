@@ -32,7 +32,7 @@ import org.scalatest.FunSuite
 class KafkaTopicDataObjectTest extends FunSuite with EmbeddedKafka with DataObjectTestSuite with SmartDataLakeLogger {
 
   import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
-  import testSession.implicits._
+  import session.implicits._
 
   private val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6000")
 

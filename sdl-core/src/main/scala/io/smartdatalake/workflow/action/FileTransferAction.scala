@@ -24,7 +24,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.util.filetransfer.FileTransfer
 import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRefDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed}
 import org.apache.spark.sql.SparkSession
 
 /**
@@ -56,35 +56,19 @@ case class FileTransferAction(override val id: ActionObjectId,
   // initialize FileTransfer
   private val fileTransfer = FileTransfer(input, output, deleteDataAfterRead, overwrite)
 
-  override def initSubFeed(subFeed: FileSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
-    val inputFileRefs = subFeed.fileRefs.getOrElse( input.getFileRefs(subFeed.partitionValues))
+  override def doTransform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed, doExec: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
+    // recreate FileRefs if needed
+    val inputFileRefs = inputSubFeed.fileRefs.getOrElse(input.getFileRefs(inputSubFeed.partitionValues))
     val fileRefPairs = fileTransfer.init(inputFileRefs)
-    subFeed.copy(fileRefs = Some(fileRefPairs.map(_._2)), dataObjectId = output.id, processedInputFileRefs = Some(inputFileRefs))
+    if (doExec) fileTransfer.exec(fileRefPairs)
+    outputSubFeed.copy(fileRefs = Some(fileRefPairs.map(_._2)), processedInputFileRefs = Some(inputFileRefs))
   }
 
-  override def execSubFeed(subFeed: FileSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
-    // recreate FileRefs is desired
-    val inputFileRefs = subFeed.fileRefs.getOrElse( input.getFileRefs(subFeed.partitionValues))
-    val fileRefPairs = fileTransfer.init(inputFileRefs)
-    fileTransfer.exec(fileRefPairs)
-    subFeed.copy(fileRefs = Some(fileRefPairs.map(_._2)), dataObjectId = output.id, processedInputFileRefs = Some(inputFileRefs))
-  }
-
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[Action] = FileTransferAction
 }
 
 object FileTransferAction extends FromConfigFactory[Action] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): FileTransferAction = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[FileTransferAction].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): FileTransferAction = {
+    extract[FileTransferAction](config)
   }
 }

@@ -22,6 +22,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{ExecutionMode, SparkStreamingOnceMode}
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
@@ -65,37 +66,32 @@ case class CustomSparkAction ( override val id: ActionObjectId,
   if (executionMode.exists(_.isInstanceOf[SparkStreamingOnceMode]) && transformer.sqlCode.nonEmpty)
     logger.warn("Defining custom stateful streaming operations with sqlCode is not well supported by Spark and can create strange errors or effects. Use scalaCode to be safe.")
 
-  /**
-   * @inheritdoc
-   */
-  override def transform(subFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
-    val mainInputSubFeed = subFeeds.find(_.dataObjectId==mainInput.id)
+  override def transform(inputSubFeeds: Seq[SparkSubFeed], outputSubFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
+    val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId==mainInput.id)
 
     // Apply custom transformation to all subfeeds
     val partitionValues = mainInputSubFeed.map(_.partitionValues).getOrElse(Seq())
-    transformer.transform(id, partitionValues, subFeeds.map( subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap)
-      .map {
-        // create output subfeeds from transformed dataframes
-        case (dataObjectId, dataFrame) =>
-          val output = outputs.find(_.id.id == dataObjectId)
-            .getOrElse(throw ConfigurationException(s"No output found for result ${dataObjectId} in $id. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
-          // get partition values from main input
-          SparkSubFeed(Some(dataFrame),dataObjectId, partitionValues)
-      }.toSeq
+    val outputDfs = transformer.transform(id, partitionValues, inputSubFeeds.map( subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap)
+    // create output subfeeds from transformed dataframes
+    outputDfs.map {
+      case (dataObjectId, dataFrame) =>
+        val outputSubFeed = outputSubFeeds.find(_.dataObjectId.id == dataObjectId)
+          .getOrElse(throw ConfigurationException(s"($id) No output found for result ${dataObjectId}. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
+        // get partition values from main input
+        outputSubFeed.copy(dataFrame = Some(dataFrame))
+    }.toSeq
   }
 
-  /**
-   * @inheritdoc
-   */
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+    transformer.transformPartitionValues(id, partitionValues)
+  }
+
   override def factory: FromConfigFactory[Action] = CustomSparkAction
 }
 
 
 object CustomSparkAction extends FromConfigFactory[Action] {
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): CustomSparkAction = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[CustomSparkAction].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CustomSparkAction = {
+    extract[CustomSparkAction](config)
   }
 }

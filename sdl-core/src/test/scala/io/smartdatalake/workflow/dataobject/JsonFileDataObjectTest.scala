@@ -30,7 +30,7 @@ import org.apache.spark.sql.types._
 
 class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjectSchemaBehavior {
 
-  val hdfs = FileSystem.get(testSession.sparkContext.hadoopConfiguration)
+  val hdfs = FileSystem.get(session.sparkContext.hadoopConfiguration)
 
   case class Data(name: String, age: Int)
 
@@ -59,7 +59,7 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
     os.write(jsonStr.getBytes("UTF-8"))
     os.close()
 
-    val aj = JsonFileDataObject.fromConfig(config, instanceRegistry)
+    val aj = JsonFileDataObject.fromConfig(config)
     val result = aj.getDataFrame()
     result.show
     assert(result.count() == 3)
@@ -110,7 +110,7 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
     os.write(jsonStr.getBytes("UTF-8"))
     os.close()
 
-    val aj = JsonFileDataObject.fromConfig(config, instanceRegistry)
+    val aj = JsonFileDataObject.fromConfig(config)
     val result = aj.getDataFrame()
     result.show()
     assert(result.count() == 1)
@@ -152,7 +152,7 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
     os.write(jsonStr.getBytes("UTF-8"))
     os.close()
 
-    val aj = JsonFileDataObject.fromConfig(config, instanceRegistry)
+    val aj = JsonFileDataObject.fromConfig(config)
     val result = aj.getDataFrame()
     assert(result.count() == 3)
 

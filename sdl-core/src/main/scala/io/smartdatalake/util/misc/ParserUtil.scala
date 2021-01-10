@@ -35,7 +35,7 @@ private[smartdatalake] object ParserUtil {
    */
   def callParser(className: String, session: SparkSession, rdd: RDD[(String, String)]): DataFrame = {
     val parserClass = className
-    val df = Class.forName(parserClass).newInstance.asInstanceOf[{
+    val df = Class.forName(parserClass).getDeclaredConstructor().newInstance().asInstanceOf[{
       def parse(session: SparkSession, rdd: RDD[(String, String)]): DataFrame
     }]
     // TODO: This is a reflexive call because it calls a method 'parse' which may or may not be a member of the

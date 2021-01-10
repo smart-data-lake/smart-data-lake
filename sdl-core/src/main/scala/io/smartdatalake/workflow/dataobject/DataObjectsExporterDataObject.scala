@@ -124,22 +124,11 @@ case class DataObjectsExporterDataObject(id: DataObjectId,
     )
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[DataObjectsExporterDataObject] = DataObjectsExporterDataObject
 }
 
 object DataObjectsExporterDataObject extends FromConfigFactory[DataObjectsExporterDataObject] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): DataObjectsExporterDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[DataObjectsExporterDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): DataObjectsExporterDataObject = {
+    extract[DataObjectsExporterDataObject](config)
   }
 }

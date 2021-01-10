@@ -82,22 +82,11 @@ case class ParquetFileDataObject( override val id: DataObjectId,
   // See: https://medium.com/@an_chee/why-using-mixed-case-field-names-in-hive-spark-sql-is-a-bad-idea-95da8b6ec1e0
   override def beforeWrite(df: DataFrame): DataFrame = super.beforeWrite(df).colNamesLowercase
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[DataObject] = ParquetFileDataObject
 }
 
 object ParquetFileDataObject extends FromConfigFactory[DataObject] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): ParquetFileDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[ParquetFileDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ParquetFileDataObject = {
+    extract[ParquetFileDataObject](config)
   }
 }

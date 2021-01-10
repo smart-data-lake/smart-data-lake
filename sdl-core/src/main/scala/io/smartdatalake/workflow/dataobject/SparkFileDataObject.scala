@@ -175,6 +175,13 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     dfPrepared = sparkRepartition.map(_.prepareDataFrame(dfPrepared,partitions, partitionValues.size, id))
       .getOrElse(dfPrepared)
 
+    // delete concerned partitions if existing
+    if (saveMode == SaveMode.Overwrite && partitions.nonEmpty) {
+      val partitionValuesCols = partitionValues.map(_.keys).reduceOption(_ ++ _).getOrElse(Set()).toSeq
+      val partitionValuesToDelete = partitionValues.intersect(listPartitions.map(_.filterKeys(partitionValuesCols)))
+      deletePartitions(partitionValuesToDelete)
+    }
+
     val hadoopPathString = hadoopPath.toString
     logger.info(s"Writing data frame to $hadoopPathString")
 

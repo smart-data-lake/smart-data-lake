@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.config
 
-import com.typesafe.config.{Config, ConfigValueFactory, ConfigValueType}
+import com.typesafe.config.{Config, ConfigException, ConfigValueFactory, ConfigValueType}
 import configs.Result
 import configs.syntax._
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, ConfigObjectId, ConnectionId, DataObjectId}
@@ -47,22 +47,31 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   def parse(config: Config, instanceRegistry: InstanceRegistry = new InstanceRegistry): InstanceRegistry = {
     implicit val registry: InstanceRegistry = instanceRegistry
 
-    val connections: Map[ConnectionId, Connection] = config.get[Map[String, Config]]("connections")
-      .valueOrElse(Map.empty)
+    val connections: Map[ConnectionId, Connection] = getConnectionConfigMap(config)
       .map{ case (id, config) => (ConnectionId(id), parseConfigObject[Connection](id, config))}
     registry.register(connections)
 
-    val dataObjects: Map[DataObjectId, DataObject] = config.get[Map[String, Config]]("dataObjects")
-      .valueOrElse(Map.empty)
+    val dataObjects: Map[DataObjectId, DataObject] = getDataObjectConfigMap(config)
       .map{ case (id, config) => (DataObjectId(id), parseConfigObject[DataObject](id, config))}
     registry.register(dataObjects)
 
-    val actions: Map[ActionObjectId, Action] = config.get[Map[String, Config]]("actions")
-      .valueOrElse(Map.empty)
+    val actions: Map[ActionObjectId, Action] = getActionConfigMap(config)
       .map{ case (id, config) => (ActionObjectId(id), parseConfigObject[Action](id, config))}
     registry.register(actions)
 
     registry
+  }
+
+  def getConnectionConfigMap(config: Config) = {
+    config.get[Map[String, Config]]("connections").valueOrElse(Map.empty)
+  }
+
+  def getDataObjectConfigMap(config: Config) = {
+    config.get[Map[String, Config]]("dataObjects").valueOrElse(Map.empty)
+  }
+
+  def getActionConfigMap(config: Config) = {
+    config.get[Map[String, Config]]("actions").valueOrElse(Map.empty)
   }
 
   /**
@@ -76,41 +85,46 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
    * @tparam A        the abstract type this object, i.e.: [[Action]] or [[DataObject]]
    * @return          a new instance of this [[SdlConfigObject]].
    */
-  def parseConfigObject[A <: SdlConfigObject with ParsableFromConfig[A]](id: String, config: Config)
+  def parseConfigObject[A <: SdlConfigObject with ParsableFromConfig[A] : TypeTag](id: String, config: Config)
                                                                         (implicit registry: InstanceRegistry): A = {
-    val clazz = Class.forName(className(id, config))
-    val mirror = runtimeMirror(clazz.getClassLoader)
-    val classSymbol = mirror.classSymbol(clazz)
+    val configObjectType = typeOf[A]
+    val errId = configObjectType.typeSymbol.name.toString + "~" + id
+    try {
 
-    require(classSymbol.companion.isModule,
-      s"Can not instantiate ${classOf[DataObject].getSimpleName} of class '${clazz.getTypeName}'. " +
-        "It does not have a companion object.")
+      // get class & module
+      val clazz = Class.forName(className(id, config))
+      val mirror = runtimeMirror(clazz.getClassLoader)
+      val classSymbol = mirror.classSymbol(clazz)
+      require(classSymbol.companion.isModule, s"($errId) Can not instantiate ${classOf[DataObject].getSimpleName} of class '${clazz.getTypeName}'. It does not have a companion object.")
+      val companionObjectSymbol = classSymbol.companion.asModule
 
-    val companionObjectSymbol = classSymbol.companion.asModule
+      // get factory method
+      logger.debug(s"Instance requested for '${clazz.getTypeName}'. Extracting factory method from companion object.")
+      val factoryMethod: FactoryMethod[A] = new FactoryMethod(companionObjectSymbol, FactoryMethodExtractor.extract(companionObjectSymbol))
 
-    logger.debug(s"Instance requested for '${clazz.getTypeName}'. Extracting factory method from companion object.")
-    val factoryMethod: FactoryMethod[A] = new FactoryMethod(companionObjectSymbol, FactoryMethodExtractor.extract(companionObjectSymbol))
-
-    // prepare refined config
-    val configWithId = config.withValue("id", ConfigValueFactory.fromAnyRef(id))
-    val refinedConfig = Environment.configPathsForLocalSubstitution.foldLeft(configWithId){
-      case (config, path) => try {
-        localSubstitution(config, path)
-      } catch {
-        case e: ConfigurationException => throw ConfigurationException(s"Error in local config substitution for object with id='$id' and path='$path': ${e.message}", Some(s"$id.$path"), e)
-      }
-    }
-
-    logger.debug(s"Invoking extracted method: $factoryMethod.")
-    Try(factoryMethod.invoke(refinedConfig, registry, mirror)) match {
-      case Success(instance) => instance
-      case Failure(e) =>
-        logger.debug(s"Failed to invoke '$factoryMethod' with '$config'.", e)
-        val cause = Option(e.getCause)
-        cause match {
-          case Some(c) => throw c
-          case None => throw e
+      // prepare refined config
+      val configWithId = config
+        .withValue("id", ConfigValueFactory.fromAnyRef(id))
+        .withoutPath("type")
+      val refinedConfig = Environment.configPathsForLocalSubstitution.foldLeft(configWithId) {
+        case (config, path) => try {
+          localSubstitution(config, path)
+        } catch {
+          case e: ConfigurationException => throw ConfigurationException(s"($errId) Error in local config substitution for object with id='$id' and path='$path': ${e.message}", Some(s"$id.$path"), e)
         }
+      }
+
+      // create object
+      logger.debug(s"Invoking extracted method: $factoryMethod.")
+      Try(factoryMethod.invoke(refinedConfig, registry, mirror)).recoverWith {
+        case e =>
+          logger.debug(s"Failed to invoke '$factoryMethod' with '$config'.", e)
+          throw Option(e.getCause).getOrElse(e)
+      }.get
+    } catch {
+      case e: ConfigException if e.getMessage.contains(errId) => throw e
+      case e: ConfigException => throw new ConfigurationException(s"($errId) ${e.getMessage}", throwable = e)
+      case e: Exception => throw new ConfigurationException(s"($errId) ${e.getClass.getSimpleName}: ${e.getMessage}", throwable = e)
     }
   }
 
