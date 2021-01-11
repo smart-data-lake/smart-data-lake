@@ -31,7 +31,6 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
-
 object ConfigLoader extends SmartDataLakeLogger {
 
   final val configFileExtensions: Set[String] = Set("conf", "json", "properties")
@@ -135,7 +134,7 @@ object ConfigLoader extends SmartDataLakeLogger {
   /**
    * Merge configurations such that configurations earlier in the list overwrite configurations at the end of the list.
    *
-   * @param configs a list of [[Confgs]]s sorted according to their priority
+   * @param configs a list of [[Config]]s sorted according to their priority
    * @return        a merged [[Config]].
    */
   private def mergeConfigs(configs: Seq[Config]): Config = {
@@ -186,8 +185,11 @@ object ConfigLoader extends SmartDataLakeLogger {
             logger.warn(s"Failed to list directory content of ${nextFile.toString}.", exception)
           case Success(children) =>
             while (children.hasNext) {
-              traversalQueue += children.next().getPath
-              logger.trace(s"Found '${traversalQueue.last.getName}' in directory $nextFile.")
+              val childPath = children.next.getPath
+              if (!childPath.getName.startsWith(".")) { // ignore hidden entries
+                traversalQueue += childPath
+                logger.debug(s"Found '${childPath.getName}' in directory $nextFile.")
+              }
             }
         }
       } else if (fs.isFile(nextFile)) {
