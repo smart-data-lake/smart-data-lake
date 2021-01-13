@@ -66,6 +66,20 @@ private[smartdatalake] class DefaultWebserviceClient(httpRequest: HttpRequest) e
   }
 
   /**
+   * Sends a PUT request with a body in the given mimetype
+   * @param body body
+   * @param mimeType mimetype to use for the body
+   * @return
+   */
+  override def put(body: Array[Byte], mimeType: String): Try[Array[Byte]] = {
+    logger.info("Sending PUT request with content-type: " +mimeType)
+    Try(httpRequest.method("PUT").header("content-type",mimeType).put(body).asBytes) match {
+      case Success(httpResponse) => checkResponse(httpResponse)
+      case Failure(exception) => Failure(exception)
+    }
+  }
+
+  /**
    *
    * Check response of webservice call
    *
