@@ -227,6 +227,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   }
 
   override def deleteAll(implicit session: SparkSession): Unit = {
+    logger.info(s"($id) deleteAll $hadoopPath")
     filesystem.delete(hadoopPath, true) // recursive=true
   }
 
