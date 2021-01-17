@@ -155,6 +155,14 @@ object Environment {
       .map(_.toBoolean).getOrElse(true)
   }
 
+  /**
+   * Set to true if you want to enable workaround to overwrite unpartitioned SparkFileDataObject on Azure ADLSv2 (default=false).
+   */
+  var enableOverwriteUnpartitionedSparkFileDataObjectAdls: Boolean = {
+    EnvironmentUtil.getSdlParameter("enableOverwriteUnpartitionedSparkFileDataObjectAdls")
+      .map(_.toBoolean).getOrElse(false)
+  }
+
   // static configurations
   val configPathsForLocalSubstitution: Seq[String] = Seq(
       "path", "table.name"
