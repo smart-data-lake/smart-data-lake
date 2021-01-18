@@ -333,8 +333,21 @@ case class FailIfNoPartitionValuesMode() extends ExecutionMode {
                                            (implicit session: SparkSession, context: ActionPipelineContext): Option[(Seq[PartitionValues], Seq[PartitionValues], Option[String])] = {
     // check if partition values present
     if (subFeed.partitionValues.isEmpty) throw new IllegalStateException(s"($actionId) Partition values are empty for mainInput ${subFeed.dataObjectId.id}")
-    // return
+    // return: no change of given partition values and filter
     None
+  }
+}
+
+/**
+ * An execution mode which forces processing all data from it's inputs.
+ */
+case class ProcessAllMode() extends ExecutionMode {
+  private[smartdatalake] override def apply(actionId: ActionObjectId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
+                                            , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
+                                           (implicit session: SparkSession, context: ActionPipelineContext): Option[(Seq[PartitionValues], Seq[PartitionValues], Option[String])] = {
+    // return: reset given partition values and filter
+    logger.info(s"($actionId) ProcessModeAll reset partition values")
+    Some(Seq(),Seq(),None)
   }
 }
 
