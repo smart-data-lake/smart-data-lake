@@ -39,6 +39,16 @@
 				<!-- do not include sdl-core into fat-jar for this module, as sdl-core is normally put into classpath separately -->
 				<sdl-core.scope>provided</sdl-core.scope>
 			</properties>
+			<dependencies>
+				<!-- spark-tags needs to have compile scope; if it's runtime it doesnt compile anymore with scala 2.11. There is a bug about annotations missing in classpath. -->
+				<!-- this is an unused declared dependency, but it's needed to override scope -->
+				<dependency>
+					<groupId>org.apache.spark</groupId>
+					<artifactId>spark-tags_${scala.minor.version}</artifactId>
+					<version>${spark.version}</version>
+					<scope>compile</scope>
+				</dependency>
+			</dependencies>
 		</profile>
 	</profiles>
 
