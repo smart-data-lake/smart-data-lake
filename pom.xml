@@ -21,7 +21,7 @@
 
 	<groupId>io.smartdatalake</groupId>
 	<artifactId>sdl-parent</artifactId>
-	<version>1.2.3-SNAPSHOT</version>
+	<version>1.2.3</version>
 	<packaging>pom</packaging>
 
 	<modules>
