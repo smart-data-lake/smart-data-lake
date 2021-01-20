@@ -72,9 +72,12 @@ abstract class SparkSubFeedsAction extends SparkAction {
       case Some(mode) =>
         mode.apply(id, mainInput, mainOutput, mainInputSubFeed, transformPartitionValues) match {
           case Some((inputPartitionValues, outputPartitionValues, newFilter)) =>
-            inputSubFeeds = inputSubFeeds.map(subFeed =>
-              ActionHelper.updatePartitionValues(inputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = inputPartitionValues, filter = (if(subFeed.dataObjectId==mainInput.id) newFilter else None)).breakLineage)
-            )
+            inputSubFeeds = inputSubFeeds.map { subFeed =>
+              val ignoreFilter = inputIdsToIgnoreFilter.contains(subFeed.dataObjectId)
+              val inputFilter = if (subFeed.dataObjectId == mainInput.id || !ignoreFilter) newFilter else None
+              val inputPartitionValuesWithIgnore = if (!ignoreFilter) inputPartitionValues else Seq()
+              ActionHelper.updatePartitionValues(inputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = inputPartitionValuesWithIgnore, filter = inputFilter).breakLineage)
+            }
             outputSubFeeds = outputSubFeeds.map(subFeed =>
               ActionHelper.updatePartitionValues(outputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = outputPartitionValues, filter = newFilter).breakLineage)
             )
