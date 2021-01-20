@@ -107,8 +107,8 @@ private[smartdatalake] trait ExecutionModeWithMainInputOutput {
  * @param failConditions            List of conditions to fail application of execution mode if true. Define as spark sql expressions working with attributes of [[PartitionDiffModeExpressionData]] returning a boolean.
  *                                  Default is that the application of the PartitionDiffMode does not fail the action. If there is no data to process, the following actions are skipped.
  *                                  Multiple conditions are evaluated individually and every condition may fail the execution mode (or-logic)
- * @param stopIfNoData optional setting if further actions should be skipped if this action has no data to process (default).
- *                     Set stopIfNoData=false if you want to run further actions nevertheless. They will receive output dataObject unfiltered as input.
+ * @param stopIfNoData              Optional setting if further actions should be skipped if this action has no data to process (default).
+ *                                  Set stopIfNoData=false if you want to run further actions nevertheless. They will receive output dataObject unfiltered as input.
  * @param selectExpression          optional expression to define or refine the list of selected output partitions. Define a spark sql expression working with the attributes of [[PartitionDiffModeExpressionData]] returning a list<map<string,string>>.
  *                                  Default is to return the originally selected output partitions found in attribute selectedPartitionValues.
  * @param applyPartitionValuesTransform If true applies the partition values transform of custom transformations on input partition values before comparison with output partition values.

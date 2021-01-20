@@ -24,8 +24,10 @@ import io.smartdatalake.definitions.ExecutionModeWithMainInputOutput
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
+
+import scala.util.{Failure, Success, Try}
 
 abstract class SparkSubFeedsAction extends SparkAction {
 
@@ -35,6 +37,8 @@ abstract class SparkSubFeedsAction extends SparkAction {
 
   def mainInputId: Option[DataObjectId]
   def mainOutputId: Option[DataObjectId]
+
+  def inputIdsToIgnoreFilter: Seq[DataObjectId]
 
   // prepare main input / output
   // this must be lazy because inputs / outputs is evaluated later in subclasses
@@ -67,25 +71,40 @@ abstract class SparkSubFeedsAction extends SparkAction {
     val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id).get
     // create output subfeeds with transformed partition values from main input
     var outputSubFeeds = outputs.map(output => ActionHelper.updatePartitionValues(output, mainInputSubFeed.toOutput(output.id), Some(transformPartitionValues)))
+    // apply execution mode in init phase and store result
+    if (context.phase == ExecutionPhase.Init) {
+      executionModeResult = Try(
+        executionMode.flatMap(_.apply(id, mainInput, mainOutput, mainInputSubFeed, transformPartitionValues))
+      ).recover {
+        // return empty output subfeeds if "no data dont stop"
+        case ex: NoDataToProcessDontStopWarning =>
+          val outputSubFeeds = outputs.map {
+            output =>
+              val subFeed = SparkSubFeed(dataFrame = None, dataObjectId = output.id, partitionValues = Seq())
+              // update partition values to output's partition columns and update dataObjectId
+              validateAndUpdateSubFeed(output, subFeed)
+          }
+          // rethrow exception with fake results added. The DAG will pass the fake results to further actions.
+          throw ex.copy(results = Some(outputSubFeeds))
+      }
+    }
     // apply execution mode
-    executionMode match {
-      case Some(mode) =>
-        mode.apply(id, mainInput, mainOutput, mainInputSubFeed, transformPartitionValues) match {
-          case Some((inputPartitionValues, outputPartitionValues, newFilter)) =>
-            inputSubFeeds = inputSubFeeds.map(subFeed =>
-              ActionHelper.updatePartitionValues(inputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = inputPartitionValues, filter = (if(subFeed.dataObjectId==mainInput.id) newFilter else None)).breakLineage)
-            )
-            outputSubFeeds = outputSubFeeds.map(subFeed =>
-              ActionHelper.updatePartitionValues(outputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = outputPartitionValues, filter = newFilter).breakLineage)
-            )
-          case None => Unit
+    executionModeResult.get match { // throws exception if execution mode is Failure
+      case Some((inputPartitionValues, outputPartitionValues, newFilter)) =>
+        inputSubFeeds = inputSubFeeds.map { subFeed =>
+          val inputFilter = if (subFeed.dataObjectId == mainInput.id) newFilter else None
+          ActionHelper.updatePartitionValues(inputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = inputPartitionValues, filter = inputFilter).breakLineage)
         }
+        outputSubFeeds = outputSubFeeds.map(subFeed =>
+          ActionHelper.updatePartitionValues(outputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = outputPartitionValues, filter = newFilter).breakLineage)
+        )
       case _ => Unit
     }
     inputSubFeeds = inputSubFeeds.map{ subFeed =>
       val input = inputMap(subFeed.dataObjectId)
       // prepare input SubFeed
-      val preparedSubFeed = prepareInputSubFeed(input, subFeed)
+      val ignoreFilter = inputIdsToIgnoreFilter.contains(subFeed.dataObjectId)
+      val preparedSubFeed = prepareInputSubFeed(input, subFeed, ignoreFilter)
       // enrich with fresh DataFrame if needed
       enrichSubFeedDataFrame(input, preparedSubFeed, context.phase)
     }
@@ -96,6 +115,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
         val output = outputMap.getOrElse(subFeed.dataObjectId, throw ConfigurationException(s"No output found for result ${subFeed.dataObjectId} in $id. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
         validateAndUpdateSubFeed(output, subFeed)
     }
+
   }
 
   /**

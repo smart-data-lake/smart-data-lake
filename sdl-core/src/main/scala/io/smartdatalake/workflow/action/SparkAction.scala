@@ -53,11 +53,6 @@ private[smartdatalake] abstract class SparkAction extends Action {
    */
   def persist: Boolean
 
-  /**
-   * execution mode for this action.
-   */
-  def executionMode: Option[ExecutionMode]
-
   override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.prepare
     executionMode.foreach(_.prepare(id))
@@ -235,16 +230,16 @@ private[smartdatalake] abstract class SparkAction extends Action {
    * @param subFeed SubFeed with transformed DataFrame
    * @return validated and updated SubFeed
    */
-  def validateAndUpdateSubFeed(output: DataObject, subFeed: SparkSubFeed )(implicit session: SparkSession): SparkSubFeed = {
+  def validateAndUpdateSubFeed(output: DataObject, subFeed: SparkSubFeed )(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     output match {
       case partitionedDO: CanHandlePartitions =>
         // validate output partition columns exist in DataFrame
-        validateDataFrameContainsCols(subFeed.dataFrame.get, partitionedDO.partitions, s"for ${output.id}")
+        subFeed.dataFrame.foreach(df => validateDataFrameContainsCols(df, partitionedDO.partitions, s"for ${output.id}"))
         // adapt subfeed
         subFeed
           .updatePartitionValues(partitionedDO.partitions)
           .movePartitionColumnsLast(partitionedDO.partitions)
-      case _ => subFeed.clearPartitionValues()
+      case _ => subFeed.clearPartitionValues
     }
   }
 
@@ -289,7 +284,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
   /**
    * Applies changes to a SubFeed from a previous action in order to be used as input for this actions transformation.
    */
-  def prepareInputSubFeed(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  def prepareInputSubFeed(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, ignoreFilters: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // persist if requested
     var preparedSubFeed = if (persist) subFeed.persist else subFeed
     // create dummy DataFrame if read schema is different from write schema on this DataObject
@@ -298,8 +293,10 @@ private[smartdatalake] abstract class SparkAction extends Action {
     val schemaChanges = writeSchema != readSchema
     require(!context.simulation || !schemaChanges, s"($id) write & read schema is not the same for ${input.id}. Need to create a dummy DataFrame, but this is not allowed in simulation!")
     preparedSubFeed = if (schemaChanges) preparedSubFeed.convertToDummy(readSchema.get) else preparedSubFeed
-    // break lineage if requested or if it's a streaming DataFrame
-    preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true)) preparedSubFeed.breakLineage else preparedSubFeed
+    // remove filters if requested
+    if (ignoreFilters) preparedSubFeed = preparedSubFeed.clearFilter.clearPartitionValues
+    // break lineage if requested or if it's a streaming DataFrame or if a filter expression is set or if ignoreFilters
+    if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined || ignoreFilters) preparedSubFeed = preparedSubFeed.breakLineage
     // return
     preparedSubFeed
   }
