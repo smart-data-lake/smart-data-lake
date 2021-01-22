@@ -114,8 +114,8 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    * @throws IllegalArgumentException if `failIfFilesMissing` = true and no files found at `path`.
    */
   protected def checkFilesExisting(implicit session:SparkSession): Boolean = {
-    val files = if (filesystem.exists(hadoopPath.getParent)) {
-      arrayToSeq(filesystem.globStatus(hadoopPath))
+    val files = if (filesystem.exists(hadoopPath)) {
+      arrayToSeq(filesystem.listStatus(hadoopPath))
     } else {
       Seq.empty
     }
@@ -179,7 +179,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
       // create path with wildcards
       val partitionLayout = HdfsUtil.getHadoopPartitionLayout(initPartitions, separator)
       val globPartitionPath = new Path(hadoopPath, pv.getPartitionString(partitionLayout))
-      logger.info(s"($id) deletePartition with globs needed because ${pv.keys.mkString(",")} is not an init of partition columns ${partitions.mkString(",")}, path = $globPartitionPath")
+      logger.info(s"($id) getConcretePaths with globs needed because ${pv.keys.mkString(",")} is not an init of partition columns ${partitions.mkString(",")}, path = $globPartitionPath")
       filesystem.globStatus(globPartitionPath).map(_.getPath)
     }
   }
