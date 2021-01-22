@@ -29,6 +29,7 @@
 		<module>sdl-kafka</module>
 		<module>sdl-splunk</module>
 		<module>sdl-jms</module>
+		<module>sdl-deltalake</module>
 	</modules>
 
 	<licenses>

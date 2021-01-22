@@ -226,12 +226,6 @@
 		</dependency>
 
 		<dependency>
-			<groupId>io.delta</groupId>
-			<artifactId>delta-core_${scala.minor.version}</artifactId>
-			<version>${deltaTable.version}</version>
-		</dependency>
-
-		<dependency>
 			<groupId>org.apache.tika</groupId>
 			<artifactId>tika-core</artifactId>
 			<version>1.24.1</version>
