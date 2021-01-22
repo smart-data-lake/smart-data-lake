@@ -128,7 +128,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
         .optionalSchema(readSchema(filesExists))
         .option("basePath", hadoopPath.toString) // this is needed for partitioned tables when subdirectories are read directly; it then keeps the partition columns from the subdirectory path in the dataframe
       // create data frame for every partition value and then build union
-      val pathsToRead = partitionValues.map( pv => new Path(hadoopPath, getPartitionString(pv).get).toString)
+      val pathsToRead = partitionValues.flatMap(getConcretePaths).map(_.toString)
       pathsToRead.map(reader.load).reduce(_ union _)
     }
 

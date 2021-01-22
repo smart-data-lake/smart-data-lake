@@ -23,6 +23,7 @@ import java.time.LocalDateTime
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, SubFeed}
@@ -150,14 +151,35 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
   }
 
   /**
-   * Updates the partition values of a SubFeed to the partition columns of the given data object, removing not existing columns from the partition values.
+   * Updates the partition values of a SubFeed to the partition columns of the given input data object:
+   * - remove not existing columns from the partition values
    */
-  def updatePartitionValues[T <: SubFeed](dataObject: DataObject, subFeed: T, partitionValuesTransform: Option[Seq[PartitionValues] => Map[PartitionValues,PartitionValues]] = None)(implicit session: SparkSession, context: ActionPipelineContext): T = {
+  def updateInputPartitionValues[T <: SubFeed](dataObject: DataObject, subFeed: T)(implicit session: SparkSession, context: ActionPipelineContext): T = {
+    dataObject match {
+      case partitionedDO: CanHandlePartitions =>
+        // remove superfluous partitionValues
+        subFeed.updatePartitionValues(partitionedDO.partitions, Some(subFeed.partitionValues)).asInstanceOf[T]
+      case _ => subFeed.clearPartitionValues.asInstanceOf[T]
+    }
+  }
+
+  /**
+   * Updates the partition values of a SubFeed to the partition columns of the given output data object:
+   * - transform partition values
+   * - add run_id_partition value if needed
+   * - removing not existing columns from the partition values.
+   */
+  def updateOutputPartitionValues[T <: SubFeed](dataObject: DataObject, subFeed: T, partitionValuesTransform: Option[Seq[PartitionValues] => Map[PartitionValues,PartitionValues]] = None)(implicit session: SparkSession, context: ActionPipelineContext): T = {
     dataObject match {
       case partitionedDO: CanHandlePartitions =>
         // transform partition values
-        val newPartitionValues = partitionValuesTransform.map(fn => fn(subFeed.partitionValues).values.toSeq.distinct)
+        var newPartitionValues = partitionValuesTransform.map(fn => fn(subFeed.partitionValues).values.toSeq.distinct)
           .getOrElse(subFeed.partitionValues)
+        // add run_id partition if needed
+        if (partitionedDO.partitions.contains(Environment.runIdPartitionColumnName)) {
+          if (newPartitionValues.nonEmpty) newPartitionValues = newPartitionValues.map(_.addKey(Environment.runIdPartitionColumnName, context.runId.toString))
+          else newPartitionValues = Seq(PartitionValues(Map(Environment.runIdPartitionColumnName -> context.runId.toString)))
+        }
         // remove superfluous partitionValues
         subFeed.updatePartitionValues(partitionedDO.partitions, Some(newPartitionValues)).asInstanceOf[T]
       case _ => subFeed.clearPartitionValues.asInstanceOf[T]

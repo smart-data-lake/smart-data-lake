@@ -65,12 +65,12 @@ abstract class SparkSubFeedsAction extends SparkAction {
     val outputMap = outputs.map(i => i.id -> i).toMap
     // convert subfeeds to SparkSubFeed type or initialize if not yet existing
     var inputSubFeeds = subFeeds.map( subFeed =>
-      ActionHelper.updatePartitionValues(inputMap(subFeed.dataObjectId), SparkSubFeed.fromSubFeed(subFeed))
+      ActionHelper.updateInputPartitionValues(inputMap(subFeed.dataObjectId), SparkSubFeed.fromSubFeed(subFeed))
         .clearFilter // subFeed filter is not passed to the next action
     )
     val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id).get
     // create output subfeeds with transformed partition values from main input
-    var outputSubFeeds = outputs.map(output => ActionHelper.updatePartitionValues(output, mainInputSubFeed.toOutput(output.id), Some(transformPartitionValues)))
+    var outputSubFeeds = outputs.map(output => ActionHelper.updateOutputPartitionValues(output, mainInputSubFeed.toOutput(output.id), Some(transformPartitionValues)))
     // apply execution mode in init phase and store result
     if (context.phase == ExecutionPhase.Init) {
       executionModeResult = Try(
@@ -93,10 +93,10 @@ abstract class SparkSubFeedsAction extends SparkAction {
       case Some((inputPartitionValues, outputPartitionValues, newFilter)) =>
         inputSubFeeds = inputSubFeeds.map { subFeed =>
           val inputFilter = if (subFeed.dataObjectId == mainInput.id) newFilter else None
-          ActionHelper.updatePartitionValues(inputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = inputPartitionValues, filter = inputFilter).breakLineage)
+          ActionHelper.updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = inputPartitionValues, filter = inputFilter).breakLineage)
         }
         outputSubFeeds = outputSubFeeds.map(subFeed =>
-          ActionHelper.updatePartitionValues(outputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = outputPartitionValues, filter = newFilter).breakLineage)
+          ActionHelper.updateOutputPartitionValues(outputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = outputPartitionValues, filter = newFilter).breakLineage)
         )
       case _ => Unit
     }

@@ -18,7 +18,9 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
+import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.{SaveMode, SparkSession}
 
 private[smartdatalake] trait FileRefDataObject extends FileDataObject {
@@ -64,7 +66,7 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
   /**
    * Given some [[FileRef]]s for another [[DataObject]], translate the paths to the root path of this [[DataObject]]
    */
-  def translateFileRefs(fileRefs: Seq[FileRef])(implicit session: SparkSession): Seq[FileRef] = {
+  def translateFileRefs(fileRefs: Seq[FileRef])(implicit session: SparkSession, context: ActionPipelineContext): Seq[FileRef] = {
     assert(!partitionLayout().exists(_.contains("*")), s"Cannot translate FileRef if partition layout contains * (${partitionLayout()})")
     fileRefs.map {
       f =>
@@ -72,7 +74,7 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
         val newFileName = if (f.fileName.matches(this.fileName.replace("*",".*"))) f.fileName
         else f.fileName + this.fileName.replace("*","")
         // prepend path and partition string before fileName
-        val newPath = getPartitionString(f.partitionValues)
+        val newPath = getPartitionString(f.partitionValues.addKey(Environment.runIdPartitionColumnName, context.runId.toString))
           .map(partitionString => getPath + separator + partitionString + newFileName)
           .getOrElse(getPath + separator + newFileName)
         f.copy(fullPath = newPath)
