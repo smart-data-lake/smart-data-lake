@@ -54,6 +54,7 @@ case class PartitionValues(elements: Map[String, Any]) {
   def keys: Set[String] = elements.keySet
   def isDefinedAt(colName: String): Boolean = elements.isDefinedAt(colName)
   def filterKeys(colNames: Seq[String]): PartitionValues = this.copy(elements = elements.filterKeys(colNames.contains))
+  def addKey(key: String, value: Any): PartitionValues = if(!elements.contains(key)) this.copy(elements = elements + (key -> value)) else this
   def getMapString: Map[String,String] = elements.mapValues(_.toString)
 }
 
@@ -118,6 +119,7 @@ private[smartdatalake] object PartitionValues {
    */
   def checkExpectedPartitionValues(existingPartitionValues: Seq[PartitionValues], expectedPartitionValues: Seq[PartitionValues]): Seq[PartitionValues] = {
     val partitionColCombinations = expectedPartitionValues.map(_.keys).distinct
+    // recursively check every partitionColCombination
     def diffPartitionValues(inputPartitions: Seq[PartitionValues], expectedPartitionValues: Seq[PartitionValues], partitionColCombinations: Seq[Set[String]]): Seq[PartitionValues] = {
       if (partitionColCombinations.isEmpty) return Seq()
       val partitionColCombination = partitionColCombinations.head

@@ -111,7 +111,6 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
   }
 
   test("read partitioned data and filter expected partitions") {
-    import session.implicits._
 
     // create data object
     val tempDir = Files.createTempDirectory("tempHadoopDO")
@@ -134,7 +133,6 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
   }
 
   test("overwrite partitioned data") {
-    import session.implicits._
 
     // create data object
     val tempDir = Files.createTempDirectory("tempHadoopDO")
@@ -161,7 +159,6 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
   }
 
   test("overwrite all") {
-    import session.implicits._
 
     // create data object
     val tempDir = Files.createTempDirectory("tempHadoopDO")
@@ -185,7 +182,6 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
   }
 
   test("overwrite all empty") {
-    import session.implicits._
 
     // create data object
     val tempDir = Files.createTempDirectory("tempHadoopDO")
@@ -206,7 +202,6 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
   }
 
   test("append filename") {
-    import session.implicits._
 
     // create data object
 
@@ -228,4 +223,33 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
 
     FileUtils.deleteDirectory(tempDir.toFile)
   }
+
+  test("get concrete paths") {
+    val tempDir = Files.createTempDirectory("concretePaths")
+    tempDir.resolve("a=1").resolve("b=1").resolve("c=1").toFile.mkdirs()
+    tempDir.resolve("a=1").resolve("b=1").resolve("c=2").toFile.mkdirs()
+    tempDir.resolve("a=1").resolve("b=2").resolve("c=1").toFile.mkdirs()
+    tempDir.resolve("a=1").resolve("b=2").resolve("c=2").toFile.mkdirs()
+    tempDir.resolve("a=1").resolve("b=3").resolve("c=1").toFile.mkdirs()
+    tempDir.resolve("a=1").resolve("b=3").resolve("c=2").toFile.mkdirs()
+    tempDir.resolve("a=2").resolve("b=1").resolve("c=1").toFile.mkdirs()
+    tempDir.resolve("a=2").resolve("b=1").resolve("c=2").toFile.mkdirs()
+    tempDir.resolve("a=2").resolve("b=2").resolve("c=1").toFile.mkdirs()
+    tempDir.resolve("a=2").resolve("b=2").resolve("c=2").toFile.mkdirs()
+    tempDir.resolve("a=2").resolve("b=3").resolve("c=1").toFile.mkdirs()
+    tempDir.resolve("a=2").resolve("b=3").resolve("c=2").toFile.mkdirs()
+
+    val do1 = RawFileDataObject("testDO", tempDir.toString, partitions = Seq("a","b","c"))
+    def removeDOBase(p: String) = p.replaceFirst(".*concretePaths.*?/", "")
+    def getPaths(pv: PartitionValues) = do1.getConcretePaths(pv).map(p => removeDOBase(p.toString))
+    // inits
+    assert(getPaths(PartitionValues(Map("a" -> 1))).sorted == Seq("a=1"))
+    assert(getPaths(PartitionValues(Map("a" -> 1, "b" -> 1))).sorted == Seq("a=1/b=1"))
+    assert(getPaths(PartitionValues(Map("a" -> 1, "b" -> 1, "c" -> 1))).sorted == Seq("a=1/b=1/c=1"))
+    // no inits
+    assert(getPaths(PartitionValues(Map("b" -> 1))).sorted == Seq("a=1/b=1","a=2/b=1"))
+    assert(getPaths(PartitionValues(Map("c" -> 1))).sorted == Seq("a=1/b=1/c=1","a=1/b=2/c=1","a=1/b=3/c=1","a=2/b=1/c=1","a=2/b=2/c=1","a=2/b=3/c=1"))
+    assert(getPaths(PartitionValues(Map("b" -> 1, "c" -> 1))).sorted == Seq("a=1/b=1/c=1","a=2/b=1/c=1"))
+  }
+
 }
