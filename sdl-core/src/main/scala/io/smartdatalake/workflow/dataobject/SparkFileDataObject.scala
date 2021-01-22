@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
+import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.util.misc.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
 import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.hadoop.fs.Path
@@ -115,22 +116,27 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
       filesystem.mkdirs(hadoopPath)
     }
 
+    val schemaOpt = readSchema(filesExists)
     val dfContent = if (partitions.isEmpty || partitionValues.isEmpty) {
       session.read
         .format(format)
         .options(options)
-        .optionalSchema(readSchema(filesExists))
+        .optionalSchema(schemaOpt)
         .load(hadoopPath.toString)
     } else {
       val reader = session.read
         .format(format)
         .options(options)
-        .optionalSchema(readSchema(filesExists))
+        .optionalSchema(schemaOpt)
         .option("basePath", hadoopPath.toString) // this is needed for partitioned tables when subdirectories are read directly; it then keeps the partition columns from the subdirectory path in the dataframe
       // create data frame for every partition value and then build union
       val pathsToRead = partitionValues.flatMap(getConcretePaths).map(_.toString)
-      // TODO: empty reduce
-      pathsToRead.map(reader.load).reduce(_ union _)
+      pathsToRead.map(reader.load).reduceOption(_ union _)
+        .getOrElse{
+          // if there are no paths to read then an empty DataFrame is created
+          require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")
+          DataFrameUtil.getEmptyDataFrame(schemaOpt.get)
+        }
     }
 
     val df = dfContent.withOptionalColumn(filenameColumn, input_file_name)
