@@ -18,14 +18,14 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkRepartitionDef}
+import io.smartdatalake.definitions.{Environment, SDLSaveMode}
+import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
 import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
-import org.apache.spark.sql.types.{StringType, StructType}
 import org.apache.spark.sql.functions.input_file_name
+import org.apache.spark.sql.types.{StringType, StructType}
 
 /**
  * A [[DataObject]] backed by a file in HDFS. Can load file contents into an Apache Spark [[DataFrame]]s.
@@ -129,6 +129,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
         .option("basePath", hadoopPath.toString) // this is needed for partitioned tables when subdirectories are read directly; it then keeps the partition columns from the subdirectory path in the dataframe
       // create data frame for every partition value and then build union
       val pathsToRead = partitionValues.flatMap(getConcretePaths).map(_.toString)
+      // TODO: empty reduce
       pathsToRead.map(reader.load).reduce(_ union _)
     }
 
@@ -139,7 +140,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
   }
 
   override def getStreamingDataFrame(options: Map[String,String], pipelineSchema: Option[StructType])(implicit session: SparkSession): DataFrame = {
-    require(schema.orElse(pipelineSchema).isDefined, s"(${id}) Schema must be defined for streaming SparkFileDataObject")
+    require(schema.orElse(pipelineSchema).isDefined, s"($id}) Schema must be defined for streaming SparkFileDataObject")
     // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
     if (!filesystem.exists(hadoopPath.getParent)) filesystem.mkdirs(hadoopPath)
 
@@ -176,16 +177,29 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     dfPrepared = sparkRepartition.map(_.prepareDataFrame(dfPrepared,partitions, partitionValues.size, id))
       .getOrElse(dfPrepared)
 
-    // delete concerned partitions if existing
-    if (saveMode == SaveMode.Overwrite && partitions.nonEmpty) {
-      val partitionValuesCols = partitionValues.map(_.keys).reduceOption(_ ++ _).getOrElse(Set()).toSeq
-      val partitionValuesToDelete = partitionValues.intersect(listPartitions.map(_.filterKeys(partitionValuesCols)))
-      deletePartitions(partitionValuesToDelete)
+    // SDLSaveMode.Overwrite: delete concerned partitions if existing, as Spark dynamic partitioning doesn't delete empty partitions
+    if (saveMode == SDLSaveMode.Overwrite) {
+      if (partitionValues.nonEmpty) {
+        val partitionValuesCols = partitionValues.map(_.keys).reduceOption(_ ++ _).getOrElse(Set()).toSeq
+        val partitionValuesToDelete = partitionValues.intersect(listPartitions.map(_.filterKeys(partitionValuesCols)))
+        deletePartitions(partitionValuesToDelete)
+      } else {
+        // SDLSaveMode.Overwrite: Workaround ADLSv2: overwrite unpartitioned data object as it is not deleted by spark csv writer (strangely it works for parquet)
+        if (Environment.enableOverwriteUnpartitionedSparkFileDataObjectAdls) {
+          deleteAll
+        }
+      }
     }
 
-    // Workaround ADLSv2: overwrite unpartitioned data object
-    if (saveMode == SaveMode.Overwrite && partitions.isEmpty && Environment.enableOverwriteUnpartitionedSparkFileDataObjectAdls) {
-      deleteAll
+    // SDLSaveMode.OverwritePreserveDirectories:
+    if (saveMode == SDLSaveMode.OverwritePreserveDirectories) {
+      if (partitionValues.nonEmpty) {
+        val partitionValuesCols = partitionValues.map(_.keys).reduceOption(_ ++ _).getOrElse(Set()).toSeq
+        val partitionValuesToDelete = partitionValues.intersect(listPartitions.map(_.filterKeys(partitionValuesCols)))
+        deletePartitionsFiles(partitionValuesToDelete)
+      } else {
+        deleteAllFiles(hadoopPath)
+      }
     }
 
     val hadoopPathString = hadoopPath.toString
@@ -193,7 +207,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
 
     // write
     dfPrepared.write.format(format)
-      .mode(saveMode)
+      .mode(saveMode.asSparkSaveMode)
       .options(options)
       .optionalPartitionBy(partitions)
       .save(hadoopPathString)

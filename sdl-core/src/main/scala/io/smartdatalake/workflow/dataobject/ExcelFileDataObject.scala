@@ -21,10 +21,12 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.SDLSaveMode
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.{AclDef, DataFrameUtil}
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SaveMode}
 
 /**
  * A [[DataObject]] backed by an Microsoft Excel data source.
@@ -60,7 +62,7 @@ case class ExcelFileDataObject(override val id: DataObjectId,
                                override val partitions: Seq[String] = Seq(),
                                override val schema: Option[StructType] = None,
                                override val schemaMin: Option[StructType] = None,
-                               override val saveMode: SaveMode = SaveMode.Overwrite,
+                               override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                override val sparkRepartition: Option[SparkRepartitionDef] = Some(SparkRepartitionDef(numberOfTasksPerPartition = 1)),
                                override val acl: Option[AclDef] = None,
                                override val connectionId: Option[ConnectionId] = None,
