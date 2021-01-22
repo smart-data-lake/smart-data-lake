@@ -18,7 +18,8 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
+import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
 import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.hadoop.fs.Path
@@ -180,6 +181,11 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
       val partitionValuesCols = partitionValues.map(_.keys).reduceOption(_ ++ _).getOrElse(Set()).toSeq
       val partitionValuesToDelete = partitionValues.intersect(listPartitions.map(_.filterKeys(partitionValuesCols)))
       deletePartitions(partitionValuesToDelete)
+    }
+
+    // Workaround ADLSv2: overwrite unpartitioned data object
+    if (saveMode == SaveMode.Overwrite && partitions.isEmpty && Environment.enableOverwriteUnpartitionedSparkFileDataObjectAdls) {
+      deleteAll
     }
 
     val hadoopPathString = hadoopPath.toString
