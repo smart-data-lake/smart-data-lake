@@ -21,10 +21,12 @@ package io.smartdatalake.workflow.dataobject
 
 import java.nio.file.Files
 
+import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.CustomFileActionTest
 import org.apache.commons.io.FileUtils
+import org.apache.hadoop.fs.Path
 
 import scala.util.Try
 
@@ -168,7 +170,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
     val df1 = Seq(("A",1),("A",2)).toDF("p", "value")
     dataObject.writeDataFrame(df1)
 
-    // overwrite partition B with new data, overwrite partition C with no data
+    // overwrite with new data
     val df2 = Seq(("B",3),("B",4)).toDF("p", "value")
     dataObject.writeDataFrame(df2)
 
@@ -191,12 +193,35 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
     val df1 = Seq(("A",1),("A",2)).toDF("p", "value")
     dataObject.writeDataFrame(df1)
 
-    // overwrite partition B with new data, overwrite partition C with no data
+    // overwrite with no data
     val df2 = Seq[(String,Int)]().toDF("p", "value")
     dataObject.writeDataFrame(df2)
 
     // test reading data
     assert(dataObject.getDataFrame().isEmpty)
+
+    FileUtils.deleteDirectory(tempDir.toFile)
+  }
+
+  test("overwrite all preserve directory") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, csvOptions = Map("header" -> "true"), saveMode = SDLSaveMode.OverwritePreserveDirectories)
+
+    // write test data
+    val df1 = Seq(("A",1),("A",2)).toDF("p", "value")
+    dataObject.writeDataFrame(df1)
+
+    // overwrite with new data
+    val df2 = Seq(("B",3),("B",4)).toDF("p", "value")
+    dataObject.writeDataFrame(df2)
+
+    // test reading data
+    val result = dataObject.getDataFrame()
+      .select($"p",$"value".cast("int"))
+      .as[(String,Int)].collect.toSeq.sorted
+    assert( result == Seq(("B",3),("B",4)))
 
     FileUtils.deleteDirectory(tempDir.toFile)
   }
@@ -250,6 +275,35 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
     assert(getPaths(PartitionValues(Map("b" -> 1))).sorted == Seq("a=1/b=1","a=2/b=1"))
     assert(getPaths(PartitionValues(Map("c" -> 1))).sorted == Seq("a=1/b=1/c=1","a=1/b=2/c=1","a=1/b=3/c=1","a=2/b=1/c=1","a=2/b=2/c=1","a=2/b=3/c=1"))
     assert(getPaths(PartitionValues(Map("b" -> 1, "c" -> 1))).sorted == Seq("a=1/b=1/c=1","a=2/b=1/c=1"))
+  }
+
+
+  test("delete files only") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", partitions = Seq("p"), path = tempDir.toString, csvOptions = Map("header" -> "true"))
+
+    // write test data
+    val df1 = Seq(("A",1),("A",2)).toDF("p", "value")
+    dataObject.writeDataFrame(df1)
+
+    // delete partition files
+    val partitionValues = PartitionValues(Map("p"->"A"))
+    val partitionPath = new Path(dataObject.hadoopPath, dataObject.getPartitionString(partitionValues).get)
+    assert(dataObject.filesystem.isDirectory(partitionPath))
+    assert(dataObject.filesystem.listStatus(partitionPath).nonEmpty)
+    dataObject.deletePartitionsFiles(Seq(partitionValues))
+    assert(dataObject.filesystem.listStatus(partitionPath).isEmpty)
+    assert(dataObject.filesystem.isDirectory(partitionPath))
+
+    // delete files in base dir
+    assert(dataObject.filesystem.listStatus(dataObject.hadoopPath).nonEmpty)
+    dataObject.deleteAllFiles(dataObject.hadoopPath)
+    assert(dataObject.filesystem.listStatus(dataObject.hadoopPath).isEmpty)
+    assert(dataObject.filesystem.isDirectory(dataObject.hadoopPath))
+
+    FileUtils.deleteDirectory(tempDir.toFile)
   }
 
 }

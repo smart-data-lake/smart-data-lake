@@ -23,6 +23,8 @@ import java.io.{InputStream, OutputStream}
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.SDLSaveMode
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.filetransfer.SshUtil
 import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -55,7 +57,7 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
                                  connectionId: ConnectionId,
                                  override val partitions: Seq[String] = Seq(),
                                  override val partitionLayout: Option[String] = None,
-                                 override val saveMode: SaveMode = SaveMode.Overwrite,
+                                 override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                  override val expectedPartitionsCondition: Option[String] = None,
                                  override val metadata: Option[DataObjectMetadata] = None)
                                 (@transient implicit val instanceRegistry: InstanceRegistry)

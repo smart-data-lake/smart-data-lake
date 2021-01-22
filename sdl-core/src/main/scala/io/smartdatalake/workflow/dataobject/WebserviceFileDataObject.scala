@@ -24,6 +24,8 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.SDLSaveMode
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{CredentialsUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.webservice._
@@ -64,7 +66,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
   val tika = new Tika
 
   // Always set to Append as we use Webservice to push files
-  override val saveMode: SaveMode = SaveMode.Append
+  override val saveMode: SDLSaveMode = SDLSaveMode.Append
 
   override def partitions: Seq[String] = partitionDefs.map(_.name)
   override def expectedPartitionsCondition: Option[String] = None // all partitions are expected to exist
