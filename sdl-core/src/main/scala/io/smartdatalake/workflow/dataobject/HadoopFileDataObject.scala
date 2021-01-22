@@ -152,12 +152,30 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     assert(partitions.nonEmpty, s"deletePartitions called but no partition columns are defined for $id")
 
     // delete given partitions on hdfs
-    partitionValues.map { pv =>
-      // check if valid init of partitions
-      assert(partitions.inits.map(_.toSet).contains(pv.keys), s"${pv.keys.mkString(",")} is not a valid init of ${partitions.mkString(",")}")
+    val pathsToDelete = partitionValues.flatMap(getConcretePaths)
+    pathsToDelete.foreach(filesystem.delete(_, /*recursive*/ true))
+  }
+
+  /**
+   * Generate all paths for given partition values exploding undefined partitions before the last given partition value.
+   * Use case: Reading all files from a given path with spark cannot contain wildcards.
+   *   If there are partitions without given partition value before the last partition value given, they must be searched with globs.
+   */
+  def getConcretePaths(pv: PartitionValues)(implicit session: SparkSession): Seq[Path] = {
+    assert(partitions.nonEmpty)
+    // check if valid init of partitions -> then we can read all at once, otherwise we need to search with globs as load doesnt support wildcards
+    if (partitions.inits.map(_.toSet).contains(pv.keys)) {
       val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitions.filter(pv.isDefinedAt), separator)
-      val partitionPath = new Path(hadoopPath, pv.getPartitionString(partitionLayout))
-      filesystem.delete(partitionPath, true) // recursive=true
+      Seq(new Path(hadoopPath, pv.getPartitionString(partitionLayout)))
+    } else {
+      // get all partition columns until last given partition value
+      val givenPartitions = pv.keys
+      val initPartitions = partitions.reverse.dropWhile(!givenPartitions.contains(_)).reverse
+      // create path with wildcards
+      val partitionLayout = HdfsUtil.getHadoopPartitionLayout(initPartitions, separator)
+      val globPartitionPath = new Path(hadoopPath, pv.getPartitionString(partitionLayout))
+      logger.info(s"($id) deletePartition with globs needed because ${pv.keys.mkString(",")} is not an init of partition columns ${partitions.mkString(",")}, path = $globPartitionPath")
+      filesystem.globStatus(globPartitionPath).map(_.getPath)
     }
   }
 
@@ -179,9 +197,14 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   }
 
   override def createEmptyPartition(partitionValues: PartitionValues)(implicit session: SparkSession): Unit = {
-    val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitions.filter(partitionValues.isDefinedAt), separator)
-    val partitionPath = new Path(hadoopPath, partitionValues.getPartitionString(partitionLayout))
-    filesystem.mkdirs(partitionPath)
+    // check if valid init of partitions -> otherwise we can not create empty partition as path is not fully defined
+    if (partitions.inits.map(_.toSet).contains(partitionValues.keys)) {
+      val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitions.filter(partitionValues.isDefinedAt), separator)
+      val partitionPath = new Path(hadoopPath, partitionValues.getPartitionString(partitionLayout))
+      filesystem.mkdirs(partitionPath)
+    } else {
+      logger.info(s"($id) can not createEmptyPartition for $partitionValues as ${partitionValues.keys.mkString(",")} is not an init of partition columns ${partitions.mkString(",")}")
+    }
   }
 
   override def getFileRefs(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[FileRef] = {

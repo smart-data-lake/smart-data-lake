@@ -19,7 +19,6 @@
 
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
@@ -32,7 +31,6 @@ import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.streaming.Trigger
-import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
 private[smartdatalake] abstract class SparkAction extends Action {
@@ -90,7 +88,8 @@ private[smartdatalake] abstract class SparkAction extends Action {
           // validate partition values existing for input
           input match {
             case partitionedInput: DataObject with CanHandlePartitions if subFeed.partitionValues.nonEmpty && (context.phase==ExecutionPhase.Exec || subFeed.isDAGStart) =>
-              val expectedPartitions = partitionedInput.filterExpectedPartitionValues(subFeed.partitionValues)
+              val completePartitionValues = subFeed.partitionValues.filter(_.keys==partitionedInput.partitions.toSet)
+              val expectedPartitions = partitionedInput.filterExpectedPartitionValues(completePartitionValues)
               val missingPartitionValues = if (expectedPartitions.nonEmpty) PartitionValues.checkExpectedPartitionValues(partitionedInput.listPartitions, expectedPartitions) else Seq()
               assert(missingPartitionValues.isEmpty, s"($id) partitions ${missingPartitionValues.mkString(", ")} missing for ${input.id}")
             case _ => Unit
