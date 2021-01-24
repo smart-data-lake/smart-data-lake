@@ -152,13 +152,14 @@ object TestUtil extends SmartDataLakeLogger {
    */
   def setupWebservice(host: String, port: Int, httpsPort: Int): WireMockServer = {
     configureFor(host,port)
+    val keystoreFile = this.getClass.getResource("/test_keystore.pkcs12").getFile
     val wireMockServer =
       new WireMockServer(
         wireMockConfig()
           .port(port)
           .httpsPort(httpsPort)
           .bindAddress(host)
-          .keystorePath("src/test/resources/test_keystore.pkcs12")
+          .keystorePath(keystoreFile)
           .keystorePassword("mytruststorepassword")
       )
     wireMockServer
