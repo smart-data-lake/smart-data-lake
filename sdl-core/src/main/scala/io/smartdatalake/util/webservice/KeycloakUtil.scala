@@ -24,18 +24,14 @@ import scalaj.http.Http
 
 import scala.util.{Failure, Success, Try}
 
-private[smartdatalake] case class KeycloakConfig(ssoServer: String, ssoRealm: String, ssoGrantType: String) extends SmartDataLakeLogger {
+private[smartdatalake] object KeycloakUtil extends SmartDataLakeLogger {
 
   /**
    * * Method used to invalidate the refresh token.
    * * It's good practice to call this method when you're done. The token won't be used anymore
    * * (we don't save it), so there's no need for the server to keep this session open.
-   *
-   * @param clientId
-   * @param clientSecret
-   * @param keycloak
    */
-  def logout(clientId: String, clientSecret: String, keycloak: Keycloak): Unit = {
+  def logout(ssoServer: String, ssoRealm: String, clientId: String, clientSecret: String, keycloak: Keycloak): Unit = {
     val logoutUrl: String = ssoServer +"/realms/" +ssoRealm+"/protocol/openid-connect/logout?"
     logger.debug(s"Calling logout url: $logoutUrl")
     val refreshToken = keycloak.tokenManager().refreshToken().getRefreshToken
@@ -58,28 +54,4 @@ private[smartdatalake] case class KeycloakConfig(ssoServer: String, ssoRealm: St
       case Failure(exception) => throw new WebserviceException(s"Keycloak logout request call failed with $exception")
     }
   }
-
-
-  /**
-   * Prepares Keycloak with given config
-   *
-   * @param clientId OAuth2 client-id
-   * @param clientSecret OAuth2 client-secret
-   * @return Keycloak Instance
-   */
-  def prepare(clientId: String, clientSecret: String) : Keycloak = {
-    assert(clientId != null)
-    assert(clientSecret != null)
-    assert(ssoRealm != null && ssoServer != null && ssoGrantType != null)
-
-    KeycloakBuilder
-      .builder
-      .serverUrl(ssoServer)
-      .realm(ssoRealm)
-      .grantType(ssoGrantType)
-      .clientId(clientId)
-      .clientSecret(clientSecret)
-      .build
-  }
-
 }
