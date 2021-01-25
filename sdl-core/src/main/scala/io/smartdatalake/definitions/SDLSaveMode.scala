@@ -31,19 +31,19 @@ object SDLSaveMode extends Enumeration {
   /**
    * @see [[SaveMode]]
    */
-  val Overwrite: Value = Value("overwrite")
+  val Overwrite: Value = Value("Overwrite")
   /**
    * @see [[SaveMode]]
    */
-  val Append: Value = Value("append")
+  val Append: Value = Value("Append")
   /**
    * @see [[SaveMode]]
    */
-  val ErrorIfExists: Value = Value("error")
+  val ErrorIfExists: Value = Value("Error")
   /**
    * @see [[SaveMode]]
    */
-  val Ignore: Value = Value("ignore")
+  val Ignore: Value = Value("Ignore")
 
   /**
    * This is like SaveMode.overwrite but doesnt delete the directory of the DataObject and its partition.
@@ -55,7 +55,7 @@ object SDLSaveMode extends Enumeration {
    * partitions where data is present in the DataFrame to be written (enabled by default in SDL).
    * To stop if no partition values are present, configure executionMode.type = FailIfNoPartitionValuesMode on the Action.
    */
-  val OverwritePreserveDirectories: Value = Value("overwritePreserveDirectories")
+  val OverwritePreserveDirectories: Value = Value("OverwritePreserveDirectories")
 
 
   /* add implicit methods to enumeration, e.g. asSparkSaveMode */
