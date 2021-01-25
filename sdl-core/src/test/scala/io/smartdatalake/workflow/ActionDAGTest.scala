@@ -721,9 +721,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val schema = DataType.fromDDL("lastname string, firstname string, rating int").asInstanceOf[StructType]
     val srcDO = JsonFileDataObject( "src1", tempDir.resolve("src1").toString.replace('\\', '/'), schema = Some(schema))
     instanceRegistry.register(srcDO)
-    val tgt1DO = JsonFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SaveMode.Append, jsonOptions = Some(Map("multiLine" -> "false")))
+    val tgt1DO = JsonFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SDLSaveMode.Append, jsonOptions = Some(Map("multiLine" -> "false")))
     instanceRegistry.register(tgt1DO)
-    val tgt2DO = JsonFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'), saveMode = SaveMode.Append, jsonOptions = Some(Map("multiLine" -> "false")))
+    val tgt2DO = JsonFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'), saveMode = SDLSaveMode.Append, jsonOptions = Some(Map("multiLine" -> "false")))
     instanceRegistry.register(tgt2DO)
 
     // prepare DAG
@@ -784,7 +784,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val schema = DataType.fromDDL("lastname string, firstname string, rating int").asInstanceOf[StructType]
     val srcDO = JsonFileDataObject( "src1", tempDir.resolve("src1").toString.replace('\\', '/'), schema = Some(schema))
     instanceRegistry.register(srcDO)
-    val tgt1DO = JsonFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SaveMode.Append, jsonOptions = Some(Map("multiLine" -> "false")))
+    val tgt1DO = JsonFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SDLSaveMode.Append, jsonOptions = Some(Map("multiLine" -> "false")))
     instanceRegistry.register(tgt1DO)
     val tgt2DO = JsonFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'), jsonOptions = Some(Map("multiLine" -> "false")))
     instanceRegistry.register(tgt2DO)
@@ -848,7 +848,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(src1DO)
     val src2DO = JsonFileDataObject( "src2", tempDir.resolve("src2").toString.replace('\\', '/'), schema = Some(schema))
     instanceRegistry.register(src2DO)
-    val tgt1DO = JsonFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SaveMode.Append, jsonOptions = Some(Map("multiLine" -> "false")))
+    val tgt1DO = JsonFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SDLSaveMode.Append, jsonOptions = Some(Map("multiLine" -> "false")))
     instanceRegistry.register(tgt1DO)
 
     // prepare DAG
@@ -906,7 +906,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val schema = DataType.fromDDL("lastname string, firstname string, rating int, tstmp timestamp").asInstanceOf[StructType]
     val srcDO = JsonFileDataObject( "src1", tempDir.resolve("src1").toString.replace('\\', '/'), schema = Some(schema))
     instanceRegistry.register(srcDO)
-    val tgt1DO = ParquetFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SaveMode.Append)
+    val tgt1DO = ParquetFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SDLSaveMode.Append)
     instanceRegistry.register(tgt1DO)
     val tgt2DO = ParquetFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'))
     instanceRegistry.register(tgt2DO)
@@ -970,7 +970,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val schema2 = DataType.fromDDL("lastname string, firstname string, address string").asInstanceOf[StructType]
     val src2DO = JsonFileDataObject( "src2", tempDir.resolve("src2").toString.replace('\\', '/'), schema = Some(schema2))
     instanceRegistry.register(src2DO)
-    val tgt1DO = ParquetFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SaveMode.Append)
+    val tgt1DO = ParquetFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SDLSaveMode.Append)
     instanceRegistry.register(tgt1DO)
     val tgt2DO = ParquetFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'))
     instanceRegistry.register(tgt2DO)
@@ -1026,7 +1026,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val schema = DataType.fromDDL("lastname string, firstname string, rating int, tstmp timestamp").asInstanceOf[StructType]
     val srcDO = JsonFileDataObject( "src1", tempDir.resolve("src1").toString.replace('\\', '/'), schema = Some(schema))
     instanceRegistry.register(srcDO)
-    val tgt1DO = ParquetFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SaveMode.Append)
+    val tgt1DO = ParquetFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SDLSaveMode.Append)
     instanceRegistry.register(tgt1DO)
 
     // prepare DAG
@@ -1050,9 +1050,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val schema = DataType.fromDDL("lastname string, firstname string, rating int, tstmp timestamp").asInstanceOf[StructType]
     val srcDO = JsonFileDataObject( "src1", tempDir.resolve("src1").toString.replace('\\', '/'), schema = Some(schema), partitions = Seq("lastname"))
     instanceRegistry.register(srcDO)
-    val tgt1DO = ParquetFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), partitions = Seq("lastname"), saveMode = SaveMode.Append)
+    val tgt1DO = ParquetFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), partitions = Seq("lastname"), saveMode = SDLSaveMode.Append)
     instanceRegistry.register(tgt1DO)
-    val tgt2DO = ParquetFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'), partitions = Seq("lastname"), saveMode = SaveMode.Append)
+    val tgt2DO = ParquetFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'), partitions = Seq("lastname"), saveMode = SDLSaveMode.Append)
     instanceRegistry.register(tgt2DO)
 
     // prepare DAG

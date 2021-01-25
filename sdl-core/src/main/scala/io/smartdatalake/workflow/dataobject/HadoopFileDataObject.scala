@@ -114,8 +114,8 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    * @throws IllegalArgumentException if `failIfFilesMissing` = true and no files found at `path`.
    */
   protected def checkFilesExisting(implicit session:SparkSession): Boolean = {
-    val files = if (filesystem.exists(hadoopPath.getParent)) {
-      arrayToSeq(filesystem.globStatus(hadoopPath))
+    val files = if (filesystem.exists(hadoopPath)) {
+      arrayToSeq(filesystem.listStatus(hadoopPath))
     } else {
       Seq.empty
     }
@@ -138,15 +138,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   /**
    * Delete Hadoop Partitions.
    *
-   * Note that this is only possible, if every set of column names in `partitionValues` are valid "inits"
-   * of this [[DataObject]]'s `partitions`.
-   *
-   * Every valid "init" can be produced by repeatedly removing the last element of a collection.
-   * Example:
-   * - a,b of a,b,c -> OK
-   * - a,c of a,b,c -> NOK
-   *
-   * @see [[scala.collection.TraversableLike.init]]
+   * if there is no value for a partition column before the last partition column given, the partition path will be exploded
    */
   override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
     assert(partitions.nonEmpty, s"deletePartitions called but no partition columns are defined for $id")
@@ -154,6 +146,19 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     // delete given partitions on hdfs
     val pathsToDelete = partitionValues.flatMap(getConcretePaths)
     pathsToDelete.foreach(filesystem.delete(_, /*recursive*/ true))
+  }
+
+  /**
+   * Delete files inside Hadoop Partitions, but keep partition directory to preserve ACLs
+   *
+   * if there is no value for a partition column before the last partition column given, the partition path will be exploded
+   */
+  def deletePartitionsFiles(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+    assert(partitions.nonEmpty, s"deletePartitions called but no partition columns are defined for $id")
+
+    // delete files for given partitions on hdfs
+    val pathsToDelete = partitionValues.flatMap(getConcretePaths)
+    pathsToDelete.foreach(deleteAllFiles)
   }
 
   /**
@@ -174,7 +179,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
       // create path with wildcards
       val partitionLayout = HdfsUtil.getHadoopPartitionLayout(initPartitions, separator)
       val globPartitionPath = new Path(hadoopPath, pv.getPartitionString(partitionLayout))
-      logger.info(s"($id) deletePartition with globs needed because ${pv.keys.mkString(",")} is not an init of partition columns ${partitions.mkString(",")}, path = $globPartitionPath")
+      logger.info(s"($id) getConcretePaths with globs needed because ${pv.keys.mkString(",")} is not an init of partition columns ${partitions.mkString(",")}, path = $globPartitionPath")
       filesystem.globStatus(globPartitionPath).map(_.getPath)
     }
   }
@@ -226,7 +231,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     super.preWrite
     // validate if acl's must be / are configured before writing
     if (Environment.hadoopAuthoritiesWithAclsRequired.exists( a => filesystem.getUri.toString.contains(a))) {
-      require(acl.isDefined, s"($id) ACL definitions are required for writing DataObjects on hadoop authority ${filesystem.getUri} by environment setting hadoopAuthoritiesWithAclsRequired")
+      require(acl().isDefined, s"($id) ACL definitions are required for writing DataObjects on hadoop authority ${filesystem.getUri} by environment setting hadoopAuthoritiesWithAclsRequired")
     }
   }
 
@@ -252,6 +257,14 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   override def deleteAll(implicit session: SparkSession): Unit = {
     logger.info(s"($id) deleteAll $hadoopPath")
     filesystem.delete(hadoopPath, true) // recursive=true
+  }
+
+  /**
+   * delete all files inside given path recursively
+   */
+  def deleteAllFiles(path: Path)(implicit session: SparkSession): Unit = {
+    val dirEntries = filesystem.globStatus(new Path(path,"*")).map(_.getPath)
+    dirEntries.foreach(filesystem.delete(_, /*recursive*/ true))
   }
 
   protected[workflow] def applyAcls(implicit session: SparkSession): Unit = {

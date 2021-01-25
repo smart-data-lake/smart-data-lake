@@ -19,9 +19,10 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
 import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.spark.sql.SparkSession
 
 private[smartdatalake] trait FileRefDataObject extends FileDataObject {
 
@@ -124,7 +125,7 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
    * Overwrite or Append new data.
    * When writing partitioned data, this applies only to partitions concerned.
    */
-  def saveMode: SaveMode
+  def saveMode: SDLSaveMode
 }
 
 private[smartdatalake] case class FileRef( fullPath:String, fileName: String, partitionValues: PartitionValues) {
