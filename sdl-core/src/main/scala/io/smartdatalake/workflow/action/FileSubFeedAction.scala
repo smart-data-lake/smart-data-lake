@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.definitions.{Environment, ExecutionMode}
+import io.smartdatalake.definitions.{Environment, ExecutionMode, SDLSaveMode}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject._
@@ -61,6 +61,8 @@ abstract class FileSubFeedAction extends Action {
     // make sure all output partitions exist in input
     val unknownPartitions = output.partitions.diff(input.partitions :+ Environment.runIdPartitionColumnName)
     if (unknownPartitions.nonEmpty) throw ConfigurationException(s"($id) Partition columns ${unknownPartitions.mkString(", ")} not found in input")
+    // check for unsupported save mode
+    assert(output.saveMode!=SDLSaveMode.OverwritePreserveDirectories, s"($id) saveMode OverwritePreserveDirectories not supported for now.")
   }
 
   private def prepareSubFeed(subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): (FileSubFeed,FileSubFeed) = {
@@ -110,7 +112,7 @@ abstract class FileSubFeedAction extends Action {
     assert(subFeeds.size == 1, s"Only one subfeed allowed for FileSubFeedActions (Action $id, inputSubfeed's ${subFeeds.map(_.dataObjectId).mkString(",")})")
     var (inputSubFeed,outputSubFeed) = prepareSubFeed(subFeeds.head)
     // delete existing files on overwrite
-    if (output.saveMode == SaveMode.Overwrite) {
+    if (output.saveMode == SDLSaveMode.Overwrite) {
       if (output.partitions.nonEmpty)
         if (outputSubFeed.partitionValues.nonEmpty) output.deletePartitions(outputSubFeed.partitionValues)
         else logger.warn(s"($id) Cannot delete data from partitioned data object ${output.id} as no partition values are given but saveMode=overwrite")

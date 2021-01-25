@@ -42,7 +42,7 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         |     type = RawFileDataObject
         |     path = /my/path2
         |     partitions = []
-        |     saveMode = append
+        |     saveMode = Append
         |   }
         |   do3 = {
         |     type = CsvFileDataObject
@@ -53,7 +53,7 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         |       header = "true"
         |       quote = "\""
         |     }
-        |     saveMode = overwritePreserveDirectories
+        |     saveMode = OverwritePreserveDirectories
         |   }
         |}
         |actions = {

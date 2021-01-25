@@ -21,8 +21,9 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{DateColumnType, Environment}
+import io.smartdatalake.definitions.{DateColumnType, Environment, SDLSaveMode}
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SmartDataLakeLogger}
@@ -66,7 +67,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
                                override val schemaMin: Option[StructType] = None,
                                override var table: Table,
                                numInitialHdfsPartitions: Int = 16,
-                               saveMode: SaveMode = SaveMode.Overwrite,
+                               saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                acl: Option[AclDef] = None,
                                connectionId: Option[ConnectionId] = None,
                                override val expectedPartitionsCondition: Option[String] = None,
@@ -82,6 +83,8 @@ case class HiveTableDataObject(override val id: DataObjectId,
   // prepare table
   table = table.overrideDb(connection.map(_.db))
   if (table.db.isEmpty) throw ConfigurationException(s"($id) db is not defined in table and connection.")
+
+  assert(saveMode!=SDLSaveMode.OverwritePreserveDirectories, s"($id) saveMode OverwritePreserveDirectories not supported for now.")
 
   // prepare final path
   @transient private var hadoopPathHolder: Path = _
@@ -154,7 +157,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
     val dfPrepared = if (createTableOnly) session.createDataFrame(List[Row]().asJava, df.schema) else df
 
     // write table and fix acls
-    HiveUtil.writeDfToHive( dfPrepared, hadoopPath, table, partitions, saveMode, numInitialHdfsPartitions=numInitialHdfsPartitions )
+    HiveUtil.writeDfToHive( dfPrepared, hadoopPath, table, partitions, saveMode.asSparkSaveMode, numInitialHdfsPartitions=numInitialHdfsPartitions )
     val aclToApply = acl.orElse(connection.flatMap(_.acl))
     if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
     if (analyzeTableAfterWrite && !createTableOnly) {
