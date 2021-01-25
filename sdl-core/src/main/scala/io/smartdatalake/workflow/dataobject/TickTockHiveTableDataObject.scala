@@ -21,8 +21,9 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{DateColumnType, Environment}
+import io.smartdatalake.definitions.{DateColumnType, Environment, SDLSaveMode}
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, DataFrameUtil}
@@ -43,7 +44,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
                                        override val schemaMin: Option[StructType] = None,
                                        override var table: Table,
                                        numInitialHdfsPartitions: Int = 16,
-                                       saveMode: SaveMode = SaveMode.Overwrite,
+                                       saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                        acl: Option[AclDef] = None,
                                        override val expectedPartitionsCondition: Option[String] = None,
                                        connectionId: Option[ConnectionId] = None,
@@ -59,6 +60,8 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   // prepare table
   table = table.overrideDb(connection.map(_.db))
   if (table.db.isEmpty) throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
+
+  assert(saveMode!=SDLSaveMode.OverwritePreserveDirectories, s"($id) saveMode OverwritePreserveDirectories not supported for now.")
 
   // prepare final path
   @transient private var hadoopPathHolder: Path = _
@@ -152,7 +155,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     }
 
     // write table and fix acls
-    HiveUtil.writeDfToHiveWithTickTock(dfPrepared, hadoopPath, table, partitions, saveMode, forceTickTock = isRecursiveInput)
+    HiveUtil.writeDfToHiveWithTickTock(dfPrepared, hadoopPath, table, partitions, saveMode.asSparkSaveMode, forceTickTock = isRecursiveInput)
     val aclToApply = acl.orElse(connection.flatMap(_.acl))
     if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
     if (analyzeTableAfterWrite && !createTableOnly) {
