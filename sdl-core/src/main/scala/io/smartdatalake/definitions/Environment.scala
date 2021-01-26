@@ -169,7 +169,7 @@ object Environment {
     , "create-sql", "createSql", "pre-read-sql", "preReadSql", "post-read-sql", "postReadSql", "pre-write-sql", "preWriteSql", "post-write-sql", "postWriteSql"
     , "executionMode.checkpointLocation", "execution-mode.checkpoint-location")
   val defaultPathSeparator: Char = '/'
-  val runIdPartitionColumnName = "_run_id"
+  val runIdPartitionColumnName = "run_id"
 
   // dynamically shared environment for custom code (see also #106)
   def sparkSession: SparkSession = _sparkSession
