@@ -596,8 +596,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     srcDO.writeDataFrame(df1, Seq())
     val partitionDiffMode = PartitionDiffMode(
       applyCondition = Some("isStartNode"),
-      selectExpression = Some("slice(selectedPartitionValues,-1,1)"), // only one partition: last partition first
-      failCondition = Some("size(selectedPartitionValues) = 0 and size(outputPartitionValues) = 0")
+      selectExpression = Some("slice(selectedOutputPartitionValues,-1,1)"), // only one partition: last partition first
+      failCondition = Some("size(selectedOutputPartitionValues) = 0 and size(outputPartitionValues) = 0")
     )
     val actions: Seq[SparkSubFeedAction] = Seq(
       DeduplicateAction("a", srcDO.id, tgt1DO.id, executionMode = Some(partitionDiffMode))
