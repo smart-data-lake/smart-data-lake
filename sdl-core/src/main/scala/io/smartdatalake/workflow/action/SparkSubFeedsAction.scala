@@ -96,7 +96,8 @@ abstract class SparkSubFeedsAction extends SparkAction {
           ActionHelper.updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = inputPartitionValues, filter = inputFilter).breakLineage)
         }
         outputSubFeeds = outputSubFeeds.map(subFeed =>
-          ActionHelper.updateOutputPartitionValues(outputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = outputPartitionValues, filter = newFilter).breakLineage)
+          // we need to transform inputPartitionValues again to outputPartitionValues so that partition values from partitions not existing in mainOutput are not lost.
+          ActionHelper.updateOutputPartitionValues(outputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = inputPartitionValues, filter = newFilter).breakLineage, Some(transformPartitionValues))
         )
       case _ => Unit
     }

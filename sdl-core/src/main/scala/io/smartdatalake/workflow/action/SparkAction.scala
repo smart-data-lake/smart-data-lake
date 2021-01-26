@@ -251,7 +251,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
    */
   def validateDataFrameContainsCols(df: DataFrame, columns: Seq[String], debugName: String): Unit = {
     val missingColumns = columns.diff(df.columns)
-    assert(missingColumns.isEmpty, s"DataFrame $debugName doesn't include columns $missingColumns")
+    assert(missingColumns.isEmpty, s"DataFrame $debugName doesn't include columns ${missingColumns.mkString(", ")}")
   }
 
   /**
