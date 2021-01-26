@@ -390,7 +390,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
 
     // setup DataObjects
     // For testing we will read something from Spark UI API...
-    val srcDO = WebserviceFileDataObject("src1", WebserviceOptions(session.sparkContext.uiWebUrl.get + "/api/v1/applications"))
+    val srcDO = WebserviceFileDataObject("src1", url = session.sparkContext.uiWebUrl.get + "/api/v1/applications")
     val tgtDO = JsonFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'))
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
@@ -414,7 +414,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
 
     // setup DataObjects
     // For testing we will read something from Spark UI API...
-    val srcDO = WebserviceFileDataObject("src1", WebserviceOptions(session.sparkContext.uiWebUrl.get + "/api/v1")
+    val srcDO = WebserviceFileDataObject("src1", url = session.sparkContext.uiWebUrl.get + "/api/v1"
       , partitionDefs = Seq(WebservicePartitionDefinition("subject", Seq("applications","version"))), partitionLayout = Some("/%subject%"))
     val tgtDO = JsonFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'))
     instanceRegistry.register(srcDO)

@@ -18,11 +18,21 @@
  */
 package io.smartdatalake.util.webservice
 
-/**
-  * Wrapper for webservice responses
-  *
-  * @param content Response Body of a webservice call as string
-  */
-private[smartdatalake] case class Response(content: String) {
+import scala.util.Try
 
+private[smartdatalake] trait WebserviceClient {
+
+  /**
+    * Sends a GET request to a webservice
+    *
+    * @return Success(with response as Array[Byte])
+    *         or Failure([[WebserviceException]] with reason of failure)
+    */
+  def get(): Try[Array[Byte]]
+
+
+  def post(body: Array[Byte], mimeType: String): Try[Array[Byte]]
+
+
+  def put(body: Array[Byte], mimeType: String): Try[Array[Byte]]
 }
