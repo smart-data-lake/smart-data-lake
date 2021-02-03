@@ -22,7 +22,7 @@ import java.sql.Timestamp
 import java.time.LocalDateTime
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -129,7 +129,7 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
     invalidCharacters.replaceAllIn(str, "_")
   }
 
-  def getMainDataObject[T <: DataObject](mainId: Option[DataObjectId], dataObjects: Seq[T], inputOutput: String, mainNeeded: Boolean, actionId: ActionObjectId): T = {
+  def getMainDataObject[T <: DataObject](mainId: Option[DataObjectId], dataObjects: Seq[T], inputOutput: String, mainNeeded: Boolean, actionId: ActionId): T = {
     // split dataObjects into dataObjects with partition columns defined and others
     val partitionedDataObjects = dataObjects.collect{ case x: T @unchecked with CanHandlePartitions => x }.filter(_.partitions.nonEmpty)
     val unpartitionedDataObjects = dataObjects.filterNot(partitionedDataObjects.contains(_))

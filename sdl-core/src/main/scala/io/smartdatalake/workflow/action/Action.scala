@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action
 
 import java.time.{Duration, LocalDateTime}
 
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -47,7 +47,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   /**
    * A unique identifier for this instance.
    */
-  override val id: ActionObjectId
+  override val id: ActionId
 
   /**
    * Additional metadata for the Action
