@@ -19,7 +19,7 @@
 package io.smartdatalake.config
 
 import configs.{ConfigError, Configs, Result}
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, ConnectionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.{AuthMode, Condition, ExecutionMode}
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.workflow.action.customlogic.{CustomDfCreatorConfig, CustomDfTransformerConfig, CustomDfsTransformerConfig, CustomFileTransformerConfig, SparkUDFCreatorConfig}
@@ -95,8 +95,8 @@ trait ConfigImplicits {
   implicit val dataObjectIdReader: Configs[DataObjectId] = Configs.fromTry { (c, p) => DataObjectId(c.getString(p))}
 
   /**
-   * A ConfigReader reader that reads [[ActionObjectId]] values.
+   * A ConfigReader reader that reads [[ActionId]] values.
    */
-  implicit val actionObjectIdReader: Configs[ActionObjectId] = Configs.fromTry { (c, p) => ActionObjectId(c.getString(p))}
+  implicit val actionObjectIdReader: Configs[ActionId] = Configs.fromTry { (c, p) => ActionId(c.getString(p))}
 
 }

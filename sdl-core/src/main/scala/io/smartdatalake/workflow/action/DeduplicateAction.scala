@@ -22,7 +22,7 @@ import java.sql.Timestamp
 import java.time.LocalDateTime
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{ExecutionMode, TechnicalTableColumn}
 import io.smartdatalake.util.evolution.SchemaEvolution
@@ -56,7 +56,7 @@ import scala.util.{Failure, Success, Try}
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  */
-case class DeduplicateAction(override val id: ActionObjectId,
+case class DeduplicateAction(override val id: ActionId,
                              inputId: DataObjectId,
                              outputId: DataObjectId,
                              transformer: Option[CustomDfTransformerConfig] = None,
