@@ -97,6 +97,6 @@ trait ConfigImplicits {
   /**
    * A ConfigReader reader that reads [[ActionId]] values.
    */
-  implicit val actionObjectIdReader: Configs[ActionId] = Configs.fromTry { (c, p) => ActionId(c.getString(p))}
+  implicit val actionIdReader: Configs[ActionId] = Configs.fromTry { (c, p) => ActionId(c.getString(p))}
 
 }

@@ -44,13 +44,13 @@ private[smartdatalake] object ActionDAGRunState {
   import org.json4s.jackson.JsonMethods._
   import org.json4s.jackson.Serialization
   implicit val formats =  DefaultFormats.withHints(ShortTypeHints(List(classOf[SparkSubFeed],classOf[FileSubFeed]))).withTypeHintFieldName("type") +
-    RuntimeEventStateSerializer + DurationSerializer + LocalDateTimeSerializer + ActionObjectIdKeySerializer
+    RuntimeEventStateSerializer + DurationSerializer + LocalDateTimeSerializer + ActionIdKeySerializer
 
   def toJson(actionDAGRunState: ActionDAGRunState): String = pretty(parse(Serialization.write(actionDAGRunState)))
 
   def fromJson(stateJson: String): ActionDAGRunState = {
     val rawState = parse(stateJson).extract[ActionDAGRunState]
-    // fix key class type of "value class ActionObjectId" for scala 2.11 (ActionDAGRunTest fails for scala 2.11 otherwise)
+    // fix key class type of "value class ActionId" for scala 2.11 (ActionDAGRunTest fails for scala 2.11 otherwise)
     rawState.copy(actionsState = rawState.actionsState.map( e => (if (e._1.getClass==classOf[String]) ActionId(e._1.asInstanceOf[String]) else e._1, e._2)))
   }
 
@@ -69,8 +69,8 @@ private[smartdatalake] object ActionDAGRunState {
     { case JString(tstmp) => LocalDateTime.parse(tstmp) },
     { case tstmp: LocalDateTime => JString(tstmp.toString) }
   ))
-  // custom serialization for ActionObjectId as key of Maps
-  case object ActionObjectIdKeySerializer extends CustomKeySerializer[ActionId](format => (
+  // custom serialization for ActionId as key of Maps
+  case object ActionIdKeySerializer extends CustomKeySerializer[ActionId](format => (
     { case id => ActionId(id) },
     { case id: ActionId => id.id }
   ))
