@@ -20,7 +20,7 @@
 package io.smartdatalake.metrics
 
 import java.time.format.DateTimeFormatter
-import java.time.{Duration, Instant}
+import java.time.{Duration, Instant, ZoneId}
 
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -65,8 +65,8 @@ private[smartdatalake] case class SparkStageMetrics(jobInfo: JobInfo, stageId: I
   lazy val shuffleFetchWaitTime: Duration = Duration.ofMillis(shuffleFetchWaitTimeInMillis)
   lazy val shuffleWriteTime: Duration = Duration.ofMillis(shuffleWriteTimeInNanos / 1000000)
 
-  // foramtters
-  private lazy val dateTimeFormat = DateTimeFormatter.ISO_OFFSET_DATE_TIME
+  // formatters
+  private lazy val dateTimeFormat = DateTimeFormatter.ISO_OFFSET_DATE_TIME.withZone(ZoneId.systemDefault)
   private def durationString(valueSeparator: String)(name: String, duration: Duration): String = s"${keyValueString(valueSeparator)(name, duration.toString)}"
   private def keyValueString(valueSeparator: String)(key: String, value: String): String = s"$key$valueSeparator$value"
 
