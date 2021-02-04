@@ -194,7 +194,7 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
 }
 
 class TestCustomPartitionMode() extends CustomPartitionModeLogic {
-  override def apply(session: SparkSession, options: Map[String, String], actionObjectId: ActionId, input: DataObject with CanHandlePartitions, output: DataObject with CanHandlePartitions, givenPartitionValues: Seq[Map[String, String]], context: ActionPipelineContext): Option[Seq[Map[String, String]]] = {
+  override def apply(session: SparkSession, options: Map[String, String], actionId: ActionId, input: DataObject with CanHandlePartitions, output: DataObject with CanHandlePartitions, givenPartitionValues: Seq[Map[String, String]], context: ActionPipelineContext): Option[Seq[Map[String, String]]] = {
     val partitionValuesToProcess = input.listPartitions(session).diff(output.listPartitions(session))
     Some(partitionValuesToProcess.map(_.getMapString))
   }

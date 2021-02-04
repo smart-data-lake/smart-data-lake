@@ -76,5 +76,5 @@ object SdlConfigObject {
 
   implicit def stringToConnectionId(str: String): ConnectionId = ConnectionId(str)
   implicit def stringToDataObjectId(str: String): DataObjectId = DataObjectId(str)
-  implicit def stringToActionObjectId(str: String): ActionId = ActionId(str)
+  implicit def stringToActionId(str: String): ActionId = ActionId(str)
 }
