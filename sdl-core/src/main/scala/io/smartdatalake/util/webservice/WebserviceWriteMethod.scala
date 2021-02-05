@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,21 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
 package io.smartdatalake.util.webservice
 
-import scala.util.Try
-
-private[smartdatalake] trait Webservice {
-
-  /**
-    * Sends a GET request to a webservice
-    *
-    * @return Success(with response as Array[Byte])
-    *         or Failure([[WebserviceException]] with reason of failure)
-    */
-  def get(): Try[Array[Byte]]
-
-
-  def post(body: Array[Byte], mimeType: String): Try[Array[Byte]]
-
+object WebserviceWriteMethod extends Enumeration {
+  type WebserviceWriteMethod = Value
+  val Post = Value("post")
+  val Put = Value("put")
 }

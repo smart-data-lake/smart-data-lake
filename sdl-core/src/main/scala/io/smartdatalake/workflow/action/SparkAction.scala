@@ -19,7 +19,6 @@
 
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
@@ -32,7 +31,6 @@ import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.streaming.Trigger
-import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
 private[smartdatalake] abstract class SparkAction extends Action {
@@ -52,11 +50,6 @@ private[smartdatalake] abstract class SparkAction extends Action {
    * behaviour set breakDataFrameLineage=false.
    */
   def persist: Boolean
-
-  /**
-   * execution mode for this action.
-   */
-  def executionMode: Option[ExecutionMode]
 
   override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.prepare
@@ -95,7 +88,8 @@ private[smartdatalake] abstract class SparkAction extends Action {
           // validate partition values existing for input
           input match {
             case partitionedInput: DataObject with CanHandlePartitions if subFeed.partitionValues.nonEmpty && (context.phase==ExecutionPhase.Exec || subFeed.isDAGStart) =>
-              val expectedPartitions = partitionedInput.filterExpectedPartitionValues(subFeed.partitionValues)
+              val completePartitionValues = subFeed.partitionValues.filter(_.keys==partitionedInput.partitions.toSet)
+              val expectedPartitions = partitionedInput.filterExpectedPartitionValues(completePartitionValues)
               val missingPartitionValues = if (expectedPartitions.nonEmpty) PartitionValues.checkExpectedPartitionValues(partitionedInput.listPartitions, expectedPartitions) else Seq()
               assert(missingPartitionValues.isEmpty, s"($id) partitions ${missingPartitionValues.mkString(", ")} missing for ${input.id}")
             case _ => Unit
@@ -141,7 +135,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
         if (noData) logger.info(s"($id) no data to process for ${output.id} in streaming mode")
         // return
         noData
-      case None | Some(_: PartitionDiffMode) | Some(_: SparkIncrementalMode) | Some(_: FailIfNoPartitionValuesMode) | Some(_: CustomPartitionMode) =>
+      case None | Some(_: PartitionDiffMode) | Some(_: SparkIncrementalMode) | Some(_: FailIfNoPartitionValuesMode) | Some(_: CustomPartitionMode) | Some(_: ProcessAllMode) =>
         // Auto persist if dataFrame is reused later
         val preparedSubFeed = if (context.dataFrameReuseStatistics.contains((output.id, subFeed.partitionValues))) {
           val partitionValuesStr = if (subFeed.partitionValues.nonEmpty) s" and partitionValues ${subFeed.partitionValues.mkString(", ")}" else ""
@@ -235,16 +229,16 @@ private[smartdatalake] abstract class SparkAction extends Action {
    * @param subFeed SubFeed with transformed DataFrame
    * @return validated and updated SubFeed
    */
-  def validateAndUpdateSubFeed(output: DataObject, subFeed: SparkSubFeed )(implicit session: SparkSession): SparkSubFeed = {
+  def validateAndUpdateSubFeed(output: DataObject, subFeed: SparkSubFeed )(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     output match {
       case partitionedDO: CanHandlePartitions =>
         // validate output partition columns exist in DataFrame
-        validateDataFrameContainsCols(subFeed.dataFrame.get, partitionedDO.partitions, s"for ${output.id}")
+        subFeed.dataFrame.foreach(df => validateDataFrameContainsCols(df, partitionedDO.partitions, s"for ${output.id}"))
         // adapt subfeed
         subFeed
           .updatePartitionValues(partitionedDO.partitions)
           .movePartitionColumnsLast(partitionedDO.partitions)
-      case _ => subFeed.clearPartitionValues()
+      case _ => subFeed.clearPartitionValues
     }
   }
 
@@ -257,7 +251,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
    */
   def validateDataFrameContainsCols(df: DataFrame, columns: Seq[String], debugName: String): Unit = {
     val missingColumns = columns.diff(df.columns)
-    assert(missingColumns.isEmpty, s"DataFrame $debugName doesn't include columns $missingColumns")
+    assert(missingColumns.isEmpty, s"DataFrame $debugName doesn't include columns ${missingColumns.mkString(", ")}")
   }
 
   /**
@@ -289,7 +283,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
   /**
    * Applies changes to a SubFeed from a previous action in order to be used as input for this actions transformation.
    */
-  def prepareInputSubFeed(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  def prepareInputSubFeed(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, ignoreFilters: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // persist if requested
     var preparedSubFeed = if (persist) subFeed.persist else subFeed
     // create dummy DataFrame if read schema is different from write schema on this DataObject
@@ -298,8 +292,10 @@ private[smartdatalake] abstract class SparkAction extends Action {
     val schemaChanges = writeSchema != readSchema
     require(!context.simulation || !schemaChanges, s"($id) write & read schema is not the same for ${input.id}. Need to create a dummy DataFrame, but this is not allowed in simulation!")
     preparedSubFeed = if (schemaChanges) preparedSubFeed.convertToDummy(readSchema.get) else preparedSubFeed
-    // break lineage if requested or if it's a streaming DataFrame
-    preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true)) preparedSubFeed.breakLineage else preparedSubFeed
+    // remove filters if requested
+    if (ignoreFilters) preparedSubFeed = preparedSubFeed.clearFilter.clearPartitionValues
+    // break lineage if requested or if it's a streaming DataFrame or if a filter expression is set or if ignoreFilters
+    if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined || ignoreFilters) preparedSubFeed = preparedSubFeed.breakLineage
     // return
     preparedSubFeed
   }

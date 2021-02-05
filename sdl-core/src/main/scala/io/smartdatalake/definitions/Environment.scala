@@ -155,12 +155,21 @@ object Environment {
       .map(_.toBoolean).getOrElse(true)
   }
 
+  /**
+   * Set to true if you want to enable workaround to overwrite unpartitioned SparkFileDataObject on Azure ADLSv2 (default=false).
+   */
+  var enableOverwriteUnpartitionedSparkFileDataObjectAdls: Boolean = {
+    EnvironmentUtil.getSdlParameter("enableOverwriteUnpartitionedSparkFileDataObjectAdls")
+      .map(_.toBoolean).getOrElse(false)
+  }
+
   // static configurations
   val configPathsForLocalSubstitution: Seq[String] = Seq(
       "path", "table.name"
     , "create-sql", "createSql", "pre-read-sql", "preReadSql", "post-read-sql", "postReadSql", "pre-write-sql", "preWriteSql", "post-write-sql", "postWriteSql"
     , "executionMode.checkpointLocation", "execution-mode.checkpoint-location")
   val defaultPathSeparator: Char = '/'
+  val runIdPartitionColumnName = "run_id"
 
   // dynamically shared environment for custom code (see also #106)
   def sparkSession: SparkSession = _sparkSession

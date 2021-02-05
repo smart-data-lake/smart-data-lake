@@ -21,8 +21,10 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
+
+import scala.util.{Failure, Success, Try}
 
 abstract class SparkSubFeedAction extends SparkAction {
 
@@ -60,19 +62,28 @@ abstract class SparkSubFeedAction extends SparkAction {
 
   private def doTransform(subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // convert subfeed to SparkSubFeed type or initialize if not yet existing
-    var inputSubFeed = ActionHelper.updatePartitionValues(input, SparkSubFeed.fromSubFeed(subFeed))
+    var inputSubFeed = ActionHelper.updateInputPartitionValues(input, SparkSubFeed.fromSubFeed(subFeed))
       .clearFilter // subFeed filter is not passed to the next action
     // create output subfeed with transformed partition values
-    var outputSubFeed = ActionHelper.updatePartitionValues(output, inputSubFeed.toOutput(output.id), Some(transformPartitionValues))
-    // apply execution mode
-    executionMode match {
-      case Some(mode) =>
-        mode.apply(id, input, output, inputSubFeed, transformPartitionValues) match {
-          case Some((inputPartitionValues, outputPartitionValues, filter)) =>
-            inputSubFeed = inputSubFeed.copy(partitionValues = inputPartitionValues, filter=filter).breakLineage
-            outputSubFeed = outputSubFeed.copy(partitionValues = outputPartitionValues, filter=filter).breakLineage
-          case None => Unit
-        }
+    var outputSubFeed = ActionHelper.updateOutputPartitionValues(output, inputSubFeed.toOutput(output.id), Some(transformPartitionValues))
+    // apply execution mode in init phase and store result
+    if (context.phase == ExecutionPhase.Init) {
+      executionModeResult = Try(
+        executionMode.flatMap(_.apply(id, input, output, inputSubFeed, transformPartitionValues))
+      ).recover{
+        case ex: NoDataToProcessDontStopWarning =>
+          // return empty output subfeed if "no data dont stop"
+          val outputSubFeed = SparkSubFeed(dataFrame = None, dataObjectId = output.id, partitionValues = Seq())
+          // update partition values to output's partition columns and update dataObjectId
+          validateAndUpdateSubFeed(output, outputSubFeed)
+          // rethrow exception with fake results added. The DAG will pass the fake results to further actions.
+          throw ex.copy(results = Some(Seq(outputSubFeed)))
+      }
+    }
+    executionModeResult.get match { // throws exception if execution mode is Failure
+      case Some((inputPartitionValues, outputPartitionValues, newFilter)) =>
+        inputSubFeed = inputSubFeed.copy(partitionValues = inputPartitionValues, filter = newFilter).breakLineage
+        outputSubFeed = outputSubFeed.copy(partitionValues = outputPartitionValues, filter = newFilter).breakLineage
       case _ => Unit
     }
     // prepare input SubFeed

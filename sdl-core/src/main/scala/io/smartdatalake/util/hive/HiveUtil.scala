@@ -259,18 +259,21 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       logger.info(s"(${table.fullName}) writeDfToHive: insert into ${table.fullName}")
 
       // Try to determine maximum number of records according to catalog statistics
-      val maxRecordsPerFile: Option[BigInt] = calculateMaxRecordsPerFileFromStatistics(table)
-      val df_partitioned = if(maxRecordsPerFile.isDefined) {
-        // if exact number of records could be determined from Hive statistics, use it to split files
-        logger.info(s"(${table.fullName}) writing with maxRecordsPerFile " +maxRecordsPerFile.get.toLong)
-        // TODO: Check for side effects (df.write.option("maxRecordsPerFile", ... ) does only work for FileWriters, but spark config "spark.sql.files.maxRecordsPerFile" works also for writing tables,
-        //       so we're setting it on the current runtime config used by all DFs / RDDs
-        session.conf.set("spark.sql.files.maxRecordsPerFile", maxRecordsPerFile.get.toLong)
-        HdfsUtil.repartitionForHdfsFileSize(df_newColsSorted, outputPath, reducePartitions = true)
+      val df_partitioned = if (numInitialHdfsPartitions != -1) {
+        val maxRecordsPerFile: Option[BigInt] = calculateMaxRecordsPerFileFromStatistics(table)
+        if (maxRecordsPerFile.isDefined) {
+          // if exact number of records could be determined from Hive statistics, use it to split files
+          logger.info(s"(${table.fullName}) writing with maxRecordsPerFile " + maxRecordsPerFile.get.toLong)
+          // TODO: Check for side effects (df.write.option("maxRecordsPerFile", ... ) does only work for FileWriters, but spark config "spark.sql.files.maxRecordsPerFile" works also for writing tables,
+          //       so we're setting it on the current runtime config used by all DFs / RDDs
+          session.conf.set("spark.sql.files.maxRecordsPerFile", maxRecordsPerFile.get.toLong)
+          HdfsUtil.repartitionForHdfsFileSize(df_newColsSorted, outputPath, reducePartitions = true)
+        }
+        else {
+          HdfsUtil.repartitionForHdfsFileSize(df_newColsSorted, outputPath)
+        }
       }
-      else {
-        HdfsUtil.repartitionForHdfsFileSize(df_newColsSorted, outputPath)
-      }
+      else df_newColsSorted
 
       // Write file
       df_partitioned.write

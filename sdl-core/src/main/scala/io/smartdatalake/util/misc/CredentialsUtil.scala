@@ -22,9 +22,10 @@ import io.smartdatalake.config.ConfigurationException
 
 import scala.util.Try
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import org.apache.spark.annotation.DeveloperApi
 
-
-private[smartdatalake] object CredentialsUtil extends SmartDataLakeLogger {
+@DeveloperApi
+object CredentialsUtil extends SmartDataLakeLogger {
 
   /**
    * Parses the credentials option from config to know what type of credentials to use and the name of the variables
@@ -53,7 +54,7 @@ private[smartdatalake] object CredentialsUtil extends SmartDataLakeLogger {
     }
   }
 
-  def getCredentialsInfo(credentialsConfig: String): (String, String) = {
+  private def getCredentialsInfo(credentialsConfig: String): (String, String) = {
     logger.debug(s"Parsing variable ${credentialsConfig}")
     credentialsConfig.split("#") match {
       case Array(x, y) => (x, y)
@@ -61,7 +62,7 @@ private[smartdatalake] object CredentialsUtil extends SmartDataLakeLogger {
     }
   }
 
-  def getCredentialsFromEnv(variableName: String): String = {
+  private def getCredentialsFromEnv(variableName: String): String = {
     logger.debug(s"Trying to get credentials from environment variable $variableName")
     sys.env.get(variableName) match {
       case Some(key) => key
@@ -69,7 +70,7 @@ private[smartdatalake] object CredentialsUtil extends SmartDataLakeLogger {
     }
   }
 
-  def getCredentialsFromSecret(variableString: String): String = {
+  private def getCredentialsFromSecret(variableString: String): String = {
     logger.debug(s"Trying to split variable string $variableString")
     variableString.split("\\.") match {
       case Array(x, y) =>
@@ -87,14 +88,10 @@ private[smartdatalake] object CredentialsUtil extends SmartDataLakeLogger {
     }
   }
 
-  def getCredentialsFromFile(fileAndVariableName: String): String = {
+  private def getCredentialsFromFile(fileAndVariableName: String): String = {
     assert(fileAndVariableName.split(";").length == 2, s"Expected semicolon separated filename and variable, got $fileAndVariableName")
     val Array(file, variable) = fileAndVariableName.split(";")
     val props = TryWithRessource.execSource(scala.io.Source.fromFile(file))(_.getLines.toSeq)
     Try(props.find(_.startsWith(variable+"=")).get.split("=")(1)).getOrElse(throw new ConfigurationException(s"Variable $variable in file $file not found"))
   }
-
-
-
-
 }

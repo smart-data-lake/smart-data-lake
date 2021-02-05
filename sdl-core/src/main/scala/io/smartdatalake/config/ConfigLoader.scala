@@ -192,7 +192,7 @@ object ConfigLoader extends SmartDataLakeLogger {
               }
             }
         }
-      } else if (fs.isFile(nextFile) && hasPermission(nextFile, FsAction.READ)) {
+      } else if (fs.isFile(nextFile)) {
         // filter filename extension and ignore potential log4j files
         val fileExtension = nextFile.getName.split('.').last
         if (configFileExtensions.contains(fileExtension) && !nextFile.getName.contains("log4j")) {
@@ -202,27 +202,5 @@ object ConfigLoader extends SmartDataLakeLogger {
       }
     }
     readableFileIndex
-  }
-
-  /**
-   * Check if the current user has permission to execute `action` on HDFS path `path`.
-   *
-   * @param path        a HDFS path
-   * @param action      an action like [[FsAction.READ]]
-   * @param fs          a configure HDFS [[FileSystem]] handle.
-   * @return            `true` if the current user has permission for `action` on `path`. `false` otherwise.
-   */
-  private def hasPermission(path: Path, action: FsAction)(implicit fs: FileSystem): Boolean = {
-    try {
-      if (EnvironmentUtil.isWindowsOS) true // Workaround: checking permissions on windows doesn't work with Hadoop (version 2.6)
-      else {
-        fs.access(path, action)
-        true
-      }
-    } catch {
-      case t: Throwable =>
-        logger.warn(s"Cannot access $path: ${t.getClass.getSimpleName}: ${t.getMessage}")
-        false
-    }
   }
 }

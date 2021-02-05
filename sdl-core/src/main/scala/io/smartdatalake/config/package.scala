@@ -20,9 +20,8 @@ package io.smartdatalake.config
 
 import configs.{ConfigError, Configs, Result}
 import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, ConnectionId, DataObjectId}
-import io.smartdatalake.definitions.{Condition, ExecutionMode}
+import io.smartdatalake.definitions.{AuthMode, Condition, ExecutionMode}
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
-import io.smartdatalake.util.webservice.KeycloakConfig
 import io.smartdatalake.workflow.action.customlogic.{CustomDfCreatorConfig, CustomDfTransformerConfig, CustomDfsTransformerConfig, CustomFileTransformerConfig, SparkUDFCreatorConfig}
 import io.smartdatalake.workflow.dataobject.WebserviceFileDataObject
 import org.apache.spark.sql.streaming.OutputMode
@@ -78,17 +77,11 @@ trait ConfigImplicits {
   implicit val sparkRepartitionDefReader: Configs[SparkRepartitionDef] = Configs.derive[SparkRepartitionDef]
   implicit val executionModeReader: Configs[ExecutionMode] = Configs.derive[ExecutionMode]
   implicit val conditionReader: Configs[Condition] = Configs.derive[Condition]
+  implicit val authModeReader: Configs[AuthMode] = Configs.derive[AuthMode]
   // --------------------------------------------------------------------------------
 
   implicit def mapDataObjectIdStringReader(implicit mapReader: Configs[Map[String,String]]): Configs[Map[DataObjectId, String]] = {
     Configs.fromConfig { c => mapReader.extract(c).map(_.map{ case (k,v) => (DataObjectId(k), v)})}
-  }
-
-  /**
-   * A ConfigReader reader that reads [[KeycloakConfig]] values.
-   */
-  implicit val keyCloakConfigReader: Configs[Option[KeycloakConfig]] = Configs.fromConfigTry { c =>
-    WebserviceFileDataObject.getKeyCloakConfig(c)
   }
 
   /**

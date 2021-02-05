@@ -18,7 +18,8 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.definitions.ExecutionMode
+import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.definitions.{Environment, ExecutionMode, SDLSaveMode}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject._
@@ -57,13 +58,18 @@ abstract class FileSubFeedAction extends Action {
   override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.prepare
     executionMode.foreach(_.prepare(id))
+    // make sure all output partitions exist in input
+    val unknownPartitions = output.partitions.diff(input.partitions :+ Environment.runIdPartitionColumnName)
+    if (unknownPartitions.nonEmpty) throw ConfigurationException(s"($id) Partition columns ${unknownPartitions.mkString(", ")} not found in input")
+    // check for unsupported save mode
+    assert(output.saveMode!=SDLSaveMode.OverwritePreserveDirectories, s"($id) saveMode OverwritePreserveDirectories not supported for now.")
   }
 
   private def prepareSubFeed(subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): (FileSubFeed,FileSubFeed) = {
     // convert subfeeds to FileSubFeed type or initialize if not yet existing
-    var inputSubFeed = ActionHelper.updatePartitionValues(input, FileSubFeed.fromSubFeed(subFeed))
+    var inputSubFeed = ActionHelper.updateInputPartitionValues(input, FileSubFeed.fromSubFeed(subFeed))
     // create output subfeed
-    var outputSubFeed = ActionHelper.updatePartitionValues(output, inputSubFeed.toOutput(output.id))
+    var outputSubFeed = ActionHelper.updateOutputPartitionValues(output, inputSubFeed.toOutput(output.id))
     // apply execution mode & prepare output partitions
     executionMode match {
       case Some(mode) =>
@@ -106,7 +112,7 @@ abstract class FileSubFeedAction extends Action {
     assert(subFeeds.size == 1, s"Only one subfeed allowed for FileSubFeedActions (Action $id, inputSubfeed's ${subFeeds.map(_.dataObjectId).mkString(",")})")
     var (inputSubFeed,outputSubFeed) = prepareSubFeed(subFeeds.head)
     // delete existing files on overwrite
-    if (output.saveMode == SaveMode.Overwrite) {
+    if (output.saveMode == SDLSaveMode.Overwrite) {
       if (output.partitions.nonEmpty)
         if (outputSubFeed.partitionValues.nonEmpty) output.deletePartitions(outputSubFeed.partitionValues)
         else logger.warn(s"($id) Cannot delete data from partitioned data object ${output.id} as no partition values are given but saveMode=overwrite")
@@ -119,6 +125,8 @@ abstract class FileSubFeedAction extends Action {
     }
     val filesWritten = transformedSubFeed.fileRefs.get.size.toLong
     logger.info(s"($id) finished writing files to ${output.id}: duration=$d files_written=$filesWritten")
+    // make sure empty partitions are created as well
+    output.createMissingPartitions(outputSubFeed.partitionValues)
     // send metric to action (for file subfeeds this has to be done manually while spark subfeeds get's the metrics via a spark events listener)
     onRuntimeMetrics(Some(output.id), GenericMetrics(s"$id-${output.id}", 1, Map("duration"->d, "files_written"->filesWritten)))
     // update subFeed
@@ -146,11 +154,6 @@ abstract class FileSubFeedAction extends Action {
    * This is needed to reprocess all files of a path/partition instead of the FileRef's passed from the previous Action.
    */
   def breakFileRefLineage: Boolean
-
-  /**
-   * Execution mode if this Action is a start node of a DAG run
-   */
-  def executionMode: Option[ExecutionMode]
 
   /**
    * If true delete files after they are successfully processed.
