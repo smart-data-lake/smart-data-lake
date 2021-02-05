@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow
 
 import io.smartdatalake.app.StateListener
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -124,7 +124,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
     t
   }
 
-  private def unionDuplicateSubFeeds(subFeeds: Seq[SubFeed], actionId: ActionObjectId)(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
+  private def unionDuplicateSubFeeds(subFeeds: Seq[SubFeed], actionId: ActionId)(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     subFeeds.groupBy(_.dataObjectId).mapValues {
       subFeeds =>
         if (subFeeds.size > 1) {
@@ -187,7 +187,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
   /**
    * Collect runtime information for every action of the dag
    */
-  def getRuntimeInfos: Map[ActionObjectId, RuntimeInfo] = {
+  def getRuntimeInfos: Map[ActionId, RuntimeInfo] = {
     dag.getNodes.map( a => (a.id, a.getRuntimeInfo.getOrElse(RuntimeInfo(RuntimeEventState.PENDING)))).toMap
   }
 
@@ -243,7 +243,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
     dag.sortedNodes.collect { case n: Action => n }.foreach(_.reset)
   }
 
-  def notifyActionMetric(actionId: ActionObjectId, dataObjectId: Option[DataObjectId], metrics: ActionMetrics): Unit = {
+  def notifyActionMetric(actionId: ActionId, dataObjectId: Option[DataObjectId], metrics: ActionMetrics): Unit = {
     val action = dag.getNodes
       .find(_.nodeId == actionId.id).getOrElse(throw new IllegalStateException(s"Unknown action $actionId"))
     action.onRuntimeMetrics(dataObjectId, metrics)

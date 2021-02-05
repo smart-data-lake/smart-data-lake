@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow.action.customlogic
 
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -124,21 +124,21 @@ case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFi
     else                          "sqlCode: "+sqlCode
   }
 
-  def transform(actionId: ActionObjectId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame])(implicit session: SparkSession, context: ActionPipelineContext) : Map[String,DataFrame] = {
+  def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame])(implicit session: SparkSession, context: ActionPipelineContext) : Map[String,DataFrame] = {
     // replace runtime options
     val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
     // transform
     impl.get.transform(session, options ++ runtimeOptionsReplaced, dfs)
   }
 
-  def transformPartitionValues(actionId: ActionObjectId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+  def transformPartitionValues(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
     // replace runtime options
     val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
     // transform
     impl.get.transformPartitionValues(options ++ runtimeOptionsReplaced, partitionValues)
   }
 
-  private def prepareRuntimeOptions(actionId: ActionObjectId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[String,String] = {
+  private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[String,String] = {
     lazy val data = DefaultExpressionData.from(context, partitionValues)
     runtimeOptions.mapValues {
       expr => SparkExpressionUtil.evaluateString(actionId, Some("transformation.runtimeOptions"), expr, data)

@@ -21,7 +21,7 @@ package io.smartdatalake.config
 import java.io.InputStreamReader
 
 import com.typesafe.config.{Config, ConfigFactory}
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, ConnectionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.{EnvironmentUtil, SmartDataLakeLogger}
@@ -103,7 +103,7 @@ object ConfigLoader extends SmartDataLakeLogger {
     // check for duplicate first class object definitions (connections, data objects, actions)
     if (Environment.enableCheckConfigDuplicates) {
       val objectIdLocationMap =
-        sortedFileConfigs.flatMap { case (file, config) => ConfigParser.getActionConfigMap(config).keys.map(objName => (ActionObjectId(objName), file)) } ++
+        sortedFileConfigs.flatMap { case (file, config) => ConfigParser.getActionConfigMap(config).keys.map(objName => (ActionId(objName), file)) } ++
           sortedFileConfigs.flatMap { case (file, config) => ConfigParser.getDataObjectConfigMap(config).keys.map(objName => (DataObjectId(objName), file)) } ++
           sortedFileConfigs.flatMap { case (file, config) => ConfigParser.getConnectionConfigMap(config).keys.map(objName => (ConnectionId(objName), file)) }
       val duplicates = objectIdLocationMap.groupBy(_._1)

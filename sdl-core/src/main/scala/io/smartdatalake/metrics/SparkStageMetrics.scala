@@ -22,7 +22,7 @@ package io.smartdatalake.metrics
 import java.time.format.DateTimeFormatter
 import java.time.{Duration, Instant, ZoneId}
 
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionMetrics
 import org.apache.spark.scheduler.{AccumulableInfo, SparkListener, SparkListenerJobStart, SparkListenerStageCompleted}
@@ -124,7 +124,7 @@ private[smartdatalake] case class JobInfo(id: Int, group: String, description: S
 /**
  * Collects spark metrics for spark stages.
  */
-private[smartdatalake] class SparkStageMetricsListener(notifyStageMetricsFunc: (ActionObjectId, Option[DataObjectId], ActionMetrics) => Unit) extends SparkListener with SmartDataLakeLogger {
+private[smartdatalake] class SparkStageMetricsListener(notifyStageMetricsFunc: (ActionId, Option[DataObjectId], ActionMetrics) => Unit) extends SparkListener with SmartDataLakeLogger {
 
   /**
    * Stores jobID and jobDescription indexed by stage ids.
@@ -168,9 +168,9 @@ private[smartdatalake] class SparkStageMetricsListener(notifyStageMetricsFunc: (
     // extract concerned Action and DataObject
     val actionIdRegex = "Action~([a-zA-Z0-9_-]+)".r.unanchored
     val actionId = sparkStageMetrics.jobInfo.group match {
-      case actionIdRegex(id) => Some(ActionObjectId(id))
+      case actionIdRegex(id) => Some(ActionId(id))
       case _ => sparkStageMetrics.jobInfo.description match { // for spark streaming jobs we cant set the jobGroup, but only the description
-        case actionIdRegex(id) => Some(ActionObjectId(id))
+        case actionIdRegex(id) => Some(ActionId(id))
         case _ =>
           logger.warn(s"Couldn't extract ActionId from sparkJobGroupId (${sparkStageMetrics.jobInfo.group})")
           None

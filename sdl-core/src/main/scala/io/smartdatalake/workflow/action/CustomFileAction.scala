@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.ExecutionMode
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, TryWithRessource}
@@ -42,7 +42,7 @@ import org.apache.spark.sql.SparkSession
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  */
-case class CustomFileAction(override val id: ActionObjectId,
+case class CustomFileAction(override val id: ActionId,
                             inputId: DataObjectId,
                             outputId: DataObjectId,
                             transformer: CustomFileTransformerConfig,
