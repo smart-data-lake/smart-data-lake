@@ -166,6 +166,7 @@ object ConfigLoader extends SmartDataLakeLogger {
 
   /**
    * Collect readable files with valid config file extensions from HDFS in BFS order indexed by file extension.
+   * Note that all filenames containing "log4j" are ignored.
    *
    * This is an internal method to create a utility data structure.
    *
@@ -190,9 +191,10 @@ object ConfigLoader extends SmartDataLakeLogger {
             }
         }
       } else if (fs.isFile(nextFile)) {
+        // filter filename extension and ignore potential log4j files
         val fileExtension = nextFile.getName.split('.').last
-        if (configFileExtensions.contains(fileExtension) && !nextFile.getName.equals("log4j.properties")) {
-          logger.trace(s"'$nextFile' is a configuration file.")
+        if (configFileExtensions.contains(fileExtension) && !nextFile.getName.contains("log4j")) {
+          logger.debug(s"'$nextFile' is a configuration file.")
           readableFileIndex(fileExtension) += nextFile
         }
       }
