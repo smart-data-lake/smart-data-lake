@@ -92,14 +92,14 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
   }
 
   test("PartitionDiffMode failCondition") {
-    val executionMode = PartitionDiffMode(nbOfPartitionValuesPerRun=Some(1), failCondition=Some("array_contains(transform(selectedPartitionValues, p -> p.lastname), 'doe')"))
+    val executionMode = PartitionDiffMode(nbOfPartitionValuesPerRun=Some(1), failCondition=Some("array_contains(transform(selectedOutputPartitionValues, p -> p.lastname), 'doe')"))
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
     intercept[ExecutionModeFailedException](executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping))
   }
 
   test("PartitionDiffMode failConditions with description") {
-    val executionMode = PartitionDiffMode(nbOfPartitionValuesPerRun=Some(1), failConditions=Seq(Condition(description=Some("fail on lastname=doe"), expression="array_contains(transform(selectedPartitionValues, p -> p.lastname), 'doe')")))
+    val executionMode = PartitionDiffMode(nbOfPartitionValuesPerRun=Some(1), failConditions=Seq(Condition(description=Some("fail on lastname=doe"), expression="array_contains(transform(selectedOutputPartitionValues, p -> p.lastname), 'doe')")))
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
     val ex = intercept[ExecutionModeFailedException](executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping))
@@ -107,7 +107,7 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
   }
 
   test("PartitionDiffMode selectExpression") {
-    val executionMode = PartitionDiffMode(selectExpression = Some("slice(selectedPartitionValues,-1,1)")) // select last value only
+    val executionMode = PartitionDiffMode(selectExpression = Some("slice(selectedOutputPartitionValues,-1,1)")) // select last value only
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
     val (partitionValues, outputPartitionValues, filter) = executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping).get
