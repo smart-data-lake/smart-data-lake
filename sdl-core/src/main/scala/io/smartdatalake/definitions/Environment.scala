@@ -20,9 +20,9 @@ package io.smartdatalake.definitions
 
 import java.net.URI
 
-import io.smartdatalake.app.GlobalConfig
+import io.smartdatalake.app.{GlobalConfig, SDLPlugin}
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.util.misc.EnvironmentUtil
+import io.smartdatalake.util.misc.{CustomCodeUtil, EnvironmentUtil}
 import org.apache.spark.sql.SparkSession
 
 /**
@@ -170,6 +170,12 @@ object Environment {
     , "executionMode.checkpointLocation", "execution-mode.checkpoint-location")
   val defaultPathSeparator: Char = '/'
   val runIdPartitionColumnName = "run_id"
+
+  // instantiate sdl plugin if configured
+  private[smartdatalake] lazy val sdlPlugin: Option[SDLPlugin] = {
+    EnvironmentUtil.getSdlParameter("pluginClassName")
+      .map(CustomCodeUtil.getClassInstanceByName[SDLPlugin])
+  }
 
   // dynamically shared environment for custom code (see also #106)
   def sparkSession: SparkSession = _sparkSession
