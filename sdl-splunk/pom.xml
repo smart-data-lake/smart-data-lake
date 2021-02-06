@@ -56,6 +56,14 @@
 		<sdl-core.scope>compile</sdl-core.scope>
 	</properties>
 
+	<repositories>
+		<repository>
+			<id>splunk-artifactory</id>
+			<name>Splunk Releases</name>
+			<url>https://splunk.jfrog.io/splunk/ext-releases-local</url>
+		</repository>
+	</repositories>
+
 	<dependencies>
 		<dependency>
 			<groupId>io.smartdatalake</groupId>
