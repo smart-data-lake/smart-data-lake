@@ -22,7 +22,7 @@ import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.util.misc.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions.input_file_name
@@ -183,29 +183,34 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     dfPrepared = sparkRepartition.map(_.prepareDataFrame(dfPrepared,partitions, partitionValues.size, id))
       .getOrElse(dfPrepared)
 
-    // SDLSaveMode.Overwrite: delete concerned partitions if existing, as Spark dynamic partitioning doesn't delete empty partitions
-    if (saveMode == SDLSaveMode.Overwrite) {
-      if (partitionValues.nonEmpty) {
-        val partitionValuesCols = partitionValues.map(_.keys).reduceOption(_ ++ _).getOrElse(Set()).toSeq
-        val partitionValuesToDelete = partitionValues.intersect(listPartitions.map(_.filterKeys(partitionValuesCols)))
-        deletePartitions(partitionValuesToDelete)
-      } else {
-        // SDLSaveMode.Overwrite: Workaround ADLSv2: overwrite unpartitioned data object as it is not deleted by spark csv writer (strangely it works for parquet)
-        if (Environment.enableOverwriteUnpartitionedSparkFileDataObjectAdls) {
-          deleteAll
+    // apply special save modes
+    saveMode match {
+      case SDLSaveMode.Overwrite =>
+        if (partitionValues.nonEmpty) { // delete concerned partitions if existing, as Spark dynamic partitioning doesn't delete empty partitions
+          deletePartitions(filterPartitionsExisting(partitionValues))
+        } else {
+          // SDLSaveMode.Overwrite: Workaround ADLSv2: overwrite unpartitioned data object as it is not deleted by spark csv writer (strangely it works for parquet)
+          if (Environment.enableOverwriteUnpartitionedSparkFileDataObjectAdls) {
+            deleteAll
+          }
         }
-      }
-    }
-
-    // SDLSaveMode.OverwritePreserveDirectories:
-    if (saveMode == SDLSaveMode.OverwritePreserveDirectories) {
-      if (partitionValues.nonEmpty) {
-        val partitionValuesCols = partitionValues.map(_.keys).reduceOption(_ ++ _).getOrElse(Set()).toSeq
-        val partitionValuesToDelete = partitionValues.intersect(listPartitions.map(_.filterKeys(partitionValuesCols)))
-        deletePartitionsFiles(partitionValuesToDelete)
-      } else {
-        deleteAllFiles(hadoopPath)
-      }
+      case SDLSaveMode.OverwriteOptimized =>
+        if (partitionValues.nonEmpty) { // delete concerned partitions if existing, as append mode is used later
+          deletePartitions(filterPartitionsExisting(partitionValues))
+        } else if (partitions.isEmpty) { // delete all data if existing, as append mode is used later
+          deleteAll
+        } else {
+          throw new ProcessingLogicException(s"($id) OverwriteOptimized without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data.")
+        }
+      case SDLSaveMode.OverwritePreserveDirectories => // only delete files but not directories
+        if (partitionValues.nonEmpty) { // delete concerned partitions files if existing, as append mode is used later
+          deletePartitionsFiles(filterPartitionsExisting(partitionValues))
+        } else if (partitions.isEmpty) { // delete all data if existing, as append mode is used later
+          deleteAllFiles(hadoopPath)
+        } else {
+          throw new ProcessingLogicException(s"($id) OverwriteOptimized without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data.")
+        }
+      case _ => Unit
     }
 
     val hadoopPathString = hadoopPath.toString
@@ -229,6 +234,16 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
         require(files.size <= 1, s"($id) Number of files should not be greater than 1 because SparkRepartitionDef.numberOfTasksPerPartition should be set to 1 if filename is set!")
         files.map(f => new Path(f.fullPath)).foreach( p => filesystem.rename(p, new Path(p.getParent, filename)))
     }
+  }
+
+
+  /**
+   * Filters only existing partition.
+   * Note that partition values to check don't need to have a key/value defined for every partition column.
+   */
+  def filterPartitionsExisting(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[PartitionValues]  = {
+    val partitionValueKeys = PartitionValues.getPartitionValuesKeys(partitionValues).toSeq
+    partitionValues.intersect(listPartitions.map(_.filterKeys(partitionValueKeys)))
   }
 }
 

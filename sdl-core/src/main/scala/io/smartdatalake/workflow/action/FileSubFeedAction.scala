@@ -63,6 +63,7 @@ abstract class FileSubFeedAction extends Action {
     if (unknownPartitions.nonEmpty) throw ConfigurationException(s"($id) Partition columns ${unknownPartitions.mkString(", ")} not found in input")
     // check for unsupported save mode
     assert(output.saveMode!=SDLSaveMode.OverwritePreserveDirectories, s"($id) saveMode OverwritePreserveDirectories not supported for now.")
+    assert(output.saveMode!=SDLSaveMode.OverwriteOptimized, s"($id) saveMode OverwriteOptimized not supported for now.")
   }
 
   private def prepareSubFeed(subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): (FileSubFeed,FileSubFeed) = {

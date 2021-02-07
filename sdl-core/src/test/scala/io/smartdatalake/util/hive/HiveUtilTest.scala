@@ -39,7 +39,6 @@ class HiveUtilTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger
   import session.implicits._
 
   private val hiveTable = Table(Some("default"), "unittesttable")
-  private val hiveTableTmp = Table(Some("default"), "unittesttable_tmp")
 
   val tmpDirOnFS: Path = Files.createTempDirectory("sdl_test")
   val tableDirOnFS: Path = Paths.get(tmpDirOnFS.toString, hiveTable.name)
@@ -57,8 +56,7 @@ class HiveUtilTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger
   private def cleanup(): Unit = {
     logger.info("cleanup!")
     // cleanup tables
-    HiveUtil.dropTable(hiveTable)
-    HiveUtil.dropTable(hiveTableTmp)
+    HiveUtil.dropTable(hiveTable, hdfsTablePath)
     // cleanup existing files
     FileUtils.deleteDirectory(tmpDirOnFS.toFile)
   }

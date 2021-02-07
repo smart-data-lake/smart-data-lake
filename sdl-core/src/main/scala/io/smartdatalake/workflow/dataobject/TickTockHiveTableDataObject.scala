@@ -62,6 +62,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   if (table.db.isEmpty) throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
 
   assert(saveMode!=SDLSaveMode.OverwritePreserveDirectories, s"($id) saveMode OverwritePreserveDirectories not supported for now.")
+  assert(saveMode!=SDLSaveMode.OverwriteOptimized, s"($id) saveMode OverwriteOptimized not supported for now.")
 
   // prepare final path
   @transient private var hadoopPathHolder: Path = _
@@ -190,7 +191,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   }
 
   override def dropTable(implicit session: SparkSession): Unit = {
-    HiveUtil.dropTable(table)
+    HiveUtil.dropTable(table, hadoopPath, filesystem = Some(filesystem))
   }
 
   override def factory: FromConfigFactory[DataObject] = TickTockHiveTableDataObject
