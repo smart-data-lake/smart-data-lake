@@ -174,6 +174,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * @param appConfig Application configuration (parsed from command line).
    */
   def run(appConfig: SmartDataLakeBuilderConfig): Map[RuntimeEventState,Int] = try {
+    // invoke SDLPlugin if configured
+    Environment.sdlPlugin.foreach(_.startup())
+    // handle state if defined
     if (appConfig.statePath.isDefined) {
       assert(appConfig.applicationName.nonEmpty, "Application name must be defined if statePath is set")
       // check if latest run succeeded
@@ -197,6 +200,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   } finally {
     // make sure memory logger timer task is stopped
     MemoryUtils.stopMemoryLogger()
+    // invoke SDLPlugin if configured
+    Environment.sdlPlugin.foreach(_.shutdown())
   }
 
   /**
