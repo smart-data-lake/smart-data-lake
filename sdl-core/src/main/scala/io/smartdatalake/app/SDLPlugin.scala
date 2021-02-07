@@ -23,7 +23,7 @@ import org.apache.spark.annotation.DeveloperApi
 
 /**
  * SDL Plugin defines an interface to execute custom code on SDL startup and shutdown.
- * Configure it by set java system property "sdl.pluginClassName" to a class name implementing SDLPlugin interface.
+ * Configure it by setting a java system property "sdl.pluginClassName" to a class name implementing SDLPlugin interface.
  * The class needs to have a constructor without any parameters.
  */
 @DeveloperApi
