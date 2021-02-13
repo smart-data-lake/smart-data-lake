@@ -64,7 +64,7 @@ object SDLSaveMode extends Enumeration {
    * This helps if there are performance problems when using dynamic partitioning mode with hive tables and many partitions.
    *
    * Implementation: This save mode will delete processed partition directories manually.
-   * If no partition values are present when writing to a partitioned data object, all all partitions are deleted. This is
+   * If no partition values are present when writing to a partitioned data object, all partitions are deleted. This is
    * different to Sparks dynamic partitioning, which only deletes partitions where data is present in the DataFrame to
    * be written (enabled by default in SDL).
    * To stop if no partition values are present, configure executionMode.type = FailIfNoPartitionValuesMode on the Action.
