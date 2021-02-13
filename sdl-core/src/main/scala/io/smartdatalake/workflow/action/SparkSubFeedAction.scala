@@ -74,16 +74,14 @@ abstract class SparkSubFeedAction extends SparkAction {
         case ex: NoDataToProcessDontStopWarning =>
           // return empty output subfeed if "no data dont stop"
           val outputSubFeed = SparkSubFeed(dataFrame = None, dataObjectId = output.id, partitionValues = Seq())
-          // update partition values to output's partition columns and update dataObjectId
-          validateAndUpdateSubFeed(output, outputSubFeed)
           // rethrow exception with fake results added. The DAG will pass the fake results to further actions.
           throw ex.copy(results = Some(Seq(outputSubFeed)))
       }
     }
     executionModeResult.get match { // throws exception if execution mode is Failure
-      case Some((inputPartitionValues, outputPartitionValues, newFilter)) =>
-        inputSubFeed = inputSubFeed.copy(partitionValues = inputPartitionValues, filter = newFilter).breakLineage
-        outputSubFeed = outputSubFeed.copy(partitionValues = outputPartitionValues, filter = newFilter).breakLineage
+      case Some(result) =>
+        inputSubFeed = inputSubFeed.copy(partitionValues = result.inputPartitionValues, filter = result.filter).breakLineage
+        outputSubFeed = outputSubFeed.copy(partitionValues = result.outputPartitionValues, filter = result.filter).breakLineage
       case _ => Unit
     }
     // prepare input SubFeed
@@ -141,6 +139,8 @@ abstract class SparkSubFeedAction extends SparkAction {
     postExecSubFeed(inputSubFeeds.head, outputSubFeeds.head)
   }
 
-  def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit /* NOP */
+  def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    executionMode.foreach(_.postExec(id, input, output, inputSubFeed, outputSubFeed))
+  }
 
 }

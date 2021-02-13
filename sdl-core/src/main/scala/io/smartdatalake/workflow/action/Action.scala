@@ -22,7 +22,7 @@ import java.time.{Duration, LocalDateTime}
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
-import io.smartdatalake.definitions.ExecutionMode
+import io.smartdatalake.definitions.{ExecutionMode, ExecutionModeResult}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ExecutionPhase.{ExecutionPhase, Value}
@@ -81,7 +81,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   def executionMode: Option[ExecutionMode]
 
   // execution mode is evaluated in init phase and result must be stored for exec phase
-  protected var executionModeResult: Try[Option[(Seq[PartitionValues], Seq[PartitionValues], Option[String])]] = Success(None)
+  protected var executionModeResult: Try[Option[ExecutionModeResult]] = Success(None)
 
   /**
    * Spark SQL condition evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.

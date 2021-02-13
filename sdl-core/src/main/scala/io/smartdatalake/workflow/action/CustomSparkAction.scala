@@ -32,7 +32,6 @@ import org.apache.spark.sql.SparkSession
  * [[Action]] to transform data according to a custom transformer.
  * Allows to transform multiple input and output dataframes.
  *
- * @param id
  * @param inputIds input DataObject's
  * @param outputIds output DataObject's
  * @param transformer custom transformation for multiple dataframes to apply
@@ -43,7 +42,6 @@ import org.apache.spark.sql.SparkSession
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  * @param recursiveInputIds output of action that are used as input in the same action
  * @param inputIdsToIgnoreFilter optional list of input ids to ignore filter (partition values & filter clause)
- * @param metadata
  */
 case class CustomSparkAction (override val id: ActionId,
                               inputIds: Seq[DataObjectId],

@@ -46,7 +46,7 @@ case class CustomFileAction(override val id: ActionId,
                             inputId: DataObjectId,
                             outputId: DataObjectId,
                             transformer: CustomFileTransformerConfig,
-                            override val deleteDataAfterRead: Boolean = false,
+                            @deprecated("use executionMode = FileIncrementalMoveMode instead") override val deleteDataAfterRead: Boolean = false,
                             filesPerPartition: Int = 10,
                             override val breakFileRefLineage: Boolean = false,
                             override val executionMode: Option[ExecutionMode] = None,
@@ -64,9 +64,8 @@ case class CustomFileAction(override val id: ActionId,
 
   override def doTransform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed, doExec: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
     import session.implicits._
-
-    // recreate FileRefs is desired
-    val inputFileRefs = inputSubFeed.fileRefs.getOrElse( input.getFileRefs(inputSubFeed.partitionValues))
+    assert(inputSubFeed.fileRefs.nonEmpty, "inputSubFeed.fileRefs must be defined for CustomFileAction.doTransform")
+    val inputFileRefs = inputSubFeed.fileRefs.get
     val tgtFileRefs = output.translateFileRefs(inputFileRefs)
 
     // transform files in distributed mode with Spark
