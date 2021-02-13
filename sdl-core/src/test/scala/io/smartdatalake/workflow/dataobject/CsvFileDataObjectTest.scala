@@ -215,8 +215,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     val tgtDO = CsvFileDataObject(id="test1", path=escapedFilePath(tempDir.toFile.getPath), sparkRepartition=Some(SparkRepartitionDef(numberOfTasksPerPartition=1, filename=Some("data.csv"))))
     tgtDO.writeDataFrame(dfInit, Seq())
     val resultFileRefs = tgtDO.getFileRefs(Seq())
-    resultFileRefs.size shouldBe 1
-    resultFileRefs.head.fileName shouldBe "data.csv"
+    resultFileRefs.map(_.fileName).sorted shouldBe Seq("data.csv")
   }
 
   test("Writing file with numberOfTasksPerPartition=5 results in 5 files written, incl. rename") {
@@ -227,7 +226,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     val tgtDO = CsvFileDataObject(id="test1", path=escapedFilePath(tempDir.toFile.getPath), sparkRepartition=Some(SparkRepartitionDef(numberOfTasksPerPartition=5, filename=Some("data.csv"))))
     tgtDO.writeDataFrame(dfInit, Seq())
     val resultFileRefs = tgtDO.getFileRefs(Seq())
-    resultFileRefs.map(_.fileName) shouldBe Seq("data.1.csv","data.2.csv","data.3.csv","data.4.csv","data.5.csv")
+    resultFileRefs.map(_.fileName).sorted shouldBe Seq("data.1.csv","data.2.csv","data.3.csv","data.4.csv","data.5.csv")
   }
 
 
@@ -239,7 +238,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     val tgtDO = CsvFileDataObject(id="test1", path=escapedFilePath(tempDir.toFile.getPath), partitions = Seq("name"), sparkRepartition=Some(SparkRepartitionDef(numberOfTasksPerPartition=1, keyCols = Seq("name"), filename = Some("data.csv"))))
     tgtDO.writeDataFrame(dfInit, Seq(PartitionValues(Map("name"->"test0")), PartitionValues(Map("name"->"test1"))))
     val resultFileRefs = tgtDO.getFileRefs(Seq())
-    resultFileRefs.map(_.fileName) shouldBe Seq("data.csv","data.csv")
+    resultFileRefs.map(_.fileName).sorted shouldBe Seq("data.csv","data.csv")
   }
 
   def createDataObject(options: Map[String, String])(path: String, schemaOpt: Option[StructType]): CsvFileDataObject = {
