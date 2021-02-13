@@ -307,7 +307,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
       .collect { case subFeed: SparkSubFeed => subFeed }
       .foreach { subFeed =>
         if (context.forgetDataFrameReuse(subFeed.dataObjectId, subFeed.partitionValues, id).contains(0)) {
-          logger.info(s"($id) Removing cached DataFrame for ${subFeed.dataObjectId} and partitionValues ${subFeed.partitionValues.mkString(", ")}")
+          logger.info(s"($id) Removing cached DataFrame for ${subFeed.dataObjectId} and partitionValues=${subFeed.partitionValues.mkString(", ")}")
           subFeed.dataFrame.foreach(_.unpersist)
         }
     }
