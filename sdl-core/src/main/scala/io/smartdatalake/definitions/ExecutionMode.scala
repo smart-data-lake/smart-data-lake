@@ -64,7 +64,7 @@ sealed trait ExecutionMode extends SmartDataLakeLogger {
     applyConditionsDef.foreach(_.syntaxCheck[DefaultExecutionModeExpressionData](actionId, Some("applyCondition")))
   }
   /**
-   * Called in init phase to apply execution mode. Result is stored an re-used in execution phase.
+   * Called in init phase to apply execution mode. Result is stored and re-used in execution phase.
    */
   private[smartdatalake] def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
                                    , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
