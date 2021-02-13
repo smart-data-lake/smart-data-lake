@@ -21,7 +21,8 @@ package io.smartdatalake.util.hdfs
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.dataobject.SparkFileDataObject
+import io.smartdatalake.workflow.dataobject.{FileRef, SparkFileDataObject}
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{col, hash, lit, pmod}
 
@@ -38,7 +39,9 @@ import org.apache.spark.sql.functions.{col, hash, lit, pmod}
  * @param numberOfTasksPerPartition Number of Spark tasks to create per partition before writing to DataObject by repartitioning the DataFrame. This controls how many files are created in each Hadoop partition.
  * @param keyCols Optional key columns to distribute records over Spark tasks inside a Hadoop partition. If numberOfTasksPerPArtition is 1 this setting has no effect. If DataObject has Hadoop partitions defined, keyCols must be defined.
  * @param sortCols Optional columns to sort records inside files created.
- * @param filename Option filename to rename target file if numberOfTasksPerPartition is 1
+ * @param filename Option filename to rename target file(s). If numberOfTasksPerPartition is greater than 1,
+ *                 multiple files can exist in a directory and a number is inserted into the filename after the first '.'.
+ *                 Example: filename=data.csv -> files created are data.1.csv, data.2.csv, ...
  */
 case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
                                keyCols: Seq[String] = Seq(),
@@ -46,7 +49,6 @@ case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
                                filename: Option[String] = None
                               ) extends SmartDataLakeLogger {
   assert(numberOfTasksPerPartition > 0, s"numberOfTasksPerPartition must be greater than 0")
-  assert(filename.isEmpty || numberOfTasksPerPartition == 1, s"if filename is defined then numberOfTasksPerPartition must be set to 1.")
 
   /**
    *
@@ -71,5 +73,32 @@ case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
     // sort within spark partitions
     if (sortCols.nonEmpty) dfRepartitioned.sortWithinPartitions(sortCols.map(col):_*)
     else dfRepartitioned
+  }
+
+  def renameFiles(fileRefs: Seq[FileRef])(implicit filesystem: FileSystem): Unit = {
+    filename.foreach { filename =>
+      fileRefs.groupBy(_.partitionValues).values.foreach { files =>
+        if (numberOfTasksPerPartition > 1) {
+          files.zipWithIndex.foreach {
+            case (fileRef, idx) => renameFile(fileRef, filename, Some(idx+1))
+          }
+        } else {
+          assert(files.size == 1, "number of files for a partition value should be 1 if numberOfTasksPerPartition=1!")
+          renameFile(files.head, filename)
+        }
+      }
+    }
+  }
+
+  private def renameFile(fileRef: FileRef, filename: String, idxOpt: Option[Int] = None)(implicit filesystem: FileSystem): Unit = {
+    val path = new Path(fileRef.fullPath)
+    def addIndexToFileName(filename: String, idx: Int): String = {
+      val elements = filename.split('.')
+      (Seq(elements.head, idx.toString) ++ elements.drop(1)).mkString(".")
+    }
+    val newFilename = idxOpt.map(idx => addIndexToFileName(filename, idx))
+      .getOrElse(filename)
+    val newPath = new Path(path.getParent, newFilename)
+    filesystem.rename(new Path(fileRef.fullPath), newPath)
   }
 }
