@@ -26,7 +26,7 @@ import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.dataobject.Table
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.functions.{array, col}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
@@ -54,14 +54,16 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    * Deletes a Hive table
    *
    * @param table Hive table
+   * @param tablePath path of table to delete
    * @param doPurge Flag to indicate if PURGE should be used when deleting (don't delete to HDFS trash). Default: true
    * @param existingOnly Flag if check "if exists" should be executed. Default: true
    */
-  def dropTable(table: Table, doPurge: Boolean = true, existingOnly: Boolean = true)(implicit session: SparkSession): Unit = {
+  def dropTable(table: Table, tablePath: Path, filesystem: Option[FileSystem] = None, doPurge: Boolean = true, existingOnly: Boolean = true)(implicit session: SparkSession): Unit = {
     val existsClause = if (existingOnly) "if exists " else ""
     val purgeClause = if (doPurge) " purge" else ""
     val stmt = s"drop table $existsClause${table.fullName}$purgeClause"
     execSqlStmt(stmt)
+    HdfsUtil.deletePath(tablePath, filesystem.getOrElse(HdfsUtil.getHadoopFsFromSpark(tablePath)), false)
   }
 
   /**
@@ -613,11 +615,11 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     execSqlStmt(s"ALTER TABLE ${table.fullName} ADD IF NOT EXISTS PARTITION ($partitionDef)")
   }
 
-  def dropPartition(table: Table, tablePath: Path, partition: PartitionValues)(implicit session: SparkSession): Unit = {
+  def dropPartition(table: Table, tablePath: Path, partition: PartitionValues, filesystem: Option[FileSystem] = None)(implicit session: SparkSession): Unit = {
     val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partition.keys.toSeq, Environment.defaultPathSeparator)
     val partitionPath = new Path(tablePath, partition.getPartitionString(partitionLayout))
-    HdfsUtil.deletePath(partitionPath, HdfsUtil.getHadoopFsFromSpark(partitionPath), false)
     val partitionDef = partition.elements.map{ case (k,v) => s"$k='$v'"}.mkString(", ")
     execSqlStmt(s"ALTER TABLE ${table.fullName} DROP IF EXISTS PARTITION ($partitionDef)")
+    HdfsUtil.deletePath(partitionPath, filesystem.getOrElse(HdfsUtil.getHadoopFsFromSpark(partitionPath)), false)
   }
 }

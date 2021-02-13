@@ -46,7 +46,8 @@ object SDLSaveMode extends Enumeration {
   val Ignore: Value = Value("Ignore")
 
   /**
-   * This is like SaveMode.overwrite but doesnt delete the directory of the DataObject and its partition.
+   * This is like SDLSaveMode.Overwrite but doesnt delete the directory of the DataObject and its partition, but only the files
+   * inside. Then it uses Sparks append mode to add the new files.
    * Like that ACLs set on the base directory are preserved.
    *
    * Implementation: This save mode will delete all files inside the base directory, but not the directory itself.
@@ -56,6 +57,19 @@ object SDLSaveMode extends Enumeration {
    * To stop if no partition values are present, configure executionMode.type = FailIfNoPartitionValuesMode on the Action.
    */
   val OverwritePreserveDirectories: Value = Value("OverwritePreserveDirectories")
+
+  /**
+   * This is like SDLSaveMode.Overwrite but processed partitions are manually deleted instead of using dynamic partitioning mode.
+   * Then it uses Sparks append mode to add the new partitions.
+   * This helps if there are performance problems when using dynamic partitioning mode with hive tables and many partitions.
+   *
+   * Implementation: This save mode will delete processed partition directories manually.
+   * If no partition values are present when writing to a partitioned data object, all partitions are deleted. This is
+   * different to Sparks dynamic partitioning, which only deletes partitions where data is present in the DataFrame to
+   * be written (enabled by default in SDL).
+   * To stop if no partition values are present, configure executionMode.type = FailIfNoPartitionValuesMode on the Action.
+   */
+  val OverwriteOptimized: Value = Value("OverwriteOptimized")
 
 
   /* add implicit methods to enumeration, e.g. asSparkSaveMode */
@@ -70,6 +84,7 @@ object SDLSaveMode extends Enumeration {
       case ErrorIfExists => SaveMode.ErrorIfExists
       case Ignore => SaveMode.Ignore
       case OverwritePreserveDirectories => SaveMode.Append // Append with spark, but delete files before with hadoop
+      case OverwriteOptimized => SaveMode.Append // Append with spark, but delete partitions before with hadoop
     }
   }
   implicit def value2SparkSaveMode(mode: Value): SDLSaveModeValue = new SDLSaveModeValue(mode)
