@@ -58,7 +58,6 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * Definition of repartition operation before writing DataFrame with Spark to Hadoop.
    */
   def sparkRepartition: Option[SparkRepartitionDef]
-  assert(sparkRepartition.flatMap(_.filename).isEmpty || partitions.isEmpty, s"($id) Cannot rename file with SparkRepartitionDef for partitioned DataObject")
 
   /**
    * Callback that enables potential transformation to be applied to `df` before the data is written.
@@ -226,16 +225,9 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     // make sure empty partitions are created as well
     createMissingPartitions(partitionValues)
 
-    // rename file according to sparkRepartition (only if not partitioned and numberOfTasksPerPartition=1)
-    sparkRepartition.flatMap(_.filename).foreach {
-      filename =>
-        require(partitions.isEmpty, s"($id) Cannot rename file with SparkRepartitionDef for partitioned DataObject")
-        val files = getFileRefs(Seq())
-        require(files.size <= 1, s"($id) Number of files should not be greater than 1 because SparkRepartitionDef.numberOfTasksPerPartition should be set to 1 if filename is set!")
-        files.map(f => new Path(f.fullPath)).foreach( p => filesystem.rename(p, new Path(p.getParent, filename)))
-    }
+    // rename file according to SparkRepartitionDef
+    sparkRepartition.foreach(_.renameFiles(getFileRefs(partitionValues))(filesystem))
   }
-
 
   /**
    * Filters only existing partition.
