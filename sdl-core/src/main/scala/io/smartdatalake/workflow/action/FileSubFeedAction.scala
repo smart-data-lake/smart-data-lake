@@ -26,6 +26,8 @@ import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow._
 import org.apache.spark.sql.{SaveMode, SparkSession}
 
+import scala.util.Try
+
 abstract class FileSubFeedAction extends Action {
 
   /**
@@ -71,15 +73,23 @@ abstract class FileSubFeedAction extends Action {
     var inputSubFeed = ActionHelper.updateInputPartitionValues(input, FileSubFeed.fromSubFeed(subFeed))
     // create output subfeed
     var outputSubFeed = ActionHelper.updateOutputPartitionValues(output, inputSubFeed.toOutput(output.id))
+    // apply execution mode in init phase and store result
+    if (context.phase == ExecutionPhase.Init) {
+      executionModeResult = Try(
+        executionMode.flatMap(_.apply(id, input, output, inputSubFeed, PartitionValues.oneToOneMapping))
+      ).recover{
+        case ex: NoDataToProcessDontStopWarning =>
+          // return empty output subfeed if "no data dont stop"
+          val outputSubFeed = FileSubFeed(dataObjectId = output.id, partitionValues = Seq(), fileRefs = None)
+          // rethrow exception with fake results added. The DAG will pass the fake results to further actions.
+          throw ex.copy(results = Some(Seq(outputSubFeed)))
+      }
+    }
     // apply execution mode & prepare output partitions
-    executionMode match {
-      case Some(mode) =>
-        mode.apply(id, input, output, inputSubFeed, PartitionValues.oneToOneMapping) match {
-          case Some((inputPartitionValues, outputPartitionValues, _)) =>
-            inputSubFeed = inputSubFeed.copy(partitionValues = inputPartitionValues).breakLineage
-            outputSubFeed = outputSubFeed.copy(partitionValues = outputPartitionValues).breakLineage
-          case None => Unit
-        }
+    executionModeResult.get match { // throws exception if execution mode is Failure
+      case Some(result) =>
+        inputSubFeed = inputSubFeed.copy(partitionValues = result.inputPartitionValues, fileRefs = result.fileRefs).breakLineage
+        outputSubFeed = outputSubFeed.copy(partitionValues = result.outputPartitionValues).breakLineage
       case _ => Unit
     }
     // validate partition values existing for input
@@ -87,6 +97,11 @@ abstract class FileSubFeedAction extends Action {
       val expectedPartitions = input.filterExpectedPartitionValues(inputSubFeed.partitionValues)
       val missingPartitionValues = if (expectedPartitions.nonEmpty) PartitionValues.checkExpectedPartitionValues(input.listPartitions, expectedPartitions) else Seq()
       assert(missingPartitionValues.isEmpty, s"($id) partitions $missingPartitionValues missing for ${input.id}")
+    }
+    // update fileRefs
+    if (inputSubFeed.fileRefs.isEmpty) {
+      val fileRefs = inputSubFeed.fileRefs.getOrElse(input.getFileRefs(inputSubFeed.partitionValues))
+      inputSubFeed = inputSubFeed.copy(fileRefs = Some(fileRefs))
     }
     // break lineage if requested
     if (breakFileRefLineage) inputSubFeed = inputSubFeed.breakLineage
@@ -142,12 +157,7 @@ abstract class FileSubFeedAction extends Action {
   }
 
   def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    // delete Input Files if desired
-    if (deleteDataAfterRead()) (input, outputSubFeed) match {
-      case (fileRefInput: FileRefDataObject, fileSubFeed: FileSubFeed) =>
-        fileSubFeed.processedInputFileRefs.foreach(fileRefs => fileRefInput.deleteFileRefs(fileRefs))
-      case x => throw new IllegalStateException(s"Unmatched case $x")
-    }
+    executionMode.foreach(_.postExec(id, input, output, inputSubFeed, outputSubFeed))
   }
 
   /**

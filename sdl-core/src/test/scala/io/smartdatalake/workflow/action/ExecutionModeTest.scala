@@ -28,7 +28,7 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.customlogic.{SparkUDFCreator, SparkUDFCreatorConfig}
 import io.smartdatalake.workflow.dataobject._
-import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, SparkSubFeed}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.expressions.UserDefinedFunction
@@ -64,23 +64,30 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
   tgt2DO.writeDataFrame(l1.where($"rating"<=2), Seq())
   instanceRegistry.register(tgt2DO)
 
+  val fileSrcDO = CsvFileDataObject("fileSrcDO", tempPath+s"/fileTestSrc", partitions=Seq("lastname"))
+  fileSrcDO.writeDataFrame(l1, Seq())
+  instanceRegistry.register(fileSrcDO)
+
+  val fileEmptyDO = CsvFileDataObject("fileEmptyDO", tempPath+s"/fileTestEmpty", partitions=Seq("lastname"))
+  instanceRegistry.register(fileEmptyDO)
+
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
   test("PartitionDiffMode default") {
     val executionMode = PartitionDiffMode()
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
-    val (partitionValues, outputPartitionValues, filter) = executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping).get
-    assert(partitionValues == Seq(PartitionValues(Map("lastname" -> "doe")), PartitionValues(Map("lastname" -> "einstein"))))
+    val result = executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping).get
+    assert(result.inputPartitionValues == Seq(PartitionValues(Map("lastname" -> "doe")), PartitionValues(Map("lastname" -> "einstein"))))
   }
 
   test("PartitionDiffMode nbOfPartitionValuesPerRun=1 and positive applyCondition") {
     val executionMode = PartitionDiffMode(nbOfPartitionValuesPerRun=Some(1), applyCondition=Some("feed = 'feedTest'"))
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
-    val (partitionValues, outputPartitionValues, filter) = executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping).get
-    assert(partitionValues == Seq(PartitionValues(Map("lastname" -> "doe"))))
-    assert(outputPartitionValues == Seq(PartitionValues(Map("lastname" -> "doe"))))
+    val result = executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping).get
+    assert(result.inputPartitionValues == Seq(PartitionValues(Map("lastname" -> "doe"))))
+    assert(result.outputPartitionValues == Seq(PartitionValues(Map("lastname" -> "doe"))))
   }
 
   test("PartitionDiffMode negative applyCondition") {
@@ -110,8 +117,8 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
     val executionMode = PartitionDiffMode(selectExpression = Some("slice(selectedOutputPartitionValues,-1,1)")) // select last value only
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
-    val (partitionValues, outputPartitionValues, filter) = executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping).get
-    assert(partitionValues == Seq(PartitionValues(Map("lastname" -> "einstein"))))
+    val result = executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping).get
+    assert(result.inputPartitionValues == Seq(PartitionValues(Map("lastname" -> "einstein"))))
   }
 
   test("PartitionDiffMode selectAdditionalInputExpression with udf") {
@@ -120,17 +127,17 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
     val executionMode = PartitionDiffMode(selectAdditionalInputExpression = Some("testUdfAddLastNameEinstein(selectedInputPartitionValues,inputPartitionValues)"))
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
-    val (inputPartitionValues, outputPartitionValues, filter) = executionMode.apply(ActionId("test"), srcDO, tgt2DO, subFeed, PartitionValues.oneToOneMapping).get
-    assert(outputPartitionValues == Seq(PartitionValues(Map("lastname" -> "doe")))) // Einstein already exists in tgt2
-    assert(inputPartitionValues.toSet == Set(PartitionValues(Map("lastname" -> "einstein")), PartitionValues(Map("lastname" -> "doe")))) // but Einstein is added as additional input partition
+    val result = executionMode.apply(ActionId("test"), srcDO, tgt2DO, subFeed, PartitionValues.oneToOneMapping).get
+    assert(result.outputPartitionValues == Seq(PartitionValues(Map("lastname" -> "doe")))) // Einstein already exists in tgt2
+    assert(result.inputPartitionValues.toSet == Set(PartitionValues(Map("lastname" -> "einstein")), PartitionValues(Map("lastname" -> "doe")))) // but Einstein is added as additional input partition
   }
 
   test("PartitionDiffMode alternativeOutputId") {
     val executionMode = PartitionDiffMode(alternativeOutputId = Some("tgt2"))
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
-    val (partitionValues, outputPartitionValues, filter) = executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping).get
-    assert(partitionValues == Seq(PartitionValues(Map("lastname" -> "doe")))) // partition lastname=einstein is already loaded into tgt2
+    val result = executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping).get
+    assert(result.inputPartitionValues == Seq(PartitionValues(Map("lastname" -> "doe")))) // partition lastname=einstein is already loaded into tgt2
   }
 
   test("PartitionDiffMode no data to process") {
@@ -158,16 +165,16 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
     val executionMode = SparkIncrementalMode(compareCol = "rating")
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
-    val (partitionValues, outputPartitionValues, filter) = executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping).get
-    assert(filter.isEmpty) // no filter if target is empty as everything needs to be copied
+    val result = executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping).get
+    assert(result.filter.isEmpty) // no filter if target is empty as everything needs to be copied
   }
 
   test("SparkIncrementalMode partially filled target") {
     val executionMode = SparkIncrementalMode(compareCol = "rating")
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
-    val (partitionValues, outputPartitionValues, filter) = executionMode.apply(ActionId("test"), srcDO, tgt2DO, subFeed, PartitionValues.oneToOneMapping).get
-    assert(filter.nonEmpty)
+    val result = executionMode.apply(ActionId("test"), srcDO, tgt2DO, subFeed, PartitionValues.oneToOneMapping).get
+    assert(result.filter.nonEmpty)
   }
 
   test("SparkIncrementalMode no data to process") {
@@ -177,7 +184,7 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
     intercept[NoDataToProcessWarning](executionMode.apply(ActionId("test"), tgt2DO, tgt2DO, subFeed, PartitionValues.oneToOneMapping))
   }
 
-  test("SparkIncrementalMode no data to process dont stop") {
+  test("SparkIncrementalMode no data to process don't stop") {
     val executionMode = SparkIncrementalMode(compareCol = "rating", stopIfNoData = false)
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, tgt2DO.id, partitionValues = Seq())
@@ -188,8 +195,30 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
     val executionMode = CustomPartitionMode(className = classOf[TestCustomPartitionMode].getName, alternativeOutputId = Some("tgt2"))
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
-    val (partitionValues, outputPartitionValues, filter) = executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping).get
-    assert(partitionValues == Seq(PartitionValues(Map("lastname" -> "doe")))) // partition lastname=einstein is already loaded into tgt2
+    val result = executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping).get
+    assert(result.inputPartitionValues == Seq(PartitionValues(Map("lastname" -> "doe")))) // partition lastname=einstein is already loaded into tgt2
+  }
+
+  test("FileIncrementalMoveMode select file refs") {
+    val executionMode = FileIncrementalMoveMode()
+    executionMode.prepare(ActionId("test"))
+    val subFeed: FileSubFeed = FileSubFeed(fileRefs = None, dataObjectId = fileSrcDO.id, partitionValues = Seq())
+    val result = executionMode.apply(ActionId("test"), fileSrcDO, fileSrcDO, subFeed, PartitionValues.oneToOneMapping).get
+    assert(result.fileRefs.get.nonEmpty)
+  }
+
+  test("FileIncrementalMoveMode no data to process") {
+    val executionMode = FileIncrementalMoveMode()
+    executionMode.prepare(ActionId("test"))
+    val subFeed: FileSubFeed = FileSubFeed(fileRefs = None, dataObjectId = fileEmptyDO.id, partitionValues = Seq())
+    intercept[NoDataToProcessWarning](executionMode.apply(ActionId("test"), fileEmptyDO, fileEmptyDO, subFeed, PartitionValues.oneToOneMapping))
+  }
+
+  test("FileIncrementalMoveMode no data to process don't stop") {
+    val executionMode = FileIncrementalMoveMode(stopIfNoData = false)
+    executionMode.prepare(ActionId("test"))
+    val subFeed: FileSubFeed = FileSubFeed(fileRefs = None, dataObjectId = fileEmptyDO.id, partitionValues = Seq())
+    intercept[NoDataToProcessDontStopWarning](executionMode.apply(ActionId("test"), fileEmptyDO, fileEmptyDO, subFeed, PartitionValues.oneToOneMapping))
   }
 }
 

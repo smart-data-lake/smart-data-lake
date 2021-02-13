@@ -79,10 +79,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
         // return empty output subfeeds if "no data dont stop"
         case ex: NoDataToProcessDontStopWarning =>
           val outputSubFeeds = outputs.map {
-            output =>
-              val subFeed = SparkSubFeed(dataFrame = None, dataObjectId = output.id, partitionValues = Seq())
-              // update partition values to output's partition columns and update dataObjectId
-              validateAndUpdateSubFeed(output, subFeed)
+            output => SparkSubFeed(dataFrame = None, dataObjectId = output.id, partitionValues = Seq())
           }
           // rethrow exception with fake results added. The DAG will pass the fake results to further actions.
           throw ex.copy(results = Some(outputSubFeeds))
@@ -90,14 +87,14 @@ abstract class SparkSubFeedsAction extends SparkAction {
     }
     // apply execution mode
     executionModeResult.get match { // throws exception if execution mode is Failure
-      case Some((inputPartitionValues, outputPartitionValues, newFilter)) =>
+      case Some(result) =>
         inputSubFeeds = inputSubFeeds.map { subFeed =>
-          val inputFilter = if (subFeed.dataObjectId == mainInput.id) newFilter else None
-          ActionHelper.updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = inputPartitionValues, filter = inputFilter).breakLineage)
+          val inputFilter = if (subFeed.dataObjectId == mainInput.id) result.filter else None
+          ActionHelper.updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = result.inputPartitionValues, filter = inputFilter).breakLineage)
         }
         outputSubFeeds = outputSubFeeds.map(subFeed =>
           // we need to transform inputPartitionValues again to outputPartitionValues so that partition values from partitions not existing in mainOutput are not lost.
-          ActionHelper.updateOutputPartitionValues(outputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = inputPartitionValues, filter = newFilter).breakLineage, Some(transformPartitionValues))
+          ActionHelper.updateOutputPartitionValues(outputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = result.inputPartitionValues, filter = result.filter).breakLineage, Some(transformPartitionValues))
         )
       case _ => Unit
     }
@@ -166,5 +163,12 @@ abstract class SparkSubFeedsAction extends SparkAction {
 
   private def executionModeNeedsMainInputOutput: Boolean = {
     executionMode.exists{_.isInstanceOf[ExecutionModeWithMainInputOutput]}
+  }
+
+  override def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.postExec(inputSubFeeds, outputSubFeeds)
+    val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id).get
+    val mainOutputSubFeed = outputSubFeeds.find(_.dataObjectId == mainOutput.id).get
+    executionMode.foreach(_.postExec(id, mainInput, mainOutput, mainInputSubFeed, mainOutputSubFeed))
   }
 }
