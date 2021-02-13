@@ -24,7 +24,7 @@ import io.smartdatalake.definitions.OutputType.OutputType
 import io.smartdatalake.definitions.{Environment, HiveTableLocationSuffix, OutputType}
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{EnvironmentUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.dataobject.Table
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.functions.{array, col}
@@ -261,7 +261,14 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       logger.info(s"(${table.fullName}) writeDfToHive: insert into ${table.fullName}")
 
       // Try to determine maximum number of records according to catalog statistics
-      val df_partitioned = if (numInitialHdfsPartitions != -1) {
+      val df_partitioned = if (numInitialHdfsPartitions == -1) {
+        // pass DataFrame straight through if numInitialHdfsPartitions == -1, in this case the file size in the responsibility of the framework and must be controlled in custom transformations
+        df_newColsSorted
+      } else if (EnvironmentUtil.isSparkAdaptiveQueryExecEnabled) {
+        // pass DataFrame straight through if AQE is enabled
+        logger.warn(s"(${table.fullName}) numInitialHdfsPartitions is ignored when Spark 3.0 Adaptive Query Execution (AQE) is enabled")
+        df_newColsSorted
+      } else {
         val maxRecordsPerFile: Option[BigInt] = calculateMaxRecordsPerFileFromStatistics(table)
         if (maxRecordsPerFile.isDefined) {
           // if exact number of records could be determined from Hive statistics, use it to split files
@@ -270,12 +277,10 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
           //       so we're setting it on the current runtime config used by all DFs / RDDs
           session.conf.set("spark.sql.files.maxRecordsPerFile", maxRecordsPerFile.get.toLong)
           HdfsUtil.repartitionForHdfsFileSize(df_newColsSorted, outputPath, reducePartitions = true)
-        }
-        else {
+        } else {
           HdfsUtil.repartitionForHdfsFileSize(df_newColsSorted, outputPath)
         }
       }
-      else df_newColsSorted
 
       // Write file
       df_partitioned.write
@@ -286,8 +291,14 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       // for new tables:
       // use user defined numInitialHdfsPartitions or leave partitioning as is
       // it's assumed that i.e. a CustomDfCreator takes care of proper partitioning in this case
-      val df_partitioned =
-        if(numInitialHdfsPartitions == -1)  df_newColsSorted else df_newColsSorted.repartition(numInitialHdfsPartitions)
+      val df_partitioned = if (numInitialHdfsPartitions == -1) {
+        // pass DataFrame straight through if numInitialHdfsPartitions == -1, in this case the file size in the responsibility of the framework and must be controlled in custom transformations
+        df_newColsSorted
+      } else if (EnvironmentUtil.isSparkAdaptiveQueryExecEnabled) {
+        // pass DataFrame straight through if AQE is enabled
+        logger.warn(s"(${table.fullName}) numInitialHdfsPartitions is ignored when Spark 3.0 Adaptive Query Execution (AQE) is enabled")
+        df_newColsSorted
+      } else df_newColsSorted.repartition(numInitialHdfsPartitions)
 
       // create and write to table
       if (partitions.nonEmpty) { // with partitions
