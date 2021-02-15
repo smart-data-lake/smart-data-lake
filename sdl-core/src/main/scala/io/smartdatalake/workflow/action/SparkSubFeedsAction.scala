@@ -27,7 +27,7 @@ import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFra
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 abstract class SparkSubFeedsAction extends SparkAction {
 
@@ -44,6 +44,15 @@ abstract class SparkSubFeedsAction extends SparkAction {
   // this must be lazy because inputs / outputs is evaluated later in subclasses
   lazy val mainInput: DataObject with CanCreateDataFrame = ActionHelper.getMainDataObject[DataObject with CanCreateDataFrame](mainInputId, inputs, "input", executionModeNeedsMainInputOutput, id)
   lazy val mainOutput: DataObject with CanWriteDataFrame = ActionHelper.getMainDataObject[DataObject with CanWriteDataFrame](mainOutputId, outputs, "output", executionModeNeedsMainInputOutput, id)
+
+  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.prepare
+    // check skip condition
+    executionCondition.foreach(_.syntaxCheck[SubFeedsExpressionData](id, Some("executionCondition")))
+    // check main input/output by triggering lazy values
+    mainInput
+    mainOutput
+  }
 
   /**
    * Transform [[SparkSubFeed]]'s.
@@ -75,22 +84,14 @@ abstract class SparkSubFeedsAction extends SparkAction {
     if (context.phase == ExecutionPhase.Init) {
       executionModeResult = Try(
         executionMode.flatMap(_.apply(id, mainInput, mainOutput, mainInputSubFeed, transformPartitionValues))
-      ).recover {
-        // return empty output subfeeds if "no data dont stop"
-        case ex: NoDataToProcessDontStopWarning =>
-          val outputSubFeeds = outputs.map {
-            output => SparkSubFeed(dataFrame = None, dataObjectId = output.id, partitionValues = Seq())
-          }
-          // rethrow exception with fake results added. The DAG will pass the fake results to further actions.
-          throw ex.copy(results = Some(outputSubFeeds))
-      }
+      ).recover { ActionHelper.getHandleExecutionModeExceptionPartialFunction(outputs) }
     }
     // apply execution mode
     executionModeResult.get match { // throws exception if execution mode is Failure
       case Some(result) =>
         inputSubFeeds = inputSubFeeds.map { subFeed =>
           val inputFilter = if (subFeed.dataObjectId == mainInput.id) result.filter else None
-          ActionHelper.updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = result.inputPartitionValues, filter = inputFilter).breakLineage)
+          ActionHelper.updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeed.copy(partitionValues = result.inputPartitionValues, filter = inputFilter, isSkipped = false).breakLineage)
         }
         outputSubFeeds = outputSubFeeds.map(subFeed =>
           // we need to transform inputPartitionValues again to outputPartitionValues so that partition values from partitions not existing in mainOutput are not lost.
@@ -170,5 +171,13 @@ abstract class SparkSubFeedsAction extends SparkAction {
     val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id).get
     val mainOutputSubFeed = outputSubFeeds.find(_.dataObjectId == mainOutput.id).get
     executionMode.foreach(_.postExec(id, mainInput, mainOutput, mainInputSubFeed, mainOutputSubFeed))
+  }
+}
+
+case class SubFeedExpressionData(partitionValues: Seq[Map[String,String]], isDAGStart: Boolean, isSkipped: Boolean)
+case class SubFeedsExpressionData(inputSubFeeds: Map[String, SubFeedExpressionData])
+object SubFeedsExpressionData {
+  def fromSubFeeds(subFeeds: Seq[SubFeed]): SubFeedsExpressionData = {
+    SubFeedsExpressionData(subFeeds.map(subFeed => (subFeed.dataObjectId.id, SubFeedExpressionData(subFeed.partitionValues.map(_.getMapString), subFeed.isDAGStart, subFeed.isSkipped))).toMap)
   }
 }

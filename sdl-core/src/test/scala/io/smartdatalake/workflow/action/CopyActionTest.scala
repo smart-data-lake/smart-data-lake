@@ -197,7 +197,9 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("A","doe","john",5)).toDF("type", "lastname", "firstname", "rating")
     val l1PartitionValues = Seq(PartitionValues(Map("type"->"A")))
     srcDO.writeDataFrame(l1, l1PartitionValues) // prepare testdata
+    action.preInit(Seq(srcSubFeed))
     val initOutputSubFeeds = action.init(Seq(srcSubFeed))
+    action.preExec(Seq(srcSubFeed))
     val tgtSubFeed1 = action.exec(Seq(srcSubFeed))(session,contextExec).head
 
     // check first load
@@ -270,6 +272,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("20100101","jonson","rob",5),("20100103","doe","bob",3)).toDF("dt", "lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
+    action1.preInit(Seq(srcSubFeed))
     val tgtSubFeed = action1.init(Seq(srcSubFeed)).head.asInstanceOf[SparkSubFeed]
 
     // check simulate
@@ -279,12 +282,14 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtSubFeed.dataFrame.get.columns.contains("mt"))
 
     // run
+    action1.preExec(Seq(srcSubFeed))(session,contextExec)
     action1.exec(Seq(srcSubFeed))(session,contextExec)
     assert(tgtDO.getDataFrame().count == 2)
 
     // simulate next run
-    action1.reset
-    intercept[NoDataToProcessWarning](action1.init(Seq(srcSubFeed)).head.asInstanceOf[SparkSubFeed])
+    action1.reset()
+    action1.preInit(Seq(srcSubFeed))
+    intercept[NoDataToProcessDontStopWarning](action1.init(Seq(srcSubFeed)))
   }
 
 }

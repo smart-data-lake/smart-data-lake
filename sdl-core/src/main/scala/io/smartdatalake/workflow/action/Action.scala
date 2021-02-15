@@ -22,7 +22,7 @@ import java.time.{Duration, LocalDateTime}
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
-import io.smartdatalake.definitions.{ExecutionMode, ExecutionModeResult}
+import io.smartdatalake.definitions.{Condition, ExecutionMode, ExecutionModeResult}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, SparkExpressionUtil}
 import io.smartdatalake.workflow.ExecutionPhase.{ExecutionPhase, Value}
@@ -76,6 +76,14 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   def outputs: Seq[DataObject]
 
   /**
+   * execution condition for this action.
+   */
+  def executionCondition: Option[Condition]
+
+  // execution condition is evaluated in init phase and result must be stored for exec phase
+  protected var executionConditionResult: (Boolean,Option[String]) = (true,None)
+
+  /**
    * execution mode for this action.
    */
   def executionMode: Option[ExecutionMode]
@@ -114,6 +122,35 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   }
 
   /**
+   * Checks before initalization of Action
+   * In this step execution condition is evaluated and is Action init is skipped if result is false.
+   */
+  def preInit(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    //noinspection MapGetOrElseBoolean
+    executionConditionResult = executionCondition.map { c =>
+      // evaluate condition if existing
+      val data = SubFeedsExpressionData.fromSubFeeds(subFeeds)
+      if (!c.evaluate(id, Some("executionCondition"), data)) {
+        val descriptionText = c.description.map(d => s""""$d" """).getOrElse("")
+        val msg = s"""($id) execution skipped because of failed executionCondition ${descriptionText}expression="${c.expression}" $data"""
+        (false, Some(msg))
+      } else (true, None)
+    }.getOrElse{
+      // default behaviour: if no executionCondition is defined, Action is executed if no input subFeed is skipped.
+      val skippedSubFeeds = subFeeds.filter(_.isSkipped)
+      if (skippedSubFeeds.nonEmpty) {
+        val msg = s"""($id) execution skipped because input subFeeds are skipped: ${subFeeds.map(_.dataObjectId)}"""
+        (false, Some(msg))
+      } else (true, None)
+    }
+    // check execution condition result
+    if (!executionConditionResult._1) {
+      val outputSubFeeds = outputs.map(output => InitSubFeed(dataObjectId = output.id, partitionValues = Seq(), isSkipped = true))
+      throw new TaskSkippedDontStopWarning(id.id, executionConditionResult._2.get, Some(outputSubFeeds))
+    }
+  }
+
+  /**
    * Initialize Action with [[SubFeed]]'s to be processed.
    * In this step the execution mode is evaluated and the result stored for the exec phase.
    * If successful
@@ -131,9 +168,15 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * e.g. JdbcTableDataObjects preWriteSql
    */
   def preExec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    setSparkJobMetadata(None) // init spark jobGroupId to identify metrics
+    // check execution condition result from init phase
+    if (!executionConditionResult._1) {
+      val outputSubFeeds = outputs.map(output => InitSubFeed(dataObjectId = output.id, partitionValues = Seq(), isSkipped = true))
+      throw new TaskSkippedDontStopWarning(id.id, executionConditionResult._2.get, Some(outputSubFeeds))
+    }
     //  if execution mode result from init phase is failure, throw corresponding exception
     if (executionModeResult.isFailure) executionModeResult.get
+    // init spark jobGroupId to identify metrics
+    setSparkJobMetadata(None)
     // otherwise continue processing
     inputs.foreach( input => input.preRead(findSubFeedPartitionValues(input.id, subFeeds)))
     outputs.foreach(_.preWrite) // Note: transformed subFeeds don't exist yet, that's why no partition values can be passed as parameters.
@@ -302,6 +345,8 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
     runtimeEvents.clear
     dataObjectRuntimeMetricsDelivered.clear
     dataObjectRuntimeMetricsMap.clear
+    executionConditionResult = (true,None)
+    executionModeResult = Success(None)
   }
 
   /**

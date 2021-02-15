@@ -23,10 +23,10 @@ import java.time.LocalDateTime
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.definitions.Environment
+import io.smartdatalake.definitions.{Environment, ExecutionModeResult}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, InitSubFeed, SubFeed}
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.TimestampType
@@ -184,6 +184,22 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
         subFeed.updatePartitionValues(partitionedDO.partitions, Some(newPartitionValues)).asInstanceOf[T]
       case _ => subFeed.clearPartitionValues.asInstanceOf[T]
     }
+  }
+
+  def getHandleExecutionModeExceptionPartialFunction(outputs: Seq[DataObject]): PartialFunction[Throwable, Option[ExecutionModeResult]] = {
+    // return empty output subfeeds if "no data"
+    case ex: NoDataToProcessWarning =>
+      // This exception is changed to a NoDataToProcessDontStopWarning but subFeeds have isSkipped set to true
+      // The following action's executionCondition will stop by default if there is a skipped input subFeed. The executionCondition can be set to "true" to get stopIfNoData=false behaviour.
+      val outputSubFeeds = outputs.map(output => InitSubFeed(dataObjectId = output.id, partitionValues = Seq(), isSkipped = true))
+      // throw NoDataToProcessDontStopWarning with fake results added. The DAG will pass the fake results to further actions.
+      throw NoDataToProcessDontStopWarning(ex.actionId, ex.msg, results = Some(outputSubFeeds))
+    case ex: NoDataToProcessDontStopWarning =>
+      // in this case subFeed isSkipped is set to false to be backward compatible with executionMode stopIfNoData=false
+      // This can be removed once executionMode stopIfNoData is removed.
+      val outputSubFeeds = outputs.map(output => InitSubFeed(dataObjectId = output.id, partitionValues = Seq()))
+      // rethrow exception with fake results added. The DAG will pass the fake results to further actions.
+      throw ex.copy(results = Some(outputSubFeeds))
   }
 }
 
