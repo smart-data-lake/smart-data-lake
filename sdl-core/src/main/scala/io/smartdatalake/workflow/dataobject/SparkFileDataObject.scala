@@ -196,7 +196,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
       case SDLSaveMode.OverwriteOptimized =>
         if (partitionValues.nonEmpty) { // delete concerned partitions if existing, as append mode is used later
           deletePartitions(filterPartitionsExisting(partitionValues))
-        } else if (partitions.isEmpty) { // delete all data if existing, as append mode is used later
+        } else if (partitions.isEmpty || Environment.globalConfig.allowOverwriteAllPartitionsWithoutPartitionValues.contains(id)) { // delete all data if existing, as append mode is used later
           deleteAll
         } else {
           throw new ProcessingLogicException(s"($id) OverwriteOptimized without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data.")
@@ -204,10 +204,10 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
       case SDLSaveMode.OverwritePreserveDirectories => // only delete files but not directories
         if (partitionValues.nonEmpty) { // delete concerned partitions files if existing, as append mode is used later
           deletePartitionsFiles(filterPartitionsExisting(partitionValues))
-        } else if (partitions.isEmpty) { // delete all data if existing, as append mode is used later
+        } else if (partitions.isEmpty || Environment.globalConfig.allowOverwriteAllPartitionsWithoutPartitionValues.contains(id)) { // delete all data if existing, as append mode is used later
           deleteAllFiles(hadoopPath)
         } else {
-          throw new ProcessingLogicException(s"($id) OverwriteOptimized without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data.")
+          throw new ProcessingLogicException(s"($id) OverwritePreserveDirectories without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data.")
         }
       case _ => Unit
     }
