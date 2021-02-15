@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{ExecutionMode, SparkStreamingOnceMode}
+import io.smartdatalake.definitions.{Condition, ExecutionMode, SparkStreamingOnceMode}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
@@ -32,15 +32,16 @@ import org.apache.spark.sql.SparkSession
  * [[Action]] to transform data according to a custom transformer.
  * Allows to transform multiple input and output dataframes.
  *
- * @param inputIds input DataObject's
- * @param outputIds output DataObject's
- * @param transformer custom transformation for multiple dataframes to apply
- * @param mainInputId optional selection of main inputId used for execution mode and partition values propagation. Only needed if there are multiple input DataObject's.
- * @param mainOutputId optional selection of main outputId used for execution mode and partition values propagation. Only needed if there are multiple output DataObject's.
- * @param executionMode optional execution mode for this Action
- * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
- *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
- * @param recursiveInputIds output of action that are used as input in the same action
+ * @param inputIds               input DataObject's
+ * @param outputIds              output DataObject's
+ * @param transformer            custom transformation for multiple dataframes to apply
+ * @param mainInputId            optional selection of main inputId used for execution mode and partition values propagation. Only needed if there are multiple input DataObject's.
+ * @param mainOutputId           optional selection of main outputId used for execution mode and partition values propagation. Only needed if there are multiple output DataObject's.
+ * @param executionMode          optional execution mode for this Action
+ * @param executionCondition     optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
+ * @param metricsFailCondition   optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
+ *                               If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
+ * @param recursiveInputIds      output of action that are used as input in the same action
  * @param inputIdsToIgnoreFilter optional list of input ids to ignore filter (partition values & filter clause)
  */
 case class CustomSparkAction (override val id: ActionId,
@@ -52,6 +53,7 @@ case class CustomSparkAction (override val id: ActionId,
                               override val mainInputId: Option[DataObjectId] = None,
                               override val mainOutputId: Option[DataObjectId] = None,
                               override val executionMode: Option[ExecutionMode] = None,
+                              override val executionCondition: Option[Condition] = None,
                               override val metricsFailCondition: Option[String] = None,
                               override val metadata: Option[ActionMetadata] = None,
                               recursiveInputIds: Seq[DataObjectId] = Seq(),

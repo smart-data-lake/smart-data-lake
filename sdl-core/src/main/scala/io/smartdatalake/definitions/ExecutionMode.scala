@@ -141,7 +141,7 @@ case class PartitionDiffMode( partitionColNb: Option[Int] = None
                             , applyCondition: Option[String] = None
                             , failCondition: Option[String] = None
                             , failConditions: Seq[Condition] = Seq()
-                            , stopIfNoData: Boolean = true
+                            , @deprecated("use following actions executionCondition=true & executionMode=ProcessAll instead") stopIfNoData: Boolean = true
                             , selectExpression: Option[String] = None
                             , applyPartitionValuesTransform: Boolean = false
                             , selectAdditionalInputExpression: Option[String] = None
@@ -286,7 +286,11 @@ case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[
  * @param applyCondition Condition to decide if execution mode should be applied or not. Define a spark sql expression working with attributes of [[DefaultExecutionModeExpressionData]] returning a boolean.
  *                       Default is to apply the execution mode if given partition values (partition values from command line or passed from previous action) are not empty.
  */
-case class SparkIncrementalMode(compareCol: String, override val alternativeOutputId: Option[DataObjectId] = None, stopIfNoData: Boolean = true, applyCondition: Option[Condition] = None) extends ExecutionMode with ExecutionModeWithMainInputOutput {
+case class SparkIncrementalMode( compareCol: String
+                               , override val alternativeOutputId: Option[DataObjectId] = None
+                               , @deprecated("use dependent action executionCondition=true & executionMode=ProcessAll instead") stopIfNoData: Boolean = true
+                               , applyCondition: Option[Condition] = None
+                               ) extends ExecutionMode with ExecutionModeWithMainInputOutput {
   private[smartdatalake] override val applyConditionsDef = applyCondition.toSeq
   private[smartdatalake] override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
   private[smartdatalake] override def prepare(actionId: ActionId)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {

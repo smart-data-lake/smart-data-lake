@@ -36,8 +36,10 @@ import org.apache.spark.sql.functions.{col, hash, lit, pmod}
  * When writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal
  * to numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.
  *
- * @param numberOfTasksPerPartition Number of Spark tasks to create per partition before writing to DataObject by repartitioning the DataFrame. This controls how many files are created in each Hadoop partition.
- * @param keyCols Optional key columns to distribute records over Spark tasks inside a Hadoop partition. If numberOfTasksPerPArtition is 1 this setting has no effect. If DataObject has Hadoop partitions defined, keyCols must be defined.
+ * @param numberOfTasksPerPartition Number of Spark tasks to create per partition before writing to DataObject by repartitioning the DataFrame.
+ *                                  This controls how many files are created in each Hadoop partition.
+ * @param keyCols  Optional key columns to distribute records over Spark tasks inside a Hadoop partition.
+ *                 If DataObject has Hadoop partitions defined, keyCols must be defined.
  * @param sortCols Optional columns to sort records inside files created.
  * @param filename Option filename to rename target file(s). If numberOfTasksPerPartition is greater than 1,
  *                 multiple files can exist in a directory and a number is inserted into the filename after the first '.'.
