@@ -179,7 +179,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
 
     // prepare data
     var dfPrepared = beforeWrite(df)
-    dfPrepared = sparkRepartition.map(_.prepareDataFrame(dfPrepared,partitions, partitionValues.size, id))
+    dfPrepared = sparkRepartition.map(_.prepareDataFrame(dfPrepared, partitions, partitionValues, id))
       .getOrElse(dfPrepared)
 
     // apply special save modes
