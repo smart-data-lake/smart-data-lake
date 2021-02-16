@@ -164,7 +164,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
       case SDLSaveMode.OverwriteOptimized =>
         if (partitionValues.nonEmpty) { // delete concerned partitions if existing, as append mode is used later
           deletePartitionsIfExisting(partitionValues)
-        } else if (partitions.isEmpty) { // delete table if existing, as append mode is used later
+        } else if (partitions.isEmpty || Environment.globalConfig.allowOverwriteAllPartitionsWithoutPartitionValues.contains(id)) { // delete table if existing, as append mode is used later
           dropTable
         } else {
           throw new ProcessingLogicException(s"($id) OverwriteOptimized without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data.")
