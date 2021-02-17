@@ -24,7 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.definitions.{ExecutionMode, ExecutionModeResult}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{SmartDataLakeLogger, SparkExpressionUtil}
 import io.smartdatalake.workflow.ExecutionPhase.{ExecutionPhase, Value}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.{RuntimeEventState, Value}
@@ -110,7 +110,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
     require(duplicateNames.isEmpty, s"The names of your DataObjects are not unique when replacing special characters with underscore. Duplicates: ${duplicateNames.mkString(",")}")
 
     // validate metricsFailCondition
-    metricsFailCondition.foreach(c => evaluateMetricsFailCondition(c))
+    metricsFailCondition.foreach(c => SparkExpressionUtil.syntaxCheck[Metric,Boolean](id, Some("metricsFailCondition"), c))
   }
 
   /**
