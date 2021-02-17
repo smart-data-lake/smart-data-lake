@@ -24,6 +24,7 @@ import java.nio.file.Files
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.ProcessingLogicException
 import io.smartdatalake.workflow.action.CustomFileActionTest
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.Path
@@ -298,12 +299,21 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
     assert(dataObject.filesystem.isDirectory(partitionPath))
 
     // delete files in base dir
-    assert(dataObject.filesystem.listStatus(dataObject.hadoopPath).nonEmpty)
+    assert(dataObject.filesystem.listStatus(dataObject.hadoopPath).exists(_.isFile))
     dataObject.deleteAllFiles(dataObject.hadoopPath)
-    assert(dataObject.filesystem.listStatus(dataObject.hadoopPath).isEmpty)
+    assert(!dataObject.filesystem.listStatus(dataObject.hadoopPath).exists(_.isFile))
     assert(dataObject.filesystem.isDirectory(dataObject.hadoopPath))
+    assert(dataObject.filesystem.isDirectory(new Path(dataObject.hadoopPath,"p=A")))
 
     FileUtils.deleteDirectory(tempDir.toFile)
+  }
+
+  test("OverwriteOptimized without partition values not allowed for partitioned DataObject") {
+    val df = Seq(("A", "2", 1), ("B", "1", 2), ("C", "X", 3)).toDF("p1", "p2", "value")
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", partitions = Seq("p1","p2"), path = tempDir.toString, saveMode = SDLSaveMode.OverwriteOptimized)
+    a [ProcessingLogicException] should be thrownBy dataObject.writeDataFrame(df, partitionValues = Seq())
   }
 
 }

@@ -106,10 +106,17 @@ private[smartdatalake] object PartitionValues {
   }
 
   /**
+   * Extract keys from list of partition values
+   */
+  def getPartitionValuesKeys(partitionValues: Seq[PartitionValues]): Set[String] = {
+    partitionValues.map(_.keys).reduceOption(_ ++ _).getOrElse(Set())
+  }
+
+  /**
    * Return PartitionValues keys which are not included in given partition columns
    */
   def checkWrongPartitionValues(partitionValues: Seq[PartitionValues], partitions: Seq[String]): Seq[String] = {
-    partitionValues.map(_.keys).reduceOption(_ ++ _).getOrElse(Set()).diff(partitions.toSet).toSeq
+    getPartitionValuesKeys(partitionValues).diff(partitions.toSet).toSeq
   }
 
   /**

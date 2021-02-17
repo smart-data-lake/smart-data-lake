@@ -26,7 +26,7 @@ import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
-import io.smartdatalake.util.misc.{AclDef, AclUtil, DataFrameUtil}
+import io.smartdatalake.util.misc.{AclDef, AclUtil, DataFrameUtil, EnvironmentUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.HiveTableConnection
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -62,6 +62,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   if (table.db.isEmpty) throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
 
   assert(saveMode!=SDLSaveMode.OverwritePreserveDirectories, s"($id) saveMode OverwritePreserveDirectories not supported for now.")
+  assert(saveMode!=SDLSaveMode.OverwriteOptimized, s"($id) saveMode OverwriteOptimized not supported for now.")
 
   // prepare final path
   @transient private var hadoopPathHolder: Path = _
@@ -143,12 +144,17 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
                             (implicit session: SparkSession): Unit = {
     val dfPrepared = if (createTableOnly) {
       // create empty df with existing df's schema
-      session.createDataFrame(List.empty[Row].asJava, df.schema)
+      DataFrameUtil.getEmptyDataFrame(df.schema)
     } else {
-      // pass DataFrame straight through if numInitialHdfsPartitions == -1, in this case the file size in the responsibility of the framework and must be controlled in custom transformations
-      if(numInitialHdfsPartitions == -1) df
-      // estimate number of partitions from existing data, otherwise use numInitialHdfsPartitions
-      else if (isTableExisting) {
+      if (numInitialHdfsPartitions == -1) {
+        // pass DataFrame straight through if numInitialHdfsPartitions == -1, in this case the file size in the responsibility of the framework and must be controlled in custom transformations
+        df
+      } else if (EnvironmentUtil.isSparkAdaptiveQueryExecEnabled) {
+        // pass DataFrame straight through if AQE is enabled
+        logger.warn(s"($id) numInitialHdfsPartitions is ignored when Spark 3.0 Adaptive Query Execution (AQE) is enabled")
+        df
+      } else if (isTableExisting) {
+        // estimate number of partitions from existing data, otherwise use numInitialHdfsPartitions
         val currentHdfsPath = HdfsUtil.prefixHadoopPath(HiveUtil.existingTickTockLocation(table), None)
         HdfsUtil.repartitionForHdfsFileSize(df, currentHdfsPath)
       } else df.repartition(numInitialHdfsPartitions)
@@ -190,7 +196,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   }
 
   override def dropTable(implicit session: SparkSession): Unit = {
-    HiveUtil.dropTable(table)
+    HiveUtil.dropTable(table, hadoopPath, filesystem = Some(filesystem))
   }
 
   override def factory: FromConfigFactory[DataObject] = TickTockHiveTableDataObject

@@ -351,11 +351,6 @@
 			<url>https://repo1.maven.org/maven2/</url>
 		</repository>
 		<repository>
-			<id>spring-plugins</id>
-			<name>Spring Plugins Repository</name>
-			<url>https://repo.spring.io/plugins-release/</url>
-		</repository>
-		<repository>
 			<id>confluent</id>
 			<name>Confluent Schema Repository</name>
 			<url>https://packages.confluent.io/maven/</url>

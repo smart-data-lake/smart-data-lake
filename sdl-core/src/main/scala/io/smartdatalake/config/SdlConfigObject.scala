@@ -61,7 +61,7 @@ object SdlConfigObject {
   /**
    * Value class for action object identifiers.
    */
-  case class ActionObjectId(override val id: String) extends AnyVal with ConfigObjectId {
+  case class ActionId(override val id: String) extends AnyVal with ConfigObjectId {
     override def toString: String = "Action~"+id
   }
 
@@ -76,5 +76,5 @@ object SdlConfigObject {
 
   implicit def stringToConnectionId(str: String): ConnectionId = ConnectionId(str)
   implicit def stringToDataObjectId(str: String): DataObjectId = DataObjectId(str)
-  implicit def stringToActionObjectId(str: String): ActionObjectId = ActionObjectId(str)
+  implicit def stringToActionId(str: String): ActionId = ActionId(str)
 }

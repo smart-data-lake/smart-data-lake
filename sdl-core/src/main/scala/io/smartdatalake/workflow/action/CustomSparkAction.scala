@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{ExecutionMode, SparkStreamingOnceMode}
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -32,7 +32,6 @@ import org.apache.spark.sql.SparkSession
  * [[Action]] to transform data according to a custom transformer.
  * Allows to transform multiple input and output dataframes.
  *
- * @param id
  * @param inputIds input DataObject's
  * @param outputIds output DataObject's
  * @param transformer custom transformation for multiple dataframes to apply
@@ -43,21 +42,20 @@ import org.apache.spark.sql.SparkSession
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  * @param recursiveInputIds output of action that are used as input in the same action
  * @param inputIdsToIgnoreFilter optional list of input ids to ignore filter (partition values & filter clause)
- * @param metadata
  */
-case class CustomSparkAction ( override val id: ActionObjectId,
-                               inputIds: Seq[DataObjectId],
-                               outputIds: Seq[DataObjectId],
-                               transformer: CustomDfsTransformerConfig,
-                               override val breakDataFrameLineage: Boolean = false,
-                               override val persist: Boolean = false,
-                               override val mainInputId: Option[DataObjectId] = None,
-                               override val mainOutputId: Option[DataObjectId] = None,
-                               override val executionMode: Option[ExecutionMode] = None,
-                               override val metricsFailCondition: Option[String] = None,
-                               override val metadata: Option[ActionMetadata] = None,
-                               recursiveInputIds: Seq[DataObjectId] = Seq(),
-                               override val inputIdsToIgnoreFilter: Seq[DataObjectId] = Seq()
+case class CustomSparkAction (override val id: ActionId,
+                              inputIds: Seq[DataObjectId],
+                              outputIds: Seq[DataObjectId],
+                              transformer: CustomDfsTransformerConfig,
+                              override val breakDataFrameLineage: Boolean = false,
+                              override val persist: Boolean = false,
+                              override val mainInputId: Option[DataObjectId] = None,
+                              override val mainOutputId: Option[DataObjectId] = None,
+                              override val executionMode: Option[ExecutionMode] = None,
+                              override val metricsFailCondition: Option[String] = None,
+                              override val metadata: Option[ActionMetadata] = None,
+                              recursiveInputIds: Seq[DataObjectId] = Seq(),
+                              override val inputIdsToIgnoreFilter: Seq[DataObjectId] = Seq()
 )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedsAction {
 
   // checks

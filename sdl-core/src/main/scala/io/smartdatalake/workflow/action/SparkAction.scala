@@ -251,7 +251,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
    */
   def validateDataFrameContainsCols(df: DataFrame, columns: Seq[String], debugName: String): Unit = {
     val missingColumns = columns.diff(df.columns)
-    assert(missingColumns.isEmpty, s"DataFrame $debugName doesn't include columns $missingColumns")
+    assert(missingColumns.isEmpty, s"DataFrame $debugName doesn't include columns ${missingColumns.mkString(", ")}")
   }
 
   /**
@@ -307,7 +307,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
       .collect { case subFeed: SparkSubFeed => subFeed }
       .foreach { subFeed =>
         if (context.forgetDataFrameReuse(subFeed.dataObjectId, subFeed.partitionValues, id).contains(0)) {
-          logger.info(s"($id) Removing cached DataFrame for ${subFeed.dataObjectId} and partitionValues ${subFeed.partitionValues.mkString(", ")}")
+          logger.info(s"($id) Removing cached DataFrame for ${subFeed.dataObjectId} and partitionValues=${subFeed.partitionValues.mkString(", ")}")
           subFeed.dataFrame.foreach(_.unpersist)
         }
     }

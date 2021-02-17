@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action
 import java.time.LocalDateTime
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{ExecutionMode, TechnicalTableColumn}
 import io.smartdatalake.util.evolution.SchemaEvolution
@@ -59,7 +59,7 @@ import scala.util.{Failure, Success, Try}
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  */
 case class HistorizeAction(
-                            override val id: ActionObjectId,
+                            override val id: ActionId,
                             inputId: DataObjectId,
                             outputId: DataObjectId,
                             transformer: Option[CustomDfTransformerConfig] = None,

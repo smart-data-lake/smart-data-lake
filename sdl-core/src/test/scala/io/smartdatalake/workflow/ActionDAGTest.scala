@@ -524,7 +524,6 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     val feed = "actiondag"
     val srcDir = "testSrc"
-    val tgtDir = "testTgt"
     val resourceFile = "AB_NYC_2019.csv"
     val tempDir = Files.createTempDirectory(feed)
 
@@ -543,11 +542,11 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // setup tgt2 CSV DataObject
     val srcSchema = srcDO.getDataFrame().head.schema // infer schema from original CSV
-    val tgt2DO = new CsvFileDataObject( "tgt2", tempDir.resolve(tgtDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","), schema = Some(srcSchema))
+    val tgt2DO = new CsvFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","), schema = Some(srcSchema))
     instanceRegistry.register(tgt2DO)
 
     // setup tgt3 CSV DataObject
-    val tgt3DO = new CsvFileDataObject( "tgt3", tempDir.resolve(tgtDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","), schema = Some(srcSchema))
+    val tgt3DO = new CsvFileDataObject( "tgt3", tempDir.resolve("tgt3").toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","), schema = Some(srcSchema))
     instanceRegistry.register(tgt3DO)
 
     // prepare ActionPipeline
@@ -564,7 +563,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // read src/tgt and count
     val dfSrc = srcDO.getDataFrame()
     val srcCount = dfSrc.count
-    val dfTgt3 = tgt1DO.getDataFrame()
+    val dfTgt3 = tgt3DO.getDataFrame()
     val tgtCount = dfTgt3.count
     assert(srcCount == tgtCount)
 
@@ -596,8 +595,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     srcDO.writeDataFrame(df1, Seq())
     val partitionDiffMode = PartitionDiffMode(
       applyCondition = Some("isStartNode"),
-      selectExpression = Some("slice(selectedPartitionValues,-1,1)"), // only one partition: last partition first
-      failCondition = Some("size(selectedPartitionValues) = 0 and size(outputPartitionValues) = 0")
+      selectExpression = Some("slice(selectedOutputPartitionValues,-1,1)"), // only one partition: last partition first
+      failCondition = Some("size(selectedOutputPartitionValues) = 0 and size(outputPartitionValues) = 0")
     )
     val actions: Seq[SparkSubFeedAction] = Seq(
       DeduplicateAction("a", srcDO.id, tgt1DO.id, executionMode = Some(partitionDiffMode))

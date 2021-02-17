@@ -25,7 +25,8 @@ import io.smartdatalake.definitions.{DateColumnType, Environment}
 import io.smartdatalake.util.misc.DataFrameUtil.arrayToSeq
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
-import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils}
+import io.smartdatalake.util.hive.HiveUtil.logger
+import io.smartdatalake.util.misc.{AclDef, AclUtil, DataFrameUtil, EnvironmentUtil, PerformanceUtils}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.HiveTableConnection
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -124,9 +125,17 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                     (implicit session: SparkSession): Unit = {
     val dfPrepared = if (createTableOnly) {
       // create empty df with existing df's schema
-      session.createDataFrame(List.empty[Row].asJava, df.schema)
-    } else df.repartition(Math.max(1,numInitialHdfsPartitions))
-
+      DataFrameUtil.getEmptyDataFrame(df.schema)
+    } else if (numInitialHdfsPartitions == -1) {
+      // pass DataFrame straight through if numInitialHdfsPartitions == -1, in this case the file size in the responsibility of the framework and must be controlled in custom transformations
+      df
+    } else if (EnvironmentUtil.isSparkAdaptiveQueryExecEnabled) {
+      // pass DataFrame straight through if AQE is enabled
+      logger.warn(s"(${table.fullName}) numInitialHdfsPartitions is ignored when Spark 3.0 Adaptive Query Execution (AQE) is enabled")
+      df
+    } else{
+      df.repartition(Math.max(1,numInitialHdfsPartitions))
+    }
 
     // write table
     val deltaTableWriter = dfPrepared.write.format("delta")

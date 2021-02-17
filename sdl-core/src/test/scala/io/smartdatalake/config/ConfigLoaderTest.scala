@@ -52,6 +52,11 @@ class ConfigLoaderTest extends FlatSpec with Matchers {
     a [ConfigException] should be thrownBy config.getString("noconfig")
   }
 
+  it must "ignore hidden files" in {
+    val config = ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config").toString))
+    config.hasPath("hidden") shouldBe false
+  }
+
   it must "only parse config files in directories" in {
     val config = ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/subdirectory").toString))
     config.getString("foo") shouldBe "foo"

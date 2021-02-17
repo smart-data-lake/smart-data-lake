@@ -22,11 +22,11 @@ import java.time.LocalDateTime
 
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
-import io.smartdatalake.definitions.Environment
+import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 
 class HiveTableDataObjectTest extends DataObjectTestSuite {
 
@@ -149,21 +149,48 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     srcDO.dropTable
 
     // write test data 1 - create partition A and B
-    val partitionValuesCreated = Seq( PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
+    val partitionValuesCreated1 = Seq( PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
     val df1 = Seq(("A",1),("A",2),("B",3),("B",4)).toDF("p", "value")
-    srcDO.writeDataFrame(df1, partitionValuesCreated )
+    srcDO.writeDataFrame(df1, partitionValuesCreated1 )
 
     // test 1
     srcDO.getDataFrame().count shouldEqual 4 // four records should remain, 2 from partition A and 2 from partition B
-    partitionValuesCreated.toSet shouldEqual srcDO.listPartitions.toSet
+    partitionValuesCreated1.toSet shouldEqual srcDO.listPartitions.toSet
 
     // write test data 2 - overwrite partition B
+    val partitionValuesCreated2 = Seq(PartitionValues(Map("p"->"B")))
     val df2 = Seq(("B",5)).toDF("p", "value")
-    srcDO.writeDataFrame(df2, partitionValuesCreated )
+    srcDO.writeDataFrame(df2, partitionValuesCreated2 )
 
     // test 2
     srcDO.getDataFrame().count shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
-    partitionValuesCreated.toSet shouldEqual srcDO.listPartitions.toSet
+    partitionValuesCreated1.toSet shouldEqual srcDO.listPartitions.toSet
+  }
+
+  test("overwrite optimized only one partition") {
+
+    // create data object
+    val srcTable = Table(Some("default"), "input")
+    val srcDO = HiveTableDataObject( "input", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, partitions = Seq("p"), numInitialHdfsPartitions = 1, saveMode = SDLSaveMode.OverwriteOptimized)
+    srcDO.dropTable
+
+    // write test data 1 - create partition A and B
+    val partitionValuesCreated1 = Seq( PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
+    val df1 = Seq(("A",1),("A",2),("B",3),("B",4)).toDF("p", "value")
+    srcDO.writeDataFrame(df1, partitionValuesCreated1 )
+
+    // test 1
+    srcDO.getDataFrame().count shouldEqual 4 // four records should remain, 2 from partition A and 2 from partition B
+    partitionValuesCreated1.toSet shouldEqual srcDO.listPartitions.toSet
+
+    // write test data 2 - overwrite partition B
+    val partitionValuesCreated2 = Seq(PartitionValues(Map("p"->"B")))
+    val df2 = Seq(("B",5)).toDF("p", "value")
+    srcDO.writeDataFrame(df2, partitionValuesCreated2 )
+
+    // test 2
+    srcDO.getDataFrame().count shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
+    partitionValuesCreated1.toSet shouldEqual srcDO.listPartitions.toSet
   }
 
   test("create and list partition one level") {
@@ -263,5 +290,13 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val tgtTable = Table(Some("default"), "nonexistenttgttable")
     val tgtDO = HiveTableDataObject("tgtthatsurelydoesnotexistyet", path=None, table = tgtTable)
     an [Exception] should be thrownBy tgtDO.writeDataFrame(df, partitionValues = Seq())
+  }
+
+  test("OverwriteOptimized without partition values not allowed for partitioned DataObject") {
+    val df = Seq(("A", "2", 1), ("B", "1", 2), ("C", "X", 3)).toDF("p1", "p2", "value")
+    // create data object
+    val table = Table(Some("default"), "input")
+    val dataObject = HiveTableDataObject( "input", Some(tempPath+s"/${table.fullName}"), table = table, partitions = Seq("p1","p2"), saveMode = SDLSaveMode.OverwriteOptimized)
+    a [ProcessingLogicException] should be thrownBy dataObject.writeDataFrame(df, partitionValues = Seq())
   }
 }

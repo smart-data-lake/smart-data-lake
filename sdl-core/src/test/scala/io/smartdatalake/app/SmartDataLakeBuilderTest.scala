@@ -60,6 +60,9 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val appName = "sdlb-recovery"
     val feedName = "test"
 
+    // configure SDLPlugin for testing
+    System.setProperty("sdl.pluginClassName", classOf[TestSDLPlugin].getName)
+
     HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
@@ -152,6 +155,11 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == selectedPartitions)
       if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
     }
+
+    // test and reset SDLPlugin config
+    assert(TestSDLPlugin.startupCalled)
+    assert(TestSDLPlugin.shutdownCalled)
+    System.clearProperty("sdl.pluginClassName")
   }
 
   test("sdlb run with initialExecutionMode=PartitionDiffMode, increase runId on second run, state listener") {
@@ -309,4 +317,13 @@ class TestUDFAddXCreator() extends SparkUDFCreator {
   override def get(options: Map[String, String]): UserDefinedFunction = {
     udf((v: Int) => v + options("x").toInt)
   }
+}
+
+class TestSDLPlugin extends SDLPlugin {
+  override def startup(): Unit = { TestSDLPlugin.startupCalled = true }
+  override def shutdown(): Unit = { TestSDLPlugin.shutdownCalled = true }
+}
+object TestSDLPlugin {
+  var startupCalled = false
+  var shutdownCalled = false
 }
