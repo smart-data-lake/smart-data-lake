@@ -30,6 +30,7 @@
 		<module>sdl-splunk</module>
 		<module>sdl-jms</module>
 		<module>sdl-deltalake</module>
+		<module>sdl-snowflake</module>
 	</modules>
 
 	<licenses>
@@ -219,6 +220,8 @@
 		<scala.version>${scala.minor.version}.12</scala.version>
 
 		<spark.version>3.0.1</spark.version>
+		<spark.minor.version>3.0</spark.minor.version>
+		<snowflake.version>2.8.4</snowflake.version>
 		<spark-extensions.version>2.0.8</spark-extensions.version>
 
 		<!-- SPARK-PARENT start: properties copied from spark-parent pom version 2.4.7 for spark-parent import in dependencyManagement -->
