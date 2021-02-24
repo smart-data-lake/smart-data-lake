@@ -114,6 +114,11 @@ abstract class SparkSubFeedAction extends SparkAction {
   override final def exec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == 1, s"Only one subfeed allowed for SparkSubFeedActions (Action $id, inputSubfeed's ${subFeeds.map(_.dataObjectId).mkString(",")})")
     val subFeed = subFeeds.head
+
+    // set initial job metadata since spark job may start during transform
+    val transformMessage = s"writing to ${output.id}"
+    setSparkJobMetadata(Some(transformMessage))
+
     // transform
     val transformedSubFeed = doTransform(subFeed)
     // write output
