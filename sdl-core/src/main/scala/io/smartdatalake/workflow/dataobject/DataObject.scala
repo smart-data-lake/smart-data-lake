@@ -22,14 +22,18 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, AtlasExportable}
 import io.smartdatalake.workflow.connection.Connection
 import org.apache.spark.sql.SparkSession
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
-private[smartdatalake] trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] with SmartDataLakeLogger {
+/**
+ * This is the root trait for every DataObject.
+ */
+@DeveloperApi
+trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] with SmartDataLakeLogger with AtlasExportable {
 
   /**
    * A unique identifier for this instance.
@@ -96,6 +100,8 @@ private[smartdatalake] trait DataObject extends SdlConfigObject with ParsableFro
   def toStringShort: String = {
     s"$id[${this.getClass.getSimpleName}]"
   }
+
+  override def atlasName: String = id.id
 }
 
 /**
