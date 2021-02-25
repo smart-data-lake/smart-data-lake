@@ -238,7 +238,11 @@ private[smartdatalake] abstract class SparkAction extends Action {
         subFeed
           .updatePartitionValues(partitionedDO.partitions)
           .movePartitionColumnsLast(partitionedDO.partitions)
-      case _ => subFeed.clearPartitionValues
+      case _ =>
+        context.phase match {
+          case ExecutionPhase.Init => subFeed.clearPartitionValues
+          case _ => subFeed.copy(partitionValues = Seq())
+        }
     }
   }
 
