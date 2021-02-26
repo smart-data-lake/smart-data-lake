@@ -42,15 +42,21 @@ abstract class SparkSubFeedsAction extends SparkAction {
 
   // prepare main input / output
   // this must be lazy because inputs / outputs is evaluated later in subclasses
-  lazy val mainInput: DataObject with CanCreateDataFrame = ActionHelper.getMainDataObject[DataObject with CanCreateDataFrame](mainInputId, inputs, "input", executionModeNeedsMainInputOutput, id)
-  lazy val mainOutput: DataObject with CanWriteDataFrame = ActionHelper.getMainDataObject[DataObject with CanWriteDataFrame](mainOutputId, outputs, "output", executionModeNeedsMainInputOutput, id)
+  // Note: we not yet decide for a main input as inputs might be skipped at runtime, but we can already create a prioritized list.
+  lazy val prioritizedMainInputCandidates: Seq[DataObject with CanCreateDataFrame] = ActionHelper.getMainDataObjectCandidates(mainInputId, inputs, "input", executionModeNeedsMainInputOutput, id)
+  lazy val mainOutput: DataObject with CanWriteDataFrame = ActionHelper.getMainDataObjectCandidates(mainOutputId, outputs, "output", executionModeNeedsMainInputOutput, id).head
+  def getMainInput(inputSubFeeds: Seq[SubFeed]): DataObject = {
+    // take first data object which has as SubFeed which is not skipped
+    prioritizedMainInputCandidates.find(dataObject => !inputSubFeeds.find(_.dataObjectId == dataObject.id).get.isSkipped)
+      .getOrElse(prioritizedMainInputCandidates.head) // otherwise just take first candidate
+  }
 
   override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.prepare
     // check skip condition
     executionCondition.foreach(_.syntaxCheck[SubFeedsExpressionData](id, Some("executionCondition")))
     // check main input/output by triggering lazy values
-    mainInput
+    prioritizedMainInputCandidates
     mainOutput
   }
 
@@ -70,6 +76,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
   def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues]
 
   private def doTransform(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
+    val mainInput = getMainInput(subFeeds)
     val inputMap = (inputs ++ recursiveInputs).map(i => i.id -> i).toMap
     val outputMap = outputs.map(i => i.id -> i).toMap
     // convert subfeeds to SparkSubFeed type or initialize if not yet existing
@@ -141,6 +148,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
    */
   override final def exec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == inputs.size + recursiveInputs.size, s"Number of subFeed's must match number of inputs for SparkSubFeedActions (Action $id, subfeed's ${subFeeds.map(_.dataObjectId).mkString(",")}, inputs ${inputs.map(_.id).mkString(",")})")
+    val mainInput = getMainInput(subFeeds)
     val mainInputSubFeed = subFeeds.find(_.dataObjectId == mainInput.id).getOrElse(throw new IllegalStateException(s"subFeed for main input ${mainInput.id} not found"))
     // transform
     val transformedSubFeeds = doTransform(subFeeds)
@@ -169,6 +177,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
 
   override def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.postExec(inputSubFeeds, outputSubFeeds)
+    val mainInput = getMainInput(inputSubFeeds)
     val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id).get
     val mainOutputSubFeed = outputSubFeeds.find(_.dataObjectId == mainOutput.id).get
     executionMode.foreach(_.postExec(id, mainInput, mainOutput, mainInputSubFeed, mainOutputSubFeed))

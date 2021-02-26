@@ -129,24 +129,16 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
     invalidCharacters.replaceAllIn(str, "_")
   }
 
-  def getMainDataObject[T <: DataObject](mainId: Option[DataObjectId], dataObjects: Seq[T], inputOutput: String, mainNeeded: Boolean, actionId: ActionId): T = {
-    // split dataObjects into dataObjects with partition columns defined and others
-    val partitionedDataObjects = dataObjects.collect{ case x: T @unchecked with CanHandlePartitions => x }.filter(_.partitions.nonEmpty)
-    val unpartitionedDataObjects = dataObjects.filterNot(partitionedDataObjects.contains(_))
-    mainId.map {
-      // 1. mainInput is defined
-      id => dataObjects.find(_.id == id).getOrElse(throw ConfigurationException(s"($actionId) main${inputOutput}Id $id not found in ${inputOutput}s"))
-    }.orElse {
-      // 2. there is only one partitioned dataObject
-      if (partitionedDataObjects.size==1) partitionedDataObjects.headOption
-      else None
-    }.orElse {
-      // 3. there is only one dataObject in total
-      if (dataObjects.size==1) dataObjects.headOption else None
-    }.getOrElse {
-      // 4. mainInput is not unique, we log a warning and favor partitioned dataObjects over others.
-      if (mainNeeded) logger.warn(s"($actionId) Could not determine unique main $inputOutput but execution mode might need it. Decided for ${dataObjects.head.id}.")
-      (partitionedDataObjects ++ unpartitionedDataObjects).head
+  def getMainDataObjectCandidates[T <: DataObject](mainId: Option[DataObjectId], dataObjects: Seq[T], inputOutput: String, mainNeeded: Boolean, actionId: ActionId): Seq[T] = {
+    if (mainId.isDefined) {
+      // if mainInput is defined -> return only that DataObject
+      Seq(dataObjects.find(_.id == mainId.get).getOrElse(throw ConfigurationException(s"($actionId) main${inputOutput}Id ${mainId.get} not found in ${inputOutput}s")))
+    } else {
+      // prioritize DataObjects by number of partition columns
+      dataObjects.sortBy {
+        case x: CanHandlePartitions => x.partitions.size
+        case _ => 0
+      }.reverse
     }
   }
 
