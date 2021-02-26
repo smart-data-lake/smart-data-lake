@@ -169,20 +169,26 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
    * - add run_id_partition value if needed
    * - removing not existing columns from the partition values.
    */
-  def updateOutputPartitionValues[T <: SubFeed](dataObject: DataObject, subFeed: T, partitionValuesTransform: Option[Seq[PartitionValues] => Map[PartitionValues,PartitionValues]] = None)(implicit session: SparkSession, context: ActionPipelineContext): T = {
+  def updateOutputPartitionValues[T <: SubFeed](dataObject: DataObject, subFeed: T, partitionValuesTransform: Option[Seq[PartitionValues] => Map[PartitionValues,PartitionValues]] = None)(implicit session: SparkSession, context: ActionPipelineContext): T =
     dataObject match {
       case partitionedDO: CanHandlePartitions =>
         // transform partition values
-        var newPartitionValues = partitionValuesTransform.map(fn => fn(subFeed.partitionValues).values.toSeq.distinct)
+        val newPartitionValues = partitionValuesTransform.map(fn => fn(subFeed.partitionValues).values.toSeq.distinct)
           .getOrElse(subFeed.partitionValues)
-        // add run_id partition if needed
-        if (partitionedDO.partitions.contains(Environment.runIdPartitionColumnName)) {
-          if (newPartitionValues.nonEmpty) newPartitionValues = newPartitionValues.map(_.addKey(Environment.runIdPartitionColumnName, context.runId.toString))
-          else newPartitionValues = Seq(PartitionValues(Map(Environment.runIdPartitionColumnName -> context.runId.toString)))
-        }
         // remove superfluous partitionValues
         subFeed.updatePartitionValues(partitionedDO.partitions, Some(newPartitionValues)).asInstanceOf[T]
       case _ => subFeed.clearPartitionValues.asInstanceOf[T]
+    }
+
+  def addRunIdPartitionIfNeeded[T <: SubFeed](dataObject: DataObject, subFeed: T)(implicit session: SparkSession, context: ActionPipelineContext): T = {
+    dataObject match {
+      case partitionedDO: CanHandlePartitions =>
+        if (partitionedDO.partitions.contains(Environment.runIdPartitionColumnName)) {
+          val newPartitionValues = if (subFeed.partitionValues.nonEmpty) subFeed.partitionValues.map(_.addKey(Environment.runIdPartitionColumnName, context.runId.toString))
+          else Seq(PartitionValues(Map(Environment.runIdPartitionColumnName -> context.runId.toString)))
+          subFeed.updatePartitionValues(partitionedDO.partitions, Some(newPartitionValues)).asInstanceOf[T]
+        } else subFeed
+      case _ => subFeed
     }
   }
 

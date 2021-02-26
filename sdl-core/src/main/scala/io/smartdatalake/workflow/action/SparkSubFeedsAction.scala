@@ -99,6 +99,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
         )
       case _ => Unit
     }
+    outputSubFeeds = outputSubFeeds.map(subFeed => ActionHelper.addRunIdPartitionIfNeeded(outputMap(subFeed.dataObjectId), subFeed))
     inputSubFeeds = inputSubFeeds.map{ subFeed =>
       val input = inputMap(subFeed.dataObjectId)
       // prepare input SubFeed

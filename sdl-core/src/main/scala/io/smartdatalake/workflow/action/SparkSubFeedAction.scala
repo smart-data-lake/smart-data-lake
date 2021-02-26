@@ -78,6 +78,7 @@ abstract class SparkSubFeedAction extends SparkAction {
         outputSubFeed = outputSubFeed.copy(partitionValues = result.outputPartitionValues, filter = result.filter).breakLineage
       case _ => Unit
     }
+    outputSubFeed = ActionHelper.addRunIdPartitionIfNeeded(output, outputSubFeed)
     // prepare input SubFeed
     inputSubFeed = prepareInputSubFeed(input, inputSubFeed)
     // enrich with fresh DataFrame if needed

@@ -426,6 +426,7 @@ trait CustomPartitionModeLogic {
 /**
  * Execution mode to incrementally process file-based DataObjects.
  * It takes all existing files in the input DataObject and removes (deletes) them after processing.
+ * Input partition values are applied when searching for files and also used as output partition values.
  * @param stopIfNoData optional setting if further actions should be skipped if this action has no data to process (default).
  *                     Set stopIfNoData=false if you want to run further actions nevertheless. They will receive output dataObject unfiltered as input.
  */
@@ -449,7 +450,7 @@ case class FileIncrementalMoveMode(stopIfNoData: Boolean = true) extends Executi
           if (stopIfNoData) throw NoDataToProcessWarning(actionId.id, msg)
           else throw NoDataToProcessDontStopWarning(actionId.id, msg)
         }
-        Some(ExecutionModeResult(fileRefs = Some(fileRefs)))
+        Some(ExecutionModeResult(fileRefs = Some(fileRefs), inputPartitionValues = inputSubFeed.partitionValues, outputPartitionValues = inputSubFeed.partitionValues))
       case _ => throw ConfigurationException(s"($actionId) FileIncrementalMoveMode needs FileRefDataObject and FileSubFeed as input")
     }
   }
