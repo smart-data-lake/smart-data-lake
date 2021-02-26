@@ -72,6 +72,7 @@ case class CustomSparkAction (override val id: ActionId,
     logger.warn("Defining custom stateful streaming operations with sqlCode is not well supported by Spark and can create strange errors or effects. Use scalaCode to be safe.")
 
   override def transform(inputSubFeeds: Seq[SparkSubFeed], outputSubFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
+    val mainInput = getMainInput(inputSubFeeds)
     val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId==mainInput.id)
 
     // Apply custom transformation to all subfeeds
