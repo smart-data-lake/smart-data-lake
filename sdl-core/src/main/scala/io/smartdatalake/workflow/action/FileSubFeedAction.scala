@@ -151,6 +151,12 @@ abstract class FileSubFeedAction extends Action {
   }
 
   def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    // delete Input Files if desired
+    if (deleteDataAfterRead()) (input, outputSubFeed) match {
+      case (fileRefInput: FileRefDataObject, fileSubFeed: FileSubFeed) =>
+        fileSubFeed.processedInputFileRefs.foreach(fileRefs => fileRefInput.deleteFileRefs(fileRefs))
+      case x => throw new IllegalStateException(s"Unmatched case $x")
+    }
     executionMode.foreach(_.postExec(id, input, output, inputSubFeed, outputSubFeed))
   }
 

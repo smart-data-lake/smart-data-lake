@@ -219,7 +219,7 @@
 		<scala.version>${scala.minor.version}.12</scala.version>
 
 		<spark.version>3.0.1</spark.version>
-		<spark-extensions.version>2.0.7</spark-extensions.version>
+		<spark-extensions.version>2.0.8</spark-extensions.version>
 
 		<!-- SPARK-PARENT start: properties copied from spark-parent pom version 2.4.7 for spark-parent import in dependencyManagement -->
 		<!-- attention - manually adapted are: zookeeper, scala.version, scala.binary.version -->

@@ -21,10 +21,11 @@ package io.smartdatalake.util.hdfs
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.dataobject.{FileRef, SparkFileDataObject}
+import io.smartdatalake.workflow.dataobject.FileRef
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.functions.{col, hash, lit, pmod}
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.IntegerType
 
 /**
  * This controls repartitioning of the DataFrame before writing with Spark to Hadoop.
@@ -56,25 +57,48 @@ case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
    *
    * @param df DataFrame to repartition
    * @param partitions DataObjects partition columns
-   * @param nbOfPartitionValues Number fo PartitionsValues to be written with this DataFrame
+   * @param partitionValues PartitionsValues to be written with this DataFrame
    * @param dataObjectId id of DataObject for logging
    * @return
    */
-  def prepareDataFrame(df: DataFrame, partitions: Seq[String], nbOfPartitionValues: Int, dataObjectId: DataObjectId): DataFrame = {
+  def prepareDataFrame(df: DataFrame, partitions: Seq[String], partitionValues: Seq[PartitionValues], dataObjectId: DataObjectId): DataFrame = {
+    // count partition values having all partition columns specified
+    val partitionsSet = partitions.toSet
+    val nbOfCompletePartitionValues = partitionValues.count(_.keys == partitionsSet)
     // repartition spark DataFrame
-    val dfRepartitioned = if (partitions.nonEmpty && nbOfPartitionValues > 1) {
-      if (numberOfTasksPerPartition > 1 && keyCols.isEmpty ) logger.warn(s"($dataObjectId) SparkRepartitionDef: cannot distribute records over Spark tasks within Hadoop partitions with no keyCols defined. Define keyCols!")
-      // to distribute records across tasks within partitions, we need calculate a task number from keyCols
-      val taskNbCol = pmod(hash(keyCols.map(col):_*),lit(numberOfTasksPerPartition))
-      df.repartition(numberOfTasksPerPartition * nbOfPartitionValues, partitions.map(col) :+ taskNbCol :_*)
-    } else {
-      if (partitions.nonEmpty && nbOfPartitionValues == 0) logger.warn(s"($dataObjectId) SparkRepartitionDef: cannot multiply numberOfTasksPerPartition when writing with no partitions values to partitioned table ")
-      if (keyCols.isEmpty) df.repartition(numberOfTasksPerPartition)
-      else df.repartition(numberOfTasksPerPartition, keyCols.map(col):_*)
+    val dfRepartitioned = if (partitions.nonEmpty) {
+      if (nbOfCompletePartitionValues == 0) { // writing partitioned data object with no partition values given
+        logger.info(s"($dataObjectId) SparkRepartitionDef: cannot multiply numberOfTasksPerPartition when writing with no partitions values to partitioned table. Will let spark decide about the number of tasks created, but use keyCols/rand to limit number of tasks with data.")
+        repartitionForMultiplePartitionValues(df, partitions, None, dataObjectId)
+      } else if (nbOfCompletePartitionValues == 1) { // writing partitioned data object with 1 partition value
+        repartitionForOnePartitionValue(df) // this is the same as writing an un-partitioned data object
+      } else { // nbOfPartitionValues > 1 -> writing partitioned data object with multiple partition values given
+        repartitionForMultiplePartitionValues(df, partitions, Some(nbOfCompletePartitionValues), dataObjectId)
+      }
+    } else { // un-partitioned data object
+      repartitionForOnePartitionValue(df) // this is the same as writing only one partition value
     }
     // sort within spark partitions
     if (sortCols.nonEmpty) dfRepartitioned.sortWithinPartitions(sortCols.map(col):_*)
     else dfRepartitioned
+  }
+
+  private def repartitionForOnePartitionValue(df: DataFrame): DataFrame = {
+    if (keyCols.isEmpty || numberOfTasksPerPartition == 1) df.repartition(numberOfTasksPerPartition)
+    else df.repartition(numberOfTasksPerPartition, keyCols.map(col):_*)
+  }
+
+  private def repartitionForMultiplePartitionValues(df: DataFrame, partitions: Seq[String], nbOfPartitionValues: Option[Int], dataObjectId: DataObjectId): DataFrame = {
+    if (numberOfTasksPerPartition > 1 && keyCols.isEmpty) logger.info(s"($dataObjectId) SparkRepartitionDef: distribution of records over Spark tasks within Hadoop partitions not defined, using random value now. Define keyCols to have better control over the distribution.")
+    // to distribute records across tasks within partitions, we need calculate a task number from keyCols
+    val repartitionCols = if (numberOfTasksPerPartition == 1) partitions.map(col)
+    else if (keyCols.nonEmpty) partitions.map(col) :+ pmod(hash(keyCols.map(col): _*), lit(numberOfTasksPerPartition))
+    else partitions.map(col) :+ floor(rand * numberOfTasksPerPartition).cast(IntegerType)
+    if (nbOfPartitionValues.isDefined) {
+      df.repartition(numberOfTasksPerPartition * nbOfPartitionValues.get, repartitionCols: _*)
+    } else {
+      df.repartition(repartitionCols: _*)
+    }
   }
 
   def renameFiles(fileRefs: Seq[FileRef])(implicit filesystem: FileSystem): Unit = {
