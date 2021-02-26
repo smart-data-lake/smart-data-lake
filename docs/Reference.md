@@ -150,7 +150,6 @@ Example - only process the last selected partition:
 By defining **alternativeOutputId** attribute you can define another DataObject which will be used to check for already existing data.
 This can be used to select data to process against a DataObject later in the pipeline.
 
-
 ### SparkStreamingOnceMode: Incremental load 
 Some DataObjects are not partitioned, but nevertheless you dont want to read all data from the input on every run. You want to load it incrementally.
 This can be accomplished by specifying execution mode SparkStreamingOnceMode. Under the hood it uses "Spark Structured Streaming" and triggers a single microbatch (Trigger.Once).
@@ -173,13 +172,32 @@ Default is to apply the SparkIncrementalMode. Define an applyCondition by a spar
 By defining **alternativeOutputId** attribute you can define another DataObject which will be used to check for already existing data.
 This can be used to select data to process against a DataObject later in the pipeline.
 
-By defining **stopIfNoData** attribute you can customize if dependent actions should be executed also if the current action has no data selected by the execution mode.
-Default is stopIfNoData = true.
-
-
 ### FailIfNoPartitionValuesMode
 To simply check if partition values are present and fail otherwise, configure execution mode FailIfNoPartitionValuesMode.
 This is useful to prevent potential reprocessing of whole table through wrong usage.
+
+### ProcessAllMode
+An execution mode which forces processing all data from it's inputs, removing partitionValues and filter conditions received from previous actions.
+
+### CustomPartitionMode
+An execution mode to create custom partition execution mode logic in scala. 
+Implement trait CustomPartitionModeLogic by defining a function which receives main input&output DataObject and returns partition values to process as Seq[Map[String,String]\]
+
+## Execution Condition
+For every Action an executionCondition can be defined. The execution condition allows to define if an action is executed or skipped. The default behaviour is that an Action is skipped if at least one input SubFeed is skipped.
+Define an executionCondition by a spark sql expression working with attributes of SubFeedsExpressionData returning a boolean.
+The Action is skipped if the executionCondition is evaluated to false. In that case dependent actions get empty SubFeeds marked with isSkipped=true as input.
+
+Example - skip Action only if input1 and input2 SubFeed are skipped: 
+```
+  executionCondition = "!inputSubFeeds.input1.isSkipped or !inputSubFeeds.input2.isSkipped"
+```
+
+Example - Always execute Action and use all existing data as input: 
+```
+  executionCondition = true
+  executionMode = ProcessAllMode
+```
 
 ## Metrics
 Metrics are gathered per Action and output-DataObject when running a DAG. They can be found in log statements and are written to the state file.
