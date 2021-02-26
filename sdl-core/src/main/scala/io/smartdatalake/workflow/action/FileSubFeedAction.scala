@@ -86,6 +86,7 @@ abstract class FileSubFeedAction extends Action {
         outputSubFeed = outputSubFeed.copy(partitionValues = result.outputPartitionValues).breakLineage
       case _ => Unit
     }
+    outputSubFeed = ActionHelper.addRunIdPartitionIfNeeded(output, outputSubFeed)
     // validate partition values existing for input
     if (inputSubFeed.partitionValues.nonEmpty && (context.phase==ExecutionPhase.Exec || inputSubFeed.isDAGStart)) {
       val expectedPartitions = input.filterExpectedPartitionValues(inputSubFeed.partitionValues)
