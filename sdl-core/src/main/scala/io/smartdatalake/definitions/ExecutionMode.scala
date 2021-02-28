@@ -141,7 +141,7 @@ case class PartitionDiffMode( partitionColNb: Option[Int] = None
                             , applyCondition: Option[String] = None
                             , failCondition: Option[String] = None
                             , failConditions: Seq[Condition] = Seq()
-                            , @deprecated("use following actions executionCondition=true & executionMode=ProcessAll instead") stopIfNoData: Boolean = true
+                            , @deprecated("use following actions executionCondition=true & executionMode=ProcessAll instead", "2.0.3") stopIfNoData: Boolean = true
                             , selectExpression: Option[String] = None
                             , applyPartitionValuesTransform: Boolean = false
                             , selectAdditionalInputExpression: Option[String] = None
@@ -288,7 +288,7 @@ case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[
  */
 case class SparkIncrementalMode( compareCol: String
                                , override val alternativeOutputId: Option[DataObjectId] = None
-                               , @deprecated("use dependent action executionCondition=true & executionMode=ProcessAll instead") stopIfNoData: Boolean = true
+                               , @deprecated("use dependent action executionCondition=true & executionMode=ProcessAll instead", "2.0.3") stopIfNoData: Boolean = true
                                , applyCondition: Option[Condition] = None
                                ) extends ExecutionMode with ExecutionModeWithMainInputOutput {
   private[smartdatalake] override val applyConditionsDef = applyCondition.toSeq
