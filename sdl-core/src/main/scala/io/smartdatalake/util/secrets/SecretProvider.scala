@@ -36,7 +36,7 @@ case class SecretProviderConfig(className: String, options: Map[String,String] =
     constructor.newInstance(options).asInstanceOf[SecretProvider]
   } catch {
     case e: NoSuchMethodException => throw ConfigurationException(s"""SecretProvider class $className needs constructor with parameter "options: Map[String,String]": ${e.getMessage}""", Some("globalConfig.secretProviders"), e)
-    case e: Exception => throw ConfigurationException(s"Cannot instantiate SecretProviderCreator class $className: ${e.getMessage}", Some("globalConfig.secretProviders"), e)
+    case e: Exception => throw ConfigurationException(s"Cannot instantiate SecretProvider class $className: ${e.getClass.getSimpleName} ${e.getMessage}", Some("globalConfig.secretProviders"), e)
   }
 }
 

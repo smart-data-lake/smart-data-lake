@@ -19,6 +19,7 @@
 
 package io.smartdatalake.util.secrets
 
+import io.smartdatalake.config.ConfigurationException
 import org.scalatest.FunSuite
 
 class SecretsUtilTest extends FunSuite {
@@ -31,6 +32,11 @@ class SecretsUtilTest extends FunSuite {
 
 }
 
-class TestSecretProvider(options: Map[String,String]) extends SecretProvider {
-  override def getSecret(name: String): String = name + options("option1")
+class TestSecretProvider(option1: String) extends SecretProvider {
+  def this(options: Map[String, String]) {
+    this(
+      options.getOrElse("option1", throw new ConfigurationException(s"Cannot create TestSecretProvider, option 'option1' missing."))
+    )
+  }
+  override def getSecret(name: String): String = name + option1
 }

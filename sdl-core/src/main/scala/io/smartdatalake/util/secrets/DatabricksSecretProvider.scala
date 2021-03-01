@@ -29,7 +29,7 @@ import io.smartdatalake.config.ConfigurationException
 class DatabricksSecretProvider(scope: String) extends SecretProvider {
   def this(options: Map[String, String]) {
     this(
-      options.getOrElse("file", throw new ConfigurationException(s"Cannot create FileSecretProvider, option 'file' missing."))
+      options.getOrElse("scope", throw new ConfigurationException(s"Cannot create DatabricksSecretProvider, option 'scope' missing."))
     )
   }
   override def getSecret(name: String): String =
