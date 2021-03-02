@@ -41,7 +41,7 @@ import org.apache.spark.sql.SparkSession
 case class FileTransferAction(override val id: ActionId,
                               inputId: DataObjectId,
                               outputId: DataObjectId,
-                              @deprecated("use executionMode = FileIncrementalMoveMode instead") override val deleteDataAfterRead: Boolean = false,
+                              @deprecated("use executionMode = FileIncrementalMoveMode instead", "2.0.3") override val deleteDataAfterRead: Boolean = false,
                               overwrite: Boolean = true,
                               override val breakFileRefLineage: Boolean = false,
                               override val executionMode: Option[ExecutionMode] = None,

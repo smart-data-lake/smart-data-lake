@@ -26,6 +26,7 @@ import io.smartdatalake.config.ConfigImplicits
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.{MemoryUtils, SmartDataLakeLogger}
+import io.smartdatalake.util.secrets.{SecretProviderConfig, SecretsUtil}
 import io.smartdatalake.workflow.action.customlogic.SparkUDFCreatorConfig
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.custom.ExpressionEvaluator
@@ -41,14 +42,20 @@ import org.apache.spark.sql.custom.ExpressionEvaluator
  * @param stateListeners Define state listeners to be registered for receiving events of the execution of SmartDataLake job
  * @param sparkUDFs      Define UDFs to be registered in spark session. The registered UDFs are available in Spark SQL transformations
  *                       and expression evaluation, e.g. configuration of ExecutionModes.
+ * @param secretProviders Define SecretProvider's to be registered.
  * @param allowOverwriteAllPartitionsWithoutPartitionValues Configure a list of exceptions for partitioned DataObject id's,
  *                       which are allowed to overwrite the all partitions of a table if no partition values are set.
  *                       This is used to override/avoid a protective error when using SDLSaveMode.OverwriteOptimized|OverwritePreserveDirectories.
  *                       Define it as a list of DataObject id's.
  */
-case class GlobalConfig( kryoClasses: Option[Seq[String]] = None, sparkOptions: Option[Map[String,String]] = None, enableHive: Boolean = true
-                       , memoryLogTimer: Option[MemoryLogTimerConfig] = None, shutdownHookLogger: Boolean = false
-                       , stateListeners: Seq[StateListenerConfig] = Seq(), sparkUDFs: Option[Map[String,SparkUDFCreatorConfig]] = None
+case class GlobalConfig( kryoClasses: Option[Seq[String]] = None
+                       , sparkOptions: Option[Map[String,String]] = None
+                       , enableHive: Boolean = true
+                       , memoryLogTimer: Option[MemoryLogTimerConfig] = None
+                       , shutdownHookLogger: Boolean = false
+                       , stateListeners: Seq[StateListenerConfig] = Seq()
+                       , sparkUDFs: Option[Map[String,SparkUDFCreatorConfig]] = None
+                       , secretProviders: Option[Map[String,SecretProviderConfig]] = None
                        , allowOverwriteAllPartitionsWithoutPartitionValues: Seq[DataObjectId] = Seq()
                        )
 extends SmartDataLakeLogger {
@@ -61,6 +68,11 @@ extends SmartDataLakeLogger {
 
   // add debug shutdown hook logger
   if (shutdownHookLogger) MemoryUtils.addDebugShutdownHooks()
+
+  // register secret providers
+  secretProviders.getOrElse(Map()).foreach { case (id, providerConfig) =>
+    SecretsUtil.registerProvider(id, providerConfig.provider)
+  }
 
   /**
    * Create a spark session using settings from this global config

@@ -7,16 +7,51 @@ The main sections are global, connections, data objects and actions.
 As a starting point, use the [application.conf](https://github.com/smart-data-lake/sdl-examples/blob/develop/src/main/resources/application.conf) from SDL-examples. 
 More details and options are described below. 
 
-### User and Password Variables
-Usernames and passwords should not be stored in you configuration files in clear text as these files are often stored directly in the version control system.
-They should also not be visible in logfiles after execution.
-Instead of having the username and password directly, use the following conventions:
+### Global Options
+In the global section of the configuration you can set global configurations such as spark options used by all executions.
+You can find a list of all configurations under [API docs](site/scaladocs/io/smartdatalake/app/GlobalConfig.html).  
+A good list with examples can be found in the [application.conf](https://github.com/smart-data-lake/sdl-examples/blob/develop/src/main/resources/application.conf) of sdl-examples.
 
-Pattern|Meaning
----|---
-CLEAR#pd|The variable will be used literally (cleartext). This is only recommended for test environments.
-ENV#pd|The values for this variable will be read from the environment variable called "pd". 
-DBSECRET#scope.pd|Used in a Databricks environment, i.e. Microsoft Azure. Expects the variable "pd" to be stored in the given scope.
+### Secrets User and Password Variables
+Usernames, passwords and other secrets should not be stored in your configuration files in clear text as these files are often stored directly in the version control system.
+They should also not be visible in logfiles after execution.
+
+Instead of having the username and password configured directly in your configuration files, you can use secret providers
+for configuration values that end with `...Variable`, like BasicAuthMode's userVariable and passwordVariable.
+To configure a secret use the convention `<SecretProviderId>#<SecretName>`.
+
+Default secret providers are:
+
+SecretProviderId|Pattern|Meaning
+---|---|---
+CLEAR|CLEAR#pd|The secret will be used literally (cleartext). This is only recommended for test environments.
+ENV|ENV#pd|The value for this secret will be read from the environment variable called "pd". 
+
+You can configure custom secret providers by providing a list of secret providers with custom options and their id in GlobalConfig as follows:
+```
+global {
+  secretProviders {
+    <secretProviderId> = {
+     className = <fully qualified class name of SecretProvider>
+     options = { <options as key/value> }
+    }
+  }
+}
+```
+
+Example: configure DatabricksSecretProvider with id=DBSECRETS and scope=test (scope is a specific configuration needed for accessing secrets in Databricks).
+```
+global {
+  secretProviders {
+    DBSECRETS = {
+     className = io.smartdatalake.util.secrets.DatabricksSecretProvider
+     options = { scope = test }
+    }
+  }
+}
+```
+
+You can create custom SecretProvider classes by implementing trait SecretProvider and a constructor with parameter `options: Map[String,String]`.
 
 ### Local substitution
 Local substitution allows to reuse the id of a configuration object inside its attribute definitions by the special token "~{id}". See the following example:
@@ -33,10 +68,6 @@ dataObjects {
 }
 ```
 Note: local substitution only works in a fixed set of attributes defined in Environment.configPathsForLocalSubstitution.
-
-## Global Options
-The global section of the configuration is mainly used to set spark options used by all executions.
-A good list with examples can be found in the [application.conf](https://github.com/smart-data-lake/sdl-examples/blob/develop/src/main/resources/application.conf) of sdl-examples.
 
 ## Connections
 Some Data Objects need a connection, e.g. JdbcTableDataObject, as they need to know how to connect to a database.
@@ -88,7 +119,6 @@ Usage: DefaultSmartDataLakeBuilder [options]
 There exists the following adapted applications versions:
 - **LocalSmartDataLakeBuilder**:<br>default for Spark master is `local[*]` and it has additional properties to configure Kerberos authentication. Use this application to run in a local environment (e.g. IntelliJ) without cluster deployment.  
 - **DatabricksSmartDataLakeBuilder**:<br>see [MicrosoftAzure](MicrosoftAzure.md)
-
 
 # Concepts
 
