@@ -23,7 +23,9 @@ import java.nio.file.Paths
 import java.sql.Timestamp
 
 import com.typesafe.config.ConfigFactory
+import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.commons.io.FileUtils
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{DataFrame, Row}
@@ -43,7 +45,7 @@ class AccessTableDataObjectTest extends DataObjectTestSuite {
 
   test("it should be possible to read a table from an access 2016 database") {
     // prepare
-    val dataObj = AccessTableDataObject.fromConfig(access2016SampleConfig, instanceRegistry)
+    val dataObj = AccessTableDataObject.fromConfig(access2016SampleConfig)
 
     // run
     val df: DataFrame = dataObj.getDataFrame()
@@ -72,7 +74,7 @@ class AccessTableDataObjectTest extends DataObjectTestSuite {
          | table = { db = test, name = "tableName" }
          |}
          """.stripMargin)
-    val dataObj = AccessTableDataObject.fromConfig(access2000SampleConfig, instanceRegistry)
+    val dataObj = AccessTableDataObject.fromConfig(access2000SampleConfig)
 
     // run
     val df = dataObj.getDataFrame()
@@ -91,7 +93,7 @@ class AccessTableDataObjectTest extends DataObjectTestSuite {
 
   test("Reading an access 2016 database using the Ucanaccess driver directly throws an exception") {
     // prepare
-    val dataObj = AccessTableDataObject.fromConfig(access2016SampleConfig, instanceRegistry)
+    val dataObj = AccessTableDataObject.fromConfig(access2016SampleConfig)
     val executorLogLevel = Logger.getLogger("org.apache.spark.executor.Executor").getLevel
     val taskSetManagerLogLevel = Logger.getLogger("org.apache.spark.scheduler.TaskSetManager").getLevel
 
@@ -127,7 +129,7 @@ class AccessTableDataObjectTest extends DataObjectTestSuite {
            | table = { db = test, name = "tableName" }
            |}
          """.stripMargin)
-      val actionInput = AccessTableDataObject.fromConfig(config, instanceRegistry)
+      val actionInput = AccessTableDataObject.fromConfig(config)
 
       // run
       an [Exception] should be thrownBy actionInput.getDataFrame()

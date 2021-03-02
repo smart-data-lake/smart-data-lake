@@ -24,7 +24,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StructField, _}
 import org.scalatest.FunSuite
-import org.scalatest.prop.Checkers
+import org.scalatestplus.scalacheck.Checkers
 
 
 /**
@@ -53,7 +53,7 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     assert(!SchemaEvolution.hasSameColNamesAndTypes(schemaOld, schemaNew))
   }
 
-  test("Old and new schema with different sorting are identical, no matter in which order") {
+  test("Old and new schema with different sorting are identical, no matter in which order, but newDf is sorted according to oldDf") {
     val schemaOld = StructType(List(
       StructField("SF_NR_1", IntegerType),
       StructField("SF_NR_2", IntegerType),
@@ -98,6 +98,10 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     assert(SchemaEvolution.hasSameColNamesAndTypes(newDf, oldDf))
     assert(SchemaEvolution.newColumns(newDf, oldDf).isEmpty)
     assert(SchemaEvolution.deletedColumns(newDf, oldDf).isEmpty)
+
+    // schema evolution sorts newDf according to oldDf
+    val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
+    assert(oldEvoDf.columns.toSeq == newEvoDf.columns.toSeq)
   }
 
   test("New columns: new column exists in addition to existing columns") {
@@ -215,6 +219,9 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
     val newDf = TestUtil.arbitraryDataFrame(schemaNew)
     assert(!SchemaEvolution.hasSameColNamesAndTypes(oldDf, newDf))
+
+    val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
+    assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
   }
 
   test("Column dropped: dropped column still used but with empty values and ignored according to config") {

@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.util.hdfs
 
+import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.functions._
 
@@ -34,11 +35,12 @@ private[smartdatalake] object Partition {
  * A partition is defined by values for its partition columns.
  * It can be represented by a Map. The key of the Map are the partition column names.
  */
-private[smartdatalake] case class PartitionValues(elements: Map[String, Any]) {
-  def getPartitionString(partitionLayout: String): String= {
+@DeveloperApi
+case class PartitionValues(elements: Map[String, Any]) {
+  private[smartdatalake] def getPartitionString(partitionLayout: String): String= {
     PartitionLayout.replaceTokens(partitionLayout, this)
   }
-  def getSparkExpr: Column = {
+  private[smartdatalake] def getSparkExpr: Column = {
     // "and" filter concatenation of each element
     elements.map {case (k,v) => col(k) === lit(v)}.reduce( (a,b) => a and b)
   }
@@ -52,6 +54,7 @@ private[smartdatalake] case class PartitionValues(elements: Map[String, Any]) {
   def keys: Set[String] = elements.keySet
   def isDefinedAt(colName: String): Boolean = elements.isDefinedAt(colName)
   def filterKeys(colNames: Seq[String]): PartitionValues = this.copy(elements = elements.filterKeys(colNames.contains))
+  def addKey(key: String, value: Any): PartitionValues = if(!elements.contains(key)) this.copy(elements = elements + (key -> value)) else this
   def getMapString: Map[String,String] = elements.mapValues(_.toString)
 }
 
@@ -103,11 +106,17 @@ private[smartdatalake] object PartitionValues {
   }
 
   /**
+   * Extract keys from list of partition values
+   */
+  def getPartitionValuesKeys(partitionValues: Seq[PartitionValues]): Set[String] = {
+    partitionValues.map(_.keys).reduceOption(_ ++ _).getOrElse(Set())
+  }
+
+  /**
    * Return PartitionValues keys which are not included in given partition columns
    */
   def checkWrongPartitionValues(partitionValues: Seq[PartitionValues], partitions: Seq[String]): Seq[String] = {
-    if (partitionValues.nonEmpty) partitionValues.map(_.keys).reduce(_ ++ _).diff(partitions.toSet).toSeq
-    else Seq()
+    getPartitionValuesKeys(partitionValues).diff(partitions.toSet).toSeq
   }
 
   /**
@@ -117,6 +126,7 @@ private[smartdatalake] object PartitionValues {
    */
   def checkExpectedPartitionValues(existingPartitionValues: Seq[PartitionValues], expectedPartitionValues: Seq[PartitionValues]): Seq[PartitionValues] = {
     val partitionColCombinations = expectedPartitionValues.map(_.keys).distinct
+    // recursively check every partitionColCombination
     def diffPartitionValues(inputPartitions: Seq[PartitionValues], expectedPartitionValues: Seq[PartitionValues], partitionColCombinations: Seq[Set[String]]): Seq[PartitionValues] = {
       if (partitionColCombinations.isEmpty) return Seq()
       val partitionColCombination = partitionColCombinations.head
@@ -126,6 +136,8 @@ private[smartdatalake] object PartitionValues {
     }
     diffPartitionValues(existingPartitionValues, expectedPartitionValues, partitionColCombinations)
   }
+
+  def oneToOneMapping(partitionValues: Seq[PartitionValues]): Map[PartitionValues,PartitionValues] = partitionValues.map(x => (x,x)).toMap
 }
 
 /**

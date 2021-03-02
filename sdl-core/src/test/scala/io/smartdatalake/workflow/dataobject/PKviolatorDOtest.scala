@@ -20,10 +20,12 @@ package io.smartdatalake.workflow.dataobject
 
 import java.nio.file.Files
 
+import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.dataobject.PKViolatorsDataObject.colListType
 import org.apache.spark.sql.functions.lit
@@ -39,6 +41,7 @@ class PKviolatorDOtest extends FunSuite with BeforeAndAfter with SmartDataLakeLo
   protected implicit val session: SparkSession = sessionHiveCatalog
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+  implicit val actionPipelineContext : ActionPipelineContext = ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
 
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString

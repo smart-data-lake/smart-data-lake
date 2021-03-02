@@ -22,7 +22,7 @@ import java.nio.file.Files
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.BasicAuthMode
+import io.smartdatalake.definitions.{BasicAuthMode, FileIncrementalMoveMode, SDLSaveMode}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.connection.SftpFileRefConnection
@@ -297,7 +297,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     assert(r1.head.fileName == resourceFile)
   }
 
-  test("copy file from hadoop to hadoop without partitions and mode overwrite and deleteDataAfterRead") {
+  test("copy file from hadoop to hadoop without partitions and mode overwrite and FileIncrementalMoveMode") {
 
     val feed = "filetransfer"
     val srcDir = "testSrc"
@@ -310,14 +310,15 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
 
     // setup DataObjects
     val srcDO = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"))
-    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"), saveMode = SaveMode.Overwrite)
+    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"), saveMode = SDLSaveMode.Overwrite)
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
 
     // prepare & start load 1
     implicit val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
-    val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id, deleteDataAfterRead = true)
+    val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id, executionMode = Some(FileIncrementalMoveMode()))
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
+    action1.init(Seq(srcSubFeed))
     action1.preExec(Seq(srcSubFeed))
     val tgtSubFeed1 = action1.exec(Seq(srcSubFeed)).head
     action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed1))
@@ -325,24 +326,25 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
 
     // check 1
     val r1 = tgtDO.getFileRefs(Seq())
-    assert(r1.size == 1)
-    assert(r1.head.fileName == resourceFile+"1")
+    assert(r1.map(_.fileName) == Seq(resourceFile+"1"))
+    assert(srcDO.getFileRefs(Seq()).isEmpty)
 
     // copy data 2 file to hadoop
     TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile+"2").toFile)
 
     // start load 2
+    action1.init(Seq(srcSubFeed))
     action1.preExec(Seq(srcSubFeed))
     val tgtSubFeed2 = action1.exec(Seq(srcSubFeed)).head
     action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed2))
 
     // check 2
     val r2 = tgtDO.getFileRefs(Seq())
-    assert(r2.size == 1)
-    assert(r2.head.fileName == resourceFile+"2")
+    assert(r2.map(_.fileName) == Seq(resourceFile+"2"))
+    assert(srcDO.getFileRefs(Seq()).isEmpty)
   }
 
-  test("copy file from hadoop to hadoop without partitions and mode append and deleteDataAfterRead") {
+  test("copy file from hadoop to hadoop without partitions and mode append and FileIncrementalMoveMode") {
 
     val feed = "filetransfer"
     val srcDir = "testSrc"
@@ -355,31 +357,37 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
 
     // setup DataObjects
     val srcDO = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"))
-    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"), saveMode = SaveMode.Append)
+    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"), saveMode = SDLSaveMode.Append)
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
 
     // prepare & start load 1
     implicit val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
-    val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id, deleteDataAfterRead = true)
+    val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id, executionMode = Some(FileIncrementalMoveMode()))
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
+    action1.init(Seq(srcSubFeed))
+    action1.preExec(Seq(srcSubFeed))
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
+    action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed))
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
 
     // check 1
     val r1 = tgtDO.getFileRefs(Seq())
-    assert(r1.size == 1)
-    assert(r1.head.fileName == resourceFile+"1")
+    assert(r1.map(_.fileName) == Seq(resourceFile+"1"))
+    assert(srcDO.getFileRefs(Seq()).isEmpty)
 
     // copy data 2 file to hadoop
     TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile+"2").toFile)
 
     // start load 2
-    action1.exec(Seq(srcSubFeed)).head
+    action1.init(Seq(srcSubFeed))
+    action1.preExec(Seq(srcSubFeed))
+    val tgtSubFeed2 = action1.exec(Seq(srcSubFeed)).head
+    action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed2))
 
     // check 2
-    val r2 = tgtDO.getFileRefs(Seq())
-    assert(r2.size == 2)
+    assert(tgtDO.getFileRefs(Seq()).size == 2)
+    assert(srcDO.getFileRefs(Seq()).isEmpty)
   }
 
   test("copy webservice output to hadoop file") {
@@ -390,7 +398,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
 
     // setup DataObjects
     // For testing we will read something from Spark UI API...
-    val srcDO = WebserviceFileDataObject("src1", WebserviceOptions(session.sparkContext.uiWebUrl.get + "/api/v1/applications"))
+    val srcDO = WebserviceFileDataObject("src1", url = session.sparkContext.uiWebUrl.get + "/api/v1/applications")
     val tgtDO = JsonFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'))
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
@@ -414,7 +422,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
 
     // setup DataObjects
     // For testing we will read something from Spark UI API...
-    val srcDO = WebserviceFileDataObject("src1", WebserviceOptions(session.sparkContext.uiWebUrl.get + "/api/v1")
+    val srcDO = WebserviceFileDataObject("src1", url = session.sparkContext.uiWebUrl.get + "/api/v1"
       , partitionDefs = Seq(WebservicePartitionDefinition("subject", Seq("applications","version"))), partitionLayout = Some("/%subject%"))
     val tgtDO = JsonFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'))
     instanceRegistry.register(srcDO)

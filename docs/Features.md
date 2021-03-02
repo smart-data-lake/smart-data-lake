@@ -18,7 +18,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
 
 ##### Connectivity
 * Spark: diverse connectors (HadoopFS, Hive, DeltaLake, JDBC, Kafka, Splunk, Webservice, JMS) and formats (CSV, JSON, XML, Avro, Parquet, Excel, Access …)
-* File: SFTP, Local
+* File: SFTP, Local, Webservice
 * Easily extendable through implementing predefined scala traits
 
 ##### Generic Transformations
@@ -79,3 +79,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
   * Spark data pipeline simulation (acceptance tests)
 * Support for Deployment
   * Dry-run
+
+##### Spark Performance
+* Execute multiple Spark jobs in parallel within the same Spark Session to save resources
+* Automatically cache and release intermediate results (DataFrames)

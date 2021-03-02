@@ -21,6 +21,8 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.SDLSaveMode
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.AclDef
 import org.apache.spark.sql.SaveMode
@@ -51,7 +53,7 @@ case class AvroFileDataObject( override val id: DataObjectId,
                                override val partitions: Seq[String] = Seq(),
                                override val schema: Option[StructType] = None,
                                override val schemaMin: Option[StructType] = None,
-                               override val saveMode: SaveMode = SaveMode.Overwrite,
+                               override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                override val sparkRepartition: Option[SparkRepartitionDef] = None,
                                override val acl: Option[AclDef] = None,
                                override val connectionId: Option[ConnectionId] = None,
@@ -66,23 +68,12 @@ case class AvroFileDataObject( override val id: DataObjectId,
   // this is only needed for FileRef actions
   override val fileName: String = "*.avro*"
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[DataObject] = AvroFileDataObject
 }
 
 
 object AvroFileDataObject extends FromConfigFactory[DataObject] {
-
-  /**
-   * @inheritdoc
-   */
-  def fromConfig(config: Config, instanceRegistry: InstanceRegistry): AvroFileDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[AvroFileDataObject].value
+  def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): AvroFileDataObject = {
+    extract[AvroFileDataObject](config)
   }
 }

@@ -31,6 +31,7 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.SplunkConnection
 import io.smartdatalake.workflow.dataobject.SplunkFormatter.{fromSplunkStringFormat, toSplunkStringFormat}
 import org.apache.spark.sql._
@@ -60,7 +61,7 @@ case class SplunkDataObject(override val id: DataObjectId,
   private implicit val rowSeqEncoder: Encoder[Seq[Row]] = Encoders.kryo[Seq[Row]]
   private implicit val queryTimeIntervalEncoder: Encoder[QueryTimeInterval] = Encoders.kryo[QueryTimeInterval]
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit spark: SparkSession): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit spark: SparkSession, context: ActionPipelineContext): DataFrame = {
     readFromSplunk(params)
   }
 
@@ -132,9 +133,6 @@ case class SplunkDataObject(override val id: DataObjectId,
     }
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[DataObject] = SplunkDataObject
 }
 
@@ -164,7 +162,7 @@ object SplunkDataObject extends FromConfigFactory[DataObject] {
   }
 
   /**
-   * A [[Configs]] reader that reads [[SplunkParams]] values.
+   * A ConfigReader that reads [[SplunkParams]] values.
    *
    * SplunkParams have special semantics for Duration which are covered with this reader.
    */
@@ -172,15 +170,8 @@ object SplunkDataObject extends FromConfigFactory[DataObject] {
     SplunkParams.fromConfig(c)
   }
 
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): SplunkDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[SplunkDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SplunkDataObject = {
+    extract[SplunkDataObject](config)
   }
 }
 

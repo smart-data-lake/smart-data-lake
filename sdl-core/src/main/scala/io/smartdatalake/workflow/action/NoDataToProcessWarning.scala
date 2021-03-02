@@ -20,6 +20,17 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.workflow.DAGHelper.NodeId
-import io.smartdatalake.workflow.TaskSkippedWarning
+import io.smartdatalake.workflow.{SubFeed, TaskSkippedDontStopWarning, TaskSkippedWarning}
+import org.apache.spark.annotation.DeveloperApi
 
-private[smartdatalake] case class NoDataToProcessWarning(actionId: NodeId, msg: String) extends TaskSkippedWarning(actionId, msg)
+/**
+ * Execution modes can throw this exception to indicate that there is no data to process, and dependent Actions should not be executed.
+ */
+@DeveloperApi
+case class NoDataToProcessWarning(actionId: NodeId, msg: String) extends TaskSkippedWarning(actionId, msg)
+
+/**
+ * Execution modes can throw this exception to indicate that there is no data to process, and dependent Actions should be executed nevertheless.
+ */
+@DeveloperApi
+case class NoDataToProcessDontStopWarning(actionId: NodeId, msg: String, results: Option[Seq[SubFeed]] = None) extends TaskSkippedDontStopWarning(actionId, msg, results)

@@ -27,6 +27,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil
+import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.types.StructType
@@ -47,7 +48,7 @@ case class AccessTableDataObject(override val id: DataObjectId,
                                 )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends TableDataObject {
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession) : DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext) : DataFrame = {
 
     // currently, only the schema is being inferred using [[net.ucanaccess.jdbc.UcanaccessDriver]]...
     val tableSchema = session.read
@@ -117,23 +118,11 @@ case class AccessTableDataObject(override val id: DataObjectId,
 
   override def dropTable(implicit session: SparkSession): Unit = throw new NotImplementedError
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[DataObject] = AccessTableDataObject
 }
 
 object AccessTableDataObject extends FromConfigFactory[DataObject] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): AccessTableDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-
-    config.extract[AccessTableDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): AccessTableDataObject = {
+    extract[AccessTableDataObject](config)
   }
 }

@@ -18,7 +18,6 @@
  */
 package io.smartdatalake.util.misc
 
-import io.smartdatalake.util.streaming.DummyStreamProvider
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
@@ -239,8 +238,9 @@ private[smartdatalake] object DataFrameUtil {
     def isEqual(df2: DataFrame): Boolean = {
       // As a set-theoretic function symmetricDifference ignores multiple occurences of the same row.
       // Thus we need also to compare the cardinalities and the schemata of the two data frames.
+      // For the schema, the order of columns doesn't need to match.
       // Note that two schemata equal only if they agree on nullability of their columns.
-      symmetricDifference(df2).isEmpty && df.schema == df2.schema && df.count == df2.count
+      df.schema.fields.toSet == df2.schema.fields.toSet && symmetricDifference(df2).isEmpty && df.count == df2.count
     }
 
     /**
@@ -254,12 +254,16 @@ private[smartdatalake] object DataFrameUtil {
     /**
      * symmetric difference of two data frames: (df∪df2)∖(df∩df2) = (df∖df2)∪(df2∖df)
      *
-     * @param df2 : data frame to comapre with
+     * @param df2 : data frame to compare with
      * @param diffColName : name of boolean column which indicates whether the row belongs to df
      * @return data frame
      */
     def symmetricDifference(df2: DataFrame, diffColName: String = "_in_first_df"): DataFrame = {
-      df.except(df2).withColumn(diffColName,lit(true)).union(df2.except(df).withColumn(diffColName,lit(false)))
+      require(df.columns.toSet == df2.columns.toSet, "DataFrames must have the same columns for symmetricDifference calculation")
+      // reorder columns according to the original df for calculating symmetricDifference
+      val colOrder = df.columns.map(col)
+      df.except(df2.select(colOrder:_*)).withColumn(diffColName,lit(true))
+      .unionByName(df2.select(colOrder:_*).except(df).withColumn(diffColName,lit(false)))
     }
 
     /**

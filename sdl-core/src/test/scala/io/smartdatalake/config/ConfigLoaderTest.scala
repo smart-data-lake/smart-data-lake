@@ -49,13 +49,22 @@ class ConfigLoaderTest extends FlatSpec with Matchers {
 
   it must "not parse a file that is not a config file" in {
     val config = ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/subdirectory/file.txt").toString))
-    an [ConfigException] should be thrownBy config.getString("noconfig")
+    a [ConfigException] should be thrownBy config.getString("noconfig")
+  }
+
+  it must "ignore hidden files" in {
+    val config = ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config").toString))
+    config.hasPath("hidden") shouldBe false
   }
 
   it must "only parse config files in directories" in {
     val config = ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/subdirectory").toString))
     config.getString("foo") shouldBe "foo"
     config.getString("config2") shouldBe "config2"
-    an [ConfigException] should be thrownBy config.getString("noconfig")
+    a [ConfigException] should be thrownBy config.getString("noconfig")
+  }
+
+  it should "fail on duplicate configuration object IDs" in {
+    a [ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/configWithDuplicates").toString))
   }
 }

@@ -21,9 +21,9 @@ package io.smartdatalake.util.util
 import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, Row}
 import org.scalatest.Matchers
 
 class DataFrameUtilTest extends org.scalatest.FunSuite with Matchers with SmartDataLakeLogger {
@@ -54,13 +54,13 @@ class DataFrameUtilTest extends org.scalatest.FunSuite with Matchers with SmartD
       (3,Seq(("c","C",Seq("c","X")))),
       (4,Seq(("d","D",Seq("d","D")))),
       (5,Seq(("e","E",Seq("e","E"))))
-    ).toDF("id","Value")
+    ).toDF("id","value")
     val actual: DataFrame = dfComplex.symmetricDifference(df_complex_2,"df_complex")
     val actualCount = actual.count()
     val expected = Seq(
       (3,Seq(("c","C",Seq("c","C"))),true),
       (3,Seq(("c","C",Seq("c","X"))),false)
-    ).toDF("id","Value","_in_first_df")
+    ).toDF("id","value","_in_first_df")
     val resultat: Boolean = (actual.schema == dfComplex.schema.add("df_complex", BooleanType, nullable = false)) &&
       (2 == actualCount) && (actual.takeAsList(2)===expected.takeAsList(2))
     if (!resultat) {

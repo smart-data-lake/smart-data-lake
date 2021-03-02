@@ -23,7 +23,8 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, FromConfigFactory, InstanceRegistry, ParsableFromConfig}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
-import io.smartdatalake.workflow.TaskSkippedDontStopWarning
+import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{ArrayType, MapType, StringType, StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
@@ -59,7 +60,7 @@ case class PKViolatorsDataObject(id: DataObjectId,
                                 (@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with ParsableFromConfig[PKViolatorsDataObject] {
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
 
     import PKViolatorsDataObject.{colListType, columnNameName, columnValueName}
     // Get all DataObjects from registry
@@ -108,30 +109,20 @@ case class PKViolatorsDataObject(id: DataObjectId,
       }
     }
     val pkViolatorsDfs = dataObjectsWithPk.flatMap(getPKviolatorDf)
-    if (pkViolatorsDfs.isEmpty) throw new TaskSkippedDontStopWarning(id.id, s"($id) No existing table with primary key found")
+    if (pkViolatorsDfs.isEmpty) throw NoDataToProcessWarning(id.id, s"($id) No existing table with primary key found")
 
     // combine & return dataframe
     def unionDf(df1: DataFrame, df2: DataFrame) = df1.union(df2)
     pkViolatorsDfs.reduce(unionDf)
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[PKViolatorsDataObject] = PKViolatorsDataObject
 }
 
 object PKViolatorsDataObject extends FromConfigFactory[PKViolatorsDataObject] {
 
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): PKViolatorsDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[PKViolatorsDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): PKViolatorsDataObject = {
+    extract[PKViolatorsDataObject](config)
   }
 
   val columnNameName = "column_name"

@@ -19,12 +19,13 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.PartitionValues
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import io.smartdatalake.workflow.ActionPipelineContext
+import org.apache.spark.sql.types.{DataType, StructType}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 private[smartdatalake] trait CanCreateDataFrame {
 
-  def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession) : DataFrame
+  def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext) : DataFrame
 
   /**
    * Creates the read schema based on a given write schema.
@@ -33,4 +34,8 @@ private[smartdatalake] trait CanCreateDataFrame {
    */
   def createReadSchema(writeSchema: StructType)(implicit session: SparkSession): StructType = writeSchema
 
+  protected def addFieldIfNotExisting(writeSchema: StructType, colName: String, dataType: DataType): StructType = {
+    if (!writeSchema.fieldNames.contains(colName)) writeSchema.add(colName, dataType)
+    else writeSchema
+  }
 }

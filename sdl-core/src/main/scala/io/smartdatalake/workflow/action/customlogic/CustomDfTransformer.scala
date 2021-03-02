@@ -19,11 +19,12 @@
 package io.smartdatalake.workflow.action.customlogic
 
 import io.smartdatalake.config.SdlConfigObject
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData, PythonUtil, SparkExpressionUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionHelper
+import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig.fnTransformType
 import org.apache.spark.python.PythonHelper.SparkEntryPoint
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -43,23 +44,38 @@ trait CustomDfTransformer extends Serializable {
    */
   def transform(session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String) : DataFrame
 
+  /**
+   * Optional function to define the transformation of input to output partition values.
+   * For example this enables to implement aggregations where multiple input partitions are combined into one output partition.
+   * Note that the default value is input = output partition values, which should be correct for most use cases.
+   *
+   * @param partitionValues partition values to be transformed
+   * @param options Options specified in the configuration for this transformation
+   */
+  def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Map[PartitionValues,PartitionValues] = PartitionValues.oneToOneMapping(partitionValues)
 }
 
 /**
  * Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1)
+ * Define a transform function which receives a DataObjectIds, a DataFrames and a map of options and has to return a
+ * DataFrame, see also [[CustomDfTransformer]].
  *
  * Note about Python transformation: Environment with Python and PySpark needed.
  * PySpark session is initialize and available under variables `sc`, `session`, `sqlContext`.
- * Input DataFrame is available as `inputDf`. Output DataFrame must be set with `setOutputDf(df)`.
+ * Other variables available are
+ * - `inputDf`: Input DataFrame
+ * - `options`: Transformation options as Map[String,String]
+ * - `dataObjectId`: Id of input dataObject as String
+ * Output DataFrame must be set with `setOutputDf(df)`.
  *
- * @param className Optional class name to load transformer code from
- * @param scalaFile Optional file where scala code for transformation is loaded from
- * @param scalaCode Optional scala code for transformation
+ * @param className Optional class name implementing trait [[CustomDfTransformer]]
+ * @param scalaFile Optional file where scala code for transformation is loaded from. The scala code in the file needs to be a function of type [[fnTransformType]].
+ * @param scalaCode Optional scala code for transformation. The scala code needs to be a function of type [[fnTransformType]].
  * @param sqlCode Optional SQL code for transformation.
  *                Use tokens %{<key>} to replace with runtimeOptions in SQL code.
  *                Example: "select * from test where run = %{runId}"
- * @param pythonFile Optional pythonFile to use for python transformation
- * @param pythonCode Optional pythonCode to user for python transformation
+ * @param pythonFile Optional pythonFile to use for python transformation. The python code can use variables inputDf, dataObjectId and options. The transformed DataFrame has to be set with setOutputDf.
+ * @param pythonCode Optional pythonCode to user for python transformation. The python code can use variables inputDf, dataObjectId and options. The transformed DataFrame has to be set with setOutputDf.
  * @param options Options to pass to the transformation
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
@@ -72,13 +88,13 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
   }.orElse {
     scalaFile.map {
       file =>
-        val fnTransform = CustomCodeUtil.compileCode[(SparkSession, Map[String,String], DataFrame, String) => DataFrame](HdfsUtil.readHadoopFile(file))
+        val fnTransform = CustomCodeUtil.compileCode[fnTransformType](HdfsUtil.readHadoopFile(file))
         new CustomDfTransformerWrapper( fnTransform )
     }
   }.orElse {
     scalaCode.map {
       code =>
-        val fnTransform = CustomCodeUtil.compileCode[(SparkSession, Map[String,String], DataFrame, String) => DataFrame](code)
+        val fnTransform = CustomCodeUtil.compileCode[fnTransformType](code)
         new CustomDfTransformerWrapper( fnTransform )
     }
   }.orElse {
@@ -111,17 +127,28 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
     else throw new IllegalStateException("transformation undefined!")
   }
 
-  def transform(actionId: ActionObjectId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit session: SparkSession, context: ActionPipelineContext) : DataFrame = {
+  def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit session: SparkSession, context: ActionPipelineContext) : DataFrame = {
     // replace runtime options
-    lazy val data = DefaultExpressionData.from(context, partitionValues)
-    val runtimeOptionsReplaced = runtimeOptions.mapValues {
-      expr => SparkExpressionUtil.evaluateString(actionId, Some("transformation.runtimeObjects"), expr, data)
-    }.filter(_._2.isDefined).mapValues(_.get)
+    val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
     // transform
     impl.get.transform(session, options ++ runtimeOptionsReplaced, df, dataObjectId.id)
   }
 
-  private def createSqlFnTransform(sql: String): (SparkSession, Map[String, String], DataFrame, String) => DataFrame = {
+  def transformPartitionValues(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+    // replace runtime options
+    val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
+    // transform
+    impl.get.transformPartitionValues(options ++ runtimeOptionsReplaced, partitionValues)
+  }
+
+  private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[String,String] = {
+    lazy val data = DefaultExpressionData.from(context, partitionValues)
+    runtimeOptions.mapValues {
+      expr => SparkExpressionUtil.evaluateString(actionId, Some("transformation.runtimeOptions"), expr, data)
+    }.filter(_._2.isDefined).mapValues(_.get)
+  }
+
+  private def createSqlFnTransform(sql: String): fnTransformType = {
     (session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectIdStr: String) => {
       val dataObjectId = DataObjectId(dataObjectIdStr)
       val objectId = ActionHelper.replaceSpecialCharactersWithUnderscore(dataObjectIdStr)
@@ -135,7 +162,7 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
     }
   }
 
-  private def createPythonFnTransform(code: String): (SparkSession, Map[String, String], DataFrame, String) => DataFrame = {
+  private def createPythonFnTransform(code: String): fnTransformType = {
     (session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String) => {
       // python transformation is executed by passing options and input/output DataFrame through entry point
       val objectId = ActionHelper.replaceSpecialCharactersWithUnderscore(dataObjectId)
@@ -157,6 +184,10 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
       }
     }
   }
+}
+
+object CustomDfTransformerConfig {
+  type fnTransformType = (SparkSession, Map[String, String], DataFrame, String) => DataFrame
 }
 
 private[smartdatalake] class DfTransformerPySparkEntryPoint(override val session: SparkSession, options: Map[String,String], inputDf: DataFrame, dataObjectId: String, var outputDf: Option[DataFrame] = None) extends SparkEntryPoint {

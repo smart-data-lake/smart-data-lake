@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.util.filetransfer
 
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
 
@@ -32,7 +33,7 @@ private[smartdatalake] trait FileTransfer {
    * @param fileRefs files to be transfered
    * @return target files which will be created when file transfer is executed
    */
-  def init(fileRefs: Seq[FileRef])(implicit session: SparkSession): Seq[(FileRef,FileRef)] = {
+  def init(fileRefs: Seq[FileRef])(implicit session: SparkSession, context: ActionPipelineContext): Seq[(FileRef,FileRef)] = {
     val tgtFileRefs = tgtDO.translateFileRefs(fileRefs)
     fileRefs.zip(tgtFileRefs)
   }
@@ -40,7 +41,7 @@ private[smartdatalake] trait FileTransfer {
   /**
    * Executes the file transfer
    */
-  def exec(fileRefPairs: Seq[(FileRef,FileRef)])(implicit session: SparkSession): Unit
+  def exec(fileRefPairs: Seq[(FileRef,FileRef)])(implicit session: SparkSession, context: ActionPipelineContext): Unit
 
 }
 

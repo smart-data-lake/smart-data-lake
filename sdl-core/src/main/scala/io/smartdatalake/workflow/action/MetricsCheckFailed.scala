@@ -20,3 +20,7 @@
 package io.smartdatalake.workflow.action
 
 private[smartdatalake] case class MetricsCheckFailed(msg: String) extends Exception(msg)
+
+case class Metric(dataObjectId: String, key: Option[String], value: Option[String]) {
+  override def toString: String = s"Metric(dataObjectId=$dataObjectId key=$key value=$value)"
+}

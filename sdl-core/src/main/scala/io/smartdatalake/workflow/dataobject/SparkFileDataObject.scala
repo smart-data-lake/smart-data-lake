@@ -18,12 +18,15 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
+import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.util.misc.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
+import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
-import org.apache.spark.sql.types.{StringType, StructType}
 import org.apache.spark.sql.functions.input_file_name
+import org.apache.spark.sql.types.{StringType, StructType}
 
 /**
  * A [[DataObject]] backed by a file in HDFS. Can load file contents into an Apache Spark [[DataFrame]]s.
@@ -55,7 +58,6 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * Definition of repartition operation before writing DataFrame with Spark to Hadoop.
    */
   def sparkRepartition: Option[SparkRepartitionDef]
-  assert(sparkRepartition.flatMap(_.filename).isEmpty || partitions.isEmpty, s"($id) Cannot rename file with SparkRepartitionDef for partitioned DataObject")
 
   /**
    * Callback that enables potential transformation to be applied to `df` before the data is written.
@@ -97,7 +99,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * @param session the current [[SparkSession]].
    * @return a new [[DataFrame]] containing the data stored in the file at `path`
    */
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession) : DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext) : DataFrame = {
     import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 
     val wrongPartitionValues = PartitionValues.checkWrongPartitionValues(partitionValues, partitions)
@@ -113,21 +115,27 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
       filesystem.mkdirs(hadoopPath)
     }
 
+    val schemaOpt = readSchema(filesExists)
     val dfContent = if (partitions.isEmpty || partitionValues.isEmpty) {
       session.read
         .format(format)
         .options(options)
-        .optionalSchema(readSchema(filesExists))
+        .optionalSchema(schemaOpt)
         .load(hadoopPath.toString)
     } else {
       val reader = session.read
         .format(format)
         .options(options)
-        .optionalSchema(readSchema(filesExists))
+        .optionalSchema(schemaOpt)
         .option("basePath", hadoopPath.toString) // this is needed for partitioned tables when subdirectories are read directly; it then keeps the partition columns from the subdirectory path in the dataframe
       // create data frame for every partition value and then build union
-      val pathsToRead = partitionValues.map( pv => new Path(hadoopPath, getPartitionString(pv).get).toString)
-      pathsToRead.map(reader.load).reduce(_ union _)
+      val pathsToRead = partitionValues.flatMap(getConcretePaths).map(_.toString)
+      pathsToRead.map(reader.load).reduceOption(_ union _)
+        .getOrElse{
+          // if there are no paths to read then an empty DataFrame is created
+          require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")
+          DataFrameUtil.getEmptyDataFrame(schemaOpt.get)
+        }
     }
 
     val df = dfContent.withOptionalColumn(filenameColumn, input_file_name)
@@ -137,7 +145,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
   }
 
   override def getStreamingDataFrame(options: Map[String,String], pipelineSchema: Option[StructType])(implicit session: SparkSession): DataFrame = {
-    require(schema.orElse(pipelineSchema).isDefined, s"(${id}) Schema must be defined for streaming SparkFileDataObject")
+    require(schema.orElse(pipelineSchema).isDefined, s"($id}) Schema must be defined for streaming SparkFileDataObject")
     // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
     if (!filesystem.exists(hadoopPath.getParent)) filesystem.mkdirs(hadoopPath)
 
@@ -152,7 +160,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
 
   override def createReadSchema(writeSchema: StructType)(implicit session: SparkSession): StructType = {
     // add additional columns created by SparkFileDataObject
-    filenameColumn.map(colName => writeSchema.add(colName, StringType))
+    filenameColumn.map(colName => addFieldIfNotExisting(writeSchema, colName, StringType))
       .getOrElse(writeSchema)
   }
 
@@ -171,15 +179,45 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
 
     // prepare data
     var dfPrepared = beforeWrite(df)
-    dfPrepared = sparkRepartition.map(_.prepareDataFrame(dfPrepared,partitions, partitionValues.size, id))
+    dfPrepared = sparkRepartition.map(_.prepareDataFrame(dfPrepared, partitions, partitionValues, id))
       .getOrElse(dfPrepared)
+
+    // apply special save modes
+    saveMode match {
+      case SDLSaveMode.Overwrite =>
+        if (partitionValues.nonEmpty) { // delete concerned partitions if existing, as Spark dynamic partitioning doesn't delete empty partitions
+          deletePartitions(filterPartitionsExisting(partitionValues))
+        } else {
+          // SDLSaveMode.Overwrite: Workaround ADLSv2: overwrite unpartitioned data object as it is not deleted by spark csv writer (strangely it works for parquet)
+          if (Environment.enableOverwriteUnpartitionedSparkFileDataObjectAdls) {
+            deleteAll
+          }
+        }
+      case SDLSaveMode.OverwriteOptimized =>
+        if (partitionValues.nonEmpty) { // delete concerned partitions if existing, as append mode is used later
+          deletePartitions(filterPartitionsExisting(partitionValues))
+        } else if (partitions.isEmpty || Environment.globalConfig.allowOverwriteAllPartitionsWithoutPartitionValues.contains(id)) { // delete all data if existing, as append mode is used later
+          deleteAll
+        } else {
+          throw new ProcessingLogicException(s"($id) OverwriteOptimized without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data.")
+        }
+      case SDLSaveMode.OverwritePreserveDirectories => // only delete files but not directories
+        if (partitionValues.nonEmpty) { // delete concerned partitions files if existing, as append mode is used later
+          deletePartitionsFiles(filterPartitionsExisting(partitionValues))
+        } else if (partitions.isEmpty || Environment.globalConfig.allowOverwriteAllPartitionsWithoutPartitionValues.contains(id)) { // delete all data if existing, as append mode is used later
+          deleteAllFiles(hadoopPath)
+        } else {
+          throw new ProcessingLogicException(s"($id) OverwritePreserveDirectories without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data.")
+        }
+      case _ => Unit
+    }
 
     val hadoopPathString = hadoopPath.toString
     logger.info(s"Writing data frame to $hadoopPathString")
 
     // write
     dfPrepared.write.format(format)
-      .mode(saveMode)
+      .mode(saveMode.asSparkSaveMode)
       .options(options)
       .optionalPartitionBy(partitions)
       .save(hadoopPathString)
@@ -187,14 +225,17 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     // make sure empty partitions are created as well
     createMissingPartitions(partitionValues)
 
-    // rename file according to sparkRepartition (only if not partitioned and numberOfTasksPerPartition=1)
-    sparkRepartition.flatMap(_.filename).foreach {
-      filename =>
-        require(partitions.isEmpty, s"($id) Cannot rename file with SparkRepartitionDef for partitioned DataObject")
-        val files = getFileRefs(Seq())
-        require(files.size <= 1, s"($id) Number of files should not be greater than 1 because SparkRepartitionDef.numberOfTasksPerPartition should be set to 1 if filename is set!")
-        files.map(f => new Path(f.fullPath)).foreach( p => filesystem.rename(p, new Path(p.getParent, filename)))
-    }
+    // rename file according to SparkRepartitionDef
+    sparkRepartition.foreach(_.renameFiles(getFileRefs(partitionValues))(filesystem))
+  }
+
+  /**
+   * Filters only existing partition.
+   * Note that partition values to check don't need to have a key/value defined for every partition column.
+   */
+  def filterPartitionsExisting(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[PartitionValues]  = {
+    val partitionValueKeys = PartitionValues.getPartitionValuesKeys(partitionValues).toSeq
+    partitionValues.intersect(listPartitions.map(_.filterKeys(partitionValueKeys)))
   }
 }
 

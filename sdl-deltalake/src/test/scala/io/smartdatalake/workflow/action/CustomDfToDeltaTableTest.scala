@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,16 +19,14 @@
 package io.smartdatalake.workflow.action
 
 import java.nio.file.Files
-import java.time.LocalDateTime
 
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.dataobject.{CustomDfDataObject, DeltaLakeTableDataObject, Table}
-import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
@@ -40,6 +38,8 @@ class CustomDfToDeltaTableTest extends FunSuite with BeforeAndAfter {
   val tempPath: String = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+  implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
   before { instanceRegistry.clear() }
 
@@ -55,11 +55,9 @@ class CustomDfToDeltaTableTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(targetDO)
 
     // prepare & start load
-    val startTime = LocalDateTime.now()
-    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(startTime), SmartDataLakeBuilderConfig())
     val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id)
     val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
-    testAction.exec(Seq(srcSubFeed))
+    testAction.exec(Seq(srcSubFeed))(session, contextExec)
 
     val expected = sourceDO.getDataFrame()
     val actual = targetDO.getDataFrame()
@@ -80,11 +78,9 @@ class CustomDfToDeltaTableTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(targetDO)
 
     // prepare & start load
-    val startTime = LocalDateTime.now()
-    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(startTime), SmartDataLakeBuilderConfig())
     val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id)
     val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
-    testAction.exec(Seq(srcSubFeed))
+    testAction.exec(Seq(srcSubFeed))(session, contextExec)
 
     val expected = sourceDO.getDataFrame()
     val actual = targetDO.getDataFrame()

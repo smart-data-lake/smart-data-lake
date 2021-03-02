@@ -19,13 +19,13 @@
 package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.ExecutionMode
+import io.smartdatalake.definitions.{Condition, ExecutionMode}
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, TryWithRessource}
 import io.smartdatalake.workflow.action.customlogic.CustomFileTransformerConfig
-import io.smartdatalake.workflow.dataobject.{FileRefDataObject, HadoopFileDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, SubFeed}
+import io.smartdatalake.workflow.dataobject.HadoopFileDataObject
+import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 
@@ -39,17 +39,20 @@ import org.apache.spark.sql.SparkSession
  * @param transformer a custom file transformer, which reads a file from HadoopFileDataObject and writes it back to another HadoopFileDataObject
  * @param deleteDataAfterRead if the input files should be deleted after processing successfully
  * @param filesPerPartition number of files per Spark partition
+ * @param executionMode optional execution mode for this Action
+ * @param executionCondition     optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  */
-case class CustomFileAction(override val id: ActionObjectId,
+case class CustomFileAction(override val id: ActionId,
                             inputId: DataObjectId,
                             outputId: DataObjectId,
                             transformer: CustomFileTransformerConfig,
-                            override val deleteDataAfterRead: Boolean = false,
+                            @deprecated("use executionMode = FileIncrementalMoveMode instead") override val deleteDataAfterRead: Boolean = false,
                             filesPerPartition: Int = 10,
                             override val breakFileRefLineage: Boolean = false,
                             override val executionMode: Option[ExecutionMode] = None,
+                            override val executionCondition: Option[Condition] = None,
                             override val metricsFailCondition: Option[String] = None,
                             override val metadata: Option[ActionMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)
@@ -57,69 +60,54 @@ case class CustomFileAction(override val id: ActionObjectId,
 
   assert(filesPerPartition>0, s"($id) filesPerPartition must be greater than 0. Current value: $filesPerPartition")
 
-  override val input = getInputDataObject[HadoopFileDataObject](inputId)
-  override val output = getOutputDataObject[HadoopFileDataObject](outputId)
+  override val input: HadoopFileDataObject = getInputDataObject[HadoopFileDataObject](inputId)
+  override val output: HadoopFileDataObject = getOutputDataObject[HadoopFileDataObject](outputId)
   override val inputs: Seq[HadoopFileDataObject] = Seq(input)
   override val outputs: Seq[HadoopFileDataObject] = Seq(output)
 
-  override def initSubFeed(subFeed: FileSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
-    val inputFileRefs = subFeed.fileRefs.getOrElse( input.getFileRefs(subFeed.partitionValues))
-    val tgtFileRefs = output.translateFileRefs(inputFileRefs)
-    subFeed.copy(fileRefs = Some(tgtFileRefs), dataObjectId = output.id, processedInputFileRefs = Some(inputFileRefs))
-  }
-
-  override def execSubFeed(subFeed: FileSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
+  override def doTransform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed, doExec: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
     import session.implicits._
-
-    // recreate FileRefs is desired
-    val inputFileRefs = subFeed.fileRefs.getOrElse( input.getFileRefs(subFeed.partitionValues))
+    assert(inputSubFeed.fileRefs.nonEmpty, "inputSubFeed.fileRefs must be defined for CustomFileAction.doTransform")
+    val inputFileRefs = inputSubFeed.fileRefs.get
     val tgtFileRefs = output.translateFileRefs(inputFileRefs)
-    val filePathPairs = inputFileRefs.map(_.fullPath).zip(tgtFileRefs.map(_.fullPath))
 
     // transform files in distributed mode with Spark
-    // Create a Dataset of files to be processed
-    val srcDO = input // avoid serialization of whole action by assigning input to local variable
-    srcDO.filesystem // init filesystem to prepare hadoop conf serialization
-    val tgtDO = output // avoid serialization of whole action by assigning output to local variable
-    tgtDO.filesystem // init filesystem to prepare hadoop conf serialization
-    val transformerVal = transformer // avoid serialization of whole action by assigning transformer to local variable
-    val nbOfPartitions = math.max(filePathPairs.size/filesPerPartition,1)
-    val transformedDs = filePathPairs.toDS.repartition(nbOfPartitions)
-      .map { case (srcPath, tgtPath) =>
-        val result =TryWithRessource.exec( srcDO.filesystem.open(new Path(srcPath))) { is =>
-          TryWithRessource.exec( tgtDO.filesystem.create(new Path(tgtPath), true)) { os => // overwrite = true
-            transformerVal.transform(is, os)
+    if (doExec) {
+      // Create a Dataset of files to be processed
+      val srcDO = input // avoid serialization of whole action by assigning input to local variable
+      srcDO.filesystem // init filesystem to prepare hadoop conf serialization
+      val tgtDO = output // avoid serialization of whole action by assigning output to local variable
+      tgtDO.filesystem // init filesystem to prepare hadoop conf serialization
+      val transformerVal = transformer // avoid serialization of whole action by assigning transformer to local variable
+      val filePathPairs = inputFileRefs.map(_.fullPath).zip(tgtFileRefs.map(_.fullPath))
+      val nbOfPartitions = math.max(filePathPairs.size / filesPerPartition, 1)
+      val transformedDs = filePathPairs.toDS.repartition(nbOfPartitions)
+        .map { case (srcPath, tgtPath) =>
+          val result = TryWithRessource.exec(srcDO.filesystem.open(new Path(srcPath))) { is =>
+            TryWithRessource.exec(tgtDO.filesystem.create(new Path(tgtPath), true)) { os => // overwrite = true
+              transformerVal.transform(is, os)
+            }
           }
+          (srcPath, tgtPath, result.map(_.getMessage))
         }
-        (srcPath, tgtPath, result.map(_.getMessage))
-      }
 
-    // execute the data set and log results
-    val results = transformedDs.collect
-    results.foreach{ case (_, tgt, ex) =>
-      if (ex.isEmpty) logger.info(s"transformed $tgt")
-      else logger.error(s"transformed $tgt with error $ex")
+      // execute the data set and log results
+      val results = transformedDs.collect
+      results.foreach { case (_, tgt, ex) =>
+        if (ex.isEmpty) logger.info(s"transformed $tgt")
+        else logger.error(s"transformed $tgt with error $ex")
+      }
     }
 
     // return
-    subFeed.copy(fileRefs = Some(tgtFileRefs), dataObjectId = output.id, processedInputFileRefs = Some(inputFileRefs))
+    outputSubFeed.copy(fileRefs = Some(tgtFileRefs), processedInputFileRefs = Some(inputFileRefs))
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[Action] = CustomFileAction
 }
 
 object CustomFileAction extends FromConfigFactory[Action] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): CustomFileAction = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[CustomFileAction].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CustomFileAction = {
+    extract[CustomFileAction](config)
   }
 }

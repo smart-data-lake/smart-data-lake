@@ -25,20 +25,20 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
+import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions.expr
-import org.apache.spark.sql.{Dataset, Encoder, SparkSession}
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.matching.Regex
-import scala.util.{Failure, Success, Try}
 
 /**
  * Utils to misuse spark sql expressions as expression language to substitute tokens with values from case class instances.
  */
 private[smartdatalake] object SparkExpressionUtil {
 
-  val tokenStartChar = "%"
-  val tokenExpressionRegex = (tokenStartChar + """\{(.*?)\}""").r
+  private val tokenStartChar = "%"
+  private val tokenExpressionRegex = (tokenStartChar + """\{(.*?)\}""").r
 
   /**
    * Substitutes all tokens in a string by the expression defined by the token evaluated against the given case class instance.
@@ -47,74 +47,75 @@ private[smartdatalake] object SparkExpressionUtil {
    * @param configName config name for logging
    * @param str String with tokens to replace
    * @param data Case class instance with data to be used as replacement
-   * @param onlySyntaxCheck If true only expression syntax is checked. Use for validation only.
    */
-  def substitute[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], str: String, data: T, onlySyntaxCheck: Boolean = false)(implicit session: SparkSession): String = {
+  def substitute[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], str: String, data: T): String = {
     val substituter = (regMatch: Regex.Match) => {
       val expression = regMatch.group(1)
-      val value = evaluateString(id, configName, expression, data, onlySyntaxCheck)
-      if (!onlySyntaxCheck) value.getOrElse(throw new IllegalStateException(s"($id) spark expression evaluation for '$expression' and config $configName not defined by $data"))
-      else s"#expression#" // use dummy replacement if onlySyntaxCheck=true
+      val value = evaluateString[T](id, configName, expression, data)
+      value.getOrElse {
+        throw new IllegalStateException(s"($id) spark expression evaluation for '$expression'${getConfigNameMsg(configName)} not defined by $data")
+      }
     }
     tokenExpressionRegex.replaceAllIn(str, substituter)
   }
 
-  def evaluateBoolean[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], expression: String, data: T, onlySyntaxCheck: Boolean = false)(implicit session: SparkSession): Boolean = {
-    import session.implicits._
-    val dsResult = createDataset[T,Boolean](id, configName, expression, data)
-    if (!onlySyntaxCheck) {
-      Try {
-        dsResult.head
-      } match {
-        case Success(v) => v.getOrElse(throw new IllegalStateException(s"($id) spark expression evaluation for '$expression' and config $configName not defined by $data"))
-        case Failure(e) => throw new IllegalStateException(s"($id) spark expression evaluation for '$expression' and config $configName failed", e)
-      }
-    } else false
-  }
+  /**
+   * Evaluate an expression with boolean return type against a given case class instance
+   * @param id id of the config object for meaningful exception text
+   * @param configName optional configuration name for meaningful exception text
+   * @param expression expression to be evaluated
+   * @param data case class instance
+   * @tparam T class of object the expression should be evaluated on
+   */
+  def evaluateBoolean[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], expression: String, data: T, syntaxCheckOnly: Boolean = false): Boolean =
+    evaluate[T, Boolean](id, configName, expression, data)
+      .getOrElse(false)
 
-  def evaluateString[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], expression: String, data: T, onlySyntaxCheck: Boolean = false)(implicit session: SparkSession): Option[String] = {
-    import session.implicits._
-    val dsResult = createDataset[T,String](id, configName, expression, data)
-    if (!onlySyntaxCheck) {
-      Try {
-        dsResult.head
-      } match {
-        case Success(v) => v
-        case Failure(e) => throw new IllegalStateException(s"($id) spark expression evaluation for '$expression' and config $configName failed", e)
-      }
-    } else None
-  }
+  /**
+   * Evaluate an expression with string return type against a given case class instance
+   * @param id id of the config object for meaningful exception text
+   * @param configName optional configuration name for meaningful exception text
+   * @param expression expression to be evaluated
+   * @param data case class instance
+   * @tparam T class of object the expression should be evaluated on
+   */
+  def evaluateString[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], expression: String, data: T): Option[String] =
+    evaluate[T, Any](id, configName, expression, data)
+      .map(_.toString)
 
-  def evaluateAny[T <: Product : TypeTag](id: ConfigObjectId, configName: Option[String], expression: String, data: T, onlySyntaxCheck: Boolean = false)(implicit session: SparkSession): Option[Any] = {
-    import session.implicits._
-    val dsData = Seq(data).toDS
-    val dfResult = Try {
-      dsData.select(expr(expression))
-    } match {
-      case Success(v) => v
-      case Failure(e) => throw ConfigurationException(s"($id) spark expression evaluation for '$expression' and config $configName not possible", configName, e)
+  /**
+   * Evaluate an expression against a given case class instance
+   * @param id id of the config object for meaningful exception text
+   * @param configName optional configuration name for meaningful exception text
+   * @param expression expression to be evaluated
+   * @param data case class instance
+   * @tparam T class of object the expression should be evaluated on
+   * @tparam R class of expressions expected return type
+   */
+  def evaluate[T <: Product : TypeTag, R : TypeTag : ClassTag](id: ConfigObjectId, configName: Option[String], expression: String, data: T): Option[R] = {
+    try {
+      val evaluator = new ExpressionEvaluator[T,R](expr(expression))
+      Option(evaluator(data))
+    } catch {
+      case e: Exception =>
+        throw ConfigurationException(s"($id) spark expression evaluation for '$expression'${getConfigNameMsg(configName)} failed: ${e.getMessage}", configName, e)
     }
-    if (!onlySyntaxCheck) {
-      Try {
-        val result = dfResult.head
-        if (!result.isNullAt(0)) Some(dfResult.head.get(0))
-        else None
-      } match {
-        case Success(v) => v
-        case Failure(e) => throw new IllegalStateException(s"($id) spark expression evaluation for '$expression' and config $configName failed", e)
-      }
-    } else None
   }
 
-  private def createDataset[T <: Product : TypeTag, R](id: ConfigObjectId, configName: Option[String], expression: String, data: T)(implicit session: SparkSession, encoder: Encoder[Option[R]]): Dataset[Option[R]] = {
-    import org.apache.spark.sql.functions.expr
-    import session.implicits._
-    val dsData = Seq(data).toDS
-    Try {
-      dsData.select(expr(expression).cast(encoder.schema.head.dataType)).as[Option[R]]
-    } match {
-      case Success(v) => v
-      case Failure(e) => throw ConfigurationException(s"($id) spark expression evaluation for '$expression' and config $configName not possible", configName, e)
+  /**
+   * Check syntax of an expression against a given case class
+   * @param id id of the config object for meaningful exception text
+   * @param configName optional configuration name for meaningful exception text
+   * @param expression expression to be evaluated
+   * @tparam T class of object the expression should be evaluated on
+   * @tparam R class of expressions expected return type
+   */
+  def syntaxCheck[T <: Product : TypeTag, R : TypeTag : ClassTag](id: ConfigObjectId, configName: Option[String], expression: String): Unit = {
+    try {
+      new ExpressionEvaluator[T,R](expr(expression))
+    } catch {
+      case e: Exception =>
+        throw ConfigurationException(s"($id) spark expression syntax check for '$expression'${getConfigNameMsg(configName)} failed: ${e.getMessage}", configName, e)
     }
   }
 
@@ -124,10 +125,14 @@ private[smartdatalake] object SparkExpressionUtil {
   def substituteOptions(id: ConfigObjectId, configName: Option[String], str: String, options: Map[String,String]): String = {
     val substituter = (regMatch: Regex.Match) => {
       val key = regMatch.group(1)
-      options.getOrElse(key, throw ConfigurationException(s"($id) key '$key' not found in options for config $configName"))
+      options.getOrElse(key, {
+        throw ConfigurationException(s"($id) key '$key' not found in options${getConfigNameMsg(configName)}")
+      })
     }
     tokenExpressionRegex.replaceAllIn(str, substituter)
   }
+
+  private def getConfigNameMsg(configName: Option[String]) = configName.map(" from config "+_).getOrElse("")
 }
 
 case class DefaultExpressionData( feed: String, application: String, runId: Int, attemptId: Int, executionPhase:String, referenceTimestamp: Option[Timestamp]

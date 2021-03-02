@@ -21,11 +21,13 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.SDLSaveMode
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.json.DefaultFlatteningParser
 import io.smartdatalake.util.misc.AclDef
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SaveMode}
 
 /**
  * A [[io.smartdatalake.workflow.dataobject.DataObject]] backed by an XML data source.
@@ -54,7 +56,7 @@ case class XmlFileDataObject(override val id: DataObjectId,
                              override val partitions: Seq[String] = Seq(),
                              override val schema: Option[StructType] = None,
                              override val schemaMin: Option[StructType] = None,
-                             override val saveMode: SaveMode = SaveMode.Overwrite,
+                             override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                              override val sparkRepartition: Option[SparkRepartitionDef] = None,
                              flatten: Boolean = false,
                              override val acl: Option[AclDef] = None,
@@ -80,23 +82,12 @@ case class XmlFileDataObject(override val id: DataObjectId,
     } else dfSuper
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[DataObject] = XmlFileDataObject
 }
 
 object XmlFileDataObject extends FromConfigFactory[DataObject] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): XmlFileDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[XmlFileDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): XmlFileDataObject = {
+    extract[XmlFileDataObject](config)
   }
 }
 

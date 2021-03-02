@@ -24,9 +24,9 @@ import io.smartdatalake.definitions.OutputType.OutputType
 import io.smartdatalake.definitions.{Environment, HiveTableLocationSuffix, OutputType}
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{EnvironmentUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.dataobject.Table
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.functions.{array, col}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
@@ -54,14 +54,16 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    * Deletes a Hive table
    *
    * @param table Hive table
+   * @param tablePath path of table to delete
    * @param doPurge Flag to indicate if PURGE should be used when deleting (don't delete to HDFS trash). Default: true
    * @param existingOnly Flag if check "if exists" should be executed. Default: true
    */
-  def dropTable(table: Table, doPurge: Boolean = true, existingOnly: Boolean = true)(implicit session: SparkSession): Unit = {
+  def dropTable(table: Table, tablePath: Path, filesystem: Option[FileSystem] = None, doPurge: Boolean = true, existingOnly: Boolean = true)(implicit session: SparkSession): Unit = {
     val existsClause = if (existingOnly) "if exists " else ""
     val purgeClause = if (doPurge) " purge" else ""
     val stmt = s"drop table $existsClause${table.fullName}$purgeClause"
     execSqlStmt(stmt)
+    HdfsUtil.deletePath(tablePath, filesystem.getOrElse(HdfsUtil.getHadoopFsFromSpark(tablePath)), false)
   }
 
   /**
@@ -186,6 +188,14 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
   }
 
   /**
+   * Move partition columns at end of DataFrame as required when writing to Hive in Spark > 2.x
+   */
+  def movePartitionColsLast( df: DataFrame, partitions:Seq[String] ): DataFrame = {
+    val newColOrder = movePartitionColsLast(df.columns, partitions)
+    df.select(newColOrder.map(col):_*)
+  }
+
+  /**
    * Writes DataFrame to Hive table by using DataFrameWriter.
    * A missing table gets created. Dynamic partitioning is used to create partitions on the fly by Spark.
    * Existing data of partition is overwritten, if table has no partitions all table-data is overwritten.
@@ -251,17 +261,25 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       logger.info(s"(${table.fullName}) writeDfToHive: insert into ${table.fullName}")
 
       // Try to determine maximum number of records according to catalog statistics
-      val maxRecordsPerFile: Option[BigInt] = calculateMaxRecordsPerFileFromStatistics(table)
-      val df_partitioned = if(maxRecordsPerFile.isDefined) {
-        // if exact number of records could be determined from Hive statistics, use it to split files
-        logger.info(s"(${table.fullName}) writing with maxRecordsPerFile " +maxRecordsPerFile.get.toLong)
-        // TODO: Check for side effects (df.write.option("maxRecordsPerFile", ... ) does only work for FileWriters, but spark config "spark.sql.files.maxRecordsPerFile" works also for writing tables,
-        //       so we're setting it on the current runtime config used by all DFs / RDDs
-        session.conf.set("spark.sql.files.maxRecordsPerFile", maxRecordsPerFile.get.toLong)
-        HdfsUtil.repartitionForHdfsFileSize(df_newColsSorted, outputPath, reducePartitions = true)
-      }
-      else {
-        HdfsUtil.repartitionForHdfsFileSize(df_newColsSorted, outputPath)
+      val df_partitioned = if (numInitialHdfsPartitions == -1) {
+        // pass DataFrame straight through if numInitialHdfsPartitions == -1, in this case the file size in the responsibility of the framework and must be controlled in custom transformations
+        df_newColsSorted
+      } else if (EnvironmentUtil.isSparkAdaptiveQueryExecEnabled) {
+        // pass DataFrame straight through if AQE is enabled
+        logger.warn(s"(${table.fullName}) numInitialHdfsPartitions is ignored when Spark 3.0 Adaptive Query Execution (AQE) is enabled")
+        df_newColsSorted
+      } else {
+        val maxRecordsPerFile: Option[BigInt] = calculateMaxRecordsPerFileFromStatistics(table)
+        if (maxRecordsPerFile.isDefined) {
+          // if exact number of records could be determined from Hive statistics, use it to split files
+          logger.info(s"(${table.fullName}) writing with maxRecordsPerFile " + maxRecordsPerFile.get.toLong)
+          // TODO: Check for side effects (df.write.option("maxRecordsPerFile", ... ) does only work for FileWriters, but spark config "spark.sql.files.maxRecordsPerFile" works also for writing tables,
+          //       so we're setting it on the current runtime config used by all DFs / RDDs
+          session.conf.set("spark.sql.files.maxRecordsPerFile", maxRecordsPerFile.get.toLong)
+          HdfsUtil.repartitionForHdfsFileSize(df_newColsSorted, outputPath, reducePartitions = true)
+        } else {
+          HdfsUtil.repartitionForHdfsFileSize(df_newColsSorted, outputPath)
+        }
       }
 
       // Write file
@@ -273,8 +291,14 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       // for new tables:
       // use user defined numInitialHdfsPartitions or leave partitioning as is
       // it's assumed that i.e. a CustomDfCreator takes care of proper partitioning in this case
-      val df_partitioned =
-        if(numInitialHdfsPartitions == -1)  df_newColsSorted else df_newColsSorted.repartition(numInitialHdfsPartitions)
+      val df_partitioned = if (numInitialHdfsPartitions == -1) {
+        // pass DataFrame straight through if numInitialHdfsPartitions == -1, in this case the file size in the responsibility of the framework and must be controlled in custom transformations
+        df_newColsSorted
+      } else if (EnvironmentUtil.isSparkAdaptiveQueryExecEnabled) {
+        // pass DataFrame straight through if AQE is enabled
+        logger.warn(s"(${table.fullName}) numInitialHdfsPartitions is ignored when Spark 3.0 Adaptive Query Execution (AQE) is enabled")
+        df_newColsSorted
+      } else df_newColsSorted.repartition(numInitialHdfsPartitions)
 
       // create and write to table
       if (partitions.nonEmpty) { // with partitions
@@ -602,11 +626,11 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     execSqlStmt(s"ALTER TABLE ${table.fullName} ADD IF NOT EXISTS PARTITION ($partitionDef)")
   }
 
-  def dropPartition(table: Table, tablePath: Path, partition: PartitionValues)(implicit session: SparkSession): Unit = {
+  def dropPartition(table: Table, tablePath: Path, partition: PartitionValues, filesystem: Option[FileSystem] = None)(implicit session: SparkSession): Unit = {
     val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partition.keys.toSeq, Environment.defaultPathSeparator)
     val partitionPath = new Path(tablePath, partition.getPartitionString(partitionLayout))
-    HdfsUtil.deletePath(partitionPath, HdfsUtil.getHadoopFsFromSpark(partitionPath), false)
     val partitionDef = partition.elements.map{ case (k,v) => s"$k='$v'"}.mkString(", ")
     execSqlStmt(s"ALTER TABLE ${table.fullName} DROP IF EXISTS PARTITION ($partitionDef)")
+    HdfsUtil.deletePath(partitionPath, filesystem.getOrElse(HdfsUtil.getHadoopFsFromSpark(partitionPath)), false)
   }
 }

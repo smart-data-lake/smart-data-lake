@@ -21,6 +21,8 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.SDLSaveMode
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
@@ -62,7 +64,7 @@ case class ParquetFileDataObject( override val id: DataObjectId,
                                   override val partitions: Seq[String] = Seq(),
                                   override val schema: Option[StructType] = None,
                                   override val schemaMin: Option[StructType] = None,
-                                  override val saveMode: SaveMode = SaveMode.Overwrite,
+                                  override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                   override val sparkRepartition: Option[SparkRepartitionDef] = None,
                                   override val acl: Option[AclDef] = None,
                                   override val connectionId: Option[ConnectionId] = None,
@@ -82,22 +84,11 @@ case class ParquetFileDataObject( override val id: DataObjectId,
   // See: https://medium.com/@an_chee/why-using-mixed-case-field-names-in-hive-spark-sql-is-a-bad-idea-95da8b6ec1e0
   override def beforeWrite(df: DataFrame): DataFrame = super.beforeWrite(df).colNamesLowercase
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[DataObject] = ParquetFileDataObject
 }
 
 object ParquetFileDataObject extends FromConfigFactory[DataObject] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): ParquetFileDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[ParquetFileDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ParquetFileDataObject = {
+    extract[ParquetFileDataObject](config)
   }
 }

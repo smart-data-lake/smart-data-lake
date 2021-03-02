@@ -23,6 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, FromConfigFactory, InstanceRegistry, ParsableFromConfig}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ProductUtil._
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -60,7 +61,7 @@ case class ActionsExporterDataObject(id: DataObjectId,
    * @param session SparkSession to use
    * @return DataFrame including all Actions in the instanceRegistry, used for exporting the metadata
    */
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
     import session.implicits._
 
     val listElementsSeparator = ","
@@ -129,23 +130,12 @@ case class ActionsExporterDataObject(id: DataObjectId,
     )
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[ActionsExporterDataObject] = ActionsExporterDataObject
 }
 
 object ActionsExporterDataObject extends FromConfigFactory[ActionsExporterDataObject] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): ActionsExporterDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[ActionsExporterDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ActionsExporterDataObject = {
+    extract[ActionsExporterDataObject](config)
   }
 }
 

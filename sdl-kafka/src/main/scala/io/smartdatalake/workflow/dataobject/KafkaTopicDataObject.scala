@@ -29,6 +29,7 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType
 import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer}
@@ -134,7 +135,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false")
     props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, classOf[ByteArrayDeserializer].getName)
     props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, classOf[ByteArrayDeserializer].getName)
-    props.putAll(connection.authProps)
+    connection.authProps.asScala.foreach{ case (k,v) => props.put(k,v)}
     new KafkaConsumer(props)
   }
 
@@ -180,7 +181,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     df
   }
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
 
     // get DataFrame from topic
     val dfRaw = if (partitionValues.nonEmpty) {
@@ -290,7 +291,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   private def getTopicPartitionsAtTstmp(topicPartitions: Seq[TopicPartition], localDateTime: LocalDateTime) = {
-    val topicPartitionsStart = topicPartitions.map( p => (p, new java.lang.Long(localDateTime.atZone(datePartitionCol.get.zoneId).toInstant.toEpochMilli))).toMap.asJava
+    val topicPartitionsStart = topicPartitions.map( p => (p, java.lang.Long.valueOf(localDateTime.atZone(datePartitionCol.get.zoneId).toInstant.toEpochMilli))).toMap.asJava
     consumer.offsetsForTimes(topicPartitionsStart).asScala.toSeq.sortBy(_._1.partition)
   }
 
@@ -419,11 +420,7 @@ object KafkaTopicDataObject extends FromConfigFactory[DataObject] {
   /**
     * @inheritdoc
     */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): KafkaTopicDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[KafkaTopicDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): KafkaTopicDataObject = {
+    extract[KafkaTopicDataObject](config)
   }
 }

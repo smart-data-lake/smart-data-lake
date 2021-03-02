@@ -20,20 +20,23 @@ package io.smartdatalake.workflow.action
 
 import java.nio.file.Files
 import java.sql.Timestamp
-import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
+import java.time.{LocalDateTime, Month, ZoneOffset}
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.definitions.TechnicalTableColumn
+import io.smartdatalake.testutils.DataFrameTestHelper._
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
 class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+
   import session.implicits._
 
   private val tempDir = Files.createTempDirectory("test")
@@ -60,7 +63,7 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
-    val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+    val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id)
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
@@ -72,22 +75,21 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
       .select($"rating", $"dl_ts_captured")
       .as[(Int,Timestamp)].collect().toSeq
     assert(r1.size == 1)
-    assert(r1.head._2.toLocalDateTime == refTimestamp1)
+    assert(ChronoUnit.MILLIS.between(r1.head._2.toLocalDateTime,refTimestamp1) == 0)
 
     // prepare & start 2nd load
     val refTimestamp2 = LocalDateTime.now()
-    val context2 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp2), SmartDataLakeBuilderConfig())
-    val action2 = DeduplicateAction("dda2", srcDO.id, tgtDO.id)
+    val context2 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp2), SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
     val l2 = Seq(("doe","john",10)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l2, Seq())
-    action2.exec(Seq(SparkSubFeed(None, "src1", Seq())))(session, context2)
+    action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(session, context2)
 
     val r2 = session.table(s"${tgtTable.fullName}")
       .select($"rating", $"dl_ts_captured").orderBy($"dl_ts_captured")
       .as[(Int,Timestamp)].collect().toSeq
     assert(r2.size == 1)
     assert(r2.head._1 == 10) // rating should be the second one
-    assert(r2.head._2.toLocalDateTime == refTimestamp2)
+    assert(ChronoUnit.MILLIS.between(r2.head._2.toLocalDateTime,refTimestamp2) == 0)
   }
 
   test("early validation that output primary key exists") {
@@ -119,8 +121,7 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     // prepare & start 1st load
-    val refTimestamp1 = LocalDateTime.now()
-    val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+    val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(LocalDateTime.now), SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, filterClause = Some("lastname='jonson'"))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
@@ -133,4 +134,51 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
       .as[Int].collect().toSeq
     assert(r1.size == 1)
   }
+
+  test("deduplicate with schema evolution") {
+    val colId = "id"
+    val colValueOld = "old_value_column_string"
+    val colValueNew = "new_value_column_decimal"
+
+    // initial deduplication while adding new column
+    val df1 = createDf(Map(
+      colId -> 1,
+      colValueOld -> "X",
+      TechnicalTableColumn.captured.toString -> ts("2020-07-01 10:00")
+    ))
+
+    val df2 = createDf(Map(
+      colId -> 1,
+      colValueOld -> "A",
+      colValueNew -> dec(100)
+    ))
+
+    val dateTime1 = LocalDateTime.of(2020, Month.AUGUST, 15, 10, 0, 0)
+    val dfResult1 = DeduplicateAction
+      .deduplicateDataFrame(Option(df1), Seq(colId), dateTime1,
+        ignoreOldDeletedColumns = false, ignoreOldDeletedNestedColumns = true)(df2)
+
+    // deduplicate again, using the new column
+    val df3 = createDf(Map(
+      colId -> 1,
+      colValueOld -> "B",
+      colValueNew -> dec(200)
+    ))
+
+    val dateTime2 = LocalDateTime.of(2020, Month.AUGUST, 16, 10, 0, 0)
+    val dfResult2 = DeduplicateAction
+      .deduplicateDataFrame(Option(dfResult1), Seq(colId), dateTime2,
+        ignoreOldDeletedColumns = false, ignoreOldDeletedNestedColumns = true)(df3)
+
+    // the expected result is the final passed value with a captured column
+    val dfExpected = createDf(Map(
+      colId -> 1,
+      colValueOld -> "B",
+      colValueNew -> dec(200),
+      TechnicalTableColumn.captured.toString -> ts("2020-08-16 10:00")
+    ))
+
+    assertDataFramesEqual(dfExpected, dfResult2)
+  }
+
 }

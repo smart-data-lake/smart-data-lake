@@ -19,11 +19,12 @@
 package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.ExecutionMode
+import io.smartdatalake.definitions.{Condition, ExecutionMode}
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, CanWriteDataFrame, DataObject, FileRefDataObject}
+import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.expr
@@ -42,10 +43,11 @@ import scala.util.{Failure, Success, Try}
  * @param additionalColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
  *                          The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  * @param executionMode optional execution mode for this Action
+ * @param executionCondition     optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  */
-case class CopyAction(override val id: ActionObjectId,
+case class CopyAction(override val id: ActionId,
                       inputId: DataObjectId,
                       outputId: DataObjectId,
                       deleteDataAfterRead: Boolean = false,
@@ -58,6 +60,7 @@ case class CopyAction(override val id: ActionObjectId,
                       override val breakDataFrameLineage: Boolean = false,
                       override val persist: Boolean = false,
                       override val executionMode: Option[ExecutionMode] = None,
+                      override val executionCondition: Option[Condition] = None,
                       override val metricsFailCondition: Option[String] = None,
                       override val metadata: Option[ActionMetadata] = None
                      )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedAction {
@@ -73,8 +76,14 @@ case class CopyAction(override val id: ActionObjectId,
     case Failure(e) => throw new ConfigurationException(s"(${id}) Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
   }
 
-  override def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
-    applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, Seq(), filterClauseExpr)
+  override def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+    val transformedDf = applyTransformations(inputSubFeed, transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, Seq(), filterClauseExpr)
+    outputSubFeed.copy(dataFrame = Some(transformedDf))
+  }
+
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+    if (transformer.isDefined) transformer.get.transformPartitionValues(id, partitionValues)
+    else PartitionValues.oneToOneMapping(partitionValues)
   }
 
   override def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
@@ -89,21 +98,11 @@ case class CopyAction(override val id: ActionObjectId,
     }
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[Action] = CopyAction
 }
 
 object CopyAction extends FromConfigFactory[Action] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): CopyAction = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[CopyAction].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CopyAction = {
+    extract[CopyAction](config)
   }
 }

@@ -20,51 +20,55 @@ jobs:
         ref: master
         persist-credentials: false
     - name: JDK 8 Set
-      uses: actions/setup-java@v1.3.0
+      uses: actions/setup-java@v1
       with: 
         java-version: 1.8
     - name: Maven Cache
-      uses: actions/cache@v1.1.2
+      uses: actions/cache@v2
       with:
         path: ~/.m2/repository
         key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
         restore-keys: ${{ runner.os }}-maven-
         
     - name: Maven Get Version
-      run: |
-        echo ::set-env name=MVN_CURRENT_VERSION::$(mvn -B -f /home/runner/work/smart-data-lake/smart-data-lake/pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec)
+      run: echo MVN_CURRENT_VERSION=$(mvn -B -P scala-2.12 -f /home/runner/work/smart-data-lake/smart-data-lake/pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
     - name: Set Release Version
-      run: |
-        echo ::set-env name=MVN_RELEASE_VERSION::$(mvn -B -f /home/runner/work/smart-data-lake/smart-data-lake/pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec | sed 's/-SNAPSHOT//g')
+      run: echo MVN_RELEASE_VERSION=${MVN_CURRENT_VERSION/-SNAPSHOT/} >> $GITHUB_ENV
     #- name: Printenv
     #  run: |
-    #    echo "MVN_CURRENT_VERSION=${MVN_CURRENT_VERSION}
-    #    echo "MVN_RELEASE_VERSION=${MVN_RELEASE_VERSION}
     #    printenv
     - name: Maven Set Release Version
-      run: sed -i "/${MVN_CURRENT_VERSION}/{s//${MVN_RELEASE_VERSION}/;:p;n;bp}" pom.xml
-      
-    - name: Maven Deploy to Bintray for Scala 2.11
-      env:
-        BINTRAY_API_KEY: ${{ secrets.BINTRAY_API_KEY }}
       run: |
-        mkdir -p ~/.m2
-        echo "<settings><servers><server><id>bintray-smart-data-lake-smart-data-lake</id><username>smartdatalake</username><password>${BINTRAY_API_KEY}</password></server></servers></settings>" > ~/.m2/settings.xml
-        mvn clean scala:doc-jar deploy -f pom.xml
-    - name: Maven Deploy to Bintray for Scala 2.12
-      env:
-        BINTRAY_API_KEY: ${{ secrets.BINTRAY_API_KEY }}
-      run: |
-        mkdir -p ~/.m2
-        echo "<settings><servers><server><id>bintray-smart-data-lake-smart-data-lake</id><username>smartdatalake</username><password>${BINTRAY_API_KEY}</password></server></servers></settings>" > ~/.m2/settings.xml
-        mvn -P scala-2.12 clean scala:doc-jar deploy -f pom.xml
-        
+        sed -i "/${MVN_CURRENT_VERSION}/{s//${MVN_RELEASE_VERSION}/;:p;n;bp}" pom.xml
+        sed -i "/${MVN_CURRENT_VERSION}/{s//${MVN_RELEASE_VERSION}/;:p;n;bp}" */pom.xml
+
+    - name: Maven deploy to sonatype for Scala 2.11
+      uses: samuelmeuli/action-maven-publish@v1
+      with:
+        gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+        gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+        nexus_username: ${{ secrets.SONATYPE_USERNAME }}
+        nexus_password: ${{ secrets.SONATYPE_PASSWORD }}
+        maven_profiles: scala-2.11,release-sonatype
+        maven_args: -B -f pom.xml
+
+    - name: Maven deploy to sonatype for Scala 2.12
+      uses: samuelmeuli/action-maven-publish@v1
+      with:
+        gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+        gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+        nexus_username: ${{ secrets.SONATYPE_USERNAME }}
+        nexus_password: ${{ secrets.SONATYPE_PASSWORD }}
+        maven_profiles: scala-2.12,release-sonatype
+        # exclude sdl-parent as it is already uploaded with previous deploy, stays the same and cannot be replaced in remote repository
+        maven_args: -B -pl '!.' -f pom.xml
+
     - name: Git Commit and Tag Release
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add -A
-        git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to committ
+        git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
         git tag -f ${MVN_RELEASE_VERSION} -m "Release ${MVN_RELEASE_VERSION}"
     - name: Git Pull Master
       run: |
@@ -75,8 +79,7 @@ jobs:
       uses: ad-m/github-push-action@master
       with:
         github_token: ${{ secrets.PAT_ACTIONS }}
-        
-                  
+
     # DEVELOP BRANCH
     - name: Develop Git Checkout
       uses: actions/checkout@v2
@@ -93,7 +96,7 @@ jobs:
         git branch
         git checkout develop
         git merge origin/master
-        git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to committ
+        git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
     
     - name: Develop Git Push Release
       uses: ad-m/github-push-action@master
@@ -108,7 +111,9 @@ jobs:
         current-version: ${{ env.MVN_RELEASE_VERSION }}
         version-fragment: bug
     - name: Develop Set Next Snapshot version
-      run: sed -i "/${MVN_RELEASE_VERSION}/{s//${{ steps.bump_version.outputs.next-version }}-SNAPSHOT/;:p;n;bp}" pom.xml
+      run: |
+        sed -i "/${MVN_RELEASE_VERSION}/{s//${{ steps.bump_version.outputs.next-version }}-SNAPSHOT/;:p;n;bp}" pom.xml
+        sed -i "/${MVN_RELEASE_VERSION}/{s//${{ steps.bump_version.outputs.next-version }}-SNAPSHOT/;:p;n;bp}" */pom.xml
     - name: Develop Git Commit Snapshot
       run: |
         git config --local user.email "action@github.com"

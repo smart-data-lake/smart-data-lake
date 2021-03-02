@@ -18,21 +18,30 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.io.{ByteArrayInputStream, InputStream}
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.AuthMode
+import io.smartdatalake.definitions.SDLSaveMode
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{CredentialsUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.webservice.WebserviceWriteMethod.WebserviceWriteMethod
 import io.smartdatalake.util.webservice._
+import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.{SaveMode, SparkSession}
-import org.keycloak.admin.client.Keycloak
-import org.keycloak.representations.AccessTokenResponse
+import org.apache.tika.Tika
 
 import scala.util.{Failure, Success, Try}
 
 case class WebservicePartitionDefinition( name: String, values: Seq[String])
+
+case class HttpProxyConfig(host: String, port: Int)
+
+case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int)
 
 /**
  * [[DataObject]] to call webservice and return response as InputStream
@@ -43,72 +52,79 @@ case class WebservicePartitionDefinition( name: String, values: Seq[String])
  * @param partitionLayout definition of partitions in query string. Use %<partitionColName>% as placeholder for partition column value in layout.
  */
 case class WebserviceFileDataObject(override val id: DataObjectId,
-                                    webserviceOptions: WebserviceOptions,
+                                    url: String,
+                                    additionalHeaders: Map[String,String] = Map(),
+                                    timeouts: Option[HttpTimeoutConfig] = None,
+                                    readTimeoutMs: Option[Int] = None,
+                                    authMode: Option[AuthMode] = None,
+                                    mimeType: Option[String] = None,
+                                    writeMethod: WebserviceWriteMethod = WebserviceWriteMethod.Post,
+                                    proxy: Option[HttpProxyConfig] = None,
+                                    followRedirects: Boolean = false,
                                     partitionDefs: Seq[WebservicePartitionDefinition] = Seq(),
                                     override val partitionLayout: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends FileRefDataObject with CanCreateInputStream with SmartDataLakeLogger {
+  extends FileRefDataObject with CanCreateInputStream with CanCreateOutputStream with SmartDataLakeLogger {
 
-  private val webServiceClientId = webserviceOptions.clientIdVariable.map(CredentialsUtil.getCredentials)
-  private val webServiceClientSecret = webserviceOptions.clientSecretVariable.map(CredentialsUtil.getCredentials)
-  private val webServiceUser = webserviceOptions.userVariable.map(CredentialsUtil.getCredentials)
-  private val webServicePassword = webserviceOptions.passwordVariable.map(CredentialsUtil.getCredentials)
+  // Used to determine mimetype of post data
+  val tika = new Tika
 
-  val keycloak: Option[Keycloak] = webserviceOptions.keycloakAuth.map(_.prepare(webServiceClientId.get, webServiceClientSecret.get))
-
-  // not used for now as writing data is not yet implemented
-  override val saveMode: SaveMode = SaveMode.Overwrite
+  // Always set to Append as we use Webservice to push files
+  override val saveMode: SDLSaveMode = SDLSaveMode.Append
 
   override def partitions: Seq[String] = partitionDefs.map(_.name)
   override def expectedPartitionsCondition: Option[String] = None // all partitions are expected to exist
 
-  /**
-   * Get Access Token through Keycloak
-   * @return
-   */
-  def getAccessToken : Option[AccessTokenResponse] = {
-    keycloak.map(_.tokenManager.getAccessToken)
+  override def prepare(implicit session: SparkSession): Unit = {
+    // prepare auth mode if defined
+    authMode.foreach(_.prepare())
   }
 
   /**
-   * Initialized the webservice
-   * @return
-   */
-  def prepareWebservice(query: String) : Webservice = {
-    // If we have a keycloak config, we use Keycloak for all webservice calls and let it handle the tokens
-    if(webserviceOptions.keycloakAuth.isDefined) {
-
-      val token = getAccessToken.get
-
-      logger.debug(s"Token is: ${token.getToken.substring(0,30)}...")
-      logger.debug("Token expires in " + token.getExpiresIn)
-
-      // Call webservice with token
-      initWebservice(webserviceOptions.url + query, webserviceOptions.connectionTimeoutMs, webserviceOptions.readTimeoutMs
-        , webserviceOptions.authHeader, webServiceClientId, webServiceClientSecret, webServiceUser
-        , webServicePassword, Some(token.getToken))
-    }
-    // Call webservice without token
-    else {
-      initWebservice(webserviceOptions.url + query, webserviceOptions.connectionTimeoutMs, webserviceOptions.readTimeoutMs
-        , webserviceOptions.authHeader, None, None, webServiceUser, webServicePassword, None)
-    }
-
-  }
-
-  /**
-   *  Calls webservice and returns response as string
-   *  Supports different methods
-   *  client-id / client-secret --> Call with Bearer token incl. automatic refresh of token if necessary
-   *  Normal call with optional custom header and user/password
+   *  Calls webservice and returns response
     *
+   * @param query optional URL with replaced placeholders to call
     * @return Response as Array[Byte]
     */
-  def getResponse(query: String) : Array[Byte] = {
-    val webserviceClient = prepareWebservice(query)
+  def getResponse(query: Option[String] = None) : Array[Byte] = {
+    val webserviceClient = ScalaJWebserviceClient(this, query.map(url+_))
 
     webserviceClient.get() match {
+      case Success(c) => c
+      case Failure(e) => logger.error(e.getMessage, e)
+        throw new WebserviceException(e.getMessage)
+    }
+  }
+
+  /**
+   * Calls webservice POST method with binary data as body
+   * @param body post body as Byte Array, type will be determined by Tika
+   * @param query optional URL with replaced placeholders to call
+   * @return Response as Array[Byte]
+   */
+  def postResponse(body: Array[Byte], query: Option[String] = None) : Array[Byte] = {
+    val webserviceClient = ScalaJWebserviceClient(this, query.map(url+_))
+
+    // Try to extract Mime Type
+    // JSON is detected as text/plain, try to parse it as JSON to more precisely define it as
+    // application/json
+    val mimetype: String = mimeType.getOrElse {
+      tika.detect(body) match {
+        case "text/plain" => try {
+          new ObjectMapper().readTree(body)
+          "application/json"
+        } catch {
+          case _: Throwable => "text/plain"
+        }
+        case s => s
+      }
+    }
+    val response = writeMethod match {
+      case WebserviceWriteMethod.Post => webserviceClient.post(body, mimetype)
+      case WebserviceWriteMethod.Put => webserviceClient.put(body, mimetype)
+    }
+    response match {
       case Success(c) => c
       case Failure(e) => logger.error(e.getMessage, e)
         throw new WebserviceException(e.getMessage)
@@ -121,48 +137,32 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
    * @param query it should be possible to define the partition to read as query string, but this is not yet implemented
    */
   override def createInputStream(query: String)(implicit session: SparkSession): InputStream = {
-    val webserviceClient = prepareWebservice(query)
-    webserviceClient.get() match {
-      case Success(c) => new ByteArrayInputStream(c)
-      case Failure(e) => throw new WebserviceException(s"Could not create InputStream for $id and $query: ${e.getClass.getSimpleName} - ${e.getMessage}")
-    }
+    new ByteArrayInputStream(getResponse(Some(query)))
   }
 
   /**
-   * Initializes the webservice according to given parameters
-   * @param url URL to call
-   * @param connectionTimeoutMs Connection timeout in milliseconds
-   * @param readTimeoutMs Read timeout in milliseconds
-   * @param authHeader custom authentication header
-   * @param clientId client-id for OAuth2
-   * @param clientSecret client-secret for OAuth2
-   * @param user user for basic authentication
-   * @param pwd password for basic authentication
-   * @param token token for direct call with token
-   * @return
+   *
+   * @param path is ignored for webservices
+   * @param overwrite is ignored for webservices
+   * @param session implicit spark session
+   * @return outputstream that writes to WebService once it's closed
    */
-  def initWebservice(url: String, connectionTimeoutMs: Option[Int], readTimeoutMs: Option[Int], authHeader: Option[String], clientId: Option[String], clientSecret: Option[String], user: Option[String], pwd: Option[String], token: Option[String] = None): Webservice = {
-    if (token.isEmpty) {
-      // "classic" call if no token is provided. In this case, we still distinguish between:
-      // auth-header: custom auth-header was provided, use it
-      // client-id / client-secret: OAuth2, token refresh currently handled by Keycloak
-      // user / password: Basic Authentication
-      if (authHeader.isDefined) {
-        DefaultWebserviceClient(Some(url), Some(Map("auth-header" -> authHeader.get)), connectionTimeoutMs, readTimeoutMs)
-      } else if (clientId.isDefined) {
-        val client_params = Map("client-id" -> clientId.get, "client-secret" -> clientSecret.getOrElse(throw new ConfigurationException("client-secret missing for client-id authentification")))
-        DefaultWebserviceClient(Some(url), Some(client_params), connectionTimeoutMs, readTimeoutMs)
-      } else if (user.isDefined) {
-        DefaultWebserviceClient(Some(url), Some(Map("user" -> user.get, "password" -> pwd.getOrElse(throw new ConfigurationException("password missing for user authentification")))), connectionTimeoutMs, readTimeoutMs)
-      } else {
-        // Call without any special headers (no authentication)
-        DefaultWebserviceClient(Some(url), None, connectionTimeoutMs, readTimeoutMs)
+  override def createOutputStream(path: String, overwrite: Boolean)(implicit session: SparkSession): OutputStream = {
+    new ByteArrayOutputStream() {
+      override def close(): Unit = Try {
+        super.close()
+        val bytes = this.toByteArray
+        postResponse(bytes, None)
+      } match {
+        case Success(_) => Unit
+        case Failure(e) => throw new RuntimeException(s"($id) Could not post to webservice: ${e.getMessage}", e)
       }
-    } else {
-      // Call with Token (without Keycloak)
-      val client_params = Map("token"->token.get)
-      DefaultWebserviceClient(Some(url), Some(client_params), connectionTimeoutMs, readTimeoutMs)
     }
+  }
+
+  override def postWrite(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.postWrite(partitionValues)
+    authMode.foreach(_.close())
   }
 
   /**
@@ -214,52 +214,12 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
    */
   override def path: String = ""
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[DataObject] = WebserviceFileDataObject
+
 }
 
 object WebserviceFileDataObject extends FromConfigFactory[DataObject] with SmartDataLakeLogger {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): WebserviceFileDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[WebserviceFileDataObject].value
-  }
-
-  def getKeyCloakConfig(webserviceOptions: Config): Option[KeycloakConfig] = {
-    if (webserviceOptions.hasPath("client-id")) {
-      val ssoServer: String = Try(webserviceOptions.getString("ssoServer")).getOrElse(
-        throw ConfigurationException.createMissingMessage("webservice-options.ssoServer")
-      )
-      val ssoRealm: String = Try(webserviceOptions.getString("ssoRealm")).getOrElse(
-        throw ConfigurationException.createMissingMessage("webservice-options.ssoRealm")
-      )
-      val ssoGrantType: String = Try(webserviceOptions.getString("ssoGrantType")).getOrElse(
-        throw ConfigurationException.createMissingMessage("webservice-options.ssoGrantType")
-      )
-      Some(KeycloakConfig(ssoServer, ssoRealm, ssoGrantType))
-    }
-    else {
-      None
-    }
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): WebserviceFileDataObject = {
+    extract[WebserviceFileDataObject](config)
   }
 }
-
-case class WebserviceOptions (url: String,
-                              connectionTimeoutMs: Option[Int] = None,
-                              readTimeoutMs: Option[Int] = None,
-                              authHeader: Option[String] = None,
-                              clientIdVariable: Option[String] = None,
-                              clientSecretVariable: Option[String] = None,
-                              keycloakAuth: Option[KeycloakConfig] = None,
-                              userVariable: Option[String] = None,
-                              passwordVariable: Option[String] = None,
-                              token: Option[String] = None)
-

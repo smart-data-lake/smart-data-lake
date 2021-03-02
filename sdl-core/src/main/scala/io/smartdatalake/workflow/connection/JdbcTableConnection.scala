@@ -26,6 +26,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{AuthMode, BasicAuthMode, Environment}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 
 /**
  * Connection information for jdbc tables.
@@ -112,12 +113,8 @@ case class JdbcTableConnection( override val id: ConnectionId,
 }
 
 object JdbcTableConnection extends FromConfigFactory[Connection] {
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): JdbcTableConnection = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[JdbcTableConnection].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): JdbcTableConnection = {
+    extract[JdbcTableConnection](config)
   }
 }
 
@@ -127,6 +124,9 @@ object JdbcTableConnection extends FromConfigFactory[Connection] {
  * Implementations may vary depending on the concrete DB system.
  */
 private[smartdatalake] abstract class SQLCatalog(connection: JdbcTableConnection) {
+  // get spark jdbc dialect definitions
+  protected val jdbcDialect: JdbcDialect = JdbcDialects.get(connection.url)
+  protected val isNoopDialect: Boolean = jdbcDialect.getClass.getSimpleName.startsWith("NoopDialect") // The default implementation is used for unknown url types
   def isDbExisting(db: String)(implicit session: SparkSession): Boolean
   def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean
   protected def evalRecordExists( rs:ResultSet ) : Boolean = {
@@ -138,6 +138,7 @@ private[smartdatalake] object SQLCatalog {
   def fromJdbcDriver(driver: String, connection: JdbcTableConnection): SQLCatalog = {
     driver match {
       case d if d.toLowerCase.contains("oracle") => new OracleSQLCatalog(connection)
+      case d if d.toLowerCase.contains("com.sap.db") => new SapHanaSQLCatalog(connection)
       case _ => new DefaultSQLCatalog(connection)
     }
   }
@@ -156,12 +157,17 @@ private[smartdatalake] class DefaultSQLCatalog(connection: JdbcTableConnection) 
     connection.execJdbcQuery(cntTableInCatalog, evalRecordExists )
   }
   override def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean = {
-    val cntTableInCatalog =
-      if (Environment.enableJdbcCaseSensitivity)
+    if (!isNoopDialect) {
+      val dbPrefix = if (db.equals("")) "" else db + "."
+      val existsQuery = jdbcDialect.getTableExistsQuery(dbPrefix + table)
+      connection.execJdbcStatement(existsQuery)
+    } else {
+      val cntTableInCatalog = if (Environment.enableJdbcCaseSensitivity)
         s"select count(*) from INFORMATION_SCHEMA.TABLES where TABLE_NAME='$table' and TABLE_SCHEMA='$db'"
       else
         s"select count(*) from INFORMATION_SCHEMA.TABLES where upper(TABLE_NAME)=upper('$table') and upper(TABLE_SCHEMA)=upper('$db')"
-    connection.execJdbcQuery( cntTableInCatalog, evalRecordExists )
+      connection.execJdbcQuery(cntTableInCatalog, evalRecordExists)
+    }
   }
 }
 
@@ -180,9 +186,31 @@ private[smartdatalake] class OracleSQLCatalog(connection: JdbcTableConnection) e
   override def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean = {
     val cntTableInCatalog =
       if (Environment.enableJdbcCaseSensitivity)
-        s"select count(*) from ALL_TABLES where TABLE_NAME='$table' and OWNER='$db'"
+        s"select count(*) from ((select TABLE_NAME as name from ALL_TABLES where TABLE_NAME='$table' and OWNER='$db') union all (select VIEW_NAME as name from ALL_VIEWS where VIEW_NAME='$table' and OWNER='$db'))"
       else
-        s"select count(*) from ALL_TABLES where upper(TABLE_NAME)=upper('$table') and upper(OWNER)=upper('$db')"
+        s"select count(*) from ((select TABLE_NAME as name from ALL_TABLES where TABLE_NAME=upper('$table') and OWNER=upper('$db')) union all (select VIEW_NAME as name from ALL_VIEWS where VIEW_NAME=upper('$table') and OWNER=upper('$db')))"
+    connection.execJdbcQuery( cntTableInCatalog, evalRecordExists )
+  }
+}
+
+/**
+ * SAP HANA JDBC Catalog query implementation
+ */
+private[smartdatalake] class SapHanaSQLCatalog(connection: JdbcTableConnection) extends SQLCatalog(connection) {
+  override def isDbExisting(db: String)(implicit session: SparkSession): Boolean = {
+    val cntTableInCatalog =
+      if (Environment.enableJdbcCaseSensitivity)
+        s"select count(*) from PUBLIC.SCHEMAS where SCHEMA_NAME='$db'"
+      else
+        s"select count(*) from PUBLIC.SCHEMAS where upper(SCHEMA_NAME)=upper('$db')"
+    connection.execJdbcQuery(cntTableInCatalog, evalRecordExists)
+  }
+  override def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean = {
+    val cntTableInCatalog =
+      if (Environment.enableJdbcCaseSensitivity)
+        s"select count(*) from ((select TABLE_NAME as name from PUBLIC.TABLES where TABLE_NAME='$table' and SCHEMA_NAME='$db') union all (select VIEW_NAME as name from PUBLIC.VIEWS where VIEW_NAME='$table' and SCHEMA_NAME='$db'))"
+      else
+        s"select count(*) from ((select TABLE_NAME as name from PUBLIC.TABLES where upper(TABLE_NAME)=upper('$table') and upper(SCHEMA_NAME)=upper('$db')) union all (select VIEW_NAME as name from PUBLIC.VIEWS where upper(VIEW_NAME)=upper('$table') and upper(SCHEMA_NAME)=upper('$db')))"
     connection.execJdbcQuery( cntTableInCatalog, evalRecordExists )
   }
 }

@@ -3,8 +3,6 @@ package io.smartdatalake.util.misc
 import java.lang.management.{BufferPoolMXBean, ManagementFactory}
 import java.util.{Timer, TimerTask}
 
-import sun.misc.SharedSecrets
-
 import scala.collection.JavaConverters._
 
 /**
@@ -151,7 +149,7 @@ object MemoryUtils extends SmartDataLakeLogger {
   }
 
   /**
-   * Add shutdown hooks to trace why the java application has stopped
+   * Add shutdown hook to trace why the java application has stopped
    */
   def addDebugShutdownHooks(): Unit = {
 
@@ -163,16 +161,6 @@ object MemoryUtils extends SmartDataLakeLogger {
       }
     })
 
-    // try to add system shutdown hook to log stacktrace
-    try {
-      SharedSecrets.getJavaLangAccess.registerShutdownHook(7, true, new Runnable {
-        def run(): Unit = {
-          logger.info(s"jvm shutdown hook: thread=${Thread.currentThread}, stacktrace=${new Exception().getStackTrace.map(_.toString)}")
-        }
-      })
-    } catch {
-      case e:Exception => logger.warn(s"could not create system shutdown hook: ${e.getClass.getSimpleName} - ${e.getMessage}")
-    }
   }
 
   def formatBytesMB(bytes:Long): String = {

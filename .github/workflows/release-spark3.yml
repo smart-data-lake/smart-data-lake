@@ -1,0 +1,116 @@
+name: master-spark3 release
+
+on: 
+  pull_request:
+    branches: 
+      - master-spark3
+    types: [closed]
+
+jobs:
+  build-release:
+    if: github.event.pull_request.merged == true
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Git Checkout
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+        ref: master-spark3
+        persist-credentials: false
+    - name: JDK 8 Set
+      uses: actions/setup-java@v1
+      with: 
+        java-version: 1.8
+    - name: Maven Cache
+      uses: actions/cache@v2
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-maven-
+        
+    - name: Maven Get Version
+      run: echo MVN_CURRENT_VERSION=$(mvn -B -P scala-2.12 -f /home/runner/work/smart-data-lake/smart-data-lake/pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
+    - name: Set Release Version
+      run: echo MVN_RELEASE_VERSION=${MVN_CURRENT_VERSION/-SNAPSHOT/} >> $GITHUB_ENV
+      #- name: Printenv
+      #  run: |
+      #    printenv
+    - name: Maven Set Release Version
+      run: |
+        sed -i "/${MVN_CURRENT_VERSION}/{s//${MVN_RELEASE_VERSION}/;:p;n;bp}" pom.xml
+        sed -i "/${MVN_CURRENT_VERSION}/{s//${MVN_RELEASE_VERSION}/;:p;n;bp}" */pom.xml
+      
+    - name: Maven deploy to sonatype for Scala 2.12
+      uses: samuelmeuli/action-maven-publish@v1
+      with:
+        gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+        gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+        nexus_username: ${{ secrets.SONATYPE_USERNAME }}
+        nexus_password: ${{ secrets.SONATYPE_PASSWORD }}
+        maven_profiles: scala-2.12,release-sonatype
+        maven_args: -B -f pom.xml
+
+    - name: Git Commit and Tag Release
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A
+        git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
+        git tag -f ${MVN_RELEASE_VERSION} -m "Release ${MVN_RELEASE_VERSION}"
+    - name: Git Pull Master-spark3
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git pull
+    - name: Git Push Master-spark3
+      uses: ad-m/github-push-action@master
+      with:
+        branch: master-spark3
+        github_token: ${{ secrets.PAT_ACTIONS }}
+
+    # DEVELOP BRANCH
+    - name: Develop-spark3 Git Checkout
+      uses: actions/checkout@v2
+      with:
+        ref: develop-spark3
+        fetch-depth: 0
+        persist-credentials: false
+    - name: Git Merge to develop-spark3
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git branch
+        git fetch --all
+        git branch
+        git checkout develop-spark3
+        git merge origin/master-spark3
+        git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
+    
+    - name: Develop-spark3 Git Push Release
+      uses: ad-m/github-push-action@master
+      with:
+        branch: develop-spark3
+        github_token: ${{ secrets.PAT_ACTIONS }}
+    
+    - name: Develop-spark3 Get Next Version
+      id: bump_version
+      uses: christian-draeger/increment-semantic-version@1.0.1
+      with:
+        current-version: ${{ env.MVN_RELEASE_VERSION }}
+        version-fragment: bug
+    - name: Develop-spark3 Set Next Snapshot version
+      run: |
+        sed -i "/${MVN_RELEASE_VERSION}/{s//${{ steps.bump_version.outputs.next-version }}-SNAPSHOT/;:p;n;bp}" pom.xml
+        sed -i "/${MVN_RELEASE_VERSION}/{s//${{ steps.bump_version.outputs.next-version }}-SNAPSHOT/;:p;n;bp}" */pom.xml
+    - name: Develop-spark3 Git Commit Snapshot
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git commit -m "Increment to next SNAPSHOT release" -a
+    - name: Develop-spark3 Git Push Snapshot
+      uses: ad-m/github-push-action@master
+      with:
+        branch: develop-spark3
+        github_token: ${{ secrets.PAT_ACTIONS }}

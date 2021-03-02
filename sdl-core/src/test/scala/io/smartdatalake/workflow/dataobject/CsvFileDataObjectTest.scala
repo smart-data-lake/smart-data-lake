@@ -19,20 +19,23 @@
 package io.smartdatalake.workflow.dataobject
 
 import java.io.File
+import java.nio.file.Files
 
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.testutils.DataObjectTestSuite
-import io.smartdatalake.util.hdfs.SparkRepartitionDef
+import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SaveMode}
+
+import scala.util.Random
 
 /**
  * Unit tests for [[CsvFileDataObject]].
  */
 class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjectSchemaBehavior {
 
-  import testSession.implicits._
+  import session.implicits._
 
   test("Reading from an empty file with header=true and inferSchema=false results in an empty, schema-less data frame.") {
     val tempFile = File.createTempFile("temp", "csv")
@@ -49,7 +52,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
            | path = "${escapedFilePath(tempFile.getPath)}"
            |}
          """.stripMargin)
-      val dataObj = CsvFileDataObject.fromConfig(config, instanceRegistry)
+      val dataObj = CsvFileDataObject.fromConfig(config)
 
       val df = dataObj.getDataFrame()
       df.schema shouldBe empty
@@ -74,7 +77,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
            | path = "${escapedFilePath(tempFile.getPath)}"
            |}
          """.stripMargin)
-      val dataObj = CsvFileDataObject.fromConfig(config, instanceRegistry)
+      val dataObj = CsvFileDataObject.fromConfig(config)
 
       val df = dataObj.getDataFrame()
       df.schema shouldBe empty
@@ -99,7 +102,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
            | path = "${escapedFilePath(tempFile.getPath)}"
            |}
          """.stripMargin)
-      val dataObj = CsvFileDataObject.fromConfig(config, instanceRegistry)
+      val dataObj = CsvFileDataObject.fromConfig(config)
 
       val df = dataObj.getDataFrame()
       df.schema shouldBe empty
@@ -112,17 +115,15 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
   testsFor(readEmptySources(createDataObject(Map("inferSchema" -> "false", "header" -> "false")), ".csv"))
 
   test("User-defined schema takes precedence over schema inference from header.") {
-    val tempFile = File.createTempFile("temp", "csv")
-    tempFile.deleteOnExit()
+    val tempDir = Files.createTempDirectory("csv")
 
-
-    testSession.createDataFrame(testSession.sparkContext.makeRDD(Seq(
+    session.createDataFrame(session.sparkContext.makeRDD(Seq(
       Row.fromTuple("A", "B"),
       Row.fromTuple("B", "1")
     )),
       StructType.fromDDL("h1 STRING, h2 STRING"))
       .write.mode(SaveMode.Overwrite).format("com.databricks.spark.csv")
-      .save(tempFile.getPath)
+      .save(tempDir.toFile.getPath)
 
     try {
       val config = ConfigFactory.parseString(
@@ -135,11 +136,11 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
            |  delimiter = ","
            | }
            | schema = "header1 STRING, header2 INT"
-           | path = "${escapedFilePath(tempFile.getPath)}"
+           | path = "${escapedFilePath(tempDir.toFile.getPath)}"
            |}
          """.stripMargin)
 
-      val dataObj = CsvFileDataObject.fromConfig(config, instanceRegistry)
+      val dataObj = CsvFileDataObject.fromConfig(config)
 
       val df = dataObj.getDataFrame()
 
@@ -156,22 +157,20 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
       }
 
     } finally {
-      FileUtils.forceDelete(tempFile)
+      FileUtils.forceDelete(tempDir.toFile)
     }
   }
 
   test("User-defined schema takes precedence over schema inference.") {
-    val tempFile = File.createTempFile("temp", "csv")
-    tempFile.deleteOnExit()
+    val tempDir = Files.createTempDirectory("csv")
 
-
-    testSession.createDataFrame(testSession.sparkContext.makeRDD(Seq(
+    session.createDataFrame(session.sparkContext.makeRDD(Seq(
       Row.fromTuple("A", "B"),
       Row.fromTuple("B", "1")
     )),
       StructType.fromDDL("h1 STRING, h2 STRING"))
       .write.mode(SaveMode.Overwrite).format("com.databricks.spark.csv")
-      .save(tempFile.getPath)
+      .save(tempDir.toFile.getPath)
 
     try {
       val config = ConfigFactory.parseString(
@@ -184,11 +183,11 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
            |  delimiter = ","
            | }
            | schema = "header1 STRING, header2 INT"
-           | path = "${escapedFilePath(tempFile.getPath)}"
+           | path = "${escapedFilePath(tempDir.toFile.getPath)}"
            |}
          """.stripMargin)
 
-      val dataObj = CsvFileDataObject.fromConfig(config, instanceRegistry)
+      val dataObj = CsvFileDataObject.fromConfig(config)
 
       val df = dataObj.getDataFrame()
 
@@ -199,7 +198,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
       df.count() shouldBe 2
 
     } finally {
-      FileUtils.forceDelete(tempFile)
+      FileUtils.forceDelete(tempDir.toFile)
     }
   }
 
@@ -209,28 +208,37 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
   testsFor(validateSchemaMinOnRead(createDataObjectWithSchemaMin(Map("header" -> "false", "inferSchema" -> "true")), fileExtension = ".csv"))
 
   test("Writing file with numberOfTasksPerPartition=1 results in 1 file written, incl. rename") {
-    val tempFile = File.createTempFile("temp", "csv")
-    tempFile.deleteOnExit()
+    val tempDir = Files.createTempDirectory("csv")
 
     val dfInit = (1 to 1000).map( i => ("test", i)).toDF("name", "cnt")
       .repartition(10)
-    val tgtDO = CsvFileDataObject(id="test1", path=escapedFilePath(tempFile.getPath), sparkRepartition=Some(SparkRepartitionDef(numberOfTasksPerPartition=1, filename=Some("data.csv"))))
+    val tgtDO = CsvFileDataObject(id="test1", path=escapedFilePath(tempDir.toFile.getPath), sparkRepartition=Some(SparkRepartitionDef(numberOfTasksPerPartition=1, filename=Some("data.csv"))))
     tgtDO.writeDataFrame(dfInit, Seq())
     val resultFileRefs = tgtDO.getFileRefs(Seq())
-    resultFileRefs.size shouldBe 1
-    resultFileRefs.head.fileName shouldBe "data.csv"
+    resultFileRefs.map(_.fileName).sorted shouldBe Seq("data.csv")
   }
 
-  test("Writing file with numberOfTasksPerPartition=2 results in 2 files written") {
-    val tempFile = File.createTempFile("temp", "csv")
-    tempFile.deleteOnExit()
+  test("Writing file with numberOfTasksPerPartition=5 results in 5 files written, incl. rename") {
+    val tempDir = Files.createTempDirectory("csv")
 
     val dfInit = (1 to 1000).map( i => ("test", i)).toDF("name", "cnt")
       .repartition(10)
-    val tgtDO = CsvFileDataObject(id="test1", path=escapedFilePath(tempFile.getPath), sparkRepartition=Some(SparkRepartitionDef(numberOfTasksPerPartition=2)))
+    val tgtDO = CsvFileDataObject(id="test1", path=escapedFilePath(tempDir.toFile.getPath), sparkRepartition=Some(SparkRepartitionDef(numberOfTasksPerPartition=5, filename=Some("data.csv"))))
     tgtDO.writeDataFrame(dfInit, Seq())
     val resultFileRefs = tgtDO.getFileRefs(Seq())
-    resultFileRefs.size shouldBe 2
+    resultFileRefs.map(_.fileName).sorted shouldBe Seq("data.1.csv","data.2.csv","data.3.csv","data.4.csv","data.5.csv")
+  }
+
+
+  test("Writing file with numberOfTasksPerPartition=2 and partitions results in 2 files written") {
+    val tempDir = Files.createTempDirectory("csv")
+
+    val dfInit = (1 to 1000).map( i => ("test"+Random.nextInt(2), i)).toDF("name", "cnt")
+      .repartition(10)
+    val tgtDO = CsvFileDataObject(id="test1", path=escapedFilePath(tempDir.toFile.getPath), partitions = Seq("name"), sparkRepartition=Some(SparkRepartitionDef(numberOfTasksPerPartition=1, keyCols = Seq("name"), filename = Some("data.csv"))))
+    tgtDO.writeDataFrame(dfInit, Seq(PartitionValues(Map("name"->"test0")), PartitionValues(Map("name"->"test1"))))
+    val resultFileRefs = tgtDO.getFileRefs(Seq())
+    resultFileRefs.map(_.fileName).sorted shouldBe Seq("data.csv","data.csv")
   }
 
   def createDataObject(options: Map[String, String])(path: String, schemaOpt: Option[StructType]): CsvFileDataObject = {

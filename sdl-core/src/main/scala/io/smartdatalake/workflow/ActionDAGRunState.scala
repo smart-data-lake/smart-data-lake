@@ -22,7 +22,7 @@ package io.smartdatalake.workflow
 import java.time.{LocalDateTime, Duration => JavaDuration}
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
-import io.smartdatalake.config.SdlConfigObject.ActionObjectId
+import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{RuntimeEventState, RuntimeInfo}
@@ -30,8 +30,8 @@ import io.smartdatalake.workflow.action.{RuntimeEventState, RuntimeInfo}
 /**
  * ActionDAGRunState contains all configuration and state of an ActionDAGRun needed to start a recovery run in case of failure.
  */
-private[smartdatalake] case class ActionDAGRunState( appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int,runStartTime: LocalDateTime, attemptStartTime: LocalDateTime
-                                                   , actionsState: Map[ActionObjectId, RuntimeInfo], isFinal: Boolean) {
+private[smartdatalake] case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime
+                                                    , actionsState: Map[ActionId, RuntimeInfo], isFinal: Boolean) {
   def toJson: String = ActionDAGRunState.toJson(this)
   def isFailed: Boolean = actionsState.exists(_._2.state==RuntimeEventState.FAILED)
   def isSucceeded: Boolean = isFinal && !isFailed
@@ -44,14 +44,14 @@ private[smartdatalake] object ActionDAGRunState {
   import org.json4s.jackson.JsonMethods._
   import org.json4s.jackson.Serialization
   implicit val formats =  DefaultFormats.withHints(ShortTypeHints(List(classOf[SparkSubFeed],classOf[FileSubFeed]))).withTypeHintFieldName("type") +
-    RuntimeEventStateSerializer + DurationSerializer + LocalDateTimeSerializer + ActionObjectIdKeySerializer
+    RuntimeEventStateSerializer + DurationSerializer + LocalDateTimeSerializer + ActionIdKeySerializer
 
   def toJson(actionDAGRunState: ActionDAGRunState): String = pretty(parse(Serialization.write(actionDAGRunState)))
 
   def fromJson(stateJson: String): ActionDAGRunState = {
     val rawState = parse(stateJson).extract[ActionDAGRunState]
-    // fix key class type of "value class ActionObjectId" for scala 2.11 (ActionDAGRunTest fails for scala 2.11 otherwise)
-    rawState.copy(actionsState = rawState.actionsState.map( e => (if (e._1.getClass==classOf[String]) ActionObjectId(e._1.asInstanceOf[String]) else e._1, e._2)))
+    // fix key class type of "value class ActionId" for scala 2.11 (ActionDAGRunTest fails for scala 2.11 otherwise)
+    rawState.copy(actionsState = rawState.actionsState.map( e => (if (e._1.getClass==classOf[String]) ActionId(e._1.asInstanceOf[String]) else e._1, e._2)))
   }
 
   // custom serialization for RuntimeEventState which is shorter than the default
@@ -69,10 +69,10 @@ private[smartdatalake] object ActionDAGRunState {
     { case JString(tstmp) => LocalDateTime.parse(tstmp) },
     { case tstmp: LocalDateTime => JString(tstmp.toString) }
   ))
-  // custom serialization for ActionObjectId as key of Maps
-  case object ActionObjectIdKeySerializer extends CustomKeySerializer[ActionObjectId](format => (
-    { case id => ActionObjectId(id) },
-    { case id: ActionObjectId => id.id }
+  // custom serialization for ActionId as key of Maps
+  case object ActionIdKeySerializer extends CustomKeySerializer[ActionId](format => (
+    { case id => ActionId(id) },
+    { case id: ActionId => id.id }
   ))
 }
 

@@ -52,7 +52,7 @@ case class KafkaConnection(override val id: ConnectionId,
   @transient private lazy val adminClient = {
     val props = new Properties()
     props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, brokers)
-    props.putAll(authProps)
+    authProps.asScala.foreach{ case (k,v) => props.put(k,v)}
     AdminClient.create(props)
   }
 
@@ -101,8 +101,7 @@ case class KafkaConnection(override val id: ConnectionId,
 }
 
 object KafkaConnection extends FromConfigFactory[Connection] {
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): KafkaConnection = {
-    import configs.syntax.ConfigOps
-    config.extract[KafkaConnection].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): KafkaConnection = {
+    extract[KafkaConnection](config)
   }
 }

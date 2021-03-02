@@ -8,7 +8,7 @@ See [Running Spark on YARN](https://spark.apache.org/docs/latest/running-on-yarn
 
 1.  Build the project (with activated profile fat-jar) if you haven't done that already: 
     ```bash
-    mvn package -DskipTests -Pscala-2.11 -Pfat-jar)
+    mvn package -DskipTests -Pscala-2.11 -Pfat-jar
     ```
 
 1.  Copy test data file to hdfs home directory:
