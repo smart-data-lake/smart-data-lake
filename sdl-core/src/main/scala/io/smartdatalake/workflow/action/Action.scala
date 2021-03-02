@@ -42,7 +42,7 @@ import scala.util.{Success, Try}
  * An action defines a [[DAGNode]], that is, a transformation from input [[DataObject]]s to output [[DataObject]]s in
  * the DAG of actions.
  */
-private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNode with SmartDataLakeLogger {
+private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNode with SmartDataLakeLogger with AtlasExportable {
 
   /**
    * A unique identifier for this instance.
@@ -365,6 +365,8 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
     val outputStr = outputs.map( _.toStringShort).mkString(", ")
     s"$toStringShort Inputs: $inputStr Outputs: $outputStr"
   }
+
+  override def atlasName: String = id.id
 }
 
 /**
