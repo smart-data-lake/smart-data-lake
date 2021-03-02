@@ -76,7 +76,7 @@ trait ConfigImplicits {
   implicit val customFileTransformerConfigReader: Configs[CustomFileTransformerConfig] = Configs.derive[CustomFileTransformerConfig]
   implicit val sparkUdfCreatorConfigReader: Configs[SparkUDFCreatorConfig] = Configs.derive[SparkUDFCreatorConfig]
   implicit val sparkRepartitionDefReader: Configs[SparkRepartitionDef] = Configs.derive[SparkRepartitionDef]
-  implicit val secretProfiderConfigReader: Configs[SecretProviderConfig] = Configs.derive[SecretProviderConfig]
+  implicit val secretProviderConfigReader: Configs[SecretProviderConfig] = Configs.derive[SecretProviderConfig]
   implicit val executionModeReader: Configs[ExecutionMode] = Configs.derive[ExecutionMode]
   implicit val conditionReader: Configs[Condition] = Configs.derive[Condition]
   implicit val authModeReader: Configs[AuthMode] = Configs.derive[AuthMode]
