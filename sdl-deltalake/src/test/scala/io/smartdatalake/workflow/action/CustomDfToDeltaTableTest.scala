@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action
 
 import java.nio.file.Files
 
-import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.config.{InstanceRegistry, TestCustomDfCreator}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
@@ -47,7 +47,7 @@ class CustomDfToDeltaTableTest extends FunSuite with BeforeAndAfter {
 
     // setup DataObjects
     val feed = "customDf2Delta"
-    val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some("io.smartdatalake.config.TestCustomDfCreator")))
+    val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
     val targetTable = Table(db = Some("default"), name = "custom_df_copy", query = None, primaryKey = Some(Seq("line")))
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", path=targetTablePath, table=targetTable, numInitialHdfsPartitions=1)
@@ -70,7 +70,7 @@ class CustomDfToDeltaTableTest extends FunSuite with BeforeAndAfter {
 
     // setup DataObjects
     val feed = "customDf2Delta_partitioned"
-    val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some("io.smartdatalake.config.TestCustomDfCreator")))
+    val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
     val targetTable = Table(db = Some("default"), name = "custom_df_copy_partitioned", query = None, primaryKey = Some(Seq("line")))
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", partitions=Seq("num"), path=targetTablePath, table=targetTable, numInitialHdfsPartitions=1)
