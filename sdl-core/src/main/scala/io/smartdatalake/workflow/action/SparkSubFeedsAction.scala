@@ -66,7 +66,6 @@ abstract class SparkSubFeedsAction extends SparkAction {
     // convert subfeeds to SparkSubFeed type or initialize if not yet existing
     var inputSubFeeds = subFeeds.map( subFeed =>
       ActionHelper.updateInputPartitionValues(inputMap(subFeed.dataObjectId), SparkSubFeed.fromSubFeed(subFeed))
-        .clearFilter // subFeed filter is not passed to the next action
     )
     val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id).get
     // create output subfeeds with transformed partition values from main input

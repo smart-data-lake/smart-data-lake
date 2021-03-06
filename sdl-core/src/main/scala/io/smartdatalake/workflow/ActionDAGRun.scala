@@ -162,7 +162,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
     result
   }
 
-  private def getRecursiveSubFeeds(node: Action)(implicit context: ActionPipelineContext): Seq[SubFeed] = {
+  private def getRecursiveSubFeeds(node: Action)(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(node.recursiveInputs.map(_.isInstanceOf[TransactionalSparkTableDataObject]).forall(_==true), "Recursive inputs only work for TransactionalSparkTableDataObjects.")
     // recursive inputs are only passed as input SubFeeds for SparkSubFeedsAction, which can take more than one input SubFeed
     // for SparkSubFeedAction (e.g. Deduplicate and HistorizeAction) which implicitly use a recursive input, the Action is responsible the get the SubFeed.
@@ -172,7 +172,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
     }
   }
 
-  private def getInitialSubFeed(dataObjectId: DataObjectId)(implicit context: ActionPipelineContext) = {
+  private def getInitialSubFeed(dataObjectId: DataObjectId)(implicit session: SparkSession, context: ActionPipelineContext) = {
     initialSubFeeds.find(_.dataObjectId==dataObjectId)
       .getOrElse {
         val partitions = context.instanceRegistry.get[DataObject](dataObjectId) match {
@@ -180,7 +180,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
           case _ => Seq()
         }
         if (context.simulation) throw new IllegalStateException(s"Initial subfeed for $dataObjectId missing for dry run.")
-        else InitSubFeed(dataObjectId, partitionValues).updatePartitionValues(partitions)
+        else InitSubFeed(dataObjectId, partitionValues).updatePartitionValues(partitions, breakLineageOnChange = false)
       }
   }
 

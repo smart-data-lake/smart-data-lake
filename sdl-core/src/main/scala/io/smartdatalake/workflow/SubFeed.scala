@@ -21,7 +21,7 @@ package io.smartdatalake.workflow
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.hive.HiveUtil
-import io.smartdatalake.util.misc.DataFrameUtil
+import io.smartdatalake.util.misc.{DataFrameUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.streaming.DummyStreamProvider
 import io.smartdatalake.workflow.dataobject.FileRef
 import org.apache.spark.sql.types.StructType
@@ -32,7 +32,7 @@ import sun.reflect.generics.reflectiveObjects.NotImplementedException
  * A SubFeed transports references to data between Actions.
  * Data can be represented by different technologies like Files or DataFrame.
  */
-trait SubFeed extends DAGResult {
+trait SubFeed extends DAGResult with SmartDataLakeLogger {
   def dataObjectId: DataObjectId
   def partitionValues: Seq[PartitionValues]
   def isDAGStart: Boolean
@@ -40,14 +40,14 @@ trait SubFeed extends DAGResult {
   /**
    * Break lineage.
    * This means to discard an existing DataFrame or List of FileRefs, so that it is requested again from the DataObject.
-   * This is usable to break long DataFrame Lineages over multiple Actions and instead reread the data from an intermediate table
-   * @return
+   * On one side this is usable to break long DataFrame Lineages over multiple Actions and instead reread the data from
+   * an intermediate table. On the other side it is needed if partition values or filter condition are changed.
    */
   def breakLineage(implicit session: SparkSession, context: ActionPipelineContext): SubFeed
 
-  def clearPartitionValues(implicit session: SparkSession, context: ActionPipelineContext): SubFeed
+  def clearPartitionValues(breakLineageOnChange: Boolean = true)(implicit session: SparkSession, context: ActionPipelineContext): SubFeed
 
-  def updatePartitionValues(partitions: Seq[String], newPartitionValues: Option[Seq[PartitionValues]] = None): SubFeed
+  def updatePartitionValues(partitions: Seq[String], breakLineageOnChange: Boolean = true, newPartitionValues: Option[Seq[PartitionValues]] = None)(implicit session: SparkSession, context: ActionPipelineContext): SubFeed
 
   def clearDAGStart(): SubFeed
 
@@ -58,8 +58,14 @@ trait SubFeed extends DAGResult {
   override def resultId: String = dataObjectId.id
 
   def unionPartitionValues(otherPartitionValues: Seq[PartitionValues]): Seq[PartitionValues] = {
+    // union is only possible if both inputs have partition values defined. Otherwise default is no partition values which means to read all data.
     if (this.partitionValues.nonEmpty && otherPartitionValues.nonEmpty) (this.partitionValues ++ otherPartitionValues).distinct
     else Seq()
+  }
+}
+object SubFeed {
+  def filterPartitionValues(partitionValues: Seq[PartitionValues], partitions: Seq[String]): Seq[PartitionValues] = {
+    partitionValues.map( pvs => PartitionValues(pvs.elements.filterKeys(partitions.contains))).filter(_.nonEmpty)
   }
 }
 
@@ -86,13 +92,18 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
     // dummy DataFrames must be exchanged to real DataFrames before reading in exec-phase.
     if(dataFrame.isDefined && !isDummy && !context.simulation) convertToDummy(dataFrame.get.schema) else this
   }
-  override def clearPartitionValues(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
-    this.copy(partitionValues = Seq()).breakLineage
+  override def clearPartitionValues(breakLineageOnChange: Boolean = true)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+    if (breakLineageOnChange && partitionValues.nonEmpty) {
+      logger.info(s"($dataObjectId) breakLineage called for SubFeed from clearPartitionValues")
+      this.copy(partitionValues = Seq()).breakLineage
+    } else this.copy(partitionValues = Seq())
   }
-  override def updatePartitionValues(partitions: Seq[String], newPartitionValues: Option[Seq[PartitionValues]] = None): SparkSubFeed = {
-    val updatedPartitionValues = newPartitionValues.getOrElse(partitionValues)
-      .map( pvs => PartitionValues(pvs.elements.filterKeys(partitions.contains))).filter(_.nonEmpty)
-    this.copy(partitionValues = updatedPartitionValues)
+  override def updatePartitionValues(partitions: Seq[String], breakLineageOnChange: Boolean = true, newPartitionValues: Option[Seq[PartitionValues]] = None)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+    val updatedPartitionValues = SubFeed.filterPartitionValues(newPartitionValues.getOrElse(partitionValues), partitions)
+    if (breakLineageOnChange && partitionValues != updatedPartitionValues) {
+      logger.info(s"($dataObjectId) breakLineage called for SubFeed from updatePartitionValues")
+      this.copy(partitionValues = updatedPartitionValues).breakLineage
+    } else this.copy(partitionValues = updatedPartitionValues)
   }
   def movePartitionColumnsLast(partitions: Seq[String]): SparkSubFeed = {
     this.copy(dataFrame = this.dataFrame.map( df => HiveUtil.movePartitionColsLast(df, partitions)))
@@ -115,9 +126,12 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
       .convertToDummy(this.dataFrame.orElse(sparkSubFeed.dataFrame).get.schema)
     case x => this.copy(dataFrame = None, partitionValues = unionPartitionValues(x.partitionValues), isDAGStart = this.isDAGStart || x.isDAGStart)
   }
-  def clearFilter(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
-    // if filter is removed, also the DataFrame must be removed so that the next action get's a fresh unfiltered DataFrame
-    if (filter.isDefined) this.copy(filter = None).breakLineage else this
+  def clearFilter(breakLineageOnChange: Boolean = true)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+    // if filter is removed, also the DataFrame must be removed so that the next action get's a fresh unfiltered DataFrame with all data of this DataObject
+    if (breakLineageOnChange && filter.isDefined) {
+      logger.info(s"($dataObjectId) breakLineage called for SubFeed from clearFilter")
+      this.copy(filter = None).breakLineage
+    } else this.copy(filter = None)
   }
   def persist: SparkSubFeed = {
     this.copy(dataFrame = this.dataFrame.map(_.persist))
@@ -139,7 +153,7 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
 object SparkSubFeed {
   def fromSubFeed( subFeed: SubFeed )(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     subFeed match {
-      case sparkSubFeed: SparkSubFeed => sparkSubFeed.clearFilter // make sure there is no filter, as filter can not be passed between actions.
+      case sparkSubFeed: SparkSubFeed => sparkSubFeed.clearFilter() // make sure there is no filter, as filter can not be passed between actions.
       case _ => SparkSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart)
     }
   }
@@ -163,13 +177,18 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
   override def breakLineage(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
     this.copy(fileRefs = None, processedInputFileRefs = None)
   }
-  override def clearPartitionValues(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
-    this.copy(partitionValues = Seq()).breakLineage
+  override def clearPartitionValues(breakLineageOnChange: Boolean = true)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
+    if (breakLineageOnChange && partitionValues.nonEmpty) {
+      logger.info(s"($dataObjectId) breakLineage called for SubFeed from clearPartitionValues")
+      this.copy(partitionValues = Seq()).breakLineage
+    } else this.copy(partitionValues = Seq())
   }
-  override def updatePartitionValues(partitions: Seq[String], newPartitionValues: Option[Seq[PartitionValues]] = None): FileSubFeed = {
-    val updatedPartitionValues = newPartitionValues.getOrElse(partitionValues)
-      .map( pvs => PartitionValues(pvs.elements.filterKeys(partitions.contains))).filter(_.nonEmpty)
-    this.copy(partitionValues = updatedPartitionValues)
+  override def updatePartitionValues(partitions: Seq[String], breakLineageOnChange: Boolean = true, newPartitionValues: Option[Seq[PartitionValues]] = None)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
+    val updatedPartitionValues = SubFeed.filterPartitionValues(newPartitionValues.getOrElse(partitionValues), partitions)
+    if (breakLineageOnChange && partitionValues != updatedPartitionValues) {
+      logger.info(s"($dataObjectId) breakLineage called for SubFeed from updatePartitionValues")
+      this.copy(partitionValues = updatedPartitionValues).breakLineage
+    } else this.copy(partitionValues = updatedPartitionValues)
   }
   def checkPartitionValuesColsExisting(partitions: Set[String]): Boolean = {
     partitionValues.forall( pvs => partitions.diff(pvs.keys).isEmpty)
@@ -210,13 +229,18 @@ case class InitSubFeed(override val dataObjectId: DataObjectId, override val par
   extends SubFeed {
   override def isDAGStart: Boolean = true
   override def breakLineage(implicit session: SparkSession, context: ActionPipelineContext): InitSubFeed = this
-  override def clearPartitionValues(implicit session: SparkSession, context: ActionPipelineContext): InitSubFeed = {
-    this.copy(partitionValues = Seq())
+  override def clearPartitionValues(breakLineageOnChange: Boolean = true)(implicit session: SparkSession, context: ActionPipelineContext): InitSubFeed = {
+    if (breakLineageOnChange && partitionValues.nonEmpty) {
+      logger.info(s"($dataObjectId) breakLineage called for SubFeed from clearPartitionValues")
+      this.copy(partitionValues = Seq()).breakLineage
+    } else this.copy(partitionValues = Seq())
   }
-  override def updatePartitionValues(partitions: Seq[String], newPartitionValues: Option[Seq[PartitionValues]] = None): InitSubFeed = {
-    val updatedPartitionValues = newPartitionValues.getOrElse(partitionValues)
-      .map( pvs => PartitionValues(pvs.elements.filterKeys(partitions.contains))).filter(_.nonEmpty)
-    this.copy(partitionValues = updatedPartitionValues)
+  override def updatePartitionValues(partitions: Seq[String], breakLineageOnChange: Boolean = true, newPartitionValues: Option[Seq[PartitionValues]] = None)(implicit session: SparkSession, context: ActionPipelineContext): InitSubFeed = {
+    val updatedPartitionValues = SubFeed.filterPartitionValues(newPartitionValues.getOrElse(partitionValues), partitions)
+    if (breakLineageOnChange && partitionValues != updatedPartitionValues) {
+      logger.info(s"($dataObjectId) breakLineage called for SubFeed from updatePartitionValues")
+      this.copy(partitionValues = updatedPartitionValues).breakLineage
+    } else this.copy(partitionValues = updatedPartitionValues)
   }
   override def clearDAGStart(): InitSubFeed = throw new NotImplementedException() // calling clearDAGStart makes no sense on InitSubFeed
   override def toOutput(dataObjectId: DataObjectId): FileSubFeed = throw new NotImplementedException()
