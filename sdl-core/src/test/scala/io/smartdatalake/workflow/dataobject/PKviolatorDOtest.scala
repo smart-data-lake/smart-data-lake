@@ -23,6 +23,7 @@ import java.nio.file.Files
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil._
+import io.smartdatalake.testutils.custom.TestCustomDfNonUniqueWithNullCreator
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -122,7 +123,7 @@ class PKviolatorDOtest extends FunSuite with BeforeAndAfter with SmartDataLakeLo
 
     // a custom data object
     val customDO = CustomDfDataObject(id="custom_do",
-      creator = CustomDfCreatorConfig(className = Some("io.smartdatalake.config.TestCustomDfNonUniqueWithNullCreator")))
+      creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfNonUniqueWithNullCreator].getName)))
     instanceRegistry.register(customDO)
 
     val hiveTablePKidDO = createHiveTable(tableName= "hive_table_pk_id", dirPath= tempPath, df= dfNonUniqueWithNull, primaryKeyColumns= Some(Seq("id")))

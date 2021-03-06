@@ -20,7 +20,8 @@ package io.smartdatalake.config
 
 import com.typesafe.config.{ConfigException, ConfigFactory}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode, KeycloakClientSecretAuthMode}
+import io.smartdatalake.definitions.{DateColumnType, KeycloakClientSecretAuthMode, SDLSaveMode}
+import io.smartdatalake.testutils.custom.TestCustomDfCreator
 import io.smartdatalake.util.misc.{AclDef, AclElement}
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.connection.JdbcTableConnection
@@ -292,7 +293,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
 
   "CustomDfDataObject" should "be parsable" in {
     val testCreatorConfig = CustomDfCreatorConfig(
-      className = Some("io.smartdatalake.config.TestCustomDfCreator"),
+      className = Some(classOf[TestCustomDfCreator].getName),
       options = Some(Map("test" -> "foo"))
     )
 
@@ -302,7 +303,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
          | 123 = {
          |   type = CustomDfDataObject
          |   creator {
-         |     class-name = io.smartdatalake.config.TestCustomDfCreator
+         |     class-name = io.smartdatalake.testutils.custom.TestCustomDfCreator
          |     options = {
          |       test = foo
          |     }

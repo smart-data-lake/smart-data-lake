@@ -20,9 +20,9 @@ package io.smartdatalake.workflow.action
 
 import java.nio.file.Files
 
-import io.smartdatalake.config.{InstanceRegistry, TestCustomDfCreator}
+import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.testutils.TestUtil._
+import io.smartdatalake.testutils.custom.TestCustomDfCreator
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.dataobject.{CustomDfDataObject, DeltaLakeTableDataObject, Table}
@@ -62,7 +62,7 @@ class CustomDfToDeltaTableTest extends FunSuite with BeforeAndAfter {
     val expected = sourceDO.getDataFrame()
     val actual = targetDO.getDataFrame()
     val resultat: Boolean = expected.isEqual(actual)
-    if (!resultat) printFailedTestResult("Df2HiveTable",Seq())(actual)(expected)
+    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(expected)
     assert(resultat)
   }
 
@@ -85,7 +85,7 @@ class CustomDfToDeltaTableTest extends FunSuite with BeforeAndAfter {
     val expected = sourceDO.getDataFrame()
     val actual = targetDO.getDataFrame()
     val resultat: Boolean = expected.isEqual(actual)
-    if (!resultat) printFailedTestResult("Df2HiveTable",Seq())(actual)(expected)
+    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(expected)
     assert(resultat)
   }
 
