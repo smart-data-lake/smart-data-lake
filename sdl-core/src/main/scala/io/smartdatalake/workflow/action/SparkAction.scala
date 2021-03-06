@@ -253,20 +253,16 @@ private[smartdatalake] abstract class SparkAction extends Action {
    * @param subFeed SubFeed with transformed DataFrame
    * @return validated and updated SubFeed
    */
-  def validateAndUpdateSubFeed(output: DataObject, subFeed: SparkSubFeed )(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  def validateAndUpdateSubFeed(output: DataObject, subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     output match {
       case partitionedDO: CanHandlePartitions =>
         // validate output partition columns exist in DataFrame
         subFeed.dataFrame.foreach(df => validateDataFrameContainsCols(df, partitionedDO.partitions, s"for ${output.id}"))
         // adapt subfeed
         subFeed
-          .updatePartitionValues(partitionedDO.partitions)
+          .updatePartitionValues(partitionedDO.partitions, breakLineageOnChange = false)
           .movePartitionColumnsLast(partitionedDO.partitions)
-      case _ =>
-        context.phase match {
-          case ExecutionPhase.Init => subFeed.clearPartitionValues
-          case _ => subFeed.copy(partitionValues = Seq())
-        }
+      case _ => subFeed.clearPartitionValues(breakLineageOnChange = false)
     }
   }
 
@@ -320,10 +316,10 @@ private[smartdatalake] abstract class SparkAction extends Action {
     val schemaChanges = writeSchema != readSchema
     require(!context.simulation || !schemaChanges, s"($id) write & read schema is not the same for ${input.id}. Need to create a dummy DataFrame, but this is not allowed in simulation!")
     preparedSubFeed = if (schemaChanges) preparedSubFeed.convertToDummy(readSchema.get) else preparedSubFeed
-    // remove filters if requested
-    if (ignoreFilters) preparedSubFeed = preparedSubFeed.clearFilter.clearPartitionValues
-    // break lineage if requested or if it's a streaming DataFrame or if a filter expression is set or if ignoreFilters
-    if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined || ignoreFilters) preparedSubFeed = preparedSubFeed.breakLineage
+    // remove potential filter and partition values added by execution mode
+    if (ignoreFilters) preparedSubFeed = preparedSubFeed.clearFilter().clearPartitionValues()
+    // break lineage if requested or if it's a streaming DataFrame or if a filter expression is set
+    if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined) preparedSubFeed = preparedSubFeed.breakLineage
     // return
     preparedSubFeed
   }

@@ -150,8 +150,9 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
     dataObject match {
       case partitionedDO: CanHandlePartitions =>
         // remove superfluous partitionValues
-        subFeed.updatePartitionValues(partitionedDO.partitions, Some(subFeed.partitionValues)).asInstanceOf[T]
-      case _ => subFeed.clearPartitionValues.asInstanceOf[T]
+        subFeed.updatePartitionValues(partitionedDO.partitions, newPartitionValues = Some(subFeed.partitionValues)).asInstanceOf[T]
+      case _ =>
+        subFeed.clearPartitionValues().asInstanceOf[T]
     }
   }
 
@@ -168,8 +169,9 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
         val newPartitionValues = partitionValuesTransform.map(fn => fn(subFeed.partitionValues).values.toSeq.distinct)
           .getOrElse(subFeed.partitionValues)
         // remove superfluous partitionValues
-        subFeed.updatePartitionValues(partitionedDO.partitions, Some(newPartitionValues)).asInstanceOf[T]
-      case _ => subFeed.clearPartitionValues.asInstanceOf[T]
+        subFeed.updatePartitionValues(partitionedDO.partitions, breakLineageOnChange = false, newPartitionValues = Some(newPartitionValues)).asInstanceOf[T]
+      case _ =>
+        subFeed.clearPartitionValues(breakLineageOnChange = false).asInstanceOf[T]
     }
 
   def addRunIdPartitionIfNeeded[T <: SubFeed](dataObject: DataObject, subFeed: T)(implicit session: SparkSession, context: ActionPipelineContext): T = {

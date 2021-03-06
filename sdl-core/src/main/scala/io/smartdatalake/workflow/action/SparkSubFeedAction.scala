@@ -63,7 +63,6 @@ abstract class SparkSubFeedAction extends SparkAction {
   private def doTransform(subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // convert subfeed to SparkSubFeed type or initialize if not yet existing
     var inputSubFeed = ActionHelper.updateInputPartitionValues(input, SparkSubFeed.fromSubFeed(subFeed))
-      .clearFilter // subFeed filter is not passed to the next action
     // create output subfeed with transformed partition values
     var outputSubFeed = ActionHelper.updateOutputPartitionValues(output, inputSubFeed.toOutput(output.id), Some(transformPartitionValues))
     // apply execution mode in init phase and store result
