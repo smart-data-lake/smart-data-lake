@@ -180,7 +180,7 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
         if (partitionedDO.partitions.contains(Environment.runIdPartitionColumnName)) {
           val newPartitionValues = if (subFeed.partitionValues.nonEmpty) subFeed.partitionValues.map(_.addKey(Environment.runIdPartitionColumnName, context.runId.toString))
           else Seq(PartitionValues(Map(Environment.runIdPartitionColumnName -> context.runId.toString)))
-          subFeed.updatePartitionValues(partitionedDO.partitions, Some(newPartitionValues)).asInstanceOf[T]
+          subFeed.updatePartitionValues(partitionedDO.partitions, breakLineageOnChange = false, newPartitionValues = Some(newPartitionValues)).asInstanceOf[T]
         } else subFeed
       case _ => subFeed
     }
