@@ -19,7 +19,10 @@
 
 package io.smartdatalake.workflow.action
 
+import java.time.Duration
+
 import io.smartdatalake.definitions._
+import io.smartdatalake.metrics.NoMetricsFoundException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.{DfSDL, getEmptyDataFrame}
 import io.smartdatalake.util.misc.{DataFrameUtil, DefaultExpressionData, SparkExpressionUtil}
@@ -143,6 +146,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
    * @return true if no data was transfered, otherwise false
    */
   def writeSubFeed(subFeed: SparkSubFeed, output: DataObject with CanWriteDataFrame, isRecursiveInput: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Boolean = {
+    assert(!subFeed.isDummy, s"($id) Can not write dummy DataFrame to ${output.id}")
     executionMode match {
       case Some(m: SparkStreamingOnceMode) =>
         // Write in streaming mode - use spark streaming with Trigger.Once and awaitTermination
@@ -335,6 +339,24 @@ private[smartdatalake] abstract class SparkAction extends Action {
           subFeed.dataFrame.foreach(_.unpersist)
         }
     }
+  }
+
+  def logWritingStarted(subFeed: SparkSubFeed)(implicit session: SparkSession): Unit = {
+    val msg = s"writing to ${subFeed.dataObjectId}" + (if (subFeed.partitionValues.nonEmpty) s", partitionValues ${subFeed.partitionValues.mkString(" ")}" else "")
+    logger.info(s"($id) start " + msg)
+    setSparkJobMetadata(Some(msg))
+  }
+
+  def logWritingFinished(subFeed: SparkSubFeed, noData: Boolean, duration: Duration)(implicit session: SparkSession): Unit = {
+    setSparkJobMetadata()
+    val metricsLog = if (noData) ", no data found"
+    else try {
+      getFinalMetrics(subFeed.dataObjectId).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
+    } catch {
+      // for some DataSources Spark optimizer doesn't execute anything if DataFrame is empty
+      case _: NoMetricsFoundException if subFeed.dataFrame.get.isEmpty => ", dataFrame is empty, no metrics found"
+    }
+    logger.info(s"($id) finished writing DataFrame to ${subFeed.dataObjectId.id}: jobDuration=$duration" + metricsLog)
   }
 
 }

@@ -155,17 +155,12 @@ abstract class SparkSubFeedsAction extends SparkAction {
     // write output
     outputs.foreach { output =>
       val subFeed = transformedSubFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"subFeed for output ${output.id} not found"))
-      val msg = s"writing DataFrame to ${output.id}" + (if (subFeed.partitionValues.nonEmpty) s", partitionValues ${subFeed.partitionValues.mkString(" ")}" else "")
-      logger.info(s"($id) start " + msg)
-      setSparkJobMetadata(Some(msg))
+      logWritingStarted(subFeed)
       val isRecursiveInput = recursiveInputs.exists(_.id == subFeed.dataObjectId)
       val (noData,d) = PerformanceUtils.measureDuration {
         writeSubFeed(subFeed, output, isRecursiveInput)
       }
-      setSparkJobMetadata()
-      val metricsLog = if (noData) ", no data found"
-      else getFinalMetrics(output.id).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
-      logger.info(s"($id) finished writing DataFrame to ${output.id}: jobDuration=$d" + metricsLog)
+      logWritingFinished(subFeed, noData, d)
     }
     // return
     transformedSubFeeds
