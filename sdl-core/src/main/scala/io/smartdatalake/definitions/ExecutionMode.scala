@@ -141,7 +141,7 @@ case class PartitionDiffMode( partitionColNb: Option[Int] = None
                             , applyCondition: Option[String] = None
                             , failCondition: Option[String] = None
                             , failConditions: Seq[Condition] = Seq()
-                            , stopIfNoData: Boolean = true
+                            , @deprecated("use following actions executionCondition=true & executionMode=ProcessAll instead") stopIfNoData: Boolean = true
                             , selectExpression: Option[String] = None
                             , applyPartitionValuesTransform: Boolean = false
                             , selectAdditionalInputExpression: Option[String] = None
@@ -286,7 +286,11 @@ case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[
  * @param applyCondition Condition to decide if execution mode should be applied or not. Define a spark sql expression working with attributes of [[DefaultExecutionModeExpressionData]] returning a boolean.
  *                       Default is to apply the execution mode if given partition values (partition values from command line or passed from previous action) are not empty.
  */
-case class SparkIncrementalMode(compareCol: String, override val alternativeOutputId: Option[DataObjectId] = None, stopIfNoData: Boolean = true, applyCondition: Option[Condition] = None) extends ExecutionMode with ExecutionModeWithMainInputOutput {
+case class SparkIncrementalMode( compareCol: String
+                               , override val alternativeOutputId: Option[DataObjectId] = None
+                               , @deprecated("use dependent action executionCondition=true & executionMode=ProcessAll instead") stopIfNoData: Boolean = true
+                               , applyCondition: Option[Condition] = None
+                               ) extends ExecutionMode with ExecutionModeWithMainInputOutput {
   private[smartdatalake] override val applyConditionsDef = applyCondition.toSeq
   private[smartdatalake] override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
   private[smartdatalake] override def prepare(actionId: ActionId)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
@@ -422,6 +426,7 @@ trait CustomPartitionModeLogic {
 /**
  * Execution mode to incrementally process file-based DataObjects.
  * It takes all existing files in the input DataObject and removes (deletes) them after processing.
+ * Input partition values are applied when searching for files and also used as output partition values.
  * @param stopIfNoData optional setting if further actions should be skipped if this action has no data to process (default).
  *                     Set stopIfNoData=false if you want to run further actions nevertheless. They will receive output dataObject unfiltered as input.
  */
@@ -445,7 +450,7 @@ case class FileIncrementalMoveMode(stopIfNoData: Boolean = true) extends Executi
           if (stopIfNoData) throw NoDataToProcessWarning(actionId.id, msg)
           else throw NoDataToProcessDontStopWarning(actionId.id, msg)
         }
-        Some(ExecutionModeResult(fileRefs = Some(fileRefs)))
+        Some(ExecutionModeResult(fileRefs = Some(fileRefs), inputPartitionValues = inputSubFeed.partitionValues, outputPartitionValues = inputSubFeed.partitionValues))
       case _ => throw ConfigurationException(s"($actionId) FileIncrementalMoveMode needs FileRefDataObject and FileSubFeed as input")
     }
   }

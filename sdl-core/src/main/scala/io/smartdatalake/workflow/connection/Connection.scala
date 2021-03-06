@@ -20,8 +20,9 @@ package io.smartdatalake.workflow.connection
 
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{ParsableFromConfig, SdlConfigObject}
+import io.smartdatalake.workflow.AtlasExportable
 
-private[smartdatalake] trait Connection extends SdlConfigObject with ParsableFromConfig[Connection] {
+private[smartdatalake] trait Connection extends SdlConfigObject with ParsableFromConfig[Connection] with AtlasExportable {
 
   /**
    * A unique identifier for this instance.
@@ -36,6 +37,8 @@ private[smartdatalake] trait Connection extends SdlConfigObject with ParsableFro
   def toStringShort: String = {
     s"$id[${this.getClass.getSimpleName}]"
   }
+
+  override def atlasName: String = id.id
 }
 
 /**

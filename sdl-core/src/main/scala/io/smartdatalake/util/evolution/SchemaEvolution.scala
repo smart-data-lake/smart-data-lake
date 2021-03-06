@@ -150,8 +150,8 @@ private[smartdatalake] object SchemaEvolution extends SmartDataLakeLogger {
     def getNullColumnOfType(d: DataType) = lit(null).cast(d)
 
     // log entry point
-    logger.info(s"old schema: ${oldDf.schema.treeString}")
-    logger.info(s"new schema: ${newDf.schema.treeString}")
+    logger.debug(s"old schema: ${oldDf.schema.treeString}")
+    logger.debug(s"new schema: ${newDf.schema.treeString}")
 
     val oldColsWithoutTechCols = oldDf.columns.filter(c => !colsToIgnore.contains(c)).toSeq
     val newColsWithoutTechCols = newDf.columns.filter(c => !colsToIgnore.contains(c)).toSeq
@@ -219,6 +219,8 @@ private[smartdatalake] object SchemaEvolution extends SmartDataLakeLogger {
       // log information
       val infoList = tgtColumns.flatMap(_.infoMsg).mkString("\n\t")
       logger.info(s"schema evolution needed. mapping is: \n\t$infoList")
+      logger.info(s"old schema: ${oldDf.schema.treeString}")
+      logger.info(s"new schema: ${newDf.schema.treeString}")
 
       // prepare dataframes
       val oldExtendedDf = oldDf.select(tgtColumns.flatMap(_.oldToNewColumn):_*)

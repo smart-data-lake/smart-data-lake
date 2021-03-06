@@ -118,6 +118,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
         node.edges.map(dataObjectId => getInitialSubFeed(dataObjectId))
       case (node: Action, subFeeds) =>
         val deduplicatedSubFeeds = unionDuplicateSubFeeds(subFeeds ++ getRecursiveSubFeeds(node), node.id)
+        node.preInit(deduplicatedSubFeeds)
         node.init(deduplicatedSubFeeds)
       case x => throw new IllegalStateException(s"Unmatched case $x")
     }

@@ -46,7 +46,6 @@ object EnvironmentUtil {
    * @param key the name of the parameter in camelCase notation, starting with a lowercase letter.
    */
   def getSdlParameter(key: String): Option[String] = {
-
     sys.props.get("sdl."+key)
       .orElse(sys.env.get("SDL_"+camelCaseToUpper(key)))
   }

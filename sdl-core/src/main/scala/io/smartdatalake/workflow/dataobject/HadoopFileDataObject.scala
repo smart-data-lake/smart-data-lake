@@ -264,7 +264,10 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    */
   def deleteAllFiles(path: Path)(implicit session: SparkSession): Unit = {
     val dirEntries = filesystem.globStatus(new Path(path,"*")).map(_.getPath)
-    dirEntries.foreach(filesystem.delete(_, /*recursive*/ true))
+    dirEntries.foreach { p =>
+      if (filesystem.isDirectory(p)) deleteAllFiles(p)
+      else filesystem.delete(p, /*recursive*/ false)
+    }
   }
 
   protected[workflow] def applyAcls(implicit session: SparkSession): Unit = {

@@ -22,6 +22,7 @@ import java.net.URI
 
 import io.smartdatalake.app.{GlobalConfig, SDLPlugin}
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.{CustomCodeUtil, EnvironmentUtil}
 import org.apache.spark.sql.SparkSession
 

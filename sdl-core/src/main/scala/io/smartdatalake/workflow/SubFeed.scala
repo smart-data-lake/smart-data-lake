@@ -36,6 +36,7 @@ trait SubFeed extends DAGResult with SmartDataLakeLogger {
   def dataObjectId: DataObjectId
   def partitionValues: Seq[PartitionValues]
   def isDAGStart: Boolean
+  def isSkipped: Boolean
 
   /**
    * Break lineage.
@@ -83,6 +84,7 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
                         override val dataObjectId: DataObjectId,
                         override val partitionValues: Seq[PartitionValues],
                         override val isDAGStart: Boolean = false,
+                        override val isSkipped: Boolean = false,
                         isDummy: Boolean = false,
                         filter: Option[String] = None
                        )
@@ -112,7 +114,7 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
     this.copy(isDAGStart = false)
   }
   override def toOutput(dataObjectId: DataObjectId): SparkSubFeed = {
-    this.copy(dataFrame = None, filter=None, isDAGStart = false, isDummy = false, dataObjectId = dataObjectId)
+    this.copy(dataFrame = None, filter=None, isDAGStart = false, isSkipped = false, isDummy = false, dataObjectId = dataObjectId)
   }
   override def union(other: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SubFeed = other match {
     case sparkSubFeed: SparkSubFeed if this.hasReusableDataFrame && sparkSubFeed.hasReusableDataFrame =>
@@ -154,7 +156,7 @@ object SparkSubFeed {
   def fromSubFeed( subFeed: SubFeed )(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     subFeed match {
       case sparkSubFeed: SparkSubFeed => sparkSubFeed.clearFilter() // make sure there is no filter, as filter can not be passed between actions.
-      case _ => SparkSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart)
+      case _ => SparkSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
     }
   }
 }
@@ -171,6 +173,7 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
                        override val dataObjectId: DataObjectId,
                        override val partitionValues: Seq[PartitionValues],
                        override val isDAGStart: Boolean = false,
+                       override val isSkipped: Boolean = false,
                        processedInputFileRefs: Option[Seq[FileRef]] = None
                       )
   extends SubFeed {
@@ -197,7 +200,7 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
     this.copy(isDAGStart = false)
   }
   override def toOutput(dataObjectId: DataObjectId): FileSubFeed = {
-    this.copy(fileRefs = None, processedInputFileRefs = None, isDAGStart = false, dataObjectId = dataObjectId)
+    this.copy(fileRefs = None, processedInputFileRefs = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId)
   }
   override def union(other: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SubFeed = other match {
     case fileSubFeed: FileSubFeed if this.fileRefs.isDefined && fileSubFeed.fileRefs.isDefined =>
@@ -214,7 +217,7 @@ object FileSubFeed {
   def fromSubFeed( subFeed: SubFeed ): FileSubFeed = {
     subFeed match {
       case fileSubFeed: FileSubFeed => fileSubFeed
-      case _ => FileSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart)
+      case _ => FileSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
     }
   }
 }
@@ -225,7 +228,7 @@ object FileSubFeed {
  * @param dataObjectId id of the DataObject this SubFeed corresponds to
  * @param partitionValues Values of Partitions transported by this SubFeed
  */
-case class InitSubFeed(override val dataObjectId: DataObjectId, override val partitionValues: Seq[PartitionValues])
+case class InitSubFeed(override val dataObjectId: DataObjectId, override val partitionValues: Seq[PartitionValues], override val isSkipped: Boolean = false)
   extends SubFeed {
   override def isDAGStart: Boolean = true
   override def breakLineage(implicit session: SparkSession, context: ActionPipelineContext): InitSubFeed = this
