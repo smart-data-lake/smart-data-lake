@@ -30,13 +30,13 @@ import scala.util.{Failure, Success, Try}
 private[smartdatalake] case class ScalaJWebserviceClient(request: HttpRequest) extends WebserviceClient {
   private val contentTypeHeader = "content-type"
   override def get(): Try[Array[Byte]] = {
-    exec(request.option(HttpOptions.followRedirects(true)))
+    exec(request)
   }
   override def post(body: Array[Byte], mimeType: String): Try[Array[Byte]] = {
-    exec(request.header(contentTypeHeader, mimeType).postData(body).option(HttpOptions.followRedirects(true)))
+    exec(request.header(contentTypeHeader, mimeType).postData(body))
   }
   override def put(body: Array[Byte], mimeType: String): Try[Array[Byte]] = {
-    exec(request.header(contentTypeHeader, mimeType).put(body).option(HttpOptions.followRedirects(true)))
+    exec(request.header(contentTypeHeader, mimeType).put(body))
   }
   private def exec(request: HttpRequest): Try[Array[Byte]] = {
     Try(request.asBytes) match {
