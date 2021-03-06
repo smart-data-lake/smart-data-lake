@@ -1084,6 +1084,31 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
   }
 
+  test("dont throw exception if no output metrics on empty DataFrame") {
+    // setup DataObjects
+    val feed = "actionpipeline"
+    val srcTable = Table(Some("default"), "ap_input")
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    srcDO.dropTable
+    instanceRegistry.register(srcDO)
+    val tgt1DO = UnpartitionedTestDataObject( "tgt1")
+    instanceRegistry.register(tgt1DO)
+
+    // prepare DAG
+    val df1 = Seq[(String,String,Int)]().toDF("lastname", "firstname", "rating")
+    val expectedPartitions = Seq(PartitionValues(Map("lastname"->"doe")))
+    srcDO.writeDataFrame(df1, expectedPartitions)
+    val actions: Seq[SparkSubFeedAction] = Seq(
+      CopyAction("a", srcDO.id, tgt1DO.id)
+    )
+    val dag: ActionDAGRun = ActionDAGRun(actions, 1, 1)
+
+    // first dag run
+    dag.prepare
+    dag.init
+    dag.exec(session,contextExec)
+  }
+
 }
 
 class TestActionDagTransformer extends CustomDfsTransformer {

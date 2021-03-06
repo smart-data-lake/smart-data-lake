@@ -23,6 +23,7 @@ import java.time.{Duration, LocalDateTime}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.definitions.{ExecutionMode, ExecutionModeResult}
+import io.smartdatalake.metrics.NoMetricsFoundException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ExecutionPhase.{ExecutionPhase, Value}
@@ -283,7 +284,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
         Thread.sleep(500)
         getLatestMetrics(dataObjectId)
       }
-      .orElse( throw new IllegalStateException(s"($id) Metrics for $dataObjectId not found"))
+      .orElse( throw NoMetricsFoundException(s"($id) Metrics for $dataObjectId not found"))
     // remember for which data object final metrics has been delivered, so that we can warn on late arriving metrics!
     dataObjectRuntimeMetricsDelivered += dataObjectId
     // return
