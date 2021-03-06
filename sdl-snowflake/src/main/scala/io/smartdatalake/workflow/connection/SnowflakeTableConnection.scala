@@ -58,16 +58,15 @@ case class SnowflakeTableConnection(override val id: ConnectionId,
 
   def getSnowflakeOptions: Map[String, String] = {
     if (authMode.isDefined) authMode.get match {
-      case m: BasicAuthMode => {
+      case m: BasicAuthMode =>
         Map(
           "sfURL" -> url,
           "sfUser" -> m.user,
           "sfPassword" -> m.password,
           "sfDatabase" -> schema,
           "sfSchema" -> db,
-          "sfWarehouse" -> warehouse,
+          "sfWarehouse" -> warehouse
         )
-      }
       case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Snowflake connection.")
     } else throw new IllegalArgumentException(s"($id) No authMode given for Snowflake connection.")
   }
