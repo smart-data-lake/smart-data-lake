@@ -1255,7 +1255,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // second dag run - skip action execution because there are no new partitions to process
     dag.prepare
-    intercept[NoDataToProcessWarning](dag.init)
+    val results = dag.init
+    assert(results.head.isSkipped)
   }
 
 }
