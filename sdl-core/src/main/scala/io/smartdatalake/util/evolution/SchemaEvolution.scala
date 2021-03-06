@@ -202,7 +202,7 @@ private[smartdatalake] object SchemaEvolution extends SmartDataLakeLogger {
             case (Some(o),Some(n)) if o.simpleString != n.simpleString =>
               val convertedColumns = convertDataType(col(c), o, n, ignoreOldDeletedNestedColumns)
               val info = if (convertedColumns.isDefined) Some(s"column $c is converted from ${o.simpleString}/${n.simpleString} to ${convertedColumns.get._3.simpleString}") else None
-              val err = if (convertedColumns.isEmpty) Some(s"column $c cannot be converted from ${o.simpleString}/${n.simpleString} to ${convertedColumns.get._3.simpleString}") else None
+              val err = if (convertedColumns.isEmpty) Some(s"column $c cannot be converted from ${o.simpleString} to ${n.simpleString}") else None
               (convertedColumns.map(_._1.as(c)), convertedColumns.map(_._2.as(c)), info, err)
             // datatypes are equal -> no conversion required
             case (Some(o),Some(n)) => (thisColumn,thisColumn,None,None)

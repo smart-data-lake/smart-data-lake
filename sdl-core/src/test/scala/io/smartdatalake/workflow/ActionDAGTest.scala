@@ -1199,6 +1199,66 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
   }
 
+  test("dont throw exception if no output metrics on empty DataFrame") {
+    // setup DataObjects
+    val feed = "actionpipeline"
+    val srcTable = Table(Some("default"), "ap_input")
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    srcDO.dropTable
+    instanceRegistry.register(srcDO)
+    val tgt1DO = UnpartitionedTestDataObject( "tgt1")
+    instanceRegistry.register(tgt1DO)
+
+    // prepare DAG
+    val df1 = Seq[(String,String,Int)]().toDF("lastname", "firstname", "rating")
+    val expectedPartitions = Seq(PartitionValues(Map("lastname"->"doe")))
+    srcDO.writeDataFrame(df1, expectedPartitions)
+    val actions: Seq[SparkSubFeedAction] = Seq(
+      CopyAction("a", srcDO.id, tgt1DO.id)
+    )
+    val dag: ActionDAGRun = ActionDAGRun(actions, 1, 1)
+
+    // first dag run
+    dag.prepare
+    dag.init
+    dag.exec(session,contextExec)
+  }
+
+  test("action dag with 2 actions in sequence and executionMode=PartitionDiffMode, second action can not handle partitions") {
+    // setup DataObjects
+    val feed = "actionpipeline"
+    val srcTable = Table(Some("default"), "ap_input")
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    srcDO.dropTable
+    instanceRegistry.register(srcDO)
+    val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
+    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), table = tgt1Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    tgt1DO.dropTable
+    instanceRegistry.register(tgt1DO)
+    val tgt2DO = UnpartitionedTestDataObject( "tgt2")
+    instanceRegistry.register(tgt2DO)
+
+    // prepare DAG
+    val df1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
+    val expectedPartitions = Seq(PartitionValues(Map("lastname"->"doe")))
+    srcDO.writeDataFrame(df1, expectedPartitions)
+    val actions: Seq[SparkSubFeedAction] = Seq(
+      CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode()))
+      , CopyAction("b", tgt1DO.id, tgt2DO.id)
+    )
+    val dag: ActionDAGRun = ActionDAGRun(actions, 1, 1)
+
+    // first dag run
+    dag.prepare
+    dag.init
+    dag.exec(session,contextExec)
+
+    // second dag run - skip action execution because there are no new partitions to process
+    dag.prepare
+    val results = dag.init
+    assert(results.head.isSkipped)
+  }
+
 }
 
 class TestActionDagTransformer extends CustomDfsTransformer {

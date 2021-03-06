@@ -24,7 +24,7 @@ import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFra
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 abstract class SparkSubFeedAction extends SparkAction {
 
@@ -63,7 +63,6 @@ abstract class SparkSubFeedAction extends SparkAction {
   private def doTransform(subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // convert subfeed to SparkSubFeed type or initialize if not yet existing
     var inputSubFeed = ActionHelper.updateInputPartitionValues(input, SparkSubFeed.fromSubFeed(subFeed))
-      .clearFilter // subFeed filter is not passed to the next action
     // create output subfeed with transformed partition values
     var outputSubFeed = ActionHelper.updateOutputPartitionValues(output, inputSubFeed.toOutput(output.id), Some(transformPartitionValues))
     // apply execution mode in init phase and store result
@@ -112,17 +111,12 @@ abstract class SparkSubFeedAction extends SparkAction {
     // transform
     val transformedSubFeed = doTransform(subFeed)
     // write output
-    val msg = s"writing to ${output.id}" + (if (transformedSubFeed.partitionValues.nonEmpty) s", partitionValues ${transformedSubFeed.partitionValues.mkString(" ")}" else "")
-    logger.info(s"($id) start " + msg)
-    setSparkJobMetadata(Some(msg))
+    logWritingStarted(transformedSubFeed)
     val isRecursiveInput = recursiveInputs.exists(_.id == output.id)
     val (noData,d) = PerformanceUtils.measureDuration {
       writeSubFeed(transformedSubFeed, output, isRecursiveInput)
     }
-    setSparkJobMetadata()
-    val metricsLog = if (noData) ", no data found"
-    else getFinalMetrics(output.id).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
-    logger.info(s"($id) finished writing DataFrame to ${output.id}: jobDuration=$d" + metricsLog)
+    logWritingFinished(transformedSubFeed, noData, d)
     // return
     Seq(transformedSubFeed)
   }

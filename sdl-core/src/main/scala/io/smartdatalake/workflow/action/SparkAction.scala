@@ -19,7 +19,10 @@
 
 package io.smartdatalake.workflow.action
 
+import java.time.Duration
+
 import io.smartdatalake.definitions._
+import io.smartdatalake.metrics.NoMetricsFoundException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.{DfSDL, getEmptyDataFrame}
 import io.smartdatalake.util.misc.{DataFrameUtil, DefaultExpressionData, SparkExpressionUtil}
@@ -143,6 +146,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
    * @return true if no data was transfered, otherwise false
    */
   def writeSubFeed(subFeed: SparkSubFeed, output: DataObject with CanWriteDataFrame, isRecursiveInput: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Boolean = {
+    assert(!subFeed.isDummy, s"($id) Can not write dummy DataFrame to ${output.id}")
     executionMode match {
       case Some(m: SparkStreamingOnceMode) =>
         // Write in streaming mode - use spark streaming with Trigger.Once and awaitTermination
@@ -249,16 +253,16 @@ private[smartdatalake] abstract class SparkAction extends Action {
    * @param subFeed SubFeed with transformed DataFrame
    * @return validated and updated SubFeed
    */
-  def validateAndUpdateSubFeed(output: DataObject, subFeed: SparkSubFeed )(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  def validateAndUpdateSubFeed(output: DataObject, subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     output match {
       case partitionedDO: CanHandlePartitions =>
         // validate output partition columns exist in DataFrame
         subFeed.dataFrame.foreach(df => validateDataFrameContainsCols(df, partitionedDO.partitions, s"for ${output.id}"))
         // adapt subfeed
         subFeed
-          .updatePartitionValues(partitionedDO.partitions)
+          .updatePartitionValues(partitionedDO.partitions, breakLineageOnChange = false)
           .movePartitionColumnsLast(partitionedDO.partitions)
-      case _ => subFeed.clearPartitionValues
+      case _ => subFeed.clearPartitionValues(breakLineageOnChange = false)
     }
   }
 
@@ -312,10 +316,10 @@ private[smartdatalake] abstract class SparkAction extends Action {
     val schemaChanges = writeSchema != readSchema
     require(!context.simulation || !schemaChanges, s"($id) write & read schema is not the same for ${input.id}. Need to create a dummy DataFrame, but this is not allowed in simulation!")
     preparedSubFeed = if (schemaChanges) preparedSubFeed.convertToDummy(readSchema.get) else preparedSubFeed
-    // remove filters if requested
-    if (ignoreFilters) preparedSubFeed = preparedSubFeed.clearFilter.clearPartitionValues
-    // break lineage if requested or if it's a streaming DataFrame or if a filter expression is set or if ignoreFilters
-    if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined || ignoreFilters) preparedSubFeed = preparedSubFeed.breakLineage
+    // remove potential filter and partition values added by execution mode
+    if (ignoreFilters) preparedSubFeed = preparedSubFeed.clearFilter().clearPartitionValues()
+    // break lineage if requested or if it's a streaming DataFrame or if a filter expression is set
+    if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined) preparedSubFeed = preparedSubFeed.breakLineage
     // return
     preparedSubFeed
   }
@@ -331,6 +335,24 @@ private[smartdatalake] abstract class SparkAction extends Action {
           subFeed.dataFrame.foreach(_.unpersist)
         }
     }
+  }
+
+  def logWritingStarted(subFeed: SparkSubFeed)(implicit session: SparkSession): Unit = {
+    val msg = s"writing to ${subFeed.dataObjectId}" + (if (subFeed.partitionValues.nonEmpty) s", partitionValues ${subFeed.partitionValues.mkString(" ")}" else "")
+    logger.info(s"($id) start " + msg)
+    setSparkJobMetadata(Some(msg))
+  }
+
+  def logWritingFinished(subFeed: SparkSubFeed, noData: Boolean, duration: Duration)(implicit session: SparkSession): Unit = {
+    setSparkJobMetadata()
+    val metricsLog = if (noData) ", no data found"
+    else try {
+      getFinalMetrics(subFeed.dataObjectId).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
+    } catch {
+      // for some DataSources Spark optimizer doesn't execute anything if DataFrame is empty
+      case _: NoMetricsFoundException if subFeed.dataFrame.get.isEmpty => ", dataFrame is empty, no metrics found"
+    }
+    logger.info(s"($id) finished writing DataFrame to ${subFeed.dataObjectId.id}: jobDuration=$duration" + metricsLog)
   }
 
 }
