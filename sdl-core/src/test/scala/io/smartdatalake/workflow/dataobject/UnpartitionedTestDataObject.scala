@@ -41,7 +41,7 @@ case class UnpartitionedTestDataObject(override val id: DataObjectId,
   }
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
-                             (implicit session: SparkSession): Unit = {
+                             (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     df.show
   }
 
