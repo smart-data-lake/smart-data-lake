@@ -20,7 +20,7 @@
 package io.smartdatalake.app
 
 import com.typesafe.config.Config
-import configs.Configs
+import configs.ConfigReader
 import configs.syntax._
 import io.smartdatalake.config.ConfigImplicits
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
@@ -99,7 +99,7 @@ extends SmartDataLakeLogger {
 }
 object GlobalConfig extends ConfigImplicits {
   private[smartdatalake] def from(config: Config): GlobalConfig = {
-    implicit val customStateListenerConfig: Configs[StateListenerConfig] = Configs.derive[StateListenerConfig]
+    implicit val customStateListenerConfig: ConfigReader[StateListenerConfig] = ConfigReader.derive[StateListenerConfig]
     globalConfig = Some(config.get[Option[GlobalConfig]]("global").value.getOrElse(GlobalConfig()))
     globalConfig.get
   }
