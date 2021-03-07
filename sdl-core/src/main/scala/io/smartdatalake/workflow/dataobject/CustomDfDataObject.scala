@@ -19,6 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
+import configs.ConfigKeyNaming
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues

@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.{Config, ConfigFactory}
-import io.smartdatalake.config.{TestAction, TestConnection, TestDataObject}
+import io.smartdatalake.config.objects.{TestAction, TestConnection, TestDataObject}
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.workflow.action.ActionMetadata
 

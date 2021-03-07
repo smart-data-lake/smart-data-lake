@@ -18,7 +18,8 @@
  */
 package io.smartdatalake.config
 
-import com.typesafe.config.{ConfigException, ConfigFactory}
+import com.typesafe.config.{ConfigException, ConfigFactory, ConfigValueFactory}
+import configs.ConfigKeyNaming
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.{DateColumnType, KeycloakClientSecretAuthMode, SDLSaveMode}
 import io.smartdatalake.testutils.custom.TestCustomDfCreator
@@ -326,7 +327,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
          | 123 = {
          |  type = WebserviceFileDataObject
          |  url = "http://test"
-         |  authMode = {
+         |  auth-mode = {
          |    type = KeycloakClientSecretAuthMode
          |    ssoServer = server
          |    ssoRealm = realm

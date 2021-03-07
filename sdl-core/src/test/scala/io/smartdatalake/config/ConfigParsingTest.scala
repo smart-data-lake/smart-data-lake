@@ -20,7 +20,9 @@ package io.smartdatalake.config
 
 import com.typesafe.config.{ConfigException, ConfigFactory}
 import io.smartdatalake.config.ConfigParser.localSubstitution
+import io.smartdatalake.config.{ConfigParser, InstanceRegistry, SdlConfigObject}
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
+import io.smartdatalake.config.objects.{TestAction, TestConnection, TestDataObject}
 import io.smartdatalake.definitions.{Environment, PartitionDiffMode, SDLSaveMode}
 import io.smartdatalake.workflow.action.{Action, FileTransferAction}
 import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, DataObject, DataObjectMetadata, RawFileDataObject}
@@ -119,12 +121,12 @@ class ConfigParsingTest extends FlatSpec with Matchers {
       """
         |connections = {
         |   tcon = {
-        |     type = io.smartdatalake.config.TestConnection
+        |     type = io.smartdatalake.config.objects.TestConnection
         |   }
         |}
         |dataObjects = {
         |   tdo = {
-        |     type = io.smartdatalake.config.TestDataObject
+        |     type = io.smartdatalake.config.objects.TestDataObject
         |     arg1 = foo
         |     args = [bar, "!"]
         |     connectionId = tcon
@@ -148,12 +150,12 @@ class ConfigParsingTest extends FlatSpec with Matchers {
       """
         |dataObjects = {
         |   tdo1 = {
-        |     type = io.smartdatalake.config.TestDataObject
+        |     type = io.smartdatalake.config.objects.TestDataObject
         |     arg1 = foo
         |     args = [bar, "!"]
         |   }
         |   tdo2 = {
-        |     type = io.smartdatalake.config.TestDataObject
+        |     type = io.smartdatalake.config.objects.TestDataObject
         |     arg1 = goo
         |     args = [bar]
         |   }
@@ -184,13 +186,13 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         |dataObjects = {
         |   tdo1 = {
         |     id = tdo1
-        |     type = io.smartdatalake.config.TestDataObject
+        |     type = io.smartdatalake.config.objects.TestDataObject
         |     arg1 = foo
         |     args = []
         |   }
         |   tdo2 = {
         |     id = tdo2
-        |     type = io.smartdatalake.config.TestDataObject
+        |     type = io.smartdatalake.config.objects.TestDataObject
         |     arg1 = bar
         |     args = []
         |   }
@@ -198,7 +200,7 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         |
         |actions = {
         |   ta1 = {
-        |     type = io.smartdatalake.config.TestAction
+        |     type = io.smartdatalake.config.objects.TestAction
         |     inputId = tdo1
         |     outputId = tdo2
         |   }
@@ -230,12 +232,12 @@ class ConfigParsingTest extends FlatSpec with Matchers {
       """
         |dataObjects = {
         | tdo1 = {
-        |   type = io.smartdatalake.config.TestDataObject
+        |   type = io.smartdatalake.config.objects.TestDataObject
         |   arg1 = foo
         |   args = [bar, "!"]
         | }
         | tdo2 = {
-        |   type = io.smartdatalake.config.TestDataObject
+        |   type = io.smartdatalake.config.objects.TestDataObject
         |   arg1 = goo
         |   args = [bar]
         | }
@@ -243,12 +245,12 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         |
         |actions = {
         |   ta1 = {
-        |     type = io.smartdatalake.config.TestAction
+        |     type = io.smartdatalake.config.objects.TestAction
         |     inputId = tdo1
         |     outputId = tdo2
         |   }
         |   ta2 = {
-        |     type = io.smartdatalake.config.TestAction
+        |     type = io.smartdatalake.config.objects.TestAction
         |     inputId = tdo2
         |     outputId = tdo1
         |   }
@@ -291,12 +293,12 @@ class ConfigParsingTest extends FlatSpec with Matchers {
       """
         |dataObjects = {
         | tdo1 = {
-        |   type = io.smartdatalake.config.TestDataObject
+        |   type = io.smartdatalake.config.objects.TestDataObject
         |   arg1 = foo
         |   args = [bar, "!"]
         | }
         | tdo2 = {
-        |   type = io.smartdatalake.config.TestDataObject
+        |   type = io.smartdatalake.config.objects.TestDataObject
         |   arg1 = goo
         |   args = [bar]
         | }
@@ -324,18 +326,17 @@ class ConfigParsingTest extends FlatSpec with Matchers {
 
   }
 
-  /*
   "TestAction" should "fail on superfluous key" in {
     val dataObjectsConfig = ConfigFactory.parseString(
       """
         |dataObjects = {
         | tdo1 = {
-        |   type = io.smartdatalake.config.TestDataObject
+        |   type = io.smartdatalake.config.objects.TestDataObject
         |   arg1 = foo
         |   args = [bar, "!"]
         | }
         | tdo2 = {
-        |   type = io.smartdatalake.config.TestDataObject
+        |   type = io.smartdatalake.config.objects.TestDataObject
         |   arg1 = goo
         |   args = [bar]
         | }
@@ -365,12 +366,12 @@ class ConfigParsingTest extends FlatSpec with Matchers {
       """
         |dataObjects = {
         | tdo1 = {
-        |   type = io.smartdatalake.config.TestDataObject
+        |   type = io.smartdatalake.config.objects.TestDataObject
         |   arg1 = foo
         |   args = [bar, "!"]
         | }
         | tdo2 = {
-        |   type = io.smartdatalake.config.TestDataObject
+        |   type = io.smartdatalake.config.objects.TestDataObject
         |   arg1 = goo
         |   args = [bar]
         | }
@@ -382,6 +383,7 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         | id = a
         | inputId = tdo1
         | outputId = tdo2
+        | test = test
         | executionMode = {
         |  type = PartitionDiffMode
         |  partitionColNb = 2
@@ -402,12 +404,12 @@ class ConfigParsingTest extends FlatSpec with Matchers {
       """
         |dataObjects = {
         | tdo1 = {
-        |   type = io.smartdatalake.config.TestDataObject
+        |   type = io.smartdatalake.config.objects.TestDataObject
         |   arg1 = foo
         |   args = [bar, "!"]
         | }
         | tdo2 = {
-        |   type = io.smartdatalake.config.TestDataObject
+        |   type = io.smartdatalake.config.objects.TestDataObject
         |   arg1 = goo
         |   args = [bar]
         | }
@@ -431,19 +433,18 @@ class ConfigParsingTest extends FlatSpec with Matchers {
     implicit val registry: InstanceRegistry = ConfigParser.parse(dataObjectsConfig)
     intercept[ConfigException](TestAction.fromConfig(config.getConfig("a")))
   }
-  */
 
   "TestAction" should "fail on unknown type of optional sealed trait" in {
     val dataObjectsConfig = ConfigFactory.parseString(
       """
         |dataObjects = {
         | tdo1 = {
-        |   type = io.smartdatalake.config.TestDataObject
+        |   type = io.smartdatalake.config.objects.TestDataObject
         |   arg1 = foo
         |   args = [bar, "!"]
         | }
         | tdo2 = {
-        |   type = io.smartdatalake.config.TestDataObject
+        |   type = io.smartdatalake.config.objects.TestDataObject
         |   arg1 = goo
         |   args = [bar]
         | }

@@ -18,13 +18,12 @@
  */
 package io.smartdatalake.config
 
-import configs.{ConfigError, Configs, Result}
+import configs.{ConfigError, ConfigKeyNaming, ConfigReader, Result}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.{AuthMode, Condition, ExecutionMode}
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.secrets.SecretProviderConfig
 import io.smartdatalake.workflow.action.customlogic.{CustomDfCreatorConfig, CustomDfTransformerConfig, CustomDfsTransformerConfig, CustomFileTransformerConfig, SparkUDFCreatorConfig}
-import io.smartdatalake.workflow.dataobject.WebserviceFileDataObject
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
 
@@ -35,27 +34,24 @@ trait ConfigImplicits {
   /**
    * default naming strategy is to allow lowerCamelCase and hypen-separated key naming, and fail on superfluous keys
    */
-  //TODO: this is needed for configs 0.5.0
-  /*
   implicit def sdlDefaultNaming[A]: ConfigKeyNaming[A] =
     ConfigKeyNaming.hyphenSeparated[A].or(ConfigKeyNaming.lowerCamelCase[A].apply _)
-      .withFailOnSuperfluousKeys()
-  */
+      .withFailOnSuperfluousKeys
 
   /**
-   * A ConfigReader reader that reads [[StructType]] values.
+   * A [[ConfigReader]] reader that reads [[StructType]] values.
    *
    * This reader parses a [[StructType]] from a DDL string.
    */
-  implicit val structTypeReader: Configs[StructType] = Configs.fromTry { (c, p) =>
+  implicit val structTypeReader: ConfigReader[StructType] = ConfigReader.fromTry { (c, p) =>
     StructType.fromDDL(c.getString(p))
   }
 
   /**
-   * A ConfigReader reader that reads [[OutputMode]].
+   * A [[ConfigReader]] reader that reads [[OutputMode]].
    */
-  implicit val outputModeReader: Configs[OutputMode] = {
-    Configs.fromConfig(_.toString.toLowerCase match {
+  implicit val outputModeReader: ConfigReader[OutputMode] = {
+    ConfigReader.fromConfig(_.toString.toLowerCase match {
       case "append" => Result.successful(OutputMode.Append())
       case "complete" => Result.successful(OutputMode.Complete())
       case "update" => Result.successful(OutputMode.Update())
@@ -70,35 +66,35 @@ trait ConfigImplicits {
   // see: https://github.com/kxbmap/configs/issues/44
   // TODO: check periodically if still needed, should not be needed with scala 2.13+
   // --------------------------------------------------------------------------------
-  implicit val customDfCreatorConfigReader: Configs[CustomDfCreatorConfig] = Configs.derive[CustomDfCreatorConfig]
-  implicit val customDfTransformerConfigReader: Configs[CustomDfTransformerConfig] = Configs.derive[CustomDfTransformerConfig]
-  implicit val customDfsTransformerConfigReader: Configs[CustomDfsTransformerConfig] = Configs.derive[CustomDfsTransformerConfig]
-  implicit val customFileTransformerConfigReader: Configs[CustomFileTransformerConfig] = Configs.derive[CustomFileTransformerConfig]
-  implicit val sparkUdfCreatorConfigReader: Configs[SparkUDFCreatorConfig] = Configs.derive[SparkUDFCreatorConfig]
-  implicit val sparkRepartitionDefReader: Configs[SparkRepartitionDef] = Configs.derive[SparkRepartitionDef]
-  implicit val secretProviderConfigReader: Configs[SecretProviderConfig] = Configs.derive[SecretProviderConfig]
-  implicit val executionModeReader: Configs[ExecutionMode] = Configs.derive[ExecutionMode]
-  implicit val conditionReader: Configs[Condition] = Configs.derive[Condition]
-  implicit val authModeReader: Configs[AuthMode] = Configs.derive[AuthMode]
+  implicit val customDfCreatorConfigReader: ConfigReader[CustomDfCreatorConfig] = ConfigReader.derive[CustomDfCreatorConfig]
+  implicit val customDfTransformerConfigReader: ConfigReader[CustomDfTransformerConfig] = ConfigReader.derive[CustomDfTransformerConfig]
+  implicit val customDfsTransformerConfigReader: ConfigReader[CustomDfsTransformerConfig] = ConfigReader.derive[CustomDfsTransformerConfig]
+  implicit val customFileTransformerConfigReader: ConfigReader[CustomFileTransformerConfig] = ConfigReader.derive[CustomFileTransformerConfig]
+  implicit val sparkUdfCreatorConfigReader: ConfigReader[SparkUDFCreatorConfig] = ConfigReader.derive[SparkUDFCreatorConfig]
+  implicit val sparkRepartitionDefReader: ConfigReader[SparkRepartitionDef] = ConfigReader.derive[SparkRepartitionDef]
+  implicit val secretProviderConfigReader: ConfigReader[SecretProviderConfig] = ConfigReader.derive[SecretProviderConfig]
+  implicit val executionModeReader: ConfigReader[ExecutionMode] = ConfigReader.derive[ExecutionMode]
+  implicit val conditionReader: ConfigReader[Condition] = ConfigReader.derive[Condition]
+  implicit val authModeReader: ConfigReader[AuthMode] = ConfigReader.derive[AuthMode]
   // --------------------------------------------------------------------------------
 
-  implicit def mapDataObjectIdStringReader(implicit mapReader: Configs[Map[String,String]]): Configs[Map[DataObjectId, String]] = {
-    Configs.fromConfig { c => mapReader.extract(c).map(_.map{ case (k,v) => (DataObjectId(k), v)})}
+  implicit def mapDataObjectIdStringReader(implicit mapReader: ConfigReader[Map[String,String]]): ConfigReader[Map[DataObjectId, String]] = {
+    ConfigReader.fromConfig { c => mapReader.extract(c).map(_.map{ case (k,v) => (DataObjectId(k), v)})}
   }
 
   /**
-   * A ConfigReader reader that reads [[ConnectionId]] values.
+   * A reader that reads [[ConnectionId]] values.
    */
-  implicit val connectionIdReader: Configs[ConnectionId] = Configs.fromTry { (c, p) => ConnectionId(c.getString(p))}
+  implicit val connectionIdReader: ConfigReader[ConnectionId] = ConfigReader.fromTry { (c, p) => ConnectionId(c.getString(p))}
 
   /**
-   * A ConfigReader reader that reads [[DataObjectId]] values.
+   * A reader that reads [[DataObjectId]] values.
    */
-  implicit val dataObjectIdReader: Configs[DataObjectId] = Configs.fromTry { (c, p) => DataObjectId(c.getString(p))}
+  implicit val dataObjectIdReader: ConfigReader[DataObjectId] = ConfigReader.fromTry { (c, p) => DataObjectId(c.getString(p))}
 
   /**
-   * A ConfigReader reader that reads [[ActionId]] values.
+   * A reader that reads [[ActionId]] values.
    */
-  implicit val actionIdReader: Configs[ActionId] = Configs.fromTry { (c, p) => ActionId(c.getString(p))}
+  implicit val actionIdReader: ConfigReader[ActionId] = ConfigReader.fromTry { (c, p) => ActionId(c.getString(p))}
 
 }
