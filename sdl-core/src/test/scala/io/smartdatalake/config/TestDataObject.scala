@@ -46,7 +46,8 @@ case class TestDataObject( id: DataObjectId,
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = null
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession): Unit = {}
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
+                             (implicit session: SparkSession, context: ActionPipelineContext): Unit = {}
 
   override var table: Table = Table(db=Some("testdb"), name="testtable")
 

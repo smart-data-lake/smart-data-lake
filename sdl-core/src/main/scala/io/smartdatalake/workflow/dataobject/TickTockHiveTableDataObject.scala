@@ -114,7 +114,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
       session.table(s"${table.fullName}")
     }
 
-    validateSchemaMin(df)
+    validateSchemaMin(df, "read")
     df
   }
 
@@ -127,8 +127,8 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   }
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
-                             (implicit session: SparkSession): Unit = {
-    validateSchemaMin(df)
+                             (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    validateSchemaMin(df, "write")
     writeDataFrameInternal(df, createTableOnly=false, partitionValues, isRecursiveInput)
 
     // make sure empty partitions are created as well
