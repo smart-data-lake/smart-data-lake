@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.dataobject.FileRef
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, Column}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.IntegerType
 
@@ -49,7 +49,8 @@ import org.apache.spark.sql.types.IntegerType
 case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
                                keyCols: Seq[String] = Seq(),
                                sortCols: Seq[String] = Seq(),
-                               filename: Option[String] = None
+                               filename: Option[String] = None,
+                               sortAsc: Boolean = true,
                               ) extends SmartDataLakeLogger {
   assert(numberOfTasksPerPartition > 0, s"numberOfTasksPerPartition must be greater than 0")
 
@@ -79,7 +80,10 @@ case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
       repartitionForOnePartitionValue(df) // this is the same as writing only one partition value
     }
     // sort within spark partitions
-    if (sortCols.nonEmpty) dfRepartitioned.sortWithinPartitions(sortCols.map(col):_*)
+    if (sortCols.nonEmpty) {
+      if(sortAsc) dfRepartitioned.sortWithinPartitions(sortCols.map(col):_*)
+      else dfRepartitioned.sortWithinPartitions(sortCols.map(colIn => col(colIn).desc):_*)
+    }
     else dfRepartitioned
   }
 
