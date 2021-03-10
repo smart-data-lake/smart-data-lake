@@ -81,8 +81,27 @@ case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
     }
     // sort within spark partitions
     if (sortCols.nonEmpty) {
-      if(sortAsc) dfRepartitioned.sortWithinPartitions(sortCols.map(col):_*)
-      else dfRepartitioned.sortWithinPartitions(sortCols.map(colIn => col(colIn).desc):_*)
+      val sortExpr = sortCols.map { sortCol =>
+        val colNameAndSortDir = sortCol.split(" ")
+        val colName = colNameAndSortDir(0)
+        if(colNameAndSortDir.length == 1) {
+          col(colName).asc
+        } else if (colNameAndSortDir.length == 2) {
+          val sortDir = colNameAndSortDir(1)
+          sortDir match {
+            case "asc" => col(colName).asc
+            case "desc" => col(colName).desc
+            case _ => {
+              assert(sortDir != "asc" && sortDir != "desc", "Wrong sort direction provided. Sort direction is either asc or desc.")
+              col(colName).asc
+            }
+          }
+        } else {
+          assert(colNameAndSortDir.length > 3, "Too many arguments have been provided. Just provide colName or colName and sortDir separated by whitespace.")
+          col(colName).asc
+        }
+      }
+      dfRepartitioned.sortWithinPartitions(sortExpr:_*)
     }
     else dfRepartitioned
   }
