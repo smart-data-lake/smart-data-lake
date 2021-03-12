@@ -326,7 +326,7 @@ See Readme of [sdl-examples](https://github.com/smart-data-lake/sdl-examples) fo
 How it works: under the hood a PySpark DataFrame is a proxy for a Java Spark DataFrame. PySpark uses Py4j to access Java objects in the JVM.
 
 ## Schema Evolution
-SmartDataLakeBuilder is built to support schema evolution where possible. This means that data pipelines adapt them self automatically to additional or removed columns and changes of data types if possible.
+SmartDataLakeBuilder is built to support schema evolution where possible. This means that data pipelines adapt themselves automatically to additional or removed columns and changes of data types if possible.
 
 To assert that a defined list of columns is always present in the schema of a specific DataObject, use its `schemaMin` attribute to define a minimal schema. The minimal schema is validated on read and write with Spark.
 
