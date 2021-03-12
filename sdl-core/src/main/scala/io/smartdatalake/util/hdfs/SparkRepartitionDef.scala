@@ -19,6 +19,7 @@
 
 package io.smartdatalake.util.hdfs
 
+import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.dataobject.FileRef
@@ -50,7 +51,6 @@ case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
                                keyCols: Seq[String] = Seq(),
                                sortCols: Seq[String] = Seq(),
                                filename: Option[String] = None,
-                               sortAsc: Boolean = true,
                               ) extends SmartDataLakeLogger {
   assert(numberOfTasksPerPartition > 0, s"numberOfTasksPerPartition must be greater than 0")
 
@@ -81,27 +81,16 @@ case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
     }
     // sort within spark partitions
     if (sortCols.nonEmpty) {
-      val sortExpr = sortCols.map { sortCol =>
-        val colNameAndSortDir = sortCol.split(" ")
-        val colName = colNameAndSortDir(0)
-        if(colNameAndSortDir.length == 1) {
-          col(colName).asc
-        } else if (colNameAndSortDir.length == 2) {
-          val sortDir = colNameAndSortDir(1)
-          sortDir match {
-            case "asc" => col(colName).asc
-            case "desc" => col(colName).desc
-            case _ => {
-              assert(sortDir != "asc" && sortDir != "desc", "Wrong sort direction provided. Sort direction is either asc or desc.")
-              col(colName).asc
-            }
-          }
-        } else {
-          assert(colNameAndSortDir.length > 3, "Too many arguments have been provided. Just provide colName or colName and sortDir separated by whitespace.")
-          col(colName).asc
-        }
+      val sortColDirRegex = "([^\s])\s([^\s])".r
+      val sortColRegex = "([^\s])".r
+      val sortExprs = sortCols.map {
+        case sortColDirRegex(colName, sortDir) if sortDir == "asc" => col(colName).asc
+        case sortColDirRegex(colName, sortDir) if sortDir == "desc" => col(colName).desc
+        case sortColDirRegex(colName, sortDir) => throw new ConfigurationException(s"""($dataObjectId) Wrong sort direction ($sortDir) provided in [sparkRepartition.sortCols] entry "$sortCols". Sort direction must be asc or desc.""", Some("sparkRepartition.sortCols"))
+        case sortColRegex(colName) => col(colName).asc
+        case entry => throw new ConfigurationException(s"""($dataObjectId) Too many arguments provided in [sparkRepartition.sortCols] entry "$entry". Just provide colName or colName and sortDir separated by whitespace.""")
       }
-      dfRepartitioned.sortWithinPartitions(sortExpr:_*)
+      dfRepartitioned.sortWithinPartitions(sortExprs:_*)
     }
     else dfRepartitioned
   }
