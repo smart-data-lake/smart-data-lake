@@ -70,7 +70,7 @@ case class JmsDataObject(override val id: DataObjectId,
       Duration(maxBatchAgeSec, TimeUnit.SECONDS), txBatchSize, session)
 
     val df = receiver.receiveMessages().getOrElse(session.emptyDataFrame)
-    validateSchemaMin(df)
+    validateSchemaMin(df, "read")
     df
   }
 
