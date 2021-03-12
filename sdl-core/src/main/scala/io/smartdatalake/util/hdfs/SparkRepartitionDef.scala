@@ -81,8 +81,8 @@ case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
     }
     // sort within spark partitions
     if (sortCols.nonEmpty) {
-      val sortColDirRegex = "([^\s])\s([^\s])".r
-      val sortColRegex = "([^\s])".r
+      val sortColDirRegex = "([^\\s]+)\\s([^\\s]+)".r
+      val sortColRegex = "([^\\s]+)".r
       val sortExprs = sortCols.map {
         case sortColDirRegex(colName, sortDir) if sortDir == "asc" => col(colName).asc
         case sortColDirRegex(colName, sortDir) if sortDir == "desc" => col(colName).desc
