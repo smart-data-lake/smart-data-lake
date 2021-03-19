@@ -21,14 +21,14 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode}
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
+import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode}
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import org.apache.spark.sql.types.{DateType, StringType, StructType}
-import org.apache.spark.sql.{DataFrame, SaveMode}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
  * A [[DataObject]] backed by a comma-separated value (CSV) data source.
@@ -60,7 +60,7 @@ import org.apache.spark.sql.{DataFrame, SaveMode}
  * @see [[org.apache.spark.sql.DataFrameReader]]
  * @see [[org.apache.spark.sql.DataFrameWriter]]
  *
- * @param schema An optional data object schema. If defined, any automatic schema inference is avoided.
+ * @param schema An optional data object schema. If defined, any automatic schema inference is avoided. As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
  * @param csvOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
  * @param dateColumnType Specifies the string format used for writing date typed data.
  * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop.
@@ -108,7 +108,7 @@ case class CsvFileDataObject( override val id: DataObjectId,
   /**
    * Formats date type column values according to the specified `dateColumnType` before writing to CSV file.
    */
-  override def beforeWrite(df: DataFrame): DataFrame = {
+  override def beforeWrite(df: DataFrame)(implicit session: SparkSession): DataFrame = {
     val dfSuper = super.beforeWrite(df)
     // standardize date column types
     dateColumnType match {

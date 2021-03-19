@@ -27,7 +27,7 @@ import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SaveMode}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
  * A [[io.smartdatalake.workflow.dataobject.DataObject]] backed by a JSON data source.
@@ -41,6 +41,7 @@ import org.apache.spark.sql.{DataFrame, SaveMode}
  * @param stringify Set the data type for all values to string.
  * @param jsonOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and
  *                    [[org.apache.spark.sql.DataFrameWriter]].
+ * @param schema An optional data object schema. If defined, any automatic schema inference is avoided. As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
  * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
@@ -76,12 +77,12 @@ case class JsonFileDataObject( override val id: DataObjectId,
   private val formatOptionsDefault = Map("multiLine" -> "true")
   override val options: Map[String, String] = formatOptionsDefault ++ jsonOptions.getOrElse(Map())
 
-  override def afterRead(df: DataFrame): DataFrame  = {
+  override def afterRead(df: DataFrame)(implicit session: SparkSession): DataFrame  = {
     val dfSuper = super.afterRead(df)
     if (stringify) dfSuper.castAll2String else dfSuper
   }
 
-  override def beforeWrite(df: DataFrame): DataFrame  = {
+  override def beforeWrite(df: DataFrame)(implicit session: SparkSession): DataFrame  = {
     val dfSuper = super.beforeWrite(df)
     if (stringify) dfSuper.castAll2String else dfSuper
   }

@@ -28,6 +28,7 @@ import io.smartdatalake.workflow.ProcessingLogicException
 import io.smartdatalake.workflow.action.CustomFileActionTest
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.types.StructType
 
 import scala.util.Try
 
@@ -235,17 +236,23 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
     val srcDir = "testSrc"
     val resourceFile = "AB_NYC_2019.csv"
     val tempDir = Files.createTempDirectory(feed)
-    val sourceFileColName = "sourcefile"
+    val sourceFileColName = "_sourcefile"
 
     // copy data file to test directory
     TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile).toFile)
     // setup DataObject
-    val dataObject = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> CustomFileActionTest.delimiter), filenameColumn = Some(sourceFileColName))
+    val dataObject = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'),
+      csvOptions = Map("header" -> "true", "delimiter" -> CustomFileActionTest.delimiter), filenameColumn = Some(sourceFileColName),
+      schema = Some(StructType.fromDDL("id string,name string,host_id string,host_name string,neighbourhood_group string,neighbourhood string,latitude string,longitude string,room_type string,price string,minimum_nights string,number_of_reviews string,last_review string,reviews_per_month string,calculated_host_listings_count string,availability_365 string"))
+    )
 
-    // test
+    // test received DataFrame
     val df = dataObject.getDataFrame()
     df.columns.contains(sourceFileColName) //retrieved Dataframe has sourcefile column appended
     df.select(sourceFileColName).collect().head.getAs[String](0).endsWith(resourceFile) //content of sourcefile column corresponds to sourcefile
+
+    // test if it could be written again
+    dataObject.init(df.drop(sourceFileColName), Seq())
 
     FileUtils.deleteDirectory(tempDir.toFile)
   }
