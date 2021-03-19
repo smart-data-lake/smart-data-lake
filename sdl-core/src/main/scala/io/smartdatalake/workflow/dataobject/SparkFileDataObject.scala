@@ -63,7 +63,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    *
    * Default is to validate the `schemaMin` and not apply any modification.
    */
-  def beforeWrite(df: DataFrame): DataFrame = {
+  def beforeWrite(df: DataFrame)(implicit session: SparkSession): DataFrame = {
     validateSchemaMin(df, "write")
     schema.foreach(schemaExpected => validateSchema(df, schemaExpected, "write"))
     df
@@ -74,9 +74,9 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    *
    * Default is to validate the `schemaMin` and not apply any modification.
    */
-  def afterRead(df: DataFrame): DataFrame = {
+  def afterRead(df: DataFrame)(implicit session: SparkSession): DataFrame = {
     validateSchemaMin(df, "read")
-    schema.foreach(schemaExpected => validateSchema(df, schemaExpected, "read"))
+    schema.map(createReadSchema).foreach(schemaExpected => validateSchema(df, schemaExpected, "read"))
     df
   }
 
