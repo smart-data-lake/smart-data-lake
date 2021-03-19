@@ -43,8 +43,8 @@ abstract class SparkSubFeedsAction extends SparkAction {
   // prepare main input / output
   // this must be lazy because inputs / outputs is evaluated later in subclasses
   // Note: we not yet decide for a main input as inputs might be skipped at runtime, but we can already create a prioritized list.
-  lazy val prioritizedMainInputCandidates: Seq[DataObject with CanCreateDataFrame] = ActionHelper.getMainDataObjectCandidates(mainInputId, inputs, "input", executionModeNeedsMainInputOutput, id)
-  lazy val mainOutput: DataObject with CanWriteDataFrame = ActionHelper.getMainDataObjectCandidates(mainOutputId, outputs, "output", executionModeNeedsMainInputOutput, id).head
+  lazy val prioritizedMainInputCandidates: Seq[DataObject with CanCreateDataFrame] = ActionHelper.getMainDataObjectCandidates(mainInputId, inputs, inputIdsToIgnoreFilter, "input", executionModeNeedsMainInputOutput, id)
+  lazy val mainOutput: DataObject with CanWriteDataFrame = ActionHelper.getMainDataObjectCandidates(mainOutputId, outputs, Seq(), "output", executionModeNeedsMainInputOutput, id).head
   def getMainInput(inputSubFeeds: Seq[SubFeed]): DataObject = {
     // take first data object which has as SubFeed which is not skipped
     prioritizedMainInputCandidates.find(dataObject => !inputSubFeeds.find(_.dataObjectId == dataObject.id).get.isSkipped)
@@ -58,6 +58,9 @@ abstract class SparkSubFeedsAction extends SparkAction {
     // check main input/output by triggering lazy values
     prioritizedMainInputCandidates
     mainOutput
+    // check inputIdsToIgnoreFilters
+    val unknownInputIdsToIgnoreFilter = inputIdsToIgnoreFilter.diff(inputs.map(_.id))
+    assert(unknownInputIdsToIgnoreFilter.isEmpty, s"($id) Unknown inputIdsToIgnoreFilter ${unknownInputIdsToIgnoreFilter.mkString(", ")}")
   }
 
   /**
