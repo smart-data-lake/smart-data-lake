@@ -129,14 +129,14 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
     invalidCharacters.replaceAllIn(str, "_")
   }
 
-  def getMainDataObjectCandidates[T <: DataObject](mainId: Option[DataObjectId], dataObjects: Seq[T], inputOutput: String, mainNeeded: Boolean, actionId: ActionId): Seq[T] = {
+  def getMainDataObjectCandidates[T <: DataObject](mainId: Option[DataObjectId], dataObjects: Seq[T], dataObjectIdsToIgnoreFilter: Seq[DataObjectId], inputOutput: String, mainNeeded: Boolean, actionId: ActionId): Seq[T] = {
     if (mainId.isDefined) {
       // if mainInput is defined -> return only that DataObject
       Seq(dataObjects.find(_.id == mainId.get).getOrElse(throw ConfigurationException(s"($actionId) main${inputOutput}Id ${mainId.get} not found in ${inputOutput}s")))
     } else {
       // prioritize DataObjects by number of partition columns
       dataObjects.sortBy {
-        case x: CanHandlePartitions => x.partitions.size
+        case x: CanHandlePartitions if !dataObjectIdsToIgnoreFilter.contains(x.id) => x.partitions.size
         case _ => 0
       }.reverse
     }
