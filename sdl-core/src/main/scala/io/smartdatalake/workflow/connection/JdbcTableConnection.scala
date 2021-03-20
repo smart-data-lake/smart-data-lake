@@ -148,7 +148,7 @@ private[smartdatalake] abstract class SQLCatalog(connection: JdbcTableConnection
     val dbPrefix = if (db.equals("")) "" else db + "."
     val tableExistsQuery = jdbcDialect.getTableExistsQuery(dbPrefix+table)
     try {
-      connection.execJdbcStatement(tableExistsQuery)
+      connection.execJdbcStatement(tableExistsQuery, logging = false)
       true
     }
     catch {
