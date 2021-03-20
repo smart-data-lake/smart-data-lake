@@ -197,12 +197,12 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * In this step any task on Input- or Output-DataObjects needed after the main task is executed,
    * e.g. JdbcTableDataObjects postWriteSql or CopyActions deleteInputData.
    */
-  def postExec(inputSubFeed: Seq[SubFeed], outputSubFeed: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     // evaluate metrics fail condition if defined
     metricsFailCondition.foreach( c => evaluateMetricsFailCondition(c))
     // process postRead/Write hooks
-    inputs.foreach( input => input.postRead(findSubFeedPartitionValues(input.id, inputSubFeed)))
-    outputs.foreach( output => output.postWrite(findSubFeedPartitionValues(output.id, outputSubFeed)))
+    inputs.foreach( input => input.postRead(findSubFeedPartitionValues(input.id, inputSubFeeds)))
+    outputs.foreach( output => output.postWrite(findSubFeedPartitionValues(output.id, outputSubFeeds)))
   }
 
   /**

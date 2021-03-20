@@ -323,8 +323,10 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val action1 = CustomSparkAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id), transformer = customTransformerConfig, executionCondition = executionCondition)
     val srcSubFeed1 = SparkSubFeed(None, "src1", Seq(), isSkipped = true)
     val srcSubFeed2 = SparkSubFeed(None, "src2", Seq(), isSkipped = true)
+    val tgtSubFeed1 = SparkSubFeed(None, "tgt1", Seq(), isSkipped = true)
     intercept[TaskSkippedDontStopWarning[_]](action1.preInit(Seq(srcSubFeed1,srcSubFeed2)))
     intercept[TaskSkippedDontStopWarning[_]](action1.preExec(Seq(srcSubFeed1,srcSubFeed2)))
+    action1.postExec(Seq(srcSubFeed1,srcSubFeed2), Seq(tgtSubFeed1))
 
     // dont skip if one subfeed skipped
     val action2 = CustomSparkAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id), transformer = customTransformerConfig, executionCondition = executionCondition)
