@@ -145,7 +145,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
       } else (true, None)
     }
     // check execution condition result
-    if (!executionConditionResult._1) {
+    if (!executionConditionResult._1 && !context.appConfig.isDryRun) {
       val outputSubFeeds = outputs.map(output => InitSubFeed(dataObjectId = output.id, partitionValues = Seq(), isSkipped = true))
       throw new TaskSkippedDontStopWarning(id.id, executionConditionResult._2.get, Some(outputSubFeeds))
     }
