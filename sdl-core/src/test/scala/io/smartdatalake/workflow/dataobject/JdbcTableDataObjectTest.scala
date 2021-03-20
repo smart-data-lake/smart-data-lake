@@ -41,6 +41,19 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     assert(dfRead.symmetricDifference(df).isEmpty)
   }
 
+  test("write and read case sensitive jdbc table") {
+    import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+    instanceRegistry.register(jdbcConnection)
+    // Use double quotes for case sensitivity in HSQLDB
+    val table = Table(Some("\"PUBLIC\""), "\"CaseSensitiveTable1\"")
+    val dataObject = JdbcTableDataObject( "jdbcDO1", table = table, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes"->"type varchar(255), lastname varchar(255), firstname varchar(255)"))
+    dataObject.dropTable
+    val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
+    dataObject.writeDataFrame(df, Seq())
+    val dfRead = dataObject.getDataFrame(Seq())
+    assert(dfRead.symmetricDifference(df).isEmpty)
+  }
+
   test("check pre/post sql") {
     import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
     instanceRegistry.register(jdbcConnection)

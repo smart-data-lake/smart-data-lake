@@ -123,12 +123,42 @@ object JdbcTableConnection extends FromConfigFactory[Connection] {
  * SQL JDBC Catalog query method definition.
  * Implementations may vary depending on the concrete DB system.
  */
-private[smartdatalake] abstract class SQLCatalog(connection: JdbcTableConnection) {
+private[smartdatalake] abstract class SQLCatalog(connection: JdbcTableConnection) extends SmartDataLakeLogger  {
   // get spark jdbc dialect definitions
   protected val jdbcDialect: JdbcDialect = JdbcDialects.get(connection.url)
   protected val isNoopDialect: Boolean = jdbcDialect.getClass.getSimpleName.startsWith("NoopDialect") // The default implementation is used for unknown url types
+  // use jdbcDialect to define identifiers used for quoting
+  protected val (quoteStart,quoteEnd) = {
+    val dbUnquoted = jdbcDialect.quoteIdentifier("dummy")
+    val quoteStart = dbUnquoted.replaceFirst("dummy.*", "")
+    val quoteEnd = dbUnquoted.replaceFirst(".*dummy", "")
+    (quoteStart, quoteEnd)
+  }
+  // true if the given identifier is quoted
+  def isQuotedIdentifier(s: String) : Boolean = {
+    s.startsWith(quoteStart) && s.endsWith(quoteEnd)
+  }
+  // returns the string with quotes removed
+  def removeQuotes(s: String) : String = {
+    s.stripPrefix(quoteStart).stripSuffix(quoteEnd)
+  }
+
   def isDbExisting(db: String)(implicit session: SparkSession): Boolean
-  def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean
+  def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean = {
+    val dbPrefix = if (db.equals("")) "" else db + "."
+    val tableExistsQuery = jdbcDialect.getTableExistsQuery(dbPrefix+table)
+    try {
+      connection.execJdbcStatement(tableExistsQuery, logging = false)
+      true
+    }
+    catch {
+      case _: Throwable => {
+        logger.info("No access on table or table does not exist: " +dbPrefix+table)
+        false
+      }
+    }
+  }
+
   protected def evalRecordExists( rs:ResultSet ) : Boolean = {
     rs.next
     rs.getInt(1) == 1
@@ -149,25 +179,13 @@ private[smartdatalake] object SQLCatalog {
  */
 private[smartdatalake] class DefaultSQLCatalog(connection: JdbcTableConnection) extends SQLCatalog(connection) {
   override def isDbExisting(db: String)(implicit session: SparkSession): Boolean = {
-    val cntTableInCatalog =
-      if (Environment.enableJdbcCaseSensitivity)
-        s"select count(*) from INFORMATION_SCHEMA.SCHEMATA where TABLE_SCHEMA='$db'"
-      else
-        s"select count(*) from INFORMATION_SCHEMA.SCHEMATA where upper(TABLE_SCHEMA)=upper('$db')"
-    connection.execJdbcQuery(cntTableInCatalog, evalRecordExists )
-  }
-  override def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean = {
-    if (!isNoopDialect) {
-      val dbPrefix = if (db.equals("")) "" else db + "."
-      val existsQuery = jdbcDialect.getTableExistsQuery(dbPrefix + table)
-      connection.execJdbcStatement(existsQuery)
-    } else {
-      val cntTableInCatalog = if (Environment.enableJdbcCaseSensitivity)
-        s"select count(*) from INFORMATION_SCHEMA.TABLES where TABLE_NAME='$table' and TABLE_SCHEMA='$db'"
-      else
-        s"select count(*) from INFORMATION_SCHEMA.TABLES where upper(TABLE_NAME)=upper('$table') and upper(TABLE_SCHEMA)=upper('$db')"
-      connection.execJdbcQuery(cntTableInCatalog, evalRecordExists)
+    val cntTableInCatalog = if(isQuotedIdentifier(db)) {
+      s"select count(*) from INFORMATION_SCHEMA.SCHEMATA where TABLE_SCHEMA='${removeQuotes(db)}'"
     }
+    else {
+      s"select count(*) from INFORMATION_SCHEMA.SCHEMATA where UPPER(TABLE_SCHEMA)=UPPER('$db')"
+    }
+    connection.execJdbcQuery(cntTableInCatalog, evalRecordExists )
   }
 }
 
@@ -176,20 +194,13 @@ private[smartdatalake] class DefaultSQLCatalog(connection: JdbcTableConnection) 
  */
 private[smartdatalake] class OracleSQLCatalog(connection: JdbcTableConnection) extends SQLCatalog(connection) {
   override def isDbExisting(db: String)(implicit session: SparkSession): Boolean = {
-    val cntTableInCatalog =
-      if (Environment.enableJdbcCaseSensitivity)
-        s"select count(*) from ALL_USERS where USERNAME='$db'"
-      else
-        s"select count(*) from ALL_USERS where upper(USERNAME)=upper('$db')"
+    val cntTableInCatalog = if(isQuotedIdentifier(db))  {
+      s"select count(*) from ALL_USERS where USERNAME='${removeQuotes(db)}'"
+    }
+    else {
+      s"select count(*) from ALL_USERS where UPPER(USERNAME)=UPPER('$db')"
+    }
     connection.execJdbcQuery(cntTableInCatalog, evalRecordExists)
-  }
-  override def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean = {
-    val cntTableInCatalog =
-      if (Environment.enableJdbcCaseSensitivity)
-        s"select count(*) from ((select TABLE_NAME as name from ALL_TABLES where TABLE_NAME='$table' and OWNER='$db') union all (select VIEW_NAME as name from ALL_VIEWS where VIEW_NAME='$table' and OWNER='$db'))"
-      else
-        s"select count(*) from ((select TABLE_NAME as name from ALL_TABLES where TABLE_NAME=upper('$table') and OWNER=upper('$db')) union all (select VIEW_NAME as name from ALL_VIEWS where VIEW_NAME=upper('$table') and OWNER=upper('$db')))"
-    connection.execJdbcQuery( cntTableInCatalog, evalRecordExists )
   }
 }
 
@@ -198,19 +209,12 @@ private[smartdatalake] class OracleSQLCatalog(connection: JdbcTableConnection) e
  */
 private[smartdatalake] class SapHanaSQLCatalog(connection: JdbcTableConnection) extends SQLCatalog(connection) {
   override def isDbExisting(db: String)(implicit session: SparkSession): Boolean = {
-    val cntTableInCatalog =
-      if (Environment.enableJdbcCaseSensitivity)
-        s"select count(*) from PUBLIC.SCHEMAS where SCHEMA_NAME='$db'"
-      else
-        s"select count(*) from PUBLIC.SCHEMAS where upper(SCHEMA_NAME)=upper('$db')"
+    val cntTableInCatalog = if(isQuotedIdentifier(db))  {
+      s"select count(*) from PUBLIC.SCHEMAS where SCHEMA_NAME='${removeQuotes(db)}'"
+    }
+    else {
+      s"select count(*) from PUBLIC.SCHEMAS where upper(SCHEMA_NAME)=upper('$db')"
+    }
     connection.execJdbcQuery(cntTableInCatalog, evalRecordExists)
-  }
-  override def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean = {
-    val cntTableInCatalog =
-      if (Environment.enableJdbcCaseSensitivity)
-        s"select count(*) from ((select TABLE_NAME as name from PUBLIC.TABLES where TABLE_NAME='$table' and SCHEMA_NAME='$db') union all (select VIEW_NAME as name from PUBLIC.VIEWS where VIEW_NAME='$table' and SCHEMA_NAME='$db'))"
-      else
-        s"select count(*) from ((select TABLE_NAME as name from PUBLIC.TABLES where upper(TABLE_NAME)=upper('$table') and upper(SCHEMA_NAME)=upper('$db')) union all (select VIEW_NAME as name from PUBLIC.VIEWS where upper(VIEW_NAME)=upper('$table') and upper(SCHEMA_NAME)=upper('$db')))"
-    connection.execJdbcQuery( cntTableInCatalog, evalRecordExists )
   }
 }
