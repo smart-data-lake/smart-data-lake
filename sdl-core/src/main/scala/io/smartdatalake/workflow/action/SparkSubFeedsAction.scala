@@ -45,9 +45,9 @@ abstract class SparkSubFeedsAction extends SparkAction {
   // Note: we not yet decide for a main input as inputs might be skipped at runtime, but we can already create a prioritized list.
   lazy val prioritizedMainInputCandidates: Seq[DataObject with CanCreateDataFrame] = ActionHelper.getMainDataObjectCandidates(mainInputId, inputs, inputIdsToIgnoreFilter, "input", executionModeNeedsMainInputOutput, id)
   lazy val mainOutput: DataObject with CanWriteDataFrame = ActionHelper.getMainDataObjectCandidates(mainOutputId, outputs, Seq(), "output", executionModeNeedsMainInputOutput, id).head
-  def getMainInput(inputSubFeeds: Seq[SubFeed]): DataObject = {
+  def getMainInput(inputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): DataObject = {
     // take first data object which has as SubFeed which is not skipped
-    prioritizedMainInputCandidates.find(dataObject => !inputSubFeeds.find(_.dataObjectId == dataObject.id).get.isSkipped)
+    prioritizedMainInputCandidates.find(dataObject => !inputSubFeeds.find(_.dataObjectId == dataObject.id).get.isSkipped || context.appConfig.isDryRun)
       .getOrElse(prioritizedMainInputCandidates.head) // otherwise just take first candidate
   }
 
