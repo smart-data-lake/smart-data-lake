@@ -19,6 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 
@@ -31,9 +32,9 @@ private[smartdatalake] trait CanWriteDataFrame {
    * Called during init phase for checks and initialization.
    * If possible dont change the system until execution phase.
    */
-  def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = Unit
+  def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
 
-  def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession): Unit
+  def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Unit
 
   /**
    * Write Spark structured streaming DataFrame
@@ -44,7 +45,8 @@ private[smartdatalake] trait CanWriteDataFrame {
    * @param trigger Trigger frequency for stream
    * @param checkpointLocation location for checkpoints of streaming query
    */
-  def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String,String], checkpointLocation: String, queryName: String, outputMode: OutputMode = OutputMode.Append)(implicit session: SparkSession): StreamingQuery = {
+  def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String,String], checkpointLocation: String, queryName: String, outputMode: OutputMode = OutputMode.Append)
+                             (implicit session: SparkSession, context: ActionPipelineContext): StreamingQuery = {
 
     // lambda function is ambiguous with foreachBatch in scala 2.12... we need to create a real function...
     // Note: no partition values supported when writing streaming target
@@ -60,6 +62,5 @@ private[smartdatalake] trait CanWriteDataFrame {
       .foreachBatch(microBatchWriter _)
       .start()
   }
-
 
 }

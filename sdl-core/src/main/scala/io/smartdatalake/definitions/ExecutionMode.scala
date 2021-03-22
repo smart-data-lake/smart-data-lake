@@ -371,7 +371,7 @@ case class FailIfNoPartitionValuesMode() extends ExecutionMode {
                                             , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
                                            (implicit session: SparkSession, context: ActionPipelineContext): Option[ExecutionModeResult] = {
     // check if partition values present
-    if (subFeed.partitionValues.isEmpty) throw new IllegalStateException(s"($actionId) Partition values are empty for mainInput ${subFeed.dataObjectId.id}")
+    if (subFeed.partitionValues.isEmpty && !context.appConfig.isDryRun) throw new IllegalStateException(s"($actionId) Partition values are empty for mainInput ${subFeed.dataObjectId.id}")
     // return: no change of given partition values and filter
     None
   }

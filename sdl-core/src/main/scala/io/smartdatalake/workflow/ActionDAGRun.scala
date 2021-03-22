@@ -118,8 +118,15 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
         node.edges.map(dataObjectId => getInitialSubFeed(dataObjectId))
       case (node: Action, subFeeds) =>
         val deduplicatedSubFeeds = unionDuplicateSubFeeds(subFeeds ++ getRecursiveSubFeeds(node), node.id)
-        node.preInit(deduplicatedSubFeeds)
-        node.init(deduplicatedSubFeeds)
+        val previousThreadName = setThreadName(getActionThreadName(node.id))
+        val resultSubFeeds = try {
+          node.preInit(deduplicatedSubFeeds)
+          node.init(deduplicatedSubFeeds)
+        } finally {
+          setThreadName(previousThreadName)
+        }
+        // return
+        resultSubFeeds
       case x => throw new IllegalStateException(s"Unmatched case $x")
     }
     t
@@ -146,9 +153,15 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
           node.edges.map(dataObjectId => getInitialSubFeed(dataObjectId))
         case (node: Action, subFeeds) =>
           val deduplicatedSubFeeds = unionDuplicateSubFeeds(subFeeds ++ getRecursiveSubFeeds(node), node.id)
-          node.preExec(deduplicatedSubFeeds)
-          val resultSubFeeds = node.exec(deduplicatedSubFeeds)
-          node.postExec(deduplicatedSubFeeds, resultSubFeeds)
+          val previousThreadName = setThreadName(getActionThreadName(node.id))
+          val resultSubFeeds = try {
+            node.preExec(deduplicatedSubFeeds)
+            val resultSubFeeds = node.exec(deduplicatedSubFeeds)
+            node.postExec(deduplicatedSubFeeds, resultSubFeeds)
+            resultSubFeeds
+          } finally {
+            setThreadName(previousThreadName)
+          }
           //return
           resultSubFeeds
         case x => throw new IllegalStateException(s"Unmatched case $x")
@@ -248,6 +261,17 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
     val action = dag.getNodes
       .find(_.nodeId == actionId.id).getOrElse(throw new IllegalStateException(s"Unknown action $actionId"))
     action.onRuntimeMetrics(dataObjectId, metrics)
+  }
+
+  // Helper methods rename thread so that it includes phase and action id for logging
+  private var previousThreadName: Option[String] = None
+  private def getActionThreadName(id: ActionId)(implicit context: ActionPipelineContext) = {
+    s"${context.phase.toString.toLowerCase()}-${id.id}"
+  }
+  private def setThreadName(name: String): String = {
+    val previousThreadName = Thread.currentThread().getName
+    Thread.currentThread().setName(name)
+    previousThreadName
   }
 }
 
