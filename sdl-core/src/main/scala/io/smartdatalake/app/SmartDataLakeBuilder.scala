@@ -178,7 +178,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // invoke SDLPlugin if configured
     Environment.sdlPlugin.foreach(_.startup())
     // handle state if defined
-    if (appConfig.statePath.isDefined) {
+    if (appConfig.statePath.isDefined && !appConfig.isDryRun) {
       assert(appConfig.applicationName.nonEmpty, "Application name must be defined if statePath is set")
       // check if latest run succeeded
       val appName = appConfig.applicationName.get
