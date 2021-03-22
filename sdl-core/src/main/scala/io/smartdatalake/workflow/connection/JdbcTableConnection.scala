@@ -23,8 +23,10 @@ import java.sql.{DriverManager, ResultSet, Statement, Connection => SqlConnectio
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{AuthMode, BasicAuthMode, Environment}
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.definitions.{AuthMode, BasicAuthMode}
+import io.smartdatalake.util.misc.{SmartDataLakeLogger, TryWithResourcePool}
+import org.apache.commons.pool2.impl.{DefaultPooledObject, GenericObjectPool}
+import org.apache.commons.pool2.{BasePooledObjectFactory, PooledObject}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 
@@ -37,14 +39,20 @@ import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
  * @param driver class name of jdbc driver
  * @param authMode optional authentication information: for now BasicAuthMode is supported.
  * @param db jdbc database
+ * @param maxParallelConnections number of parallel jdbc connections created by an instance of this connection
+ *                               Note that Spark manages JDBC Connections on its own. This setting only applies to JDBC connection
+ *                               used by SDL for validating metadata or pre/postSQL.
+ * @param connectionPoolMaxIdleTimeSec timeout to close unused connections in the pool
  * @param metadata
  */
-case class JdbcTableConnection( override val id: ConnectionId,
-                                url: String,
-                                driver: String,
-                                authMode: Option[AuthMode] = None,
-                                db: Option[String] = None,
-                                override val metadata: Option[ConnectionMetadata] = None
+case class JdbcTableConnection(override val id: ConnectionId,
+                               url: String,
+                               driver: String,
+                               authMode: Option[AuthMode] = None,
+                               db: Option[String] = None,
+                               maxParallelConnections: Int = 1,
+                               connectionPoolMaxIdleTimeSec: Int = 3,
+                               override val metadata: Option[ConnectionMetadata] = None
                                ) extends Connection with SmartDataLakeLogger {
 
   // Allow only supported authentication modes
@@ -54,44 +62,62 @@ case class JdbcTableConnection( override val id: ConnectionId,
   // prepare catalog implementation
   val catalog: SQLCatalog = SQLCatalog.fromJdbcDriver(driver, this)
 
-  def execJdbcStatement(sql:String, logging: Boolean = true) : Boolean = {
-    var conn: SqlConnection = null
-    var stmt: Statement = null
-    try {
-      conn = getConnection
-      stmt = conn.createStatement
-      if (logging) logger.info(s"execJdbcStatement: $sql")
-      stmt.execute(sql)
-    } finally {
-      if (stmt!=null) stmt.close()
-      if (conn!=null) conn.close()
+  /**
+   * Get a connection from the pool and execute an arbitrary function
+   */
+  def execWithJdbcConnection[A]( func: SqlConnection => A ): A = {
+    TryWithResourcePool.exec(pool){
+      con => func(con)
     }
   }
 
+  /**
+   * Get a JDBC connection from the pool, create a JDBC statement and execute an arbitrary function
+   */
+  def execWithJdbcStatement[A]( func: Statement => A ): A = {
+    execWithJdbcConnection { conn =>
+      var stmt: Statement = null
+      try {
+        stmt = conn.createStatement
+        func(stmt)
+      } finally {
+        if (stmt != null) stmt.close()
+      }
+    }
+  }
+
+  /**
+   * Execute an SQL statement
+   * @return true if the first result is a ResultSet object; false if it is an update count or there are no results
+   */
+  def execJdbcStatement(sql:String, logging: Boolean = true) : Boolean = {
+    execWithJdbcStatement { stmt =>
+      if (logging) logger.info(s"execJdbcStatement: $sql")
+      stmt.execute(sql)
+    }
+  }
+
+  /**
+   * Execute an SQL query and evaluate its ResultSet
+   * @param sql sql query to execute
+   * @param evalResultSet function to evaluate the JDBC ResultSet
+   * @return the evaluated result
+   */
   def execJdbcQuery[A](sql:String, evalResultSet: ResultSet => A ) : A = {
-    var conn: SqlConnection = null
-    var stmt: Statement = null
-    var rs: ResultSet = null
-    try {
-      conn = getConnection
-      stmt = conn.createStatement
-      logger.info(s"execJdbcQuery: $sql")
-      rs = stmt.executeQuery(sql)
-      evalResultSet( rs )
-    } finally {
-      if (rs!=null) rs.close()
-      if (stmt!=null) stmt.close()
-      if (conn!=null) conn.close()
+    execWithJdbcStatement { stmt =>
+      var rs: ResultSet = null
+      try {
+        logger.info(s"execJdbcQuery: $sql")
+        rs = stmt.executeQuery(sql)
+        evalResultSet(rs)
+      } finally {
+        if (rs != null) rs.close()
+      }
     }
   }
 
   def test(): Unit = {
-    var conn: SqlConnection = null
-    try {
-      conn = getConnection
-    } finally {
-      if (conn!=null) conn.close()
-    }
+    execWithJdbcConnection{ _ => Unit }
   }
 
   private def getConnection: SqlConnection = {
@@ -107,6 +133,17 @@ case class JdbcTableConnection( override val id: ConnectionId,
       case m: BasicAuthMode => Map( "user" -> m.user, "password" -> m.password )
       case _ => throw new IllegalArgumentException(s"${authMode.getClass.getSimpleName} not supported.")
     } else Map()
+  }
+
+  // setup connection pool
+  val pool = new GenericObjectPool[SqlConnection](new JdbcClientPoolFactory)
+  pool.setMaxTotal(maxParallelConnections)
+  pool.setMaxIdle(1) // keep max one idle jdbc connection
+  pool.setMinEvictableIdleTimeMillis(connectionPoolMaxIdleTimeSec * 1000) // timeout to close jdbc connection if not in use
+  private class JdbcClientPoolFactory extends BasePooledObjectFactory[SqlConnection] {
+    override def create(): SqlConnection = getConnection
+    override def wrap(con: SqlConnection): PooledObject[SqlConnection] = new DefaultPooledObject(con)
+    override def destroyObject(p: PooledObject[SqlConnection]): Unit = p.getObject.close()
   }
 
   override def factory: FromConfigFactory[Connection] = JdbcTableConnection
