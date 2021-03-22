@@ -42,15 +42,17 @@ import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
  * @param maxParallelConnections number of parallel jdbc connections created by an instance of this connection
  *                               Note that Spark manages JDBC Connections on its own. This setting only applies to JDBC connection
  *                               used by SDL for validating metadata or pre/postSQL.
+ * @param connectionPoolMaxIdleTimeSec timeout to close unused connections in the pool
  * @param metadata
  */
-case class JdbcTableConnection( override val id: ConnectionId,
-                                url: String,
-                                driver: String,
-                                authMode: Option[AuthMode] = None,
-                                db: Option[String] = None,
-                                maxParallelConnections: Int = 1,
-                                override val metadata: Option[ConnectionMetadata] = None
+case class JdbcTableConnection(override val id: ConnectionId,
+                               url: String,
+                               driver: String,
+                               authMode: Option[AuthMode] = None,
+                               db: Option[String] = None,
+                               maxParallelConnections: Int = 1,
+                               connectionPoolMaxIdleTimeSec: Int = 3,
+                               override val metadata: Option[ConnectionMetadata] = None
                                ) extends Connection with SmartDataLakeLogger {
 
   // Allow only supported authentication modes
@@ -137,7 +139,7 @@ case class JdbcTableConnection( override val id: ConnectionId,
   val pool = new GenericObjectPool[SqlConnection](new JdbcClientPoolFactory)
   pool.setMaxTotal(maxParallelConnections)
   pool.setMaxIdle(1) // keep max one idle jdbc connection
-  pool.setMinEvictableIdleTimeMillis(3000) // timeout to close jdbc connection if not in use
+  pool.setMinEvictableIdleTimeMillis(connectionPoolMaxIdleTimeSec * 1000) // timeout to close jdbc connection if not in use
   private class JdbcClientPoolFactory extends BasePooledObjectFactory[SqlConnection] {
     override def create(): SqlConnection = getConnection
     override def wrap(con: SqlConnection): PooledObject[SqlConnection] = new DefaultPooledObject(con)
