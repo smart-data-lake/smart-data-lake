@@ -20,6 +20,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
 * Spark: diverse connectors (HadoopFS, Hive, DeltaLake, JDBC, Kafka, Splunk, Webservice, JMS) and formats (CSV, JSON, XML, Avro, Parquet, Excel, Access …)
 * File: SFTP, Local, Webservice
 * Easily extendable through implementing predefined scala traits
+* Support for getting secrets from different secret providers
 
 ##### Generic Transformations
 * Spark based: Copy, Historization, Deduplication

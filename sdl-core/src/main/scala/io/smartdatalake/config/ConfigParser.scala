@@ -21,7 +21,7 @@ package io.smartdatalake.config
 import com.typesafe.config.{Config, ConfigException, ConfigValueFactory, ConfigValueType}
 import configs.Result
 import configs.syntax._
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, ConfigObjectId, ConnectionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, ConfigObjectId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.Action
@@ -55,8 +55,8 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
       .map{ case (id, config) => (DataObjectId(id), parseConfigObject[DataObject](id, config))}
     registry.register(dataObjects)
 
-    val actions: Map[ActionObjectId, Action] = getActionConfigMap(config)
-      .map{ case (id, config) => (ActionObjectId(id), parseConfigObject[Action](id, config))}
+    val actions: Map[ActionId, Action] = getActionConfigMap(config)
+      .map{ case (id, config) => (ActionId(id), parseConfigObject[Action](id, config))}
     registry.register(actions)
 
     registry

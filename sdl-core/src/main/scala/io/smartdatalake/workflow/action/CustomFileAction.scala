@@ -19,9 +19,9 @@
 package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.ExecutionMode
+import io.smartdatalake.definitions.{Condition, ExecutionMode}
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, TryWithRessource}
 import io.smartdatalake.workflow.action.customlogic.CustomFileTransformerConfig
 import io.smartdatalake.workflow.dataobject.HadoopFileDataObject
@@ -39,17 +39,20 @@ import org.apache.spark.sql.SparkSession
  * @param transformer a custom file transformer, which reads a file from HadoopFileDataObject and writes it back to another HadoopFileDataObject
  * @param deleteDataAfterRead if the input files should be deleted after processing successfully
  * @param filesPerPartition number of files per Spark partition
+ * @param executionMode optional execution mode for this Action
+ * @param executionCondition     optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  */
-case class CustomFileAction(override val id: ActionObjectId,
+case class CustomFileAction(override val id: ActionId,
                             inputId: DataObjectId,
                             outputId: DataObjectId,
                             transformer: CustomFileTransformerConfig,
-                            override val deleteDataAfterRead: Boolean = false,
+                            @deprecated("use executionMode = FileIncrementalMoveMode instead", "2.0.3") override val deleteDataAfterRead: Boolean = false,
                             filesPerPartition: Int = 10,
                             override val breakFileRefLineage: Boolean = false,
                             override val executionMode: Option[ExecutionMode] = None,
+                            override val executionCondition: Option[Condition] = None,
                             override val metricsFailCondition: Option[String] = None,
                             override val metadata: Option[ActionMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)
@@ -64,9 +67,8 @@ case class CustomFileAction(override val id: ActionObjectId,
 
   override def doTransform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed, doExec: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
     import session.implicits._
-
-    // recreate FileRefs is desired
-    val inputFileRefs = inputSubFeed.fileRefs.getOrElse( input.getFileRefs(inputSubFeed.partitionValues))
+    assert(inputSubFeed.fileRefs.nonEmpty, "inputSubFeed.fileRefs must be defined for CustomFileAction.doTransform")
+    val inputFileRefs = inputSubFeed.fileRefs.get
     val tgtFileRefs = output.translateFileRefs(inputFileRefs)
 
     // transform files in distributed mode with Spark

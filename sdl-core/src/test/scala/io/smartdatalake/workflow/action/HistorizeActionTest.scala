@@ -64,7 +64,7 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
     val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
     val action1 = HistorizeAction("ha", srcDO.id, tgtDO.id)
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
-    srcDO.writeDataFrame(l1, Seq())
+    srcDO.writeDataFrame(l1, Seq())(session, context1)
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(session,context1).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
@@ -80,7 +80,7 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
     val context2 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp2), SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
     val action2 = HistorizeAction("ha2", srcDO.id, tgtDO.id)
     val l2 = Seq(("doe","john",10)).toDF("lastname", "firstname", "rating")
-    srcDO.writeDataFrame(l2, Seq())
+    srcDO.writeDataFrame(l2, Seq())(session, context1)
     val srcSubFeed2 = SparkSubFeed(None, "src1", Seq())
     action2.exec(Seq(srcSubFeed2))(session, context2)
 

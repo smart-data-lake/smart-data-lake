@@ -21,12 +21,13 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.SDLSaveMode
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
-import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SaveMode}
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
 /**
  *
@@ -48,6 +49,11 @@ import org.apache.spark.sql.{DataFrame, SaveMode}
  *             Optionally defined partitions are appended with hadoop standard partition layout to this path.
  *             Only files ending with *.parquet* are considered as data for this DataObject.
  * @param partitions partition columns for this data object
+ * @param parquetOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and
+ *                       [[org.apache.spark.sql.DataFrameWriter]].
+ * @param schema An optional schema for the spark data frame to be validated on read and write. Note: Existing Parquet files
+ *               contain a source schema. Therefore, this schema is ignored when reading from existing Parquet files.
+ *               As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
  * @param saveMode spark [[SaveMode]] to use when writing files, default is "overwrite"
  * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop.
  * @param acl override connections permissions for files created with this connection
@@ -60,9 +66,10 @@ import org.apache.spark.sql.{DataFrame, SaveMode}
 case class ParquetFileDataObject( override val id: DataObjectId,
                                   override val path: String,
                                   override val partitions: Seq[String] = Seq(),
+                                  parquetOptions: Option[Map[String,String]] = None,
                                   override val schema: Option[StructType] = None,
                                   override val schemaMin: Option[StructType] = None,
-                                  override val saveMode: SaveMode = SaveMode.Overwrite,
+                                  override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                   override val sparkRepartition: Option[SparkRepartitionDef] = None,
                                   override val acl: Option[AclDef] = None,
                                   override val connectionId: Option[ConnectionId] = None,
@@ -77,10 +84,13 @@ case class ParquetFileDataObject( override val id: DataObjectId,
   // this is only needed for FileRef actions
   override val fileName: String = "*.parquet*"
 
+  override val options: Map[String, String] = parquetOptions.getOrElse(Map())
+
   // when writing parquet files, schema column names are forced to lower,
   // because they can also be accessed by Hive which is case insensitive.
   // See: https://medium.com/@an_chee/why-using-mixed-case-field-names-in-hive-spark-sql-is-a-bad-idea-95da8b6ec1e0
-  override def beforeWrite(df: DataFrame): DataFrame = super.beforeWrite(df).colNamesLowercase
+  override def beforeWrite(df: DataFrame)(implicit session: SparkSession): DataFrame =
+    super.beforeWrite(df).colNamesLowercase
 
   override def factory: FromConfigFactory[DataObject] = ParquetFileDataObject
 }

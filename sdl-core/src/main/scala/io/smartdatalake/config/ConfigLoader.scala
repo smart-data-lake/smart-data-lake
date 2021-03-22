@@ -21,7 +21,7 @@ package io.smartdatalake.config
 import java.io.InputStreamReader
 
 import com.typesafe.config.{Config, ConfigFactory}
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, ConnectionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.{EnvironmentUtil, SmartDataLakeLogger}
@@ -30,7 +30,6 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
-
 
 object ConfigLoader extends SmartDataLakeLogger {
 
@@ -103,7 +102,7 @@ object ConfigLoader extends SmartDataLakeLogger {
     // check for duplicate first class object definitions (connections, data objects, actions)
     if (Environment.enableCheckConfigDuplicates) {
       val objectIdLocationMap =
-        sortedFileConfigs.flatMap { case (file, config) => ConfigParser.getActionConfigMap(config).keys.map(objName => (ActionObjectId(objName), file)) } ++
+        sortedFileConfigs.flatMap { case (file, config) => ConfigParser.getActionConfigMap(config).keys.map(objName => (ActionId(objName), file)) } ++
           sortedFileConfigs.flatMap { case (file, config) => ConfigParser.getDataObjectConfigMap(config).keys.map(objName => (DataObjectId(objName), file)) } ++
           sortedFileConfigs.flatMap { case (file, config) => ConfigParser.getConnectionConfigMap(config).keys.map(objName => (ConnectionId(objName), file)) }
       val duplicates = objectIdLocationMap.groupBy(_._1)
@@ -135,7 +134,7 @@ object ConfigLoader extends SmartDataLakeLogger {
   /**
    * Merge configurations such that configurations earlier in the list overwrite configurations at the end of the list.
    *
-   * @param configs a list of [[Confgs]]s sorted according to their priority
+   * @param configs a list of [[Config]]s sorted according to their priority
    * @return        a merged [[Config]].
    */
   private def mergeConfigs(configs: Seq[Config]): Config = {
@@ -166,6 +165,7 @@ object ConfigLoader extends SmartDataLakeLogger {
 
   /**
    * Collect readable files with valid config file extensions from HDFS in BFS order indexed by file extension.
+   * Note that all filenames containing "log4j" are ignored.
    *
    * This is an internal method to create a utility data structure.
    *
@@ -185,40 +185,22 @@ object ConfigLoader extends SmartDataLakeLogger {
             logger.warn(s"Failed to list directory content of ${nextFile.toString}.", exception)
           case Success(children) =>
             while (children.hasNext) {
-              traversalQueue += children.next().getPath
-              logger.trace(s"Found '${traversalQueue.last.getName}' in directory $nextFile.")
+              val childPath = children.next.getPath
+              if (!childPath.getName.startsWith(".")) { // ignore hidden entries
+                traversalQueue += childPath
+                logger.debug(s"Found '${childPath.getName}' in directory $nextFile.")
+              }
             }
         }
-      } else if (fs.isFile(nextFile) && hasPermission(nextFile, FsAction.READ)) {
+      } else if (fs.isFile(nextFile)) {
+        // filter filename extension and ignore potential log4j files
         val fileExtension = nextFile.getName.split('.').last
-        if (configFileExtensions.contains(fileExtension) && !nextFile.getName.equals("log4j.properties")) {
-          logger.trace(s"'$nextFile' is a configuration file.")
+        if (configFileExtensions.contains(fileExtension) && !nextFile.getName.contains("log4j")) {
+          logger.debug(s"'$nextFile' is a configuration file.")
           readableFileIndex(fileExtension) += nextFile
         }
       }
     }
     readableFileIndex
-  }
-
-  /**
-   * Check if the current user has permission to execute `action` on HDFS path `path`.
-   *
-   * @param path        a HDFS path
-   * @param action      an action like [[FsAction.READ]]
-   * @param fs          a configure HDFS [[FileSystem]] handle.
-   * @return            `true` if the current user has permission for `action` on `path`. `false` otherwise.
-   */
-  private def hasPermission(path: Path, action: FsAction)(implicit fs: FileSystem): Boolean = {
-    try {
-      if (EnvironmentUtil.isWindowsOS) true // Workaround: checking permissions on windows doesn't work with Hadoop (version 2.6)
-      else {
-        fs.access(path, action)
-        true
-      }
-    } catch {
-      case t: Throwable =>
-        logger.warn(s"Cannot access $path: ${t.getClass.getSimpleName}: ${t.getMessage}")
-        false
-    }
   }
 }

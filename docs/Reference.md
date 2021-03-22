@@ -7,16 +7,51 @@ The main sections are global, connections, data objects and actions.
 As a starting point, use the [application.conf](https://github.com/smart-data-lake/sdl-examples/blob/develop/src/main/resources/application.conf) from SDL-examples. 
 More details and options are described below. 
 
-### User and Password Variables
-Usernames and passwords should not be stored in you configuration files in clear text as these files are often stored directly in the version control system.
-They should also not be visible in logfiles after execution.
-Instead of having the username and password directly, use the following conventions:
+### Global Options
+In the global section of the configuration you can set global configurations such as spark options used by all executions.
+You can find a list of all configurations under [API docs](site/scaladocs/io/smartdatalake/app/GlobalConfig.html).  
+A good list with examples can be found in the [application.conf](https://github.com/smart-data-lake/sdl-examples/blob/develop/src/main/resources/application.conf) of sdl-examples.
 
-Pattern|Meaning
----|---
-CLEAR#pd|The variable will be used literally (cleartext). This is only recommended for test environments.
-ENV#pd|The values for this variable will be read from the environment variable called "pd". 
-DBSECRET#scope.pd|Used in a Databricks environment, i.e. Microsoft Azure. Expects the variable "pd" to be stored in the given scope.
+### Secrets User and Password Variables
+Usernames, passwords and other secrets should not be stored in your configuration files in clear text as these files are often stored directly in the version control system.
+They should also not be visible in logfiles after execution.
+
+Instead of having the username and password configured directly in your configuration files, you can use secret providers
+for configuration values that end with `...Variable`, like BasicAuthMode's userVariable and passwordVariable.
+To configure a secret use the convention `<SecretProviderId>#<SecretName>`.
+
+Default secret providers are:
+
+SecretProviderId|Pattern|Meaning
+---|---|---
+CLEAR|CLEAR#pd|The secret will be used literally (cleartext). This is only recommended for test environments.
+ENV|ENV#pd|The value for this secret will be read from the environment variable called "pd". 
+
+You can configure custom secret providers by providing a list of secret providers with custom options and their id in GlobalConfig as follows:
+```
+global {
+  secretProviders {
+    <secretProviderId> = {
+     className = <fully qualified class name of SecretProvider>
+     options = { <options as key/value> }
+    }
+  }
+}
+```
+
+Example: configure DatabricksSecretProvider with id=DBSECRETS and scope=test (scope is a specific configuration needed for accessing secrets in Databricks).
+```
+global {
+  secretProviders {
+    DBSECRETS = {
+     className = io.smartdatalake.util.secrets.DatabricksSecretProvider
+     options = { scope = test }
+    }
+  }
+}
+```
+
+You can create custom SecretProvider classes by implementing trait SecretProvider and a constructor with parameter `options: Map[String,String]`.
 
 ### Local substitution
 Local substitution allows to reuse the id of a configuration object inside its attribute definitions by the special token "~{id}". See the following example:
@@ -33,10 +68,6 @@ dataObjects {
 }
 ```
 Note: local substitution only works in a fixed set of attributes defined in Environment.configPathsForLocalSubstitution.
-
-## Global Options
-The global section of the configuration is mainly used to set spark options used by all executions.
-A good list with examples can be found in the [application.conf](https://github.com/smart-data-lake/sdl-examples/blob/develop/src/main/resources/application.conf) of sdl-examples.
 
 ## Connections
 Some Data Objects need a connection, e.g. JdbcTableDataObject, as they need to know how to connect to a database.
@@ -88,7 +119,6 @@ Usage: DefaultSmartDataLakeBuilder [options]
 There exists the following adapted applications versions:
 - **LocalSmartDataLakeBuilder**:<br>default for Spark master is `local[*]` and it has additional properties to configure Kerberos authentication. Use this application to run in a local environment (e.g. IntelliJ) without cluster deployment.  
 - **DatabricksSmartDataLakeBuilder**:<br>see [MicrosoftAzure](MicrosoftAzure.md)
-
 
 # Concepts
 
@@ -150,7 +180,6 @@ Example - only process the last selected partition:
 By defining **alternativeOutputId** attribute you can define another DataObject which will be used to check for already existing data.
 This can be used to select data to process against a DataObject later in the pipeline.
 
-
 ### SparkStreamingOnceMode: Incremental load 
 Some DataObjects are not partitioned, but nevertheless you dont want to read all data from the input on every run. You want to load it incrementally.
 This can be accomplished by specifying execution mode SparkStreamingOnceMode. Under the hood it uses "Spark Structured Streaming" and triggers a single microbatch (Trigger.Once).
@@ -173,13 +202,32 @@ Default is to apply the SparkIncrementalMode. Define an applyCondition by a spar
 By defining **alternativeOutputId** attribute you can define another DataObject which will be used to check for already existing data.
 This can be used to select data to process against a DataObject later in the pipeline.
 
-By defining **stopIfNoData** attribute you can customize if dependent actions should be executed also if the current action has no data selected by the execution mode.
-Default is stopIfNoData = true.
-
-
 ### FailIfNoPartitionValuesMode
 To simply check if partition values are present and fail otherwise, configure execution mode FailIfNoPartitionValuesMode.
 This is useful to prevent potential reprocessing of whole table through wrong usage.
+
+### ProcessAllMode
+An execution mode which forces processing all data from it's inputs, removing partitionValues and filter conditions received from previous actions.
+
+### CustomPartitionMode
+An execution mode to create custom partition execution mode logic in scala. 
+Implement trait CustomPartitionModeLogic by defining a function which receives main input&output DataObject and returns partition values to process as Seq[Map[String,String]\]
+
+## Execution Condition
+For every Action an executionCondition can be defined. The execution condition allows to define if an action is executed or skipped. The default behaviour is that an Action is skipped if at least one input SubFeed is skipped.
+Define an executionCondition by a spark sql expression working with attributes of SubFeedsExpressionData returning a boolean.
+The Action is skipped if the executionCondition is evaluated to false. In that case dependent actions get empty SubFeeds marked with isSkipped=true as input.
+
+Example - skip Action only if input1 and input2 SubFeed are skipped: 
+```
+  executionCondition = "!inputSubFeeds.input1.isSkipped or !inputSubFeeds.input2.isSkipped"
+```
+
+Example - Always execute Action and use all existing data as input: 
+```
+  executionCondition = true
+  executionMode = ProcessAllMode
+```
 
 ## Metrics
 Metrics are gathered per Action and output-DataObject when running a DAG. They can be found in log statements and are written to the state file.
@@ -276,3 +324,25 @@ Requirements:
 See Readme of [sdl-examples](https://github.com/smart-data-lake/sdl-examples) for a working example and instructions to setup python environment for IntelliJ  
 
 How it works: under the hood a PySpark DataFrame is a proxy for a Java Spark DataFrame. PySpark uses Py4j to access Java objects in the JVM.
+
+## Schema Evolution
+SmartDataLakeBuilder is built to support schema evolution where possible. This means that data pipelines adapt themselves automatically to additional or removed columns and changes of data types if possible.
+
+To assert that a defined list of columns is always present in the schema of a specific DataObject, use its `schemaMin` attribute to define a minimal schema. The minimal schema is validated on read and write with Spark.
+
+To fix the schema for a specific DataObject many DataObjects support the `schema` attribute (e.g. all children of SparkFileDataObject) for reading and writing with Spark. 
+The `schema` attribute allows to define the schema the DataObject tries to read data with, and can be used to avoid schema inference with Spark DataSources.
+On write the DataFrame to be written must match the defined `schema` exactly (nullability and column order are ignored). 
+
+The following list describes specific behaviour of DataObjects:
+* HiveTableDataObject & TickTockHiveTableDataObject: Table schema is managed by Hive and automatically created on first write and updated on subsequent overwrites of the whole table. Changing schema for partitioned tables is not supported.
+  By manipulating the table definition with DDL statements (e.g. alter table add columns) its possible to read data files with a different schema. 
+* SparkFileDataObject: see detailed description in [Spark Data Sources](https://spark.apache.org/docs/latest/sql-data-sources.html).
+  * Many Data Sources support schema inference (e.g. Json, Csv), but we would not recommend this for production data pipelines as the result might not be stable when new data arrives.
+  * For Data Formats with included schema (e.g. Avro, Parquet), schema is read from a random data file. If data files have different schemas, Parquet Data Source supports to consolidate schemas by setting option `mergeSchema=true`. Avro Data Source does not support this.
+  * If you define the `schema` attribute of the DataObject, SDL tries to read the data files with the defined schema. This is e.g. supported by the Json Data Source, but not the CSV Data Source.
+* JdbcTableDataObject: The table has to be created manually or by providing a create table statement in `createSql` attribute. There is no automatic schema evolution for now.
+
+Recipes for data pipelines with schema evolution:
+* CopyAction supports schema evolution if all data is processed by overwriting the whole output DataObject. It needs an output DataObject which doesn't have a fixed schema, e.g. HiveTableDataObject.
+* HistorizeAction & DeduplicateAction supports schema evolution for incremental data. They consolidate the existing data & schema of the output DataObject with a potentially new schema of the input DataObject. Then they overwrite the whole output DataObject. They need a TransactionalSparkTableDataObject as output, which doesn't have a fixed schema, e.g. TickTockHiveTableDataObject.

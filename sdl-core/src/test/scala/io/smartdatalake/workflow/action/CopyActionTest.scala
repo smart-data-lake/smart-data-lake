@@ -19,14 +19,11 @@
 package io.smartdatalake.workflow.action
 
 import java.nio.file.Files
-import java.time.LocalDateTime
 
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.PartitionDiffMode
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, CustomDfTransformerConfig}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed, SparkSubFeed}
@@ -200,8 +197,11 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("A","doe","john",5)).toDF("type", "lastname", "firstname", "rating")
     val l1PartitionValues = Seq(PartitionValues(Map("type"->"A")))
     srcDO.writeDataFrame(l1, l1PartitionValues) // prepare testdata
+    action.preInit(Seq(srcSubFeed))
     val initOutputSubFeeds = action.init(Seq(srcSubFeed))
+    action.preExec(Seq(srcSubFeed))
     val tgtSubFeed1 = action.exec(Seq(srcSubFeed))(session,contextExec).head
+    action.postExec(Seq(srcSubFeed), Seq(tgtSubFeed1))
 
     // check first load
     assert(initOutputSubFeeds.head.asInstanceOf[SparkSubFeed].dataFrame.get.columns.last == "type", "partition columns must be moved last already in init phase")
@@ -215,6 +215,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val l2PartitionValues = Seq(PartitionValues(Map("type"->"B")))
     srcDO.writeDataFrame(l2, l2PartitionValues) // prepare testdata
     assert(srcDO.getDataFrame().count == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
+    action.init(Seq(srcSubFeed))
     val tgtSubFeed2 = action.exec(Seq(srcSubFeed))(session,contextExec).head
 
     // check 2nd load
@@ -272,6 +273,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("20100101","jonson","rob",5),("20100103","doe","bob",3)).toDF("dt", "lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
+    action1.preInit(Seq(srcSubFeed))
     val tgtSubFeed = action1.init(Seq(srcSubFeed)).head.asInstanceOf[SparkSubFeed]
 
     // check simulate
@@ -281,12 +283,15 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtSubFeed.dataFrame.get.columns.contains("mt"))
 
     // run
-    action1.exec(Seq(srcSubFeed))(session,contextExec)
+    action1.preExec(Seq(srcSubFeed))(session,contextExec)
+    val resultSubFeeds = action1.exec(Seq(srcSubFeed))(session,contextExec)
     assert(tgtDO.getDataFrame().count == 2)
+    action1.postExec(Seq(srcSubFeed),resultSubFeeds)(session,contextExec)
 
     // simulate next run
-    action1.reset
-    intercept[NoDataToProcessWarning](action1.init(Seq(srcSubFeed)).head.asInstanceOf[SparkSubFeed])
+    action1.reset()
+    action1.preInit(Seq(srcSubFeed))
+    intercept[NoDataToProcessDontStopWarning](action1.init(Seq(srcSubFeed)))
   }
 
 }
@@ -294,7 +299,6 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 class TestDfTransformer extends CustomDfTransformer {
   def transform(session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectId: String) : DataFrame = {
     import session.implicits._
-    import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
     df.withColumn("rating", $"rating" + 1)
   }
 }

@@ -20,14 +20,21 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.SDLSaveMode
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
+import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.AclDef
 import org.apache.spark.sql.SaveMode
+import org.apache.spark.sql.types.StructType
 
 /**
  * DataObject of type raw for files with unknown content.
  * Provides details to an Action to access raw files.
+ * By specifying format you can custom Spark data formats
+ *
+ * @param customFormat Custom Spark data source format, e.g. binaryFile or text. Only needed if you want to read/write this DataObject with Spark.
+ * @param options Options for custom Spark data source format. Only of use if you want to read/write this DataObject with Spark.
  * @param fileName Definition of fileName. This is concatenated with path and partition layout to search for files. Default is an asterix to match everything.
  * @param saveMode Overwrite or Append new data.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
@@ -36,17 +43,23 @@ import org.apache.spark.sql.SaveMode
  */
 case class RawFileDataObject( override val id: DataObjectId,
                               override val path: String,
+                              customFormat: Option[String] = None,
+                              override val options: Map[String, String] = Map(),
                               override val fileName: String = "*",
                               override val partitions: Seq[String] = Seq(),
-                              override val saveMode: SaveMode = SaveMode.Overwrite,
+                              override val schema: Option[StructType] = None,
+                              override val schemaMin: Option[StructType] = None,
+                              override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
+                              override val sparkRepartition: Option[SparkRepartitionDef] = None,
                               override val acl: Option[AclDef] = None,
                               override val connectionId: Option[ConnectionId] = None,
+                              override val filenameColumn: Option[String] = None,
                               override val expectedPartitionsCondition: Option[String] = None,
                               override val metadata: Option[DataObjectMetadata] = None
                             )(@transient implicit override val instanceRegistry: InstanceRegistry)
-  extends HadoopFileDataObject {
+  extends SparkFileDataObject with CanCreateDataFrame with CanWriteDataFrame {
 
-  // reading binary files as DataFrame is supported starting from Spark 3.0, see https://docs.databricks.com/data/data-sources/binary-file.html
+  override def format: String = customFormat.getOrElse(throw ConfigurationException(s"($id) set attribute customFormat if you want to read/write this a RawFileDataObject with Spark"))
 
   override def factory: FromConfigFactory[DataObject] = RawFileDataObject
 

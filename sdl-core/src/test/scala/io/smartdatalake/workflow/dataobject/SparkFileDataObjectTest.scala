@@ -21,10 +21,14 @@ package io.smartdatalake.workflow.dataobject
 
 import java.nio.file.Files
 
+import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.ProcessingLogicException
 import io.smartdatalake.workflow.action.CustomFileActionTest
 import org.apache.commons.io.FileUtils
+import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.types.StructType
 
 import scala.util.Try
 
@@ -111,7 +115,6 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
   }
 
   test("read partitioned data and filter expected partitions") {
-    import session.implicits._
 
     // create data object
     val tempDir = Files.createTempDirectory("tempHadoopDO")
@@ -134,7 +137,6 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
   }
 
   test("overwrite partitioned data") {
-    import session.implicits._
 
     // create data object
     val tempDir = Files.createTempDirectory("tempHadoopDO")
@@ -161,7 +163,6 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
   }
 
   test("overwrite all") {
-    import session.implicits._
 
     // create data object
     val tempDir = Files.createTempDirectory("tempHadoopDO")
@@ -171,7 +172,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
     val df1 = Seq(("A",1),("A",2)).toDF("p", "value")
     dataObject.writeDataFrame(df1)
 
-    // overwrite partition B with new data, overwrite partition C with no data
+    // overwrite with new data
     val df2 = Seq(("B",3),("B",4)).toDF("p", "value")
     dataObject.writeDataFrame(df2)
 
@@ -185,7 +186,6 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
   }
 
   test("overwrite all empty") {
-    import session.implicits._
 
     // create data object
     val tempDir = Files.createTempDirectory("tempHadoopDO")
@@ -195,7 +195,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
     val df1 = Seq(("A",1),("A",2)).toDF("p", "value")
     dataObject.writeDataFrame(df1)
 
-    // overwrite partition B with new data, overwrite partition C with no data
+    // overwrite with no data
     val df2 = Seq[(String,Int)]().toDF("p", "value")
     dataObject.writeDataFrame(df2)
 
@@ -205,8 +205,30 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
     FileUtils.deleteDirectory(tempDir.toFile)
   }
 
+  test("overwrite all preserve directory") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, csvOptions = Map("header" -> "true"), saveMode = SDLSaveMode.OverwritePreserveDirectories)
+
+    // write test data
+    val df1 = Seq(("A",1),("A",2)).toDF("p", "value")
+    dataObject.writeDataFrame(df1)
+
+    // overwrite with new data
+    val df2 = Seq(("B",3),("B",4)).toDF("p", "value")
+    dataObject.writeDataFrame(df2)
+
+    // test reading data
+    val result = dataObject.getDataFrame()
+      .select($"p",$"value".cast("int"))
+      .as[(String,Int)].collect.toSeq.sorted
+    assert( result == Seq(("B",3),("B",4)))
+
+    FileUtils.deleteDirectory(tempDir.toFile)
+  }
+
   test("append filename") {
-    import session.implicits._
 
     // create data object
 
@@ -214,18 +236,91 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
     val srcDir = "testSrc"
     val resourceFile = "AB_NYC_2019.csv"
     val tempDir = Files.createTempDirectory(feed)
-    val sourceFileColName = "sourcefile"
+    val sourceFileColName = "_sourcefile"
 
     // copy data file to test directory
     TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile).toFile)
     // setup DataObject
-    val dataObject = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> CustomFileActionTest.delimiter), filenameColumn = Some(sourceFileColName))
+    val dataObject = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'),
+      csvOptions = Map("header" -> "true", "delimiter" -> CustomFileActionTest.delimiter), filenameColumn = Some(sourceFileColName),
+      schema = Some(StructType.fromDDL("id string,name string,host_id string,host_name string,neighbourhood_group string,neighbourhood string,latitude string,longitude string,room_type string,price string,minimum_nights string,number_of_reviews string,last_review string,reviews_per_month string,calculated_host_listings_count string,availability_365 string"))
+    )
 
-    // test
+    // test received DataFrame
     val df = dataObject.getDataFrame()
     df.columns.contains(sourceFileColName) //retrieved Dataframe has sourcefile column appended
     df.select(sourceFileColName).collect().head.getAs[String](0).endsWith(resourceFile) //content of sourcefile column corresponds to sourcefile
 
+    // test if it could be written again
+    dataObject.init(df.drop(sourceFileColName), Seq())
+
     FileUtils.deleteDirectory(tempDir.toFile)
   }
+
+  test("get concrete paths") {
+    val tempDir = Files.createTempDirectory("concretePaths")
+    tempDir.resolve("a=1").resolve("b=1").resolve("c=1").toFile.mkdirs()
+    tempDir.resolve("a=1").resolve("b=1").resolve("c=2").toFile.mkdirs()
+    tempDir.resolve("a=1").resolve("b=2").resolve("c=1").toFile.mkdirs()
+    tempDir.resolve("a=1").resolve("b=2").resolve("c=2").toFile.mkdirs()
+    tempDir.resolve("a=1").resolve("b=3").resolve("c=1").toFile.mkdirs()
+    tempDir.resolve("a=1").resolve("b=3").resolve("c=2").toFile.mkdirs()
+    tempDir.resolve("a=2").resolve("b=1").resolve("c=1").toFile.mkdirs()
+    tempDir.resolve("a=2").resolve("b=1").resolve("c=2").toFile.mkdirs()
+    tempDir.resolve("a=2").resolve("b=2").resolve("c=1").toFile.mkdirs()
+    tempDir.resolve("a=2").resolve("b=2").resolve("c=2").toFile.mkdirs()
+    tempDir.resolve("a=2").resolve("b=3").resolve("c=1").toFile.mkdirs()
+    tempDir.resolve("a=2").resolve("b=3").resolve("c=2").toFile.mkdirs()
+
+    val do1 = RawFileDataObject("testDO", tempDir.toString, partitions = Seq("a","b","c"))
+    def removeDOBase(p: String) = p.replaceFirst(".*concretePaths.*?/", "")
+    def getPaths(pv: PartitionValues) = do1.getConcretePaths(pv).map(p => removeDOBase(p.toString))
+    // inits
+    assert(getPaths(PartitionValues(Map("a" -> 1))).sorted == Seq("a=1"))
+    assert(getPaths(PartitionValues(Map("a" -> 1, "b" -> 1))).sorted == Seq("a=1/b=1"))
+    assert(getPaths(PartitionValues(Map("a" -> 1, "b" -> 1, "c" -> 1))).sorted == Seq("a=1/b=1/c=1"))
+    // no inits
+    assert(getPaths(PartitionValues(Map("b" -> 1))).sorted == Seq("a=1/b=1","a=2/b=1"))
+    assert(getPaths(PartitionValues(Map("c" -> 1))).sorted == Seq("a=1/b=1/c=1","a=1/b=2/c=1","a=1/b=3/c=1","a=2/b=1/c=1","a=2/b=2/c=1","a=2/b=3/c=1"))
+    assert(getPaths(PartitionValues(Map("b" -> 1, "c" -> 1))).sorted == Seq("a=1/b=1/c=1","a=2/b=1/c=1"))
+  }
+
+
+  test("delete files only") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", partitions = Seq("p"), path = tempDir.toString, csvOptions = Map("header" -> "true"))
+
+    // write test data
+    val df1 = Seq(("A",1),("A",2)).toDF("p", "value")
+    dataObject.writeDataFrame(df1)
+
+    // delete partition files
+    val partitionValues = PartitionValues(Map("p"->"A"))
+    val partitionPath = new Path(dataObject.hadoopPath, dataObject.getPartitionString(partitionValues).get)
+    assert(dataObject.filesystem.isDirectory(partitionPath))
+    assert(dataObject.filesystem.listStatus(partitionPath).nonEmpty)
+    dataObject.deletePartitionsFiles(Seq(partitionValues))
+    assert(dataObject.filesystem.listStatus(partitionPath).isEmpty)
+    assert(dataObject.filesystem.isDirectory(partitionPath))
+
+    // delete files in base dir
+    assert(dataObject.filesystem.listStatus(dataObject.hadoopPath).exists(_.isFile))
+    dataObject.deleteAllFiles(dataObject.hadoopPath)
+    assert(!dataObject.filesystem.listStatus(dataObject.hadoopPath).exists(_.isFile))
+    assert(dataObject.filesystem.isDirectory(dataObject.hadoopPath))
+    assert(dataObject.filesystem.isDirectory(new Path(dataObject.hadoopPath,"p=A")))
+
+    FileUtils.deleteDirectory(tempDir.toFile)
+  }
+
+  test("OverwriteOptimized without partition values not allowed for partitioned DataObject") {
+    val df = Seq(("A", "2", 1), ("B", "1", 2), ("C", "X", 3)).toDF("p1", "p2", "value")
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", partitions = Seq("p1","p2"), path = tempDir.toString, saveMode = SDLSaveMode.OverwriteOptimized)
+    a [ProcessingLogicException] should be thrownBy dataObject.writeDataFrame(df, partitionValues = Seq())
+  }
+
 }

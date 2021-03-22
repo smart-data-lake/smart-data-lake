@@ -22,7 +22,7 @@ import java.io.File
 import java.time.LocalDateTime
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.ActionObjectId
+import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -73,6 +73,7 @@ case class SmartDataLakeBuilderConfig(feedSel: String = null,
   }
   def getPartitionValues: Option[Seq[PartitionValues]] = partitionValues.orElse(multiPartitionValues)
   val appName: String = applicationName.getOrElse(feedSel)
+  def isDryRun: Boolean = test.contains(TestMode.DryRun)
 }
 object TestMode extends Enumeration {
   type TestMode = Value
@@ -174,7 +175,10 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * @param appConfig Application configuration (parsed from command line).
    */
   def run(appConfig: SmartDataLakeBuilderConfig): Map[RuntimeEventState,Int] = try {
-    if (appConfig.statePath.isDefined) {
+    // invoke SDLPlugin if configured
+    Environment.sdlPlugin.foreach(_.startup())
+    // handle state if defined
+    if (appConfig.statePath.isDefined && !appConfig.isDryRun) {
       assert(appConfig.applicationName.nonEmpty, "Application name must be defined if statePath is set")
       // check if latest run succeeded
       val appName = appConfig.applicationName.get
@@ -197,6 +201,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   } finally {
     // make sure memory logger timer task is stopped
     MemoryUtils.stopMemoryLogger()
+    // invoke SDLPlugin if configured
+    Environment.sdlPlugin.foreach(_.shutdown())
   }
 
   /**
@@ -234,7 +240,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * Start run.
    * @return tuple of list of final subfeeds and statistics (action count per RuntimeEventState)
    */
-  private[smartdatalake] def startRun(appConfig: SmartDataLakeBuilderConfig, runId: Int = 1, attemptId: Int = 1, runStartTime: LocalDateTime = LocalDateTime.now, attemptStartTime: LocalDateTime = LocalDateTime.now, actionIdsToSkip: Seq[ActionObjectId] = Seq(), initialSubFeeds: Seq[SubFeed] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, simulation: Boolean = false) : (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
+  private[smartdatalake] def startRun(appConfig: SmartDataLakeBuilderConfig, runId: Int = 1, attemptId: Int = 1, runStartTime: LocalDateTime = LocalDateTime.now, attemptStartTime: LocalDateTime = LocalDateTime.now, actionIdsToSkip: Seq[ActionId] = Seq(), initialSubFeeds: Seq[SubFeed] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, simulation: Boolean = false) : (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
 
     // validate application config
     appConfig.validate()
@@ -264,7 +270,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     exec(appConfig, runId, attemptId, runStartTime, attemptStartTime, actionIdsToSkip, initialSubFeeds, stateStore, stateListeners, simulation)(Environment._instanceRegistry, session)
   }
 
-  private[smartdatalake] def exec(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime, actionIdsToSkip: Seq[ActionObjectId], initialSubFeeds: Seq[SubFeed], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener], simulation: Boolean)(implicit instanceRegistry: InstanceRegistry, session: SparkSession) : (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
+  private[smartdatalake] def exec(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime, actionIdsToSkip: Seq[ActionId], initialSubFeeds: Seq[SubFeed], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener], simulation: Boolean)(implicit instanceRegistry: InstanceRegistry, session: SparkSession) : (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
 
     // select actions by feedSel
     val actionsSelected = instanceRegistry.getActions.filter(_.metadata.flatMap(_.feed).exists(_.matches(appConfig.feedSel)))
@@ -295,7 +301,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       } else {
         actionDAGRun.prepare
         actionDAGRun.init
-        if (appConfig.test.contains(TestMode.DryRun)) { // stop here if only dry-run
+        if (appConfig.isDryRun) { // stop here if only dry-run
           logger.info(s"${appConfig.test.get}-Test successful")
           return (Seq(), Map())
         }

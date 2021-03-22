@@ -150,8 +150,8 @@ private[smartdatalake] object SchemaEvolution extends SmartDataLakeLogger {
     def getNullColumnOfType(d: DataType) = lit(null).cast(d)
 
     // log entry point
-    logger.info(s"old schema: ${oldDf.schema.treeString}")
-    logger.info(s"new schema: ${newDf.schema.treeString}")
+    logger.debug(s"old schema: ${oldDf.schema.treeString}")
+    logger.debug(s"new schema: ${newDf.schema.treeString}")
 
     val oldColsWithoutTechCols = oldDf.columns.filter(c => !colsToIgnore.contains(c)).toSeq
     val newColsWithoutTechCols = newDf.columns.filter(c => !colsToIgnore.contains(c)).toSeq
@@ -202,7 +202,7 @@ private[smartdatalake] object SchemaEvolution extends SmartDataLakeLogger {
             case (Some(o),Some(n)) if o.simpleString != n.simpleString =>
               val convertedColumns = convertDataType(col(c), o, n, ignoreOldDeletedNestedColumns)
               val info = if (convertedColumns.isDefined) Some(s"column $c is converted from ${o.simpleString}/${n.simpleString} to ${convertedColumns.get._3.simpleString}") else None
-              val err = if (convertedColumns.isEmpty) Some(s"column $c cannot be converted from ${o.simpleString}/${n.simpleString} to ${convertedColumns.get._3.simpleString}") else None
+              val err = if (convertedColumns.isEmpty) Some(s"column $c cannot be converted from ${o.simpleString} to ${n.simpleString}") else None
               (convertedColumns.map(_._1.as(c)), convertedColumns.map(_._2.as(c)), info, err)
             // datatypes are equal -> no conversion required
             case (Some(o),Some(n)) => (thisColumn,thisColumn,None,None)
@@ -219,6 +219,8 @@ private[smartdatalake] object SchemaEvolution extends SmartDataLakeLogger {
       // log information
       val infoList = tgtColumns.flatMap(_.infoMsg).mkString("\n\t")
       logger.info(s"schema evolution needed. mapping is: \n\t$infoList")
+      logger.info(s"old schema: ${oldDf.schema.treeString}")
+      logger.info(s"new schema: ${newDf.schema.treeString}")
 
       // prepare dataframes
       val oldExtendedDf = oldDf.select(tgtColumns.flatMap(_.oldToNewColumn):_*)

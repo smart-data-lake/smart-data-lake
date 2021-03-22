@@ -27,17 +27,30 @@ private[smartdatalake] abstract class DAGException(msg: String, cause: Throwable
   def getMessageWithCause: String = msg + Option(getDAGRootExceptions.head.getCause).map(t => s": ${t.getClass.getSimpleName}: ${t.getMessage}").getOrElse("")
 }
 
-private[smartdatalake] case class TaskFailedException(id: NodeId, cause: Throwable, override val severity: ExceptionSeverity.ExceptionSeverity) extends DAGException(id, cause) {
+private[smartdatalake] case class TaskFailedException(id: NodeId, msg: String, cause: Throwable, override val severity: ExceptionSeverity.ExceptionSeverity) extends DAGException(msg, cause) {
   override def getDAGRootExceptions: Seq[DAGException] = Seq(this)
 }
 private[smartdatalake] object TaskFailedException {
-  def apply(id: NodeId, cause: Throwable): TaskFailedException = cause match {
-    case ex: DAGException => TaskFailedException(id, cause, ex.severity)
-    case _ => TaskFailedException(id, cause, ExceptionSeverity.FAILED)
+  def apply(id: NodeId, cause: Throwable): TaskFailedException = {
+    // get root cause to show create message of this exception
+    val rootCause = getRootCause(cause)
+    val msg = s"Task $id failed. Root cause is '${rootCause.getClass.getSimpleName}: ${rootCause.getMessage}'"
+    // create exception
+    val ex = cause match {
+      case ex: DAGException => TaskFailedException(id, msg, cause, ex.severity)
+      case _ => TaskFailedException(id, msg, cause, ExceptionSeverity.FAILED)
+    }
+    // remove stacktrace: avoid many lines of DAG, Monix and Java stacktrace and show directly the real exception that made the task fail
+    ex.setStackTrace(Array())
+    ex
+  }
+  // recursively get root cause of exception
+  def getRootCause(cause: Throwable): Throwable = {
+    Option(cause.getCause).map(getRootCause).getOrElse(cause)
   }
 }
 
-private[smartdatalake] case class TaskCancelledException(id: NodeId) extends DAGException(id) {
+private[smartdatalake] case class TaskCancelledException(id: NodeId) extends DAGException(s"Task $id cancelled") {
   override val severity: ExceptionSeverity.ExceptionSeverity = ExceptionSeverity.CANCELLED
   override def getDAGRootExceptions: Seq[DAGException] = Seq(this)
 }
@@ -53,7 +66,7 @@ private[smartdatalake] class TaskSkippedDontStopWarning[R <: DAGResult](id: Node
   def getResults: Option[Seq[R]] = results
 }
 
-private[smartdatalake] case class TaskPredecessorFailureWarning(id: NodeId, cause: DAGException, allCauses: Seq[DAGException]) extends DAGException(id, cause) {
+private[smartdatalake] case class TaskPredecessorFailureWarning(id: NodeId, cause: DAGException, allCauses: Seq[DAGException]) extends DAGException(s"Task $id failed because predecessor failed", cause) {
   override val severity: ExceptionSeverity.ExceptionSeverity = cause.severity
   override def getDAGRootExceptions: Seq[DAGException] = allCauses.flatMap(_.getDAGRootExceptions)
 }

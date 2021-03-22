@@ -21,15 +21,15 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{DateColumnType, Environment}
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
+import io.smartdatalake.definitions.{DateColumnType, Environment, SDLSaveMode}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SmartDataLakeLogger}
-import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.HiveTableConnection
+import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 
@@ -66,7 +66,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
                                override val schemaMin: Option[StructType] = None,
                                override var table: Table,
                                numInitialHdfsPartitions: Int = 16,
-                               saveMode: SaveMode = SaveMode.Overwrite,
+                               saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                acl: Option[AclDef] = None,
                                connectionId: Option[ConnectionId] = None,
                                override val expectedPartitionsCondition: Option[String] = None,
@@ -82,6 +82,8 @@ case class HiveTableDataObject(override val id: DataObjectId,
   // prepare table
   table = table.overrideDb(connection.map(_.db))
   if (table.db.isEmpty) throw ConfigurationException(s"($id) db is not defined in table and connection.")
+
+  assert(saveMode!=SDLSaveMode.OverwritePreserveDirectories, s"($id) saveMode OverwritePreserveDirectories not supported for now.")
 
   // prepare final path
   @transient private var hadoopPathHolder: Path = _
@@ -126,8 +128,14 @@ case class HiveTableDataObject(override val id: DataObjectId,
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
     val df = session.table(s"${table.fullName}")
-    validateSchemaMin(df)
+    validateSchemaMin(df, "read")
     df
+  }
+
+  override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    validateSchemaMin(df, "write")
+    // validate against hive table schema if existing
+    if (isTableExisting) validateSchema(df, session.table(table.fullName).schema, "write")
   }
 
   override def preWrite(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
@@ -139,9 +147,9 @@ case class HiveTableDataObject(override val id: DataObjectId,
   }
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
-                             (implicit session: SparkSession): Unit = {
+                             (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     require(!isRecursiveInput, "($id) HiveTableDataObject cannot write dataframe when dataobject is also used as recursive input ")
-    validateSchemaMin(df)
+    validateSchemaMin(df, "write")
     writeDataFrameInternal(df, createTableOnly = false, partitionValues)
   }
 
@@ -153,8 +161,25 @@ case class HiveTableDataObject(override val id: DataObjectId,
   private def writeDataFrameInternal(df: DataFrame, createTableOnly:Boolean, partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): Unit = {
     val dfPrepared = if (createTableOnly) session.createDataFrame(List[Row]().asJava, df.schema) else df
 
+    // apply special save modes
+    saveMode match {
+      case SDLSaveMode.Overwrite =>
+        if (partitionValues.nonEmpty) { // delete concerned partitions if existing, as Spark dynamic partitioning doesn't delete empty partitions
+          deletePartitionsIfExisting(partitionValues)
+        }
+      case SDLSaveMode.OverwriteOptimized =>
+        if (partitionValues.nonEmpty) { // delete concerned partitions if existing, as append mode is used later
+          deletePartitionsIfExisting(partitionValues)
+        } else if (partitions.isEmpty || Environment.globalConfig.allowOverwriteAllPartitionsWithoutPartitionValues.contains(id)) { // delete table if existing, as append mode is used later
+          dropTable
+        } else {
+          throw new ProcessingLogicException(s"($id) OverwriteOptimized without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data.")
+        }
+      case _ => Unit
+    }
+
     // write table and fix acls
-    HiveUtil.writeDfToHive( dfPrepared, hadoopPath, table, partitions, saveMode, numInitialHdfsPartitions=numInitialHdfsPartitions )
+    HiveUtil.writeDfToHive( dfPrepared, hadoopPath, table, partitions, saveMode.asSparkSaveMode, numInitialHdfsPartitions=numInitialHdfsPartitions )
     val aclToApply = acl.orElse(connection.flatMap(_.acl))
     if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
     if (analyzeTableAfterWrite && !createTableOnly) {
@@ -183,7 +208,17 @@ case class HiveTableDataObject(override val id: DataObjectId,
   }
 
   override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
-    partitionValues.foreach( pv => HiveUtil.dropPartition(table, hadoopPath, pv))
+    partitionValues.foreach( pv => HiveUtil.dropPartition(table, hadoopPath, pv, Some(filesystem)))
+  }
+
+  /**
+   * Checks if partition exists and deletes it.
+   * Note that partition values to check don't need to have a key/value defined for every partition column.
+   */
+  def deletePartitionsIfExisting(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit  = {
+    val partitionValueKeys = PartitionValues.getPartitionValuesKeys(partitionValues).toSeq
+    val partitionValuesToDelete = partitionValues.intersect(listPartitions.map(_.filterKeys(partitionValueKeys)))
+    deletePartitions(partitionValuesToDelete)
   }
 
   override def createEmptyPartition(partitionValues: PartitionValues)(implicit session: SparkSession): Unit = {
@@ -192,7 +227,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
   }
 
   override def dropTable(implicit session: SparkSession): Unit = {
-    HiveUtil.dropTable(table)
+    HiveUtil.dropTable(table, hadoopPath, filesystem = Some(filesystem))
   }
 
   override def factory: FromConfigFactory[DataObject] = HiveTableDataObject

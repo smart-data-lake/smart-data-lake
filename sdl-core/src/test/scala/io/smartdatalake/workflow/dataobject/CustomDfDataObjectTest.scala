@@ -20,8 +20,8 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
-import io.smartdatalake.config.{TestCustomDfCreator, TestCustomDfCreatorWithSchema}
 import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.testutils.custom.{TestCustomDfCreator, TestCustomDfCreatorWithSchema}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
 import org.scalatest.Matchers

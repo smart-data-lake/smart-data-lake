@@ -24,6 +24,7 @@ import java.io.InputStream
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.customlogic.CustomFileCreatorConfig
@@ -45,7 +46,7 @@ case class CustomFileDataObject(override val id: DataObjectId,
     Seq(FileRef("custom", "custom", PartitionValues(Map())))
   }
 
-  override def saveMode: SaveMode =
+  override def saveMode: SDLSaveMode =
     throw new ConfigurationException("CustomFileDataObject does not support being written to")
 
   override def path: String =
