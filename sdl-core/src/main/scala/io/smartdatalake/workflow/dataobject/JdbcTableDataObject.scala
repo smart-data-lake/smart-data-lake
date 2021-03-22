@@ -201,8 +201,21 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def isDbExisting(implicit session: SparkSession): Boolean = connection.catalog.isDbExisting(table.db.get)
-  override def isTableExisting(implicit session: SparkSession): Boolean = connection.catalog.isTableExisting(table.db.get, table.name)
+  // cache if db is existing - update as long as db is not existing
+  private var _isDBExisting: Boolean = false
+  override def isDbExisting(implicit session: SparkSession): Boolean = {
+    if (!_isDBExisting &&connection.catalog.isDbExisting(table.db.get)) _isDBExisting = true
+    // return
+    _isDBExisting
+  }
+
+  // cache if table is existing - update as long as table is not existing
+  private var _isTableExisting: Boolean = false
+  override def isTableExisting(implicit session: SparkSession): Boolean = {
+    if (!_isTableExisting && connection.catalog.isTableExisting(table.db.get, table.name)) _isTableExisting = true
+    // return
+    _isTableExisting
+  }
 
   def deleteAllData(implicit session: SparkSession): Unit = {
     connection.execJdbcStatement(s"delete from ${table.fullName}")
