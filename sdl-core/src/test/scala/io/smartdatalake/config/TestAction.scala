@@ -19,8 +19,8 @@
 package io.smartdatalake.config
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
-import io.smartdatalake.definitions.ExecutionMode
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.definitions.{Condition, ExecutionMode}
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, TransactionalSparkTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
@@ -34,11 +34,12 @@ import org.apache.spark.sql.SparkSession
  * @param outputId output [[DataObject]] id
  * @param arg1  some (optional) dummy argument
  */
-case class TestAction(override val id: ActionObjectId,
+case class TestAction(override val id: ActionId,
                       inputId: DataObjectId,
                       outputId: DataObjectId,
                       arg1: Option[String],
                       executionMode: Option[ExecutionMode] = None,
+                      override val executionCondition: Option[Condition] = None,
                       override val metricsFailCondition: Option[String] = None,
                       override val metadata: Option[ActionMetadata] = None
                      )(implicit instanceRegistry: InstanceRegistry)

@@ -21,7 +21,7 @@ package io.smartdatalake.config
 import com.typesafe.config.{ConfigException, ConfigFactory}
 import io.smartdatalake.config.ConfigParser.localSubstitution
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.definitions.{Environment, PartitionDiffMode}
+import io.smartdatalake.definitions.{Environment, PartitionDiffMode, SDLSaveMode}
 import io.smartdatalake.workflow.action.{Action, FileTransferAction}
 import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, DataObject, DataObjectMetadata, RawFileDataObject}
 import org.apache.spark.sql.types.StructType
@@ -42,6 +42,7 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         |     type = RawFileDataObject
         |     path = /my/path2
         |     partitions = []
+        |     saveMode = Append
         |   }
         |   do3 = {
         |     type = CsvFileDataObject
@@ -52,6 +53,7 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         |       header = "true"
         |       quote = "\""
         |     }
+        |     saveMode = OverwritePreserveDirectories
         |   }
         |}
         |actions = {
@@ -76,7 +78,8 @@ class ConfigParsingTest extends FlatSpec with Matchers {
     val do2 = RawFileDataObject(
       id = "do2",
       path = "/my/path2",
-      partitions = Seq.empty
+      partitions = Seq.empty,
+      saveMode = SDLSaveMode.Append
     )
 
     val do3 = CsvFileDataObject(
@@ -87,7 +90,8 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         "escape" -> "\\",
         "header" -> "true",
         "quote" -> "\""
-      )
+      ),
+      saveMode = SDLSaveMode.OverwritePreserveDirectories
     )
 
     dataObjects should contain allOf(do1, do2, do3)

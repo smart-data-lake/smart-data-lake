@@ -108,7 +108,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
     val fs = getHadoopFsFromSpark(existingFilePath)
     val (numFiles, sumSize, avgSize) = HdfsUtil.sizeInfo(existingFilePath, fs)
     val reduceBy = if(reducePartitions) 2 else 1
-    val numPartitionsRequired = Math.max(1,Math.ceil(sumSize.toDouble/desiredSize.toDouble).toInt) / reduceBy
+    val numPartitionsRequired = Math.max(1,Math.ceil(sumSize.toDouble / desiredSize / reduceBy).toInt)
     val currentPartitionNum = df.rdd.getNumPartitions
 
     logger.debug(s"Current Parquet files: ${numFiles} with a size of ${sumSize}. Requiring ${numPartitionsRequired} partitions now.")

@@ -60,6 +60,9 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val appName = "sdlb-recovery"
     val feedName = "test"
 
+    // configure SDLPlugin for testing
+    System.setProperty("sdl.pluginClassName", classOf[TestSDLPlugin].getName)
+
     HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
@@ -152,6 +155,11 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == selectedPartitions)
       if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
     }
+
+    // test and reset SDLPlugin config
+    assert(TestSDLPlugin.startupCalled)
+    assert(TestSDLPlugin.shutdownCalled)
+    System.clearProperty("sdl.pluginClassName")
   }
 
   test("sdlb run with initialExecutionMode=PartitionDiffMode, increase runId on second run, state listener") {
@@ -256,14 +264,17 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val srcPath = tempPath + s"/${srcTable.fullName}"
     // source table has partitions columns dt and type
     val srcDO = HiveTableDataObject("src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname", "firstname")))
     val tgt1Path = tempPath + s"/${tgt1Table.fullName}"
     val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tgt1Path), table = tgt1Table, numInitialHdfsPartitions = 1)
+    tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
     val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname", "firstname")))
-    val tgt2Path = tempPath + s"/${tgt1Table.fullName}"
+    val tgt2Path = tempPath + s"/${tgt2Table.fullName}"
     val tgt2DO = HiveTableDataObject("tgt2", Some(tgt2Path), table = tgt2Table, numInitialHdfsPartitions = 1)
+    tgt2DO.dropTable
     instanceRegistry.register(tgt2DO)
 
     // prepare input DataFrame
@@ -309,4 +320,13 @@ class TestUDFAddXCreator() extends SparkUDFCreator {
   override def get(options: Map[String, String]): UserDefinedFunction = {
     udf((v: Int) => v + options("x").toInt)
   }
+}
+
+class TestSDLPlugin extends SDLPlugin {
+  override def startup(): Unit = { TestSDLPlugin.startupCalled = true }
+  override def shutdown(): Unit = { TestSDLPlugin.shutdownCalled = true }
+}
+object TestSDLPlugin {
+  var startupCalled = false
+  var shutdownCalled = false
 }

@@ -19,13 +19,22 @@
 
 package io.smartdatalake.util.misc
 
+import org.apache.spark.sql.SparkSession
+
 object EnvironmentUtil {
 
   /**
    * check if running on windows os
    */
-  def isWindowsOS = {
+  def isWindowsOS: Boolean = {
     sys.env.get("OS").exists(_.toLowerCase.startsWith("windows"))
+  }
+
+  /**
+   * check if Spark AQE (Spark 3.0) is enabled
+   */
+  def isSparkAdaptiveQueryExecEnabled(implicit session: SparkSession): Boolean = {
+    session.version.takeWhile(_ != '.').toInt >= 3 && session.conf.get("spark.sql.adaptive.enabled").toBoolean
   }
 
   /**
@@ -37,7 +46,6 @@ object EnvironmentUtil {
    * @param key the name of the parameter in camelCase notation, starting with a lowercase letter.
    */
   def getSdlParameter(key: String): Option[String] = {
-
     sys.props.get("sdl."+key)
       .orElse(sys.env.get("SDL_"+camelCaseToUpper(key)))
   }

@@ -19,10 +19,10 @@
 package io.smartdatalake.config
 
 import configs.{ConfigError, Configs, Result}
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, ConnectionId, DataObjectId}
-import io.smartdatalake.definitions.{Condition, ExecutionMode}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
+import io.smartdatalake.definitions.{AuthMode, Condition, ExecutionMode}
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
-import io.smartdatalake.util.webservice.KeycloakConfig
+import io.smartdatalake.util.secrets.SecretProviderConfig
 import io.smartdatalake.workflow.action.customlogic.{CustomDfCreatorConfig, CustomDfTransformerConfig, CustomDfsTransformerConfig, CustomFileTransformerConfig, SparkUDFCreatorConfig}
 import io.smartdatalake.workflow.dataobject.WebserviceFileDataObject
 import org.apache.spark.sql.streaming.OutputMode
@@ -76,19 +76,14 @@ trait ConfigImplicits {
   implicit val customFileTransformerConfigReader: Configs[CustomFileTransformerConfig] = Configs.derive[CustomFileTransformerConfig]
   implicit val sparkUdfCreatorConfigReader: Configs[SparkUDFCreatorConfig] = Configs.derive[SparkUDFCreatorConfig]
   implicit val sparkRepartitionDefReader: Configs[SparkRepartitionDef] = Configs.derive[SparkRepartitionDef]
+  implicit val secretProviderConfigReader: Configs[SecretProviderConfig] = Configs.derive[SecretProviderConfig]
   implicit val executionModeReader: Configs[ExecutionMode] = Configs.derive[ExecutionMode]
   implicit val conditionReader: Configs[Condition] = Configs.derive[Condition]
+  implicit val authModeReader: Configs[AuthMode] = Configs.derive[AuthMode]
   // --------------------------------------------------------------------------------
 
   implicit def mapDataObjectIdStringReader(implicit mapReader: Configs[Map[String,String]]): Configs[Map[DataObjectId, String]] = {
     Configs.fromConfig { c => mapReader.extract(c).map(_.map{ case (k,v) => (DataObjectId(k), v)})}
-  }
-
-  /**
-   * A ConfigReader reader that reads [[KeycloakConfig]] values.
-   */
-  implicit val keyCloakConfigReader: Configs[Option[KeycloakConfig]] = Configs.fromConfigTry { c =>
-    WebserviceFileDataObject.getKeyCloakConfig(c)
   }
 
   /**
@@ -102,8 +97,8 @@ trait ConfigImplicits {
   implicit val dataObjectIdReader: Configs[DataObjectId] = Configs.fromTry { (c, p) => DataObjectId(c.getString(p))}
 
   /**
-   * A ConfigReader reader that reads [[ActionObjectId]] values.
+   * A ConfigReader reader that reads [[ActionId]] values.
    */
-  implicit val actionObjectIdReader: Configs[ActionObjectId] = Configs.fromTry { (c, p) => ActionObjectId(c.getString(p))}
+  implicit val actionIdReader: Configs[ActionId] = Configs.fromTry { (c, p) => ActionId(c.getString(p))}
 
 }

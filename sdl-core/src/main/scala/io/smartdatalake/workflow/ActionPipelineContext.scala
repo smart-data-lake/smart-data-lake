@@ -22,7 +22,7 @@ import java.time.LocalDateTime
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
@@ -58,16 +58,16 @@ case class ActionPipelineContext (
                                   attemptStartTime: LocalDateTime = LocalDateTime.now(),
                                   simulation: Boolean = false,
                                   var phase: ExecutionPhase = ExecutionPhase.Prepare,
-                                  dataFrameReuseStatistics: mutable.Map[(DataObjectId, Seq[PartitionValues]), Seq[ActionObjectId]] = mutable.Map()
+                                  dataFrameReuseStatistics: mutable.Map[(DataObjectId, Seq[PartitionValues]), Seq[ActionId]] = mutable.Map()
 ) extends SmartDataLakeLogger {
   private[smartdatalake] def getReferenceTimestampOrNow: LocalDateTime = referenceTimestamp.getOrElse(LocalDateTime.now)
-  private[smartdatalake] def rememberDataFrameReuse(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], actionId: ActionObjectId): Int = dataFrameReuseStatistics.synchronized {
+  private[smartdatalake] def rememberDataFrameReuse(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], actionId: ActionId): Int = dataFrameReuseStatistics.synchronized {
     val key = (dataObjectId, partitionValues)
     val newValue = dataFrameReuseStatistics.getOrElse(key, Seq()) :+ actionId
     dataFrameReuseStatistics.update(key, newValue)
     newValue.size
   }
-  private[smartdatalake] def forgetDataFrameReuse(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], actionId: ActionObjectId): Option[Int] = dataFrameReuseStatistics.synchronized {
+  private[smartdatalake] def forgetDataFrameReuse(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], actionId: ActionId): Option[Int] = dataFrameReuseStatistics.synchronized {
     val key = (dataObjectId, partitionValues)
     val existingValue = dataFrameReuseStatistics.get(key)
     existingValue.map { v =>

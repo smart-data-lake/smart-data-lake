@@ -53,4 +53,8 @@ private[smartdatalake] trait TableDataObject extends DataObject with CanCreateDa
   def isPKcandidateKey(implicit session: SparkSession, context: ActionPipelineContext): Boolean =  {
     table.primaryKey.isEmpty || getDataFrame().isCandidateKey(table.primaryKey.get.toArray)
   }
+
+  override def atlasQualifiedName(prefix: String): String = s"${table.db.getOrElse("default")}.${table.name}"
+
+  override def atlasName: String = id.id
 }

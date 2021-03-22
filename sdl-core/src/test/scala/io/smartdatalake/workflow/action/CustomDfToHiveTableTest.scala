@@ -22,9 +22,10 @@ import java.nio.file.Files
 import java.time.LocalDateTime
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
-import io.smartdatalake.config.{InstanceRegistry, TestCustomDfCreator, TestCustomDfManyTypes}
+import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.TestUtil._
+import io.smartdatalake.testutils.custom.{TestCustomDfCreator, TestCustomDfManyTypes}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig

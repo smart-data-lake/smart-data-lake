@@ -23,6 +23,8 @@ import java.sql.{ResultSet, ResultSetMetaData}
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.SDLSaveMode
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.{DefaultExpressionData, SparkExpressionUtil}
@@ -47,7 +49,7 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
  * @param postWriteSql SQL-statement to be executed in exec phase after writing output table, using output jdbc connection
  *                   Use tokens with syntax %{<spark sql expression>} to substitute with values from [[DefaultExpressionData]].
  * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
- * @param saveMode spark [[SaveMode]] to use when writing table, default is "overwrite". Only "append" and "overwrite" supported.
+ * @param saveMode [[SDLSaveMode]] to use when writing table, default is "Overwrite". Only "Append" and "Overwrite" supported.
  * @param table The jdbc table to be read
  * @param jdbcFetchSize Number of rows to be fetched together by the Jdbc driver
  * @param connectionId Id of JdbcConnection configuration
@@ -69,7 +71,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                override val schemaMin: Option[StructType] = None,
                                override var table: Table,
                                jdbcFetchSize: Int = 1000,
-                               saveMode: SaveMode = SaveMode.Overwrite,
+                               saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                connectionId: ConnectionId,
                                jdbcOptions: Map[String, String] = Map(),
                                virtualPartitions: Seq[String] = Seq(),
@@ -92,7 +94,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   table = table.overrideDb(connection.db)
   if(table.db.isEmpty) throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
 
-  assert(saveMode==SaveMode.Append || saveMode==SaveMode.Overwrite, s"($id) Only saveMode append and overwrite supported.")
+  assert(saveMode==SDLSaveMode.Append || saveMode==SDLSaveMode.Overwrite, s"($id) Only saveMode Append and Overwrite are supported.")
 
   // jdbc column metadata
   lazy val columns = getJdbcColumnMetadata
@@ -135,13 +137,32 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       .options(connection.getAuthModeSparkOptions)
       .options(queryOrTable)
       .load()
-    validateSchemaMin(df)
+    validateSchemaMin(df, "read")
     df.colNamesLowercase
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession): Unit = {
+  override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    validateSchemaMin(df, "write")
+    validateSchemaOnWrite(df)
+  }
+
+  // cache response to avoid jdbc query.
+  private var cachedExistingSchema: Option[StructType] = None
+  private def validateSchemaOnWrite(df: DataFrame)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    // validate against hive table schema if existing
+    if (isTableExisting) {
+      val existingSchema = cachedExistingSchema.getOrElse {
+        cachedExistingSchema = Some(getDataFrame().schema)
+        cachedExistingSchema.get
+      }
+      validateSchema(df, existingSchema, "write")
+    }
+  }
+
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     require(table.query.isEmpty, s"($id) Cannot write to jdbc DataObject defined by a query.")
-    validateSchemaMin(df)
+    validateSchemaMin(df, "write")
+    validateSchemaOnWrite(df)
 
     // validate columns exists
     val dfWrite = if (isTableExisting) {
@@ -152,7 +173,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       assert(colsMissingInTable.isEmpty, s"Columns ${colsMissingInDataFrame.mkString(", ")} exist in $id but not in DataFrame")
 
       // cleanup existing data if saveMode=overwrite
-      if (saveMode == SaveMode.Overwrite) {
+      if (saveMode == SDLSaveMode.Overwrite) {
         if (partitionValues.nonEmpty) deletePartitions(partitionValues)
         else deleteAllData
       }
@@ -199,8 +220,23 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def isDbExisting(implicit session: SparkSession): Boolean = connection.catalog.isDbExisting(table.db.get)
-  override def isTableExisting(implicit session: SparkSession): Boolean = connection.catalog.isTableExisting(table.db.get, table.name)
+  // cache response to avoid jdbc query.
+  private var cachedIsDbExisting: Option[Boolean] = None
+  override def isDbExisting(implicit session: SparkSession): Boolean = {
+    cachedIsDbExisting.getOrElse {
+      cachedIsDbExisting = Option(connection.catalog.isDbExisting(table.db.get))
+      cachedIsDbExisting.get
+    }
+  }
+  // cache if table is existing to avoid jdbc query.
+  private var cachedIsTableExisting: Option[Boolean] = None
+  override def isTableExisting(implicit session: SparkSession): Boolean = {
+    cachedIsTableExisting.getOrElse {
+      val existing = connection.catalog.isTableExisting(table.db.get, table.name)
+      if (existing) cachedIsTableExisting = Some(existing) // only cache if existing, otherwise query again later
+      existing
+    }
+  }
 
   def deleteAllData(implicit session: SparkSession): Unit = {
     connection.execJdbcStatement(s"delete from ${table.fullName}")
@@ -238,9 +274,9 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       assert(partitionsColss.size == 1, "All partition values must have the same set of partition columns defined!")
       val partitionCols = partitionsColss.head
       val deletePartitionQuery = if (partitionCols.size == 1) {
-        s"delete from ${table.fullName} where ${partitionCols.head} in (${partitionValues.map(pv => pv(partitionCols.head)).mkString(",")})"
+        s"delete from ${table.fullName} where ${partitionCols.head} in ('${partitionValues.map(pv => pv(partitionCols.head)).mkString("','")}')"
       } else {
-        val partitionValuesStr = partitionValues.map(pv => s"(${partitionCols.map(pv(_).toString).mkString(",")})")
+        val partitionValuesStr = partitionValues.map(pv => s"('${partitionCols.map(pv(_).toString).mkString("','")}')")
         s"delete from ${table.fullName} where (${partitionCols.mkString(",")}) in (${partitionValuesStr.mkString(",")})"
       }
       connection.execJdbcStatement(deletePartitionQuery)
