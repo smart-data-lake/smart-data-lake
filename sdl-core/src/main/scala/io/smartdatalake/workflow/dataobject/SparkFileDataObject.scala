@@ -90,7 +90,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * @param sourceExists Whether the source file/table exists already. Existing sources may have a source schema.
    * @return The schema to use for the data frame reader when reading from the source.
    */
-  def getReadSchema(sourceExists: Boolean): Option[StructType] = schema
+  def getSchema(sourceExists: Boolean): Option[StructType] = schema
 
   /**
    * Constructs an Apache Spark [[DataFrame]] from the underlying file content.
@@ -115,7 +115,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
       filesystem.mkdirs(hadoopPath)
     }
 
-    val schemaOpt = getReadSchema(filesExists)
+    val schemaOpt = getSchema(filesExists)
     val dfContent = if (partitions.isEmpty || partitionValues.isEmpty) {
       session.read
         .format(format)
