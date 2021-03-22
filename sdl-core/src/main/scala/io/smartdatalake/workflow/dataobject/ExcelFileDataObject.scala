@@ -25,8 +25,8 @@ import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.{AclDef, DataFrameUtil}
-import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
  * A [[DataObject]] backed by an Microsoft Excel data source.
@@ -50,7 +50,7 @@ import org.apache.spark.sql.types.StructType
  * When no schema is provided and `inferSchema` is disabled, all columns are assumed to be of string type.
  *
  * @param excelOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
- * @param schema An optional data object schema. If defined, any automatic schema inference is avoided.
+ * @param schema An optional data object schema. If defined, any automatic schema inference is avoided. As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
  * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop. Default is numberOfTasksPerPartition = 1.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
@@ -87,7 +87,7 @@ case class ExcelFileDataObject(override val id: DataObjectId,
   /**
    * @inheritdoc
    */
-  override def afterRead(df: DataFrame): DataFrame = {
+  override def afterRead(df: DataFrame)(implicit session: SparkSession): DataFrame = {
     val dfSuper = super.afterRead(df)
 
     // cleanup header names
@@ -98,7 +98,7 @@ case class ExcelFileDataObject(override val id: DataObjectId,
   /**
    * Checks preconditions before writing.
    */
-  override def beforeWrite(df: DataFrame): DataFrame = {
+  override def beforeWrite(df: DataFrame)(implicit session: SparkSession): DataFrame = {
     val dfSuper = super.beforeWrite(df)
 
     // check for unsupported write options

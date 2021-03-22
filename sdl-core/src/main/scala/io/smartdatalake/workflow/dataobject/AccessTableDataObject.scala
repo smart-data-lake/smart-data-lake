@@ -75,7 +75,7 @@ case class AccessTableDataObject(override val id: DataObjectId,
     val df = session.createDataFrame(session.sparkContext.makeRDD(rows), tableSchema)
     db.close()
 
-    validateSchemaMin(df)
+    validateSchemaMin(df, "read")
     //return
     df
   }

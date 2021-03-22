@@ -137,13 +137,32 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       .options(connection.getAuthModeSparkOptions)
       .options(queryOrTable)
       .load()
-    validateSchemaMin(df)
+    validateSchemaMin(df, "read")
     df.colNamesLowercase
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession): Unit = {
+  override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    validateSchemaMin(df, "write")
+    validateSchemaOnWrite(df)
+  }
+
+  // cache response to avoid jdbc query.
+  private var cachedExistingSchema: Option[StructType] = None
+  private def validateSchemaOnWrite(df: DataFrame)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    // validate against hive table schema if existing
+    if (isTableExisting) {
+      val existingSchema = cachedExistingSchema.getOrElse {
+        cachedExistingSchema = Some(getDataFrame().schema)
+        cachedExistingSchema.get
+      }
+      validateSchema(df, existingSchema, "write")
+    }
+  }
+
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     require(table.query.isEmpty, s"($id) Cannot write to jdbc DataObject defined by a query.")
-    validateSchemaMin(df)
+    validateSchemaMin(df, "write")
+    validateSchemaOnWrite(df)
 
     // validate columns exists
     val dfWrite = if (isTableExisting) {
@@ -201,20 +220,22 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
   }
 
-  // cache if db is existing - update as long as db is not existing
-  private var _isDBExisting: Boolean = false
+  // cache response to avoid jdbc query.
+  private var cachedIsDbExisting: Option[Boolean] = None
   override def isDbExisting(implicit session: SparkSession): Boolean = {
-    if (!_isDBExisting &&connection.catalog.isDbExisting(table.db.get)) _isDBExisting = true
-    // return
-    _isDBExisting
+    cachedIsDbExisting.getOrElse {
+      cachedIsDbExisting = Option(connection.catalog.isDbExisting(table.db.get))
+      cachedIsDbExisting.get
+    }
   }
-
-  // cache if table is existing - update as long as table is not existing
-  private var _isTableExisting: Boolean = false
+  // cache if table is existing to avoid jdbc query.
+  private var cachedIsTableExisting: Option[Boolean] = None
   override def isTableExisting(implicit session: SparkSession): Boolean = {
-    if (!_isTableExisting && connection.catalog.isTableExisting(table.db.get, table.name)) _isTableExisting = true
-    // return
-    _isTableExisting
+    cachedIsTableExisting.getOrElse {
+      val existing = connection.catalog.isTableExisting(table.db.get, table.name)
+      if (existing) cachedIsTableExisting = Some(existing) // only cache if existing, otherwise query again later
+      existing
+    }
   }
 
   def deleteAllData(implicit session: SparkSession): Unit = {

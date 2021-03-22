@@ -148,7 +148,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
   }
 
-  override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+  override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     // check schema compatibility
     require(df.columns.toSet == Set("key","value"), s"(${id}) Expects columns key, value in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
     convertToKafka(keyType, df("key"), SubjectType.key, eagerCheck = true)
@@ -176,7 +176,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       .as("kafka")
       .withOptionalColumn(datePartitionCol.map(_.colName), udfFormatPartition(col("timestamp")))
       .select(colsToSelect:_*)
-    validateSchemaMin(df)
+    validateSchemaMin(df, "read")
     // return
     df
   }
@@ -268,7 +268,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     )
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession): Unit = {
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     convertToWriteDataFrame(df)
       .write
       .format("kafka")
@@ -277,7 +277,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       .save
   }
 
-  override def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String, String], checkpointLocation: String, queryName: String, outputMode: OutputMode)(implicit session: SparkSession): StreamingQuery = {
+  override def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String, String], checkpointLocation: String, queryName: String, outputMode: OutputMode)(implicit session: SparkSession, context: ActionPipelineContext): StreamingQuery = {
     convertToWriteDataFrame(df)
       .writeStream
       .format("kafka")

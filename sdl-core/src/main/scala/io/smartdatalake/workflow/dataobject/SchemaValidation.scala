@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.workflow.SchemaViolationException
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.StructType
@@ -29,6 +29,7 @@ import org.apache.spark.sql.types.StructType
  * A [[DataObject]] that allows for optional schema validation on read and on write.
  */
 private[smartdatalake] trait SchemaValidation { this: DataObject =>
+
   /**
    * An optional, minimal schema that a [[DataObject]] schema must have to pass schema validation.
    *
@@ -50,21 +51,49 @@ private[smartdatalake] trait SchemaValidation { this: DataObject =>
    * Validate the schema of a given Spark Data Frame `df` against `schemaMin`.
    *
    * @param df The data frame to validate.
+   * @param role role used in exception message. Set to read or write.
    * @throws SchemaViolationException is the `schemaMin` does not validate.
    */
-  def validateSchemaMin(df: DataFrame): Unit = {
-    schemaMin.foreach { structType =>
-      val diff = df.schemaDiffTo(structType,
+  def validateSchemaMin(df: DataFrame, role: String): Unit = {
+    schemaMin.foreach { schemaExpected =>
+      val missingCols = SchemaUtil.schemaDiff(schemaExpected, df.schema,
         ignoreNullable = Environment.schemaValidationIgnoresNullability,
         deep = Environment.schemaValidationDeepComarison
       )
-      if (diff.nonEmpty) {
+      if (missingCols.nonEmpty) {
         throw new SchemaViolationException(
-          s"""($id) does not have a valid schemaMin.
-             |- Actual schema: ${df.schema.treeString}
-             |- schemaMin: ${structType.treeString}
-             |- difference in: ${StructType(diff.toSeq).treeString}""".stripMargin)
+          s"""($id) DataFrame does not fulfil schemaMin on $role:
+             |- missingCols=${missingCols.mkString(", ")}
+             |- schemaMin: ${schemaExpected.fields.mkString(", ")}
+             |- schemaDf: ${df.schema.fields.mkString(", ")}""".stripMargin)
       }
+    }
+  }
+
+  /**
+   * Validate the schema of a given Spark Data Frame `df` against a given expected schema.
+   *
+   * @param df The data frame to validate.
+   * @param schemaExpected The expected schema to validate against.
+   * @param role role used in exception message. Set to read or write.
+   * @throws SchemaViolationException is the `schemaMin` does not validate.
+   */
+  def validateSchema(df: DataFrame, schemaExpected: StructType, role: String): Unit = {
+    val missingCols = SchemaUtil.schemaDiff(schemaExpected, df.schema,
+      ignoreNullable = Environment.schemaValidationIgnoresNullability,
+      deep = Environment.schemaValidationDeepComarison
+    )
+    val superfluousCols = SchemaUtil.schemaDiff(df.schema, schemaExpected,
+      ignoreNullable = Environment.schemaValidationIgnoresNullability,
+      deep = Environment.schemaValidationDeepComarison
+    )
+    if (missingCols.nonEmpty || superfluousCols.nonEmpty) {
+      throw new SchemaViolationException(
+        s"""($id) DataFrame does not match schema defined on $role:
+           |- missingCols=${missingCols.mkString(", ")}
+           |- superfluousCols=${superfluousCols.mkString(", ")}
+           |- schemaExpected: ${schemaExpected.fields.mkString(", ")}
+           |- schemaDf: ${df.schema.fields.mkString(", ")}""".stripMargin)
     }
   }
 }
