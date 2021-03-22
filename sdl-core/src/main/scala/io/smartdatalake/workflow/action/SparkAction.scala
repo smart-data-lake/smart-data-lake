@@ -132,8 +132,8 @@ private[smartdatalake] abstract class SparkAction extends Action {
 
   def createEmptyDataFrame(dataObject: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
     val schema = dataObject match {
-      case sparkFileInput: SparkFileDataObject => sparkFileInput.getReadSchema(false)
-      case userDefInput: UserDefinedSchema => userDefInput.schema
+      case sparkFileInput: SparkFileDataObject => sparkFileInput.getSchema(false).map(dataObject.createReadSchema)
+      case userDefInput: UserDefinedSchema => userDefInput.schema.map(dataObject.createReadSchema)
       case _ => None
     }
     schema.map( s => DataFrameUtil.getEmptyDataFrame(s))
