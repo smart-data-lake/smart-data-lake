@@ -132,10 +132,16 @@ case class HiveTableDataObject(override val id: DataObjectId,
     df
   }
 
+  /**
+   * Overwriting Hive table with different schema is allowed if table has no partitions, as table is overwritten as whole.
+   */
+  private def isOverwriteSchemaAllowed = (saveMode==SDLSaveMode.Overwrite || saveMode!=SDLSaveMode.OverwriteOptimized) && partitions.isEmpty
+
   override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.init(df, partitionValues)
     validateSchemaMin(df, "write")
     // validate against hive table schema if existing
-    if (isTableExisting) validateSchema(df, session.table(table.fullName).schema, "write")
+    if (isTableExisting && !isOverwriteSchemaAllowed) validateSchema(df, session.table(table.fullName).schema, "write")
   }
 
   override def preWrite(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
