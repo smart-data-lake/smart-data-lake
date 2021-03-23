@@ -78,7 +78,7 @@ jobs:
     - name: Git Push Master
       uses: ad-m/github-push-action@master
       with:
-        branch: master-spark3
+        branch: master
         github_token: ${{ secrets.PAT_ACTIONS }}
 
     # DEVELOP BRANCH
