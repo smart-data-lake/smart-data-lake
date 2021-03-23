@@ -81,7 +81,7 @@ extends SmartDataLakeLogger {
     if (Environment._sparkSession != null) logger.warn("Your SparkSession was already set, that should not happen. We will re-initialize it anyway now.")
     // prepare additional spark options
     // enable MemoryLoggerExecutorPlugin if memoryLogTimer is enabled
-    val executorPlugins = (sparkOptions.flatMap(_.get("spark.executor.plugins")).toSeq ++ (if (memoryLogTimer.isDefined) Seq(classOf[MemoryLoggerExecutorPlugin].getName) else Seq()))
+    val executorPlugins = (sparkOptions.flatMap(_.get("spark.plugins")).toSeq ++ (if (memoryLogTimer.isDefined) Seq(classOf[MemoryLoggerExecutorPlugin].getName) else Seq()))
     // config for MemoryLoggerExecutorPlugin can only be transfered to Executor by spark-options
     val memoryLogOptions = memoryLogTimer.map(_.getAsMap).getOrElse(Map())
     val sparkOptionsExtended = sparkOptions.getOrElse(Map()) ++ memoryLogOptions ++ (if (executorPlugins.nonEmpty) Map("spark.executor.plugins" -> executorPlugins.mkString(",")) else Map())
