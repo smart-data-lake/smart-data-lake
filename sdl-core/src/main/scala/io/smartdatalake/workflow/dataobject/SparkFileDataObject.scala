@@ -130,7 +130,8 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
         .option("basePath", hadoopPath.toString) // this is needed for partitioned tables when subdirectories are read directly; it then keeps the partition columns from the subdirectory path in the dataframe
       // create data frame for every partition value and then build union
       val pathsToRead = partitionValues.flatMap(getConcretePaths).map(_.toString)
-      pathsToRead.map(reader.load).reduceOption(_ union _)
+      val df = if (pathsToRead.nonEmpty) Some(reader.load(pathsToRead:_*)) else None
+      df.filter(df => schemaOpt.isDefined || partitions.diff(df.columns).isEmpty) // filter DataFrames without partition columns as they are empty (this might happen if there is no schema specified and the partition is empty)
         .getOrElse {
           // if there are no paths to read then an empty DataFrame is created
           require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")

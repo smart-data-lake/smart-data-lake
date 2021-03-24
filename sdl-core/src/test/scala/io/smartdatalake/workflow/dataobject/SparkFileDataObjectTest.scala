@@ -306,6 +306,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
     assert(dataObject.filesystem.isDirectory(partitionPath))
 
     // delete files in base dir
+    dataObject.filesystem.createNewFile(new Path(dataObject.hadoopPath, "testFile"))
     assert(dataObject.filesystem.listStatus(dataObject.hadoopPath).exists(_.isFile))
     dataObject.deleteAllFiles(dataObject.hadoopPath)
     assert(!dataObject.filesystem.listStatus(dataObject.hadoopPath).exists(_.isFile))
