@@ -23,6 +23,8 @@ import org.apache.spark.python.PythonHelper
 import org.apache.spark.python.PythonHelper.SparkEntryPoint
 import org.apache.spark.sql.SparkSession
 
+import scala.collection.JavaConverters._
+
 private[smartdatalake] object PythonUtil {
 
   /**
@@ -34,12 +36,12 @@ private[smartdatalake] object PythonUtil {
    *                      This is used to transfer SparkContext to python and can hold additional custom parameters.
    *                      entryPointObj must at least implement trait SparkEntryPoint.
    */
-  def execPythonTransform[T<:SparkEntryPoint](entryPointObj: T, code: String): Unit = {
+  def execPythonSparkCode[T<:PythonSparkEntryPoint](entryPointObj: T, code: String): Unit = {
     PythonHelper.exec(entryPointObj, mainInitCode + sys.props("line.separator") + code)
   }
 
   // python spark gateway init code
-  val mainInitCode =
+  private val mainInitCode =
     """
       |from pyspark.java_gateway import launch_gateway
       |from pyspark.context import SparkContext
@@ -57,8 +59,14 @@ private[smartdatalake] object PythonUtil {
       |sc = SparkContext(conf=sparkConf, gateway=gateway, jsc=javaSparkContext)
       |session = SparkSession(sc, entryPoint.session())
       |sqlContext = SQLContext(sc, session, entryPoint.getSQLContext())
+      |options = entryPoint.getOptions()
       |print("python spark session initialized (sc, session, sqlContext)")
       |""".stripMargin
+
 }
 
-class DfTransformerSparkEntryPoint(override val session: SparkSession, options: Map[String,String] = Map()) extends SparkEntryPoint
+class PythonSparkEntryPoint(override val session: SparkSession, options: Map[String,String] = Map()) extends SparkEntryPoint {
+  // HashMap is transformed into Python dictionary by py4j
+  def getOptions: java.util.HashMap[String,String] = new java.util.HashMap(options.asJava)
+}
+

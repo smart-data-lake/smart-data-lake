@@ -123,7 +123,7 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
 
   test("PartitionDiffMode selectAdditionalInputExpression with udf") {
     val udfConfig = SparkUDFCreatorConfig(classOf[TestUdfAddLastnameEinstein].getName)
-    ExpressionEvaluator.registerUdf("testUdfAddLastNameEinstein", udfConfig.get)
+    ExpressionEvaluator.registerUdf("testUdfAddLastNameEinstein", udfConfig.getUDF)
     val executionMode = PartitionDiffMode(selectAdditionalInputExpression = Some("testUdfAddLastNameEinstein(selectedInputPartitionValues,inputPartitionValues)"))
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
