@@ -39,7 +39,7 @@ case class SparkUDFCreatorConfig(className: String, options: Map[String,String] 
     case e: NoSuchMethodException => throw ConfigurationException(s"SparkUDFCreatorConfig class $className needs constructor without parameters: ${e.getMessage}", Some("globalConfig.sparkUDFs"), e)
     case e: Exception => throw ConfigurationException(s"Cannot instantiate SparkUDFCreatorConfig class $className: ${e.getMessage}", Some("globalConfig.sparkUDFs"), e)
   }
-  private[smartdatalake] def get: UserDefinedFunction = creator.get(options)
+  private[smartdatalake] def getUDF: UserDefinedFunction = creator.get(options)
 }
 
 /**
