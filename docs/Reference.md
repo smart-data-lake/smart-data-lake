@@ -104,7 +104,7 @@ and takes the following arguments:
 Usage: DefaultSmartDataLakeBuilder [options]
   -f, --feed-sel <value>   Regex pattern to select the feed to execute.
   -n, --name <value>       Optional name of the application. If not specified feed-sel is used.
-  -c, --config <value>     One or multiple configuration files or directories containing configuration files, separated by comma.
+  -c, --config <value>     One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme "cp" which is treated as classpath entry.
   --partition-values <value>
                            Partition values to process in format <partitionColName>=<partitionValue>[,<partitionValue>,...].
   --multi-partition-values <value>
