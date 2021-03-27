@@ -40,7 +40,7 @@ import scopt.OptionParser
  *
  * @param feedSel         Regex pattern to select the feed to execute.
  * @param applicationName Application name.
- * @param configuration   A configuration file or a directory containing configuration files.
+ * @param configuration   One or multiple configuration files or directories containing configuration files, separated by comma.
  * @param master          The Spark master URL passed to SparkContext when in local mode.
  * @param deployMode      The Spark deploy mode passed to SparkContext when in local mode.
  * @param username        Kerberos user name (`username`@`kerberosDomain`) for local mode.
@@ -132,7 +132,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       .text("Optional name of the application. If not specified feed-sel is used.")
     opt[String]('c', "config")
       .action( (arg, config) => config.copy(configuration = Some(arg)) )
-      .text("One or multiple configuration files or directories containing configuration files, separated by comma.")
+      .text("One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme \"cp\" which is treated as classpath entry.")
     opt[String]("partition-values")
       .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseSingleColArg(arg))))
       .text(s"Partition values to process in format ${PartitionValues.singleColFormat}.")
@@ -252,7 +252,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     // load config
     val config: Config = appConfig.configuration match {
-      case Some(configuration) => ConfigLoader.loadConfigFromFilesystem(configuration.split(',').toSeq)
+      case Some(configuration) => ConfigLoader.loadConfigFromFilesystem(configuration.split(',').map(_.trim).toSeq)
       case None => ConfigLoader.loadConfigFromClasspath
     }
     require(config.hasPath("actions"), s"No configuration parsed or it does not have a section called actions")

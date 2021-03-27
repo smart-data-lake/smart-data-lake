@@ -18,17 +18,16 @@
  */
 package io.smartdatalake.config
 
-import java.io.InputStreamReader
-
 import com.typesafe.config.{Config, ConfigFactory}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.HdfsUtil
-import io.smartdatalake.util.misc.{EnvironmentUtil, SmartDataLakeLogger}
-import org.apache.hadoop.fs.permission.FsAction
-import org.apache.hadoop.fs.{FileSystem, Path}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path, RemoteIterator}
 
-import scala.collection.mutable
+import java.io.InputStreamReader
+import scala.collection.AbstractIterator
 import scala.util.{Failure, Success, Try}
 
 object ConfigLoader extends SmartDataLakeLogger {
@@ -55,7 +54,8 @@ object ConfigLoader extends SmartDataLakeLogger {
   def loadConfigFromClasspath: Config = ConfigFactory.load()
 
   /**
-   * Load the configuration from the file system location `configLocation`.
+   * Load the configuration from the file system locations `configLocations`.
+   * Entries must be valid hadoop URIs or a special URI with scheme "cp" which is treated as classpath entry.
    *
    * If `configLocation` is a directory, it is traversed in breadth-first search (BFS) order provided by hadoop file system.
    * Only file names ending in '.conf', '.json', or '.properties' are processed.
@@ -83,28 +83,30 @@ object ConfigLoader extends SmartDataLakeLogger {
    */
   def loadConfigFromFilesystem(configLocations: Seq[String]): Config = try {
     val hadoopPaths = configLocations.map( l => HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(l)))
-    logger.info(s"Loading configuration from filesystem location: ${hadoopPaths.map(_.toUri).mkString(", ")}.")
-    implicit val fileSystem: FileSystem = HdfsUtil.getHadoopFs(hadoopPaths.head)
+    logger.info(s"Loading configuration from filesystem locations: ${hadoopPaths.map(_.toUri).mkString(", ")}.")
+    val hadoopConf: Configuration = new Configuration() // note that we could not yet load additional hadoop/spark configurations set in the configuration files
 
-    hadoopPaths.foreach( p => require(fileSystem.exists(p), s"$p is not a valid location."))
-
-    val configFileIndex = filesInBfsOrderByExtension(hadoopPaths)
-    logger.debug(s"Configuration file index:\n${configFileIndex.map(e => s"\t${e._1} -> ${e._2.mkString(", ")}").mkString("\n")}")
+    // Search locations for config files
+    val configFiles = hadoopPaths.flatMap(
+      location => if (ClasspathConfigFile.canHandleScheme(location)) Seq(ClasspathConfigFile(location))
+      else getFilesInBfsOrder(location)(location.getFileSystem(hadoopConf))
+    )
+    if (configFiles.isEmpty) throw ConfigurationException(s"No configuration files found in ${hadoopPaths.mkString(", ")}. " +
+      s"Ensure the configuration files have one of the following extensions: ${configFileExtensions.map(ext => s".$ext").mkString(", ")}")
 
     //read file extensions in the same order as typesafe config
-    val sortedFileConfigs = (configFileIndex("properties") ++ configFileIndex("json") ++ configFileIndex("conf"))
-      .map(file => (file, parseConfig(file))).reverse
-    if (sortedFileConfigs.isEmpty) {
-      logger.error(s"Paths $hadoopPaths do not contain valid configuration files. " +
-        s"Ensure the configuration files have one of the following extensions: ${configFileExtensions.map(ext => s".$ext").mkString(", ")}")
-    }
+    val sortedConfigFiles = configFiles.filter(_.extension=="properties") ++ configFiles.filter(_.extension=="json") ++ configFiles.filter(_.extension=="conf")
+    logger.debug(s"Configuration files to parse:\n${sortedConfigFiles.mkString("\n")}")
+
+    // parse config files
+    val sortedConfigs = sortedConfigFiles.map(file => (file, parseConfig(file))).reverse
 
     // check for duplicate first class object definitions (connections, data objects, actions)
     if (Environment.enableCheckConfigDuplicates) {
       val objectIdLocationMap =
-        sortedFileConfigs.flatMap { case (file, config) => ConfigParser.getActionConfigMap(config).keys.map(objName => (ActionId(objName), file)) } ++
-          sortedFileConfigs.flatMap { case (file, config) => ConfigParser.getDataObjectConfigMap(config).keys.map(objName => (DataObjectId(objName), file)) } ++
-          sortedFileConfigs.flatMap { case (file, config) => ConfigParser.getConnectionConfigMap(config).keys.map(objName => (ConnectionId(objName), file)) }
+        sortedConfigs.flatMap { case (file, config) => ConfigParser.getActionConfigMap(config).keys.map(objName => (ActionId(objName), file)) } ++
+          sortedConfigs.flatMap { case (file, config) => ConfigParser.getDataObjectConfigMap(config).keys.map(objName => (DataObjectId(objName), file)) } ++
+          sortedConfigs.flatMap { case (file, config) => ConfigParser.getConnectionConfigMap(config).keys.map(objName => (ConnectionId(objName), file)) }
       val duplicates = objectIdLocationMap.groupBy(_._1)
         .filter(_._2.size > 1)
         .mapValues(_.map(_._2))
@@ -116,7 +118,7 @@ object ConfigLoader extends SmartDataLakeLogger {
 
     //system properties take precedence
     val systemPropConfig = ConfigFactory.systemProperties()
-    mergeConfigs(systemPropConfig +: sortedFileConfigs.map(_._2)).resolve()
+    mergeConfigs(systemPropConfig +: sortedConfigs.map(_._2)).resolve()
   } catch {
     // catch if hadoop libraries are missing and output debug informations
     case ex:UnsatisfiedLinkError =>
@@ -142,12 +144,12 @@ object ConfigLoader extends SmartDataLakeLogger {
   }
 
   /**
-   * Parse a file as Hocon [[Config]]
-   * @param file: Hadoop file location of Hocon configuration file
+   * Parse a configuration file as Hocon [[Config]]
+   * @param file: a ConfigFile to parse
    * @return parsed [[Config]] object
    */
-  private def parseConfig(file: Path)(implicit fs: FileSystem): Config = {
-    val reader = new InputStreamReader(fs.open(file))
+  private def parseConfig(file: ConfigFile): Config = {
+    val reader = file.getReader
     try {
       val parsedConfig = ConfigFactory.parseReader(reader)
       if (parsedConfig.isEmpty) {
@@ -156,51 +158,80 @@ object ConfigLoader extends SmartDataLakeLogger {
       parsedConfig
     } catch {
       case exception: Throwable =>
-        logger.error(s"Failed to parse config from ${file.toString}", exception)
-        throw exception
+        throw ConfigurationException(s"Failed to parse config from ${file.toString}", None, exception)
     } finally {
       reader.close()
     }
   }
 
   /**
-   * Collect readable files with valid config file extensions from HDFS in BFS order indexed by file extension.
+   * Collect Hadoop files with valid config file extensions in BFS order.
    * Note that all filenames containing "log4j" are ignored.
    *
    * This is an internal method to create a utility data structure.
+   * BFS is implemented by recursion.
    *
-   * @param rootPaths     root [[Path]]s pointing to a configuration file or a directory from where the traversal starts.
-   * @param fs            a configured HDFS [[FileSystem]] handle.
-   * @return              a map with BFS ordered file lists for each file extension in [[ConfigLoader.configFileExtensions]].
+   * @param path [[Path]] pointing to a configuration file or a directory from where the traversal should start.
+   * @return     a BFS ordered config file list.
    */
-  private def filesInBfsOrderByExtension(rootPaths: Seq[Path])(implicit fs: FileSystem): Map[String, Seq[Path]] = {
-    val traversalQueue = mutable.Queue[Path](rootPaths:_*)
-    val readableFileIndex = configFileExtensions.map((_, new mutable.MutableList[Path]())).toMap
-
-    while (traversalQueue.nonEmpty) {
-      val nextFile = traversalQueue.dequeue()
-      if (fs.isDirectory(nextFile)) {
-        Try(fs.listLocatedStatus(nextFile)) match {
-          case Failure(exception) =>
-            logger.warn(s"Failed to list directory content of ${nextFile.toString}.", exception)
-          case Success(children) =>
-            while (children.hasNext) {
-              val childPath = children.next.getPath
-              if (!childPath.getName.startsWith(".")) { // ignore hidden entries
-                traversalQueue += childPath
-                logger.debug(s"Found '${childPath.getName}' in directory $nextFile.")
-              }
-            }
-        }
-      } else if (fs.isFile(nextFile)) {
-        // filter filename extension and ignore potential log4j files
-        val fileExtension = nextFile.getName.split('.').last
-        if (configFileExtensions.contains(fileExtension) && !nextFile.getName.contains("log4j")) {
-          logger.debug(s"'$nextFile' is a configuration file.")
-          readableFileIndex(fileExtension) += nextFile
-        }
+  private def getFilesInBfsOrder(path: Path)(implicit fs: FileSystem): Seq[ConfigFile] = {
+    if (fs.isDirectory(path)) {
+      Try(RemoteIteratorWrapper(fs.listStatusIterator(path))) match {
+        case Failure(exception) =>
+          logger.warn(s"Failed to list directory content of ${path.toString}.", exception)
+          Seq()
+        case Success(children) =>
+          // sort files before directories for BFS
+          val (directories, files) = children
+            .filterNot(_.getPath.getName.startsWith(".")) // ignore hidden entries
+            .partition(_.isDirectory)
+          (files ++ directories).flatMap(p => getFilesInBfsOrder(p.getPath)).toSeq
       }
+    } else if (fs.isFile(path) && ConfigFile.canHandleExtension(path)) {
+      if (path.getName.contains("log4j")) {
+        logger.debug(s"Ignoring log4j configuration file '$path'.")
+        Seq()
+      } else {
+        Seq(HadoopConfigFile(path))
+      }
+    } else {
+      logger.debug(s"Ignoring file '$path'.")
+      Seq()
     }
-    readableFileIndex
+  }
+
+  /**
+   * Wrapper for Hadoop RemoteIterator to use it with Scala style
+   */
+  private case class RemoteIteratorWrapper[T](underlying: RemoteIterator[T]) extends AbstractIterator[T] with Iterator[T] {
+    def hasNext: Boolean = underlying.hasNext
+    def next(): T = underlying.next()
+  }
+
+  // Helper classes to handle different location types
+  private case class HadoopConfigFile(override val path: Path)(implicit val fs: FileSystem) extends ConfigFile {
+    override def getReader = new InputStreamReader(fs.open(path))
+  }
+  private case class ClasspathConfigFile(override val path: Path) extends ConfigFile {
+    override def getReader: InputStreamReader = {
+      val resource = path.toUri.getPath
+      val inputStream = Option(getClass.getResourceAsStream(resource))
+        .getOrElse(throw ConfigurationException(s"Could not find resource $resource in classpath"))
+      new InputStreamReader(inputStream)
+    }
+  }
+  private object ClasspathConfigFile {
+    def canHandleScheme(path: Path): Boolean = path.toUri.getScheme == "cp"
+  }
+  private trait ConfigFile {
+    def path: Path
+    lazy val extension: String = ConfigFile.getExtension(path)
+    if (!ConfigFile.canHandleExtension(extension)) throw ConfigurationException(s"Cannot parse file with unknown extension $path. Allowed extensions are ${configFileExtensions.mkString(", ")}")
+    def getReader: InputStreamReader
+  }
+  private object ConfigFile {
+    def canHandleExtension(extension: String): Boolean = configFileExtensions.contains(extension)
+    def canHandleExtension(path: Path): Boolean = canHandleExtension(getExtension(path))
+    private def getExtension(path: Path): String = path.getName.split('.').last
   }
 }

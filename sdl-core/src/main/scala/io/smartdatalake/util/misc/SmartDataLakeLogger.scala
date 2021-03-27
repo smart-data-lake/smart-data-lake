@@ -30,4 +30,9 @@ private[smartdatalake] trait SmartDataLakeLogger {
     logger.error( s"$msg: ${e.getClass.getSimpleName} - ${e.getMessage}" )
     throw e
   }
+
+  private[smartdatalake] def logException(e: Exception): Exception = {
+    logger.error( s"${e.getClass.getSimpleName} - ${e.getMessage}" )
+    e
+  }
 }
