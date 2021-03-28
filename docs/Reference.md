@@ -324,3 +324,25 @@ Requirements:
 See Readme of [sdl-examples](https://github.com/smart-data-lake/sdl-examples) for a working example and instructions to setup python environment for IntelliJ  
 
 How it works: under the hood a PySpark DataFrame is a proxy for a Java Spark DataFrame. PySpark uses Py4j to access Java objects in the JVM.
+
+## Schema Evolution
+SmartDataLakeBuilder is built to support schema evolution where possible. This means that data pipelines adapt themselves automatically to additional or removed columns and changes of data types if possible.
+
+To assert that a defined list of columns is always present in the schema of a specific DataObject, use its `schemaMin` attribute to define a minimal schema. The minimal schema is validated on read and write with Spark.
+
+To fix the schema for a specific DataObject many DataObjects support the `schema` attribute (e.g. all children of SparkFileDataObject) for reading and writing with Spark. 
+The `schema` attribute allows to define the schema the DataObject tries to read data with, and can be used to avoid schema inference with Spark DataSources.
+On write the DataFrame to be written must match the defined `schema` exactly (nullability and column order are ignored). 
+
+The following list describes specific behaviour of DataObjects:
+* HiveTableDataObject & TickTockHiveTableDataObject: Table schema is managed by Hive and automatically created on first write and updated on subsequent overwrites of the whole table. Changing schema for partitioned tables is not supported.
+  By manipulating the table definition with DDL statements (e.g. alter table add columns) its possible to read data files with a different schema. 
+* SparkFileDataObject: see detailed description in [Spark Data Sources](https://spark.apache.org/docs/latest/sql-data-sources.html).
+  * Many Data Sources support schema inference (e.g. Json, Csv), but we would not recommend this for production data pipelines as the result might not be stable when new data arrives.
+  * For Data Formats with included schema (e.g. Avro, Parquet), schema is read from a random data file. If data files have different schemas, Parquet Data Source supports to consolidate schemas by setting option `mergeSchema=true`. Avro Data Source does not support this.
+  * If you define the `schema` attribute of the DataObject, SDL tries to read the data files with the defined schema. This is e.g. supported by the Json Data Source, but not the CSV Data Source.
+* JdbcTableDataObject: The table has to be created manually or by providing a create table statement in `createSql` attribute. There is no automatic schema evolution for now.
+
+Recipes for data pipelines with schema evolution:
+* CopyAction supports schema evolution if all data is processed by overwriting the whole output DataObject. It needs an output DataObject which doesn't have a fixed schema, e.g. HiveTableDataObject.
+* HistorizeAction & DeduplicateAction supports schema evolution for incremental data. They consolidate the existing data & schema of the output DataObject with a potentially new schema of the input DataObject. Then they overwrite the whole output DataObject. They need a TransactionalSparkTableDataObject as output, which doesn't have a fixed schema, e.g. TickTockHiveTableDataObject.

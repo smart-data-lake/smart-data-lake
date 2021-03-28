@@ -19,6 +19,7 @@
 
 package io.smartdatalake.util.hdfs
 
+import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.dataobject.FileRef
@@ -49,7 +50,7 @@ import org.apache.spark.sql.types.IntegerType
 case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
                                keyCols: Seq[String] = Seq(),
                                sortCols: Seq[String] = Seq(),
-                               filename: Option[String] = None
+                               filename: Option[String] = None,
                               ) extends SmartDataLakeLogger {
   assert(numberOfTasksPerPartition > 0, s"numberOfTasksPerPartition must be greater than 0")
 
@@ -79,7 +80,18 @@ case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
       repartitionForOnePartitionValue(df) // this is the same as writing only one partition value
     }
     // sort within spark partitions
-    if (sortCols.nonEmpty) dfRepartitioned.sortWithinPartitions(sortCols.map(col):_*)
+    if (sortCols.nonEmpty) {
+      val sortColDirRegex = "([^\\s]+)\\s([^\\s]+)".r
+      val sortColRegex = "([^\\s]+)".r
+      val sortExprs = sortCols.map {
+        case sortColDirRegex(colName, sortDir) if sortDir == "asc" => col(colName).asc
+        case sortColDirRegex(colName, sortDir) if sortDir == "desc" => col(colName).desc
+        case sortColDirRegex(colName, sortDir) => throw new ConfigurationException(s"""($dataObjectId) Wrong sort direction ($sortDir) provided in [sparkRepartition.sortCols] entry "$sortCols". Sort direction must be asc or desc.""", Some("sparkRepartition.sortCols"))
+        case sortColRegex(colName) => col(colName).asc
+        case entry => throw new ConfigurationException(s"""($dataObjectId) Too many arguments provided in [sparkRepartition.sortCols] entry "$entry". Just provide colName or colName and sortDir separated by whitespace.""")
+      }
+      dfRepartitioned.sortWithinPartitions(sortExprs:_*)
+    }
     else dfRepartitioned
   }
 

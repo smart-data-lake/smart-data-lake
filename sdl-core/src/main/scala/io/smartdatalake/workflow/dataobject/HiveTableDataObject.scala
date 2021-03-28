@@ -128,8 +128,14 @@ case class HiveTableDataObject(override val id: DataObjectId,
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
     val df = session.table(s"${table.fullName}")
-    validateSchemaMin(df)
+    validateSchemaMin(df, "read")
     df
+  }
+
+  override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    validateSchemaMin(df, "write")
+    // validate against hive table schema if existing
+    if (isTableExisting) validateSchema(df, session.table(table.fullName).schema, "write")
   }
 
   override def preWrite(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
@@ -141,9 +147,9 @@ case class HiveTableDataObject(override val id: DataObjectId,
   }
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
-                             (implicit session: SparkSession): Unit = {
+                             (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     require(!isRecursiveInput, "($id) HiveTableDataObject cannot write dataframe when dataobject is also used as recursive input ")
-    validateSchemaMin(df)
+    validateSchemaMin(df, "write")
     writeDataFrameInternal(df, createTableOnly = false, partitionValues)
   }
 

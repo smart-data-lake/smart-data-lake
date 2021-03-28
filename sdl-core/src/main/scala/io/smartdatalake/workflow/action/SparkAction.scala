@@ -132,8 +132,8 @@ private[smartdatalake] abstract class SparkAction extends Action {
 
   def createEmptyDataFrame(dataObject: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
     val schema = dataObject match {
-      case sparkFileInput: SparkFileDataObject => sparkFileInput.readSchema(false)
-      case userDefInput: UserDefinedSchema => userDefInput.schema
+      case sparkFileInput: SparkFileDataObject => sparkFileInput.getSchema(false).map(dataObject.createReadSchema)
+      case userDefInput: UserDefinedSchema => userDefInput.schema.map(dataObject.createReadSchema)
       case _ => None
     }
     schema.map( s => DataFrameUtil.getEmptyDataFrame(s))
@@ -147,6 +147,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
    */
   def writeSubFeed(subFeed: SparkSubFeed, output: DataObject with CanWriteDataFrame, isRecursiveInput: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Boolean = {
     assert(!subFeed.isDummy, s"($id) Can not write dummy DataFrame to ${output.id}")
+    // write
     executionMode match {
       case Some(m: SparkStreamingOnceMode) =>
         // Write in streaming mode - use spark streaming with Trigger.Once and awaitTermination

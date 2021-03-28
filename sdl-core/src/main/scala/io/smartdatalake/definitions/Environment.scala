@@ -140,15 +140,6 @@ object Environment {
   }
 
   /**
-   * Set to true if you want table and database names to be case sensitive when loading over JDBC.
-   * If your database supports case sensitive table names and you want to use that feature, set this to true.
-   */
-  var enableJdbcCaseSensitivity: Boolean = {
-    EnvironmentUtil.getSdlParameter("enableJdbcCaseSensitivity")
-      .map(_.toBoolean).getOrElse(false)
-  }
-
-  /**
    * Set to true if you want to enable automatic caching of DataFrames that are used multiple times (default=true).
    */
   var enableAutomaticDataFrameCaching: Boolean = {

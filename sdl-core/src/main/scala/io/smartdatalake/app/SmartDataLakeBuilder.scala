@@ -73,6 +73,7 @@ case class SmartDataLakeBuilderConfig(feedSel: String = null,
   }
   def getPartitionValues: Option[Seq[PartitionValues]] = partitionValues.orElse(multiPartitionValues)
   val appName: String = applicationName.getOrElse(feedSel)
+  def isDryRun: Boolean = test.contains(TestMode.DryRun)
 }
 object TestMode extends Enumeration {
   type TestMode = Value
@@ -177,7 +178,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // invoke SDLPlugin if configured
     Environment.sdlPlugin.foreach(_.startup())
     // handle state if defined
-    if (appConfig.statePath.isDefined) {
+    if (appConfig.statePath.isDefined && !appConfig.isDryRun) {
       assert(appConfig.applicationName.nonEmpty, "Application name must be defined if statePath is set")
       // check if latest run succeeded
       val appName = appConfig.applicationName.get
@@ -300,7 +301,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       } else {
         actionDAGRun.prepare
         actionDAGRun.init
-        if (appConfig.test.contains(TestMode.DryRun)) { // stop here if only dry-run
+        if (appConfig.isDryRun) { // stop here if only dry-run
           logger.info(s"${appConfig.test.get}-Test successful")
           return (Seq(), Map())
         }

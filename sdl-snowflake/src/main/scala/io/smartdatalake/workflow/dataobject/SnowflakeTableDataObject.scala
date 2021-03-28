@@ -71,13 +71,13 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
       .options(connection.get.getSnowflakeOptions)
       .options(queryOrTable)
       .load()
-    validateSchemaMin(df)
+    validateSchemaMin(df, "read")
     df.colNamesLowercase
   }
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
-                             (implicit session: SparkSession): Unit = {
-    validateSchemaMin(df)
+                             (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    validateSchemaMin(df, "write")
     writeDataFrame(df, createTableOnly = false, partitionValues)
   }
 

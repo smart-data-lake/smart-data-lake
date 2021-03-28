@@ -201,6 +201,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val initOutputSubFeeds = action.init(Seq(srcSubFeed))
     action.preExec(Seq(srcSubFeed))
     val tgtSubFeed1 = action.exec(Seq(srcSubFeed))(session,contextExec).head
+    action.postExec(Seq(srcSubFeed), Seq(tgtSubFeed1))
 
     // check first load
     assert(initOutputSubFeeds.head.asInstanceOf[SparkSubFeed].dataFrame.get.columns.last == "type", "partition columns must be moved last already in init phase")
@@ -283,8 +284,9 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 
     // run
     action1.preExec(Seq(srcSubFeed))(session,contextExec)
-    action1.exec(Seq(srcSubFeed))(session,contextExec)
+    val resultSubFeeds = action1.exec(Seq(srcSubFeed))(session,contextExec)
     assert(tgtDO.getDataFrame().count == 2)
+    action1.postExec(Seq(srcSubFeed),resultSubFeeds)(session,contextExec)
 
     // simulate next run
     action1.reset()

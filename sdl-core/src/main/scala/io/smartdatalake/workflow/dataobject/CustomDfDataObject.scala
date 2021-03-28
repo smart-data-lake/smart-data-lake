@@ -50,7 +50,7 @@ case class CustomDfDataObject(override val id: DataObjectId,
       case _ => creator.exec
     }
 
-    validateSchemaMin(df)
+    validateSchemaMin(df, "read")
     df
   }
 
