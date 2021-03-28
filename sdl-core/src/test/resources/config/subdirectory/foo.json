@@ -5,19 +5,19 @@
 
   "dataObjects": {
     "do1": {
-      "type": "io.smartdatalake.config.TestDataObject",
+      "type": "io.smartdatalake.config.objects.TestDataObject",
       "arg1": "Foo",
       "args": ["Bar"]
     },
     "do2": {
-      "type": "io.smartdatalake.config.TestDataObject",
+      "type": "io.smartdatalake.config.objects.TestDataObject",
       "arg1": "Bar",
       "args": ["Baz"]
     }
   },
   "actions": {
     "testActionFromConfig": {
-      "type": "io.smartdatalake.config.TestAction",
+      "type": "io.smartdatalake.config.objects.TestAction",
       "input-id": "do1",
       "output-id": "do2",
       "metadata": {
