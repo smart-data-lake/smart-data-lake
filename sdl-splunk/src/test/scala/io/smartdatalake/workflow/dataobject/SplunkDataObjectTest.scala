@@ -155,7 +155,6 @@ class SplunkDataObjectTest extends DataObjectTestSuite {
       s"""
          |{
          | id = src1
-         | type = splunk
          | connectionId = con1
          | params {
          |   query = "$query"

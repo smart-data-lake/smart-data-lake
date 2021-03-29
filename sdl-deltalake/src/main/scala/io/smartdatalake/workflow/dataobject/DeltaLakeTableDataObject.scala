@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import com.typesafe.config.Config
 import io.delta.tables.DeltaTable
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
@@ -232,9 +233,13 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   /**
    * @inheritdoc
    */
-  override def factory: FromConfigFactory[DataObject] = TickTockHiveTableDataObject
+  override def factory: FromConfigFactory[DataObject] = DeltaLakeTableDataObject
 
 }
 
-
+object DeltaLakeTableDataObject extends FromConfigFactory[DataObject] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): DeltaLakeTableDataObject = {
+    extract[DeltaLakeTableDataObject](config)
+  }
+}
 
