@@ -24,7 +24,7 @@ import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFra
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 abstract class SparkSubFeedAction extends SparkAction {
 
@@ -63,27 +63,21 @@ abstract class SparkSubFeedAction extends SparkAction {
   private def doTransform(subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // convert subfeed to SparkSubFeed type or initialize if not yet existing
     var inputSubFeed = ActionHelper.updateInputPartitionValues(input, SparkSubFeed.fromSubFeed(subFeed))
-      .clearFilter // subFeed filter is not passed to the next action
     // create output subfeed with transformed partition values
     var outputSubFeed = ActionHelper.updateOutputPartitionValues(output, inputSubFeed.toOutput(output.id), Some(transformPartitionValues))
     // apply execution mode in init phase and store result
     if (context.phase == ExecutionPhase.Init) {
       executionModeResult = Try(
         executionMode.flatMap(_.apply(id, input, output, inputSubFeed, transformPartitionValues))
-      ).recover{
-        case ex: NoDataToProcessDontStopWarning =>
-          // return empty output subfeed if "no data dont stop"
-          val outputSubFeed = SparkSubFeed(dataFrame = None, dataObjectId = output.id, partitionValues = Seq())
-          // rethrow exception with fake results added. The DAG will pass the fake results to further actions.
-          throw ex.copy(results = Some(Seq(outputSubFeed)))
-      }
+      ).recover { ActionHelper.getHandleExecutionModeExceptionPartialFunction(outputs) }
     }
     executionModeResult.get match { // throws exception if execution mode is Failure
       case Some(result) =>
-        inputSubFeed = inputSubFeed.copy(partitionValues = result.inputPartitionValues, filter = result.filter).breakLineage
+        inputSubFeed = inputSubFeed.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false).breakLineage
         outputSubFeed = outputSubFeed.copy(partitionValues = result.outputPartitionValues, filter = result.filter).breakLineage
       case _ => Unit
     }
+    outputSubFeed = ActionHelper.addRunIdPartitionIfNeeded(output, outputSubFeed)
     // prepare input SubFeed
     inputSubFeed = prepareInputSubFeed(input, inputSubFeed)
     // enrich with fresh DataFrame if needed
@@ -122,17 +116,12 @@ abstract class SparkSubFeedAction extends SparkAction {
     // transform
     val transformedSubFeed = doTransform(subFeed)
     // write output
-    val msg = s"writing to ${output.id}" + (if (transformedSubFeed.partitionValues.nonEmpty) s", partitionValues ${transformedSubFeed.partitionValues.mkString(" ")}" else "")
-    logger.info(s"($id) start " + msg)
-    setSparkJobMetadata(Some(msg))
+    logWritingStarted(transformedSubFeed)
     val isRecursiveInput = recursiveInputs.exists(_.id == output.id)
     val (noData,d) = PerformanceUtils.measureDuration {
       writeSubFeed(transformedSubFeed, output, isRecursiveInput)
     }
-    setSparkJobMetadata()
-    val metricsLog = if (noData) ", no data found"
-    else getFinalMetrics(output.id).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
-    logger.info(s"($id) finished writing DataFrame to ${output.id}: jobDuration=$d" + metricsLog)
+    logWritingFinished(transformedSubFeed, noData, d)
     // return
     Seq(transformedSubFeed)
   }

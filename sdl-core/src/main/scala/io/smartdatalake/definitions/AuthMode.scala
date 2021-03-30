@@ -18,9 +18,9 @@
  */
 package io.smartdatalake.definitions
 
-import io.smartdatalake.util.misc.{CredentialsUtil, CustomCodeUtil}
+import io.smartdatalake.util.misc.CustomCodeUtil
+import io.smartdatalake.util.secrets.SecretsUtil
 import io.smartdatalake.util.webservice.KeycloakUtil
-import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer
 import org.keycloak.admin.client.{Keycloak, KeycloakBuilder}
 
 /**
@@ -55,8 +55,8 @@ sealed trait AuthMode {
  * Connect by basic authentication
  */
 case class BasicAuthMode(userVariable: String, passwordVariable: String) extends AuthMode {
-  private[smartdatalake] val user: String = CredentialsUtil.getCredentials(userVariable)
-  private[smartdatalake] val password: String = CredentialsUtil.getCredentials(passwordVariable)
+  private[smartdatalake] val user: String = SecretsUtil.getSecret(userVariable)
+  private[smartdatalake] val password: String = SecretsUtil.getSecret(passwordVariable)
 }
 
 /**
@@ -64,7 +64,7 @@ case class BasicAuthMode(userVariable: String, passwordVariable: String) extends
  * For HTTP Connection this is used as Bearer token in Authorization header.
  */
 case class TokenAuthMode(tokenVariable: String) extends AuthMode with HttpHeaderAuth {
-  private[smartdatalake] val token: String = CredentialsUtil.getCredentials(tokenVariable)
+  private[smartdatalake] val token: String = SecretsUtil.getSecret(tokenVariable)
   private[smartdatalake] override def getHeaders: Map[String,String] = {
     Map("Authorization" -> s"Bearer $token")
   }
@@ -75,7 +75,7 @@ case class TokenAuthMode(tokenVariable: String) extends AuthMode with HttpHeader
  * Connect by custom authorization header
  */
 case class AuthHeaderMode(headerName: String = "Authorization", secretVariable: String) extends AuthMode with HttpHeaderAuth {
-  private[smartdatalake] val secret: String = CredentialsUtil.getCredentials(secretVariable)
+  private[smartdatalake] val secret: String = SecretsUtil.getSecret(secretVariable)
   private[smartdatalake] override def getHeaders: Map[String,String] = Map(headerName -> secret)
 }
 
@@ -84,8 +84,8 @@ case class AuthHeaderMode(headerName: String = "Authorization", secretVariable: 
  * For HTTP Connection this is used as Bearer token in Authorization header.
  */
 case class KeycloakClientSecretAuthMode(ssoServer: String, ssoRealm: String, ssoGrantType: String, clientIdVariable: String, clientSecretVariable: String) extends AuthMode with HttpHeaderAuth {
-  private[smartdatalake] val clientId: String = CredentialsUtil.getCredentials(clientIdVariable)
-  private[smartdatalake] val clientSecret: String = CredentialsUtil.getCredentials(clientSecretVariable)
+  private[smartdatalake] val clientId: String = SecretsUtil.getSecret(clientIdVariable)
+  private[smartdatalake] val clientSecret: String = SecretsUtil.getSecret(clientSecretVariable)
   private var keycloakClient: Keycloak = _
   private[smartdatalake] override def prepare(): Unit = {
     if (keycloakClient==null) {
@@ -134,7 +134,7 @@ trait CustomHttpAuthModeLogic extends HttpHeaderAuth {
  * Private key is read from .ssh
  */
 case class PublicKeyAuthMode(userVariable: String) extends AuthMode {
-  private[smartdatalake] val user: String = CredentialsUtil.getCredentials(userVariable)
+  private[smartdatalake] val user: String = SecretsUtil.getSecret(userVariable)
 }
 
 /**
@@ -149,8 +149,8 @@ case class SSLCertsAuthMode (
                             truststoreType: Option[String],
                             truststorePassVariable: String
                            ) extends AuthMode {
-  private[smartdatalake] val truststorePass: String = CredentialsUtil.getCredentials(truststorePassVariable)
-  private[smartdatalake] val keystorePass: String = CredentialsUtil.getCredentials(keystorePassVariable)
+  private[smartdatalake] val truststorePass: String = SecretsUtil.getSecret(truststorePassVariable)
+  private[smartdatalake] val keystorePass: String = SecretsUtil.getSecret(keystorePassVariable)
 }
 
 /**

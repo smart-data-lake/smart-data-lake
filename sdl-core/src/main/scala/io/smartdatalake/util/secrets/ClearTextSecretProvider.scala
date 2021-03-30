@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,17 +16,14 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.config
 
-import io.smartdatalake.workflow.action.customlogic.CustomDfCreator
-import io.smartdatalake.testutils.TestUtil.dfNonUniqueWithNull
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SparkSession}
+package io.smartdatalake.util.secrets
 
-class TestCustomDfNonUniqueWithNullCreator extends CustomDfCreator {
-  override def exec(session: SparkSession, config: Map[String, String]): DataFrame = dfNonUniqueWithNull
 
-  override def schema(session: SparkSession, config: Map[String, String]): Option[StructType] = Option(dfNonUniqueWithNull.schema)
-
-  override def equals(obj: Any): Boolean = getClass.equals(obj.getClass)
+/**
+ * Provide a secret in clear text in the configuration entry.
+ * This should be used only for development purposes.
+ */
+object ClearTextSecretProvider extends SecretProvider {
+  override def getSecret(name: String): String = name
 }

@@ -118,7 +118,15 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
         node.edges.map(dataObjectId => getInitialSubFeed(dataObjectId))
       case (node: Action, subFeeds) =>
         val deduplicatedSubFeeds = unionDuplicateSubFeeds(subFeeds ++ getRecursiveSubFeeds(node), node.id)
-        node.init(deduplicatedSubFeeds)
+        val previousThreadName = setThreadName(getActionThreadName(node.id))
+        val resultSubFeeds = try {
+          node.preInit(deduplicatedSubFeeds)
+          node.init(deduplicatedSubFeeds)
+        } finally {
+          setThreadName(previousThreadName)
+        }
+        // return
+        resultSubFeeds
       case x => throw new IllegalStateException(s"Unmatched case $x")
     }
     t
@@ -145,9 +153,15 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
           node.edges.map(dataObjectId => getInitialSubFeed(dataObjectId))
         case (node: Action, subFeeds) =>
           val deduplicatedSubFeeds = unionDuplicateSubFeeds(subFeeds ++ getRecursiveSubFeeds(node), node.id)
-          node.preExec(deduplicatedSubFeeds)
-          val resultSubFeeds = node.exec(deduplicatedSubFeeds)
-          node.postExec(deduplicatedSubFeeds, resultSubFeeds)
+          val previousThreadName = setThreadName(getActionThreadName(node.id))
+          val resultSubFeeds = try {
+            node.preExec(deduplicatedSubFeeds)
+            val resultSubFeeds = node.exec(deduplicatedSubFeeds)
+            node.postExec(deduplicatedSubFeeds, resultSubFeeds)
+            resultSubFeeds
+          } finally {
+            setThreadName(previousThreadName)
+          }
           //return
           resultSubFeeds
         case x => throw new IllegalStateException(s"Unmatched case $x")
@@ -162,7 +176,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
     result
   }
 
-  private def getRecursiveSubFeeds(node: Action)(implicit context: ActionPipelineContext): Seq[SubFeed] = {
+  private def getRecursiveSubFeeds(node: Action)(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(node.recursiveInputs.map(_.isInstanceOf[TransactionalSparkTableDataObject]).forall(_==true), "Recursive inputs only work for TransactionalSparkTableDataObjects.")
     // recursive inputs are only passed as input SubFeeds for SparkSubFeedsAction, which can take more than one input SubFeed
     // for SparkSubFeedAction (e.g. Deduplicate and HistorizeAction) which implicitly use a recursive input, the Action is responsible the get the SubFeed.
@@ -172,7 +186,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
     }
   }
 
-  private def getInitialSubFeed(dataObjectId: DataObjectId)(implicit context: ActionPipelineContext) = {
+  private def getInitialSubFeed(dataObjectId: DataObjectId)(implicit session: SparkSession, context: ActionPipelineContext) = {
     initialSubFeeds.find(_.dataObjectId==dataObjectId)
       .getOrElse {
         val partitions = context.instanceRegistry.get[DataObject](dataObjectId) match {
@@ -180,7 +194,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
           case _ => Seq()
         }
         if (context.simulation) throw new IllegalStateException(s"Initial subfeed for $dataObjectId missing for dry run.")
-        else InitSubFeed(dataObjectId, partitionValues).updatePartitionValues(partitions)
+        else InitSubFeed(dataObjectId, partitionValues).updatePartitionValues(partitions, breakLineageOnChange = false)
       }
   }
 
@@ -247,6 +261,17 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
     val action = dag.getNodes
       .find(_.nodeId == actionId.id).getOrElse(throw new IllegalStateException(s"Unknown action $actionId"))
     action.onRuntimeMetrics(dataObjectId, metrics)
+  }
+
+  // Helper methods rename thread so that it includes phase and action id for logging
+  private var previousThreadName: Option[String] = None
+  private def getActionThreadName(id: ActionId)(implicit context: ActionPipelineContext) = {
+    s"${context.phase.toString.toLowerCase()}-${id.id}"
+  }
+  private def setThreadName(name: String): String = {
+    val previousThreadName = Thread.currentThread().getName
+    Thread.currentThread().setName(name)
+    previousThreadName
   }
 }
 

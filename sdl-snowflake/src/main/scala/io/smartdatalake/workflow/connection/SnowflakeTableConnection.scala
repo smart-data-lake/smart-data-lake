@@ -49,27 +49,26 @@ case class SnowflakeTableConnection(override val id: ConnectionId,
                                    ) extends Connection with SmartDataLakeLogger {
 
   private val supportedAuths = Seq(classOf[BasicAuthMode])
-  require(authMode.isEmpty || supportedAuths.contains(authMode.get.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
+  require(authMode.isEmpty || supportedAuths.contains(authMode.get.getClass), s"($id) ${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
 
   def execSnowflakeStatement(sql: String, logging: Boolean = true): ResultSet = {
-    if (logging) logger.info(s"execSnowflakeStatement: $sql")
+    if (logging) logger.info(s"($id) execSnowflakeStatement: $sql")
     Utils.runQuery(getSnowflakeOptions, sql)
   }
 
   def getSnowflakeOptions: Map[String, String] = {
     if (authMode.isDefined) authMode.get match {
-      case m: BasicAuthMode => {
+      case m: BasicAuthMode =>
         Map(
           "sfURL" -> url,
           "sfUser" -> m.user,
           "sfPassword" -> m.password,
           "sfDatabase" -> schema,
           "sfSchema" -> db,
-          "sfWarehouse" -> warehouse,
+          "sfWarehouse" -> warehouse
         )
-      }
-      case _ => throw new IllegalArgumentException(s"No supported authMode given for Snowflake connection.")
-    } else throw new IllegalArgumentException(s"No authMode given for Snowflake connection.")
+      case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Snowflake connection.")
+    } else throw new IllegalArgumentException(s"($id) No authMode given for Snowflake connection.")
   }
 
   override def factory: FromConfigFactory[Connection] = SnowflakeTableConnection

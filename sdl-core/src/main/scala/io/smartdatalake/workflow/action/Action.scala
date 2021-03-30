@@ -22,7 +22,8 @@ import java.time.{Duration, LocalDateTime}
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
-import io.smartdatalake.definitions.{ExecutionMode, ExecutionModeResult}
+import io.smartdatalake.definitions.{Condition, ExecutionMode, ExecutionModeResult}
+import io.smartdatalake.metrics.NoMetricsFoundException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, SparkExpressionUtil}
 import io.smartdatalake.workflow.ExecutionPhase.{ExecutionPhase, Value}
@@ -42,7 +43,7 @@ import scala.util.{Success, Try}
  * An action defines a [[DAGNode]], that is, a transformation from input [[DataObject]]s to output [[DataObject]]s in
  * the DAG of actions.
  */
-private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNode with SmartDataLakeLogger {
+private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNode with SmartDataLakeLogger with AtlasExportable {
 
   /**
    * A unique identifier for this instance.
@@ -74,6 +75,14 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * To be implemented by subclasses
    */
   def outputs: Seq[DataObject]
+
+  /**
+   * execution condition for this action.
+   */
+  def executionCondition: Option[Condition]
+
+  // execution condition is evaluated in init phase and result must be stored for exec phase
+  protected var executionConditionResult: (Boolean,Option[String]) = (true,None)
 
   /**
    * execution mode for this action.
@@ -114,6 +123,35 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   }
 
   /**
+   * Checks before initalization of Action
+   * In this step execution condition is evaluated and is Action init is skipped if result is false.
+   */
+  def preInit(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    //noinspection MapGetOrElseBoolean
+    executionConditionResult = executionCondition.map { c =>
+      // evaluate condition if existing
+      val data = SubFeedsExpressionData.fromSubFeeds(subFeeds)
+      if (!c.evaluate(id, Some("executionCondition"), data)) {
+        val descriptionText = c.description.map(d => s""""$d" """).getOrElse("")
+        val msg = s"""($id) execution skipped because of failed executionCondition ${descriptionText}expression="${c.expression}" $data"""
+        (false, Some(msg))
+      } else (true, None)
+    }.getOrElse{
+      // default behaviour: if no executionCondition is defined, Action is executed if no input subFeed is skipped.
+      val skippedSubFeeds = subFeeds.filter(_.isSkipped)
+      if (skippedSubFeeds.nonEmpty) {
+        val msg = s"""($id) execution skipped because input subFeeds are skipped: ${subFeeds.map(_.dataObjectId)}"""
+        (false, Some(msg))
+      } else (true, None)
+    }
+    // check execution condition result
+    if (!executionConditionResult._1 && !context.appConfig.isDryRun) {
+      val outputSubFeeds = outputs.map(output => InitSubFeed(dataObjectId = output.id, partitionValues = Seq(), isSkipped = true))
+      throw new TaskSkippedDontStopWarning(id.id, executionConditionResult._2.get, Some(outputSubFeeds))
+    }
+  }
+
+  /**
    * Initialize Action with [[SubFeed]]'s to be processed.
    * In this step the execution mode is evaluated and the result stored for the exec phase.
    * If successful
@@ -131,9 +169,15 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * e.g. JdbcTableDataObjects preWriteSql
    */
   def preExec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    setSparkJobMetadata(None) // init spark jobGroupId to identify metrics
+    // check execution condition result from init phase
+    if (!executionConditionResult._1) {
+      val outputSubFeeds = outputs.map(output => InitSubFeed(dataObjectId = output.id, partitionValues = Seq(), isSkipped = true))
+      throw new TaskSkippedDontStopWarning(id.id, executionConditionResult._2.get, Some(outputSubFeeds))
+    }
     //  if execution mode result from init phase is failure, throw corresponding exception
     if (executionModeResult.isFailure) executionModeResult.get
+    // init spark jobGroupId to identify metrics
+    setSparkJobMetadata(None)
     // otherwise continue processing
     inputs.foreach( input => input.preRead(findSubFeedPartitionValues(input.id, subFeeds)))
     outputs.foreach(_.preWrite) // Note: transformed subFeeds don't exist yet, that's why no partition values can be passed as parameters.
@@ -153,12 +197,12 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * In this step any task on Input- or Output-DataObjects needed after the main task is executed,
    * e.g. JdbcTableDataObjects postWriteSql or CopyActions deleteInputData.
    */
-  def postExec(inputSubFeed: Seq[SubFeed], outputSubFeed: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     // evaluate metrics fail condition if defined
     metricsFailCondition.foreach( c => evaluateMetricsFailCondition(c))
     // process postRead/Write hooks
-    inputs.foreach( input => input.postRead(findSubFeedPartitionValues(input.id, inputSubFeed)))
-    outputs.foreach( output => output.postWrite(findSubFeedPartitionValues(output.id, outputSubFeed)))
+    inputs.foreach( input => input.postRead(findSubFeedPartitionValues(input.id, inputSubFeeds)))
+    outputs.foreach( output => output.postWrite(findSubFeedPartitionValues(output.id, outputSubFeeds)))
   }
 
   /**
@@ -283,7 +327,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
         Thread.sleep(500)
         getLatestMetrics(dataObjectId)
       }
-      .orElse( throw new IllegalStateException(s"($id) Metrics for $dataObjectId not found"))
+      .orElse( throw NoMetricsFoundException(s"($id) Metrics for $dataObjectId not found"))
     // remember for which data object final metrics has been delivered, so that we can warn on late arriving metrics!
     dataObjectRuntimeMetricsDelivered += dataObjectId
     // return
@@ -302,6 +346,8 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
     runtimeEvents.clear
     dataObjectRuntimeMetricsDelivered.clear
     dataObjectRuntimeMetricsMap.clear
+    executionConditionResult = (true,None)
+    executionModeResult = Success(None)
   }
 
   /**
@@ -320,6 +366,8 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
     val outputStr = outputs.map( _.toStringShort).mkString(", ")
     s"$toStringShort Inputs: $inputStr Outputs: $outputStr"
   }
+
+  override def atlasName: String = id.id
 }
 
 /**

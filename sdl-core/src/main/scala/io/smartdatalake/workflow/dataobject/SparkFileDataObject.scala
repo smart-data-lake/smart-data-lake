@@ -23,7 +23,6 @@ import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.util.misc.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
-import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions.input_file_name
 import org.apache.spark.sql.types.{StringType, StructType}
@@ -64,8 +63,9 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    *
    * Default is to validate the `schemaMin` and not apply any modification.
    */
-  def beforeWrite(df: DataFrame): DataFrame = {
-    validateSchemaMin(df)
+  def beforeWrite(df: DataFrame)(implicit session: SparkSession): DataFrame = {
+    validateSchemaMin(df, "write")
+    schema.foreach(schemaExpected => validateSchema(df, schemaExpected, "write"))
     df
   }
 
@@ -74,8 +74,9 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    *
    * Default is to validate the `schemaMin` and not apply any modification.
    */
-  def afterRead(df: DataFrame): DataFrame = {
-    validateSchemaMin(df)
+  def afterRead(df: DataFrame)(implicit session: SparkSession): DataFrame = {
+    validateSchemaMin(df, "read")
+    schema.map(createReadSchema).foreach(schemaExpected => validateSchema(df, schemaExpected, "read"))
     df
   }
 
@@ -89,17 +90,16 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * @param sourceExists Whether the source file/table exists already. Existing sources may have a source schema.
    * @return The schema to use for the data frame reader when reading from the source.
    */
-  def readSchema(sourceExists: Boolean): Option[StructType] = schema
+  def getSchema(sourceExists: Boolean): Option[StructType] = schema
 
   /**
    * Constructs an Apache Spark [[DataFrame]] from the underlying file content.
    *
    * @see [[DataFrameReader]]
-   *
    * @param session the current [[SparkSession]].
    * @return a new [[DataFrame]] containing the data stored in the file at `path`
    */
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext) : DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
     import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 
     val wrongPartitionValues = PartitionValues.checkWrongPartitionValues(partitionValues, partitions)
@@ -115,7 +115,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
       filesystem.mkdirs(hadoopPath)
     }
 
-    val schemaOpt = readSchema(filesExists)
+    val schemaOpt = getSchema(filesExists)
     val dfContent = if (partitions.isEmpty || partitionValues.isEmpty) {
       session.read
         .format(format)
@@ -131,7 +131,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
       // create data frame for every partition value and then build union
       val pathsToRead = partitionValues.flatMap(getConcretePaths).map(_.toString)
       pathsToRead.map(reader.load).reduceOption(_ union _)
-        .getOrElse{
+        .getOrElse {
           // if there are no paths to read then an empty DataFrame is created
           require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")
           DataFrameUtil.getEmptyDataFrame(schemaOpt.get)
@@ -144,7 +144,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     afterRead(df)
   }
 
-  override def getStreamingDataFrame(options: Map[String,String], pipelineSchema: Option[StructType])(implicit session: SparkSession): DataFrame = {
+  override def getStreamingDataFrame(options: Map[String, String], pipelineSchema: Option[StructType])(implicit session: SparkSession): DataFrame = {
     require(schema.orElse(pipelineSchema).isDefined, s"($id}) Schema must be defined for streaming SparkFileDataObject")
     // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
     if (!filesystem.exists(hadoopPath.getParent)) filesystem.mkdirs(hadoopPath)
@@ -164,6 +164,11 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
       .getOrElse(writeSchema)
   }
 
+  override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    validateSchemaMin(df, "write")
+    schema.foreach(schemaExpected => validateSchema(df, schemaExpected, "write"))
+  }
+
   /**
    * Writes the provided [[DataFrame]] to the filesystem.
    *
@@ -174,7 +179,8 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * @param partitionValues The partition layout to write.
    * @param session the current [[SparkSession]].
    */
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession): Unit = {
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
+                             (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     require(!isRecursiveInput, "($id) SparkFileDataObject cannot write dataframe when dataobject is also used as recursive input ")
 
     // prepare data
@@ -242,14 +248,4 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
 /**
  * A [[DataObject]] backed by a file in HDFS with an embedded schema.
  */
-private[smartdatalake] trait SparkFileDataObjectWithEmbeddedSchema extends SparkFileDataObject {
-    override def readSchema(filesExist: Boolean): Option[StructType] = {
-        // If the source exists, it has an embedded schema. In this case, ignore the user defined schema.
-        if (filesExist && schema.isDefined) {
-            logger.warn(s"($id) User-defined schema is configured but ignored because the source file contains a schema.")
-            None
-        } else {
-            schema
-        }
-    }
-}
+private[smartdatalake] trait SparkFileDataObjectWithEmbeddedSchema extends SparkFileDataObject

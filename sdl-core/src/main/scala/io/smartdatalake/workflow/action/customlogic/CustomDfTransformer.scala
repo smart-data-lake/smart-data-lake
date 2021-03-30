@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action.customlogic
 import io.smartdatalake.config.SdlConfigObject
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData, PythonUtil, SparkExpressionUtil}
+import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData, PythonSparkEntryPoint, PythonUtil, SparkExpressionUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionHelper
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig.fnTransformType
@@ -167,17 +167,16 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
       // python transformation is executed by passing options and input/output DataFrame through entry point
       val objectId = ActionHelper.replaceSpecialCharactersWithUnderscore(dataObjectId)
       try {
-        val entryPoint = new DfTransformerPySparkEntryPoint(session, options, df, objectId)
+        val entryPoint = new DfTransformerPythonSparkEntryPoint(session, options, df, objectId)
         val additionalInitCode = """
                                    |# prepare input parameters
-                                   |options = entryPoint.options
                                    |inputDf = DataFrame(entryPoint.getInputDf(), sqlContext) # convert input dataframe to pyspark
                                    |dataObjectId = entryPoint.getDataObjectId()
                                    |# helper function to return output dataframe
                                    |def setOutputDf( df ):
                                    |    entryPoint.setOutputDf(df._jdf)
           """.stripMargin
-        PythonUtil.execPythonTransform( entryPoint, additionalInitCode + sys.props("line.separator") + code)
+        PythonUtil.execPythonSparkCode( entryPoint, additionalInitCode + sys.props("line.separator") + code)
         entryPoint.outputDf.getOrElse(throw new IllegalStateException("Python transformation must set output DataFrame (call setOutputDf(df))"))
       } catch {
         case e: Throwable => throw new PythonTransformationException(s"Could not execute Python code. Error: ${e.getMessage}", e)
@@ -190,9 +189,8 @@ object CustomDfTransformerConfig {
   type fnTransformType = (SparkSession, Map[String, String], DataFrame, String) => DataFrame
 }
 
-private[smartdatalake] class DfTransformerPySparkEntryPoint(override val session: SparkSession, options: Map[String,String], inputDf: DataFrame, dataObjectId: String, var outputDf: Option[DataFrame] = None) extends SparkEntryPoint {
-  // it seems that py4j can handle functions but not pure attributes -> wrapper functions needed...
-  def getOptions: Map[String,String] = options
+private[smartdatalake] class DfTransformerPythonSparkEntryPoint(override val session: SparkSession, options: Map[String,String], inputDf: DataFrame, dataObjectId: String, var outputDf: Option[DataFrame] = None) extends PythonSparkEntryPoint(session, options) {
+  // it seems that py4j needs getter functions for attributes
   def getInputDf: DataFrame = inputDf
   def getDataObjectId: String = dataObjectId
   def setOutputDf(df: DataFrame): Unit = {

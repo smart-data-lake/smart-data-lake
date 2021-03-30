@@ -38,8 +38,11 @@ import org.apache.spark.sql.types.StructType
  * and [[org.apache.spark.sql.DataFrameWriter]] respectively. The reader and writer implementations are provided by
  * the [[https://github.com/databricks/spark-avro databricks spark-avro]] project.
  *
- * @param schema An optional schema for the spark data frame used when writing new Avro files. Note: Existing Avro files
+ * @param avroOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and
+ *                    [[org.apache.spark.sql.DataFrameWriter]].
+ * @param schema An optional schema for the spark data frame to be validated on read and write. Note: Existing Avro files
  *               contain a source schema. Therefore, this schema is ignored when reading from existing Avro files.
+ *               As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
  * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
@@ -51,6 +54,7 @@ import org.apache.spark.sql.types.StructType
 case class AvroFileDataObject( override val id: DataObjectId,
                                override val path: String,
                                override val partitions: Seq[String] = Seq(),
+                               avroOptions: Option[Map[String,String]] = None,
                                override val schema: Option[StructType] = None,
                                override val schemaMin: Option[StructType] = None,
                                override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
@@ -67,6 +71,8 @@ case class AvroFileDataObject( override val id: DataObjectId,
 
   // this is only needed for FileRef actions
   override val fileName: String = "*.avro*"
+
+  override val options: Map[String, String] = avroOptions.getOrElse(Map())
 
   override def factory: FromConfigFactory[DataObject] = AvroFileDataObject
 }

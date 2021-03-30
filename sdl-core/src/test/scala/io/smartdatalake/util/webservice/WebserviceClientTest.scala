@@ -60,7 +60,7 @@ class WebserviceClientTest extends FunSuite with BeforeAndAfterEach  {
 
   // TODO: Get https calls working. Error: Failure(javax.net.ssl.SSLHandshakeException: Remote host closed connection during handshake)
   ignore("Call a URL with Basic authentication") {
-    val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/basic_auth/", authMode = Some(BasicAuthMode("testuser","abc")))
+    val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/basic_auth/", authMode = Some(BasicAuthMode("CLEAR#testuser","CLEAR#abc")))
     val webserviceClient = ScalaJWebserviceClient(webserviceDO)
     val response = webserviceClient.get()
     assert(response.isSuccess)

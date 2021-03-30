@@ -36,10 +36,10 @@ case class SparkUDFCreatorConfig(className: String, options: Map[String,String] 
     val constructor = clazz.getConstructor()
     constructor.newInstance().asInstanceOf[SparkUDFCreator]
   } catch {
-    case e: NoSuchMethodException => throw ConfigurationException(s"SparkSessionCustomizer class $className needs constructor without parameters: ${e.getMessage}", Some("globalConfig.sparkSessionCustomizers"), e)
-    case e: Exception => throw ConfigurationException(s"Cannot instantiate SparkSessionCustomizer class $className: ${e.getMessage}", Some("globalConfig.sparkSessionCustomizers"), e)
+    case e: NoSuchMethodException => throw ConfigurationException(s"SparkUDFCreatorConfig class $className needs constructor without parameters: ${e.getMessage}", Some("globalConfig.sparkUDFs"), e)
+    case e: Exception => throw ConfigurationException(s"Cannot instantiate SparkUDFCreatorConfig class $className: ${e.getMessage}", Some("globalConfig.sparkUDFs"), e)
   }
-  private[smartdatalake] def get: UserDefinedFunction = creator.get(options)
+  private[smartdatalake] def getUDF: UserDefinedFunction = creator.get(options)
 }
 
 /**

@@ -23,10 +23,10 @@ import java.time.LocalDateTime
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.definitions.Environment
+import io.smartdatalake.definitions.{Environment, ExecutionModeResult}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, InitSubFeed, SubFeed}
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.TimestampType
@@ -129,24 +129,16 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
     invalidCharacters.replaceAllIn(str, "_")
   }
 
-  def getMainDataObject[T <: DataObject](mainId: Option[DataObjectId], dataObjects: Seq[T], inputOutput: String, mainNeeded: Boolean, actionId: ActionId): T = {
-    // split dataObjects into dataObjects with partition columns defined and others
-    val partitionedDataObjects = dataObjects.collect{ case x: T @unchecked with CanHandlePartitions => x }.filter(_.partitions.nonEmpty)
-    val unpartitionedDataObjects = dataObjects.filterNot(partitionedDataObjects.contains(_))
-    mainId.map {
-      // 1. mainInput is defined
-      id => dataObjects.find(_.id == id).getOrElse(throw ConfigurationException(s"($actionId) main${inputOutput}Id $id not found in ${inputOutput}s"))
-    }.orElse {
-      // 2. there is only one partitioned dataObject
-      if (partitionedDataObjects.size==1) partitionedDataObjects.headOption
-      else None
-    }.orElse {
-      // 3. there is only one dataObject in total
-      if (dataObjects.size==1) dataObjects.headOption else None
-    }.getOrElse {
-      // 4. mainInput is not unique, we log a warning and favor partitioned dataObjects over others.
-      if (mainNeeded) logger.warn(s"($actionId) Could not determine unique main $inputOutput but execution mode might need it. Decided for ${dataObjects.head.id}.")
-      (partitionedDataObjects ++ unpartitionedDataObjects).head
+  def getMainDataObjectCandidates[T <: DataObject](mainId: Option[DataObjectId], dataObjects: Seq[T], dataObjectIdsToIgnoreFilter: Seq[DataObjectId], inputOutput: String, mainNeeded: Boolean, actionId: ActionId): Seq[T] = {
+    if (mainId.isDefined) {
+      // if mainInput is defined -> return only that DataObject
+      Seq(dataObjects.find(_.id == mainId.get).getOrElse(throw ConfigurationException(s"($actionId) main${inputOutput}Id ${mainId.get} not found in ${inputOutput}s")))
+    } else {
+      // prioritize DataObjects by number of partition columns
+      dataObjects.sortBy {
+        case x: CanHandlePartitions if !dataObjectIdsToIgnoreFilter.contains(x.id) => x.partitions.size
+        case _ => 0
+      }.reverse
     }
   }
 
@@ -158,8 +150,9 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
     dataObject match {
       case partitionedDO: CanHandlePartitions =>
         // remove superfluous partitionValues
-        subFeed.updatePartitionValues(partitionedDO.partitions, Some(subFeed.partitionValues)).asInstanceOf[T]
-      case _ => subFeed.clearPartitionValues.asInstanceOf[T]
+        subFeed.updatePartitionValues(partitionedDO.partitions, newPartitionValues = Some(subFeed.partitionValues)).asInstanceOf[T]
+      case _ =>
+        subFeed.clearPartitionValues().asInstanceOf[T]
     }
   }
 
@@ -169,21 +162,44 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
    * - add run_id_partition value if needed
    * - removing not existing columns from the partition values.
    */
-  def updateOutputPartitionValues[T <: SubFeed](dataObject: DataObject, subFeed: T, partitionValuesTransform: Option[Seq[PartitionValues] => Map[PartitionValues,PartitionValues]] = None)(implicit session: SparkSession, context: ActionPipelineContext): T = {
+  def updateOutputPartitionValues[T <: SubFeed](dataObject: DataObject, subFeed: T, partitionValuesTransform: Option[Seq[PartitionValues] => Map[PartitionValues,PartitionValues]] = None)(implicit session: SparkSession, context: ActionPipelineContext): T =
     dataObject match {
       case partitionedDO: CanHandlePartitions =>
         // transform partition values
-        var newPartitionValues = partitionValuesTransform.map(fn => fn(subFeed.partitionValues).values.toSeq.distinct)
+        val newPartitionValues = partitionValuesTransform.map(fn => fn(subFeed.partitionValues).values.toSeq.distinct)
           .getOrElse(subFeed.partitionValues)
-        // add run_id partition if needed
-        if (partitionedDO.partitions.contains(Environment.runIdPartitionColumnName)) {
-          if (newPartitionValues.nonEmpty) newPartitionValues = newPartitionValues.map(_.addKey(Environment.runIdPartitionColumnName, context.runId.toString))
-          else newPartitionValues = Seq(PartitionValues(Map(Environment.runIdPartitionColumnName -> context.runId.toString)))
-        }
         // remove superfluous partitionValues
-        subFeed.updatePartitionValues(partitionedDO.partitions, Some(newPartitionValues)).asInstanceOf[T]
-      case _ => subFeed.clearPartitionValues.asInstanceOf[T]
+        subFeed.updatePartitionValues(partitionedDO.partitions, breakLineageOnChange = false, newPartitionValues = Some(newPartitionValues)).asInstanceOf[T]
+      case _ =>
+        subFeed.clearPartitionValues(breakLineageOnChange = false).asInstanceOf[T]
     }
+
+  def addRunIdPartitionIfNeeded[T <: SubFeed](dataObject: DataObject, subFeed: T)(implicit session: SparkSession, context: ActionPipelineContext): T = {
+    dataObject match {
+      case partitionedDO: CanHandlePartitions =>
+        if (partitionedDO.partitions.contains(Environment.runIdPartitionColumnName)) {
+          val newPartitionValues = if (subFeed.partitionValues.nonEmpty) subFeed.partitionValues.map(_.addKey(Environment.runIdPartitionColumnName, context.runId.toString))
+          else Seq(PartitionValues(Map(Environment.runIdPartitionColumnName -> context.runId.toString)))
+          subFeed.updatePartitionValues(partitionedDO.partitions, breakLineageOnChange = false, newPartitionValues = Some(newPartitionValues)).asInstanceOf[T]
+        } else subFeed
+      case _ => subFeed
+    }
+  }
+
+  def getHandleExecutionModeExceptionPartialFunction(outputs: Seq[DataObject]): PartialFunction[Throwable, Option[ExecutionModeResult]] = {
+    // return empty output subfeeds if "no data"
+    case ex: NoDataToProcessWarning =>
+      // This exception is changed to a NoDataToProcessDontStopWarning but subFeeds have isSkipped set to true
+      // The following action's executionCondition will stop by default if there is a skipped input subFeed. The executionCondition can be set to "true" to get stopIfNoData=false behaviour.
+      val outputSubFeeds = outputs.map(output => InitSubFeed(dataObjectId = output.id, partitionValues = Seq(), isSkipped = true))
+      // throw NoDataToProcessDontStopWarning with fake results added. The DAG will pass the fake results to further actions.
+      throw NoDataToProcessDontStopWarning(ex.actionId, ex.msg, results = Some(outputSubFeeds))
+    case ex: NoDataToProcessDontStopWarning =>
+      // in this case subFeed isSkipped is set to false to be backward compatible with executionMode stopIfNoData=false
+      // This can be removed once executionMode stopIfNoData is removed.
+      val outputSubFeeds = outputs.map(output => InitSubFeed(dataObjectId = output.id, partitionValues = Seq()))
+      // rethrow exception with fake results added. The DAG will pass the fake results to further actions.
+      throw ex.copy(results = Some(outputSubFeeds))
   }
 }
 

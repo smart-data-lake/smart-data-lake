@@ -39,7 +39,7 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
  * @param schemaMin    An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
  * @param table        Snowflake table to be written by this output
  * @param saveMode     spark [[SaveMode]] to use when writing files, default is "overwrite"
- * @param connectionId optional id of [[io.smartdatalake.workflow.connection.SnowflakeTableConnection]]
+ * @param connectionId optional id of [[SnowflakeTableConnection]]
  * @param metadata     meta data
  */
 case class SnowflakeTableDataObject(override val id: DataObjectId,
@@ -55,7 +55,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
    * Connection defines connection string, credentials and database schema/name
    */
   private val connection = connectionId.map(c => getConnection[SnowflakeTableConnection](c))
-  assert(connection.isDefined, "A SnowflakeTableDataObject needs to have an assigned SnowflakeTableConnection.")
+  assert(connection.isDefined, "($id) A SnowflakeTableDataObject needs to have an assigned SnowflakeTableConnection.")
 
   // prepare table
   table = table.overrideDb(connection.map(_.db))
@@ -71,13 +71,13 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
       .options(connection.get.getSnowflakeOptions)
       .options(queryOrTable)
       .load()
-    validateSchemaMin(df)
+    validateSchemaMin(df, "read")
     df.colNamesLowercase
   }
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
-                             (implicit session: SparkSession): Unit = {
-    validateSchemaMin(df)
+                             (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    validateSchemaMin(df, "write")
     writeDataFrame(df, createTableOnly = false, partitionValues)
   }
 

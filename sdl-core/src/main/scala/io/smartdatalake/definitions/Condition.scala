@@ -26,13 +26,11 @@ import io.smartdatalake.util.misc.SparkExpressionUtil
 import scala.reflect.runtime.universe.TypeTag
 
 /**
- * Definition of a Spark SQL condition with description.
- * This is used for example to define failConditions of [[PartitionDiffMode]].
- *
- * @param expression Condition formulated as Spark SQL. The attributes available are dependent on the context.
- * @param description A textual description of the condition to be shown in error messages.
+ * Trait defining basics for a Spark SQL condition with description.
  */
-case class Condition(expression: String, description: Option[String] = None) {
+private[smartdatalake] trait ConditionBase {
+  def expression: String
+  def description: Option[String]
 
   private[smartdatalake] def syntaxCheck[T<:Product:TypeTag](id: ConfigObjectId, configName: Option[String]): Unit = {
     SparkExpressionUtil.syntaxCheck[T,Boolean](id, configName, expression)
@@ -42,3 +40,12 @@ case class Condition(expression: String, description: Option[String] = None) {
     SparkExpressionUtil.evaluateBoolean[T](id, configName, expression, data)
   }
 }
+
+/**
+ * Definition of a Spark SQL condition with description.
+ * This is used for example to define failConditions of [[PartitionDiffMode]].
+ *
+ * @param expression Condition formulated as Spark SQL. The attributes available are dependent on the context.
+ * @param description A textual description of the condition to be shown in error messages.
+ */
+case class Condition(override val expression: String, override val description: Option[String] = None) extends ConditionBase

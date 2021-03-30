@@ -23,7 +23,7 @@ import java.time.LocalDateTime
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{ExecutionMode, TechnicalTableColumn}
+import io.smartdatalake.definitions.{Condition, ExecutionMode, TechnicalTableColumn}
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.historization.Historization
@@ -55,6 +55,7 @@ import scala.util.{Failure, Success, Try}
  * @param additionalColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
  *                          The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  * @param executionMode optional execution mode for this Action
+ * @param executionCondition optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  */
@@ -75,6 +76,7 @@ case class HistorizeAction(
                             override val breakDataFrameLineage: Boolean = false,
                             override val persist: Boolean = false,
                             override val executionMode: Option[ExecutionMode] = None,
+                            override val executionCondition: Option[Condition] = None,
                             override val metricsFailCondition: Option[String] = None,
                             override val metadata: Option[ActionMetadata] = None
                           )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedAction {

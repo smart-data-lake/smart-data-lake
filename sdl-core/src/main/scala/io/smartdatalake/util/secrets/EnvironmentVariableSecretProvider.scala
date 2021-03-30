@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,17 +16,20 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.config
 
-import io.smartdatalake.testutils.TestUtil.dfManyTypes
-import io.smartdatalake.workflow.action.customlogic.CustomDfCreator
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SparkSession}
+package io.smartdatalake.util.secrets
 
-class TestCustomDfManyTypes extends CustomDfCreator {
-  override def exec(session: SparkSession, config: Map[String, String]): DataFrame = dfManyTypes
+import io.smartdatalake.config.ConfigurationException
 
-  override def schema(session: SparkSession, config: Map[String, String]): Option[StructType] = Option(dfManyTypes.schema)
-
-  override def equals(obj: Any): Boolean = getClass.equals(obj.getClass)
+/**
+ * Read a secret from an environment variable.
+ * Use format ENV#<environmentVariableName> to read a secret from the specified environment variable.
+ */
+object EnvironmentVariableSecretProvider extends SecretProvider {
+  override def getSecret(name: String): String = {
+    sys.env.get(name) match {
+      case Some(key) => key
+      case _ => throw new ConfigurationException(s"Environment variable $name not found")
+    }
+  }
 }

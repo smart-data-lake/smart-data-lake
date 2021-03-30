@@ -19,18 +19,15 @@
 package io.smartdatalake.workflow.action
 
 import java.nio.file.Files
-import java.time.LocalDateTime
 
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.PartitionDiffMode
+import io.smartdatalake.definitions.{Condition, PartitionDiffMode}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.workflow.action.customlogic.{CustomDfsTransformer, CustomDfsTransformerConfig}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed, SparkSubFeed, TaskSkippedDontStopWarning}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
@@ -291,6 +288,52 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     assert(r2.size == 1) // only one record has rating 5 (see where condition)
     assert(r2.head == "doe")
 
+  }
+
+  test("copy load with 2 transformations and skip condition") {
+
+    // setup DataObjects
+    val feed = "copy"
+    val srcTable1 = Table(Some("default"), "copy_input1")
+    val srcDO1 = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable1.fullName}"), table = srcTable1, numInitialHdfsPartitions = 1)
+    srcDO1.dropTable
+    instanceRegistry.register(srcDO1)
+
+    val srcTable2 = Table(Some("default"), "copy_input2")
+    val srcDO2 = HiveTableDataObject( "src2", Some(tempPath+s"/${srcTable2.fullName}"), table = srcTable2, numInitialHdfsPartitions = 1)
+    srcDO2.dropTable
+    instanceRegistry.register(srcDO2)
+
+    val tgtTable1 = Table(Some("default"), "copy_output1", None, Some(Seq("lastname","firstname")))
+    val tgtDO1 = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable1.fullName}"), Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable1, numInitialHdfsPartitions = 1)
+    tgtDO1.dropTable
+    instanceRegistry.register(tgtDO1)
+
+    // prepare
+    val customTransformerConfig = CustomDfsTransformerConfig(sqlCode = Map(DataObjectId("tgt1")->"select * from src1 union all select * from src2"))
+    val l1 = Seq(("jonson","rob",5)).toDF("lastname", "firstname", "rating")
+    srcDO1.writeDataFrame(l1, Seq())
+    val l2 = Seq(("doe","bob",3)).toDF("lastname", "firstname", "rating")
+    srcDO2.writeDataFrame(l2, Seq())
+
+    // condition: skip only if both input subfeeds are skipped
+    val executionCondition = Some(Condition("!inputSubFeeds.src1.isSkipped or !inputSubFeeds.src2.isSkipped"))
+
+    // skip if both subfeeds skipped
+    val action1 = CustomSparkAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id), transformer = customTransformerConfig, executionCondition = executionCondition)
+    val srcSubFeed1 = SparkSubFeed(None, "src1", Seq(), isSkipped = true)
+    val srcSubFeed2 = SparkSubFeed(None, "src2", Seq(), isSkipped = true)
+    val tgtSubFeed1 = SparkSubFeed(None, "tgt1", Seq(), isSkipped = true)
+    intercept[TaskSkippedDontStopWarning[_]](action1.preInit(Seq(srcSubFeed1,srcSubFeed2)))
+    intercept[TaskSkippedDontStopWarning[_]](action1.preExec(Seq(srcSubFeed1,srcSubFeed2)))
+    action1.postExec(Seq(srcSubFeed1,srcSubFeed2), Seq(tgtSubFeed1))
+
+    // dont skip if one subfeed skipped
+    val action2 = CustomSparkAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id), transformer = customTransformerConfig, executionCondition = executionCondition)
+    val srcSubFeed3 = SparkSubFeed(None, "src1", Seq(), isSkipped = true)
+    val srcSubFeed4 = SparkSubFeed(None, "src2", Seq(), isSkipped = false)
+    action2.preInit(Seq(srcSubFeed3,srcSubFeed4)) // no exception
+    action2.preExec(Seq(srcSubFeed3,srcSubFeed4)) // no exception
   }
 
   test("date to month aggregation with partition value transformation") {

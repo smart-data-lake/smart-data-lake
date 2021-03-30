@@ -98,7 +98,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
     val df = session.read.format("delta").load(hadoopPath.toString)
-    validateSchemaMin(df)
+    validateSchemaMin(df, "read")
     df
   }
 
@@ -111,8 +111,8 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
-                             (implicit session: SparkSession): Unit = {
-    validateSchemaMin(df)
+                             (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    validateSchemaMin(df, "write")
     writeDataFrame(df, createTableOnly=false, partitionValues)
   }
 
@@ -122,7 +122,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    * or only a few HDFS files that are too large.
    */
   def writeDataFrame(df: DataFrame, createTableOnly: Boolean, partitionValues: Seq[PartitionValues])
-                    (implicit session: SparkSession): Unit = {
+                    (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     val dfPrepared = if (createTableOnly) {
       // create empty df with existing df's schema
       DataFrameUtil.getEmptyDataFrame(df.schema)

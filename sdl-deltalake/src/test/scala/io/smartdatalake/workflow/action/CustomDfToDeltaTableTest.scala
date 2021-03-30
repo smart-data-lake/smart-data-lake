@@ -22,7 +22,7 @@ import java.nio.file.Files
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.testutils.TestUtil._
+import io.smartdatalake.testutils.custom.TestCustomDfCreator
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.dataobject.{CustomDfDataObject, DeltaLakeTableDataObject, Table}
@@ -47,7 +47,7 @@ class CustomDfToDeltaTableTest extends FunSuite with BeforeAndAfter {
 
     // setup DataObjects
     val feed = "customDf2Delta"
-    val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some("io.smartdatalake.config.TestCustomDfCreator")))
+    val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
     val targetTable = Table(db = Some("default"), name = "custom_df_copy", query = None, primaryKey = Some(Seq("line")))
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", path=targetTablePath, table=targetTable, numInitialHdfsPartitions=1)
@@ -62,7 +62,7 @@ class CustomDfToDeltaTableTest extends FunSuite with BeforeAndAfter {
     val expected = sourceDO.getDataFrame()
     val actual = targetDO.getDataFrame()
     val resultat: Boolean = expected.isEqual(actual)
-    if (!resultat) printFailedTestResult("Df2HiveTable",Seq())(actual)(expected)
+    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(expected)
     assert(resultat)
   }
 
@@ -70,7 +70,7 @@ class CustomDfToDeltaTableTest extends FunSuite with BeforeAndAfter {
 
     // setup DataObjects
     val feed = "customDf2Delta_partitioned"
-    val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some("io.smartdatalake.config.TestCustomDfCreator")))
+    val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
     val targetTable = Table(db = Some("default"), name = "custom_df_copy_partitioned", query = None, primaryKey = Some(Seq("line")))
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", partitions=Seq("num"), path=targetTablePath, table=targetTable, numInitialHdfsPartitions=1)
@@ -85,7 +85,7 @@ class CustomDfToDeltaTableTest extends FunSuite with BeforeAndAfter {
     val expected = sourceDO.getDataFrame()
     val actual = targetDO.getDataFrame()
     val resultat: Boolean = expected.isEqual(actual)
-    if (!resultat) printFailedTestResult("Df2HiveTable",Seq())(actual)(expected)
+    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(expected)
     assert(resultat)
   }
 

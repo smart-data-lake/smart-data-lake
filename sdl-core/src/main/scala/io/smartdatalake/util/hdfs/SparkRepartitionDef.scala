@@ -19,6 +19,7 @@
 
 package io.smartdatalake.util.hdfs
 
+import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.dataobject.FileRef
@@ -37,8 +38,10 @@ import org.apache.spark.sql.types.IntegerType
  * When writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal
  * to numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.
  *
- * @param numberOfTasksPerPartition Number of Spark tasks to create per partition before writing to DataObject by repartitioning the DataFrame. This controls how many files are created in each Hadoop partition.
- * @param keyCols Optional key columns to distribute records over Spark tasks inside a Hadoop partition. If numberOfTasksPerPArtition is 1 this setting has no effect. If DataObject has Hadoop partitions defined, keyCols must be defined.
+ * @param numberOfTasksPerPartition Number of Spark tasks to create per partition before writing to DataObject by repartitioning the DataFrame.
+ *                                  This controls how many files are created in each Hadoop partition.
+ * @param keyCols  Optional key columns to distribute records over Spark tasks inside a Hadoop partition.
+ *                 If DataObject has Hadoop partitions defined, keyCols must be defined.
  * @param sortCols Optional columns to sort records inside files created.
  * @param filename Option filename to rename target file(s). If numberOfTasksPerPartition is greater than 1,
  *                 multiple files can exist in a directory and a number is inserted into the filename after the first '.'.
@@ -47,7 +50,7 @@ import org.apache.spark.sql.types.IntegerType
 case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
                                keyCols: Seq[String] = Seq(),
                                sortCols: Seq[String] = Seq(),
-                               filename: Option[String] = None
+                               filename: Option[String] = None,
                               ) extends SmartDataLakeLogger {
   assert(numberOfTasksPerPartition > 0, s"numberOfTasksPerPartition must be greater than 0")
 
@@ -77,7 +80,18 @@ case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
       repartitionForOnePartitionValue(df) // this is the same as writing only one partition value
     }
     // sort within spark partitions
-    if (sortCols.nonEmpty) dfRepartitioned.sortWithinPartitions(sortCols.map(col):_*)
+    if (sortCols.nonEmpty) {
+      val sortColDirRegex = "([^\\s]+)\\s([^\\s]+)".r
+      val sortColRegex = "([^\\s]+)".r
+      val sortExprs = sortCols.map {
+        case sortColDirRegex(colName, sortDir) if sortDir == "asc" => col(colName).asc
+        case sortColDirRegex(colName, sortDir) if sortDir == "desc" => col(colName).desc
+        case sortColDirRegex(colName, sortDir) => throw new ConfigurationException(s"""($dataObjectId) Wrong sort direction ($sortDir) provided in [sparkRepartition.sortCols] entry "$sortCols". Sort direction must be asc or desc.""", Some("sparkRepartition.sortCols"))
+        case sortColRegex(colName) => col(colName).asc
+        case entry => throw new ConfigurationException(s"""($dataObjectId) Too many arguments provided in [sparkRepartition.sortCols] entry "$entry". Just provide colName or colName and sortDir separated by whitespace.""")
+      }
+      dfRepartitioned.sortWithinPartitions(sortExprs:_*)
+    }
     else dfRepartitioned
   }
 
