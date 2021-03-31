@@ -31,12 +31,12 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
     """
       |dataObjects = {
       | tdo1 = {
-      |   type = io.smartdatalake.config.TestDataObject
+      |   type = io.smartdatalake.config.objects.TestDataObject
       |   arg1 = foo
       |   args = [bar, "!"]
       | }
       | tdo2 = {
-      |   type = io.smartdatalake.config.TestDataObject
+      |   type = io.smartdatalake.config.objects.TestDataObject
       |   arg1 = goo
       |   args = [bar]
       | }
@@ -126,7 +126,7 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
         |   inputId = tdo3
         |   outputId = tdo4
         |   transformer = {
-        |     class-name = io.smartdatalake.config.TestFileTransformer
+        |     class-name = io.smartdatalake.config.objects.TestFileTransformer
         |   }
         |   deleteDataAfterRead = true
         | }
@@ -141,7 +141,7 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
       outputId = "tdo4",
       deleteDataAfterRead = true,
       transformer = CustomFileTransformerConfig(
-        className = Some("io.smartdatalake.config.TestFileTransformer")
+        className = Some("io.smartdatalake.config.objects.TestFileTransformer")
       )
     )
   }
@@ -156,7 +156,7 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
         |   inputId = tdo1
         |   outputId = tdo1
         |   transformer = {
-        |     class-name = io.smartdatalake.config.TestFileTransformer
+        |     class-name = io.smartdatalake.config.objects.TestFileTransformer
         |   }
         |   deleteDataAfterRead = true
         | }

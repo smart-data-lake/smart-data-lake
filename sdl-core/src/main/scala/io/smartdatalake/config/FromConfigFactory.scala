@@ -19,7 +19,7 @@
 package io.smartdatalake.config
 
 import com.typesafe.config.Config
-import configs.Configs
+import configs.{ConfigKeyNaming, ConfigReader}
 
 /**
  * A factory object that fulfils the contract for a static factory method that parses (case) classes from [[Config]]s.
@@ -42,8 +42,8 @@ private[smartdatalake] trait FromConfigFactory[+CO <: SdlConfigObject with Parsa
   /**
    * Helper method to extract case class from config
    */
-  protected def extract[T: Configs](config: Config): T = {
-    import configs.syntax._
+  protected def extract[T: ConfigReader](config: Config): T = {
+    import configs.syntax.RichConfig
     config.extract[T].value
   }
 

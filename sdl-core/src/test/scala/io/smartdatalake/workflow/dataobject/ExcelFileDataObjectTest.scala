@@ -57,7 +57,6 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
     s"""
        |{
        | id = src1
-       | type = excel
        | path = "${escapedFilePath(xslxTempFilePath)}"
        | excel-options {
        |   sheet-name = "sheet number 1"
@@ -93,7 +92,6 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
       s"""
          |{
          | id = src1
-         | type = excel
          | path = "${escapedFilePath(xslTempFilePath)}"
          | excel-options {
          |   useHeader = true
