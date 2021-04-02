@@ -21,9 +21,12 @@ package io.smartdatalake.app
 
 import java.util
 
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.{MemoryUtils, SmartDataLakeLogger}
-import org.apache.spark.api.plugin.{ExecutorPlugin, PluginContext}
-import org.apache.spark.{SparkConf, SparkEnv}
+import org.apache.spark.api.plugin.{DriverPlugin, ExecutorPlugin, PluginContext, SparkPlugin}
+import org.apache.spark.{SparkConf, SparkContext, SparkEnv}
+
+import scala.collection.JavaConverters._
 
 /**
  * Configuration for periodic memory usage logging
@@ -39,7 +42,7 @@ case class MemoryLogTimerConfig(intervalSec: Int, logLinuxMem: Boolean = true, l
   private[smartdatalake] def getAsMap: Map[String, String] = Map(INTERVAL_SEC_OPTION -> intervalSec.toString, LOG_LINUX_MEM_OPTION -> logLinuxMem.toString, LOG_LINUX_CGROUP_MEM_OPTION -> logLinuxCGroupMem.toString, LOG_BUFFERS_OPTION -> logBuffers.toString)
 }
 private[smartdatalake] object MemoryLogTimerConfig{
-  def from(conf: SparkConf): MemoryLogTimerConfig = MemoryLogTimerConfig(conf.get(INTERVAL_SEC_OPTION).toInt, conf.get(LOG_LINUX_MEM_OPTION).toBoolean, conf.get(LOG_LINUX_CGROUP_MEM_OPTION).toBoolean, conf.get(LOG_BUFFERS_OPTION).toBoolean)
+  def from(conf: Map[String,String]): MemoryLogTimerConfig = MemoryLogTimerConfig(conf(INTERVAL_SEC_OPTION).toInt, conf(LOG_LINUX_MEM_OPTION).toBoolean, conf(LOG_LINUX_CGROUP_MEM_OPTION).toBoolean, conf(LOG_BUFFERS_OPTION).toBoolean)
   private val INTERVAL_SEC_OPTION = "spark.smartdatalake.memoryLog.intervalSec"
   private val LOG_LINUX_MEM_OPTION = "spark.smartdatalake.memoryLog.logLinuxMem"
   private val LOG_LINUX_CGROUP_MEM_OPTION = "spark.smartdatalake.memoryLog.logLinuxCGroupMem"
@@ -47,16 +50,19 @@ private[smartdatalake] object MemoryLogTimerConfig{
 }
 
 /**
- * Executor plugin to start memory usage logging on executors
+ * Executor plugin to do memory usage logging on executors
  */
-private[smartdatalake] class MemoryLoggerExecutorPlugin extends ExecutorPlugin with SmartDataLakeLogger {
+private[smartdatalake] class MemoryLoggerExecutorPlugin extends SparkPlugin {
+  override def driverPlugin(): DriverPlugin = new MemoryLoggerExecutorPluginDriverImpl
+  override def executorPlugin(): ExecutorPlugin = new MemoryLoggerExecutorPluginImpl
+}
+
+// Executor part of MemoryLoggerExecutorPlugin
+private class MemoryLoggerExecutorPluginImpl extends ExecutorPlugin with SmartDataLakeLogger {
   override def init(ctx: PluginContext, extraConf: util.Map[String, String]): Unit = {
-    // config can only be transferred to ExecutorPlugin by spark-options
-    // TODO: it might be possible to transfer configuration differently in Spark 3.0
-    val sparkConf = SparkEnv.get.conf
-    logger.debug("sparkConf: " + sparkConf.getAll.map{ case (k,v) => s"$k=$v"}.mkString(" "))
+    logger.debug("extraConf: " + extraConf.asScala.map{ case (k,v) => s"$k=$v"}.mkString(" "))
     try {
-      val memoryLogConfig = MemoryLogTimerConfig.from(sparkConf)
+      val memoryLogConfig = MemoryLogTimerConfig.from(extraConf.asScala.toMap)
       memoryLogConfig.startTimer()
       logger.info("MemoryLoggerExecutorPlugin successfully initialized")
     } catch {
@@ -66,4 +72,16 @@ private[smartdatalake] class MemoryLoggerExecutorPlugin extends ExecutorPlugin w
   override def shutdown(): Unit = {
     MemoryUtils.stopMemoryLogger()
   }
+}
+
+// Driver part of MemoryLoggerExecutorPlugin
+private class MemoryLoggerExecutorPluginDriverImpl extends SparkPlugin with DriverPlugin {
+  override def driverPlugin(): DriverPlugin = null // don't execute on driver
+  override def executorPlugin(): ExecutorPlugin = null
+  // prepare extra conf for executor plugin
+  override def init(sc: SparkContext, pluginContext: PluginContext): util.Map[String, String] = {
+    assert(Environment.globalConfig.memoryLogTimer.isDefined, "MemoryLoggerExecutorPlugin configuration missing (global.memoryLogTimer)")
+    Environment.globalConfig.memoryLogTimer.get.getAsMap.asJava
+  }
+
 }
