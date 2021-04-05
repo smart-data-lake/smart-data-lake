@@ -36,6 +36,7 @@ import org.apache.spark.sql.types.StringType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import io.smartdatalake.workflow.action.sparktransformer.{SQLDfTransformer, SQLDfsTransformer, ScalaClassDfTransformer}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 
 /**
@@ -95,7 +96,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action1.copy())
     val action2fail = CopyAction("b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformer = Some(CustomDfTransformerConfig(className = Some(classOf[FailTransformer].getName))))
+      , transformers = Seq(ScalaClassDfTransformer(className = classOf[FailTransformer].getName)))
     instanceRegistry.register(action2fail.copy())
     val selectedPartitions = Seq(PartitionValues(Map("dt"->"20180101")))
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath)
@@ -200,7 +201,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionCondition = Some(Condition("false", Some("always skip this action"))), metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action1.copy())
     val action2fail = CopyAction("b", tgt1DO.id, tgt2DO.id, executionCondition = Some(Condition("true", Some("always execute this action"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformer = Some(CustomDfTransformerConfig(className = Some(classOf[ExecFailTransformer].getName), runtimeOptions = Some(Map("phase"-> "executionPhase")))))
+      , transformers = Seq(ScalaClassDfTransformer(className = classOf[ExecFailTransformer].getName, runtimeOptions = Map("phase"-> "executionPhase"))))
     instanceRegistry.register(action2fail.copy())
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
     intercept[TaskFailedException](sdlb.run(sdlConfig))
@@ -291,14 +292,14 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(action1.copy())
     // action2 fails
     val action2fail = CopyAction("b", srcDO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformer = Some(CustomDfTransformerConfig(className = Some(classOf[FailTransformer].getName))))
+      , transformers = Seq(ScalaClassDfTransformer(className = classOf[FailTransformer].getName)))
     instanceRegistry.register(action2fail.copy())
     // action3 is cancelled because action2 fails
     val action3 = CopyAction("c", tgt2DO.id, tgt3DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action3.copy())
     // action4 is cancelled because action3 is cancelled (cancelled has higher prio than skipped from action1)
     val action4 = CustomSparkAction("d", Seq(tgt1DO.id, tgt3DO.id), Seq(tgt4DO.id), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformer = CustomDfsTransformerConfig(sqlCode = Some(Map(tgt4DO.id -> "select * from c"))))
+      , transformers = Seq(SQLDfsTransformer(code = Map(tgt4DO.id -> "select * from c"))))
     instanceRegistry.register(action4.copy())
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
     intercept[TaskFailedException](sdlb.run(sdlConfig))
@@ -387,7 +388,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // start first dag run
     // use only first partition col (dt) for partition diff mode
     val action1 = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-                            , transformer = Some(CustomDfTransformerConfig(sqlCode = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from src1"))))
+                            , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, udfAddX(rating) rating from src1")))
     instanceRegistry.register(action1.copy())
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
     sdlb.run(sdlConfig)
