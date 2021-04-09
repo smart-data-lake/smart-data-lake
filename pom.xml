@@ -2287,12 +2287,6 @@
 				<scope>${parquet.test.deps.scope}</scope>
 			</dependency>
 			<dependency>
-				<groupId>${hive.parquet.group}</groupId>
-				<artifactId>parquet-hadoop-bundle</artifactId>
-				<version>${hive.parquet.version}</version>
-				<scope>${hive.parquet.scope}</scope>
-			</dependency>
-			<dependency>
 				<groupId>org.codehaus.janino</groupId>
 				<artifactId>janino</artifactId>
 				<version>${janino.version}</version>
