@@ -45,7 +45,7 @@ case class SparkUDFCreatorConfig(className: String, options: Map[String,String] 
 /**
  * Interface to create a UserDefinedFunction object to be registered as udf.
  */
-trait SparkUDFCreator {
+trait SparkUDFCreator extends Serializable {
 
   /**
    * Function that returns a Spark UserDefinedFunction object to be registered as udf.
