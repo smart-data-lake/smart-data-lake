@@ -2339,6 +2339,11 @@
 				<version>${antlr4.version}</version>
 			</dependency>
 			<dependency>
+				<groupId>org.antlr</groupId>
+				<artifactId>antlr4</artifactId>
+				<version>${antlr4.version}</version>
+			</dependency>
+			<dependency>
 				<groupId>org.apache.commons</groupId>
 				<artifactId>commons-crypto</artifactId>
 				<version>${commons-crypto.version}</version>
