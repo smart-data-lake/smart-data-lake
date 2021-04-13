@@ -58,13 +58,13 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   assert(connection.isDefined, "($id) A SnowflakeTableDataObject needs to have an assigned SnowflakeTableConnection.")
 
   // prepare table
-  table = table.overrideDb(connection.map(_.db))
+  table = table
   if (table.db.isEmpty) {
-    throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
+    throw ConfigurationException(s"($id) A SnowFlake schema name must be added as the 'db' parameter of a SnowflakeTableDataObject.")
   }
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
-    val queryOrTable = Map(table.query.map(q => ("query", q)).getOrElse("dbtable" -> (connection.get.schema + "." + table.fullName)))
+    val queryOrTable = Map(table.query.map(q => ("query", q)).getOrElse("dbtable" -> (connection.get.database + "." + table.fullName)))
     val df = session
       .read
       .format(SNOWFLAKE_SOURCE_NAME)
@@ -96,21 +96,21 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     dfPrepared.write
       .format(SNOWFLAKE_SOURCE_NAME)
       .options(connection.get.getSnowflakeOptions)
-      .options(Map("dbtable" -> (connection.get.schema + "." + table.fullName)))
+      .options(Map("dbtable" -> (connection.get.database + "." + table.fullName)))
       .mode(saveMode)
       .save()
   }
 
   override def isDbExisting(implicit session: SparkSession): Boolean =
     connection.map(connection => {
-      val sql = s"SHOW DATABASES LIKE '${connection.db}'"
+      val sql = s"SHOW DATABASES LIKE '${connection.database}'"
       connection.execSnowflakeStatement(sql)
     }).exists(resultSet => resultSet.next())
 
 
   override def isTableExisting(implicit session: SparkSession): Boolean = {
     connection.map(connection => {
-      val sql = s"SHOW TABLES LIKE '${table.name}' IN SCHEMA ${connection.schema}.${connection.db}"
+      val sql = s"SHOW TABLES LIKE '${table.name}' IN SCHEMA ${connection.database}.${table.db.get}"
       connection.execSnowflakeStatement(sql)
     }).exists(resultSet => resultSet.next())
   }

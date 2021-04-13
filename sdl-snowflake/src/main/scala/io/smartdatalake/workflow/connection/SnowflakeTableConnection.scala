@@ -33,17 +33,17 @@ import net.snowflake.spark.snowflake.Utils
  *
  * @param id        unique id of this connection
  * @param url       snowflake connection url
- * @param authMode  optional authentication information: for now BasicAuthMode is supported.
  * @param warehouse Snowflake namespace
- * @param db        Snowflake database
- * @param schema    Snowflake database
- * @param metadata
+ * @param database  Snowflake database
+ * @param role      Snowflake role
+ * @param authMode  optional authentication information: for now BasicAuthMode is supported.
+ * @param metadata  Connection metadata
  */
 case class SnowflakeTableConnection(override val id: ConnectionId,
                                     url: String,
                                     warehouse: String,
-                                    db: String,
-                                    schema: String,
+                                    database: String,
+                                    role: String,
                                     authMode: Option[AuthMode] = None,
                                     override val metadata: Option[ConnectionMetadata] = None
                                    ) extends Connection with SmartDataLakeLogger {
@@ -63,8 +63,8 @@ case class SnowflakeTableConnection(override val id: ConnectionId,
           "sfURL" -> url,
           "sfUser" -> m.user,
           "sfPassword" -> m.password,
-          "sfDatabase" -> schema,
-          "sfSchema" -> db,
+          "sfDatabase" -> database,
+          "sfRole" -> role,
           "sfWarehouse" -> warehouse
         )
       case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Snowflake connection.")
