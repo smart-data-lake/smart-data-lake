@@ -90,6 +90,7 @@ private[smartdatalake] object ValueProjector {
       case (_: FloatType, _: DoubleType) => (x => x.asInstanceOf[Float].toDouble)
       case (d: DecimalType, _: FloatType) if d.precision <= 7 => (x => x.asInstanceOf[BigDecimal].toFloat)
       case (d: DecimalType, _: DoubleType) if d.precision <= 16 => (x => x.asInstanceOf[BigDecimal].toDouble)
+      case (d: DecimalType, _: IntegerType) => (x => x.asInstanceOf[BigDecimal].toDouble)
       case _ => throw SchemaEvolutionException(s"""schema evolution from $srcType to $tgtType not supported (field ${path.mkString(",")})""")
     }
     // add null check
