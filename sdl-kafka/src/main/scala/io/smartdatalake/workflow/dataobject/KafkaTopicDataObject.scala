@@ -45,14 +45,17 @@ import org.apache.spark.sql.types._
 import scala.collection.JavaConverters._
 
 /**
- * Definition of date partition column to extract formatted timestamp into column.
+ * Definition of date partition column to extract formatted time into column.
  *
- * @param colName date partition column name to extract timestamp into column on batch read
+ * @param colName date partition column name to extract time into column on batch read
  * @param timeFormat time format for timestamp in date partition column, definition according to java DateTimeFormatter. Default is "yyyyMMdd".
  * @param timeUnit time unit for timestamp in date partition column, definition according to java ChronoUnit. Default is "days".
  * @param timeZone time zone used for date logic. If not specified, java system default is used.
+ * @param includeCurrentPartition If the current partition should be included. Default is to list only completed partitions.
+ *                                Attention: including the current partition might result in data loss if there is more data arriving.
+ *                                But it might be useful to export all data before a scheduled maintenance.
  */
-case class DatePartitionColumnDef(colName: String, timeFormat: String = "yyyyMMdd", timeUnit: String = "days", timeZone: Option[String] = None ) {
+case class DatePartitionColumnDef(colName: String, timeFormat: String = "yyyyMMdd", timeUnit: String = "days", timeZone: Option[String] = None, includeCurrentPartition: Boolean = false) {
   @transient lazy private[smartdatalake] val formatter = DateTimeFormatter.ofPattern(timeFormat) // not serializable -> transient lazy to use in udf
   private[smartdatalake] val chronoUnit = ChronoUnit.valueOf(timeUnit.toUpperCase)
   private[smartdatalake] val zoneId = timeZone.map(ZoneId.of).getOrElse(ZoneId.systemDefault)
@@ -314,7 +317,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   override def listPartitions(implicit session: SparkSession): Seq[PartitionValues] = {
     require(datePartitionCol.isDefined, s"(${id}) datePartitionCol column must be defined for listing partition values")
     val maxEmptyConsecutive: Int = 10 // number of empty partitions to stop searching for partitions
-    val pctChronoUnitWaitToComplete = 0.02 // percentage of one chrono unit to wait after partition end date to wait until the partition is assumed to be complete. This is to handle kafka late data.
+    val pctChronoUnitWaitToComplete = 0.02 // percentage of one chrono unit to wait after partition end date until the partition is assumed to be complete. This is to handle kafka late data.
     val partitions = consumer.partitionsFor(topicName)
     require(partitions!=null, s"($id) topic $topicName doesn't exist")
     logger.debug(s"($id) got kafka partitions ${partitions.asScala.map(_.partition)} for topic $topicName")
@@ -322,7 +325,9 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     // determine last completed partition - we need to wait some time after considering a partition to be complete because of late data
     val currentPartitionStartTime = datePartitionCol.get.current
     val minDurationWaitToComplete = Duration.ofMillis((datePartitionCol.get.chronoUnit.getDuration.toMillis * pctChronoUnitWaitToComplete).toLong)
-    val lastCompletedPartitionStartTime = if (currentPartitionStartTime.isBefore(LocalDateTime.now().minus(minDurationWaitToComplete))) {
+    val lastCompletedPartitionStartTime = if (datePartitionCol.get.includeCurrentPartition) {
+      currentPartitionStartTime
+    } else if (currentPartitionStartTime.isBefore(LocalDateTime.now().minus(minDurationWaitToComplete))) {
       datePartitionCol.get.previous(currentPartitionStartTime)
     } else {
       datePartitionCol.get.previous(currentPartitionStartTime, 2)

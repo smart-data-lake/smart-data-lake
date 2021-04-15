@@ -117,6 +117,35 @@ class KafkaTopicDataObjectTest extends FunSuite with EmbeddedKafka with DataObje
     }
   }
 
+  test("Exclude or include current partition in list partitions") {
+    withRunningKafka {
+      val topic1 = "testPartitionTopic2"
+      createCustomTopic(topic1, Map(), 1, 1)
+      logger.info("topic created")
+
+      // publish one messages
+      implicit val stringSerializer = new StringSerializer
+      publishToKafka(topic1, "A", "1")
+
+      // configure DataObject with partition column defined as day and excluding current partition
+      instanceRegistry.register(kafkaConnection)
+      val dataObject1 = KafkaTopicDataObject("kafka1", topicName = topic1, connectionId = "kafkaCon1"
+        , datePartitionCol = Some(DatePartitionColumnDef( colName = "dt", timeUnit = ChronoUnit.DAYS.toString, timeFormat ="yyyyMMdd")))
+
+      // list and check partitions
+      val partitions1 = dataObject1.listPartitions
+      assert(partitions1.isEmpty) // only current partition holds data, but it is excluded
+
+      // configure DataObject with partition column defined as day and including current partition
+      val dataObject2 = KafkaTopicDataObject("kafka2", topicName = topic1, connectionId = "kafkaCon1"
+        , datePartitionCol = Some(DatePartitionColumnDef( colName = "dt", timeUnit = ChronoUnit.DAYS.toString, timeFormat ="yyyyMMdd", includeCurrentPartition = true)))
+
+      // list and check partitions
+      val partitions2 = dataObject2.listPartitions
+      assert(partitions2.size == 1) // current partition is included
+    }
+  }
+
   after {
     EmbeddedKafka.stop()
   }
