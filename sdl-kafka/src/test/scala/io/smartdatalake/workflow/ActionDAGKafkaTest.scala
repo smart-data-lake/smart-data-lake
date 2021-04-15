@@ -31,9 +31,16 @@ import io.smartdatalake.workflow.dataobject._
 import net.manub.embeddedkafka.EmbeddedKafka
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{StructField, StructType, TimestampType}
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 
-class ActionDAGKafkaTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
+/**
+ * Note about EmbeddedKafka compatibility:
+ * The currently used version 2.4.1 (in sync with the kafka version of sparks parent pom) is not compatible with JDK14+
+ * because of a change of InetSocketAddress::toString. Zookeeper doesn't start because of
+ * "java.nio.channels.UnresolvedAddressException: Session 0x0 for server localhost/<unresolved>:6001, unexpected error, closing socket connection and attempting reconnect"
+ * see also https://www.oracle.com/java/technologies/javase/14all-relnotes.html#JDK-8225499
+ */
+class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndAfter with EmbeddedKafka {
 
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
   import session.implicits._
@@ -43,6 +50,15 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfter with EmbeddedKafka
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
+  private lazy val kafka = EmbeddedKafka.start()
+  override def beforeAll() {
+    kafka // initialize lazy variable
+  }
+
+  override def afterAll(): Unit = {
+    kafka.stop(true)
+  }
+
   before {
     instanceRegistry.clear()
   }
@@ -51,51 +67,48 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfter with EmbeddedKafka
     // Note: Some DataObjects remove & add columns on read (e.g. KafkaTopicDataObject, SparkFileDataObject)
     // In this cases we have to break the lineage und create a dummy DataFrame in init phase.
 
-    withRunningKafka {
+    // setup DataObjects
+    val feed = "actionpipeline"
+    val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6000")
+    instanceRegistry.register(kafkaConnection)
+    val srcTable = Table(Some("default"), "ap_input")
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
+    instanceRegistry.register(srcDO)
+    createCustomTopic("topic1", Map(), 1, 1)
+    val tgt1DO = KafkaTopicDataObject("kafka1", topicName = "topic1", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"), schemaMin = Some(StructType(Seq(StructField("timestamp", TimestampType)))))
+    instanceRegistry.register(tgt1DO)
+    createCustomTopic("topic2", Map(), 1, 1)
+    val tgt2DO = KafkaTopicDataObject("kafka2", topicName = "topic2", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"), schemaMin = Some(StructType(Seq(StructField("timestamp", TimestampType)))))
+    instanceRegistry.register(tgt2DO)
 
-      // setup DataObjects
-      val feed = "actionpipeline"
-      val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6000")
-      instanceRegistry.register(kafkaConnection)
-      val srcTable = Table(Some("default"), "ap_input")
-      val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
-      srcDO.dropTable
-      instanceRegistry.register(srcDO)
-      createCustomTopic("topic1", Map(), 1, 1)
-      val tgt1DO = KafkaTopicDataObject("kafka1", topicName = "topic1", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"), schemaMin = Some(StructType(Seq(StructField("timestamp", TimestampType)))))
-      instanceRegistry.register(tgt1DO)
-      createCustomTopic("topic2", Map(), 1, 1)
-      val tgt2DO = KafkaTopicDataObject("kafka2", topicName = "topic2", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"), schemaMin = Some(StructType(Seq(StructField("timestamp", TimestampType)))))
-      instanceRegistry.register(tgt2DO)
+    // prepare DAG
+    val refTimestamp1 = LocalDateTime.now()
+    val appName = "test"
+    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, appName, 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+    val l1 = Seq(("doe-john", 5)).toDF("key", "value")
+    srcDO.writeDataFrame(l1, Seq())
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id)
+    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, transformer = Some(CustomDfTransformerConfig(sqlCode = Some("select 'test' as key, value from kafka1"))))
+    val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2), 1, 1)
 
-      // prepare DAG
-      val refTimestamp1 = LocalDateTime.now()
-      val appName = "test"
-      implicit val context: ActionPipelineContext = ActionPipelineContext(feed, appName, 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
-      val l1 = Seq(("doe-john", 5)).toDF("key", "value")
-      srcDO.writeDataFrame(l1, Seq())
-      val action1 = CopyAction("a", srcDO.id, tgt1DO.id)
-      val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, transformer = Some(CustomDfTransformerConfig(sqlCode = Some("select 'test' as key, value from kafka1"))))
-      val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2), 1, 1)
+    // exec dag
+    dag.prepare
+    dag.init
+    dag.exec
 
-      // exec dag
-      dag.prepare
-      dag.init
-      dag.exec
+    // check result
+    val dfR1 = tgt2DO.getDataFrame(Seq())
+    assert(dfR1.columns.toSet == Set("value","timestamp"))
+    val r1 = dfR1
+      .select($"value")
+      .as[String].collect().toSeq
+    assert(r1 == Seq("5"))
 
-      // check result
-      val dfR1 = tgt2DO.getDataFrame(Seq())
-      assert(dfR1.columns.toSet == Set("value","timestamp"))
-      val r1 = dfR1
-        .select($"value")
-        .as[String].collect().toSeq
-      assert(r1 == Seq("5"))
-
-      // check metrics
-      // note: metrics don't work for Kafka sink in Spark 2.4
-      //val action2MainMetrics = action2.getFinalMetrics(action2.outputId).get.getMainInfos
-      //assert(action2MainMetrics("records_written") == 1)
-    }
+    // check metrics
+    // note: metrics don't work for Kafka sink in Spark 2.4
+    //val action2MainMetrics = action2.getFinalMetrics(action2.outputId).get.getMainInfos
+    //assert(action2MainMetrics("records_written") == 1)
   }
 
 }
