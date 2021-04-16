@@ -58,6 +58,8 @@ case class CustomFileDataObject(override val id: DataObjectId,
 
   override def listPartitions(implicit session: SparkSession): Seq[PartitionValues] = Seq()
 
+  override def relativizePath(filePath: String): String = filePath
+
   override def factory: FromConfigFactory[DataObject] = CustomFileDataObject
 }
 

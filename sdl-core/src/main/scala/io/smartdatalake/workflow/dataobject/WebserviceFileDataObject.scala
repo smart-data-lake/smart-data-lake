@@ -214,6 +214,8 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
    */
   override def path: String = ""
 
+  override def relativizePath(filePath: String): String = filePath
+
   override def factory: FromConfigFactory[DataObject] = WebserviceFileDataObject
 
 }
