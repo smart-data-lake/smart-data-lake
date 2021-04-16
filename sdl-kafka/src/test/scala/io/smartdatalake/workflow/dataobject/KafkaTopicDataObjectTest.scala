@@ -24,11 +24,18 @@ import java.time.temporal.ChronoUnit
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.KafkaConnection
-import net.manub.embeddedkafka.EmbeddedKafka
+import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.common.serialization.StringSerializer
 import org.apache.spark.sql.streaming.Trigger
 import org.scalatest.FunSuite
 
+/**
+ * Note about EmbeddedKafka compatibility:
+ * The currently used version 2.4.1 (in sync with the kafka version of sparks parent pom) is not compatible with JDK14+
+ * because of a change of InetSocketAddress::toString. Zookeeper doesn't start because of
+ * "java.nio.channels.UnresolvedAddressException: Session 0x0 for server localhost/<unresolved>:6001, unexpected error, closing socket connection and attempting reconnect"
+ * see also https://www.oracle.com/java/technologies/javase/14all-relnotes.html#JDK-8225499
+ */
 class KafkaTopicDataObjectTest extends FunSuite with EmbeddedKafka with DataObjectTestSuite with SmartDataLakeLogger {
 
   import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
@@ -38,6 +45,7 @@ class KafkaTopicDataObjectTest extends FunSuite with EmbeddedKafka with DataObje
 
   test("Can read and write from Kafka") {
     withRunningKafka {
+      Thread.sleep(1000)
       createCustomTopic("topic", Map(), 1, 1)
       publishStringMessageToKafka("topic", "message")
       assert(consumeFirstStringMessageFrom("topic")=="message", "Whoops - couldn't read message")
@@ -117,7 +125,7 @@ class KafkaTopicDataObjectTest extends FunSuite with EmbeddedKafka with DataObje
     }
   }
 
-  test("Exclude or include current partition in list partitions") {
+  test("Exclude or include current date partition in list partitions") {
     withRunningKafka {
       val topic1 = "testPartitionTopic2"
       createCustomTopic(topic1, Map(), 1, 1)

@@ -33,6 +33,13 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{StructField, StructType, TimestampType}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
+/**
+ * Note about EmbeddedKafka compatibility:
+ * The currently used version 2.4.1 (in sync with the kafka version of sparks parent pom) is not compatible with JDK14+
+ * because of a change of InetSocketAddress::toString. Zookeeper doesn't start because of
+ * "java.nio.channels.UnresolvedAddressException: Session 0x0 for server localhost/<unresolved>:6001, unexpected error, closing socket connection and attempting reconnect"
+ * see also https://www.oracle.com/java/technologies/javase/14all-relnotes.html#JDK-8225499
+ */
 class ActionDAGKafkaTest extends FunSuite with BeforeAndAfter with EmbeddedKafka {
 
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
