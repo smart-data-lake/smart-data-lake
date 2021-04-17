@@ -24,6 +24,7 @@ import io.smartdatalake.definitions.{AuthMode, Condition, ExecutionMode}
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.secrets.SecretProviderConfig
 import io.smartdatalake.workflow.action.customlogic.{CustomDfCreatorConfig, CustomDfTransformerConfig, CustomDfsTransformerConfig, CustomFileTransformerConfig, SparkUDFCreatorConfig}
+import io.smartdatalake.workflow.dataobject.ExcelOptions
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
 
@@ -76,6 +77,10 @@ trait ConfigImplicits {
   implicit val executionModeReader: ConfigReader[ExecutionMode] = ConfigReader.derive[ExecutionMode]
   implicit val conditionReader: ConfigReader[Condition] = ConfigReader.derive[Condition]
   implicit val authModeReader: ConfigReader[AuthMode] = ConfigReader.derive[AuthMode]
+  // --------------------------------------------------------------------------------
+  // Config reader to circumvent problems related to a bug with Scala 2.11, which is no longer needed with scala 2.12
+  // The problem is that default values are not read correctly for non-trivial nested case classes
+  implicit val excelOptionsReader: ConfigReader[ExcelOptions] = ConfigReader.derive[ExcelOptions]
   // --------------------------------------------------------------------------------
 
   implicit def mapDataObjectIdStringReader(implicit mapReader: ConfigReader[Map[String,String]]): ConfigReader[Map[DataObjectId, String]] = {
