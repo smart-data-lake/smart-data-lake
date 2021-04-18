@@ -58,7 +58,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  */
 case class ExcelFileDataObject(override val id: DataObjectId,
                                override val path: String,
-                               excelOptions: ExcelOptions,
+                               excelOptions: ExcelOptions = ExcelOptions(),
                                override val partitions: Seq[String] = Seq(),
                                override val schema: Option[StructType] = None,
                                override val schemaMin: Option[StructType] = None,
@@ -191,4 +191,31 @@ case class ExcelOptions(
       "maxRowsInMemory" -> maxRowsInMemory,
       "excerptSize" -> excerptSize
     )
+}
+object ExcelOptions {
+  // Configs & scala 2.11 is having problems with default values of nested case classes
+  // Workaround: parse the config on our own
+  def fromConfig(conf: Config): ExcelOptions = {
+    ExcelOptions(
+      sheetName = getValue(conf, "sheetName"),
+      numLinesToSkip = getValue(conf, "numLinesToSkip").map(_.toInt),
+      startColumn = getValue(conf, "startColumn"),
+      endColumn = getValue(conf, "endColumn"),
+      rowLimit = getValue(conf, "rowLimit").map(_.toInt),
+      useHeader = getValue(conf, "useHeader").map(_.toBoolean).getOrElse(true),
+      treatEmptyValuesAsNulls = getValue(conf, "treatEmptyValuesAsNulls").map(_.toBoolean).orElse(Some(true)),
+      inferSchema = getValue(conf, "inferSchema").map(_.toBoolean).orElse(Some(true)),
+      timestampFormat = getValue(conf, "timestampFormat").orElse(Some("dd-MM-yyyy HH:mm:ss")),
+      dateFormat = getValue(conf, "dateFormat"),
+      maxRowsInMemory = getValue(conf, "maxRowsInMemory").map(_.toInt),
+      excerptSize = getValue(conf, "excerptSize").map(_.toInt)
+    )
+  }
+  private def getValue(conf: Config, camelCaseKey: String): Option[String] = {
+    if (conf.hasPath(camelCaseKey)) Some(conf.getString(camelCaseKey))
+    else if (conf.hasPath(camelCaseToHypenSeparated(camelCaseKey))) Some(conf.getString(camelCaseToHypenSeparated(camelCaseKey)))
+    else None
+  }
+  private def camelCaseToHypenSeparated(key: String) =
+    key.split("[A-Z]").map(_.toLowerCase).mkString("-")
 }

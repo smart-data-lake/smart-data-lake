@@ -78,10 +78,11 @@ trait ConfigImplicits {
   implicit val conditionReader: ConfigReader[Condition] = ConfigReader.derive[Condition]
   implicit val authModeReader: ConfigReader[AuthMode] = ConfigReader.derive[AuthMode]
   // --------------------------------------------------------------------------------
-  // Config reader to circumvent problems related to a bug with Scala 2.11, which is no longer needed with scala 2.12
-  // The problem is that default values are not read correctly for non-trivial nested case classes
-  implicit val excelOptionsReader: ConfigReader[ExcelOptions] = ConfigReader.derive[ExcelOptions]
-  // --------------------------------------------------------------------------------
+
+  // Configs & scala 2.11 is having problems with default values of nested case classes. Fortunately there are not many of them.
+  // This should be fixed with Configs 0.7.0
+  // Workaround is to parse them on our own and create a corresponding reader.
+  implicit val excelOptionsReader: ConfigReader[ExcelOptions] = ConfigReader.fromConfigTry{ c => ExcelOptions.fromConfig(c)}
 
   implicit def mapDataObjectIdStringReader(implicit mapReader: ConfigReader[Map[String,String]]): ConfigReader[Map[DataObjectId, String]] = {
     ConfigReader.fromConfig { c => mapReader.extract(c).map(_.map{ case (k,v) => (DataObjectId(k), v)})}
