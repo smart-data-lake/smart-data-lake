@@ -39,14 +39,16 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
  * @param schemaMin    An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
  * @param table        Snowflake table to be written by this output
  * @param saveMode     spark [[SaveMode]] to use when writing files, default is "overwrite"
- * @param connectionId optional id of [[SnowflakeTableConnection]]
+ * @param connectionId The SnowflakeTableConnection to use for the table
+ * @param comment      An optional comment to add to the table after writing a DataFrame to it
  * @param metadata     meta data
  */
 case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     override val schemaMin: Option[StructType] = None,
                                     override var table: Table,
                                     saveMode: SaveMode = SaveMode.Overwrite,
-                                    connectionId: Option[ConnectionId] = None,
+                                    connectionId: ConnectionId,
+                                    comment: Option[String],
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalSparkTableDataObject {
@@ -54,8 +56,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   /**
    * Connection defines connection string, credentials and database schema/name
    */
-  private val connection = connectionId.map(c => getConnection[SnowflakeTableConnection](c))
-  assert(connection.isDefined, "($id) A SnowflakeTableDataObject needs to have an assigned SnowflakeTableConnection.")
+  private val connection = getConnection[SnowflakeTableConnection](connectionId)
 
   // prepare table
   table = table
@@ -64,11 +65,11 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   }
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
-    val queryOrTable = Map(table.query.map(q => ("query", q)).getOrElse("dbtable" -> (connection.get.database + "." + table.fullName)))
+    val queryOrTable = Map(table.query.map(q => ("query", q)).getOrElse("dbtable" -> (connection.database + "." + table.fullName)))
     val df = session
       .read
       .format(SNOWFLAKE_SOURCE_NAME)
-      .options(connection.get.getSnowflakeOptions)
+      .options(connection.getSnowflakeOptions)
       .options(queryOrTable)
       .load()
     validateSchemaMin(df, "read")
@@ -95,24 +96,26 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 
     dfPrepared.write
       .format(SNOWFLAKE_SOURCE_NAME)
-      .options(connection.get.getSnowflakeOptions)
-      .options(Map("dbtable" -> (connection.get.database + "." + table.fullName)))
+      .options(connection.getSnowflakeOptions)
+      .options(Map("dbtable" -> (connection.database + "." + table.fullName)))
       .mode(saveMode)
       .save()
+
+    if (comment.isDefined) {
+      val sql = s"comment on table ${connection.database}.${table.fullName} is '${comment.get}';"
+      connection.execSnowflakeStatement(sql)
+    }
   }
 
-  override def isDbExisting(implicit session: SparkSession): Boolean =
-    connection.map(connection => {
-      val sql = s"SHOW DATABASES LIKE '${connection.database}'"
-      connection.execSnowflakeStatement(sql)
-    }).exists(resultSet => resultSet.next())
+  override def isDbExisting(implicit session: SparkSession): Boolean = {
+    val sql = s"SHOW DATABASES LIKE '${connection.database}'"
+    connection.execSnowflakeStatement(sql).next()
+  }
 
 
   override def isTableExisting(implicit session: SparkSession): Boolean = {
-    connection.map(connection => {
-      val sql = s"SHOW TABLES LIKE '${table.name}' IN SCHEMA ${connection.database}.${table.db.get}"
-      connection.execSnowflakeStatement(sql)
-    }).exists(resultSet => resultSet.next())
+    val sql = s"SHOW TABLES LIKE '${table.name}' IN SCHEMA ${connection.database}.${table.db.get}"
+    connection.execSnowflakeStatement(sql).next()
   }
 
   override def dropTable(implicit session: SparkSession): Unit = throw new NotImplementedError()
