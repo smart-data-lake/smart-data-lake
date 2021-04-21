@@ -38,13 +38,13 @@ import scala.collection.JavaConverters._
  * @param id unique id of this connection
  * @param brokers comma separated list of kafka bootstrap server incl. port, e.g. "host1:9092,host2:9092:
  * @param schemaRegistry url of schema registry service, e.g. "https://host2"
- * @param datasourceOptions Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)
+ * @param options Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)
  * @param metadata
  */
 case class KafkaConnection(override val id: ConnectionId,
                            brokers: String,
                            schemaRegistry: Option[String] = None,
-                           datasourceOptions: Map[String,String] = Map(),
+                           options: Map[String,String] = Map(),
                            authMode: Option[AuthMode] = None,
                            override val metadata: Option[ConnectionMetadata] = None
                           ) extends Connection {
@@ -58,7 +58,7 @@ case class KafkaConnection(override val id: ConnectionId,
 
   @transient lazy val confluentHelper: Option[ConfluentClient] = schemaRegistry.map(new ConfluentClient(_))
 
-  private val KafkaConfigOptionPrefix = "kafka."
+  private[smartdatalake] val KafkaConfigOptionPrefix = "kafka."
   private val KafkaSSLSecurityProtocol = "SSL"
 
   // Early validation and partition init use kafka clients directly and need
@@ -83,7 +83,7 @@ case class KafkaConnection(override val id: ConnectionId,
 
   // Kafka Configs are prepended with "kafka." in data source option map
   private val authOptions = authProps.asScala.map(c => (s"${KafkaConfigOptionPrefix}${c._1}", c._2))
-  private[workflow] val sparkOptions = authOptions ++ datasourceOptions + (KafkaConfigOptionPrefix+ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> brokers)
+  private[workflow] val sparkOptions = authOptions ++ options + (KafkaConfigOptionPrefix+ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> brokers)
 
   def topicExists(topic: String): Boolean = {
     adminClient.listTopics.names.get.asScala.contains(topic)
