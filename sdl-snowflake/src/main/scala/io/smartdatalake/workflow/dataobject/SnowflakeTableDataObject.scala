@@ -59,7 +59,6 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   private val connection = getConnection[SnowflakeTableConnection](connectionId)
 
   // prepare table
-  table = table
   if (table.db.isEmpty) {
     throw ConfigurationException(s"($id) A SnowFlake schema name must be added as the 'db' parameter of a SnowflakeTableDataObject.")
   }
