@@ -101,8 +101,8 @@ private object TemporalQueries {
   *                   This is used to list existing partition and is added as additional column on batch read.
   * @param batchReadConsecutivePartitionsAsRanges Set to true if consecutive partitions should be combined as one range of offsets when batch reading from topic. This results in less tasks but can be a performance problem when reading many partitions. (default=false)
   * @param batchReadMaxOffsetsPerTask Set number of offsets per Spark task when batch reading from topic.
-  * @param dataSourceOptions Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).
-  *                      These options override connection.kafkaOptions.
+  * @param options    Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).
+  *                   These options override connection.options.
   */
 case class KafkaTopicDataObject(override val id: DataObjectId,
                                 topicName: String,
@@ -114,7 +114,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                                 datePartitionCol: Option[DatePartitionColumnDef] = None,
                                 batchReadConsecutivePartitionsAsRanges: Boolean = false,
                                 batchReadMaxOffsetsPerTask: Option[Int] = None,
-                                dataSourceOptions: Map[String, String] = Map(),
+                                options: Map[String, String] = Map(),
                                 override val metadata: Option[DataObjectMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with CanCreateStreamingDataFrame with CanWriteDataFrame with CanHandlePartitions with SchemaValidation {
@@ -128,7 +128,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   require((keyType!=KafkaColumnType.AvroSchemaRegistry && valueType!=KafkaColumnType.AvroSchemaRegistry) || connection.schemaRegistry.nonEmpty, s"($id) If key or value is of type AvroSchemaRegistry, the schemaRegistry must be defined in the connection")
   require(batchReadMaxOffsetsPerTask.isEmpty || batchReadMaxOffsetsPerTask.exists(_>0), s"($id) batchReadMaxOffsetsPerTask must be greater than 0")
 
-  private val instanceOptions = connection.sparkOptions ++ dataSourceOptions
+  private val instanceOptions = connection.sparkOptions ++ options
 
   // consumer for reading topic metadata
   @transient private lazy val consumer = {
@@ -138,7 +138,9 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false")
     props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, classOf[ByteArrayDeserializer].getName)
     props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, classOf[ByteArrayDeserializer].getName)
-    connection.authProps.asScala.foreach{ case (k,v) => props.put(k,v)}
+    instanceOptions
+      .filter{ case (k,v) => k.startsWith(connection.KafkaConfigOptionPrefix)} // only kafka specific options
+      .foreach{ case (k,v) => props.put(k.stripPrefix(connection.KafkaConfigOptionPrefix),v)}
     new KafkaConsumer(props)
   }
 
