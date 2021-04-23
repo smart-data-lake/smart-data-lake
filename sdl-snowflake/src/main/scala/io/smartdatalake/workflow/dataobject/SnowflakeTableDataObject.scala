@@ -68,7 +68,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     val df = session
       .read
       .format(SNOWFLAKE_SOURCE_NAME)
-      .options(connection.getSnowflakeOptions)
+      .options(connection.getSnowflakeOptions(table.db.get))
       .options(queryOrTable)
       .load()
     validateSchemaMin(df, "read")
@@ -95,7 +95,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 
     dfPrepared.write
       .format(SNOWFLAKE_SOURCE_NAME)
-      .options(connection.getSnowflakeOptions)
+      .options(connection.getSnowflakeOptions(table.db.get))
       .options(Map("dbtable" -> (connection.database + "." + table.fullName)))
       .mode(saveMode)
       .save()

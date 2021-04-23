@@ -53,10 +53,10 @@ case class SnowflakeTableConnection(override val id: ConnectionId,
 
   def execSnowflakeStatement(sql: String, logging: Boolean = true): ResultSet = {
     if (logging) logger.info(s"($id) execSnowflakeStatement: $sql")
-    Utils.runQuery(getSnowflakeOptions, sql)
+    Utils.runQuery(getSnowflakeOptions(""), sql)
   }
 
-  def getSnowflakeOptions: Map[String, String] = {
+  def getSnowflakeOptions(schema: String): Map[String, String] = {
     if (authMode.isDefined) authMode.get match {
       case m: BasicAuthMode =>
         Map(
@@ -65,6 +65,7 @@ case class SnowflakeTableConnection(override val id: ConnectionId,
           "sfPassword" -> m.password,
           "sfDatabase" -> database,
           "sfRole" -> role,
+          "sfSchema" -> schema,
           "sfWarehouse" -> warehouse
         )
       case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Snowflake connection.")
