@@ -399,7 +399,7 @@ case class ProcessAllMode() extends ExecutionMode {
  *                            It can be used to ensure processing all partitions over multiple actions in case of errors.
  * @param options Options specified in the configuration for this execution mode
  */
-case class CustomPartitionMode(className: String, override val alternativeOutputId: Option[DataObjectId] = None, options: Map[String,String] = Map())
+case class CustomPartitionMode(className: String, override val alternativeOutputId: Option[DataObjectId] = None, options: Option[Map[String,String]] = None)
 extends ExecutionMode with ExecutionModeWithMainInputOutput {
   private[smartdatalake] override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
   private val impl = CustomCodeUtil.getClassInstanceByName[CustomPartitionModeLogic](className)
@@ -409,7 +409,7 @@ extends ExecutionMode with ExecutionModeWithMainInputOutput {
     val output = alternativeOutput.getOrElse(mainOutput)
     (mainInput, output) match {
       case (input: CanHandlePartitions, output: CanHandlePartitions) =>
-        val partitionValuesOpt = impl.apply(session, options, actionId, input, output, subFeed.partitionValues.map(_.getMapString), context)
+        val partitionValuesOpt = impl.apply(session, options.getOrElse(Map()), actionId, input, output, subFeed.partitionValues.map(_.getMapString), context)
           .map(_.map( pv => PartitionValues(pv)))
         partitionValuesOpt.map(pvs => ExecutionModeResult(inputPartitionValues = pvs, outputPartitionValues = pvs))
       case (_: CanHandlePartitions, _) =>

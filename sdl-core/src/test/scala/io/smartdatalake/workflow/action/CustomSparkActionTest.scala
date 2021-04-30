@@ -73,7 +73,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     // prepare & start load
     val customTransformerConfig = CustomDfsTransformerConfig(
       className = Some("io.smartdatalake.workflow.action.TestDfsTransformerIncrement"),
-      options = Map("increment1" -> "1"), runtimeOptions = Map("increment2" -> "runId")
+      options = Some(Map("increment1" -> "1")), runtimeOptions = Some(Map("increment2" -> "runId"))
     )
 
     val action1 = CustomSparkAction("action1", List(srcDO1.id, srcDO2.id), List(tgtDO1.id, tgtDO2.id), transformer = customTransformerConfig)
@@ -269,7 +269,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO2)
 
     // prepare & start load
-    val customTransformerConfig = CustomDfsTransformerConfig(sqlCode = Map(DataObjectId("tgt1")->"select * from copy_input where rating = 5", DataObjectId("tgt2")->"select * from copy_input where rating = 3"))
+    val customTransformerConfig = CustomDfsTransformerConfig(sqlCode = Some(Map(DataObjectId("tgt1")->"select * from copy_input where rating = 5", DataObjectId("tgt2")->"select * from copy_input where rating = 3")))
     val action1 = CustomSparkAction("ca", List(srcDO.id), List(tgtDO1.id,tgtDO2.id), transformer = customTransformerConfig)
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
@@ -310,7 +310,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO1)
 
     // prepare
-    val customTransformerConfig = CustomDfsTransformerConfig(sqlCode = Map(DataObjectId("tgt1")->"select * from src1 union all select * from src2"))
+    val customTransformerConfig = CustomDfsTransformerConfig(sqlCode = Some(Map(DataObjectId("tgt1")->"select * from src1 union all select * from src2")))
     val l1 = Seq(("jonson","rob",5)).toDF("lastname", "firstname", "rating")
     srcDO1.writeDataFrame(l1, Seq())
     val l2 = Seq(("doe","bob",3)).toDF("lastname", "firstname", "rating")

@@ -293,7 +293,7 @@
 		<ucanaccess.version>4.0.4</ucanaccess.version>
 		<!-- when changing config version, remember to update it in DatabricksSmartDataLakeBuilder main method -->
 		<typesafe.config.version>1.4.1</typesafe.config.version>
-		<kxbmap.configs.version>0.6.0</kxbmap.configs.version>
+		<kxbmap.configs.version>0.6.1</kxbmap.configs.version>
 		<monix.version>3.1.0</monix.version>
 		<scala-arm.version>2.0</scala-arm.version>
 		<splunk.version>1.6.5.0</splunk.version>

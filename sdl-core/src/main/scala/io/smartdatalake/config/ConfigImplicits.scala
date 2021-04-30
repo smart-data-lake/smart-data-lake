@@ -23,8 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObje
 import io.smartdatalake.definitions.{AuthMode, Condition, ExecutionMode}
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.secrets.SecretProviderConfig
-import io.smartdatalake.workflow.action.customlogic.{CustomDfCreatorConfig, CustomDfTransformerConfig, CustomDfsTransformerConfig, CustomFileTransformerConfig, SparkUDFCreatorConfig}
-import io.smartdatalake.workflow.dataobject.ExcelOptions
+import io.smartdatalake.workflow.action.customlogic._
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
 
@@ -78,11 +77,6 @@ trait ConfigImplicits {
   implicit val conditionReader: ConfigReader[Condition] = ConfigReader.derive[Condition]
   implicit val authModeReader: ConfigReader[AuthMode] = ConfigReader.derive[AuthMode]
   // --------------------------------------------------------------------------------
-
-  // Configs & scala 2.11 is having problems with default values of nested case classes. Fortunately there are not many of them.
-  // This should be fixed with Configs 0.7.0
-  // Workaround is to parse them on our own and create a corresponding reader.
-  implicit val excelOptionsReader: ConfigReader[ExcelOptions] = ConfigReader.fromConfigTry{ c => ExcelOptions.fromConfig(c)}
 
   implicit def mapDataObjectIdStringReader(implicit mapReader: ConfigReader[Map[String,String]]): ConfigReader[Map[DataObjectId, String]] = {
     ConfigReader.fromConfig { c => mapReader.extract(c).map(_.map{ case (k,v) => (DataObjectId(k), v)})}
