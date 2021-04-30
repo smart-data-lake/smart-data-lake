@@ -80,7 +80,7 @@ trait CustomDfTransformer extends Serializable {
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
-case class CustomDfTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Option[String] = None, pythonFile: Option[String] = None, pythonCode: Option[String] = None, options: Map[String,String] = Map(), runtimeOptions: Map[String,String] = Map()) {
+case class CustomDfTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Option[String] = None, pythonFile: Option[String] = None, pythonCode: Option[String] = None, options: Option[Map[String,String]] = None, runtimeOptions: Option[Map[String,String]] = None) {
   require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || sqlCode.isDefined || pythonFile.isDefined || pythonCode.isDefined, "Either className, scalaFile, scalaCode, sqlCode, pythonFile or code must be defined for CustomDfTransformer")
 
   val impl : Option[CustomDfTransformer] = className.map {
@@ -131,19 +131,19 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
     // replace runtime options
     val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
     // transform
-    impl.get.transform(session, options ++ runtimeOptionsReplaced, df, dataObjectId.id)
+    impl.get.transform(session, options.getOrElse(Map()) ++ runtimeOptionsReplaced, df, dataObjectId.id)
   }
 
   def transformPartitionValues(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
     // replace runtime options
     val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
     // transform
-    impl.get.transformPartitionValues(options ++ runtimeOptionsReplaced, partitionValues)
+    impl.get.transformPartitionValues(options.getOrElse(Map()) ++ runtimeOptionsReplaced, partitionValues)
   }
 
   private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[String,String] = {
     lazy val data = DefaultExpressionData.from(context, partitionValues)
-    runtimeOptions.mapValues {
+    runtimeOptions.getOrElse(Map()).mapValues {
       expr => SparkExpressionUtil.evaluateString(actionId, Some("transformation.runtimeOptions"), expr, data)
     }.filter(_._2.isDefined).mapValues(_.get)
   }

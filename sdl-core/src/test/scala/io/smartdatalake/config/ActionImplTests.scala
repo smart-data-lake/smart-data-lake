@@ -90,7 +90,7 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
   "CustomSparkAction" should "be parsable" in {
 
     val customTransformerConfig = CustomDfsTransformerConfig(
-      sqlCode = Map(DataObjectId("test") -> "select * from test")
+      sqlCode = Some(Map(DataObjectId("test") -> "select * from test"))
     )
 
     val config = ConfigFactory.parseString(
