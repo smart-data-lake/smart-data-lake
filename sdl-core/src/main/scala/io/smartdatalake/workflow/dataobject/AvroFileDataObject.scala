@@ -47,6 +47,8 @@ import org.apache.spark.sql.types.StructType
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
  *                                    Default is to expect all partitions to exist.
+ * @param housekeepingMode Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.
+ *                         See HousekeepingMode for available implementations. Default is None.
  *
  * @see [[org.apache.spark.sql.DataFrameReader]]
  * @see [[org.apache.spark.sql.DataFrameWriter]]
@@ -63,6 +65,7 @@ case class AvroFileDataObject( override val id: DataObjectId,
                                override val connectionId: Option[ConnectionId] = None,
                                override val filenameColumn: Option[String] = None,
                                override val expectedPartitionsCondition: Option[String] = None,
+                               override val housekeepingMode: Option[HousekeepingMode] = None,
                                override val metadata: Option[DataObjectMetadata] = None
                              )(@transient implicit override val instanceRegistry: InstanceRegistry)
   extends SparkFileDataObjectWithEmbeddedSchema with CanCreateDataFrame with CanWriteDataFrame {

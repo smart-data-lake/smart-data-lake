@@ -92,7 +92,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
   }
 
-  override def prepare(implicit session: SparkSession): Unit = {
+  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.prepare
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
   }

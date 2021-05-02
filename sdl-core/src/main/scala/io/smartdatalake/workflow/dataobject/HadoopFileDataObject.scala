@@ -18,19 +18,18 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.io.{InputStream, OutputStream}
-
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
-import io.smartdatalake.util.misc.{AclDef, AclUtil, SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.util.misc.DataFrameUtil.arrayToSeq
+import io.smartdatalake.util.misc.{AclDef, AclUtil, SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.HadoopFileConnection
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
 
+import java.io.{InputStream, OutputStream}
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -41,7 +40,7 @@ import scala.util.{Failure, Success, Try}
  *
  * @see [[FileSystem]]
  */
-private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with CanCreateInputStream with CanCreateOutputStream with SmartDataLakeLogger {
+private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with CanCreateInputStream with CanCreateOutputStream with HasHadoopStandardFilestore with SmartDataLakeLogger {
 
   /**
    * Return the [[InstanceRegistry]] parsed from the SDL configuration used for this run.
@@ -49,19 +48,6 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    * @return  the current [[InstanceRegistry]].
    */
   def instanceRegistry(): InstanceRegistry
-
-  /**
-   * Return a [[String]] specifying the partition layout.
-   *
-   * For Hadoop the default partition layout is colname1=<value1>/colname2=<value2>/.../
-   */
-  final override def partitionLayout(): Option[String] = {
-    if (partitions.nonEmpty) {
-      Some(HdfsUtil.getHadoopPartitionLayout(partitions, separator))
-    } else {
-      None
-    }
-  }
 
   /**
    * Return the ACL definition for the Hadoop path of this DataObject
@@ -90,23 +76,14 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   def failIfFilesMissing: Boolean = false
 
   // these variables are not serializable
-  @transient private[workflow] lazy val hadoopPath = HdfsUtil.prefixHadoopPath(path, connection.map(_.pathPrefix))
-  @transient private var filesystemHolder: FileSystem = _
-  private var serializableHadoopConf: SerializableHadoopConfiguration = _ // we must serialize hadoop config for CustomFileAction running transformation on executors
-  override def getPath: String = hadoopPath.toUri.toString
-
-  /**
-   * Create a hadoop [[FileSystem]] API handle for the provided [[SparkSession]].
-   */
-  def filesystem(implicit session: SparkSession): FileSystem = {
-    if (serializableHadoopConf == null) {
-      serializableHadoopConf = new SerializableHadoopConfiguration(session.sparkContext.hadoopConfiguration)
+  @transient private var hadoopPathHolder: Option[Path] = None
+  def hadoopPath(implicit session: SparkSession): Path = {
+    if (hadoopPathHolder.isEmpty) {
+      hadoopPathHolder = Some(HdfsUtil.prefixHadoopPath(path, connection.map(_.pathPrefix)))
     }
-    if (filesystemHolder == null) {
-      filesystemHolder = HdfsUtil.getHadoopFsWithConf(hadoopPath, serializableHadoopConf.get)
-    }
-    filesystemHolder
+    hadoopPathHolder.get
   }
+  override def getPath: String = hadoopPathHolder.map(_.toUri.toString).getOrElse(throw new RuntimeException("hadoopPath not yet initialized"))
 
   /**
    * Check if the input files exist.
@@ -210,6 +187,13 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     } else {
       logger.info(s"($id) can not createEmptyPartition for $partitionValues as ${partitionValues.keys.mkString(",")} is not an init of partition columns ${partitions.mkString(",")}")
     }
+  }
+
+  override def movePartitions(partitionValuesMapping: Seq[(PartitionValues, PartitionValues)])(implicit session: SparkSession): Unit = {
+    partitionValuesMapping.foreach {
+      case (pvExisting, pvNew) => HdfsUtil.movePartition(hadoopPath, pvExisting, pvNew, fileName, filesystem)
+    }
+    logger.info(s"($id) Archived partitions ${partitionValuesMapping.map(m => s"${m._1}->${m._2}").mkString(", ")}")
   }
 
   override def getFileRefs(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[FileRef] = {
