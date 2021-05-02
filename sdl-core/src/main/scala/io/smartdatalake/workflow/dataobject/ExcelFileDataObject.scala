@@ -19,8 +19,9 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
+import configs.ConfigReader
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigImplicits, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
@@ -124,6 +125,14 @@ object ExcelFileDataObject extends FromConfigFactory[DataObject] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ExcelFileDataObject = {
     extract[ExcelFileDataObject](config)
   }
+}
+
+/**
+ * This is a workaround needed with Scala 2.11 because configs doesn't read default values correctly in a scope with many macros.
+ * If we let scala process the macro in a smaller scope, default values are handled correctly.
+ */
+object ExcelOptions extends ConfigImplicits {
+  implicit val excelOptionsReader: ConfigReader[ExcelOptions] = ConfigReader.derive[ExcelOptions]
 }
 
 /**
