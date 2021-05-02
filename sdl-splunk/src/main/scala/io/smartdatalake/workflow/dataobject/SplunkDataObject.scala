@@ -64,7 +64,7 @@ case class SplunkDataObject(override val id: DataObjectId,
     readFromSplunk(params)
   }
 
-  override def prepare(implicit session: SparkSession): Unit = try {
+  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = try {
     connection.test()
   } catch {
     case ex: Throwable => throw ConnectionTestException(s"($id) Can not connect. Error: ${ex.getMessage}", ex)

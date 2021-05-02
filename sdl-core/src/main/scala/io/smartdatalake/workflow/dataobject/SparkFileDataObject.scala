@@ -20,9 +20,10 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
-import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.util.misc.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
+import io.smartdatalake.util.misc.{CompactionUtil, DataFrameUtil}
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions.input_file_name
 import org.apache.spark.sql.types.{StringType, StructType}
@@ -182,7 +183,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * @param partitionValues The partition layout to write.
    * @param session the current [[SparkSession]].
    */
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
+  final override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
                              (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     require(!isRecursiveInput, "($id) SparkFileDataObject cannot write dataframe when dataobject is also used as recursive input ")
 
@@ -221,21 +222,25 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
       case _ => Unit
     }
 
-    val hadoopPathString = hadoopPath.toString
-    logger.info(s"Writing data frame to $hadoopPathString")
-
     // write
-    dfPrepared.write.format(format)
-      .mode(saveMode.asSparkSaveMode)
-      .options(options)
-      .optionalPartitionBy(partitions)
-      .save(hadoopPathString)
+    writeDataFrameToPath(dfPrepared, hadoopPath)
 
     // make sure empty partitions are created as well
     createMissingPartitions(partitionValues)
 
     // rename file according to SparkRepartitionDef
     sparkRepartition.foreach(_.renameFiles(getFileRefs(partitionValues))(filesystem))
+  }
+
+  override private[smartdatalake] def writeDataFrameToPath(df: DataFrame, path: Path)(implicit session: SparkSession): Unit = {
+    val hadoopPathString = path.toString
+    logger.info(s"($id) Writing DataFrame to $hadoopPathString")
+
+    df.write.format(format)
+      .mode(saveMode.asSparkSaveMode)
+      .options(options)
+      .optionalPartitionBy(partitions)
+      .save(hadoopPathString)
   }
 
   /**
@@ -246,6 +251,14 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     val partitionValueKeys = PartitionValues.getPartitionValuesKeys(partitionValues).toSeq
     partitionValues.intersect(listPartitions.map(_.filterKeys(partitionValueKeys)))
   }
+
+  /**
+   * Compact partitions using Spark
+   */
+  override def compactPartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, actionPipelineContext: ActionPipelineContext): Unit = {
+    CompactionUtil.compactHadoopStandardPartitions(this, partitionValues)
+  }
+
 }
 
 /**

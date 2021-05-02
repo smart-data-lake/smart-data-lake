@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.SchemaViolationException
+import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -44,9 +44,22 @@ trait CanHandlePartitions { this: DataObject =>
   private[smartdatalake] def expectedPartitionsCondition: Option[String]
 
   /**
-   * Delete given partitions. This is used to cleanup partitions after they are processed.
+   * Delete given partitions. This is used to cleanup partitions by housekeeping.
+   * Note: this is optional to implement.
    */
   private[smartdatalake] def deletePartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = throw new RuntimeException(s"deletePartitions not implemented")
+
+  /**
+   * Move given partitions. This is used to archive partitions by housekeeping.
+   * Note: this is optional to implement.
+   */
+  private[smartdatalake] def movePartitions(partitionValues: Seq[(PartitionValues,PartitionValues)])(implicit session: SparkSession): Unit = throw new RuntimeException(s"movePartitions not implemented")
+
+  /**
+   * Compact given partitions combining smaller files into bigger ones. This is used to compact partitions by housekeeping.
+   * Note: this is optional to implement.
+   */
+  private[smartdatalake] def compactPartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, actionPipelineContext: ActionPipelineContext): Unit = throw new RuntimeException(s"compactPartitions not implemented")
 
   /**
    * list partition values

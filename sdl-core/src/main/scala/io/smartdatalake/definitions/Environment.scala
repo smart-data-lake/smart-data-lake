@@ -19,11 +19,11 @@
 package io.smartdatalake.definitions
 
 import java.net.URI
-
 import io.smartdatalake.app.{GlobalConfig, SDLPlugin}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.{CustomCodeUtil, EnvironmentUtil}
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 
 /**
@@ -160,7 +160,7 @@ object Environment {
       "path", "table.name"
     , "create-sql", "createSql", "pre-read-sql", "preReadSql", "post-read-sql", "postReadSql", "pre-write-sql", "preWriteSql", "post-write-sql", "postWriteSql"
     , "executionMode.checkpointLocation", "execution-mode.checkpoint-location")
-  val defaultPathSeparator: Char = '/'
+  val defaultPathSeparator: Char = Path.SEPARATOR_CHAR // normally use default hadoop path separator
   val runIdPartitionColumnName = "run_id"
 
   // instantiate sdl plugin if configured

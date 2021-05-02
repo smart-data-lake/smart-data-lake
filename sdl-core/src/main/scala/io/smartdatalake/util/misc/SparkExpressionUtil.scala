@@ -103,6 +103,25 @@ private[smartdatalake] object SparkExpressionUtil {
   }
 
   /**
+   * Evaluate an expression against a each entry of a list of case class instances
+   * @param id id of the config object for meaningful exception text
+   * @param configName optional configuration name for meaningful exception text
+   * @param expression expression to be evaluated
+   * @param data a list of case class instances
+   * @tparam T class of object the expression should be evaluated on
+   * @tparam R class of expressions expected return type
+   */
+  def evaluateSeq[T <: Product : TypeTag, R : TypeTag : ClassTag](id: ConfigObjectId, configName: Option[String], expression: String, data: Seq[T]): Seq[(T,Option[R])] = {
+    try {
+      val evaluator = new ExpressionEvaluator[T,R](expr(expression))
+      data.map(d => (d, Option(evaluator(d))))
+    } catch {
+      case e: Exception =>
+        throw ConfigurationException(s"($id) spark expression evaluation for '$expression'${getConfigNameMsg(configName)} failed: ${e.getMessage}", configName, e)
+    }
+  }
+
+  /**
    * Check syntax of an expression against a given case class
    * @param id id of the config object for meaningful exception text
    * @param configName optional configuration name for meaningful exception text
@@ -144,3 +163,5 @@ object DefaultExpressionData {
       , Timestamp.valueOf(context.attemptStartTime), partitionValues.map(_.elements.mapValues(_.toString)))
   }
 }
+
+private[smartdatalake] case class ExpressionEvaluationException(message: String, configurationPath: Option[String] = None, throwable: Throwable = null) extends RuntimeException(message, throwable)

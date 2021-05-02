@@ -19,20 +19,22 @@
 
 package io.smartdatalake.workflow.dataobject
 
-import java.nio.file.Files
-
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ProcessingLogicException
 import io.smartdatalake.workflow.action.CustomFileActionTest
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.StructType
 
+import java.nio.file
+import java.nio.file.{Files, Paths, StandardOpenOption}
 import scala.util.Try
 
-class SparkFileDataObjectTest extends DataObjectTestSuite {
+class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogger {
   import session.implicits._
 
   test("overwrite only one partition") {
@@ -322,6 +324,81 @@ class SparkFileDataObjectTest extends DataObjectTestSuite {
     val tempDir = Files.createTempDirectory("tempHadoopDO")
     val dataObject = CsvFileDataObject(id = "partitionTestCsv", partitions = Seq("p1","p2"), path = tempDir.toString, saveMode = SDLSaveMode.OverwriteOptimized)
     a [ProcessingLogicException] should be thrownBy dataObject.writeDataFrame(df, partitionValues = Seq())
+  }
+
+  private def createJsonFiles(path: file.Path, nbOfFile: Int = 100, filenamePrefix: String = "test") = {
+    Files.createDirectory(path)
+    logger.info(s"creating test files in $path")
+    (1 to nbOfFile).foreach { i =>
+      val writer = Files.newBufferedWriter(path.resolve(s"$filenamePrefix$i.json"), StandardOpenOption.CREATE, StandardOpenOption.WRITE)
+      writer.write(s"""{"value": $i}""")
+      writer.close()
+    }
+    assert(file.Files.list(path).count == nbOfFile)
+  }
+
+  // create data for 2 partitions and compact one of them
+  test("move partition function") {
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = JsonFileDataObject(id = "movePartitionTestJson", partitions = Seq("p"), path = tempDir.toString, jsonOptions = Some(Map("multiLine"->"false")))
+
+    // create 100 json files for partition p=A and p=B
+    val partitionPathA = Paths.get(tempDir.toString, "p=A")
+    val partitionPathB = Paths.get(tempDir.toString, "p=B")
+    createJsonFiles(partitionPathA, 10, "testA")
+    createJsonFiles(partitionPathB, 10, "testB")
+
+    // move partition p=A to p=B
+    val pvsToMove = Seq((PartitionValues(Map("p" -> "A")), PartitionValues(Map("p" -> "B"))))
+    dataObject.movePartitions(pvsToMove)
+
+    //check
+    assert(!file.Files.exists(partitionPathA)) // p=A is deleted
+    assert(file.Files.list(partitionPathB).count == 20) // check p=A moved to p=B
+    assert(dataObject.getDataFrame(pvsToMove.map(_._2)).select(sum($"value")).as[Long].head == 110) // check completeness of p=A + p=B
+  }
+
+  // create data for 2 partitions and compact one of them
+  test("compact partition function") {
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = JsonFileDataObject(id = "compactionTestJson", partitions = Seq("p"), path = tempDir.toString, jsonOptions = Some(Map("multiLine"->"false")))
+
+    // create 100 json files for partition p=A and p=B
+    val partitionPathA = Paths.get(tempDir.toString, "p=A")
+    val partitionPathB = Paths.get(tempDir.toString, "p=B")
+    def createFiles(path: file.Path) = {
+      Files.createDirectory(path)
+      logger.info(s"creating test files in $path")
+      (1 to 100).foreach { i =>
+        val writer = Files.newBufferedWriter(path.resolve(s"$i.json"), StandardOpenOption.CREATE, StandardOpenOption.WRITE)
+        writer.write(s"""{"value": $i}""")
+        writer.close()
+      }
+      assert(file.Files.list(path).count == 100)
+    }
+    createFiles(partitionPathA)
+    createFiles(partitionPathB)
+
+    // compact
+    logger.info("compacting partition p=A")
+    val pvsToCompact = Seq(PartitionValues(Map("p" -> "A")))
+    dataObject.compactPartitions(pvsToCompact)
+
+    //check
+    assert(file.Files.list(partitionPathA).count < 100) // check less files in p=A
+    assert(dataObject.getDataFrame(pvsToCompact).select(sum($"value")).as[Long].head == 5050) // check completeness of p=A
+    assert(file.Files.list(partitionPathB).count == 100) // check p=B not changed
+    val specialFiles = dataObject.filesystem.globStatus(new Path(tempDir.toString, s"*/_SDL*"))
+    assert(specialFiles.count(_.getPath.getName.endsWith("COMPACTED")) == 1) // one partition marked as compacted
+    assert(specialFiles.count(!_.getPath.getName.endsWith("COMPACTED")) == 0) // no other special files left
+
+    // compact 2 - dont compact p=A again
+    logger.info("compacting partition p=A 2nd time")
+    val compactedTstmp = specialFiles.find(_.getPath.getName.endsWith("COMPACTED")).get.getModificationTime
+    dataObject.compactPartitions(pvsToCompact)
+    val specialFiles2 = dataObject.filesystem.globStatus(new Path(tempDir.toString, s"*/_SDL*"))
+    val compactedTstmp2 = specialFiles.find(_.getPath.getName.endsWith("COMPACTED")).get.getModificationTime
+    assert(compactedTstmp == compactedTstmp2)
   }
 
 }
