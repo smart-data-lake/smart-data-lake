@@ -221,7 +221,7 @@
 
 		<spark.version>3.1.1</spark.version>
 		<spark.minor.version>3.0</spark.minor.version> <!-- this is used in sdl-snowflake which has no version yet for Spark 3.1 -->
-		<spark-extensions.version>2.0.10</spark-extensions.version>
+		<spark-extensions.version>2.0.11</spark-extensions.version>
 
 		<!-- SPARK-PARENT start: properties copied from spark-parent pom version 2.4.7 for spark-parent import in dependencyManagement -->
 		<!-- attention - manually adapted are: zookeeper, scala.version, scala.binary.version -->
