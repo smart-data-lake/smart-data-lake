@@ -241,7 +241,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // exec dag
     val sdlb = new DefaultSmartDataLakeBuilder
     val appConfig = SmartDataLakeBuilderConfig(feedSel=feed)
-    sdlb.exec(appConfig, 1, 1, LocalDateTime.now(), LocalDateTime.now(), Seq(), Seq(), None, Seq(), simulation = false)
+    sdlb.exec(appConfig, 1, 1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), None, Seq(), simulation = false)
 
     val r1 = tgtBDO.getDataFrame()
       .select($"rating")

@@ -22,7 +22,7 @@ package io.smartdatalake.app
 import java.nio.file.Files
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.{Environment, PartitionDiffMode}
+import io.smartdatalake.definitions.{Condition, Environment, PartitionDiffMode}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
@@ -149,8 +149,8 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
-      val resultActionsState = runState.actionsState.mapValues(_.state)
-      val expectedActionsState = Map((action2success.id, RuntimeEventState.SUCCEEDED))
+      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.attemptId))
+      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SUCCEEDED,Some(1)), action2success.id -> (RuntimeEventState.SUCCEEDED, Some(2)))
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == selectedPartitions)
       if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
@@ -160,6 +160,93 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     assert(TestSDLPlugin.startupCalled)
     assert(TestSDLPlugin.shutdownCalled)
     System.clearProperty("sdl.pluginClassName")
+  }
+
+  test("sdlb run with skipped action and recovery after action 2 failed the first time") {
+
+    // init sdlb
+    val appName = "sdlb-recovery"
+    val feedName = "test"
+
+    HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
+    val sdlb = new DefaultSmartDataLakeBuilder()
+    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+    implicit val actionPipelineContext : ActionPipelineContext = ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
+
+    // setup DataObjects
+    val srcTable = Table(Some("default"), "ap_input")
+    // source table has partitions columns dt and type
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), partitions = Seq("dt","type"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
+    instanceRegistry.register(srcDO)
+    val tgt1Table = Table(Some("default"), "ap_copy1", None, Some(Seq("lastname","firstname")))
+    // first table has partitions columns dt and type (same as source)
+    val tgt1DO = TickTockHiveTableDataObject( "tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), partitions = Seq("dt","type"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    tgt1DO.dropTable
+    instanceRegistry.register(tgt1DO)
+    val tgt2Table = Table(Some("default"), "ap_copy2", None, Some(Seq("lastname","firstname")))
+    // second table has partition columns dt only (reduced)
+    val tgt2DO = HiveTableDataObject( "tgt2", Some(tempPath+s"/${tgt2Table.fullName}"), partitions = Seq("dt"), table = tgt2Table, numInitialHdfsPartitions = 1)
+    tgt2DO.dropTable
+    instanceRegistry.register(tgt2DO)
+
+    // prepare data
+    val dfSrc = Seq(("20180101", "person", "doe","john",5) // partition 20180101 is included in partition values filter
+      ,("20190101", "company", "olmo","-",10)) // partition 20190101 is not included
+      .toDF("dt", "type", "lastname", "firstname", "rating")
+    srcDO.writeDataFrame(dfSrc, Seq())
+
+    // start first dag run -> fail
+    // action1 skipped (executionMode.applyCondition = false)
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionCondition = Some(Condition("false", Some("always skip this action"))), metadata = Some(ActionMetadata(feed = Some(feedName))))
+    instanceRegistry.register(action1.copy())
+    val action2fail = CopyAction("b", tgt1DO.id, tgt2DO.id, executionCondition = Some(Condition("true", Some("always execute this action"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformer = Some(CustomDfTransformerConfig(className = Some(classOf[FailTransformer].getName))))
+    instanceRegistry.register(action2fail.copy())
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
+    intercept[TaskFailedException](sdlb.run(sdlConfig))
+
+    // check latest state
+    {
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
+      val stateFile = stateStore.getLatestState()
+      val runState = stateStore.recoverRunState(stateFile)
+      assert(runState.runId == 1)
+      assert(runState.attemptId == 1)
+      val resultActionsState = runState.actionsState.mapValues(_.state)
+      val expectedActionsState = Map((action1.id, RuntimeEventState.SKIPPED), (action2fail.id, RuntimeEventState.FAILED))
+      assert(resultActionsState == expectedActionsState)
+    }
+
+    // now fill tgt1 with both partitions
+    tgt1DO.writeDataFrame(dfSrc, Seq())
+
+    // reset DataObjects
+    instanceRegistry.clear()
+    instanceRegistry.register(srcDO)
+    instanceRegistry.register(tgt1DO)
+    instanceRegistry.register(tgt2DO)
+    instanceRegistry.register(action1.copy())
+
+    // start recovery dag run
+    // this should execute action b with partition 20180101 only!
+    val action2success = CopyAction("b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
+    instanceRegistry.register(action2success.copy())
+    sdlb.run(sdlConfig)
+
+    // check latest state
+    {
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
+      val stateFile = stateStore.getLatestState()
+      val runState = stateStore.recoverRunState(stateFile)
+      assert(runState.runId == 1)
+      assert(runState.attemptId == 2)
+      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.attemptId))
+      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SKIPPED,Some(1)), action2success.id -> (RuntimeEventState.SUCCEEDED, Some(2)))
+      assert(resultActionsState == expectedActionsState)
+      if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
+    }
+
   }
 
   test("sdlb run with initialExecutionMode=PartitionDiffMode, increase runId on second run, state listener") {
