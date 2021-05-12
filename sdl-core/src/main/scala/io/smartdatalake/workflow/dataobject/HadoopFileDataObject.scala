@@ -201,7 +201,9 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   }
 
   override def relativizePath(path: String): String = {
-    hadoopPathUri.relativize(new Path(path).toUri).toString
+    val prefix = path.substring(0 , path.indexOf(hadoopPath.toString))
+    val fullHadoopPath = new Path(prefix + hadoopPath.toString)
+    fullHadoopPath.toUri.relativize(new Path(path).toUri).toString
   }
   private val hadoopPathUri = hadoopPath.toUri
 
