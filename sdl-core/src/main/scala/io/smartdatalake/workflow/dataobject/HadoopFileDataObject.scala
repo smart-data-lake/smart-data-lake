@@ -201,11 +201,9 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   }
 
   override def relativizePath(path: String): String = {
-    val prefix = path.substring(0 , path.indexOf(hadoopPath.toString))
-    val fullHadoopPath = new Path(prefix + hadoopPath.toString)
-    fullHadoopPath.toUri.relativize(new Path(path).toUri).toString
+    val normalizedPath = new Path(path).toString
+    normalizedPath.stripPrefix(hadoopPath.toString).stripPrefix(Path.SEPARATOR)
   }
-  private val hadoopPathUri = hadoopPath.toUri
 
   override def createEmptyPartition(partitionValues: PartitionValues)(implicit session: SparkSession): Unit = {
     // check if valid init of partitions -> otherwise we can not create empty partition as path is not fully defined
