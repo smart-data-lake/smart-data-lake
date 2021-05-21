@@ -203,7 +203,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   override def relativizePath(path: String): String = {
     val normalizedPath = new Path(path).toString
     val pathPrefix = (".*"+hadoopPath.toString).r // ignore any absolute path prefix up and including hadoop path
-    pathPrefix.replaceAllIn(normalizedPath, "").stripPrefix(Path.SEPARATOR)
+    pathPrefix.replaceFirstIn(normalizedPath, "").stripPrefix(Path.SEPARATOR)
   }
 
   override def createEmptyPartition(partitionValues: PartitionValues)(implicit session: SparkSession): Unit = {
