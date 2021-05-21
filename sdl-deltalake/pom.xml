@@ -22,7 +22,7 @@
 	<parent>
 		<groupId>io.smartdatalake</groupId>
 		<artifactId>sdl-parent</artifactId>
-		<version>2.0.3</version>
+		<version>2.0.4-SNAPSHOT</version>
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
@@ -77,7 +77,7 @@
 		<dependency>
 			<groupId>io.delta</groupId>
 			<artifactId>delta-core_${scala.minor.version}</artifactId>
-			<version>${deltaTable.version}</version>
+			<version>${delta.version}</version>
 		</dependency>
 
 		<dependency>

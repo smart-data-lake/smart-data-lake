@@ -105,6 +105,12 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
   }
 
+  override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.init(df, partitionValues)
+    validateSchemaMin(df, "write")
+    validateSchemaHasPartitionCols(df, "write")
+  }
+
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
     val df = if(!isTableExisting && schemaMin.isDefined) {
       logger.info(s"Table ${table.fullName} does not exist but schemaMin was provided. Creating empty DataFrame.")
@@ -115,6 +121,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     }
 
     validateSchemaMin(df, "read")
+    validateSchemaHasPartitionCols(df, "read")
     df
   }
 
@@ -129,6 +136,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
                              (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     validateSchemaMin(df, "write")
+    validateSchemaHasPartitionCols(df, "write")
     writeDataFrameInternal(df, createTableOnly=false, partitionValues, isRecursiveInput)
 
     // make sure empty partitions are created as well

@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action.customlogic
 import io.smartdatalake.config.SdlConfigObject
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData, PythonUtil, SparkExpressionUtil}
+import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData, PythonSparkEntryPoint, PythonUtil, SparkExpressionUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionHelper
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig.fnTransformType
@@ -80,7 +80,7 @@ trait CustomDfTransformer extends Serializable {
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
-case class CustomDfTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Option[String] = None, pythonFile: Option[String] = None, pythonCode: Option[String] = None, options: Map[String,String] = Map(), runtimeOptions: Map[String,String] = Map()) {
+case class CustomDfTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Option[String] = None, pythonFile: Option[String] = None, pythonCode: Option[String] = None, options: Option[Map[String,String]] = None, runtimeOptions: Option[Map[String,String]] = None) {
   require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || sqlCode.isDefined || pythonFile.isDefined || pythonCode.isDefined, "Either className, scalaFile, scalaCode, sqlCode, pythonFile or code must be defined for CustomDfTransformer")
 
   val impl : Option[CustomDfTransformer] = className.map {
@@ -131,19 +131,19 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
     // replace runtime options
     val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
     // transform
-    impl.get.transform(session, options ++ runtimeOptionsReplaced, df, dataObjectId.id)
+    impl.get.transform(session, options.getOrElse(Map()) ++ runtimeOptionsReplaced, df, dataObjectId.id)
   }
 
   def transformPartitionValues(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
     // replace runtime options
     val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
     // transform
-    impl.get.transformPartitionValues(options ++ runtimeOptionsReplaced, partitionValues)
+    impl.get.transformPartitionValues(options.getOrElse(Map()) ++ runtimeOptionsReplaced, partitionValues)
   }
 
   private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[String,String] = {
     lazy val data = DefaultExpressionData.from(context, partitionValues)
-    runtimeOptions.mapValues {
+    runtimeOptions.getOrElse(Map()).mapValues {
       expr => SparkExpressionUtil.evaluateString(actionId, Some("transformation.runtimeOptions"), expr, data)
     }.filter(_._2.isDefined).mapValues(_.get)
   }
@@ -167,17 +167,16 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
       // python transformation is executed by passing options and input/output DataFrame through entry point
       val objectId = ActionHelper.replaceSpecialCharactersWithUnderscore(dataObjectId)
       try {
-        val entryPoint = new DfTransformerPySparkEntryPoint(session, options, df, objectId)
+        val entryPoint = new DfTransformerPythonSparkEntryPoint(session, options, df, objectId)
         val additionalInitCode = """
                                    |# prepare input parameters
-                                   |options = entryPoint.options
                                    |inputDf = DataFrame(entryPoint.getInputDf(), sqlContext) # convert input dataframe to pyspark
                                    |dataObjectId = entryPoint.getDataObjectId()
                                    |# helper function to return output dataframe
                                    |def setOutputDf( df ):
                                    |    entryPoint.setOutputDf(df._jdf)
           """.stripMargin
-        PythonUtil.execPythonTransform( entryPoint, additionalInitCode + sys.props("line.separator") + code)
+        PythonUtil.execPythonSparkCode( entryPoint, additionalInitCode + sys.props("line.separator") + code)
         entryPoint.outputDf.getOrElse(throw new IllegalStateException("Python transformation must set output DataFrame (call setOutputDf(df))"))
       } catch {
         case e: Throwable => throw new PythonTransformationException(s"Could not execute Python code. Error: ${e.getMessage}", e)
@@ -190,9 +189,8 @@ object CustomDfTransformerConfig {
   type fnTransformType = (SparkSession, Map[String, String], DataFrame, String) => DataFrame
 }
 
-private[smartdatalake] class DfTransformerPySparkEntryPoint(override val session: SparkSession, options: Map[String,String], inputDf: DataFrame, dataObjectId: String, var outputDf: Option[DataFrame] = None) extends SparkEntryPoint {
-  // it seems that py4j can handle functions but not pure attributes -> wrapper functions needed...
-  def getOptions: Map[String,String] = options
+private[smartdatalake] class DfTransformerPythonSparkEntryPoint(override val session: SparkSession, options: Map[String,String], inputDf: DataFrame, dataObjectId: String, var outputDf: Option[DataFrame] = None) extends PythonSparkEntryPoint(session, options) {
+  // it seems that py4j needs getter functions for attributes
   def getInputDf: DataFrame = inputDf
   def getDataObjectId: String = dataObjectId
   def setOutputDf(df: DataFrame): Unit = {

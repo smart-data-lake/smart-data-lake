@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.util.hdfs
 
+import io.smartdatalake.definitions.Environment
 import org.scalatest.FunSuite
 
 class PartitionLayoutTest extends FunSuite {
@@ -43,5 +44,20 @@ class PartitionLayoutTest extends FunSuite {
     val partitionString = "abc/date2000-01-01-ZZ-test.csv"
     val partitionValues = PartitionLayout.extractPartitionValues(testLayout, "*.csv", partitionString)
     assert(partitionValues == PartitionValues(Map("date" -> "2000-01-01", "type" -> "ZZ")))
+  }
+
+  test("extracting partition values according to hadoop partition layout") {
+    val delimiter = PartitionLayout.delimiter
+    val testLayout = HdfsUtil.getHadoopPartitionLayout(Seq("a","b"), Environment.defaultPathSeparator)
+    val partitionString = "a=1/b=2/test.csv"
+    val partitionValues = PartitionLayout.extractPartitionValues(testLayout, "*.csv", partitionString)
+    assert(partitionValues == PartitionValues(Map("a" -> "1", "b" -> "2")))
+  }
+
+  test("fail extracting partition values if partition string doesn't start with partition layout") {
+    val delimiter = PartitionLayout.delimiter
+    val testLayout = HdfsUtil.getHadoopPartitionLayout(Seq("a","b"), Environment.defaultPathSeparator)
+    val partitionString = "test/a=1/b=2/test.csv"
+    intercept[RuntimeException](PartitionLayout.extractPartitionValues(testLayout, "*.csv", partitionString))
   }
 }

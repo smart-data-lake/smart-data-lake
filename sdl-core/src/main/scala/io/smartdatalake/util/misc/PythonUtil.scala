@@ -23,6 +23,8 @@ import org.apache.spark.python.PythonHelper
 import org.apache.spark.python.PythonHelper.SparkEntryPoint
 import org.apache.spark.sql.SparkSession
 
+import scala.collection.JavaConverters._
+
 private[smartdatalake] object PythonUtil {
 
   /**
@@ -34,12 +36,12 @@ private[smartdatalake] object PythonUtil {
    *                      This is used to transfer SparkContext to python and can hold additional custom parameters.
    *                      entryPointObj must at least implement trait SparkEntryPoint.
    */
-  def execPythonTransform[T<:SparkEntryPoint](entryPointObj: T, code: String): Unit = {
+  def execPythonSparkCode[T<:PythonSparkEntryPoint](entryPointObj: T, code: String): Unit = {
     PythonHelper.exec(entryPointObj, mainInitCode + sys.props("line.separator") + code)
   }
 
   // python spark gateway init code
-  val mainInitCode =
+  private val mainInitCode =
     """
       |from pyspark.java_gateway import launch_gateway
       |from pyspark.context import SparkContext
@@ -57,8 +59,26 @@ private[smartdatalake] object PythonUtil {
       |sc = SparkContext(conf=sparkConf, gateway=gateway, jsc=javaSparkContext)
       |session = SparkSession(sc, entryPoint.session())
       |sqlContext = SQLContext(sc, session, entryPoint.getSQLContext())
+      |options = entryPoint.getOptions()
       |print("python spark session initialized (sc, session, sqlContext)")
+      |# Unregister python accumulator to avoid "java.net.ConnectException: Connection refused: connect" by PythonAccumulatorV2
+      |# This happens as we call python from java and not java from python as it would be normal with pyspark.
+      |# Our python server accumulator update server is already closed when the accumulator wants to send its updates to python.
+      |# see also initialization in https://github.com/apache/spark/blob/0494dc90af48ce7da0625485a4dc6917a244d580/python/pyspark/context.py#L213
+      |def ref_scala_object(object_name):
+      |  clazz = gateway.jvm.java.lang.Class.forName(object_name+"$")
+      |  ff = clazz.getDeclaredField("MODULE$")
+      |  return ff.get(None)
+      |_accumulatorContext = ref_scala_object("org.apache.spark.util.AccumulatorContext")
+      |_accId = sc._javaAccumulator.id()
+      |_accumulatorContext.remove(_accId)
+      |sc._javaAccumulator = None
       |""".stripMargin
+
 }
 
-class DfTransformerSparkEntryPoint(override val session: SparkSession, options: Map[String,String] = Map()) extends SparkEntryPoint
+class PythonSparkEntryPoint(override val session: SparkSession, options: Map[String,String] = Map()) extends SparkEntryPoint {
+  // HashMap is transformed into Python dictionary by py4j
+  def getOptions: java.util.HashMap[String,String] = new java.util.HashMap(options.asJava)
+}
+

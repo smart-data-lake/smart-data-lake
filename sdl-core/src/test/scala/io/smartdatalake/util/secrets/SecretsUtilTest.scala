@@ -25,7 +25,7 @@ import org.scalatest.FunSuite
 class SecretsUtilTest extends FunSuite {
 
   test("register custom config provider and get secret") {
-    val providerConfig = new SecretProviderConfig(classOf[TestSecretProvider].getName, Map("option1" -> "1"))
+    val providerConfig = new SecretProviderConfig(classOf[TestSecretProvider].getName, Some(Map("option1" -> "1")))
     SecretsUtil.registerProvider("TEST", providerConfig.provider)
     assert(SecretsUtil.getSecret("TEST#test") == "test1")
   }

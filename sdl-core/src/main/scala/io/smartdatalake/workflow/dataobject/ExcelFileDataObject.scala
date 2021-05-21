@@ -58,7 +58,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  */
 case class ExcelFileDataObject(override val id: DataObjectId,
                                override val path: String,
-                               excelOptions: ExcelOptions,
+                               excelOptions: ExcelOptions  = ExcelOptions(),
                                override val partitions: Seq[String] = Seq(),
                                override val schema: Option[StructType] = None,
                                override val schemaMin: Option[StructType] = None,
@@ -178,7 +178,6 @@ case class ExcelOptions(
       Some( xSheet.getOrElse("") + xStartArea.getOrElse("") + xEndArea.getOrElse(""))
     } else None
   }
-
 
   def toMap(schema: Option[StructType]): Map[String, Option[Any]] = Map(
       "dataAddress" -> getDataAddress,

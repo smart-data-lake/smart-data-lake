@@ -67,7 +67,7 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start load
     implicit val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
-    val fileTransformerConfig = CustomFileTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestFileTransformer"), options = Map("test"->"true"))
+    val fileTransformerConfig = CustomFileTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestFileTransformer"), options = Some(Map("test"->"true")))
     val action1 = CustomFileAction(id = "cfa", srcDO.id, tgtDO.id, fileTransformerConfig, false, 1)
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
@@ -110,7 +110,7 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start load
     implicit val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
-    val fileTransformerConfig = CustomFileTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestFileTransformer"), options = Map("test"->"true"))
+    val fileTransformerConfig = CustomFileTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestFileTransformer"), options = Some(Map("test"->"true")))
     val action1 = CustomFileAction(id = "cfa", srcDO.id, tgtDO.id, fileTransformerConfig, false, 1, executionMode = Some(PartitionDiffMode()))
     val srcSubFeed = InitSubFeed("src1", srcPartitionValues) // InitSubFeed needed to test initExecutionMode!
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head

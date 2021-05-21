@@ -29,7 +29,7 @@ import org.apache.spark.sql.expressions.UserDefinedFunction
  * @param className fully qualified class name of class implementing SparkUDFCreator interface. The class needs a constructor without parameters.
  * @param options Options are passed to SparkUDFCreator apply method.
  */
-case class SparkUDFCreatorConfig(className: String, options: Map[String,String] = Map()) {
+case class SparkUDFCreatorConfig(className: String, options: Option[Map[String,String]] = None) {
   // instantiate SparkUDFCreator
   private[smartdatalake] val creator: SparkUDFCreator = try {
     val clazz = Class.forName(className)
@@ -39,13 +39,13 @@ case class SparkUDFCreatorConfig(className: String, options: Map[String,String] 
     case e: NoSuchMethodException => throw ConfigurationException(s"SparkUDFCreatorConfig class $className needs constructor without parameters: ${e.getMessage}", Some("globalConfig.sparkUDFs"), e)
     case e: Exception => throw ConfigurationException(s"Cannot instantiate SparkUDFCreatorConfig class $className: ${e.getMessage}", Some("globalConfig.sparkUDFs"), e)
   }
-  private[smartdatalake] def get: UserDefinedFunction = creator.get(options)
+  private[smartdatalake] def getUDF: UserDefinedFunction = creator.get(options.getOrElse(Map()))
 }
 
 /**
  * Interface to create a UserDefinedFunction object to be registered as udf.
  */
-trait SparkUDFCreator {
+trait SparkUDFCreator extends Serializable {
 
   /**
    * Function that returns a Spark UserDefinedFunction object to be registered as udf.

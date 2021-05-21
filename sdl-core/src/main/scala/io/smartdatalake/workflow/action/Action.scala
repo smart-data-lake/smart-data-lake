@@ -281,7 +281,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   /**
    * get latest runtime information for this action
    */
-  def getRuntimeInfo: Option[RuntimeInfo] = {
+  def getRuntimeInfo : Option[RuntimeInfo] = {
     if (runtimeEvents.nonEmpty) {
       val lastEvent = runtimeEvents.last
       val lastResults = runtimeEvents.reverseIterator.map(_.results).find(_.nonEmpty) // on failed actions we take the results from initialization to store what partition values have been tried to process
@@ -390,9 +390,13 @@ case class ActionMetadata(
 private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: ExecutionPhase, state: RuntimeEventState, msg: Option[String], results: Seq[SubFeed])
 private[smartdatalake] object RuntimeEventState extends Enumeration {
   type RuntimeEventState = Value
-  val STARTED, PREPARED, INITIALIZED, SUCCEEDED, FAILED, SKIPPED, PENDING = Value
+  val STARTED, PREPARED, INITIALIZED, SUCCEEDED, FAILED, CANCELLED, SKIPPED, PENDING = Value
 }
-private[smartdatalake] case class RuntimeInfo(state: RuntimeEventState, startTstmp: Option[LocalDateTime] = None, duration: Option[Duration] = None, msg: Option[String] = None, results: Seq[ResultRuntimeInfo] = Seq()) {
+private[smartdatalake] case class RuntimeInfo(state: RuntimeEventState, startTstmp: Option[LocalDateTime] = None, duration: Option[Duration] = None, msg: Option[String] = None, attemptId: Option[Int] = None, results: Seq[ResultRuntimeInfo] = Seq()) {
+  /**
+   * Completed Actions will be ignored in recovery
+   */
+  def hasCompleted(): Boolean = state==RuntimeEventState.SUCCEEDED || state==RuntimeEventState.SKIPPED
   override def toString: String = {
     duration.map(d => s"$state $d")
       .getOrElse(state.toString)
