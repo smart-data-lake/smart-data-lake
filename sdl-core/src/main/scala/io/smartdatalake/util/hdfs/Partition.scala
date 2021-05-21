@@ -172,7 +172,7 @@ private[smartdatalake] object PartitionLayout {
       tokenMatch => if (tokenMatch.group(3) != null) s"(${tokenMatch.group(3)})" else "(.*?)"
     })
     // create regex and match with path.
-    val partitionLayoutRegex = ("^.*" + partitionLayoutPrepared).r // add anchor at start of string.
+    val partitionLayoutRegex = ("^" + partitionLayoutPrepared).r // add anchor at start of string.
     partitionLayoutRegex.findFirstMatchIn(path) match {
       case Some(regexMatch) =>
         val tokenValues = (1 to regexMatch.groupCount).map( i => regexMatch.group(i))
