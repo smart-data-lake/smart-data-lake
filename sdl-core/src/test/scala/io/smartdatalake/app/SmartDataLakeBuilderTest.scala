@@ -51,6 +51,8 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
   private val tempPath = tempDir.toAbsolutePath.toString
 
   val statePath = "target/stateTest/"
+  // use alternate state path for second unit test as on Windows the state path sometimes can not be deleted correctly
+  val statePath2 = "target/stateTest2/"
   val filesystem = HdfsUtil.getHadoopFs(new Path(statePath))
 
 
@@ -160,6 +162,8 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     assert(TestSDLPlugin.startupCalled)
     assert(TestSDLPlugin.shutdownCalled)
     System.clearProperty("sdl.pluginClassName")
+
+    HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
   }
 
   test("sdlb run with skipped action and recovery after action 2 failed the first time") {
@@ -168,7 +172,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val appName = "sdlb-recovery"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
+    HdfsUtil.deleteFiles(new Path(statePath2), filesystem, false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
@@ -203,12 +207,12 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val action2fail = CopyAction("b", tgt1DO.id, tgt2DO.id, executionCondition = Some(Condition("true", Some("always execute this action"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
       , transformer = Some(CustomDfTransformerConfig(className = Some(classOf[FailTransformer].getName))))
     instanceRegistry.register(action2fail.copy())
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath2))
     intercept[TaskFailedException](sdlb.run(sdlConfig))
 
     // check latest state
     {
-      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath2, appName)
       val stateFile = stateStore.getLatestState()
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
@@ -236,7 +240,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // check latest state
     {
-      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath2, appName)
       val stateFile = stateStore.getLatestState()
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
@@ -244,7 +248,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.attemptId))
       val expectedActionsState = Map(action1.id -> (RuntimeEventState.SKIPPED,Some(1)), action2success.id -> (RuntimeEventState.SUCCEEDED, Some(2)))
       assert(resultActionsState == expectedActionsState)
-      if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
+      if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath2, "current")).map(_.getPath).isEmpty)
     }
 
   }
