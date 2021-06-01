@@ -25,8 +25,7 @@ import java.time.{Duration, LocalDateTime}
 
 import com.splunk._
 import com.typesafe.config.Config
-import configs.Configs
-import configs.syntax._
+import configs.ConfigReader
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -161,15 +160,13 @@ object SplunkDataObject extends FromConfigFactory[DataObject] {
     ofMinutes(value)
   }
 
-  /**
-   * A ConfigReader that reads [[SplunkParams]] values.
-   *
-   * SplunkParams have special semantics for Duration which are covered with this reader.
-   */
-  implicit val splunkParamsReader: Configs[SplunkParams] = Configs.fromConfigTry { c =>
-    SplunkParams.fromConfig(c)
+  implicit val splunkParamsReader: ConfigReader[SplunkParams] = ConfigReader.derive[SplunkParams]
+  implicit val splunkLocalDateTimeReader: ConfigReader[LocalDateTime] = ConfigReader.fromTry { (c, p) =>
+    SplunkDataObject.parseConfigDateTime(c.getString(p))
   }
-
+  implicit val splunkDurationReader: ConfigReader[Duration] = ConfigReader.fromTry { (c, p) =>
+    SplunkDataObject.parseConfigDuration(c.getInt(p))
+  }
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SplunkDataObject = {
     extract[SplunkDataObject](config)
   }
@@ -227,16 +224,4 @@ case class SplunkParams(
                          parallelRequests: Int = 2
                        ) {
   val schema: StructType = StructType(columnNames.toArray.map(name => StructField(name, StringType, nullable = true)).toList)
-}
-
-object SplunkParams {
-  def fromConfig(config: Config): SplunkParams = {
-    implicit val splunkLocalDateTimeReader: Configs[LocalDateTime] = Configs.fromTry { (c, p) =>
-      SplunkDataObject.parseConfigDateTime(c.getString(p))
-    }
-    implicit val splunkDurationReader: Configs[Duration] = Configs.fromTry { (c, p) =>
-      SplunkDataObject.parseConfigDuration(c.getInt(p))
-    }
-    config.extract[SplunkParams].value
-  }
 }

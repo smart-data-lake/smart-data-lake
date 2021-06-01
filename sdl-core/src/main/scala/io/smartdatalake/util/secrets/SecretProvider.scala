@@ -28,12 +28,12 @@ import org.apache.spark.annotation.DeveloperApi
  * @param className fully qualified class name of class implementing SecretProvider interface. The class needs a constructor with parameter "options: Map[String,String]".
  * @param options Options are passed to SecretProvider apply method.
  */
-case class SecretProviderConfig(className: String, options: Map[String,String] = Map()) {
+case class SecretProviderConfig(className: String, options: Option[Map[String,String]] = None) {
   // instantiate SecretProvider
   private[smartdatalake] val provider: SecretProvider = try {
     val clazz = Class.forName(className)
     val constructor = clazz.getConstructor(classOf[Map[String,String]])
-    constructor.newInstance(options).asInstanceOf[SecretProvider]
+    constructor.newInstance(options.getOrElse(Map())).asInstanceOf[SecretProvider]
   } catch {
     case e: NoSuchMethodException => throw ConfigurationException(s"""SecretProvider class $className needs constructor with parameter "options: Map[String,String]": ${e.getMessage}""", Some("globalConfig.secretProviders"), e)
     case e: Exception => throw ConfigurationException(s"Cannot instantiate SecretProvider class $className: ${e.getClass.getSimpleName} ${e.getMessage}", Some("globalConfig.secretProviders"), e)

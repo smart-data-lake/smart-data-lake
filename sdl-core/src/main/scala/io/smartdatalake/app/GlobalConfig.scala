@@ -20,7 +20,7 @@
 package io.smartdatalake.app
 
 import com.typesafe.config.Config
-import configs.Configs
+import configs.ConfigReader
 import configs.syntax._
 import io.smartdatalake.config.ConfigImplicits
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
@@ -84,7 +84,7 @@ extends SmartDataLakeLogger {
     if (Environment._sparkSession != null) logger.warn("Your SparkSession was already set, that should not happen. We will re-initialize it anyway now.")
     // prepare additional spark options
     // enable MemoryLoggerExecutorPlugin if memoryLogTimer is enabled
-    val executorPlugins = (sparkOptions.flatMap(_.get("spark.executor.plugins")).toSeq ++ (if (memoryLogTimer.isDefined) Seq(classOf[MemoryLoggerExecutorPlugin].getName) else Seq()))
+    val executorPlugins = (sparkOptions.flatMap(_.get("spark.plugins")).toSeq ++ (if (memoryLogTimer.isDefined) Seq(classOf[MemoryLoggerExecutorPlugin].getName) else Seq()))
     // config for MemoryLoggerExecutorPlugin can only be transferred to Executor by spark-options
     val memoryLogOptions = memoryLogTimer.map(_.getAsMap).getOrElse(Map())
     val sparkOptionsExtended = sparkOptions.getOrElse(Map()) ++ memoryLogOptions ++ (if (executorPlugins.nonEmpty) Map("spark.executor.plugins" -> executorPlugins.mkString(",")) else Map())
@@ -106,7 +106,7 @@ extends SmartDataLakeLogger {
 }
 object GlobalConfig extends ConfigImplicits {
   private[smartdatalake] def from(config: Config): GlobalConfig = {
-    implicit val customStateListenerConfig: Configs[StateListenerConfig] = Configs.derive[StateListenerConfig]
+    implicit val customStateListenerConfig: ConfigReader[StateListenerConfig] = ConfigReader.derive[StateListenerConfig]
     globalConfig = Some(config.get[Option[GlobalConfig]]("global").value.getOrElse(GlobalConfig()))
     globalConfig.get
   }

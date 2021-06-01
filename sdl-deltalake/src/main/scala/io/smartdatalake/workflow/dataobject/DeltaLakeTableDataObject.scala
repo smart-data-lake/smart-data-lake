@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import com.typesafe.config.Config
 import io.delta.tables.DeltaTable
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
@@ -96,9 +97,16 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
   }
 
+  override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.init(df, partitionValues)
+    validateSchemaMin(df, "write")
+    validateSchemaHasPartitionCols(df, "write")
+  }
+
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
     val df = session.read.format("delta").load(hadoopPath.toString)
     validateSchemaMin(df, "read")
+    validateSchemaHasPartitionCols(df, "read")
     df
   }
 
@@ -113,6 +121,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
                              (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     validateSchemaMin(df, "write")
+    validateSchemaHasPartitionCols(df, "write")
     writeDataFrame(df, createTableOnly=false, partitionValues)
   }
 
@@ -232,9 +241,13 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   /**
    * @inheritdoc
    */
-  override def factory: FromConfigFactory[DataObject] = TickTockHiveTableDataObject
+  override def factory: FromConfigFactory[DataObject] = DeltaLakeTableDataObject
 
 }
 
-
+object DeltaLakeTableDataObject extends FromConfigFactory[DataObject] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): DeltaLakeTableDataObject = {
+    extract[DeltaLakeTableDataObject](config)
+  }
+}
 

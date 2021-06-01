@@ -171,14 +171,14 @@ private[smartdatalake] object PartitionLayout {
     partitionLayoutPrepared = tokenRegex.replaceAllIn( partitionLayoutPrepared, {
       tokenMatch => if (tokenMatch.group(3) != null) s"(${tokenMatch.group(3)})" else "(.*?)"
     })
-    // create regex and match with path
-    val partitionLayoutRegex = partitionLayoutPrepared.r
+    // create regex and match with path.
+    val partitionLayoutRegex = ("^" + partitionLayoutPrepared).r // add anchor at start of string.
     partitionLayoutRegex.findFirstMatchIn(path) match {
       case Some(regexMatch) =>
         val tokenValues = (1 to regexMatch.groupCount).map( i => regexMatch.group(i))
         val tokenMap = tokens.zip(tokenValues).toMap
         PartitionValues(tokenMap)
-      case None => throw new Exception(s"prepared regexp partition layout $partitionLayoutPrepared didn't match path $path")
+      case None => throw new RuntimeException(s"""prepared regexp partition layout "$partitionLayoutRegex" didn't match path "$path"""")
     }
   }
 }

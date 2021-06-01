@@ -21,7 +21,7 @@
 
 	<groupId>io.smartdatalake</groupId>
 	<artifactId>sdl-parent</artifactId>
-	<version>2.0.4-SNAPSHOT</version>
+	<version>2.0.5-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
 	<modules>
@@ -219,9 +219,9 @@
 		<scala.minor.version>2.12</scala.minor.version>
 		<scala.version>${scala.minor.version}.12</scala.version>
 
-		<spark.version>3.0.1</spark.version>
-		<spark.minor.version>3.0</spark.minor.version>
-		<spark-extensions.version>2.0.8</spark-extensions.version>
+		<spark.version>3.1.1</spark.version>
+		<spark.minor.version>3.0</spark.minor.version> <!-- this is used in sdl-snowflake which has no version yet for Spark 3.1 -->
+		<spark-extensions.version>2.0.11</spark-extensions.version>
 
 		<!-- SPARK-PARENT start: properties copied from spark-parent pom version 2.4.7 for spark-parent import in dependencyManagement -->
 		<!-- attention - manually adapted are: zookeeper, scala.version, scala.binary.version -->
@@ -234,22 +234,19 @@
 		<protobuf.version>2.5.0</protobuf.version>
 		<yarn.version>${hadoop.version}</yarn.version>
 		<zookeeper.version>3.4.14</zookeeper.version>
-		<curator.version>2.7.1</curator.version>
+		<curator.version>2.13.0</curator.version>
 		<hive.group>org.apache.hive</hive.group>
 		<hive.classifier>core</hive.classifier>
-		<!--  Version used in Maven Hive dependency  -->
+		<!-- Version used in Maven Hive dependency -->
 		<hive.version>2.3.7</hive.version>
 		<hive23.version>2.3.7</hive23.version>
 		<!-- Version used for internal directory structure -->
 		<hive.version.short>2.3</hive.version.short>
 		<derby.version>10.12.1.1</derby.version>
 		<parquet.version>1.10.1</parquet.version>
-		<orc.version>1.5.10</orc.version>
-		<orc.classifier/>
-		<hive.parquet.group>com.twitter</hive.parquet.group>
-		<hive.parquet.version>1.6.0</hive.parquet.version>
-		<jetty.version>9.4.18.v20190429</jetty.version>
-		<javaxservlet.version>3.1.0</javaxservlet.version>
+		<orc.version>1.5.12</orc.version>
+		<jetty.version>9.4.36.v20210114</jetty.version>
+		<jakartaservlet.version>4.0.3</jakartaservlet.version>
 		<chill.version>0.9.5</chill.version>
 		<ivy.version>2.4.0</ivy.version>
 		<oro.version>2.0.8</oro.version>
@@ -280,14 +277,15 @@
 		<scalafmt.skip>true</scalafmt.skip>
 		<codehaus.jackson.version>1.9.13</codehaus.jackson.version>
 		<fasterxml.jackson.version>2.10.0</fasterxml.jackson.version>
-		<snappy.version>1.1.7.5</snappy.version>
+		<snappy.version>1.1.8.2</snappy.version>
 		<netlib.java.version>1.1.2</netlib.java.version>
 		<commons-codec.version>1.10</commons-codec.version>
-		<commons-io.version>2.4</commons-io.version>
+		<commons-compress.version>1.20</commons-compress.version>
+		<commons-io.version>2.5</commons-io.version>
 		<!-- org.apache.commons/commons-lang/-->
 		<commons-lang2.version>2.6</commons-lang2.version>
 		<!-- org.apache.commons/commons-lang3/-->
-		<commons-lang3.version>3.9</commons-lang3.version>
+		<commons-lang3.version>3.10</commons-lang3.version>
 		<!-- org.apache.commons/commons-pool2/-->
 		<commons-pool2.version>2.6.2</commons-pool2.version>
 		<datanucleus-core.version>4.1.17</datanucleus-core.version>
@@ -298,25 +296,24 @@
 		<jodd.version>3.5.2</jodd.version>
 		<jsr305.version>3.0.0</jsr305.version>
 		<libthrift.version>0.12.0</libthrift.version>
-		<antlr4.version>4.7.1</antlr4.version>
+		<antlr4.version>4.8-1</antlr4.version>
 		<jpam.version>1.1</jpam.version>
-		<selenium.version>2.52.0</selenium.version>
-		<htmlunit.version>2.22</htmlunit.version>
+		<selenium.version>3.141.59</selenium.version>
+		<htmlunit.version>2.40.0</htmlunit.version>
 		<!--
-        Managed up from older version from Avro; sync with jackson-module-paranamer dependency version
-        -->
+    	Managed up from older version from Avro; sync with jackson-module-paranamer dependency version
+   		-->
 		<paranamer.version>2.8</paranamer.version>
 		<maven-antrun.version>1.8</maven-antrun.version>
-		<commons-crypto.version>1.0.0</commons-crypto.version>
+		<commons-crypto.version>1.1.0</commons-crypto.version>
 		<!--
-        If you are changing Arrow version specification, please check ./python/pyspark/sql/utils.py,
-        and ./python/setup.py too.
+        If you are changing Arrow version specification, please check
+        ./python/pyspark/sql/pandas/utils.py, and ./python/setup.py too.
         -->
-		<arrow.version>0.15.1</arrow.version>
+		<arrow.version>2.0.0</arrow.version>
 		<!-- org.fusesource.leveldbjni will be used except on arm64 platform. -->
 		<leveldbjni.group>org.fusesource.leveldbjni</leveldbjni.group>
 		<!-- SPARK-PARENT finished -->
-
 
 		<!-- other dependency versions -->
 		<scopt.version>3.7.1</scopt.version>
@@ -325,7 +322,7 @@
 		<ucanaccess.version>4.0.4</ucanaccess.version>
 		<!-- when changing config version, remember to update it in DatabricksSmartDataLakeBuilder main method -->
 		<typesafe.config.version>1.4.1</typesafe.config.version>
-		<kxbmap.configs.version>0.4.4</kxbmap.configs.version>
+		<kxbmap.configs.version>0.6.1</kxbmap.configs.version>
 		<monix.version>3.1.0</monix.version>
 		<scala-arm.version>2.0</scala-arm.version>
 		<splunk.version>1.6.5.0</splunk.version>
@@ -333,7 +330,7 @@
 		<kafka.version>2.4.1</kafka.version>
 		<snowflake.version>2.8.4</snowflake.version>
 		<keycloak.version>4.5.0.Final</keycloak.version>
-		<deltaTable.version>0.7.0</deltaTable.version>
+		<delta.version>0.8.0</delta.version>
 		<poi.version>4.1.2</poi.version>
 
 		<scalatest.test.version>3.0.8</scalatest.test.version>
@@ -2290,12 +2287,6 @@
 				<scope>${parquet.test.deps.scope}</scope>
 			</dependency>
 			<dependency>
-				<groupId>${hive.parquet.group}</groupId>
-				<artifactId>parquet-hadoop-bundle</artifactId>
-				<version>${hive.parquet.version}</version>
-				<scope>${hive.parquet.scope}</scope>
-			</dependency>
-			<dependency>
 				<groupId>org.codehaus.janino</groupId>
 				<artifactId>janino</artifactId>
 				<version>${janino.version}</version>
@@ -2345,6 +2336,11 @@
 			<dependency>
 				<groupId>org.antlr</groupId>
 				<artifactId>antlr4-runtime</artifactId>
+				<version>${antlr4.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.antlr</groupId>
+				<artifactId>antlr4</artifactId>
 				<version>${antlr4.version}</version>
 			</dependency>
 			<dependency>

@@ -131,9 +131,13 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
             val pattern = PartitionLayout.replaceTokens(partitionLayout, PartitionValues(Map()))
             // list directories and extract partition values
             SshUtil.sftpListFiles(path + separator + pattern)(sftp)
-              .map( f => PartitionLayout.extractPartitionValues(partitionLayout, "", f.stripPrefix(path+separator) + separator))
+              .map( f => PartitionLayout.extractPartitionValues(partitionLayout, "", relativizePath(f) + separator))
         }
     }.getOrElse(Seq())
+  }
+
+  override def relativizePath(filePath: String): String = {
+    filePath.stripPrefix(path+separator)
   }
 
   override def prepare(implicit session: SparkSession): Unit = try {

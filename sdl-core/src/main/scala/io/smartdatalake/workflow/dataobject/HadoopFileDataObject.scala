@@ -195,10 +195,15 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
         // list directories and extract partition values
         filesystem.globStatus( new Path(hadoopPath, pattern))
           .filter{fs => fs.isDirectory}
-          .map(_.getPath.toString)
-          .map( path => PartitionLayout.extractPartitionValues(partitionLayout, "", path + separator))
+          .map(path => PartitionLayout.extractPartitionValues(partitionLayout, "", relativizePath(path.getPath.toString) + separator))
           .toSeq
     }.getOrElse(Seq())
+  }
+
+  override def relativizePath(path: String): String = {
+    val normalizedPath = new Path(path).toString
+    val pathPrefix = (".*"+hadoopPath.toString).r // ignore any absolute path prefix up and including hadoop path
+    pathPrefix.replaceFirstIn(normalizedPath, "").stripPrefix(Path.SEPARATOR)
   }
 
   override def createEmptyPartition(partitionValues: PartitionValues)(implicit session: SparkSession): Unit = {
