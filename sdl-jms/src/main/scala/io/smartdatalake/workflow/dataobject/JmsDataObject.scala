@@ -19,14 +19,13 @@
 package io.smartdatalake.workflow.dataobject
 
 import java.util.concurrent.TimeUnit
-
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{AuthMode, BasicAuthMode}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.jms.{JmsQueueConsumerFactory, SynchronousJmsReceiver, TextMessageHandler}
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -69,7 +68,12 @@ case class JmsDataObject(override val id: DataObjectId,
       TextMessageHandler.convert2Text, batchSize, Duration(maxWaitSec, TimeUnit.SECONDS),
       Duration(maxBatchAgeSec, TimeUnit.SECONDS), txBatchSize, session)
 
-    val df = receiver.receiveMessages().getOrElse(session.emptyDataFrame)
+    // Special case JMS:
+    // Do not process any data during init phase as messages received will not be available during Exec phase
+    val df = context.phase match {
+      case ExecutionPhase.Init => session.emptyDataFrame
+      case _ => receiver.receiveMessages().getOrElse(session.emptyDataFrame)
+    }
     validateSchemaMin(df, "read")
     df
   }
