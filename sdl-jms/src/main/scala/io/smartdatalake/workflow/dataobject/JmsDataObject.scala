@@ -27,7 +27,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.jms.{JmsQueueConsumerFactory, SynchronousJmsReceiver, TextMessageHandler}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
 import scala.concurrent.duration.Duration
 
@@ -70,9 +70,16 @@ case class JmsDataObject(override val id: DataObjectId,
 
     // Special case JMS:
     // Do not process any data during init phase as messages received will not be available during Exec phase
+
+    assert(schemaMin.isDefined, "For JmsDataObject, a schemaMin needs to be defined as we are not allowed to get messages during init phase and therefore can not guess the schema.")
+
     val df = context.phase match {
-      case ExecutionPhase.Init => session.emptyDataFrame
-      case _ => receiver.receiveMessages().getOrElse(session.emptyDataFrame)
+      case ExecutionPhase.Init => {
+        session.createDataFrame(session.sparkContext.emptyRDD[Row],schemaMin.get)
+      }
+      case _ => {
+        receiver.receiveMessages().getOrElse(session.emptyDataFrame)
+      }
     }
     validateSchemaMin(df, "read")
     df
