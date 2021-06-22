@@ -63,7 +63,7 @@ case class JmsDataObject(override val id: DataObjectId,
   require(supportedAuths.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
   val basicAuthMode = authMode.asInstanceOf[BasicAuthMode]
 
-  if(schemaMin.isDefined) logger.warn("SchemaMin ignored, for JmsDataObject is always fixed to msg:string")
+  if(schemaMin.isDefined) logger.warn("SchemaMin ignored, for JmsDataObject is always fixed to payload:string")
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
     val consumerFactory = new JmsQueueConsumerFactory(jndiContextFactory, jndiProviderUrl, basicAuthMode.user, basicAuthMode.password, connectionFactory, queue)
@@ -71,7 +71,8 @@ case class JmsDataObject(override val id: DataObjectId,
       TextMessageHandler.convert2Text, batchSize, Duration(maxWaitSec, TimeUnit.SECONDS),
       Duration(maxBatchAgeSec, TimeUnit.SECONDS), txBatchSize, session)
 
-    val schemaFixed: StructType = StructType(Array(StructField("msg",StringType, false)))
+    // Column name is derived from [[TextMessageString]]
+    val schemaFixed: StructType = StructType(Array(StructField("payload",StringType, false)))
 
     // Special case JMS:
     // Do not process any data during init phase as messages received will not be available during Exec phase
