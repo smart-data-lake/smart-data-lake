@@ -31,7 +31,7 @@ import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{ResultRuntimeInfo, RuntimeEventState, RuntimeInfo}
 import org.apache.spark.sql.DataFrame
 
-import java.time.LocalDateTime
+import java.time.{Duration, LocalDateTime}
 import java.time.format.DateTimeFormatter
 import java.{util => ju}
 import scala.collection.compat.Factory
@@ -59,6 +59,7 @@ private[smartdatalake] object ActionDAGRunState {
   implicit val localDateTimeStringConverter: StringConverter[LocalDateTime] = StringConverter.fromTry(
     LocalDateTime.parse(_, localDateTimeFormatter), localDateTimeFormatter.format
   )
+  implicit val durationStringConverter: StringConverter[Duration] = StringConverter.fromTry(Duration.parse, _.toString)
 
   // json readers
   implicit val mapStringAnyReader: ConfigReader[Map[String,Any]] = {
@@ -76,6 +77,7 @@ private[smartdatalake] object ActionDAGRunState {
   // DataFrames are not stored to Json -> always read none
   implicit val dataFrameReader: ConfigReader[Option[DataFrame]] = ConfigReader.successful(None)
   implicit val seqResultRuntimeInfoReader: ConfigReader[Seq[ResultRuntimeInfo]] = getSeqReader[ResultRuntimeInfo]
+  implicit val durationReader: ConfigReader[Duration] = ConfigReader.fromStringConfigReader
 
   // json writers
   implicit val mapStringAnyConfigWriter: ConfigWriter[Map[String,Any]] = {
@@ -86,6 +88,7 @@ private[smartdatalake] object ActionDAGRunState {
   // DataFrames are not stored to Json -> always write none
   implicit val dataFrameWriter: ConfigWriter[Option[DataFrame]] = ConfigWriter.from(_ => ConfigValue.Null)
   implicit val seqResultRuntimeInfoWriter: ConfigWriter[Seq[ResultRuntimeInfo]] = getSeqWriter[ResultRuntimeInfo]
+  implicit val durationWriter: ConfigWriter[Duration] = ConfigWriter.stringConfigWriter.contramap(durationStringConverter.toString)
 
   // write state to Json
   def toJson(actionDAGRunState: ActionDAGRunState): String = {
