@@ -22,6 +22,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
 import io.smartdatalake.workflow.ActionPipelineContext
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 
 private[smartdatalake] trait FileRefDataObject extends FileDataObject {
@@ -108,7 +109,7 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
    * Extract partition values from a given file path
    */
   protected def extractPartitionValuesFromPath(filePath: String): PartitionValues = {
-    PartitionLayout.extractPartitionValues(partitionLayout().get, fileName, filePath.stripPrefix(path + separator))
+    PartitionLayout.extractPartitionValues(partitionLayout().get, fileName, relativizePath(filePath))
   }
 
   /**

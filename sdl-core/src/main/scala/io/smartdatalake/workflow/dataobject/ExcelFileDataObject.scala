@@ -19,8 +19,9 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
+import configs.ConfigReader
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigImplicits, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
@@ -58,7 +59,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  */
 case class ExcelFileDataObject(override val id: DataObjectId,
                                override val path: String,
-                               excelOptions: ExcelOptions,
+                               excelOptions: ExcelOptions = ExcelOptions(),
                                override val partitions: Seq[String] = Seq(),
                                override val schema: Option[StructType] = None,
                                override val schemaMin: Option[StructType] = None,
@@ -127,6 +128,14 @@ object ExcelFileDataObject extends FromConfigFactory[DataObject] {
 }
 
 /**
+ * This is a workaround needed with Scala 2.11 because configs doesn't read default values correctly in a scope with many macros.
+ * If we let scala process the macro in a smaller scope, default values are handled correctly.
+ */
+object ExcelOptions extends ConfigImplicits {
+  implicit val excelOptionsReader: ConfigReader[ExcelOptions] = ConfigReader.derive[ExcelOptions]
+}
+
+/**
  * Options passed to [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]] for
  * reading and writing Microsoft Excel files. Excel support is provided by the spark-excel project (see link below).
  *
@@ -178,7 +187,6 @@ case class ExcelOptions(
       Some( xSheet.getOrElse("") + xStartArea.getOrElse("") + xEndArea.getOrElse(""))
     } else None
   }
-
 
   def toMap(schema: Option[StructType]): Map[String, Option[Any]] = Map(
       "dataAddress" -> getDataAddress,

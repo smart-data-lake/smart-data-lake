@@ -241,7 +241,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // exec dag
     val sdlb = new DefaultSmartDataLakeBuilder
     val appConfig = SmartDataLakeBuilderConfig(feedSel=feed)
-    sdlb.exec(appConfig, 1, 1, LocalDateTime.now(), LocalDateTime.now(), Seq(), Seq(), None, Seq(), simulation = false)
+    sdlb.exec(appConfig, 1, 1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), None, Seq(), simulation = false)
 
     val r1 = tgtBDO.getDataFrame()
       .select($"rating")
@@ -986,7 +986,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkIncrementalMode(compareCol = "tstmp", stopIfNoData = false)))
     val action2 = CustomSparkAction("b", Seq(tgt1DO.id,src2DO.id), Seq(tgt2DO.id)
-      , CustomDfsTransformerConfig.apply(sqlCode = Map(tgt2DO.id -> "select * from src2 join tgt1 using (lastname, firstname)")))
+      , CustomDfsTransformerConfig.apply(sqlCode = Some(Map(tgt2DO.id -> "select * from src2 join tgt1 using (lastname, firstname)"))))
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1,action2), 1, 1)
 
     // first dag run, first file processed
@@ -1042,7 +1042,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val df2 = Seq(("doe","john","waikiki beach")).toDF("lastname", "firstname", "address")
     src2DO.writeDataFrame(df2, Seq())
 
-    val transformation = CustomDfsTransformerConfig.apply(sqlCode = Map(tgt2DO.id -> "select * from src2 join tgt1 using (lastname, firstname)"))
+    val transformation = CustomDfsTransformerConfig.apply(sqlCode = Some(Map(tgt2DO.id -> "select * from src2 join tgt1 using (lastname, firstname)")))
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkIncrementalMode(compareCol = "tstmp", stopIfNoData = true)))
     val action2 = CustomSparkAction("b", Seq(tgt1DO.id,src2DO.id), Seq(tgt2DO.id), transformation, executionCondition = Some(Condition("true")))
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1,action2), 1, 1)
@@ -1097,7 +1097,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val df2 = Seq(("doe","john","waikiki beach")).toDF("lastname", "firstname", "address")
     src2DO.writeDataFrame(df2, Seq())
 
-    val transformation = CustomDfsTransformerConfig.apply(sqlCode = Map(tgt2DO.id -> "select * from src2 join tgt1 using (lastname, firstname)"))
+    val transformation = CustomDfsTransformerConfig.apply(sqlCode = Some(Map(tgt2DO.id -> "select * from src2 join tgt1 using (lastname, firstname)")))
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkIncrementalMode(compareCol = "tstmp", stopIfNoData = true)))
     val action2 = CustomSparkAction("b", Seq(tgt1DO.id,src2DO.id), Seq(tgt2DO.id), transformation, executionCondition = Some(Condition("true")), executionMode = Some(ProcessAllMode()))
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1,action2), 1, 1)
