@@ -140,7 +140,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
       // default behaviour: if no executionCondition is defined, Action is executed if no input subFeed is skipped.
       val skippedSubFeeds = subFeeds.filter(_.isSkipped)
       if (skippedSubFeeds.nonEmpty) {
-        val msg = s"""($id) execution skipped because input subFeeds are skipped: ${subFeeds.map(_.dataObjectId)}"""
+        val msg = s"""($id) execution skipped because input subFeeds are skipped: ${subFeeds.map(_.dataObjectId).mkString(", ")}"""
         (false, Some(msg))
       } else (true, None)
     }
@@ -288,7 +288,9 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
       val startEvent = runtimeEvents.reverse.find( event => event.state == RuntimeEventState.STARTED && event.phase == lastEvent.phase )
       val duration = startEvent.map( start => Duration.between(start.tstmp, lastEvent.tstmp))
       val mainMetrics = getAllLatestMetrics.map{ case (id, metrics) => (id, metrics.map(_.getMainInfos).getOrElse(Map()))}
-      val results = lastResults.toSeq.flatMap(_.map( subFeed => ResultRuntimeInfo(subFeed, mainMetrics(subFeed.dataObjectId))))
+      val outputSubFeeds = if (lastEvent.state != RuntimeEventState.SKIPPED) lastResults.toSeq.flatten
+      else outputs.map(output => InitSubFeed(output.id, partitionValues = Seq(), isSkipped = true)) // fake results for skipped actions for state information
+      val results = outputSubFeeds.map(subFeed => ResultRuntimeInfo(subFeed, mainMetrics(subFeed.dataObjectId)))
       Some(RuntimeInfo(lastEvent.state, startTstmp = startEvent.map(_.tstmp), duration = duration, msg = lastEvent.msg, results = results))
     } else None
   }

@@ -287,7 +287,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     val actionIdsSkipped = actionIdsSelected.filter( id => actionIdsToSkip.contains(id))
     val actionsToExec = actionsSelected.filterNot( action => actionIdsToSkip.contains(action.id))
     require(actionsToExec.nonEmpty, s"No actions to execute. All selected actions are skipped (${actionIdsSkipped.mkString(", ")})")
-    logger.info(s"actions to execute ${actionsToExec.map(_.id).mkString(", ")}" + (if (actionIdsSkipped.nonEmpty) s", actions skipped ${actionIdsSkipped.mkString(", ")}" else ""))
+    logger.info(s"actions to execute ${actionsToExec.map(_.id).mkString(", ")}" + (if (actionIdsSkipped.nonEmpty) s"; actions skipped ${actionIdsSkipped.mkString(", ")}" else ""))
 
     // create and execute DAG
     logger.info(s"starting application ${appConfig.appName} runId=$runId attemptId=$attemptId")
