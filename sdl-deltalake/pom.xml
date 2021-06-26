@@ -67,6 +67,15 @@
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-catalyst_${scala.minor.version}</artifactId>
 		</dependency>
+		<!--
+		 	prevent hitting missing dependency exception
+		 	see https://stackoverflow.com/questions/42327777/spark-sql-errors
+		 -->
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-tags_${scala.minor.version}</artifactId>
+			<scope>compile</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-sql-kafka-0-10_${scala.minor.version}</artifactId>
