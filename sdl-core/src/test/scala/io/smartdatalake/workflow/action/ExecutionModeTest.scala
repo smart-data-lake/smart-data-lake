@@ -71,7 +71,6 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
   instanceRegistry.register(fileSrcDO)
 
   val fileEmptyDO = CsvFileDataObject("fileEmptyDO", tempPath+s"/fileTestEmpty", partitions=Seq("lastname"))
-  fileEmptyDO.prepare
   instanceRegistry.register(fileEmptyDO)
 
   test("PartitionDiffMode default") {

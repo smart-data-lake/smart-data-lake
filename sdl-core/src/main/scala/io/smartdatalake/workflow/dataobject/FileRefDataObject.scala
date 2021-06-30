@@ -55,7 +55,7 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
    * This is for instance needed if pathPrefix is defined in a connection.
    * @return
    */
-  def getPath: String = path
+  def getPath(implicit session: SparkSession): String = path
 
   /**
    * List files for given partition values

@@ -92,16 +92,16 @@ case class HiveTableDataObject(override val id: DataObjectId,
   assert(saveMode!=SDLSaveMode.OverwritePreserveDirectories, s"($id) saveMode OverwritePreserveDirectories not supported for now.")
 
   // prepare final path
-  @transient private var hadoopPathHolder: Option[Path] = None
+  @transient private var hadoopPathHolder: Path = _
   def hadoopPath(implicit session: SparkSession): Path = {
     val thisIsTableExisting = isTableExisting
     require(thisIsTableExisting || path.isDefined, s"HiveTable ${table.fullName} does not exist, so path must be set.")
 
-    if (hadoopPathHolder.isEmpty) {
-      hadoopPathHolder = Some({
+    if (hadoopPathHolder == null) {
+      hadoopPathHolder = {
         if (thisIsTableExisting) new Path(HiveUtil.existingTableLocation(table))
         else HdfsUtil.prefixHadoopPath(path.get, connection.map(_.pathPrefix))
-      })
+      }
 
       // For existing tables, check to see if we write to the same directory. If not, issue a warning.
       if(thisIsTableExisting && path.isDefined) {
@@ -113,7 +113,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
           logger.warn(s"Table ${table.fullName} exists already with different path. The table will be written with new path definition ${hadoopPathHolder}!")
       }
     }
-    hadoopPathHolder.get
+    hadoopPathHolder
   }
 
   override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {

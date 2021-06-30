@@ -77,16 +77,15 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   def failIfFilesMissing: Boolean = false
 
   // these variables are not serializable
-  @transient private var hadoopPathHolder: Option[Path] = None
-
+  @transient private var hadoopPathHolder: Path = _
   def hadoopPath(implicit session: SparkSession): Path = {
-    if (hadoopPathHolder.isEmpty) {
-      hadoopPathHolder = Some(HdfsUtil.prefixHadoopPath(path, connection.map(_.pathPrefix)))
+    if (hadoopPathHolder == null) { // avoid null-pointer on executors...
+      hadoopPathHolder = HdfsUtil.prefixHadoopPath(path, connection.map(_.pathPrefix))
     }
-    hadoopPathHolder.get
+    hadoopPathHolder
   }
 
-  override def getPath: String = hadoopPathHolder.map(_.toUri.toString).getOrElse(throw new RuntimeException("hadoopPath not yet initialized"))
+  override def getPath(implicit session: SparkSession): String = hadoopPath.toUri.toString
 
   /**
    * Check if the input files exist.
