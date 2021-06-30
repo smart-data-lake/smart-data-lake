@@ -148,7 +148,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
 
     // Parse HDFS partitionname into Map
     def parseHDFSPartitionString(partitions:String) : Map[String,String] = try {
-      partitions.split(Environment.defaultPathSeparator).map(_.split("=")).map( e => (e(0), e(1))).toMap
+      partitions.split(Path.SEPARATOR_CHAR).map(_.split("=")).map( e => (e(0), e(1))).toMap
     } catch {
       case ex : Throwable =>
         println(s"partition doesnt follow structure (<key1>=<value1>[/<key2>=<value2>]...): $partitions")
@@ -537,7 +537,8 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     //|Location                    |hdfs://nameservice1/user/... |       |
     //+----------------------------+-----------------------------+-------+
     //
-    val location22 = Try(extendedDescribe.where(col("col_name") === "Location" && col("data_type").contains(Environment.defaultPathSeparator)).select("data_type").first.getString(0)).toOption
+    val location22 = Try(extendedDescribe.where(col("col_name") === "Location" && col("data_type")
+      .contains(Path.SEPARATOR_CHAR)).select("data_type").first.getString(0)).toOption
 
     // Spark 2.1: Location must be parsed from row with col_name == "Detailed Table Information"
     val tableDetails = extendedDescribe.where("col_name like '%Detailed Table Information%'").select("*").first()
@@ -602,7 +603,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
   def normalizePath(path: String) : String = {
     // TODO: we should convert to Hadoop Path() and back to String for normalizing
     path
-      .replaceAll("\\\\", Environment.defaultPathSeparator.toString)
+      .replaceAll("\\\\", Path.SEPARATOR)
       .replaceAll("file:/", "")
       .replaceAll("/+$", "")
       .replaceAll("tock$", "tick")
@@ -610,12 +611,11 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
 
   def listPartitions(table: Table, partitions: Seq[String])(implicit session: SparkSession): Seq[PartitionValues] = {
     import session.implicits._
-    val separator = Environment.defaultPathSeparator
     if (partitions.nonEmpty) {
-      val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitions, separator)
+      val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitions)
       // list directories and extract partition values
       session.sql(s"show partitions ${table.fullName}").as[String].collect.toSeq
-        .map( path => PartitionLayout.extractPartitionValues(partitionLayout, "", path + separator))
+        .map( path => PartitionLayout.extractPartitionValues(partitionLayout, "", path + Path.SEPARATOR))
     } else Seq()
   }
 
@@ -625,7 +625,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
   }
 
   def dropPartition(table: Table, tablePath: Path, partition: PartitionValues, filesystem: FileSystem)(implicit session: SparkSession): Unit = {
-    val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partition.keys.toSeq, Environment.defaultPathSeparator)
+    val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partition.keys.toSeq)
     val partitionPath = new Path(tablePath, partition.getPartitionString(partitionLayout))
     val partitionDef = partition.elements.map{ case (k,v) => s"$k='$v'"}.mkString(", ")
     execSqlStmt(s"ALTER TABLE ${table.fullName} DROP IF EXISTS PARTITION ($partitionDef)")
@@ -633,7 +633,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
   }
 
   def movePartition(table: Table, tablePath: Path, existingPartition: PartitionValues, newPartition: PartitionValues, filenameWithGlobs: String, filesystem: FileSystem)(implicit session: SparkSession): Unit = {
-    val partitionLayout = HdfsUtil.getHadoopPartitionLayout(existingPartition.keys.toSeq, Environment.defaultPathSeparator)
+    val partitionLayout = HdfsUtil.getHadoopPartitionLayout(existingPartition.keys.toSeq)
     val existingPartitionPath = new Path(tablePath, existingPartition.getPartitionString(partitionLayout))
     val existingPartitionPathWithFilenameGlobs = new Path(existingPartitionPath, filenameWithGlobs)
     val newPartitionPath = new Path(tablePath, newPartition.getPartitionString(partitionLayout))

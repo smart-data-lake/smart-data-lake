@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.workflow.ActionPipelineContext
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 
 private[smartdatalake] trait FileDataObject extends DataObject with CanHandlePartitions {
@@ -32,7 +33,7 @@ private[smartdatalake] trait FileDataObject extends DataObject with CanHandlePar
   /**
     * default separator for paths
     */
-  protected val separator = Environment.defaultPathSeparator
+  protected val separator = Path.SEPARATOR_CHAR // default is to use hadoop separator. DataObjects can override this if not suitable.
 
   override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.prepare

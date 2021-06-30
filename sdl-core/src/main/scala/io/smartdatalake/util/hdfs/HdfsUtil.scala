@@ -218,7 +218,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   def prefixHadoopPath(path: String, prefix: Option[String]): Path = {
     val hadoopPath = new Path(path)
     if (hadoopPath.isAbsoluteAndSchemeAuthorityNull || !hadoopPath.isAbsolute) {
-      val hadoopPathPrefixed = prefix.map( p => new Path(p + HdfsUtil.addLeadingSeparator(path, Environment.defaultPathSeparator)))
+      val hadoopPathPrefixed = prefix.map( p => new Path(p + HdfsUtil.addLeadingSeparator(path)))
         .getOrElse(hadoopPath)
       HdfsUtil.addHadoopDefaultSchemaAuthority( hadoopPathPrefixed )
     }
@@ -251,13 +251,12 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
     path.getFileSystem(hadoopConf)
   }
 
-  def addLeadingSeparator(path: String, separator: Char): String = {
-    if (path.startsWith(separator.toString)) path else separator + path
+  def addLeadingSeparator(path: String): String = {
+    if (path.startsWith(Path.SEPARATOR)) path else Path.SEPARATOR + path
   }
 
-  //TODO: remove seperator, always use default
-  def getHadoopPartitionLayout(partitionCols: Seq[String], separator: Char = Path.SEPARATOR_CHAR): String = {
-    partitionCols.map(col => s"$col=%$col%$separator").mkString
+  def getHadoopPartitionLayout(partitionCols: Seq[String]): String = {
+    partitionCols.map(col => s"$col=%$col%${Path.SEPARATOR_CHAR}").mkString
   }
 
   def readHadoopFile( file: String ): String = {
@@ -268,7 +267,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   }
 
   def movePartition(basePath: Path, existingPartition: PartitionValues, newPartition: PartitionValues, filenameWithGlobs: String, filesystem: FileSystem)(implicit session: SparkSession): Unit = {
-    val partitionLayout = getHadoopPartitionLayout(existingPartition.keys.toSeq, Environment.defaultPathSeparator)
+    val partitionLayout = getHadoopPartitionLayout(existingPartition.keys.toSeq)
     val existingPartitionPath = new Path(basePath, existingPartition.getPartitionString(partitionLayout))
     val existingPartitionPathWithFilenameGlobs = new Path(existingPartitionPath, filenameWithGlobs)
     val newPartitionPath = new Path(basePath, newPartition.getPartitionString(partitionLayout))
