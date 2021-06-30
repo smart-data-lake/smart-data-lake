@@ -43,5 +43,5 @@ private[smartdatalake] trait FileDataObject extends DataObject with CanHandlePar
   /**
    * Make a given path relative to this DataObjects base path
    */
-  def relativizePath(filePath: String): String
+  def relativizePath(filePath: String)(implicit session: SparkSession): String
 }

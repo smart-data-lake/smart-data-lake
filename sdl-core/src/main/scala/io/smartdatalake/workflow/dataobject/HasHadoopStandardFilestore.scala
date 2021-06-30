@@ -24,7 +24,7 @@ import io.smartdatalake.util.misc.SerializableHadoopConfiguration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
 
-trait HasHadoopStandardFilestore extends CanHandlePartitions {
+trait HasHadoopStandardFilestore extends CanHandlePartitions { this: DataObject =>
 
   /**
    * Create a hadoop [[FileSystem]] API handle for the provided [[SparkSession]].

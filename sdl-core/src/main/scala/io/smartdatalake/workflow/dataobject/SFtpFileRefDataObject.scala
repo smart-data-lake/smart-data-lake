@@ -137,7 +137,7 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
     }.getOrElse(Seq())
   }
 
-  override def relativizePath(filePath: String): String = {
+  override def relativizePath(filePath: String)(implicit session: SparkSession): String = {
     filePath.stripPrefix(path+separator)
   }
 
