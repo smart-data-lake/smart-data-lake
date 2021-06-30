@@ -71,7 +71,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override val expectedPartitionsCondition: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject with CanHandlePartitions {
+  extends TransactionalSparkTableDataObject with CanHandlePartitions with HasHadoopStandardFilestore {
 
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
@@ -79,14 +79,14 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   private val connection = connectionId.map(c => getConnection[HiveTableConnection](c))
 
   // prepare final path and table
-  @transient private[workflow] lazy val hadoopPath = HdfsUtil.prefixHadoopPath(path, connection.map(_.pathPrefix))
-  @transient private var filesystemHolder: FileSystem = _
-  def filesystem(implicit session: SparkSession): FileSystem = {
-    if (filesystemHolder == null) {
-      filesystemHolder = HdfsUtil.getHadoopFsFromSpark(hadoopPath)
+  @transient private var hadoopPathHolder: Option[Path] = None
+  def hadoopPath(implicit session: SparkSession): Path = {
+    if (hadoopPathHolder.isEmpty) {
+      hadoopPathHolder = Some(HdfsUtil.prefixHadoopPath(path, connection.map(_.pathPrefix)))
     }
-    filesystemHolder
+    hadoopPathHolder.get
   }
+
   table = table.overrideDb(connection.map(_.db))
   if (table.db.isEmpty) {
     throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
@@ -204,20 +204,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     files.nonEmpty
   }
 
-  protected val separator: Char = Environment.defaultPathSeparator
-
-  /**
-   * Return a [[String]] specifying the partition layout.
-   *
-   * For Hadoop the default partition layout is colname1=<value1>/colname2=<value2>/.../
-   */
-  final def partitionLayout(): Option[String] = {
-    if (partitions.nonEmpty) {
-      Some(HdfsUtil.getHadoopPartitionLayout(partitions, separator))
-    } else {
-      None
-    }
-  }
+  protected val separator: Char = Path.SEPARATOR_CHAR
 
   /**
    * List partitions on data object's root path

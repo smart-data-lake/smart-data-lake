@@ -18,8 +18,7 @@
  */
 package io.smartdatalake.app
 
-import java.net.{URL, URLClassLoader}
-
+import java.net.{URI, URL, URLClassLoader}
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -88,7 +87,7 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
       val urlsAcc: Map[String, URL] = acc++
         // add urls on this level to accumulator
         clazz.asInstanceOf[URLClassLoader].getURLs
-        .map( url => (url.getFile.split(Environment.defaultPathSeparator).last, url))
+        .map( url => (url.getFile.split('/').last, url))
         .filter{ case (name, url) => jars.contains(name)}
         .toMap
 
