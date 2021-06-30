@@ -181,7 +181,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     }.getOrElse(Seq())
   }
 
-  override def relativizePath(path: String): String = {
+  override def relativizePath(path: String)(implicit session: SparkSession): String = {
     val normalizedPath = new Path(path).toString
     val pathPrefix = (".*"+hadoopPath.toString).r // ignore any absolute path prefix up and including hadoop path
     pathPrefix.replaceFirstIn(normalizedPath, "").stripPrefix(Path.SEPARATOR)
@@ -218,6 +218,11 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
           FileRef(f.getPath.toString, f.getPath.getName, pVs)
         }
     }
+  }
+
+  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.prepare
+    hadoopPath // initialize hadoopPath
   }
 
   override def preWrite(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
