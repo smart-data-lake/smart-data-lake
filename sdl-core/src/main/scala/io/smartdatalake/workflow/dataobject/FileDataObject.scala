@@ -18,7 +18,6 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.definitions.Environment
 import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
@@ -28,7 +27,7 @@ private[smartdatalake] trait FileDataObject extends DataObject with CanHandlePar
   /**
    * The root path of the files that are handled by this DataObject.
    */
-  def path: String
+  protected def path: String
 
   /**
     * default separator for paths

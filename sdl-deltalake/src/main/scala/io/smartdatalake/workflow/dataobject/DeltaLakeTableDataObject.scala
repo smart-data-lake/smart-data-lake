@@ -79,12 +79,12 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   private val connection = connectionId.map(c => getConnection[HiveTableConnection](c))
 
   // prepare final path and table
-  @transient private var hadoopPathHolder: Option[Path] = None
+  @transient private var hadoopPathHolder: Path = _
   def hadoopPath(implicit session: SparkSession): Path = {
-    if (hadoopPathHolder.isEmpty) {
-      hadoopPathHolder = Some(HdfsUtil.prefixHadoopPath(path, connection.map(_.pathPrefix)))
+    if (hadoopPathHolder == null) { // avoid null-pointer on executors...
+      hadoopPathHolder = HdfsUtil.prefixHadoopPath(path, connection.map(_.pathPrefix))
     }
-    hadoopPathHolder.get
+    hadoopPathHolder
   }
 
   table = table.overrideDb(connection.map(_.db))
