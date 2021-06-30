@@ -20,19 +20,18 @@
 package io.smartdatalake.app
 
 import java.nio.file.Files
-
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.{Environment, PartitionDiffMode}
+import io.smartdatalake.definitions.{Condition, Environment, PartitionDiffMode}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.EnvironmentUtil
-import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, CustomDfTransformerConfig, SparkUDFCreator}
-import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction, DeduplicateAction, RuntimeEventState}
+import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, CustomDfTransformerConfig, CustomDfsTransformerConfig, SparkUDFCreator}
+import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction, CustomSparkAction, DeduplicateAction, RuntimeEventState}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore, SparkSubFeed, TaskFailedException}
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.functions.{col, udf}
+import org.apache.spark.sql.functions.{col, lit, udf}
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -57,7 +56,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
   test("sdlb run with 2 actions and positive top-level partition values filter, recovery after action 2 failed the first time") {
 
     // init sdlb
-    val appName = "sdlb-recovery"
+    val appName = "sdlb-recovery1"
     val feedName = "test"
 
     // configure SDLPlugin for testing
@@ -149,8 +148,8 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
-      val resultActionsState = runState.actionsState.mapValues(_.state)
-      val expectedActionsState = Map((action2success.id, RuntimeEventState.SUCCEEDED))
+      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.attemptId))
+      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SUCCEEDED,Some(1)), action2success.id -> (RuntimeEventState.SUCCEEDED, Some(2)))
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == selectedPartitions)
       if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
@@ -162,7 +161,202 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     System.clearProperty("sdl.pluginClassName")
   }
 
-  test("sdlb run with initialExecutionMode=PartitionDiffMode, increase runId on second run, state listener") {
+  test("sdlb run with skipped action and recovery after action 2 failed the first time") {
+
+    // init sdlb
+    val appName = "sdlb-recovery2"
+    val feedName = "test"
+
+    HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
+    val sdlb = new DefaultSmartDataLakeBuilder()
+    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+    implicit val actionPipelineContext : ActionPipelineContext = ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
+
+    // setup DataObjects
+    val srcTable = Table(Some("default"), "ap_input")
+    // source table has partitions columns dt and type
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), partitions = Seq("dt","type"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
+    instanceRegistry.register(srcDO)
+    val tgt1Table = Table(Some("default"), "ap_copy1", None, Some(Seq("lastname","firstname")))
+    // first table has partitions columns dt and type (same as source)
+    val tgt1DO = TickTockHiveTableDataObject( "tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), partitions = Seq("dt","type"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    tgt1DO.dropTable
+    instanceRegistry.register(tgt1DO)
+    val tgt2Table = Table(Some("default"), "ap_copy2", None, Some(Seq("lastname","firstname")))
+    // second table has partition columns dt only (reduced)
+    val tgt2DO = HiveTableDataObject( "tgt2", Some(tempPath+s"/${tgt2Table.fullName}"), partitions = Seq("dt"), table = tgt2Table, numInitialHdfsPartitions = 1)
+    tgt2DO.dropTable
+    instanceRegistry.register(tgt2DO)
+
+    // prepare data
+    val dfSrc = Seq(("20180101", "person", "doe","john",5), ("20190101", "company", "olmo","-",10))
+      .toDF("dt", "type", "lastname", "firstname", "rating")
+    srcDO.writeDataFrame(dfSrc, Seq())
+    tgt1DO.writeDataFrame(dfSrc) // create table because it's needed but first action is skipped
+
+    // start first dag run -> fail
+    // action1 skipped (executionMode.applyCondition = false)
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionCondition = Some(Condition("false", Some("always skip this action"))), metadata = Some(ActionMetadata(feed = Some(feedName))))
+    instanceRegistry.register(action1.copy())
+    val action2fail = CopyAction("b", tgt1DO.id, tgt2DO.id, executionCondition = Some(Condition("true", Some("always execute this action"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformer = Some(CustomDfTransformerConfig(className = Some(classOf[ExecFailTransformer].getName), runtimeOptions = Some(Map("phase"-> "executionPhase")))))
+    instanceRegistry.register(action2fail.copy())
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
+    intercept[TaskFailedException](sdlb.run(sdlConfig))
+
+    // check latest state
+    {
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
+      val stateFile = stateStore.getLatestState()
+      val runState = stateStore.recoverRunState(stateFile)
+      assert(runState.runId == 1)
+      assert(runState.attemptId == 1)
+      val resultActionsState = runState.actionsState.mapValues(_.state)
+      val expectedActionsState = Map((action1.id, RuntimeEventState.SKIPPED), (action2fail.id, RuntimeEventState.FAILED))
+      assert(resultActionsState == expectedActionsState)
+    }
+
+    // now fill tgt1 with both partitions
+    tgt1DO.writeDataFrame(dfSrc, Seq())
+
+    // reset DataObjects
+    instanceRegistry.clear()
+    instanceRegistry.register(srcDO)
+    instanceRegistry.register(tgt1DO)
+    instanceRegistry.register(tgt2DO)
+    instanceRegistry.register(action1.copy())
+
+    // start recovery dag run
+    val action2success = CopyAction("b", tgt1DO.id, tgt2DO.id, executionCondition = Some(Condition("true", Some("always execute this action"))),  metadata = Some(ActionMetadata(feed = Some(feedName))))
+    instanceRegistry.register(action2success.copy())
+    sdlb.run(sdlConfig)
+
+    // check latest state
+    {
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
+      val stateFile = stateStore.getLatestState()
+      val runState = stateStore.recoverRunState(stateFile)
+      assert(runState.runId == 1)
+      assert(runState.attemptId == 2)
+      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.attemptId))
+      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SKIPPED,Some(1)), action2success.id -> (RuntimeEventState.SUCCEEDED, Some(2)))
+      assert(resultActionsState == expectedActionsState)
+      if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
+    }
+
+  }
+
+  test("complex sdlb run with skipped action and recovery after action 2 failed the first time") {
+
+    // init sdlb
+    val appName = "sdlb-recovery3"
+    val feedName = "test"
+
+    HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
+    val sdlb = new DefaultSmartDataLakeBuilder()
+    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+    implicit val actionPipelineContext : ActionPipelineContext = ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
+
+    // setup DataObjects
+    val srcTable = Table(Some("default"), "ap_input")
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), partitions = Seq("dt"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
+    instanceRegistry.register(srcDO)
+    val tgt1Table = Table(Some("default"), "ap_copy1", None)
+    val tgt1DO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), partitions = Seq("dt"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    tgt1DO.dropTable
+    instanceRegistry.register(tgt1DO)
+    val tgt2Table = Table(Some("default"), "ap_copy2", None)
+    val tgt2DO = HiveTableDataObject( "tgt2", Some(tempPath+s"/${tgt2Table.fullName}"), partitions = Seq("dt"), table = tgt2Table, numInitialHdfsPartitions = 1)
+    tgt2DO.dropTable
+    instanceRegistry.register(tgt2DO)
+    val tgt3Table = Table(Some("default"), "ap_copy3", None)
+    val tgt3DO = HiveTableDataObject( "tgt3", Some(tempPath+s"/${tgt3Table.fullName}"), partitions = Seq("dt"), table = tgt3Table, numInitialHdfsPartitions = 1)
+    tgt3DO.dropTable
+    instanceRegistry.register(tgt3DO)
+    val tgt4Table = Table(Some("default"), "ap_copy4", None)
+    val tgt4DO = HiveTableDataObject( "tgt4", Some(tempPath+s"/${tgt4Table.fullName}"), partitions = Seq("dt"), table = tgt4Table, numInitialHdfsPartitions = 1)
+    tgt4DO.dropTable
+    instanceRegistry.register(tgt4DO)
+
+    // prepare data
+    val dfSrc = Seq(("20180101", "person", "doe","john",5), ("20190101", "company", "olmo","-",10))
+      .toDF("dt", "type", "lastname", "firstname", "rating")
+    srcDO.writeDataFrame(dfSrc, Seq())
+
+    // start first dag run -> fail
+    // action1 skipped (executionMode.applyCondition = false)
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionCondition = Some(Condition("false", Some("always skip this action"))), metadata = Some(ActionMetadata(feed = Some(feedName))))
+    instanceRegistry.register(action1.copy())
+    // action2 fails
+    val action2fail = CopyAction("b", srcDO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformer = Some(CustomDfTransformerConfig(className = Some(classOf[FailTransformer].getName))))
+    instanceRegistry.register(action2fail.copy())
+    // action3 is cancelled because action2 fails
+    val action3 = CopyAction("c", tgt2DO.id, tgt3DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
+    instanceRegistry.register(action3.copy())
+    // action4 is cancelled because action3 is cancelled (cancelled has higher prio than skipped from action1)
+    val action4 = CustomSparkAction("d", Seq(tgt1DO.id, tgt3DO.id), Seq(tgt4DO.id), metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformer = CustomDfsTransformerConfig(sqlCode = Some(Map(tgt4DO.id -> "select * from c"))))
+    instanceRegistry.register(action4.copy())
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
+    intercept[TaskFailedException](sdlb.run(sdlConfig))
+
+    // check latest state
+    {
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
+      val stateFile = stateStore.getLatestState()
+      val runState = stateStore.recoverRunState(stateFile)
+      assert(runState.runId == 1)
+      assert(runState.attemptId == 1)
+      val resultActionsState = runState.actionsState.mapValues(_.state)
+      val expectedActionsState = Map(
+        (action1.id, RuntimeEventState.SKIPPED),
+        (action2fail.id, RuntimeEventState.FAILED),
+        (action3.id, RuntimeEventState.CANCELLED),
+        (action4.id, RuntimeEventState.CANCELLED)
+      )
+      assert(resultActionsState == expectedActionsState)
+    }
+
+    // reset registry
+    instanceRegistry.clear()
+    instanceRegistry.register(srcDO)
+    instanceRegistry.register(tgt1DO)
+    instanceRegistry.register(tgt2DO)
+    instanceRegistry.register(tgt3DO)
+    instanceRegistry.register(tgt4DO)
+
+    instanceRegistry.register(action1.copy())
+    val action2success = CopyAction("b", srcDO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
+    instanceRegistry.register(action2success.copy())
+    instanceRegistry.register(action3.copy())
+    instanceRegistry.register(action4.copy())
+
+    // start recovery dag run
+    sdlb.run(sdlConfig)
+
+    // check latest state
+    {
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
+      val stateFile = stateStore.getLatestState()
+      val runState = stateStore.recoverRunState(stateFile)
+      assert(runState.runId == 1)
+      assert(runState.attemptId == 2)
+      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.attemptId))
+      val expectedActionsState = Map(
+        action1.id -> (RuntimeEventState.SKIPPED,Some(1)),
+        action2success.id -> (RuntimeEventState.SUCCEEDED, Some(2)),
+        action3.id -> (RuntimeEventState.SUCCEEDED, Some(2)),
+        action4.id -> (RuntimeEventState.SKIPPED, Some(2))
+      )
+      assert(resultActionsState == expectedActionsState)
+      if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
+    }
+  }
+
+  test("sdlb run with executionMode=PartitionDiffMode, increase runId on second run, state listener") {
 
     // init sdlb
     val appName = "sdlb-runId"
@@ -303,6 +497,13 @@ class FailTransformer extends CustomDfTransformer {
     val udfFail = udf((s: String) => {throw new IllegalStateException("aborted by FailTransformer"); s})
     // fail at spark runtime
     df.withColumn(firstStringColumn, udfFail(col(firstStringColumn)))
+  }
+}
+
+class ExecFailTransformer extends CustomDfTransformer {
+  def transform(session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String): DataFrame = {
+    if (options("phase")=="Exec") throw new IllegalStateException("aborted by FailTransformer")
+    else df
   }
 }
 

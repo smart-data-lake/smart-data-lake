@@ -20,14 +20,15 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.SchemaViolationException
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
  * A trait to be implemented by DataObjects which store partitioned data
  */
 @DeveloperApi
-trait CanHandlePartitions {
+trait CanHandlePartitions { this: DataObject =>
 
   /**
    * Definition of partition columns
@@ -92,5 +93,17 @@ trait CanHandlePartitions {
       val expectedHashCodes = partitionsValuesStringWithHashCode.toDF("elements","hashCode").where(expr(condition)).select($"hashCode").as[Int].collect.toSet
       partitionValues.filter( pv => expectedHashCodes.contains(pv.hashCode))
     }.getOrElse(partitionValues)
+  }
+
+  /**
+   * Validate the schema of a given Spark Data Frame `df` that it contains the specified partition columns
+   *
+   * @param df The data frame to validate.
+   * @param role role used in exception message. Set to read or write.
+   * @throws SchemaViolationException if the partitions columns are not included.
+   */
+  def validateSchemaHasPartitionCols(df: DataFrame, role: String): Unit = {
+    val missingCols = partitions.diff(df.columns)
+    if (missingCols.nonEmpty) throw new SchemaViolationException(s"($id) DataFrame is missing partition cols ${missingCols.mkString(", ")} on $role")
   }
 }

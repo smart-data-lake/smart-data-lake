@@ -33,17 +33,17 @@ import net.snowflake.spark.snowflake.Utils
  *
  * @param id        unique id of this connection
  * @param url       snowflake connection url
- * @param authMode  optional authentication information: for now BasicAuthMode is supported.
  * @param warehouse Snowflake namespace
- * @param db        Snowflake database
- * @param schema    Snowflake database
- * @param metadata
+ * @param database  Snowflake database
+ * @param role      Snowflake role
+ * @param authMode  optional authentication information: for now BasicAuthMode is supported.
+ * @param metadata  Connection metadata
  */
 case class SnowflakeTableConnection(override val id: ConnectionId,
                                     url: String,
                                     warehouse: String,
-                                    db: String,
-                                    schema: String,
+                                    database: String,
+                                    role: String,
                                     authMode: Option[AuthMode] = None,
                                     override val metadata: Option[ConnectionMetadata] = None
                                    ) extends Connection with SmartDataLakeLogger {
@@ -53,18 +53,19 @@ case class SnowflakeTableConnection(override val id: ConnectionId,
 
   def execSnowflakeStatement(sql: String, logging: Boolean = true): ResultSet = {
     if (logging) logger.info(s"($id) execSnowflakeStatement: $sql")
-    Utils.runQuery(getSnowflakeOptions, sql)
+    Utils.runQuery(getSnowflakeOptions(""), sql)
   }
 
-  def getSnowflakeOptions: Map[String, String] = {
+  def getSnowflakeOptions(schema: String): Map[String, String] = {
     if (authMode.isDefined) authMode.get match {
       case m: BasicAuthMode =>
         Map(
           "sfURL" -> url,
           "sfUser" -> m.user,
           "sfPassword" -> m.password,
-          "sfDatabase" -> schema,
-          "sfSchema" -> db,
+          "sfDatabase" -> database,
+          "sfRole" -> role,
+          "sfSchema" -> schema,
           "sfWarehouse" -> warehouse
         )
       case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Snowflake connection.")

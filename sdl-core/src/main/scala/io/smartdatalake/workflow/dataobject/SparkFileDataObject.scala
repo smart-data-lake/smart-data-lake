@@ -66,6 +66,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    */
   def beforeWrite(df: DataFrame)(implicit session: SparkSession): DataFrame = {
     validateSchemaMin(df, "write")
+    validateSchemaHasPartitionCols(df, "write")
     schema.foreach(schemaExpected => validateSchema(df, schemaExpected, "write"))
     df
   }
@@ -77,6 +78,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    */
   def afterRead(df: DataFrame)(implicit session: SparkSession): DataFrame = {
     validateSchemaMin(df, "read")
+    validateSchemaHasPartitionCols(df, "read")
     schema.map(createReadSchema).foreach(schemaExpected => validateSchema(df, schemaExpected, "read"))
     df
   }

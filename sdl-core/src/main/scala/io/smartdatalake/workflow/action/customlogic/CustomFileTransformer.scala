@@ -47,7 +47,7 @@ trait CustomFileTransformer extends Serializable {
  * @param scalaCode Optional scala code for transformation
  * @param options Options to pass to the transformation
  */
-case class CustomFileTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, options: Map[String,String] = Map()) {
+case class CustomFileTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, options: Option[Map[String,String]] = None) {
   require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined, "Either className or scalaFile must be defined for CustomDfTransformer")
 
   val impl : CustomFileTransformer = className.map {
@@ -67,7 +67,7 @@ case class CustomFileTransformerConfig( className: Option[String] = None, scalaF
   }.get
 
   def transform(input: FSDataInputStream, output: FSDataOutputStream): Option[Exception] = {
-    impl.transform(options, input, output)
+    impl.transform(options.getOrElse(Map()), input, output)
   }
 }
 

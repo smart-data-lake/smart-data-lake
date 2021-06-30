@@ -19,6 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import java.io.{InputStream, OutputStream}
+
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
@@ -131,9 +132,13 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
             val pattern = PartitionLayout.replaceTokens(partitionLayout, PartitionValues(Map()))
             // list directories and extract partition values
             SshUtil.sftpListFiles(path + separator + pattern)(sftp)
-              .map( f => PartitionLayout.extractPartitionValues(partitionLayout, "", f.stripPrefix(path+separator) + separator))
+              .map( f => PartitionLayout.extractPartitionValues(partitionLayout, "", relativizePath(f) + separator))
         }
     }.getOrElse(Seq())
+  }
+
+  override def relativizePath(filePath: String): String = {
+    filePath.stripPrefix(path+separator)
   }
 
   override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = try {

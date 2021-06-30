@@ -140,7 +140,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
       // default behaviour: if no executionCondition is defined, Action is executed if no input subFeed is skipped.
       val skippedSubFeeds = subFeeds.filter(_.isSkipped)
       if (skippedSubFeeds.nonEmpty) {
-        val msg = s"""($id) execution skipped because input subFeeds are skipped: ${subFeeds.map(_.dataObjectId)}"""
+        val msg = s"""($id) execution skipped because input subFeeds are skipped: ${subFeeds.map(_.dataObjectId).mkString(", ")}"""
         (false, Some(msg))
       } else (true, None)
     }
@@ -281,14 +281,16 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   /**
    * get latest runtime information for this action
    */
-  def getRuntimeInfo: Option[RuntimeInfo] = {
+  def getRuntimeInfo : Option[RuntimeInfo] = {
     if (runtimeEvents.nonEmpty) {
       val lastEvent = runtimeEvents.last
       val lastResults = runtimeEvents.reverseIterator.map(_.results).find(_.nonEmpty) // on failed actions we take the results from initialization to store what partition values have been tried to process
       val startEvent = runtimeEvents.reverse.find( event => event.state == RuntimeEventState.STARTED && event.phase == lastEvent.phase )
       val duration = startEvent.map( start => Duration.between(start.tstmp, lastEvent.tstmp))
       val mainMetrics = getAllLatestMetrics.map{ case (id, metrics) => (id, metrics.map(_.getMainInfos).getOrElse(Map()))}
-      val results = lastResults.toSeq.flatMap(_.map( subFeed => ResultRuntimeInfo(subFeed, mainMetrics(subFeed.dataObjectId))))
+      val outputSubFeeds = if (lastEvent.state != RuntimeEventState.SKIPPED) lastResults.toSeq.flatten
+      else outputs.map(output => InitSubFeed(output.id, partitionValues = Seq(), isSkipped = true)) // fake results for skipped actions for state information
+      val results = outputSubFeeds.map(subFeed => ResultRuntimeInfo(subFeed, mainMetrics(subFeed.dataObjectId)))
       Some(RuntimeInfo(lastEvent.state, startTstmp = startEvent.map(_.tstmp), duration = duration, msg = lastEvent.msg, results = results))
     } else None
   }
@@ -390,9 +392,13 @@ case class ActionMetadata(
 private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: ExecutionPhase, state: RuntimeEventState, msg: Option[String], results: Seq[SubFeed])
 private[smartdatalake] object RuntimeEventState extends Enumeration {
   type RuntimeEventState = Value
-  val STARTED, PREPARED, INITIALIZED, SUCCEEDED, FAILED, SKIPPED, PENDING = Value
+  val STARTED, PREPARED, INITIALIZED, SUCCEEDED, FAILED, CANCELLED, SKIPPED, PENDING = Value
 }
-private[smartdatalake] case class RuntimeInfo(state: RuntimeEventState, startTstmp: Option[LocalDateTime] = None, duration: Option[Duration] = None, msg: Option[String] = None, results: Seq[ResultRuntimeInfo] = Seq()) {
+private[smartdatalake] case class RuntimeInfo(state: RuntimeEventState, startTstmp: Option[LocalDateTime] = None, duration: Option[Duration] = None, msg: Option[String] = None, attemptId: Option[Int] = None, results: Seq[ResultRuntimeInfo] = Seq()) {
+  /**
+   * Completed Actions will be ignored in recovery
+   */
+  def hasCompleted(): Boolean = state==RuntimeEventState.SUCCEEDED || state==RuntimeEventState.SKIPPED
   override def toString: String = {
     duration.map(d => s"$state $d")
       .getOrElse(state.toString)

@@ -34,13 +34,13 @@ import org.apache.spark.sql.SparkSession
  * @param pythonCode Optional pythonCode to use for python UDF.
  * @param options Options are available in your python code as variable options.
  */
-case class PythonUDFCreatorConfig(pythonFile: Option[String] = None, pythonCode: Option[String] = None, options: Map[String,String] = Map()) {
+case class PythonUDFCreatorConfig(pythonFile: Option[String] = None, pythonCode: Option[String] = None, options: Option[Map[String,String]] = None) {
   require(pythonFile.isDefined || pythonCode.isDefined, "Either pythonFile or pythonCode must be defined for SparkUDFCreatorConfig")
 
   private val functionCode = pythonFile.map(HdfsUtil.readHadoopFile).orElse(pythonCode.map(_.stripMargin)).get
 
   private[smartdatalake] def registerUDF(functionName: String, session: SparkSession): Unit = {
-    val entryPoint = new PythonSparkEntryPoint(session, options)
+    val entryPoint = new PythonSparkEntryPoint(session, options.getOrElse(Map()))
     val registrationCode =
       s"""
          |session.udf.register("$functionName", $functionName)

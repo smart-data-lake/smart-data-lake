@@ -39,4 +39,9 @@ private[smartdatalake] trait FileDataObject extends DataObject with CanHandlePar
     super.prepare
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
   }
+
+  /**
+   * Make a given path relative to this DataObjects base path
+   */
+  def relativizePath(filePath: String): String
 }

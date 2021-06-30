@@ -32,7 +32,7 @@ import sun.reflect.generics.reflectiveObjects.NotImplementedException
  * A SubFeed transports references to data between Actions.
  * Data can be represented by different technologies like Files or DataFrame.
  */
-trait SubFeed extends DAGResult with SmartDataLakeLogger {
+sealed trait SubFeed extends DAGResult with SmartDataLakeLogger {
   def dataObjectId: DataObjectId
   def partitionValues: Seq[PartitionValues]
   def isDAGStart: Boolean
