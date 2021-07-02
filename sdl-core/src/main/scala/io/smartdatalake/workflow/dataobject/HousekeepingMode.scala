@@ -40,7 +40,7 @@ sealed trait HousekeepingMode {
  * {{{
  * housekeepingMode = {
  *   type = PartitionRetentionMode
- *   retentionCondition = "datediff(now(), to_date(elements('dt'), 'yyyyMMdd')) <= 90"
+ *   retentionCondition = "datediff(now(), to_date(elements['dt'], 'yyyyMMdd')) <= 90"
  * }
  * }}}
  * @param retentionCondition Condition to decide if a partition should be kept. Define a spark sql expression
@@ -70,15 +70,15 @@ case class PartitionRetentionMode(retentionCondition: String, description: Optio
 /**
  * Archive and compact old partitions:
  * Archive partition reduces the number of partitions in the past by moving older partitions into special "archive partitions".
- * Compact partition reduces the number of files in a partition by rewriting them with Spark (not yet implemented).
+ * Compact partition reduces the number of files in a partition by rewriting them with Spark.
  * Example: archive and compact a table with partition layout run_id=<integer>
  *  - archive partitions after 1000 partitions into "archive partition" equal to floor(run_id/1000)
  *  - compact "archive partition" when full
  * {{{
  * housekeepingMode = {
  *   type = PartitionArchiveCompactionMode
- *   archivePartitionExpression = "if( elements('run_id') < runId - 1000, map('run_id', elements('run_id') div 1000), elements)"
- *   compactPartitionExpression = "elements('run_id') % 1000 = 0 and elements('run_id') <= runId - 2000"
+ *   archivePartitionExpression = "if( elements['run_id'] < runId - 1000, map('run_id', elements['run_id'] div 1000), elements)"
+ *   compactPartitionExpression = "elements['run_id'] % 1000 = 0 and elements['run_id'] <= runId - 2000"
  * }
  * }}}
  * @param archivePartitionExpression Expression to define the archive partition for a given partition. Define a spark

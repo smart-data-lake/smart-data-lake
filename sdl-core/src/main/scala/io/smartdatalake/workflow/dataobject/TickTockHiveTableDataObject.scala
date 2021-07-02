@@ -46,8 +46,9 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
                                        numInitialHdfsPartitions: Int = 16,
                                        saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                        acl: Option[AclDef] = None,
-                                       override val expectedPartitionsCondition: Option[String] = None,
                                        connectionId: Option[ConnectionId] = None,
+                                       override val expectedPartitionsCondition: Option[String] = None,
+                                       override val housekeepingMode: Option[HousekeepingMode] = None,
                                        override val metadata: Option[DataObjectMetadata] = None)
                                       (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalSparkTableDataObject with CanHandlePartitions {
@@ -83,7 +84,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
         val definedPathNormalized = HiveUtil.normalizePath(path.get)
 
         if (definedPathNormalized != hadoopPathNormalized)
-          logger.warn(s"Table ${table.fullName} exists already with different path. The table will be written with new path definition ${hadoopPathHolder}!")
+          logger.warn(s"Table ${table.fullName} exists already with different path. The table will be written with new path definition $hadoopPathHolder!")
       }
     }
     hadoopPathHolder
