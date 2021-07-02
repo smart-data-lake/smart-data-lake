@@ -33,6 +33,7 @@ class HdfsUtilTest extends FunSuite {
     val filesystem = file.getFileSystem(new Configuration())
     HdfsUtil.touchFile(file, filesystem)
     val stat1 = filesystem.getFileStatus(file)
+    Thread.sleep(100)
     HdfsUtil.touchFile(file, filesystem)
     val stat2 = filesystem.getFileStatus(file)
     assert(stat1.getModificationTime != stat2.getModificationTime)
@@ -50,7 +51,7 @@ class HdfsUtilTest extends FunSuite {
     HdfsUtil.touchFile(new Path(tempPathSubdir,"test2"), filesystem)
     filesystem.rename(tempPathSubdir, path)
     assert(filesystem.listStatus(tempPath).isEmpty)
-    assert(filesystem.listStatus(path).map(_.getPath.getName).toSeq == Seq("temp", "test", "test1"))
+    assert(filesystem.listStatus(path).map(_.getPath.getName).toSeq.sorted == Seq("temp", "test", "test1"))
     assert(filesystem.listStatus(new Path(path, "test")).map(_.getPath.getName).toSeq == Seq("test2"))
   }
 
