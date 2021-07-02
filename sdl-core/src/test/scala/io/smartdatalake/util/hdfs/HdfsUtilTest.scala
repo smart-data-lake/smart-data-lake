@@ -33,7 +33,7 @@ class HdfsUtilTest extends FunSuite {
     val filesystem = file.getFileSystem(new Configuration())
     HdfsUtil.touchFile(file, filesystem)
     val stat1 = filesystem.getFileStatus(file)
-    Thread.sleep(100)
+    Thread.sleep(1000)
     HdfsUtil.touchFile(file, filesystem)
     val stat2 = filesystem.getFileStatus(file)
     assert(stat1.getModificationTime != stat2.getModificationTime)
