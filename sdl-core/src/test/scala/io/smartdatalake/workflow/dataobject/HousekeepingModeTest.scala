@@ -84,7 +84,7 @@ class HousekeepingModeTest extends FunSuite with BeforeAndAfter {
     val srcSubFeed = SparkSubFeed(None, "srcDO", Seq())
     val tgtSubFeed = SparkSubFeed(None, "tgtDO", Seq())
     action1.prepare
-    assert(tgtDO.listPartitions == Seq(PartitionValues(Map("dt" -> "20201101")), PartitionValues(Map("dt" -> "20201201"))))
+    assert(tgtDO.listPartitions.map(_.apply("dt").toString).sorted == Seq("20201101","20201201"))
     action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed)) // exec housekeeping
 
     // check partition dt=20201201 is archived and dt=20201101 is compacted
@@ -109,7 +109,7 @@ class HousekeepingModeTest extends FunSuite with BeforeAndAfter {
     val srcSubFeed = SparkSubFeed(None, "srcDO", Seq())
     val tgtSubFeed = SparkSubFeed(None, "tgtDO", Seq())
     action1.prepare
-    assert(tgtDO.listPartitions == Seq(PartitionValues(Map("dt" -> "20201101")), PartitionValues(Map("dt" -> "20201201"))))
+    assert(tgtDO.listPartitions.map(_.apply("dt").toString).sorted == Seq("20201101","20201201"))
     action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed)) // exec housekeeping
 
     // check partition dt=20201201 is archived and dt=20201101 is compacted
