@@ -385,6 +385,7 @@ case class ActionMetadata(
                            feed: Option[String] = None,
                            tags: Seq[String] = Seq()
                          )
+//TODO: restrict characters possible in name and feed (feed should not contain :;% because of regex feedSel)
 
 /**
  * A structure to collect runtime information
