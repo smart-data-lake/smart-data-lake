@@ -48,7 +48,7 @@ class PartitionLayoutTest extends FunSuite {
 
   test("extracting partition values according to hadoop partition layout") {
     val delimiter = PartitionLayout.delimiter
-    val testLayout = HdfsUtil.getHadoopPartitionLayout(Seq("a","b"), Environment.defaultPathSeparator)
+    val testLayout = HdfsUtil.getHadoopPartitionLayout(Seq("a","b"))
     val partitionString = "a=1/b=2/test.csv"
     val partitionValues = PartitionLayout.extractPartitionValues(testLayout, "*.csv", partitionString)
     assert(partitionValues == PartitionValues(Map("a" -> "1", "b" -> "2")))
@@ -56,7 +56,7 @@ class PartitionLayoutTest extends FunSuite {
 
   test("fail extracting partition values if partition string doesn't start with partition layout") {
     val delimiter = PartitionLayout.delimiter
-    val testLayout = HdfsUtil.getHadoopPartitionLayout(Seq("a","b"), Environment.defaultPathSeparator)
+    val testLayout = HdfsUtil.getHadoopPartitionLayout(Seq("a","b"))
     val partitionString = "test/a=1/b=2/test.csv"
     intercept[RuntimeException](PartitionLayout.extractPartitionValues(testLayout, "*.csv", partitionString))
   }
