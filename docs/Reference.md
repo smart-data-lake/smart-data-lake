@@ -348,7 +348,7 @@ Recipes for data pipelines with schema evolution:
 * HistorizeAction & DeduplicateAction supports schema evolution for incremental data. They consolidate the existing data & schema of the output DataObject with a potentially new schema of the input DataObject. Then they overwrite the whole output DataObject. They need a TransactionalSparkTableDataObject as output, which doesn't have a fixed schema, e.g. TickTockHiveTableDataObject.
 
 ## Housekeeping
-SmartDataLakeBuilder supports housekeeping for DataObjects by specifying the HousekeepingMode mode.
+SmartDataLakeBuilder supports housekeeping for DataObjects by specifying the HousekeepingMode.
 
 The following HousekeepingModes are currently implemented:
 * PartitionRetentionMode: Define partitions to keep by configuring a retentionCondition. 
