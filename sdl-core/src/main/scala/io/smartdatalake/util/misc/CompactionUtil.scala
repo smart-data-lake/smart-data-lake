@@ -37,12 +37,12 @@ object CompactionUtil extends SmartDataLakeLogger {
    *    Incomplete compactions are marked with a special file "_SDL_MOVING" in the temporary path.
    *    Incomplete compacted partitions must be moved from temporary path to hadoop path (see step 5)
    *    and marked as compacted (see step 6).
-   * 3. Filter already compacted partitions from given partitions by looking for "_SDL_COMPACTED" file, see step ...
+   * 3. Filter already compacted partitions from given partitions by looking for "_SDL_COMPACTED" file, see step 5
    * 4. Data from partitions to be compacted is rewritten into a temporary path under this data objects hadoop path.
    * 5. Partitions to be compacted are deleted from the hadoop path and moved from the temporary path to the hadoop path. This should be done one-by-one to reduce risk of data loss.
    *    To recover in case of unexpected abort between delete and move, a special file "_SDL_MOVING" is created in temporary path before deleting hadoop path.
    *    After moving the temporary path, this file is deleted again. Mark compacted partitions by creating a special file "_SDL_COMPACTED" and
-   * 6  Delete "_SDL_COMPACTING" file created in step 1.
+   * 6.  Delete "_SDL_COMPACTING" file created in step 1.
    * @param dataObject: DataObject with partition values to compact. The DataObject must be partitioned, able to read & write DataFrames and have a hadoop standard partition layout.
    * @param partitionValues: partition values to compact
    */

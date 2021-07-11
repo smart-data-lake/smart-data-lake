@@ -103,7 +103,7 @@ private[smartdatalake] object SparkExpressionUtil {
   }
 
   /**
-   * Evaluate an expression against a each entry of a list of case class instances
+   * Evaluate an expression against each entry of a list of case class instances
    * @param id id of the config object for meaningful exception text
    * @param configName optional configuration name for meaningful exception text
    * @param expression expression to be evaluated
