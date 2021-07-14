@@ -19,12 +19,12 @@
 package io.smartdatalake.workflow.action
 
 import java.nio.file.Files
-
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.PartitionDiffMode
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, CustomDfTransformerConfig}
+import io.smartdatalake.workflow.action.sparktransformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer, ScalaClassDfTransformer, ScalaCodeDfTransformer}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed, SparkSubFeed}
 import org.apache.spark.sql.functions.{lit, substring}
@@ -61,8 +61,8 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    val customTransformerConfig = CustomDfTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestDfTransformer"))
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformer = Some(customTransformerConfig))
+    val customTransformerConfig = ScalaClassDfTransformer(className = classOf[TestDfTransformer].getName)
+    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe")),PartitionValues(Map("lastname" -> "jonson"))))
@@ -88,7 +88,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
       // return as function
       transform _
     """
-    val customTransformerConfig = CustomDfTransformerConfig(scalaCode = Some(codeStr))
+    val customTransformerConfig = ScalaCodeDfTransformer(code = Some(codeStr))
 
     // setup DataObjects
     val feed = "copy"
@@ -102,7 +102,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformer = Some(customTransformerConfig))
+    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig))
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
@@ -129,8 +129,8 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    val customTransformerConfig = CustomDfTransformerConfig(sqlCode = Some("select * from copy_input where rating = 5"))
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformer = Some(customTransformerConfig))
+    val customTransformerConfig = SQLDfTransformer(code = "select * from copy_input where rating = 5")
+    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
@@ -239,8 +239,13 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    val customTransformerConfig = CustomDfTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestOptionsDfTransformer"), options = Some(Map("test" -> "test")), runtimeOptions = Some(Map("appName" -> "application")))
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformer = Some(customTransformerConfig), filterClause = Some("lastname='jonson'"), additionalColumns = Some(Map("run_id" -> "runId")))
+    val action1 = CopyAction("ca", srcDO.id, tgtDO.id,
+      transformers = Seq(
+        ScalaClassDfTransformer(className = classOf[TestOptionsDfTransformer].getName, options = Map("test" -> "test"), runtimeOptions = Map("appName" -> "application")),
+        FilterTransformer(filterClause = "lastname='jonson'"),
+        AdditionalColumnsTransformer(additionalColumns = Map("run_id" -> "runId"))
+      )
+    )
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
@@ -268,8 +273,8 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare, simulate
     val contextExec = contextInit.copy(phase = ExecutionPhase.Exec)
-    val customTransformerConfig = CustomDfTransformerConfig(className = Some(classOf[TestAggDfTransformer].getName))
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformer = Some(customTransformerConfig), executionMode = Some(PartitionDiffMode(applyPartitionValuesTransform=true)))
+    val customTransformerConfig = ScalaClassDfTransformer(className = classOf[TestAggDfTransformer].getName)
+    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig), executionMode = Some(PartitionDiffMode(applyPartitionValuesTransform=true)))
     val l1 = Seq(("20100101","jonson","rob",5),("20100103","doe","bob",3)).toDF("dt", "lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
@@ -316,7 +321,7 @@ class TestAggDfTransformer extends CustomDfTransformer {
     import session.implicits._
     df.withColumn("mt", substring($"dt",1,6))
   }
-  override def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Map[PartitionValues,PartitionValues] = {
-    partitionValues.map(pv => (pv,PartitionValues(Map("mt" -> pv("dt").toString.take(6))))).toMap
+  override def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Option[Map[PartitionValues,PartitionValues]] = {
+    Some(partitionValues.map(pv => (pv,PartitionValues(Map("mt" -> pv("dt").toString.take(6))))).toMap)
   }
 }

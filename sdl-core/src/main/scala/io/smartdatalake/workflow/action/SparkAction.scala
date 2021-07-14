@@ -19,22 +19,22 @@
 
 package io.smartdatalake.workflow.action
 
-import java.time.Duration
-
 import io.smartdatalake.definitions._
 import io.smartdatalake.metrics.NoMetricsFoundException
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.DataFrameUtil.{DfSDL, getEmptyDataFrame}
-import io.smartdatalake.util.misc.{DataFrameUtil, DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.util.misc.DataFrameUtil
+import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.streaming.DummyStreamProvider
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
-import io.smartdatalake.workflow.action.ActionHelper.{filterBlacklist, filterWhitelist}
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
+import io.smartdatalake.workflow.action.sparktransformer._
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
-import org.apache.spark.sql.functions.{col, lit}
+import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+
+import java.time.Duration
 
 private[smartdatalake] abstract class SparkAction extends Action {
 
@@ -177,74 +177,33 @@ private[smartdatalake] abstract class SparkAction extends Action {
   }
 
   /**
-   * Transform the DataFrame of a SubFeed
+   * apply transformer to partition values
    */
-  def subFeedDfTransformer(fnTransform: DataFrame => DataFrame)(subFeed: SparkSubFeed): SparkSubFeed = {
-    subFeed.copy(dataFrame = subFeed.dataFrame.map(fnTransform))
-  }
-
-  /**
-   * applies multiple transformations to a SubFeed
-   */
-  def multiTransformDataFrame(inputDf: DataFrame, transformers: Seq[DataFrame => DataFrame]): DataFrame = {
-    transformers.foldLeft(inputDf){
-      case (df, transform) => transform(df)
+  protected def applyTransformers(transformers: Seq[PartitionValueTransformer], partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+    transformers.foldLeft(PartitionValues.oneToOneMapping(partitionValues)){
+      case (partitionValuesMap, transformer) => transformer.applyTransformation(id, partitionValuesMap)
     }
   }
-
-  /**
-   * apply custom transformation
-   */
-  def applyCustomTransformation(transformer: CustomDfTransformerConfig, subFeed: SparkSubFeed)(df: DataFrame)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
-    transformer.transform(id, subFeed.partitionValues, df, subFeed.dataObjectId)
-  }
-
-  /**
-   * applies additionalColumns
-   */
-  def applyAdditionalColumns(additionalColumns: Map[String,String], partitionValues: Seq[PartitionValues])(df: DataFrame)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
-    val data = DefaultExpressionData.from(context, partitionValues)
-    additionalColumns.foldLeft(df){
-      case (df, (colName, expr)) =>
-        val value = SparkExpressionUtil.evaluate[DefaultExpressionData,Any](id, Some("additionalColumns"), expr, data)
-        df.withColumn(colName, lit(value.orNull))
-    }
-  }
-
-  /**
-   * applies filterClauseExpr
-   */
-  def applyFilter(filterClauseExpr: Column)(df: DataFrame): DataFrame = df.where(filterClauseExpr)
-
-  /**
-   * applies type casting decimal -> integral/float
-   */
-  def applyCastDecimal2IntegralFloat(df: DataFrame): DataFrame = df.castAllDecimal2IntegralFloat
 
   /**
    * applies all the transformations above
    */
-  def applyTransformations(inputSubFeed: SparkSubFeed,
-                           transformation: Option[CustomDfTransformerConfig],
-                           columnBlacklist: Option[Seq[String]],
-                           columnWhitelist: Option[Seq[String]],
-                           additionalColumns: Option[Map[String,String]],
-                           standardizeDatatypes: Boolean,
-                           additionalTransformers: Seq[(DataFrame => DataFrame)],
-                           filterClauseExpr: Option[Column] = None)
-                          (implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
-
-    val transformers = Seq(
-      transformation.map( t => applyCustomTransformation(t, inputSubFeed) _),
-      columnBlacklist.map(filterBlacklist),
-      columnWhitelist.map(filterWhitelist),
-      additionalColumns.map( m => applyAdditionalColumns(m, inputSubFeed.partitionValues) _),
-      filterClauseExpr.map(applyFilter),
-      (if (standardizeDatatypes) Some(applyCastDecimal2IntegralFloat _) else None) // currently we cast decimals away only but later we may add further type casts
+  def getTransformers(transformation: Option[CustomDfTransformerConfig],
+                      columnBlacklist: Option[Seq[String]],
+                      columnWhitelist: Option[Seq[String]],
+                      additionalColumns: Option[Map[String,String]],
+                      standardizeDatatypes: Boolean,
+                      additionalTransformers: Seq[DfTransformer],
+                      filterClauseExpr: Option[Column] = None)
+                     (implicit session: SparkSession, context: ActionPipelineContext): Seq[DfTransformer] = {
+    Seq(
+      transformation.map(t => t.impl),
+      columnBlacklist.map(l => BlacklistTransformer(columnBlacklist = l)),
+      columnWhitelist.map(l => WhitelistTransformer(columnWhitelist = l)),
+      additionalColumns.map(cs => AdditionalColumnsTransformer(additionalColumns = cs)),
+      filterClauseExpr.map(f => DfTransformerFunctionWrapper("filter", df => df.where(f))),
+      (if (standardizeDatatypes) Some(StandardizeDatatypesTransformer()) else None) // currently we cast decimals away only but later we may add further type casts
     ).flatten ++ additionalTransformers
-
-    // return
-    multiTransformDataFrame(inputSubFeed.dataFrame.get, transformers)
   }
 
   /**

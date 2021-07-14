@@ -20,7 +20,6 @@ package io.smartdatalake.workflow.action
 
 import java.sql.Timestamp
 import java.time.LocalDateTime
-
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
@@ -28,6 +27,7 @@ import io.smartdatalake.definitions.{Condition, ExecutionMode, TechnicalTableCol
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
+import io.smartdatalake.workflow.action.sparktransformer.{DfTransformer, DfTransformerFunctionWrapper, ParsableDfTransformer}
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject, TransactionalSparkTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
 import org.apache.spark.sql.expressions.UserDefinedFunction
@@ -44,6 +44,8 @@ import scala.util.{Failure, Success, Try}
  * @param inputId inputs DataObject
  * @param outputId output DataObject
  * @param transformer optional custom transformation to apply
+ * @param transformers optional list of transformations to apply before deduplication. See [[sparktransformer]] for a list of included Transformers.
+ *                     The transformations are applied according to the lists ordering.
  * @param columnBlacklist Remove all columns on blacklist from dataframe
  * @param columnWhitelist Keep only columns on whitelist in dataframe
  * @param additionalColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
@@ -60,11 +62,18 @@ import scala.util.{Failure, Success, Try}
 case class DeduplicateAction(override val id: ActionId,
                              inputId: DataObjectId,
                              outputId: DataObjectId,
+                             @deprecated("Use transformers instead.", "2.0.5")
                              transformer: Option[CustomDfTransformerConfig] = None,
+                             transformers: Seq[ParsableDfTransformer] = Seq(),
+                             @deprecated("Use transformers instead.", "2.0.5")
                              columnBlacklist: Option[Seq[String]] = None,
+                             @deprecated("Use transformers instead.", "2.0.5")
                              columnWhitelist: Option[Seq[String]] = None,
+                             @deprecated("Use transformers instead.", "2.0.5")
                              additionalColumns: Option[Map[String,String]] = None,
+                             @deprecated("Use transformers instead.", "2.0.5")
                              filterClause: Option[String] = None,
+                             @deprecated("Use transformers instead.", "2.0.5")
                              standardizeDatatypes: Boolean = false,
                              ignoreOldDeletedColumns: Boolean = false,
                              ignoreOldDeletedNestedColumns: Boolean = true,
@@ -93,21 +102,24 @@ case class DeduplicateAction(override val id: ActionId,
     case Failure(e) => throw new ConfigurationException(s"(${id}) Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
   }
 
-  override def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  private def getTransformers(implicit session: SparkSession, context: ActionPipelineContext): Seq[DfTransformer] = {
     val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
     val pks = output.table.primaryKey.get // existance is validated earlier
     // get existing data
     // Note that DeduplicateAction needs to read/write all existing data for tick-tock operation, even if only specific partitions have changed
     val existingDf = if (output.isTableExisting) Some(output.getDataFrame())
     else None
-    val deduplicateTransformer = DeduplicateAction.deduplicateDataFrame(existingDf, pks, timestamp, ignoreOldDeletedColumns, ignoreOldDeletedNestedColumns) _
-    val transformedDf = applyTransformations(inputSubFeed, transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, Seq(deduplicateTransformer), filterClauseExpr)
-    outputSubFeed.copy(dataFrame = Some(transformedDf))
+    val deduplicateFunction = DeduplicateAction.deduplicateDataFrame(existingDf, pks, timestamp, ignoreOldDeletedColumns, ignoreOldDeletedNestedColumns) _
+    val deduplicateTransformer = DfTransformerFunctionWrapper("deduplicate", deduplicateFunction)
+    getTransformers(transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, transformers :+ deduplicateTransformer, filterClauseExpr)
   }
 
-  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
-    if (transformer.isDefined) transformer.get.transformPartitionValues(id, partitionValues)
-    else PartitionValues.oneToOneMapping(partitionValues)
+  override def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+    applyTransformers(getTransformers, inputSubFeed, outputSubFeed)
+  }
+
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+    applyTransformers(getTransformers, partitionValues)
   }
 
   override def factory: FromConfigFactory[Action] = DeduplicateAction

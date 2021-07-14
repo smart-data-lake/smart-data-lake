@@ -18,12 +18,14 @@
  */
 package io.smartdatalake.config
 
-import configs.{ConfigError, ConfigKeyNaming, ConfigReader, Result}
+import configs.{Config, ConfigError, ConfigKeyNaming, ConfigReader, Result}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
-import io.smartdatalake.definitions.{AuthMode, Condition, ExecutionMode}
+import io.smartdatalake.definitions.{AuthMode, Condition, Environment, ExecutionMode}
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.secrets.SecretProviderConfig
+import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.action.customlogic._
+import io.smartdatalake.workflow.action.sparktransformer.{ParsableDfTransformer, ParsableDfsTransformer}
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
 
@@ -97,4 +99,21 @@ trait ConfigImplicits {
    */
   implicit val actionIdReader: ConfigReader[ActionId] = ConfigReader.fromTry { (c, p) => ActionId(c.getString(p))}
 
+  /**
+   * A reader that reads [[ParsableDfTransformer]] values.
+   * Note that DfSparkTransformer must be parsed according to it's 'type' attribute by using SDL ConfigParser.
+   */
+  implicit val dfTransformerReader: ConfigReader[ParsableDfTransformer] = ConfigReader.fromTry { (c, p) =>
+    implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
+    ConfigParser.parseConfigObject[ParsableDfTransformer](c.getConfig(p))
+  }
+
+  /**
+   * A reader that reads [[ParsableDfTransformer]] values.
+   * Note that DfSparkTransformer must be parsed according to it's 'type' attribute by using SDL ConfigParser.
+   */
+  implicit val dfsTransformerReader: ConfigReader[ParsableDfsTransformer] = ConfigReader.fromTry { (c, p) =>
+    implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
+    ConfigParser.parseConfigObject[ParsableDfsTransformer](c.getConfig(p))
+  }
 }

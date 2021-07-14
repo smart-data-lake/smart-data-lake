@@ -25,7 +25,7 @@ package io.smartdatalake.config
  *
  * @see [[ParsableFromConfig]]
  */
-private[smartdatalake] trait ParsableFromConfig[+CO <: SdlConfigObject with ParsableFromConfig[CO]] {
+private[smartdatalake] trait ParsableFromConfig[+CO <: ParsableFromConfig[CO]] {
 
   /**
    * Returns the factory that can parse this type (that is, type `CO`).
