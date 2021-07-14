@@ -127,7 +127,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       .required
       .action( (arg, config) => config.copy(feedSel = arg) )
       .text("""Select actions to execute by one or multiple expressions separated by semicolon (;). Results from multiple expressions are combined from left to right.
-          |Expression syntax: \"<operation?><prefix:?><regex>\"
+          |Expression syntax: "<operation?><prefix:?><regex>"
           |Operations:
           |- pipe symbol (|): the two sets are combined by union operation (default)
           |- ampersand symbol (&): the tow sets are combined by intersection operation
