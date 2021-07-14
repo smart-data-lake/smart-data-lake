@@ -316,7 +316,7 @@
 		<!-- SPARK-PARENT finished -->
 
 		<!-- other dependency versions -->
-		<scopt.version>3.7.1</scopt.version>
+		<scopt.version>4.0.1</scopt.version>
 		<databricks.spark-xml.version>0.9.0</databricks.spark-xml.version>
 		<spark.excel.version>0.13.5</spark.excel.version>
 		<ucanaccess.version>4.0.4</ucanaccess.version>
