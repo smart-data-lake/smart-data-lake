@@ -37,11 +37,6 @@ class DataObjectImplTests extends FlatSpec with Matchers {
 
   "AvroFileDataObject" should "be parsable" in {
 
-    val t = typeOf[AvroFileDataObject].members.collect {
-      case (m: MethodSymbol @unchecked) if m.isCaseAccessor => m
-    }
-    val names = t.map(_.name.decodedName)
-
     val config = ConfigFactory.parseString(
       """
         |dataObjects = {

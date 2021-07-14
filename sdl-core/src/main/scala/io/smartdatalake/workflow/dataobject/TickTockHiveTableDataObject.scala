@@ -46,8 +46,9 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
                                        numInitialHdfsPartitions: Int = 16,
                                        saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                        acl: Option[AclDef] = None,
-                                       override val expectedPartitionsCondition: Option[String] = None,
                                        connectionId: Option[ConnectionId] = None,
+                                       override val expectedPartitionsCondition: Option[String] = None,
+                                       override val housekeepingMode: Option[HousekeepingMode] = None,
                                        override val metadata: Option[DataObjectMetadata] = None)
                                       (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalSparkTableDataObject with CanHandlePartitions {
@@ -83,7 +84,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
         val definedPathNormalized = HiveUtil.normalizePath(path.get)
 
         if (definedPathNormalized != hadoopPathNormalized)
-          logger.warn(s"Table ${table.fullName} exists already with different path. The table will be written with new path definition ${hadoopPathHolder}!")
+          logger.warn(s"Table ${table.fullName} exists already with different path. The table will be written with new path definition $hadoopPathHolder!")
       }
     }
     hadoopPathHolder
@@ -97,7 +98,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     filesystemHolder
   }
 
-  override def prepare(implicit session: SparkSession): Unit = {
+  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.prepare
     require(isDbExisting, s"($id) Hive DB ${table.db.get} doesn't exist (needs to be created manually).")
     if (!isTableExisting)
@@ -200,7 +201,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   }
 
   override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
-    partitionValues.foreach( pv => HiveUtil.dropPartition(table, hadoopPath, pv))
+    partitionValues.foreach( pv => HiveUtil.dropPartition(table, hadoopPath, pv, filesystem))
   }
 
   override def dropTable(implicit session: SparkSession): Unit = {

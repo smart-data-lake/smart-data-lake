@@ -18,15 +18,13 @@
  */
 package io.smartdatalake.util.hdfs
 
-import java.net.URI
-
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, FileUtil, Path}
-import org.apache.spark.SparkContext
+import org.apache.hadoop.fs._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
+import java.net.URI
 import scala.io.Source
 
 /**
@@ -142,18 +140,54 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    */
   def deleteFiles( path: Path, fs:FileSystem, doWarn:Boolean ) : Unit = {
     try {
-      val deletePaths = fs.globStatus(path).map(_.getPath)
-      deletePaths.foreach{ path => fs.delete(path, true) }
-      logger.info(s"${deletePaths.size} files delete for hadoop path ${path}.")
+      val pathsToDelete = fs.globStatus(path).map(_.getPath)
+      pathsToDelete.foreach{ path => fs.delete(path, true) }
+      logger.info(s"${pathsToDelete.size} files deleted for hadoop path $path.")
     } catch {
-      case e: Exception => if (doWarn) logger.warn(s"Hadoop path ${path} couldn't be deleted (${e.getMessage})")
+      case e: Exception => if (doWarn) logger.warn(s"Hadoop path $path couldn't be deleted: (${e.getMessage})")
+    }
+  }
+
+  /**
+   * Rename single path as one hadoop operation (note it depends on the implementation if this is atomic).
+   */
+  def renamePath(path: Path, newPath: Path, fs:FileSystem ): Unit = {
+    if (fs.rename(path, newPath)) {
+      logger.info(s"Path $path renamed to $newPath")
+    } else {
+      throw new RuntimeException(s"Rename path $path to $newPath failed")
+    }
+  }
+
+  /**
+   * Move/rename path supporting "globs".
+   * New path must be a directory. If not existing it will be created (also if there are no files to move).
+   */
+  def moveFiles(path: Path, newPath: Path, fs:FileSystem, failOnError: Boolean = true, customFilter: (FileStatus => Boolean) = _ => true, addPrefixIfExisting: Boolean = false ): Unit = {
+    try {
+      if (!fs.exists(newPath)) fs.mkdirs(newPath)
+      else if (!fs.isDirectory(newPath))
+        throw new RuntimeException(s"moveFile: new path $newPath must be a directory")
+      val pathsToMove = fs.globStatus(path).toSeq.filter(_.isFile).filter(customFilter).map(_.getPath)
+      val context = FileContext.getFileContext(newPath.toUri)
+      def getParentHash(path: Path) = Integer.toHexString(path.getParent.hashCode())
+      pathsToMove.foreach{ path =>
+        try {
+          context.rename(path, new Path(newPath, path.getName))
+        } catch {
+          // it's possible that files have the same name in different directories. Rename files adds hash of parent as prefix of filename in those cases.
+          case _:FileAlreadyExistsException if (addPrefixIfExisting) =>
+            context.rename(path, new  Path(newPath, s"${getParentHash(path)}-${path.getName}"))
+        }
+      }
+      logger.info(s"${pathsToMove.size} files moved from $path to $newPath")
+    } catch {
+      case e: Exception if (!failOnError) => logger.warn(s"Hadoop path $path couldn't be moved to $newPath: (${e.getMessage})")
     }
   }
 
   /**
    * Create default Hadoop Filesystem Authority
-   *
-   * @return
    */
   def getHadoopDefaultSchemeAuthority(): URI = {
     Environment.hadoopDefaultSchemeAuthority.getOrElse( FileSystem.get(new Configuration()).getUri)
@@ -184,7 +218,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   def prefixHadoopPath(path: String, prefix: Option[String]): Path = {
     val hadoopPath = new Path(path)
     if (hadoopPath.isAbsoluteAndSchemeAuthorityNull || !hadoopPath.isAbsolute) {
-      val hadoopPathPrefixed = prefix.map( p => new Path(p + HdfsUtil.addLeadingSeparator(path, Environment.defaultPathSeparator)))
+      val hadoopPathPrefixed = prefix.map( p => new Path(p + HdfsUtil.addLeadingSeparator(path)))
         .getOrElse(hadoopPath)
       HdfsUtil.addHadoopDefaultSchemaAuthority( hadoopPathPrefixed )
     }
@@ -217,12 +251,12 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
     path.getFileSystem(hadoopConf)
   }
 
-  def addLeadingSeparator(path: String, separator: Char): String = {
-    if (path.startsWith(separator.toString)) path else separator + path
+  def addLeadingSeparator(path: String): String = {
+    if (path.startsWith(Path.SEPARATOR)) path else Path.SEPARATOR + path
   }
 
-  def getHadoopPartitionLayout(partitionCols: Seq[String], separator: Char): String = {
-    partitionCols.map(col => s"$col=%$col%$separator").mkString
+  def getHadoopPartitionLayout(partitionCols: Seq[String]): String = {
+    partitionCols.map(col => s"$col=%$col%${Path.SEPARATOR_CHAR}").mkString
   }
 
   def readHadoopFile( file: String ): String = {
@@ -230,5 +264,19 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
     val fileSystem: FileSystem = getHadoopFs(path)
     val is = fileSystem.open(path)
     Source.fromInputStream(is).getLines.mkString(sys.props("line.separator"))
+  }
+
+  def movePartition(basePath: Path, existingPartition: PartitionValues, newPartition: PartitionValues, filenameWithGlobs: String, filesystem: FileSystem)(implicit session: SparkSession): Unit = {
+    val partitionLayout = getHadoopPartitionLayout(existingPartition.keys.toSeq)
+    val existingPartitionPath = new Path(basePath, existingPartition.getPartitionString(partitionLayout))
+    val existingPartitionPathWithFilenameGlobs = new Path(existingPartitionPath, filenameWithGlobs)
+    val newPartitionPath = new Path(basePath, newPartition.getPartitionString(partitionLayout))
+    moveFiles( existingPartitionPathWithFilenameGlobs, newPartitionPath, filesystem, addPrefixIfExisting = true)
+    deletePath(existingPartitionPath, filesystem, doWarn = true)
+  }
+
+  def touchFile(path: Path, filesystem: FileSystem): Unit = {
+    val os = filesystem.create(path, /*overwrite*/ true)
+    os.close()
   }
 }

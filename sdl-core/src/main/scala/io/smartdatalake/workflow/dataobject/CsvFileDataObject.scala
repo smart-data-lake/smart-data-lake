@@ -67,7 +67,8 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
  *                                    Default is to expect all partitions to exist.
- *
+ * @param housekeepingMode Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.
+ *                         See HousekeepingMode for available implementations. Default is None.
  **/
 case class CsvFileDataObject( override val id: DataObjectId,
                               override val path: String,
@@ -82,6 +83,7 @@ case class CsvFileDataObject( override val id: DataObjectId,
                               override val connectionId: Option[ConnectionId] = None,
                               override val filenameColumn: Option[String] = None,
                               override val expectedPartitionsCondition: Option[String] = None,
+                              override val housekeepingMode: Option[HousekeepingMode] = None,
                               override val metadata: Option[DataObjectMetadata] = None
                             )(@transient implicit override val instanceRegistry: InstanceRegistry)
   extends SparkFileDataObject with CanCreateDataFrame with CanWriteDataFrame {

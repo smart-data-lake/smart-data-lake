@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 
@@ -34,7 +35,20 @@ private[smartdatalake] trait CanWriteDataFrame {
    */
   def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
 
+  /**
+   * Write DataFrame to DataObject
+   * @param df the DataFrame to write
+   * @param partitionValues partition values included in DataFrames data
+   * @param isRecursiveInput if DataFrame needs this DataObject as input - special treatment might be needed in this case.
+   */
   def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Unit
+
+  /**
+   * Write DataFrame to specific Path with properties of this DataObject.
+   * This is needed for compacting partitions by housekeeping.
+   * Note: this is optional to implement.
+   */
+  private[smartdatalake] def writeDataFrameToPath(df: DataFrame, path: Path)(implicit session: SparkSession): Unit = throw new RuntimeException("writeDataFrameToPath not implemented")
 
   /**
    * Write Spark structured streaming DataFrame

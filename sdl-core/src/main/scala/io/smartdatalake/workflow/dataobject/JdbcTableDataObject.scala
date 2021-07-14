@@ -99,7 +99,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   // jdbc column metadata
   lazy val columns = getJdbcColumnMetadata
 
-  override def prepare(implicit session: SparkSession): Unit = {
+  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
 
     // test connection
     try {
