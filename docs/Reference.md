@@ -269,19 +269,20 @@ Specifying options allows to reuse a transformation in different settings.
  
 #### Java/Scala
 You can use Spark Dataset API in Java/Scala to define custom transformations. 
-If you have a Java project, create a class that extends CustomDfTransformer or CustomDfsTransformer and implement `transform` method
+If you have a Java project, create a class that extends CustomDfTransformer or CustomDfsTransformer and implement `transform` method.
+Then use **type = ScalaClassDfTransformer** or **type = ScalaClassDfsTransformer** and configure **className** attribute.
 
 If you work without Java project, it's still possible to define your transformation in Java/Scala and compile it at runtime.
-For a 1-to-1 transformation you have to write a function that takes `session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectName: String` as parameters and returns a `DataFrame`. 
-Use **scalaFile** or **scalaCode** attribute to configure this.
-
-For many-to-many transformations you get a Map[String,DataFrame] with the DataFrames per input DataObject as parameter, and have to return a Map[String,DataFrame] with the DataFrame per output DataObject.
+For a 1-to-1 transformation use **type = ScalaCodeDfTransformer** and configure **code** or **file** as a function that takes `session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectName: String` as parameters and returns a `DataFrame`.
+For many-to-many transformations use **type = ScalaCodeDfsTransformer** and configure **code** or **file** as a function that takes `session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]` with DataFrames per input DataObject as parameter, and returns a `Map[String,DataFrame]` with the DataFrame per output DataObject.
 
 See [sdl-examples](https://github.com/smart-data-lake/sdl-examples) for details.
 
 #### SQL
-You can use Spark SQL to define custom transformations by defining **sqlCode** attribute.
+You can use Spark SQL to define custom transformations.
 Input dataObjects are available as tables to select from. Use tokens %{<key>} to replace with runtimeOptions in SQL code.
+For a 1-to-1 transformation use **type = SQLDfTransformer** and configure **code** as your SQL transformation statement.
+For many-to-many transformations use **type = SQLDfsTransformer** and configure **code** as a Map of "<outputDataObjectId>, <SQL transformation statement>".
 
 Example - using options in sql code for 1-to-1 transformation:
 ```
@@ -313,8 +314,8 @@ transformers [{
 See [sdl-examples](https://github.com/smart-data-lake/sdl-examples) for details.
 
 #### Python
-It's also possible to use Python to define a custom Spark transformation. 
-Use **pythonFile** or **pythonCode** attribute to define your transformation. 
+It's also possible to use Python to define a custom Spark transformation.
+For a 1-to-1 transformation use **type = PythonCodeDfTransformer** and configure **code** or **file** as a python function.
 PySpark session is initialize and available under variables `sc`, `session`, `sqlContext`.
 Other variables available are
 * `inputDf`: Input DataFrame
