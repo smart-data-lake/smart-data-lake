@@ -18,10 +18,13 @@
  */
 package io.smartdatalake.workflow.action
 
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
+
+import scala.util.Try
 
 abstract class SparkSubFeedAction extends SparkAction {
 
@@ -46,31 +49,43 @@ abstract class SparkSubFeedAction extends SparkAction {
    * Transform a [[SparkSubFeed]].
    * To be implemented by subclasses.
    *
-   * @param subFeed [[SparkSubFeed]] to be transformed
-   * @return transformed [[SparkSubFeed]]
+   * @param inputSubFeed [[SparkSubFeed]] to be transformed
+   * @param outputSubFeed [[SparkSubFeed]] to be enriched with transformed result
+   * @return transformed output [[SparkSubFeed]]
    */
-  def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed
+  def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed
+
+  /**
+   * Transform partition values
+   */
+  def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues]
 
   private def doTransform(subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // convert subfeed to SparkSubFeed type or initialize if not yet existing
-    var preparedSubFeed = SparkSubFeed.fromSubFeed(subFeed)
-    // apply execution mode
-    preparedSubFeed = executionMode match {
-      case Some(mode) =>
-        mode.apply(id, input, output, preparedSubFeed) match {
-          case Some((newPartitionValues, newFilter)) => preparedSubFeed.copy(partitionValues = newPartitionValues, filter = newFilter)
-          case None => preparedSubFeed
-        }
-      case _ => preparedSubFeed
+    var inputSubFeed = ActionHelper.updateInputPartitionValues(input, SparkSubFeed.fromSubFeed(subFeed))
+    // create output subfeed with transformed partition values
+    var outputSubFeed = ActionHelper.updateOutputPartitionValues(output, inputSubFeed.toOutput(output.id), Some(transformPartitionValues))
+    // apply execution mode in init phase and store result
+    if (context.phase == ExecutionPhase.Init) {
+      executionModeResult = Try(
+        executionMode.flatMap(_.apply(id, input, output, inputSubFeed, transformPartitionValues))
+      ).recover { ActionHelper.getHandleExecutionModeExceptionPartialFunction(outputs) }
     }
-    // prepare as input SubFeed
-    preparedSubFeed = prepareInputSubFeed(preparedSubFeed, input)
+    executionModeResult.get match { // throws exception if execution mode is Failure
+      case Some(result) =>
+        inputSubFeed = inputSubFeed.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false).breakLineage
+        outputSubFeed = outputSubFeed.copy(partitionValues = result.outputPartitionValues, filter = result.filter).breakLineage
+      case _ => Unit
+    }
+    outputSubFeed = ActionHelper.addRunIdPartitionIfNeeded(output, outputSubFeed)
+    // prepare input SubFeed
+    inputSubFeed = prepareInputSubFeed(input, inputSubFeed)
     // enrich with fresh DataFrame if needed
-    preparedSubFeed = enrichSubFeedDataFrame(input, preparedSubFeed, context.phase)
+    inputSubFeed = enrichSubFeedDataFrame(input, inputSubFeed, context.phase)
     // transform
-    val transformedSubFeed = transform(preparedSubFeed)
+    outputSubFeed = transform(inputSubFeed, outputSubFeed)
     // update partition values to output's partition columns and update dataObjectId
-    validateAndUpdateSubFeedPartitionValues(output, transformedSubFeed).copy(dataObjectId = output.id)
+    validateAndUpdateSubFeed(output, outputSubFeed)
   }
 
   /**
@@ -84,7 +99,7 @@ abstract class SparkSubFeedAction extends SparkAction {
     // check output
     output.init(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
     // return
-    Seq(updateSubFeedAfterWrite(transformedSubFeed))
+    Seq(transformedSubFeed)
   }
 
   /**
@@ -96,19 +111,14 @@ abstract class SparkSubFeedAction extends SparkAction {
     // transform
     val transformedSubFeed = doTransform(subFeed)
     // write output
-    val msg = s"writing to ${output.id}" + (if (transformedSubFeed.partitionValues.nonEmpty) s", partitionValues ${transformedSubFeed.partitionValues.mkString(" ")}" else "")
-    logger.info(s"($id) start " + msg)
-    setSparkJobMetadata(Some(msg))
+    logWritingStarted(transformedSubFeed)
     val isRecursiveInput = recursiveInputs.exists(_.id == output.id)
     val (noData,d) = PerformanceUtils.measureDuration {
       writeSubFeed(transformedSubFeed, output, isRecursiveInput)
     }
-    setSparkJobMetadata()
-    val metricsLog = if (noData) ", no data found"
-    else getFinalMetrics(output.id).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
-    logger.info(s"($id) finished writing DataFrame to ${output.id}: jobDuration=$d" + metricsLog)
+    logWritingFinished(transformedSubFeed, noData, d)
     // return
-    Seq(updateSubFeedAfterWrite(transformedSubFeed))
+    Seq(transformedSubFeed)
   }
 
   override final def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
@@ -118,6 +128,8 @@ abstract class SparkSubFeedAction extends SparkAction {
     postExecSubFeed(inputSubFeeds.head, outputSubFeeds.head)
   }
 
-  def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit /* NOP */
+  def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    executionMode.foreach(_.postExec(id, input, output, inputSubFeed, outputSubFeed))
+  }
 
 }

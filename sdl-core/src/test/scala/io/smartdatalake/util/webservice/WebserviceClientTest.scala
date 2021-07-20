@@ -19,10 +19,12 @@
 package io.smartdatalake.util.webservice
 
 import com.github.tomakehurst.wiremock.WireMockServer
-import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
+import io.smartdatalake.definitions.{AuthHeaderMode, BasicAuthMode, CustomHttpAuthMode, CustomHttpAuthModeLogic}
 import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.workflow.dataobject.WebserviceFileDataObject
 import org.scalatest.{BeforeAndAfterEach, FunSuite}
-import scalaj.http.HttpResponse
+import scalaj.http.{Http, HttpRequest, HttpResponse}
 
 class WebserviceClientTest extends FunSuite with BeforeAndAfterEach  {
 
@@ -30,6 +32,9 @@ class WebserviceClientTest extends FunSuite with BeforeAndAfterEach  {
   val httpsPort = 8443
   val host = "127.0.0.1"
   private var wireMockServer: WireMockServer = _
+
+  // provide an empty instance registry
+  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
   override protected def beforeEach(): Unit = {
     wireMockServer = TestUtil.setupWebservice(host, port, httpsPort)
@@ -39,94 +44,71 @@ class WebserviceClientTest extends FunSuite with BeforeAndAfterEach  {
     wireMockServer.stop()
   }
 
-  test("Wrong init: authHeader but missing url") {
-    intercept[ConfigurationException] {
-      DefaultWebserviceClient(None, Some(Map("auth-header"->"AuthHeader")), None, None)
-    }
-  }
-
-  test("Wrong init: user and password but missing url") {
-    intercept[ConfigurationException] {
-      DefaultWebserviceClient(None, Some(Map("user"->"user","password"->"password")), None, None)
-    }
-  }
-
-  test("Wrong init: token but missing url") {
-    intercept[ConfigurationException] {
-      DefaultWebserviceClient(None, Some(Map("token"->"edizdzzd")), None, None)
-    }
-  }
-
-  test("Wrong init: missing url and authHeader") {
-    intercept[ConfigurationException] {
-      DefaultWebserviceClient(url = None, authOptions = None, None, None)
-    }
-  }
-
-  test("Wrong init: missing url, no authentication") {
-    intercept[ConfigurationException] {
-      DefaultWebserviceClient(url = None)
-    }
-  }
-
   test("Call webservice with wrong Url") {
-    val webserviceClient = DefaultWebserviceClient(Some("http://..."), Some(Map("auth-header"->"Basic xyz")), None, None)
+    val webserviceDO = WebserviceFileDataObject("do1", url = "http://...")
+    val webserviceClient = ScalaJWebserviceClient(webserviceDO)
     val response = webserviceClient.get()
     assert(response.isFailure)
   }
 
   test("Call webservice without Authentication") {
-    val url = Some(s"http://$host:$port/good/no_auth/")
-    val webserviceClient = DefaultWebserviceClient(url)
+    val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/no_auth/")
+    val webserviceClient = ScalaJWebserviceClient(webserviceDO)
     val response = webserviceClient.get()
     assert(response.isSuccess)
   }
 
   // TODO: Get https calls working. Error: Failure(javax.net.ssl.SSLHandshakeException: Remote host closed connection during handshake)
   ignore("Call a URL with Basic authentication") {
-    val url = Some(s"https://$host:$httpsPort/good/basic_auth/")
-
-    val webserviceClient = DefaultWebserviceClient(url, Some(Map("auth-header"->"Basic ZnMxOmZyZWl0YWcyMDE3x")), None, None)
+    val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/basic_auth/", authMode = Some(BasicAuthMode("CLEAR#testuser","CLEAR#abc")))
+    val webserviceClient = ScalaJWebserviceClient(webserviceDO)
     val response = webserviceClient.get()
     assert(response.isSuccess)
   }
 
-  // TODO: Get https calls working. Error: Failure(javax.net.ssl.SSLHandshakeException: Remote host closed connection during handshake)
-  ignore("Call Webservice with clientid") {
-    val params = Map("client-id"->"127d4463","client-secret"->"17c85ae97525eabada371a2d82d50e3a")
-    val call = DefaultWebserviceClient(Some(s"https://$host:$httpsPort/good/client_id/"), Some(params), None, None)
-    val resp = call.get()
-    assert(resp.isSuccess)
-  }
-
   test("Call webservice with invalid AuthHeader") {
-    val url = Some(s"https://$host:$httpsPort/good/basic_auth/") // still calling good url but with bad auth
-    val webserviceClient = DefaultWebserviceClient(url, Some(Map("auth-header"->"Basic xxxxxxxxxxxxx")), None, None)
+    val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/basic_auth/", authMode = Some(AuthHeaderMode("auth-header", "CLEAR#Basic xxxxxxxxxxxxx")))
+    val webserviceClient = ScalaJWebserviceClient(webserviceDO)
     val response = webserviceClient.get()
     assert(response.isFailure)
   }
 
   test("Check response: http status code == 200") {
-    val webserviceClient = DefaultWebserviceClient(Some(s"http://$host:$port/bad/basic_auth/"), Some(Map("auth-header"->"Basic xyz")), None, None)
+    val request = Http("http://...")
     val response = HttpResponse(body = "hello there".getBytes, code = 200, headers = Map())
-    val check = webserviceClient.checkResponse(response)
+    val check = ScalaJWebserviceClient.checkResponse(request, response)
     assert(check.isSuccess)
   }
 
   test("Check response with http error status code") {
-    val webserviceClient = DefaultWebserviceClient(Some(s"http://$host:$port/bad/basic_auth/"), Some(Map("auth-header"->"Basic xyz")), None, None)
+    val request = Http("http://...")
     val response = HttpResponse(body = "error".getBytes, code = 403, headers = Map())
-    val check = webserviceClient.checkResponse(response)
+    val check = ScalaJWebserviceClient.checkResponse(request, response)
     assert(check.isFailure)
   }
 
   test("Check posting JSON") {
-    val webserviceClient = DefaultWebserviceClient(Some(s"http://$host:$port/good/post/no_auth"))
+    val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/post/no_auth")
+    val webserviceClient = ScalaJWebserviceClient(webserviceDO)
     val testJson = s"""{name: "Samantha", age: 31, city: "San Francisco"};""".getBytes
-    webserviceClient.post(testJson, "application/json")
-    val response = HttpResponse(body=testJson, code = 200, headers= Map())
-    val check = webserviceClient.checkResponse(response)
-    assert(check.isSuccess)
+    val response = webserviceClient.post(testJson, "application/json")
+    assert(response.isSuccess)
   }
 
+  test("CustomAuthMode") {
+    val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/post/no_auth", authMode = Some(CustomHttpAuthMode(className = classOf[MyCustomHttpAuthMode].getName, options = Map("test"-> "ok"))))
+    webserviceDO.prepare(null)
+    val webserviceClient = ScalaJWebserviceClient(webserviceDO)
+    assert(webserviceClient.request.headers.toMap.apply("test") == "ok")
+  }
+}
+
+
+class MyCustomHttpAuthMode extends CustomHttpAuthModeLogic {
+  var additionalHeaders: Map[String,String] = _
+  override def prepare(options: Map[String, String]): Unit = {
+    // add options as headers
+    additionalHeaders = options
+  }
+  override private[smartdatalake] def getHeaders = additionalHeaders
 }

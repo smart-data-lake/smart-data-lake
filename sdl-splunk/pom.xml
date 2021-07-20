@@ -22,7 +22,7 @@
 	<parent>
 		<groupId>io.smartdatalake</groupId>
 		<artifactId>sdl-parent</artifactId>
-		<version>1.2.1-SNAPSHOT</version>
+		<version>1.2.6-SNAPSHOT</version>
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
@@ -31,11 +31,45 @@
 
 	<name>sdl-splunk</name>
 
+	<profiles>
+		<profile>
+			<id>fat-jar</id>
+			<!-- maven appends new entries and overwrites existing entries from the same profile defined in sdl-parent -->
+			<properties>
+				<!-- do not include sdl-core into fat-jar for this module, as sdl-core is normally put into classpath separately -->
+				<sdl-core.scope>provided</sdl-core.scope>
+			</properties>
+			<dependencies>
+				<!-- spark-tags needs to have compile scope; if it's runtime it doesnt compile anymore with scala 2.11. There is a bug about annotations missing in classpath. -->
+				<!-- this is an unused declared dependency, but it's needed to override scope -->
+				<dependency>
+					<groupId>org.apache.spark</groupId>
+					<artifactId>spark-tags_${scala.minor.version}</artifactId>
+					<version>${spark.version}</version>
+					<scope>compile</scope>
+				</dependency>
+			</dependencies>
+		</profile>
+	</profiles>
+
+	<properties>
+		<sdl-core.scope>compile</sdl-core.scope>
+	</properties>
+
+	<repositories>
+		<repository>
+			<id>splunk-artifactory</id>
+			<name>Splunk Releases</name>
+			<url>https://splunk.jfrog.io/splunk/ext-releases-local</url>
+		</repository>
+	</repositories>
+
 	<dependencies>
 		<dependency>
 			<groupId>io.smartdatalake</groupId>
 			<artifactId>sdl-core_${scala.minor.version}</artifactId>
 			<version>${project.parent.version}</version>
+			<scope>${sdl-core.scope}</scope>
 		</dependency>
 
 		<dependency>
@@ -46,20 +80,14 @@
 		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-core_${scala.minor.version}</artifactId>
-			<version>${spark.version}</version>
-			<scope>${spark.deps.scope}</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-sql_${scala.minor.version}</artifactId>
-			<version>${spark.version}</version>
-			<scope>${spark.deps.scope}</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-catalyst_${scala.minor.version}</artifactId>
-			<version>${spark.version}</version>
-			<scope>${spark.deps.scope}</scope>
 		</dependency>
 
 		<dependency>

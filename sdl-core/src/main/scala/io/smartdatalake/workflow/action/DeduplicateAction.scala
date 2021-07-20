@@ -22,10 +22,11 @@ import java.sql.Timestamp
 import java.time.LocalDateTime
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{ExecutionMode, TechnicalTableColumn}
+import io.smartdatalake.definitions.{Condition, ExecutionMode, TechnicalTableColumn}
 import io.smartdatalake.util.evolution.SchemaEvolution
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject, TransactionalSparkTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
@@ -52,10 +53,11 @@ import scala.util.{Failure, Success, Try}
  *                                      Keeping deleted columns in complex data types has performance impact as all new data
  *                                      in the future has to be converted by a complex function.
  * @param executionMode optional execution mode for this Action
+ * @param executionCondition optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  */
-case class DeduplicateAction(override val id: ActionObjectId,
+case class DeduplicateAction(override val id: ActionId,
                              inputId: DataObjectId,
                              outputId: DataObjectId,
                              transformer: Option[CustomDfTransformerConfig] = None,
@@ -69,6 +71,7 @@ case class DeduplicateAction(override val id: ActionObjectId,
                              override val breakDataFrameLineage: Boolean = false,
                              override val persist: Boolean = false,
                              override val executionMode: Option[ExecutionMode] = None,
+                             override val executionCondition: Option[Condition] = None,
                              override val metricsFailCondition: Option[String] = None,
                              override val metadata: Option[ActionMetadata] = None
 )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedAction {
@@ -90,7 +93,7 @@ case class DeduplicateAction(override val id: ActionObjectId,
     case Failure(e) => throw new ConfigurationException(s"(${id}) Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
   }
 
-  override def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  override def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
     val pks = output.table.primaryKey.get // existance is validated earlier
     // get existing data
@@ -98,25 +101,22 @@ case class DeduplicateAction(override val id: ActionObjectId,
     val existingDf = if (output.isTableExisting) Some(output.getDataFrame())
     else None
     val deduplicateTransformer = DeduplicateAction.deduplicateDataFrame(existingDf, pks, timestamp, ignoreOldDeletedColumns, ignoreOldDeletedNestedColumns) _
-    applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, Seq(deduplicateTransformer), filterClauseExpr)
+    val transformedDf = applyTransformations(inputSubFeed, transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, Seq(deduplicateTransformer), filterClauseExpr)
+    outputSubFeed.copy(dataFrame = Some(transformedDf))
   }
 
-  /**
-   * @inheritdoc
-   */
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+    if (transformer.isDefined) transformer.get.transformPartitionValues(id, partitionValues)
+    else PartitionValues.oneToOneMapping(partitionValues)
+  }
+
   override def factory: FromConfigFactory[Action] = DeduplicateAction
 }
 
 object DeduplicateAction extends FromConfigFactory[Action] {
 
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): DeduplicateAction = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[DeduplicateAction].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): DeduplicateAction = {
+    extract[DeduplicateAction](config)
   }
 
   /**

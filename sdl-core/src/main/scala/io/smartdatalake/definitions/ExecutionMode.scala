@@ -21,22 +21,28 @@ package io.smartdatalake.definitions
 import java.sql.Timestamp
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{ProductUtil, SmartDataLakeLogger, SparkExpressionUtil}
+import io.smartdatalake.util.misc.{CustomCodeUtil, ProductUtil, SmartDataLakeLogger, SparkExpressionUtil}
 import io.smartdatalake.workflow.DAGHelper.NodeId
 import io.smartdatalake.workflow.ExceptionSeverity.ExceptionSeverity
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.ActionHelper.{getOptionalDataFrame, searchCommonInits}
 import io.smartdatalake.workflow.action.{NoDataToProcessDontStopWarning, NoDataToProcessWarning}
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject, FileRef, FileRefDataObject}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, max}
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types._
 
 import scala.reflect.runtime.universe.TypeTag
+
+/**
+ * Result of execution mode application
+ */
+case class ExecutionModeResult( inputPartitionValues: Seq[PartitionValues] = Seq(), outputPartitionValues: Seq[PartitionValues] = Seq()
+                              , filter: Option[String] = None, fileRefs: Option[Seq[FileRef]] = None)
 
 /**
  * Execution mode defines how data is selected when running a data pipeline.
@@ -50,11 +56,23 @@ import scala.reflect.runtime.universe.TypeTag
  * }}}
  */
 sealed trait ExecutionMode extends SmartDataLakeLogger {
-  private[smartdatalake] def prepare(actionId: ActionObjectId)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  /**
+   * Called in prepare phase to validate execution mode configuration
+   */
+  private[smartdatalake] def prepare(actionId: ActionId)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     // validate apply conditions
     applyConditionsDef.foreach(_.syntaxCheck[DefaultExecutionModeExpressionData](actionId, Some("applyCondition")))
   }
-  private[smartdatalake] def apply(actionId: ActionObjectId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Option[(Seq[PartitionValues], Option[String])] = None
+  /**
+   * Called in init phase to apply execution mode. Result is stored and re-used in execution phase.
+   */
+  private[smartdatalake] def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
+                                   , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
+                                  (implicit session: SparkSession, context: ActionPipelineContext): Option[ExecutionModeResult] = None
+  /**
+   * Called in execution phase after writing subfeed. Can be used to implement incremental processing , e.g. deleteDataAfterRead.
+   */
+  private[smartdatalake] def postExec(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, mainInputSubFeed: SubFeed, mainOutputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
   private[smartdatalake] def mainInputOutputNeeded: Boolean = false
   private[smartdatalake] val applyConditionsDef: Seq[Condition] = Seq()
   private[smartdatalake] val failConditionsDef: Seq[Condition] = Seq()
@@ -63,7 +81,7 @@ sealed trait ExecutionMode extends SmartDataLakeLogger {
    * Evaluate apply conditions.
    * @return Some(true) if any apply conditions evaluates to true (or-logic), None if there are no apply conditions
    */
-  private[smartdatalake] final def evaluateApplyConditions(actionId: ActionObjectId, subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Option[Boolean] = {
+  private[smartdatalake] final def evaluateApplyConditions(actionId: ActionId, subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Option[Boolean] = {
     val data = DefaultExecutionModeExpressionData.from(context).copy(givenPartitionValues = subFeed.partitionValues.map(_.getMapString), isStartNode = subFeed.isDAGStart)
     if (applyConditionsDef.nonEmpty) Option(applyConditionsDef.map(_.evaluate(actionId, Some("applyCondition"), data)).max)
     else None
@@ -73,7 +91,7 @@ sealed trait ExecutionMode extends SmartDataLakeLogger {
    * Evaluate fail conditions.
    * @throws ExecutionModeFailedException if any fail condition evaluates to true
    */
-  private[smartdatalake] final def evaluateFailConditions[T<:Product:TypeTag](actionId: ActionObjectId, data: T)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  private[smartdatalake] final def evaluateFailConditions[T<:Product:TypeTag](actionId: ActionId, data: T)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     failConditionsDef.foreach(c =>
       if (c.evaluate(actionId, Some("failCondition"), data)) {
         val descriptionText = c.description.map( d => s""""$d" """).getOrElse("")
@@ -94,7 +112,7 @@ private[smartdatalake] trait ExecutionModeWithMainInputOutput {
  * Partition difference execution mode lists partitions on mainInput & mainOutput DataObject and starts loading all missing partitions.
  * Partition columns to be used for comparision need to be a common 'init' of input and output partition columns.
  * This mode needs mainInput/Output DataObjects which CanHandlePartitions to list partitions.
- * Partition values are passed to following actions, if for partition columns which they have in common.
+ * Partition values are passed to following actions for partition columns which they have in common.
  *
  * @param partitionColNb            optional number of partition columns to use as a common 'init'.
  * @param alternativeOutputId       optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
@@ -105,8 +123,17 @@ private[smartdatalake] trait ExecutionModeWithMainInputOutput {
  * @param failConditions            List of conditions to fail application of execution mode if true. Define as spark sql expressions working with attributes of [[PartitionDiffModeExpressionData]] returning a boolean.
  *                                  Default is that the application of the PartitionDiffMode does not fail the action. If there is no data to process, the following actions are skipped.
  *                                  Multiple conditions are evaluated individually and every condition may fail the execution mode (or-logic)
- * @param selectExpression          optional expression to define or refine the list of selected partitions. Define a spark sql expression working with the attributes of [[PartitionDiffModeExpressionData]] returning a list<map<string,string>>.
- *                                  Default is to return the originally selected partitions found in attribute selectedPartitions.
+ * @param stopIfNoData              Optional setting if further actions should be skipped if this action has no data to process (default).
+ *                                  Set stopIfNoData=false if you want to run further actions nevertheless. They will receive output dataObject unfiltered as input.
+ * @param selectExpression          optional expression to define or refine the list of selected output partitions. Define a spark sql expression working with the attributes of [[PartitionDiffModeExpressionData]] returning a list<map<string,string>>.
+ *                                  Default is to return the originally selected output partitions found in attribute selectedOutputPartitionValues.
+ * @param applyPartitionValuesTransform If true applies the partition values transform of custom transformations on input partition values before comparison with output partition values.
+ *                                  If enabled input and output partition columns can be different. Default is to disable the transformation of partition values.
+ * @param selectAdditionalInputExpression optional expression to refine the list of selected input partitions. Note that primarily output partitions are selected by PartitionDiffMode.
+ *                                  The selected output partitions are then transformed back to the input partitions needed to create the selected output partitions. This is one-to-one except if applyPartitionValuesTransform=true.
+ *                                  And sometimes there is a need for additional input data to create the output partitions, e.g. if you aggregate a window of 7 days for every day.
+ *                                  You can customize selected input partitions by defining a spark sql expression working with the attributes of [[PartitionDiffModeExpressionData]] returning a list<map<string,string>>.
+ *                                  Default is to return the originally selected input partitions found in attribute selectedInputPartitionValues.
  */
 case class PartitionDiffMode( partitionColNb: Option[Int] = None
                             , override val alternativeOutputId: Option[DataObjectId] = None
@@ -114,21 +141,28 @@ case class PartitionDiffMode( partitionColNb: Option[Int] = None
                             , applyCondition: Option[String] = None
                             , failCondition: Option[String] = None
                             , failConditions: Seq[Condition] = Seq()
+                            , @deprecated("use following actions executionCondition=true & executionMode=ProcessAll instead", "2.0.3") stopIfNoData: Boolean = true
                             , selectExpression: Option[String] = None
+                            , applyPartitionValuesTransform: Boolean = false
+                            , selectAdditionalInputExpression: Option[String] = None
                             ) extends ExecutionMode with ExecutionModeWithMainInputOutput {
   private[smartdatalake] override val applyConditionsDef = applyCondition.toSeq.map(Condition(_))
   private[smartdatalake] override val failConditionsDef = failCondition.toSeq.map(Condition(_)) ++ failConditions
   private[smartdatalake] override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
-  private[smartdatalake] override def prepare(actionId: ActionObjectId)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  private[smartdatalake] override def prepare(actionId: ActionId)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.prepare(actionId)
     // validate fail condition
     failConditionsDef.foreach(_.syntaxCheck[PartitionDiffModeExpressionData](actionId, Some("failCondition")))
     // validate select expression
     selectExpression.foreach(expression => SparkExpressionUtil.syntaxCheck[PartitionDiffModeExpressionData, Seq[Map[String,String]]](actionId, Some("selectExpression"), expression))
+    // validate select additional input expression
+    selectAdditionalInputExpression.foreach(expression => SparkExpressionUtil.syntaxCheck[PartitionDiffModeExpressionData, Seq[Map[String,String]]](actionId, Some("selectAdditionalInputExpression"), expression))
     // check alternativeOutput exists
     alternativeOutput
   }
-  private[smartdatalake] override def apply(actionId: ActionObjectId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Option[(Seq[PartitionValues], Option[String])] = {
+  private[smartdatalake] override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
+                                            , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
+                                           (implicit session: SparkSession, context: ActionPipelineContext): Option[ExecutionModeResult] = {
     val doApply = evaluateApplyConditions(actionId, subFeed)
       .getOrElse(subFeed.partitionValues.isEmpty) // default is to apply PartitionDiffMode if no partition values are given
     if (doApply) {
@@ -139,53 +173,96 @@ case class PartitionDiffMode( partitionColNb: Option[Int] = None
           if (partitionInput.partitions.nonEmpty) {
             if (partitionOutput.partitions.nonEmpty) {
               // prepare common partition columns
-              val commonInits = searchCommonInits(partitionInput.partitions, partitionOutput.partitions)
-              require(commonInits.nonEmpty, s"$actionId has set executionMode = 'PartitionDiffMode' but no common init was found in partition columns for $input and $output")
-              val commonPartitions = if (partitionColNb.isDefined) {
-                commonInits.find(_.size == partitionColNb.get).getOrElse(throw ConfigurationException(s"$actionId has set executionMode = 'PartitionDiffMode' but no common init with ${partitionColNb.get} was found in partition columns of $input and $output from $commonInits!"))
-              } else {
-                commonInits.maxBy(_.size)
+              val (inputPartitions, outputPartitions) = if (applyPartitionValuesTransform) (partitionInput.partitions, partitionOutput.partitions)
+              else {
+                val commonInits = searchCommonInits(partitionInput.partitions, partitionOutput.partitions)
+                if (commonInits.nonEmpty) {
+                  val commonInit = if (partitionColNb.isDefined) {
+                    commonInits.find(_.size == partitionColNb.get).getOrElse(throw ConfigurationException(s"$actionId has set executionMode = 'PartitionDiffMode' but no common init with ${partitionColNb.get} was found in partition columns of ${input.id} and ${output.id} from $commonInits!"))
+                  } else {
+                    commonInits.maxBy(_.size)
+                  }
+                  (commonInit, commonInit)
+                } else {
+                  throw new ConfigurationException(s"$actionId has set executionMode = 'PartitionDiffMode' but no common init was found in partition columns for ${input.id} and ${output.id}. Enable applyPartitionValuesTransform to transform partition values.")
+                }
               }
               // calculate missing partition values
-              val inputPartitionValues = partitionInput.listPartitions.map(_.filterKeys(commonPartitions))
-              val outputPartitionValues = partitionOutput.listPartitions.map(_.filterKeys(commonPartitions))
-              val partitionValuesToBeProcessed = inputPartitionValues.toSet.diff(outputPartitionValues.toSet).toSeq
+              val filteredInputPartitionValues = partitionInput.listPartitions.map(_.filterKeys(inputPartitions))
+              val filteredOutputPartitionValues = partitionOutput.listPartitions.map(_.filterKeys(outputPartitions))
+              val inputOutputPartitionValuesMap = if (applyPartitionValuesTransform) {
+                partitionValuesTransform(filteredInputPartitionValues).mapValues(_.filterKeys(outputPartitions))
+              } else PartitionValues.oneToOneMapping(filteredInputPartitionValues) // normally this transformation is 1:1, but it can be implemented in custom transformations for aggregations
+              val outputInputPartitionValuesMap = inputOutputPartitionValuesMap.toSeq.map{ case (k,v) => (v,k)}.groupBy(_._1).mapValues(_.map(_._2))
+              val outputPartitionValuesToBeProcessed = inputOutputPartitionValuesMap.values.toSet.diff(filteredOutputPartitionValues.toSet).toSeq
               // sort and limit number of partitions processed
-              val ordering = PartitionValues.getOrdering(commonPartitions)
-              val selectedPartitionValues = nbOfPartitionValuesPerRun match {
-                case Some(n) => partitionValuesToBeProcessed.sorted(ordering).take(n)
-                case None => partitionValuesToBeProcessed.sorted(ordering)
+              val outputOrdering = PartitionValues.getOrdering(outputPartitions)
+              var selectedOutputPartitionValues = nbOfPartitionValuesPerRun match {
+                case Some(n) => outputPartitionValuesToBeProcessed.sorted(outputOrdering).take(n)
+                case None => outputPartitionValuesToBeProcessed.sorted(outputOrdering)
               }
+              // reverse lookup input partitions as selection of output partitions might have changed
+              var selectedInputPartitionValues = selectedOutputPartitionValues.flatMap(outputInputPartitionValuesMap)
               // apply optional select expression
-              val data = PartitionDiffModeExpressionData.from(context).copy(inputPartitionValues = inputPartitionValues.map(_.getMapString), outputPartitionValues = outputPartitionValues.map(_.getMapString), selectedPartitionValues = selectedPartitionValues.map(_.getMapString))
-              val refinedSelectedPartitionValues1 = selectExpression.flatMap(expression => SparkExpressionUtil.evaluate[PartitionDiffModeExpressionData, Seq[Map[String,String]]](actionId, Some("selectExpression"), expression, data))
-              val refinedSelectedPartitionValues = refinedSelectedPartitionValues1.map(partitionValuesString => partitionValuesString.map(PartitionValues(_)))
-                .getOrElse(selectedPartitionValues)
+              var data = PartitionDiffModeExpressionData.from(context).copy(givenPartitionValues = subFeed.partitionValues.map(_.getMapString),
+                inputPartitionValues = filteredInputPartitionValues.map(_.getMapString), outputPartitionValues = filteredOutputPartitionValues.map(_.getMapString),
+                selectedInputPartitionValues = selectedInputPartitionValues.map(_.getMapString), selectedOutputPartitionValues = selectedOutputPartitionValues.map(_.getMapString))
+              selectedOutputPartitionValues = if (selectExpression.isDefined) {
+                SparkExpressionUtil.evaluate[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectExpression"), selectExpression.get, data)
+                  .map(_.map(PartitionValues(_)))
+                  .getOrElse(selectedOutputPartitionValues)
+                  .sorted(outputOrdering)
+              } else selectedOutputPartitionValues
+              // reverse lookup input partitions as selection of output partitions might have changed
+              val inputOrdering = PartitionValues.getOrdering(inputPartitions)
+              selectedInputPartitionValues = selectedOutputPartitionValues.flatMap(outputInputPartitionValuesMap)
+              data = data.copy(selectedInputPartitionValues = selectedInputPartitionValues.map(_.getMapString), selectedOutputPartitionValues = selectedOutputPartitionValues.map(_.getMapString))
+              // apply optional select additional input partitions expression
+              selectedInputPartitionValues = if (selectAdditionalInputExpression.isDefined) {
+                SparkExpressionUtil.evaluate[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectAdditionalInputExpression"), selectAdditionalInputExpression.get, data)
+                  .map(_.map(PartitionValues(_)))
+                  .getOrElse(selectedInputPartitionValues)
+                  .sorted(inputOrdering)
+              } else selectedInputPartitionValues.sorted(inputOrdering)
+              data = data.copy(selectedInputPartitionValues = selectedInputPartitionValues.map(_.getMapString))
               // evaluate fail conditions
-              val refinedData = data.copy(selectedPartitionValues = refinedSelectedPartitionValues.map(_.getMapString))
-              evaluateFailConditions(actionId, refinedData) // throws exception on failed condition
+              evaluateFailConditions(actionId, data) // throws exception on failed condition
               // skip processing if no new data
-              if (partitionValuesToBeProcessed.isEmpty) throw NoDataToProcessWarning(actionId.id, s"($actionId) No partitions to process found for ${input.id}")
+              val warnMsg = if (selectedOutputPartitionValues.isEmpty) Some(s"($actionId) No partitions to process found for ${input.id}") else None
+              warnMsg.foreach { msg =>
+                if (stopIfNoData) throw NoDataToProcessWarning(actionId.id, msg)
+                else throw NoDataToProcessDontStopWarning(actionId.id, msg)
+              }
               //return
-              logger.info(s"($actionId) PartitionDiffMode selected partition values ${refinedSelectedPartitionValues.mkString(", ")} to process")
-              Some((refinedSelectedPartitionValues, None))
-            } else throw ConfigurationException(s"$actionId has set executionMode = PartitionDiffMode but $output has no partition columns defined!")
-          } else throw ConfigurationException(s"$actionId has set executionMode = PartitionDiffMode but $input has no partition columns defined!")
-        case (_: CanHandlePartitions, _) => throw ConfigurationException(s"$actionId has set executionMode = PartitionDiffMode but $output does not support partitions!")
-        case (_, _) => throw ConfigurationException(s"$actionId has set executionMode = PartitionDiffMode but $input does not support partitions!")
+              val inputPartitionLog = if (selectedInputPartitionValues != selectedOutputPartitionValues) s" by using input partitions ${selectedInputPartitionValues.mkString(", ")}" else ""
+              logger.info(s"($actionId) PartitionDiffMode selected output partition values ${selectedOutputPartitionValues.mkString(", ")} to process$inputPartitionLog.")
+              Some(ExecutionModeResult(inputPartitionValues = selectedInputPartitionValues, outputPartitionValues = selectedOutputPartitionValues))
+            } else throw ConfigurationException(s"$actionId has set executionMode = PartitionDiffMode but ${output.id} has no partition columns defined!")
+          } else throw ConfigurationException(s"$actionId has set executionMode = PartitionDiffMode but ${input.id} has no partition columns defined!")
+        case (_: CanHandlePartitions, _) => throw ConfigurationException(s"$actionId has set executionMode = PartitionDiffMode but ${output.id} does not support partitions!")
+        case (_, _) => throw ConfigurationException(s"$actionId has set executionMode = PartitionDiffMode but ${input.id} does not support partitions!")
       }
     } else None
   }
 }
+
+/**
+ * @param givenPartitionValues partition values received by main input or command line
+ * @param inputPartitionValues all partition values existing in main input DataObject
+ * @param outputPartitionValues all partition values existing in main output DataObject
+ * @param selectedInputPartitionValues input partition values selected by PartitionDiffMode
+ * @param selectedOutputPartitionValues output partition values selected by PartitionDiffMode
+ */
 case class PartitionDiffModeExpressionData(feed: String, application: String, runId: Int, attemptId: Int, referenceTimestamp: Option[Timestamp]
                                            , runStartTime: Timestamp, attemptStartTime: Timestamp
-                                           , inputPartitionValues: Seq[Map[String,String]], outputPartitionValues: Seq[Map[String,String]], selectedPartitionValues: Seq[Map[String,String]]) {
+                                           , givenPartitionValues: Seq[Map[String,String]], inputPartitionValues: Seq[Map[String,String]], outputPartitionValues: Seq[Map[String,String]]
+                                           , selectedInputPartitionValues: Seq[Map[String,String]], selectedOutputPartitionValues: Seq[Map[String,String]]) {
   override def toString: String = ProductUtil.formatObj(this)
 }
 private[smartdatalake] object PartitionDiffModeExpressionData {
   def from(context: ActionPipelineContext): PartitionDiffModeExpressionData = {
     PartitionDiffModeExpressionData(context.feed, context.application, context.runId, context.attemptId, context.referenceTimestamp.map(Timestamp.valueOf)
-      , Timestamp.valueOf(context.runStartTime), Timestamp.valueOf(context.attemptStartTime), Seq(), Seq(), Seq())
+      , Timestamp.valueOf(context.runStartTime), Timestamp.valueOf(context.attemptStartTime), Seq(), Seq(), Seq(), Seq(), Seq())
   }
 }
 
@@ -209,15 +286,21 @@ case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[
  * @param applyCondition Condition to decide if execution mode should be applied or not. Define a spark sql expression working with attributes of [[DefaultExecutionModeExpressionData]] returning a boolean.
  *                       Default is to apply the execution mode if given partition values (partition values from command line or passed from previous action) are not empty.
  */
-case class SparkIncrementalMode(compareCol: String, override val alternativeOutputId: Option[DataObjectId] = None, stopIfNoData: Boolean = true, applyCondition: Option[Condition] = None) extends ExecutionMode with ExecutionModeWithMainInputOutput {
+case class SparkIncrementalMode( compareCol: String
+                               , override val alternativeOutputId: Option[DataObjectId] = None
+                               , @deprecated("use dependent action executionCondition=true & executionMode=ProcessAll instead", "2.0.3") stopIfNoData: Boolean = true
+                               , applyCondition: Option[Condition] = None
+                               ) extends ExecutionMode with ExecutionModeWithMainInputOutput {
   private[smartdatalake] override val applyConditionsDef = applyCondition.toSeq
   private[smartdatalake] override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
-  private[smartdatalake] override def prepare(actionId: ActionObjectId)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  private[smartdatalake] override def prepare(actionId: ActionId)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.prepare(actionId)
     // check alternativeOutput exists
     alternativeOutput
   }
-  private[smartdatalake] override def apply(actionId: ActionObjectId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Option[(Seq[PartitionValues], Option[String])] = {
+  private[smartdatalake] override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
+                                            , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
+                                           (implicit session: SparkSession, context: ActionPipelineContext): Option[ExecutionModeResult] = {
     val doApply = evaluateApplyConditions(actionId, subFeed)
       .getOrElse(true) // default is to apply SparkIncrementalMode
     if (doApply) {
@@ -258,11 +341,11 @@ case class SparkIncrementalMode(compareCol: String, override val alternativeOutp
                 logger.info(s"($actionId) SparkIncrementalMode selected all data for writing to ${output.id}: output table is currently empty")
                 None
               }
-              Some((Seq(), dataFilter))
+              Some(ExecutionModeResult(filter = dataFilter))
             // select all if output is empty
             case (Some(_),None) =>
               logger.info(s"($actionId) SparkIncrementalMode selected all records for writing to ${output.id}, because output DataObject is still empty.")
-              Some((Seq(), None))
+              Some(ExecutionModeResult())
             // otherwise no data to process
             case _ =>
               logger.info(s"($actionId) SparkIncrementalMode selected all records for writing to ${output.id}, because output DataObject is still empty.")
@@ -284,11 +367,103 @@ private[smartdatalake] object SparkIncrementalMode {
  * Note: For start nodes of the DAG partition values can be defined by command line, for subsequent nodes partition values are passed on from previous nodes.
  */
 case class FailIfNoPartitionValuesMode() extends ExecutionMode {
-  private[smartdatalake] override def apply(actionId: ActionObjectId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Option[(Seq[PartitionValues], Option[String])] = {
+  private[smartdatalake] override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
+                                            , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
+                                           (implicit session: SparkSession, context: ActionPipelineContext): Option[ExecutionModeResult] = {
     // check if partition values present
-    if (subFeed.partitionValues.isEmpty) throw new IllegalStateException(s"($actionId) Partition values are empty for mainInput ${subFeed.dataObjectId.id}")
-    // return
+    if (subFeed.partitionValues.isEmpty && !context.appConfig.isDryRun) throw new IllegalStateException(s"($actionId) Partition values are empty for mainInput ${subFeed.dataObjectId.id}")
+    // return: no change of given partition values and filter
     None
+  }
+}
+
+/**
+ * An execution mode which forces processing all data from it's inputs.
+ */
+case class ProcessAllMode() extends ExecutionMode {
+  private[smartdatalake] override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
+                                            , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
+                                           (implicit session: SparkSession, context: ActionPipelineContext): Option[ExecutionModeResult] = {
+    // return: reset given partition values and filter
+    logger.info(s"($actionId) ProcessModeAll reset partition values")
+    Some(ExecutionModeResult())
+  }
+}
+
+/**
+ * Execution mode to create custom partition execution mode logic.
+ * Define a function which receives main input&output DataObject and returns partition values to process as Seq[Map[String,String]\]
+ *
+ * @param className class name implementing trait [[CustomPartitionModeLogic]]
+ * @param alternativeOutputId optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
+ *                            It can be used to ensure processing all partitions over multiple actions in case of errors.
+ * @param options Options specified in the configuration for this execution mode
+ */
+case class CustomPartitionMode(className: String, override val alternativeOutputId: Option[DataObjectId] = None, options: Option[Map[String,String]] = None)
+extends ExecutionMode with ExecutionModeWithMainInputOutput {
+  private[smartdatalake] override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
+  private val impl = CustomCodeUtil.getClassInstanceByName[CustomPartitionModeLogic](className)
+  private[smartdatalake] override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
+                                            , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
+                                           (implicit session: SparkSession, context: ActionPipelineContext): Option[ExecutionModeResult] = {
+    val output = alternativeOutput.getOrElse(mainOutput)
+    (mainInput, output) match {
+      case (input: CanHandlePartitions, output: CanHandlePartitions) =>
+        val partitionValuesOpt = impl.apply(session, options.getOrElse(Map()), actionId, input, output, subFeed.partitionValues.map(_.getMapString), context)
+          .map(_.map( pv => PartitionValues(pv)))
+        partitionValuesOpt.map(pvs => ExecutionModeResult(inputPartitionValues = pvs, outputPartitionValues = pvs))
+      case (_: CanHandlePartitions, _) =>
+        throw ConfigurationException(s"$actionId has set executionMode = CustomPartitionMode but ${output.id} does not support partitions!")
+      case (_, _) =>
+        throw ConfigurationException(s"$actionId has set executionMode = CustomPartitionMode but $mainInput does not support partitions!")
+    }
+  }
+}
+trait CustomPartitionModeLogic {
+  def apply(session: SparkSession, options: Map[String,String], actionId: ActionId, input: DataObject with CanHandlePartitions, output: DataObject with CanHandlePartitions, givenPartitionValues: Seq[Map[String,String]], context: ActionPipelineContext): Option[Seq[Map[String,String]]]
+}
+
+/**
+ * Execution mode to incrementally process file-based DataObjects.
+ * It takes all existing files in the input DataObject and removes (deletes) them after processing.
+ * Input partition values are applied when searching for files and also used as output partition values.
+ * @param stopIfNoData optional setting if further actions should be skipped if this action has no data to process (default).
+ *                     Set stopIfNoData=false if you want to run further actions nevertheless. They will receive output dataObject unfiltered as input.
+ */
+case class FileIncrementalMoveMode(stopIfNoData: Boolean = true) extends ExecutionMode {
+
+  /**
+   * Check for files in input data object.
+   */
+  private[smartdatalake] override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
+                                            , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
+                                           (implicit session: SparkSession, context: ActionPipelineContext): Option[ExecutionModeResult] = {
+    (mainInput,subFeed) match {
+      case (inputDataObject: FileRefDataObject, inputSubFeed: FileSubFeed) =>
+        // search FileRefs if not present from previous actions
+        val fileRefs = inputSubFeed.fileRefs.getOrElse(inputDataObject.getFileRefs(inputSubFeed.partitionValues))
+        // skip processing if no new data
+        val warnMsg = if (fileRefs.isEmpty) {
+          Some(s"($actionId) No files to process found for ${inputDataObject.id}, partitionValues=${inputSubFeed.partitionValues.mkString(", ")}")
+        } else None
+        warnMsg.foreach { msg =>
+          if (stopIfNoData) throw NoDataToProcessWarning(actionId.id, msg)
+          else throw NoDataToProcessDontStopWarning(actionId.id, msg)
+        }
+        Some(ExecutionModeResult(fileRefs = Some(fileRefs), inputPartitionValues = inputSubFeed.partitionValues, outputPartitionValues = inputSubFeed.partitionValues))
+      case _ => throw ConfigurationException(s"($actionId) FileIncrementalMoveMode needs FileRefDataObject and FileSubFeed as input")
+    }
+  }
+
+  /**
+   * Delete data after read
+   */
+  private[smartdatalake] override def postExec(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, mainInputSubFeed: SubFeed, mainOutputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    (mainInput, mainOutputSubFeed) match {
+      case (fileRefInput: FileRefDataObject, fileSubFeed: FileSubFeed) =>
+        fileSubFeed.processedInputFileRefs.foreach(fileRefs => fileRefInput.deleteFileRefs(fileRefs))
+      case x => throw ConfigurationException(s"($actionId) FileIncrementalMoveMode needs FileRefDataObject and FileSubFeed as input")
+    }
   }
 }
 
@@ -314,4 +489,3 @@ private[smartdatalake] case class ExecutionModeFailedException(id: NodeId, phase
   override val severity: ExceptionSeverity = if (phase == ExecutionPhase.Init) ExceptionSeverity.FAILED_DONT_STOP else ExceptionSeverity.FAILED
   override def getDAGRootExceptions: Seq[DAGException] = Seq(this)
 }
-

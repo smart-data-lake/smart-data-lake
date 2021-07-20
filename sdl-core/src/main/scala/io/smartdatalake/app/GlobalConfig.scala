@@ -20,24 +20,47 @@
 package io.smartdatalake.app
 
 import com.typesafe.config.Config
-import configs.Configs
+import configs.ConfigReader
 import configs.syntax._
+import io.smartdatalake.config.ConfigImplicits
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.{MemoryUtils, SmartDataLakeLogger}
+import io.smartdatalake.util.secrets.{SecretProviderConfig, SecretsUtil}
+import io.smartdatalake.workflow.action.customlogic.{PythonUDFCreatorConfig, SparkUDFCreatorConfig}
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.custom.ExpressionEvaluator
 
 /**
  * Global configuration options
  *
- * @param kryoClasses classes to register for spark kryo serialization
- * @param sparkOptions spark options
- * @param enableHive enable hive for spark session
- * @param memoryLogTimer enable periodic memory usage logging, see detailled configuration [[MemoryLogTimerConfig]]
+ * @param kryoClasses    classes to register for spark kryo serialization
+ * @param sparkOptions   spark options
+ * @param enableHive     enable hive for spark session
+ * @param memoryLogTimer enable periodic memory usage logging, see detailed configuration [[MemoryLogTimerConfig]]
  * @param shutdownHookLogger enable shutdown hook logger to trace shutdown cause
+ * @param stateListeners Define state listeners to be registered for receiving events of the execution of SmartDataLake job
+ * @param sparkUDFs      Define UDFs to be registered in spark session. The registered UDFs are available in Spark SQL transformations
+ *                       and expression evaluation, e.g. configuration of ExecutionModes.
+ * @param pythonUDFs     Define UDFs in python to be registered in spark session. The registered UDFs are available in Spark SQL transformations
+ *                       but not for expression evaluation.
+ * @param secretProviders Define SecretProvider's to be registered.
+ * @param allowOverwriteAllPartitionsWithoutPartitionValues Configure a list of exceptions for partitioned DataObject id's,
+ *                       which are allowed to overwrite the all partitions of a table if no partition values are set.
+ *                       This is used to override/avoid a protective error when using SDLSaveMode.OverwriteOptimized|OverwritePreserveDirectories.
+ *                       Define it as a list of DataObject id's.
  */
-case class GlobalConfig( kryoClasses: Option[Seq[String]] = None, sparkOptions: Option[Map[String,String]] = None, enableHive: Boolean = true
-                       , memoryLogTimer: Option[MemoryLogTimerConfig] = None, shutdownHookLogger: Boolean = false
-                       , stateListeners: Seq[StateListenerConfig] = Seq())
+case class GlobalConfig( kryoClasses: Option[Seq[String]] = None
+                       , sparkOptions: Option[Map[String,String]] = None
+                       , enableHive: Boolean = true
+                       , memoryLogTimer: Option[MemoryLogTimerConfig] = None
+                       , shutdownHookLogger: Boolean = false
+                       , stateListeners: Seq[StateListenerConfig] = Seq()
+                       , sparkUDFs: Option[Map[String,SparkUDFCreatorConfig]] = None
+                       , pythonUDFs: Option[Map[String,PythonUDFCreatorConfig]] = None
+                       , secretProviders: Option[Map[String,SecretProviderConfig]] = None
+                       , allowOverwriteAllPartitionsWithoutPartitionValues: Seq[DataObjectId] = Seq()
+                       )
 extends SmartDataLakeLogger {
 
   // start memory logger, else log memory once
@@ -49,6 +72,11 @@ extends SmartDataLakeLogger {
   // add debug shutdown hook logger
   if (shutdownHookLogger) MemoryUtils.addDebugShutdownHooks()
 
+  // register secret providers
+  secretProviders.getOrElse(Map()).foreach { case (id, providerConfig) =>
+    SecretsUtil.registerProvider(id, providerConfig.provider)
+  }
+
   /**
    * Create a spark session using settings from this global config
    */
@@ -57,17 +85,28 @@ extends SmartDataLakeLogger {
     // prepare additional spark options
     // enable MemoryLoggerExecutorPlugin if memoryLogTimer is enabled
     val executorPlugins = (sparkOptions.flatMap(_.get("spark.executor.plugins")).toSeq ++ (if (memoryLogTimer.isDefined) Seq(classOf[MemoryLoggerExecutorPlugin].getName) else Seq()))
-    // config for MemoryLoggerExecutorPlugin can only be transfered to Executor by spark-options
+    // config for MemoryLoggerExecutorPlugin can only be transferred to Executor by spark-options
     val memoryLogOptions = memoryLogTimer.map(_.getAsMap).getOrElse(Map())
     val sparkOptionsExtended = sparkOptions.getOrElse(Map()) ++ memoryLogOptions ++ (if (executorPlugins.nonEmpty) Map("spark.executor.plugins" -> executorPlugins.mkString(",")) else Map())
     Environment._sparkSession = AppUtil.createSparkSession(appName, master, deployMode, kryoClasses, sparkOptionsExtended, enableHive)
+    sparkUDFs.getOrElse(Map()).foreach { case (name,config) =>
+      val udf = config.getUDF
+      // register in SDL spark session
+      Environment._sparkSession.udf.register(name, udf)
+      // register for use in expression evaluation
+      ExpressionEvaluator.registerUdf(name, udf)
+    }
+    pythonUDFs.getOrElse(Map()).foreach { case (name,config) =>
+      // register in SDL spark session
+      config.registerUDF(name, Environment._sparkSession)
+    }
     // return
     Environment._sparkSession
   }
 }
-object GlobalConfig {
+object GlobalConfig extends ConfigImplicits {
   private[smartdatalake] def from(config: Config): GlobalConfig = {
-    implicit val customStateListenerConfig: Configs[StateListenerConfig] = Configs.derive[StateListenerConfig]
+    implicit val customStateListenerConfig: ConfigReader[StateListenerConfig] = ConfigReader.derive[StateListenerConfig]
     globalConfig = Some(config.get[Option[GlobalConfig]]("global").value.getOrElse(GlobalConfig()))
     globalConfig.get
   }

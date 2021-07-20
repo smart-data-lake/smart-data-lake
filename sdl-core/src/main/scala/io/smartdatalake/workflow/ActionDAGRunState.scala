@@ -19,61 +19,100 @@
 
 package io.smartdatalake.workflow
 
-import java.time.{LocalDateTime, Duration => JavaDuration}
-
+import com.typesafe.config.{ConfigFactory, ConfigRenderOptions, ConfigValueFactory}
+import configs.Result.{Failure, Success}
+import configs._
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
-import io.smartdatalake.config.SdlConfigObject.ActionObjectId
+import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.config.SdlConfigObject.ActionId
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
-import io.smartdatalake.workflow.action.{RuntimeEventState, RuntimeInfo}
+import io.smartdatalake.workflow.action.{ResultRuntimeInfo, RuntimeEventState, RuntimeInfo}
+import org.apache.spark.sql.DataFrame
+
+import java.time.{Duration, LocalDateTime}
+import java.time.format.DateTimeFormatter
+import java.{util => ju}
+import scala.collection.compat.Factory
 
 /**
  * ActionDAGRunState contains all configuration and state of an ActionDAGRun needed to start a recovery run in case of failure.
  */
-private[smartdatalake] case class ActionDAGRunState( appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int,runStartTime: LocalDateTime, attemptStartTime: LocalDateTime
-                                                   , actionsState: Map[ActionObjectId, RuntimeInfo], isFinal: Boolean) {
+private[smartdatalake] case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime
+                                                    , actionsState: Map[ActionId, RuntimeInfo], isFinal: Boolean) {
   def toJson: String = ActionDAGRunState.toJson(this)
   def isFailed: Boolean = actionsState.exists(_._2.state==RuntimeEventState.FAILED)
   def isSucceeded: Boolean = isFinal && !isFailed
 }
 private[smartdatalake] object ActionDAGRunState {
-  // json4s is used because kxbmap configs supports converting case classes to config only from version 5.0 which isn't yet stable
-  // json4s is included with spark-core
-  // Note that key-type of Maps must be String in json4s (e.g. actionsState...)
-  import org.json4s._
-  import org.json4s.jackson.JsonMethods._
-  import org.json4s.jackson.Serialization
-  implicit val formats =  DefaultFormats.withHints(ShortTypeHints(List(classOf[SparkSubFeed],classOf[FileSubFeed]))).withTypeHintFieldName("type") +
-    RuntimeEventStateSerializer + DurationSerializer + LocalDateTimeSerializer + ActionObjectIdKeySerializer
 
-  def toJson(actionDAGRunState: ActionDAGRunState): String = pretty(parse(Serialization.write(actionDAGRunState)))
+  import configs.syntax._
 
-  def fromJson(stateJson: String): ActionDAGRunState = {
-    val rawState = parse(stateJson).extract[ActionDAGRunState]
-    // fix key class type of "value class ActionObjectId" for scala 2.11 (ActionDAGRunTest fails for scala 2.11 otherwise)
-    rawState.copy(actionsState = rawState.actionsState.map( e => (if (e._1.getClass==classOf[String]) ActionObjectId(e._1.asInstanceOf[String]) else e._1, e._2)))
+  // Json Naming
+  implicit def jsonNaming[A]: ConfigKeyNaming[A] = ConfigKeyNaming.lowerCamelCase[A]
+
+  // String converters
+  implicit val actionIdStringConverter: StringConverter[ActionId] = StringConverter.fromTry(ActionId, _.id)
+  implicit val runtimeEventStateStringConverter: StringConverter[RuntimeEventState] = StringConverter.fromTry(RuntimeEventState.withName, _.toString)
+  val localDateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
+  implicit val localDateTimeStringConverter: StringConverter[LocalDateTime] = StringConverter.fromTry(
+    LocalDateTime.parse(_, localDateTimeFormatter), localDateTimeFormatter.format
+  )
+  implicit val durationStringConverter: StringConverter[Duration] = StringConverter.fromTry(Duration.parse, _.toString)
+
+  // json readers
+  implicit val mapStringAnyReader: ConfigReader[Map[String,Any]] = {
+    val anyReader: ConfigReader[Any] = ConfigReader.fromTry { (c,p) =>
+      c.getAnyRef(p) match {
+        // only String and Integer needed for now
+        case v: String => v
+        case v: Integer => v
+      }
+    }
+    val javaMapStringAnyConfigReader: ConfigReader[ju.Map[String, Any]] = ConfigReader.javaMapConfigReader(implicitly[StringConverter[String]], anyReader)
+    ConfigReader.cbfJMapConfigReader(javaMapStringAnyConfigReader, implicitly[Factory[(String, Any), Map[String, Any]]])
+  }
+  implicit val seqPartitionValuesReader: ConfigReader[Seq[PartitionValues]] = getSeqReader[PartitionValues]
+  // DataFrames are not stored to Json -> always read none
+  implicit val dataFrameReader: ConfigReader[Option[DataFrame]] = ConfigReader.successful(None)
+  implicit val seqResultRuntimeInfoReader: ConfigReader[Seq[ResultRuntimeInfo]] = getSeqReader[ResultRuntimeInfo]
+  implicit val durationReader: ConfigReader[Duration] = ConfigReader.fromStringConfigReader
+
+  // json writers
+  implicit val mapStringAnyConfigWriter: ConfigWriter[Map[String,Any]] = {
+    val anyWriter: ConfigWriter[Any] = ConfigWriter.from(ConfigValueFactory.fromAnyRef)
+    ConfigWriter.mapConfigWriter(StringConverter[String], anyWriter)
+  }
+  implicit val partitionValuesConfigWriter: ConfigWriter[PartitionValues] = ConfigWriter.derive[PartitionValues]
+  // DataFrames are not stored to Json -> always write none
+  implicit val dataFrameWriter: ConfigWriter[Option[DataFrame]] = ConfigWriter.from(_ => ConfigValue.Null)
+  implicit val seqResultRuntimeInfoWriter: ConfigWriter[Seq[ResultRuntimeInfo]] = getSeqWriter[ResultRuntimeInfo]
+  implicit val durationWriter: ConfigWriter[Duration] = ConfigWriter.stringConfigWriter.contramap(durationStringConverter.toString)
+
+  // write state to Json
+  def toJson(actionDAGRunState: ActionDAGRunState): String = {
+    val renderOptions = ConfigRenderOptions.defaults().setJson(true).setFormatted(true).setOriginComments(false)
+    val writer = ConfigWriter.derive[ActionDAGRunState]
+    writer.write(actionDAGRunState).render(renderOptions)
   }
 
-  // custom serialization for RuntimeEventState which is shorter than the default
-  case object RuntimeEventStateSerializer extends CustomSerializer[RuntimeEventState](format => (
-    { case JString(state) => RuntimeEventState.withName(state) },
-    { case state: RuntimeEventState => JString(state.toString) }
-  ))
-  // custom serialization for Duration
-  case object DurationSerializer extends CustomSerializer[JavaDuration](format => (
-    { case JString(dur) => JavaDuration.parse(dur) },
-    { case dur: JavaDuration => JString(dur.toString) }
-  ))
-  // custom serialization for LocalDateTime
-  case object LocalDateTimeSerializer extends CustomSerializer[LocalDateTime](format => (
-    { case JString(tstmp) => LocalDateTime.parse(tstmp) },
-    { case tstmp: LocalDateTime => JString(tstmp.toString) }
-  ))
-  // custom serialization for ActionObjectId as key of Maps
-  case object ActionObjectIdKeySerializer extends CustomKeySerializer[ActionObjectId](format => (
-    { case id => ActionObjectId(id) },
-    { case id: ActionObjectId => id.id }
-  ))
+  // read state from json
+  def fromJson(stateJson: String): ActionDAGRunState = {
+    ConfigFactory.parseString(stateJson).extract[ActionDAGRunState] match {
+      case Success(value) => value
+      case Failure(e) => throw new ConfigurationException(s"Unable to parse state from json: ${e.messages.mkString(",")}")
+      case _ => throw new Exception("Unmatched case, should never happen.")
+    }
+  }
+
+  // Helpers
+  private def getSeqReader[A: ConfigReader]: ConfigReader[Seq[A]] = {
+    ConfigReader.cbfJListConfigReader(ConfigReader.javaListConfigReader[A], implicitly[Factory[A, Seq[A]]])
+  }
+  private def getSeqWriter[A: ConfigWriter]: ConfigWriter[Seq[A]] = {
+    ConfigWriter.iterableConfigWriter
+  }
 }
 
 private[smartdatalake] trait ActionDAGRunStateStore[A <: StateId] extends SmartDataLakeLogger {

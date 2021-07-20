@@ -73,7 +73,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
                        fileExtension: String = null)
                       (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
 
-    test("Reading an empty file creates an empty data frame with the embedded schema and ignores user-defined schema.") {
+    test("Reading an empty file creates an empty data frame with the user-defined schema.") {
       val embeddedSchema = Seq(
         StructField("_c1", StringType, nullable = true)
       )
@@ -91,7 +91,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
         df.show()
         df.printSchema()
 
-        df.schema should contain theSameElementsInOrderAs embeddedSchema
+        df.schema should contain theSameElementsInOrderAs userSchema
         df shouldBe empty
       } finally {
         FileUtils.forceDelete(new File(path))
@@ -122,7 +122,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
 
   def validateSchemaMinOnWrite(createDataObject: (String, Option[StructType], Option[StructType]) => DataObject with CanWriteDataFrame,
                                fileExtension: String = null)
-                              (implicit session: SparkSession) : Unit = {
+                              (implicit session: SparkSession, context: ActionPipelineContext) : Unit = {
 
     val schemaMin = Seq(
       StructField("id", StringType, nullable = true),

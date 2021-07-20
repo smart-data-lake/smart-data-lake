@@ -19,12 +19,15 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.PartitionValues
-import org.apache.spark.sql.SparkSession
+import io.smartdatalake.workflow.SchemaViolationException
+import org.apache.spark.annotation.DeveloperApi
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
  * A trait to be implemented by DataObjects which store partitioned data
  */
-private[smartdatalake] trait CanHandlePartitions {
+@DeveloperApi
+trait CanHandlePartitions { this: DataObject =>
 
   /**
    * Definition of partition columns
@@ -38,12 +41,12 @@ private[smartdatalake] trait CanHandlePartitions {
    * example: "elements['yourColName'] > 2017"
    * @return true if partition is expected to exist.
    */
-  def expectedPartitionsCondition: Option[String]
+  private[smartdatalake] def expectedPartitionsCondition: Option[String]
 
   /**
    * Delete given partitions. This is used to cleanup partitions after they are processed.
    */
-  def deletePartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = throw new RuntimeException(s"deletePartitions not implemented")
+  private[smartdatalake] def deletePartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = throw new RuntimeException(s"deletePartitions not implemented")
 
   /**
    * list partition values
@@ -53,13 +56,13 @@ private[smartdatalake] trait CanHandlePartitions {
   /**
    * create empty partition
    */
-  def createEmptyPartition(partitionValues: PartitionValues)(implicit session: SparkSession): Unit = throw new RuntimeException(s"createEmptyPartition not implemented")
+  private[smartdatalake] def createEmptyPartition(partitionValues: PartitionValues)(implicit session: SparkSession): Unit = throw new RuntimeException(s"createEmptyPartition not implemented")
 
   /**
    * Create empty partitions for partition values not yet existing
    */
-  final def createMissingPartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
-    val partitionValuesCols = partitionValues.map(_.keys).fold(Set())(_ ++ _).toSeq
+  private[smartdatalake] final def createMissingPartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+    val partitionValuesCols = partitionValues.map(_.keys).reduceOption(_ ++ _).getOrElse(Set()).toSeq
     partitionValues.diff(listPartitions.map(_.filterKeys(partitionValuesCols)))
       .foreach(createEmptyPartition)
   }
@@ -67,7 +70,7 @@ private[smartdatalake] trait CanHandlePartitions {
   /**
    * Filter list of partition values by expected partitions condition
    */
-  final def filterExpectedPartitionValues(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[PartitionValues] = {
+  private[smartdatalake] final def filterExpectedPartitionValues(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[PartitionValues] = {
     import org.apache.spark.sql.functions.expr
     import session.implicits._
     expectedPartitionsCondition.map{ condition =>
@@ -76,5 +79,17 @@ private[smartdatalake] trait CanHandlePartitions {
       val expectedHashCodes = partitionsValuesStringWithHashCode.toDF("elements","hashCode").where(expr(condition)).select($"hashCode").as[Int].collect.toSet
       partitionValues.filter( pv => expectedHashCodes.contains(pv.hashCode))
     }.getOrElse(partitionValues)
+  }
+
+  /**
+   * Validate the schema of a given Spark Data Frame `df` that it contains the specified partition columns
+   *
+   * @param df The data frame to validate.
+   * @param role role used in exception message. Set to read or write.
+   * @throws SchemaViolationException if the partitions columns are not included.
+   */
+  def validateSchemaHasPartitionCols(df: DataFrame, role: String): Unit = {
+    val missingCols = partitions.diff(df.columns)
+    if (missingCols.nonEmpty) throw new SchemaViolationException(s"($id) DataFrame is missing partition cols ${missingCols.mkString(", ")} on $role")
   }
 }

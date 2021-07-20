@@ -45,14 +45,17 @@ import org.apache.spark.sql.types._
 import scala.collection.JavaConverters._
 
 /**
- * Definition of date partition column to extract formatted timestamp into column.
+ * Definition of date partition column to extract formatted time into column.
  *
- * @param colName date partition column name to extract timestamp into column on batch read
+ * @param colName date partition column name to extract time into column on batch read
  * @param timeFormat time format for timestamp in date partition column, definition according to java DateTimeFormatter. Default is "yyyyMMdd".
  * @param timeUnit time unit for timestamp in date partition column, definition according to java ChronoUnit. Default is "days".
  * @param timeZone time zone used for date logic. If not specified, java system default is used.
+ * @param includeCurrentPartition If the current partition should be included. Default is to list only completed partitions.
+ *                                Attention: including the current partition might result in data loss if there is more data arriving.
+ *                                But it might be useful to export all data before a scheduled maintenance.
  */
-case class DatePartitionColumnDef(colName: String, timeFormat: String = "yyyyMMdd", timeUnit: String = "days", timeZone: Option[String] = None ) {
+case class DatePartitionColumnDef(colName: String, timeFormat: String = "yyyyMMdd", timeUnit: String = "days", timeZone: Option[String] = None, includeCurrentPartition: Boolean = false) {
   @transient lazy private[smartdatalake] val formatter = DateTimeFormatter.ofPattern(timeFormat) // not serializable -> transient lazy to use in udf
   private[smartdatalake] val chronoUnit = ChronoUnit.valueOf(timeUnit.toUpperCase)
   private[smartdatalake] val zoneId = timeZone.map(ZoneId.of).getOrElse(ZoneId.systemDefault)
@@ -98,8 +101,8 @@ private object TemporalQueries {
   *                   This is used to list existing partition and is added as additional column on batch read.
   * @param batchReadConsecutivePartitionsAsRanges Set to true if consecutive partitions should be combined as one range of offsets when batch reading from topic. This results in less tasks but can be a performance problem when reading many partitions. (default=false)
   * @param batchReadMaxOffsetsPerTask Set number of offsets per Spark task when batch reading from topic.
-  * @param dataSourceOptions Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).
-  *                      These options override connection.kafkaOptions.
+  * @param options    Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).
+  *                   These options override connection.options.
   */
 case class KafkaTopicDataObject(override val id: DataObjectId,
                                 topicName: String,
@@ -111,7 +114,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                                 datePartitionCol: Option[DatePartitionColumnDef] = None,
                                 batchReadConsecutivePartitionsAsRanges: Boolean = false,
                                 batchReadMaxOffsetsPerTask: Option[Int] = None,
-                                dataSourceOptions: Map[String, String] = Map(),
+                                options: Map[String, String] = Map(),
                                 override val metadata: Option[DataObjectMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with CanCreateStreamingDataFrame with CanWriteDataFrame with CanHandlePartitions with SchemaValidation {
@@ -125,7 +128,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   require((keyType!=KafkaColumnType.AvroSchemaRegistry && valueType!=KafkaColumnType.AvroSchemaRegistry) || connection.schemaRegistry.nonEmpty, s"($id) If key or value is of type AvroSchemaRegistry, the schemaRegistry must be defined in the connection")
   require(batchReadMaxOffsetsPerTask.isEmpty || batchReadMaxOffsetsPerTask.exists(_>0), s"($id) batchReadMaxOffsetsPerTask must be greater than 0")
 
-  private val instanceOptions = connection.sparkOptions ++ dataSourceOptions
+  private val instanceOptions = connection.sparkOptions ++ options
 
   // consumer for reading topic metadata
   @transient private lazy val consumer = {
@@ -135,7 +138,9 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false")
     props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, classOf[ByteArrayDeserializer].getName)
     props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, classOf[ByteArrayDeserializer].getName)
-    connection.authProps.asScala.foreach{ case (k,v) => props.put(k,v)}
+    instanceOptions
+      .filter{ case (k,v) => k.startsWith(connection.KafkaConfigOptionPrefix)} // only kafka specific options
+      .foreach{ case (k,v) => props.put(k.stripPrefix(connection.KafkaConfigOptionPrefix),v)}
     new KafkaConsumer(props)
   }
 
@@ -148,7 +153,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
   }
 
-  override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+  override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     // check schema compatibility
     require(df.columns.toSet == Set("key","value"), s"(${id}) Expects columns key, value in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
     convertToKafka(keyType, df("key"), SubjectType.key, eagerCheck = true)
@@ -176,7 +181,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       .as("kafka")
       .withOptionalColumn(datePartitionCol.map(_.colName), udfFormatPartition(col("timestamp")))
       .select(colsToSelect:_*)
-    validateSchemaMin(df)
+    validateSchemaMin(df, "read")
     // return
     df
   }
@@ -268,7 +273,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     )
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession): Unit = {
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     convertToWriteDataFrame(df)
       .write
       .format("kafka")
@@ -277,7 +282,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       .save
   }
 
-  override def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String, String], checkpointLocation: String, queryName: String, outputMode: OutputMode)(implicit session: SparkSession): StreamingQuery = {
+  override def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String, String], checkpointLocation: String, queryName: String, outputMode: OutputMode)(implicit session: SparkSession, context: ActionPipelineContext): StreamingQuery = {
     convertToWriteDataFrame(df)
       .writeStream
       .format("kafka")
@@ -314,7 +319,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   override def listPartitions(implicit session: SparkSession): Seq[PartitionValues] = {
     require(datePartitionCol.isDefined, s"(${id}) datePartitionCol column must be defined for listing partition values")
     val maxEmptyConsecutive: Int = 10 // number of empty partitions to stop searching for partitions
-    val pctChronoUnitWaitToComplete = 0.02 // percentage of one chrono unit to wait after partition end date to wait until the partition is assumed to be complete. This is to handle kafka late data.
+    val pctChronoUnitWaitToComplete = 0.02 // percentage of one chrono unit to wait after partition end date until the partition is assumed to be complete. This is to handle kafka late data.
     val partitions = consumer.partitionsFor(topicName)
     require(partitions!=null, s"($id) topic $topicName doesn't exist")
     logger.debug(s"($id) got kafka partitions ${partitions.asScala.map(_.partition)} for topic $topicName")
@@ -322,7 +327,9 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     // determine last completed partition - we need to wait some time after considering a partition to be complete because of late data
     val currentPartitionStartTime = datePartitionCol.get.current
     val minDurationWaitToComplete = Duration.ofMillis((datePartitionCol.get.chronoUnit.getDuration.toMillis * pctChronoUnitWaitToComplete).toLong)
-    val lastCompletedPartitionStartTime = if (currentPartitionStartTime.isBefore(LocalDateTime.now().minus(minDurationWaitToComplete))) {
+    val lastCompletedPartitionStartTime = if (datePartitionCol.get.includeCurrentPartition) {
+      currentPartitionStartTime
+    } else if (currentPartitionStartTime.isBefore(LocalDateTime.now().minus(minDurationWaitToComplete))) {
       datePartitionCol.get.previous(currentPartitionStartTime)
     } else {
       datePartitionCol.get.previous(currentPartitionStartTime, 2)
@@ -420,11 +427,7 @@ object KafkaTopicDataObject extends FromConfigFactory[DataObject] {
   /**
     * @inheritdoc
     */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): KafkaTopicDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[KafkaTopicDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): KafkaTopicDataObject = {
+    extract[KafkaTopicDataObject](config)
   }
 }

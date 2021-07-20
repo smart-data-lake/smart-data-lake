@@ -23,6 +23,8 @@ import java.io.{InputStream, OutputStream}
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.SDLSaveMode
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.filetransfer.SshUtil
 import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -55,7 +57,7 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
                                  connectionId: ConnectionId,
                                  override val partitions: Seq[String] = Seq(),
                                  override val partitionLayout: Option[String] = None,
-                                 override val saveMode: SaveMode = SaveMode.Overwrite,
+                                 override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                  override val expectedPartitionsCondition: Option[String] = None,
                                  override val metadata: Option[DataObjectMetadata] = None)
                                 (@transient implicit val instanceRegistry: InstanceRegistry)
@@ -129,9 +131,13 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
             val pattern = PartitionLayout.replaceTokens(partitionLayout, PartitionValues(Map()))
             // list directories and extract partition values
             SshUtil.sftpListFiles(path + separator + pattern)(sftp)
-              .map( f => PartitionLayout.extractPartitionValues(partitionLayout, "", f.stripPrefix(path+separator) + separator))
+              .map( f => PartitionLayout.extractPartitionValues(partitionLayout, "", relativizePath(f) + separator))
         }
     }.getOrElse(Seq())
+  }
+
+  override def relativizePath(filePath: String): String = {
+    filePath.stripPrefix(path+separator)
   }
 
   override def prepare(implicit session: SparkSession): Unit = try {
@@ -140,22 +146,11 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
     case ex: Throwable => throw ConnectionTestException(s"($id) Can not connect. Error: ${ex.getMessage}", ex)
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[DataObject] = SFtpFileRefDataObject
 }
 
 object SFtpFileRefDataObject extends FromConfigFactory[DataObject] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): SFtpFileRefDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[SFtpFileRefDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SFtpFileRefDataObject = {
+    extract[SFtpFileRefDataObject](config)
   }
 }

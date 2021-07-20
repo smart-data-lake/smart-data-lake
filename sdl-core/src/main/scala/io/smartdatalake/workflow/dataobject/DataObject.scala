@@ -22,14 +22,19 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, AtlasExportable}
 import io.smartdatalake.workflow.connection.Connection
+import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.SparkSession
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
-private[smartdatalake] trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] with SmartDataLakeLogger {
+/**
+ * This is the root trait for every DataObject.
+ */
+@DeveloperApi
+trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] with SmartDataLakeLogger with AtlasExportable {
 
   /**
    * A unique identifier for this instance.
@@ -46,28 +51,28 @@ private[smartdatalake] trait DataObject extends SdlConfigObject with ParsableFro
    *
    * This runs during the "prepare" operation of the DAG.
    */
-  def prepare(implicit session: SparkSession): Unit = Unit
+  private[smartdatalake] def prepare(implicit session: SparkSession): Unit = Unit
 
   /**
    * Runs operations before reading from [[DataObject]]
    */
-  def preRead(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
+  private[smartdatalake] def preRead(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
 
   /**
    * Runs operations after reading from [[DataObject]]
    */
-  def postRead(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
+  private[smartdatalake] def postRead(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
 
   /**
    * Runs operations before writing to [[DataObject]]
    * Note: As the transformed SubFeed doesnt yet exist in Action.preWrite, no partition values can be passed as parameters as in preRead
    */
-  def preWrite(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
+  private[smartdatalake] def preWrite(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
 
   /**
    * Runs operations after writing to [[DataObject]]
    */
-  def postWrite(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
+  private[smartdatalake] def postWrite(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
 
   /**
    * Handle class cast exception when getting objects from instance registry
@@ -96,6 +101,8 @@ private[smartdatalake] trait DataObject extends SdlConfigObject with ParsableFro
   def toStringShort: String = {
     s"$id[${this.getClass.getSimpleName}]"
   }
+
+  override def atlasName: String = id.id
 }
 
 /**

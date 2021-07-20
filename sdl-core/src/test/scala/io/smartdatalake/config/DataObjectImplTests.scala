@@ -20,18 +20,26 @@ package io.smartdatalake.config
 
 import com.typesafe.config.{ConfigException, ConfigFactory}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.DateColumnType
+import io.smartdatalake.definitions.{DateColumnType, KeycloakClientSecretAuthMode, SDLSaveMode}
+import io.smartdatalake.testutils.custom.TestCustomDfCreator
 import io.smartdatalake.util.misc.{AclDef, AclElement}
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.connection.JdbcTableConnection
 import io.smartdatalake.workflow.dataobject.{Table, _}
-import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.scalatest.{FlatSpec, Matchers}
 
-class DataObjectImplTests extends FlatSpec with Matchers {
+import scala.reflect.runtime.universe.{MethodSymbol, typeOf}
+
+class DataObjectImplTests extends FlatSpec with Matchers with ConfigImplicits {
 
   "AvroFileDataObject" should "be parsable" in {
+
+    val t = typeOf[AvroFileDataObject].members.collect {
+      case (m: MethodSymbol @unchecked) if m.isCaseAccessor => m
+    }
+    val names = t.map(_.name.decodedName)
+
     val config = ConfigFactory.parseString(
       """
         |dataObjects = {
@@ -39,7 +47,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
         |   type = AvroFileDataObject
         |   path = /path/to/foo
         |   partitions = []
-        |   save-mode = Append
+        |   saveMode = Append
         |   acl = {
         |     permission="rwxr-x---"
         |     acls = [
@@ -60,7 +68,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
       id = "123",
       path = "/path/to/foo",
       partitions = Seq.empty,
-      saveMode = SaveMode.Append,
+      saveMode = SDLSaveMode.Append,
       acl = Some(AclDef(permission = "rwxr-x---", acls = Seq(AclElement(aclType = "group", name = "test", permission = "r-x")))),
       metadata = Some(DataObjectMetadata(name = Some("test"), description = Some("i am a test")))
     )
@@ -136,7 +144,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
           StructField("last", StringType, nullable = true)
         ))),
         partitions = Seq("dt", "type"),
-        saveMode = SaveMode.Append
+        saveMode = SDLSaveMode.Append
       ),
       CsvFileDataObject(
         id = "124",
@@ -238,7 +246,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
       path = "/path/to/foo",
       jsonOptions = Some(Map("multiLine" -> "false", "foo" -> "bar")),
       partitions = Seq.empty,
-      saveMode = SaveMode.Overwrite
+      saveMode = SDLSaveMode.Overwrite
     )
   }
 
@@ -284,7 +292,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
 
   "CustomDfDataObject" should "be parsable" in {
     val testCreatorConfig = CustomDfCreatorConfig(
-      className = Some("io.smartdatalake.config.TestCustomDfCreator"),
+      className = Some(classOf[TestCustomDfCreator].getName),
       options = Some(Map("test" -> "foo"))
     )
 
@@ -294,7 +302,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
          | 123 = {
          |   type = CustomDfDataObject
          |   creator {
-         |     class-name = io.smartdatalake.config.TestCustomDfCreator
+         |     class-name = io.smartdatalake.testutils.custom.TestCustomDfCreator
          |     options = {
          |       test = foo
          |     }
@@ -316,23 +324,24 @@ class DataObjectImplTests extends FlatSpec with Matchers {
          |dataObjects = {
          | 123 = {
          |  type = WebserviceFileDataObject
-         |  webservice-options {
-         |    url = "http://test"
-         |    client-id-variable = "CLEAR#foo"
-         |    client-secret-variable = "CLEAR#secret"
+         |  url = "http://test"
+         |  auth-mode = {
+         |    type = KeycloakClientSecretAuthMode
+         |    ssoServer = server
+         |    ssoRealm = realm
+         |    ssoGrantType = client_token
+         |    clientIdVariable = "CLEAR#foo"
+         |    clientSecretVariable = "CLEAR#secret"
          |  }
-         |  }
+         | }
          |}
          |""".stripMargin).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     registry.instances.values.head shouldBe WebserviceFileDataObject(
       id = "123",
-      WebserviceOptions(
-        url = "http://test",
-        clientIdVariable = Some("CLEAR#foo"),
-        clientSecretVariable = Some("CLEAR#secret")
-      )
+      url = "http://test",
+      authMode = Some(KeycloakClientSecretAuthMode(ssoServer = "server", ssoRealm = "realm", ssoGrantType = "client_token", clientIdVariable = "CLEAR#foo", clientSecretVariable = "CLEAR#secret"))
     )
   }
 

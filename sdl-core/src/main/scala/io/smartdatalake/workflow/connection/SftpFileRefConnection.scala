@@ -37,15 +37,17 @@ import org.apache.commons.pool2.{BasePooledObjectFactory, PooledObject}
  * @param authMode authentication information: for now BasicAuthMode and PublicKeyAuthMode are supported.
  * @param ignoreHostKeyVerification do not validate host key if true, default is false
  * @param maxParallelConnections number of parallel sftp connections created by an instance of this connection
+ * @param connectionPoolMaxIdleTimeSec timeout to close unused connections in the pool
  * @param metadata
  */
-case class SftpFileRefConnection( override val id: ConnectionId,
-                                  host: String,
-                                  port: Int = 22,
-                                  authMode: AuthMode,
-                                  ignoreHostKeyVerification: Boolean = false,
-                                  maxParallelConnections: Int = 1,
-                                  override val metadata: Option[ConnectionMetadata] = None
+case class SftpFileRefConnection(override val id: ConnectionId,
+                                 host: String,
+                                 port: Int = 22,
+                                 authMode: AuthMode,
+                                 ignoreHostKeyVerification: Boolean = false,
+                                 maxParallelConnections: Int = 1,
+                                 connectionPoolMaxIdleTimeSec: Int = 3,
+                                 override val metadata: Option[ConnectionMetadata] = None
                                  ) extends Connection {
 
   // Allow only supported authentication modes
@@ -66,7 +68,7 @@ case class SftpFileRefConnection( override val id: ConnectionId,
   val pool = new GenericObjectPool[SFTPClient](new SftpClientPoolFactory)
   pool.setMaxTotal(maxParallelConnections)
   pool.setMaxIdle(1) // keep max one idle sftp connection
-  pool.setMinEvictableIdleTimeMillis(1000) // timeout to close sftp connection if not in use
+  pool.setMinEvictableIdleTimeMillis(connectionPoolMaxIdleTimeSec * 1000) // timeout to close sftp connection if not in use
   private class SftpClientPoolFactory extends BasePooledObjectFactory[SFTPClient] {
     override def create(): SFTPClient = {
       authMode match {
@@ -80,23 +82,12 @@ case class SftpFileRefConnection( override val id: ConnectionId,
       p.getObject.close()
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[Connection] = SftpFileRefConnection
 }
 
 object SftpFileRefConnection extends FromConfigFactory[Connection] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): SftpFileRefConnection = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[SftpFileRefConnection].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SftpFileRefConnection = {
+    extract[SftpFileRefConnection](config)
   }
 }
 

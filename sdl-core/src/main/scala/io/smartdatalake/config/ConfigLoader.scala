@@ -21,6 +21,8 @@ package io.smartdatalake.config
 import java.io.InputStreamReader
 
 import com.typesafe.config.{Config, ConfigFactory}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.{EnvironmentUtil, SmartDataLakeLogger}
 import org.apache.hadoop.fs.permission.FsAction
@@ -28,7 +30,6 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
-
 
 object ConfigLoader extends SmartDataLakeLogger {
 
@@ -90,22 +91,32 @@ object ConfigLoader extends SmartDataLakeLogger {
     val configFileIndex = filesInBfsOrderByExtension(hadoopPaths)
     logger.debug(s"Configuration file index:\n${configFileIndex.map(e => s"\t${e._1} -> ${e._2.mkString(", ")}").mkString("\n")}")
 
-    val confFiles = configFileIndex("conf")
-    val jsonFiles = configFileIndex("json")
-    val propertyFiles = configFileIndex("properties")
-    if (confFiles.isEmpty && jsonFiles.isEmpty && propertyFiles.isEmpty) {
+    //read file extensions in the same order as typesafe config
+    val sortedFileConfigs = (configFileIndex("properties") ++ configFileIndex("json") ++ configFileIndex("conf"))
+      .map(file => (file, parseConfig(file))).reverse
+    if (sortedFileConfigs.isEmpty) {
       logger.error(s"Paths $hadoopPaths do not contain valid configuration files. " +
         s"Ensure the configuration files have one of the following extensions: ${configFileExtensions.map(ext => s".$ext").mkString(", ")}")
     }
-    //read file extensions in the same order as typesafe config
-    //system properties take precedence
-    val config = ConfigFactory.systemProperties()
 
-    mergeWithHdfsFiles(propertyFiles,
-      mergeWithHdfsFiles(jsonFiles,
-        mergeWithHdfsFiles(confFiles, config)
-      )
-    ).resolve()
+    // check for duplicate first class object definitions (connections, data objects, actions)
+    if (Environment.enableCheckConfigDuplicates) {
+      val objectIdLocationMap =
+        sortedFileConfigs.flatMap { case (file, config) => ConfigParser.getActionConfigMap(config).keys.map(objName => (ActionId(objName), file)) } ++
+          sortedFileConfigs.flatMap { case (file, config) => ConfigParser.getDataObjectConfigMap(config).keys.map(objName => (DataObjectId(objName), file)) } ++
+          sortedFileConfigs.flatMap { case (file, config) => ConfigParser.getConnectionConfigMap(config).keys.map(objName => (ConnectionId(objName), file)) }
+      val duplicates = objectIdLocationMap.groupBy(_._1)
+        .filter(_._2.size > 1)
+        .mapValues(_.map(_._2))
+      if (duplicates.nonEmpty) {
+        val duplicatesStr = duplicates.map { case (id, files) => s"$id=${files.mkString(";")}" }.mkString(" ")
+        throw ConfigurationException(s"Configuration parsing failed because of configuration objects defined in multiple locations: $duplicatesStr")
+      }
+    }
+
+    //system properties take precedence
+    val systemPropConfig = ConfigFactory.systemProperties()
+    mergeConfigs(systemPropConfig +: sortedFileConfigs.map(_._2)).resolve()
   } catch {
     // catch if hadoop libraries are missing and output debug informations
     case ex:UnsatisfiedLinkError =>
@@ -121,43 +132,40 @@ object ConfigLoader extends SmartDataLakeLogger {
   }
 
   /**
-   * Parse a [[Config]] using HDFS [[FileSystem]] API.
+   * Merge configurations such that configurations earlier in the list overwrite configurations at the end of the list.
    *
-   * A configuration is parsed from a supplied list of configuration locations such that configurations at the end of the
-   * list overwrite configurations at the beginning of the list.
-   *
-   * The parsed configs are then merged with the supplied `config` and settings in `config` take precendence.
-   *
-   * @param configFilePaths   a list of [[Path]]s corresponding to the HDFS locations of  configuration files.
-   * @param config            a config with which to merge the configs from `configFilePaths`.
-   * @param fs                the configured filesystem handle
-   * @return                  a merged config.
+   * @param configs a list of [[Config]]s sorted according to their priority
+   * @return        a merged [[Config]].
    */
-  private def mergeWithHdfsFiles(configFilePaths: Seq[Path], config: Config)(implicit fs: FileSystem): Config = {
-    if (configFilePaths.nonEmpty) {
-      config.withFallback(configFilePaths.map { path =>
-        val reader = new InputStreamReader(fs.open(path))
-        try {
-          val parsedConfig = ConfigFactory.parseReader(reader)
-          if (parsedConfig.isEmpty) {
-            logger.warn(s"Config parsed from ${path.toString} is empty!")
-          }
-          parsedConfig
-        } catch {
-          case exception: Throwable =>
-            logger.error(s"Failed to parse config from ${path.toString}", exception)
-            throw exception
-        } finally {
-          reader.close()
-        }
-      }.reduceRight((c1, c2) => c2.withFallback(c1)))
-    } else {
-      config
+  private def mergeConfigs(configs: Seq[Config]): Config = {
+    configs.reduceLeft((c1, c2) => c1.withFallback(c2))
+  }
+
+  /**
+   * Parse a file as Hocon [[Config]]
+   * @param file: Hadoop file location of Hocon configuration file
+   * @return parsed [[Config]] object
+   */
+  private def parseConfig(file: Path)(implicit fs: FileSystem): Config = {
+    val reader = new InputStreamReader(fs.open(file))
+    try {
+      val parsedConfig = ConfigFactory.parseReader(reader)
+      if (parsedConfig.isEmpty) {
+        logger.warn(s"Config parsed from ${file.toString} is empty!")
+      }
+      parsedConfig
+    } catch {
+      case exception: Throwable =>
+        logger.error(s"Failed to parse config from ${file.toString}", exception)
+        throw exception
+    } finally {
+      reader.close()
     }
   }
-  
+
   /**
    * Collect readable files with valid config file extensions from HDFS in BFS order indexed by file extension.
+   * Note that all filenames containing "log4j" are ignored.
    *
    * This is an internal method to create a utility data structure.
    *
@@ -177,40 +185,22 @@ object ConfigLoader extends SmartDataLakeLogger {
             logger.warn(s"Failed to list directory content of ${nextFile.toString}.", exception)
           case Success(children) =>
             while (children.hasNext) {
-              traversalQueue += children.next().getPath
-              logger.trace(s"Found '${traversalQueue.last.getName}' in directory $nextFile.")
+              val childPath = children.next.getPath
+              if (!childPath.getName.startsWith(".")) { // ignore hidden entries
+                traversalQueue += childPath
+                logger.debug(s"Found '${childPath.getName}' in directory $nextFile.")
+              }
             }
         }
-      } else if (fs.isFile(nextFile) && hasPermission(nextFile, FsAction.READ)) {
+      } else if (fs.isFile(nextFile)) {
+        // filter filename extension and ignore potential log4j files
         val fileExtension = nextFile.getName.split('.').last
-        if (configFileExtensions.contains(fileExtension) && !nextFile.getName.equals("log4j.properties")) {
-          logger.trace(s"'$nextFile' is a configuration file.")
+        if (configFileExtensions.contains(fileExtension) && !nextFile.getName.contains("log4j")) {
+          logger.debug(s"'$nextFile' is a configuration file.")
           readableFileIndex(fileExtension) += nextFile
         }
       }
     }
     readableFileIndex
-  }
-
-  /**
-   * Check if the current user has permission to execute `action` on HDFS path `path`.
-   *
-   * @param path        a HDFS path
-   * @param action      an action like [[FsAction.READ]]
-   * @param fs          a configure HDFS [[FileSystem]] handle.
-   * @return            `true` if the current user has permission for `action` on `path`. `false` otherwise.
-   */
-  private def hasPermission(path: Path, action: FsAction)(implicit fs: FileSystem): Boolean = {
-    try {
-      if (EnvironmentUtil.isWindowsOS) true // Workaround: checking permissions on windows doesn't work with Hadoop (version 2.6)
-      else {
-        fs.access(path, action)
-        true
-      }
-    } catch {
-      case t: Throwable =>
-        logger.warn(s"Cannot access $path: ${t.getClass.getSimpleName}: ${t.getMessage}")
-        false
-    }
   }
 }

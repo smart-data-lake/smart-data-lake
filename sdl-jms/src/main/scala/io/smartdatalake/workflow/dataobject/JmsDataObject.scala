@@ -19,16 +19,16 @@
 package io.smartdatalake.workflow.dataobject
 
 import java.util.concurrent.TimeUnit
-
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{AuthMode, BasicAuthMode}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.jms.{JmsQueueConsumerFactory, SynchronousJmsReceiver, TextMessageHandler}
-import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import io.smartdatalake.util.misc.DataFrameUtil
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
+import org.apache.spark.sql.types.{StringType, StructField, StructType}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
 import scala.concurrent.duration.Duration
 
@@ -63,14 +63,27 @@ case class JmsDataObject(override val id: DataObjectId,
   require(supportedAuths.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
   val basicAuthMode = authMode.asInstanceOf[BasicAuthMode]
 
+  if(schemaMin.isDefined) logger.warn("SchemaMin ignored, for JmsDataObject is always fixed to payload:string")
+
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
     val consumerFactory = new JmsQueueConsumerFactory(jndiContextFactory, jndiProviderUrl, basicAuthMode.user, basicAuthMode.password, connectionFactory, queue)
     val receiver = new SynchronousJmsReceiver[String](consumerFactory,
       TextMessageHandler.convert2Text, batchSize, Duration(maxWaitSec, TimeUnit.SECONDS),
       Duration(maxBatchAgeSec, TimeUnit.SECONDS), txBatchSize, session)
 
-    val df = receiver.receiveMessages().getOrElse(session.emptyDataFrame)
-    validateSchemaMin(df)
+    // Column name is derived from [[TextMessageString]]
+    val schemaFixed: StructType = StructType(Array(StructField("payload",StringType, false)))
+
+    // Special case JMS:
+    // Do not process any data during init phase as messages received will not be available during Exec phase
+    val df = context.phase match {
+      case ExecutionPhase.Init => {
+        DataFrameUtil.getEmptyDataFrame(schemaFixed)
+      }
+      case _ => {
+        receiver.receiveMessages().getOrElse(DataFrameUtil.getEmptyDataFrame(schemaFixed))
+      }
+    }
     df
   }
 
@@ -84,11 +97,7 @@ object JmsDataObject extends FromConfigFactory[DataObject] {
   /**
    * @inheritdoc
    */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): JmsDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[JmsDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): JmsDataObject = {
+    extract[JmsDataObject](config)
   }
 }

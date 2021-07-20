@@ -155,7 +155,6 @@ class SplunkDataObjectTest extends DataObjectTestSuite {
       s"""
          |{
          | id = src1
-         | type = splunk
          | connectionId = con1
          | params {
          |   query = "$query"
@@ -167,7 +166,7 @@ class SplunkDataObjectTest extends DataObjectTestSuite {
          | }
          |}
          """.stripMargin)
-    SplunkDataObject.fromConfig(config, instanceRegistry)
+    SplunkDataObject.fromConfig(config)
   }
 
   private def createSutWithStubs(ais: SplunkDataObject): SplunkDataObject with SplunkStub = {

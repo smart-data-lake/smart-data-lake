@@ -37,19 +37,11 @@ case class HadoopFileConnection(override val id: ConnectionId,
                                 override val metadata: Option[ConnectionMetadata] = None
                                ) extends Connection {
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[Connection] = HadoopFileConnection
 }
 
 object HadoopFileConnection extends FromConfigFactory[Connection] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): HadoopFileConnection = {
-    import configs.syntax.ConfigOps
-    config.extract[HadoopFileConnection].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): HadoopFileConnection = {
+    extract[HadoopFileConnection](config)
   }
 }

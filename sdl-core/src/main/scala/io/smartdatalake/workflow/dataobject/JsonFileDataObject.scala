@@ -21,11 +21,13 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.SDLSaveMode
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SaveMode}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
  * A [[io.smartdatalake.workflow.dataobject.DataObject]] backed by a JSON data source.
@@ -39,6 +41,7 @@ import org.apache.spark.sql.{DataFrame, SaveMode}
  * @param stringify Set the data type for all values to string.
  * @param jsonOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and
  *                    [[org.apache.spark.sql.DataFrameWriter]].
+ * @param schema An optional data object schema. If defined, any automatic schema inference is avoided. As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
  * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
@@ -55,7 +58,7 @@ case class JsonFileDataObject( override val id: DataObjectId,
                                override val partitions: Seq[String] = Seq(),
                                override val schema: Option[StructType] = None,
                                override val schemaMin: Option[StructType] = None,
-                               override val saveMode: SaveMode = SaveMode.Overwrite,
+                               override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                override val sparkRepartition: Option[SparkRepartitionDef] = None,
                                stringify: Boolean = false,
                                override val acl: Option[AclDef] = None,
@@ -74,33 +77,22 @@ case class JsonFileDataObject( override val id: DataObjectId,
   private val formatOptionsDefault = Map("multiLine" -> "true")
   override val options: Map[String, String] = formatOptionsDefault ++ jsonOptions.getOrElse(Map())
 
-  override def afterRead(df: DataFrame): DataFrame  = {
+  override def afterRead(df: DataFrame)(implicit session: SparkSession): DataFrame  = {
     val dfSuper = super.afterRead(df)
     if (stringify) dfSuper.castAll2String else dfSuper
   }
 
-  override def beforeWrite(df: DataFrame): DataFrame  = {
+  override def beforeWrite(df: DataFrame)(implicit session: SparkSession): DataFrame  = {
     val dfSuper = super.beforeWrite(df)
     if (stringify) dfSuper.castAll2String else dfSuper
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[DataObject] = JsonFileDataObject
 }
 
 object JsonFileDataObject extends FromConfigFactory[DataObject] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): JsonFileDataObject = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[JsonFileDataObject].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): JsonFileDataObject = {
+    extract[JsonFileDataObject](config)
   }
 }
 

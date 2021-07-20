@@ -26,6 +26,8 @@ import org.apache.spark.sql.functions.{col, count, to_timestamp}
 import org.apache.spark.sql.types._
 import org.slf4j.LoggerFactory
 
+import scala.language.implicitConversions
+
 object DataFrameTestHelper {
 
   val ts: String => TypedValue = formattedTimeStamp => TypedValue(formattedTimeStamp, TimestampType)
@@ -236,9 +238,9 @@ object DataFrameTestHelper {
     }
 
     if (!sameSchema) {
-      val expectedTypes = expected map (structType => structType.name -> structType.dataType) toMap
-      val actualTypes = actual map (structType => structType.name -> structType.dataType) toMap
-      val differentTypes = (expected toSet) diff (actual toSet)
+      val expectedTypes = expected.map(structType => structType.name -> structType.dataType).toMap
+      val actualTypes = actual.map(structType => structType.name -> structType.dataType).toMap
+      val differentTypes = expected.toSet.diff(actual.toSet)
       val differentTypesString = differentTypes.map(structType => {
         val treeStringExpected = new StructType(Array(StructField(structType.name, expectedTypes(structType.name), structType.nullable))).treeString
         val treeStringActual = new StructType(Array(StructField(structType.name, actualTypes(structType.name), structType.nullable))).treeString

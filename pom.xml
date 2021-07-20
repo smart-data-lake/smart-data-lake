@@ -21,7 +21,7 @@
 
 	<groupId>io.smartdatalake</groupId>
 	<artifactId>sdl-parent</artifactId>
-	<version>1.2.1-SNAPSHOT</version>
+	<version>1.2.6-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
 	<modules>
@@ -29,6 +29,8 @@
 		<module>sdl-kafka</module>
 		<module>sdl-splunk</module>
 		<module>sdl-jms</module>
+		<module>sdl-deltalake</module>
+		<module>sdl-snowflake</module>
 	</modules>
 
 	<licenses>
@@ -172,6 +174,7 @@
 							<serverId>ossrh</serverId>
 							<nexusUrl>https://oss.sonatype.org/</nexusUrl>
 							<autoReleaseAfterClose>false</autoReleaseAfterClose>
+							<stagingProgressTimeoutMinutes>30</stagingProgressTimeoutMinutes>
 						</configuration>
 					</plugin>
 				</plugins>
@@ -198,6 +201,8 @@
 		<parquet.test.deps.scope>test</parquet.test.deps.scope>
 
 		<spark.version>2.4.7</spark.version>
+		<spark.minor.version>2.4</spark.minor.version>
+		<spark-extensions.version>1.2.6</spark-extensions.version>
 
 		<!-- SPARK-PARENT start: properties copied from spark-parent pom version 2.4.7 for spark-parent import in dependencyManagement -->
 		<!-- attention - manually adapted are: zookeeper, scala.version, scala.binary.version -->
@@ -287,13 +292,14 @@
 		<spark.excel.version>0.13.5</spark.excel.version>
 		<ucanaccess.version>4.0.4</ucanaccess.version>
 		<!-- when changing config version, remember to update it in DatabricksSmartDataLakeBuilder main method -->
-		<typesafe.config.version>1.3.4</typesafe.config.version>
-		<kxbmap.configs.version>0.4.4</kxbmap.configs.version>
+		<typesafe.config.version>1.4.1</typesafe.config.version>
+		<kxbmap.configs.version>0.6.1</kxbmap.configs.version>
 		<monix.version>3.1.0</monix.version>
 		<scala-arm.version>2.0</scala-arm.version>
 		<splunk.version>1.6.5.0</splunk.version>
 		<sshj.version>0.21.1</sshj.version>
 		<kafka.version>2.4.1</kafka.version>
+		<snowflake.version>2.8.4</snowflake.version>
 		<keycloak.version>4.5.0.Final</keycloak.version>
 		<deltaTable.version>0.6.1</deltaTable.version>
 		<poi.version>4.1.2</poi.version>
@@ -314,11 +320,6 @@
 			<id>maven central</id>
 			<name>Maven Central Repository</name>
 			<url>https://repo1.maven.org/maven2/</url>
-		</repository>
-		<repository>
-			<id>spring-plugins</id>
-			<name>Spring Plugins Repository</name>
-			<url>https://repo.spring.io/plugins-release/</url>
 		</repository>
 		<repository>
 			<id>confluent</id>
@@ -2231,6 +2232,30 @@
 				<version>1.1.3</version>
 			</dependency>
 			<dependency>
+				<groupId>org.apache.spark</groupId>
+				<artifactId>spark-core_${scala.minor.version}</artifactId>
+				<version>${spark.version}</version>
+				<scope>${spark.deps.scope}</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.spark</groupId>
+				<artifactId>spark-sql_${scala.minor.version}</artifactId>
+				<version>${spark.version}</version>
+				<scope>${spark.deps.scope}</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.spark</groupId>
+				<artifactId>spark-catalyst_${scala.minor.version}</artifactId>
+				<version>${spark.version}</version>
+				<scope>${spark.deps.scope}</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.spark</groupId>
+				<artifactId>spark-hive_${scala.minor.version}</artifactId>
+				<version>${spark.version}</version>
+				<scope>${spark.deps.scope}</scope>
+			</dependency>
+			<dependency>
 				<groupId>org.apache.commons</groupId>
 				<artifactId>commons-compress</artifactId>
 				<version>1.4.1</version>
@@ -2276,6 +2301,11 @@
 				<groupId>org.tukaani</groupId>
 				<artifactId>xz</artifactId>
 				<version>1.5</version>
+			</dependency>
+			<dependency>
+				<groupId>io.smartdatalake</groupId>
+				<artifactId>spark-extensions_${scala.minor.version}</artifactId>
+				<version>${spark-extensions.version}</version>
 			</dependency>
 
 			<!-- TEST dependencies -->

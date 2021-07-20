@@ -21,10 +21,11 @@ package io.smartdatalake.workflow.action
 import java.time.LocalDateTime
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{ExecutionMode, TechnicalTableColumn}
+import io.smartdatalake.definitions.{Condition, ExecutionMode, TechnicalTableColumn}
 import io.smartdatalake.util.evolution.SchemaEvolution
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, TransactionalSparkTableDataObject}
@@ -54,11 +55,12 @@ import scala.util.{Failure, Success, Try}
  * @param additionalColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
  *                          The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  * @param executionMode optional execution mode for this Action
+ * @param executionCondition optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  */
 case class HistorizeAction(
-                            override val id: ActionObjectId,
+                            override val id: ActionId,
                             inputId: DataObjectId,
                             outputId: DataObjectId,
                             transformer: Option[CustomDfTransformerConfig] = None,
@@ -74,6 +76,7 @@ case class HistorizeAction(
                             override val breakDataFrameLineage: Boolean = false,
                             override val persist: Boolean = false,
                             override val executionMode: Option[ExecutionMode] = None,
+                            override val executionCondition: Option[Condition] = None,
                             override val metricsFailCondition: Option[String] = None,
                             override val metadata: Option[ActionMetadata] = None
                           )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedAction {
@@ -97,7 +100,7 @@ case class HistorizeAction(
     case Failure(e) => throw new ConfigurationException(s"(${id}) Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
   }
 
-  override def transform(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  override def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
     val pks = output.table.primaryKey.get // existance is validated earlier
     // get existing data
@@ -105,7 +108,13 @@ case class HistorizeAction(
     val existingDf = if (output.isTableExisting) Some(output.getDataFrame())
     else None
     val historizeTransformer = historizeDataFrame(existingDf, pks, timestamp) _
-    applyTransformations(subFeed, transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, Seq(historizeTransformer), filterClauseExpr)
+    val transformedDf = applyTransformations(inputSubFeed, transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, Seq(historizeTransformer), filterClauseExpr)
+    outputSubFeed.copy(dataFrame = Some(transformedDf))
+  }
+
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+    if (transformer.isDefined) transformer.get.transformPartitionValues(id, partitionValues)
+    else PartitionValues.oneToOneMapping(partitionValues)
   }
 
   protected def historizeDataFrame(existingDf: Option[DataFrame], pks: Seq[String], refTimestamp: LocalDateTime)(newDf: DataFrame)(implicit session: SparkSession): DataFrame = {
@@ -132,21 +141,11 @@ case class HistorizeAction(
     } else  Historization.getInitialHistory(newFeedDf, refTimestamp)
   }
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[Action] = HistorizeAction
 }
 
 object HistorizeAction extends FromConfigFactory[Action] {
-
-  /**
-   * @inheritdoc
-   */
-  override def fromConfig(config: Config, instanceRegistry: InstanceRegistry): HistorizeAction = {
-    import configs.syntax.ConfigOps
-    import io.smartdatalake.config._
-    implicit val instanceRegistryImpl: InstanceRegistry = instanceRegistry
-    config.extract[HistorizeAction].value
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): HistorizeAction = {
+    extract[HistorizeAction](config)
   }
 }

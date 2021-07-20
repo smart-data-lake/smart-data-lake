@@ -20,9 +20,9 @@
 package io.smartdatalake.metrics
 
 import java.time.format.DateTimeFormatter
-import java.time.{Duration, Instant}
+import java.time.{Duration, Instant, ZoneId}
 
-import io.smartdatalake.config.SdlConfigObject.{ActionObjectId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionMetrics
 import org.apache.spark.scheduler.{AccumulableInfo, SparkListener, SparkListenerJobStart, SparkListenerStageCompleted}
@@ -65,8 +65,8 @@ private[smartdatalake] case class SparkStageMetrics(jobInfo: JobInfo, stageId: I
   lazy val shuffleFetchWaitTime: Duration = Duration.ofMillis(shuffleFetchWaitTimeInMillis)
   lazy val shuffleWriteTime: Duration = Duration.ofMillis(shuffleWriteTimeInNanos / 1000000)
 
-  // foramtters
-  private lazy val dateTimeFormat = DateTimeFormatter.ISO_OFFSET_DATE_TIME
+  // formatters
+  private lazy val dateTimeFormat = DateTimeFormatter.ISO_OFFSET_DATE_TIME.withZone(ZoneId.systemDefault)
   private def durationString(valueSeparator: String)(name: String, duration: Duration): String = s"${keyValueString(valueSeparator)(name, duration.toString)}"
   private def keyValueString(valueSeparator: String)(key: String, value: String): String = s"$key$valueSeparator$value"
 
@@ -120,72 +120,3 @@ private[smartdatalake] case class SparkStageMetrics(jobInfo: JobInfo, stageId: I
   }
 }
 private[smartdatalake] case class JobInfo(id: Int, group: String, description: String)
-
-/**
- * Collects spark metrics for spark stages.
- */
-private[smartdatalake] class SparkStageMetricsListener(notifyStageMetricsFunc: (ActionObjectId, Option[DataObjectId], ActionMetrics) => Unit) extends SparkListener with SmartDataLakeLogger {
-
-  /**
-   * Stores jobID and jobDescription indexed by stage ids.
-   */
-  val jobInfoLookupTable: mutable.Map[Int, JobInfo] = mutable.Map.empty
-
-  /**
-   * On job start, register the job ids and stage ids.
-   */
-  override def onJobStart(jobStart: SparkListenerJobStart): Unit = {
-    jobStart.stageIds.foreach { stageId =>
-      jobInfoLookupTable(stageId) = JobInfo(jobStart.jobId, jobStart.properties.getProperty("spark.jobGroup.id"), jobStart.properties.getProperty("spark.job.description"))
-    }
-  }
-
-  /**
-   * On stage complete notify spark metrics
-   */
-  override def onStageCompleted(stageCompleted: SparkListenerStageCompleted): Unit = {
-    // extract useful informations/metrics
-    val stageId = stageCompleted.stageInfo.stageId
-    val taskMetrics = stageCompleted.stageInfo.taskMetrics
-    val shuffleReadMetrics = taskMetrics.shuffleReadMetrics
-    val jobInfo = jobInfoLookupTable(stageId)
-    val sparkStageMetrics = SparkStageMetrics(jobInfo, stageId, stageCompleted.stageInfo.name, stageCompleted.stageInfo.numTasks,
-      stageCompleted.stageInfo.submissionTime.getOrElse(-1L), stageCompleted.stageInfo.completionTime.getOrElse(-1L),
-      taskMetrics.executorRunTime, taskMetrics.executorCpuTime, taskMetrics.executorDeserializeTime, taskMetrics.executorDeserializeCpuTime,
-      taskMetrics.resultSerializationTime, taskMetrics.resultSize,
-      taskMetrics.jvmGCTime,
-      taskMetrics.memoryBytesSpilled, taskMetrics.diskBytesSpilled,
-      taskMetrics.peakExecutionMemory,
-      taskMetrics.inputMetrics.bytesRead, taskMetrics.inputMetrics.recordsRead,
-      taskMetrics.outputMetrics.bytesWritten, taskMetrics.outputMetrics.recordsWritten,
-      shuffleReadMetrics.fetchWaitTime,
-      shuffleReadMetrics.remoteBlocksFetched, shuffleReadMetrics.localBlocksFetched, shuffleReadMetrics.totalBlocksFetched,
-      shuffleReadMetrics.remoteBytesRead, shuffleReadMetrics.localBytesRead, shuffleReadMetrics.totalBytesRead,
-      shuffleReadMetrics.recordsRead,
-      taskMetrics.shuffleWriteMetrics.writeTime, taskMetrics.shuffleWriteMetrics.bytesWritten, taskMetrics.shuffleWriteMetrics.recordsWritten,
-      stageCompleted.stageInfo.accumulables.values.toSeq
-    )
-    // extract concerned Action and DataObject
-    val actionIdRegex = "Action~([a-zA-Z0-9_-]+)".r.unanchored
-    val actionId = sparkStageMetrics.jobInfo.group match {
-      case actionIdRegex(id) => Some(ActionObjectId(id))
-      case _ => sparkStageMetrics.jobInfo.description match { // for spark streaming jobs we cant set the jobGroup, but only the description
-        case actionIdRegex(id) => Some(ActionObjectId(id))
-        case _ =>
-          logger.warn(s"Couldn't extract ActionId from sparkJobGroupId (${sparkStageMetrics.jobInfo.group})")
-          None
-      }
-    }
-    if (actionId.isDefined) {
-      val dataObjectIdRegex = "DataObject~([a-zA-Z0-9_-]+)".r.unanchored
-      val dataObjectId = sparkStageMetrics.jobInfo.description match {
-        case dataObjectIdRegex(id) => Some(DataObjectId(id))
-        case _ => sparkStageMetrics.jobInfo.description match { // for spark streaming jobs we cant set the jobGroup, but only the description
-          case dataObjectIdRegex(id) => Some(DataObjectId(id))
-          case _ => None // there are some stages which are created by Spark DataFrame operations which dont belong to manipulation Actions target DataObject's, e.g. pivot operator
-        }
-      }
-      notifyStageMetricsFunc(actionId.get, dataObjectId, sparkStageMetrics)
-    }
-  }
-}

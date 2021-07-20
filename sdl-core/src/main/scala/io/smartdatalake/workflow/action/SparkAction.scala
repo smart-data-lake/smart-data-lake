@@ -19,20 +19,21 @@
 
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import java.time.Duration
+
 import io.smartdatalake.definitions._
+import io.smartdatalake.metrics.NoMetricsFoundException
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import io.smartdatalake.util.misc.DataFrameUtil.{DfSDL, getEmptyDataFrame}
 import io.smartdatalake.util.misc.{DataFrameUtil, DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.util.streaming.DummyStreamProvider
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.ActionHelper.{filterBlacklist, filterWhitelist}
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataobject._
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.streaming.Trigger
-import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
 private[smartdatalake] abstract class SparkAction extends Action {
@@ -45,15 +46,13 @@ private[smartdatalake] abstract class SparkAction extends Action {
   def breakDataFrameLineage: Boolean
 
   /**
-   * Force persisting DataFrame on Disk.
-   * This helps to reduce memory needed for caching the DataFrame content and can serve as a recovery point in case an task get's lost.
+   * Force persisting input DataFrame's on Disk.
+   * This improves performance if dataFrame is used multiple times in the transformation and can serve as a recovery point
+   * in case a task get's lost.
+   * Note that DataFrames are persisted automatically by the previous Action if later Actions need the same data. To avoid this
+   * behaviour set breakDataFrameLineage=false.
    */
   def persist: Boolean
-
-  /**
-   * execution mode for this action.
-   */
-  def executionMode: Option[ExecutionMode]
 
   override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.prepare
@@ -68,6 +67,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
    */
   def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, phase: ExecutionPhase)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     assert(input.id == subFeed.dataObjectId, s"($id) DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
+    assert(phase!=ExecutionPhase.Prepare, "Strangely enrichSubFeedDataFrame got called in phase prepare. It should only be called in Init and Exec.")
     executionMode match {
       case Some(m: SparkStreamingOnceMode) if !context.simulation =>
         if (subFeed.dataFrame.isEmpty || phase==ExecutionPhase.Exec) { // in exec phase we always needs a fresh streaming DataFrame
@@ -83,46 +83,71 @@ private[smartdatalake] abstract class SparkAction extends Action {
           subFeed.copy(dataFrame = emptyStreamingDataFrame, partitionValues = Seq()) // remove partition values for streaming mode
         } else subFeed
       case _ =>
-        if (phase==ExecutionPhase.Exec && (subFeed.dataFrame.isEmpty || subFeed.isDummy || subFeed.isStreaming.contains(true))) {
-          // validate partition values existing for input
-          input match {
-            case partitionedInput: DataObject with CanHandlePartitions if subFeed.partitionValues.nonEmpty && (context.phase==ExecutionPhase.Exec || subFeed.isDAGStart) =>
-              val expectedPartitions = partitionedInput.filterExpectedPartitionValues(subFeed.partitionValues)
-              val missingPartitionValues = PartitionValues.checkExpectedPartitionValues(partitionedInput.listPartitions, expectedPartitions)
-              assert(missingPartitionValues.isEmpty, s"($id) partitions $missingPartitionValues missing for ${input.id}")
-            case _ => Unit
+        // count reuse of subFeed.dataFrame for caching/release in exec phase
+        if (phase == ExecutionPhase.Init && subFeed.hasReusableDataFrame && Environment.enableAutomaticDataFrameCaching)
+          context.rememberDataFrameReuse(subFeed.dataObjectId, subFeed.partitionValues, id)
+        // process subfeed
+        if (phase==ExecutionPhase.Exec) {
+          // check if dataFrame must be created
+          if (subFeed.dataFrame.isEmpty || subFeed.isDummy || subFeed.isStreaming.contains(true)) {
+            // validate partition values existing for input
+            input match {
+              case partitionedInput: DataObject with CanHandlePartitions if subFeed.partitionValues.nonEmpty && (context.phase == ExecutionPhase.Exec || subFeed.isDAGStart) =>
+                val completePartitionValues = subFeed.partitionValues.filter(_.keys == partitionedInput.partitions.toSet)
+                val expectedPartitions = partitionedInput.filterExpectedPartitionValues(completePartitionValues)
+                val missingPartitionValues = if (expectedPartitions.nonEmpty) PartitionValues.checkExpectedPartitionValues(partitionedInput.listPartitions, expectedPartitions) else Seq()
+                assert(missingPartitionValues.isEmpty, s"($id) partitions ${missingPartitionValues.mkString(", ")} missing for ${input.id}")
+              case _ => Unit
+            }
+            // recreate DataFrame from DataObject if not skipped
+            val df = if (!subFeed.isSkipped) {
+              logger.info(s"($id) getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
+              input.getDataFrame(subFeed.partitionValues)
+                .colNamesLowercase // convert to lower case by default
+            } else {
+              // if skipped create empty DataFrame
+              createEmptyDataFrame(input, subFeed)
+            }
+            val filteredDf = filterDataFrame(df, subFeed.partitionValues, subFeed.getFilterCol)
+            subFeed.copy(dataFrame = Some(filteredDf))
+          } else {
+            // existing DataFrame can be used
+            subFeed
           }
-          // recreate DataFrame from DataObject
-          logger.info(s"($id) getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
-          val df = input.getDataFrame(subFeed.partitionValues)
-            .colNamesLowercase // convert to lower case by default
-          val filteredDf = filterDataFrame(df, subFeed.partitionValues, subFeed.getFilterCol)
-          subFeed.copy(dataFrame = Some(filteredDf))
-        } else if (subFeed.dataFrame.isEmpty) {
-          // create a dummy dataframe if possible as we are not in exec phase
-          val schema = input match {
-            case sparkFileInput: SparkFileDataObject => sparkFileInput.readSchema(false)
-            case userDefInput: UserDefinedSchema => userDefInput.schema
-            case _ => None
-          }
-          val df = schema.map( s => DataFrameUtil.getEmptyDataFrame(s))
-            .getOrElse(input.getDataFrame(subFeed.partitionValues))
-            .colNamesLowercase // convert to lower case by default
-          val filteredDf = filterDataFrame(df, subFeed.partitionValues, subFeed.getFilterCol)
-          subFeed.copy(dataFrame = Some(filteredDf))
-        } else if (subFeed.isStreaming.contains(true)) {
-          // convert to empty normal DataFrame
-          val emptyNormalDataFrame = subFeed.dataFrame.map(df => DataFrameUtil.getEmptyDataFrame(df.schema))
-          subFeed.copy(dataFrame = emptyNormalDataFrame)
-        } else subFeed
+        } else {
+          // phase != exec
+          if (subFeed.dataFrame.isEmpty) {
+            // create a dummy dataframe if possible as we are not in exec phase
+            val df = createEmptyDataFrame(input, subFeed)
+            val filteredDf = filterDataFrame(df, subFeed.partitionValues, subFeed.getFilterCol)
+            subFeed.copy(dataFrame = Some(filteredDf), isDummy = true)
+          } else if (subFeed.isStreaming.contains(true)) {
+            // convert to empty normal DataFrame
+            val emptyNormalDataFrame = subFeed.dataFrame.map(df => DataFrameUtil.getEmptyDataFrame(df.schema))
+            subFeed.copy(dataFrame = emptyNormalDataFrame)
+          } else subFeed
+        }
     }
+  }
+
+  def createEmptyDataFrame(dataObject: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+    val schema = dataObject match {
+      case sparkFileInput: SparkFileDataObject => sparkFileInput.getSchema(false).map(dataObject.createReadSchema)
+      case userDefInput: UserDefinedSchema => userDefInput.schema.map(dataObject.createReadSchema)
+      case _ => None
+    }
+    schema.map( s => DataFrameUtil.getEmptyDataFrame(s))
+      .getOrElse(dataObject.getDataFrame(subFeed.partitionValues).where("false"))
+      .colNamesLowercase // convert to lower case by default
   }
 
   /**
    * writes subfeed to output respecting given execution mode
    * @return true if no data was transfered, otherwise false
    */
-  def writeSubFeed(subFeed: SparkSubFeed, output: DataObject with CanWriteDataFrame, isRecursiveInput: Boolean = false)(implicit session: SparkSession): Boolean = {
+  def writeSubFeed(subFeed: SparkSubFeed, output: DataObject with CanWriteDataFrame, isRecursiveInput: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Boolean = {
+    assert(!subFeed.isDummy, s"($id) Can not write dummy DataFrame to ${output.id}")
+    // write
     executionMode match {
       case Some(m: SparkStreamingOnceMode) =>
         // Write in streaming mode - use spark streaming with Trigger.Once and awaitTermination
@@ -133,31 +158,45 @@ private[smartdatalake] abstract class SparkAction extends Action {
         if (noData) logger.info(s"($id) no data to process for ${output.id} in streaming mode")
         // return
         noData
-      case None | Some(_: PartitionDiffMode) | Some(_: SparkIncrementalMode) | Some(_: FailIfNoPartitionValuesMode) =>
+      case None | Some(_: PartitionDiffMode) | Some(_: SparkIncrementalMode) | Some(_: FailIfNoPartitionValuesMode) | Some(_: CustomPartitionMode) | Some(_: ProcessAllMode) =>
+        // Auto persist if dataFrame is reused later
+        val preparedSubFeed = if (context.dataFrameReuseStatistics.contains((output.id, subFeed.partitionValues))) {
+          val partitionValuesStr = if (subFeed.partitionValues.nonEmpty) s" and partitionValues ${subFeed.partitionValues.mkString(", ")}" else ""
+          logger.info(s"($id) Caching dataframe for ${output.id}$partitionValuesStr")
+          subFeed.persist
+        } else subFeed
         // Write in batch mode
-        assert(!subFeed.dataFrame.get.isStreaming, s"($id) Input from ${subFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingOnceMode.getClass.getSimpleName}")
-        output.writeDataFrame(subFeed.dataFrame.get, subFeed.partitionValues, isRecursiveInput)
+        assert(!preparedSubFeed.dataFrame.get.isStreaming, s"($id) Input from ${preparedSubFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingOnceMode.getClass.getSimpleName}")
+        assert(!preparedSubFeed.isDummy, s"($id) Input from ${preparedSubFeed.dataObjectId} is a dummy. Cannot write dummy DataFrame.")
+        assert(!preparedSubFeed.isSkipped, s"($id) Input from ${preparedSubFeed.dataObjectId} is a skipped. Cannot write skipped DataFrame.")
+        output.writeDataFrame(preparedSubFeed.dataFrame.get, preparedSubFeed.partitionValues, isRecursiveInput)
         // return noData
         false
       case x => throw new IllegalStateException( s"($id) ExecutionMode $x is not supported")
     }
   }
 
+  /**
+   * Transform the DataFrame of a SubFeed
+   */
+  def subFeedDfTransformer(fnTransform: DataFrame => DataFrame)(subFeed: SparkSubFeed): SparkSubFeed = {
+    subFeed.copy(dataFrame = subFeed.dataFrame.map(fnTransform))
+  }
 
   /**
-   * applies multiple transformations to a sequence of subfeeds
+   * applies multiple transformations to a SubFeed
    */
-  def multiTransformSubfeed( subFeed: SparkSubFeed, transformers: Seq[DataFrame => DataFrame]): SparkSubFeed = {
-    transformers.foldLeft( subFeed ){
-      case (subFeed, transform) => subFeed.copy( dataFrame = Some(transform(subFeed.dataFrame.get )))
+  def multiTransformDataFrame(inputDf: DataFrame, transformers: Seq[DataFrame => DataFrame]): DataFrame = {
+    transformers.foldLeft(inputDf){
+      case (df, transform) => transform(df)
     }
   }
 
   /**
    * apply custom transformation
    */
-  def applyCustomTransformation(transformer: CustomDfTransformerConfig, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues])(df: DataFrame)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
-    transformer.transform(id, partitionValues, df, dataObjectId)
+  def applyCustomTransformation(transformer: CustomDfTransformerConfig, subFeed: SparkSubFeed)(df: DataFrame)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+    transformer.transform(id, subFeed.partitionValues, df, subFeed.dataObjectId)
   }
 
   /**
@@ -193,44 +232,39 @@ private[smartdatalake] abstract class SparkAction extends Action {
                            standardizeDatatypes: Boolean,
                            additionalTransformers: Seq[(DataFrame => DataFrame)],
                            filterClauseExpr: Option[Column] = None)
-                          (implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+                          (implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+
     val transformers = Seq(
-      transformation.map( t => applyCustomTransformation(t, inputSubFeed.dataObjectId, inputSubFeed.partitionValues) _),
+      transformation.map( t => applyCustomTransformation(t, inputSubFeed) _),
       columnBlacklist.map(filterBlacklist),
       columnWhitelist.map(filterWhitelist),
       additionalColumns.map( m => applyAdditionalColumns(m, inputSubFeed.partitionValues) _),
       filterClauseExpr.map(applyFilter),
-      if (standardizeDatatypes) Some(applyCastDecimal2IntegralFloat _) else None // currently we cast decimals away only but later we may add further type casts
+      (if (standardizeDatatypes) Some(applyCastDecimal2IntegralFloat _) else None) // currently we cast decimals away only but later we may add further type casts
     ).flatten ++ additionalTransformers
 
     // return
-    multiTransformSubfeed(inputSubFeed, transformers)
+    multiTransformDataFrame(inputSubFeed.dataFrame.get, transformers)
   }
 
   /**
-   * Updates the partition values of a SubFeed to the partition columns of an output, removing not existing columns from the partition values.
-   * Further the transformed DataFrame is validated to have the output's partition columns included and partition columns are moved to the end.
+   * The transformed DataFrame is validated to have the output's partition columns included, partition columns are moved to the end and SubFeeds partition values updated.
    *
    * @param output output DataObject
    * @param subFeed SubFeed with transformed DataFrame
-   * @return SubFeed with updated partition values.
+   * @return validated and updated SubFeed
    */
-  def validateAndUpdateSubFeedPartitionValues(output: DataObject, subFeed: SparkSubFeed )(implicit session: SparkSession): SparkSubFeed = {
-    val updatedSubFeed = output match {
+  def validateAndUpdateSubFeed(output: DataObject, subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+    output match {
       case partitionedDO: CanHandlePartitions =>
         // validate output partition columns exist in DataFrame
-        validateDataFrameContainsCols(subFeed.dataFrame.get, partitionedDO.partitions, s"for ${output.id}")
+        subFeed.dataFrame.foreach(df => validateDataFrameContainsCols(df, partitionedDO.partitions, s"for ${output.id}"))
         // adapt subfeed
         subFeed
-          .updatePartitionValues(partitionedDO.partitions)
+          .updatePartitionValues(partitionedDO.partitions, breakLineageOnChange = false)
           .movePartitionColumnsLast(partitionedDO.partitions)
-      case _ => subFeed.clearPartitionValues()
+      case _ => subFeed.clearPartitionValues(breakLineageOnChange = false)
     }
-    updatedSubFeed.clearDAGStart()
-  }
-
-  def updateSubFeedAfterWrite(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
-    subFeed.clearFilter // clear filter must be applied after write, because it includes removing the DataFrame
   }
 
   /**
@@ -242,7 +276,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
    */
   def validateDataFrameContainsCols(df: DataFrame, columns: Seq[String], debugName: String): Unit = {
     val missingColumns = columns.diff(df.columns)
-    assert(missingColumns.isEmpty, s"DataFrame $debugName doesn't include columns $missingColumns")
+    assert(missingColumns.isEmpty, s"DataFrame $debugName doesn't include columns ${missingColumns.mkString(", ")}")
   }
 
   /**
@@ -274,7 +308,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
   /**
    * Applies changes to a SubFeed from a previous action in order to be used as input for this actions transformation.
    */
-  def prepareInputSubFeed(subFeed: SparkSubFeed, input: DataObject with CanCreateDataFrame)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  def prepareInputSubFeed(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, ignoreFilters: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // persist if requested
     var preparedSubFeed = if (persist) subFeed.persist else subFeed
     // create dummy DataFrame if read schema is different from write schema on this DataObject
@@ -283,15 +317,43 @@ private[smartdatalake] abstract class SparkAction extends Action {
     val schemaChanges = writeSchema != readSchema
     require(!context.simulation || !schemaChanges, s"($id) write & read schema is not the same for ${input.id}. Need to create a dummy DataFrame, but this is not allowed in simulation!")
     preparedSubFeed = if (schemaChanges) preparedSubFeed.convertToDummy(readSchema.get) else preparedSubFeed
-    // adapt partition values (#180)
-    preparedSubFeed = input match {
-      case partitionedInput: CanHandlePartitions => preparedSubFeed.updatePartitionValues(partitionedInput.partitions)
-      case _ => preparedSubFeed.clearPartitionValues()
-    }
+    // remove potential filter and partition values added by execution mode
+    if (ignoreFilters) preparedSubFeed = preparedSubFeed.clearFilter().clearPartitionValues()
     // break lineage if requested or if it's a streaming DataFrame or if a filter expression is set
-    preparedSubFeed = if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined) preparedSubFeed.breakLineage else preparedSubFeed
+    if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined) preparedSubFeed = preparedSubFeed.breakLineage
     // return
     preparedSubFeed
+  }
+
+  override def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.postExec(inputSubFeeds, outputSubFeeds)
+    // auto-unpersist DataFrames no longer needed
+    inputSubFeeds
+      .collect { case subFeed: SparkSubFeed => subFeed }
+      .foreach { subFeed =>
+        if (context.forgetDataFrameReuse(subFeed.dataObjectId, subFeed.partitionValues, id).contains(0)) {
+          logger.info(s"($id) Removing cached DataFrame for ${subFeed.dataObjectId} and partitionValues=${subFeed.partitionValues.mkString(", ")}")
+          subFeed.dataFrame.foreach(_.unpersist)
+        }
+    }
+  }
+
+  def logWritingStarted(subFeed: SparkSubFeed)(implicit session: SparkSession): Unit = {
+    val msg = s"writing to ${subFeed.dataObjectId}" + (if (subFeed.partitionValues.nonEmpty) s", partitionValues ${subFeed.partitionValues.mkString(" ")}" else "")
+    logger.info(s"($id) start " + msg)
+    setSparkJobMetadata(Some(msg))
+  }
+
+  def logWritingFinished(subFeed: SparkSubFeed, noData: Boolean, duration: Duration)(implicit session: SparkSession): Unit = {
+    setSparkJobMetadata()
+    val metricsLog = if (noData) ", no data found"
+    else try {
+      getFinalMetrics(subFeed.dataObjectId).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
+    } catch {
+      // for some DataSources Spark optimizer doesn't execute anything if DataFrame is empty
+      case _: NoMetricsFoundException if subFeed.dataFrame.get.isEmpty => ", dataFrame is empty, no metrics found"
+    }
+    logger.info(s"($id) finished writing DataFrame to ${subFeed.dataObjectId.id}: jobDuration=$duration" + metricsLog)
   }
 
 }

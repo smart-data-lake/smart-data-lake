@@ -20,9 +20,10 @@ package io.smartdatalake.definitions
 
 import java.net.URI
 
-import io.smartdatalake.app.GlobalConfig
+import io.smartdatalake.app.{GlobalConfig, SDLPlugin}
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.util.misc.EnvironmentUtil
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.util.misc.{CustomCodeUtil, EnvironmentUtil}
 import org.apache.spark.sql.SparkSession
 
 /**
@@ -97,6 +98,15 @@ object Environment {
   }
 
   /**
+   * Set to true to enable check for duplicate first class object definitions when loading configuration (default=true).
+   * The check fails if Connections, DataObjects or Actions are defined in multiple locations.
+   */
+  var enableCheckConfigDuplicates: Boolean = {
+    EnvironmentUtil.getSdlParameter("enableCheckConfigDuplicates")
+      .map(_.toBoolean).getOrElse(true)
+  }
+
+  /**
    * ordering of columns in SchemaEvolution result
    * - true: result schema is ordered according to existing schema, new columns are appended
    * - false: result schema is ordered according to new schema, deleted columns are appended
@@ -130,11 +140,18 @@ object Environment {
   }
 
   /**
-   * Set to true if you want table and database names to be case sensitive when loading over JDBC.
-   * If your database supports case sensitive table names and you want to use that feature, set this to true.
+   * Set to true if you want to enable automatic caching of DataFrames that are used multiple times (default=true).
    */
-  var enableJdbcCaseSensitivity: Boolean = {
-    EnvironmentUtil.getSdlParameter("enableJdbcCaseSensitivity")
+  var enableAutomaticDataFrameCaching: Boolean = {
+    EnvironmentUtil.getSdlParameter("enableAutomaticDataFrameCaching")
+      .map(_.toBoolean).getOrElse(true)
+  }
+
+  /**
+   * Set to true if you want to enable workaround to overwrite unpartitioned SparkFileDataObject on Azure ADLSv2 (default=false).
+   */
+  var enableOverwriteUnpartitionedSparkFileDataObjectAdls: Boolean = {
+    EnvironmentUtil.getSdlParameter("enableOverwriteUnpartitionedSparkFileDataObjectAdls")
       .map(_.toBoolean).getOrElse(false)
   }
 
@@ -144,6 +161,13 @@ object Environment {
     , "create-sql", "createSql", "pre-read-sql", "preReadSql", "post-read-sql", "postReadSql", "pre-write-sql", "preWriteSql", "post-write-sql", "postWriteSql"
     , "executionMode.checkpointLocation", "execution-mode.checkpoint-location")
   val defaultPathSeparator: Char = '/'
+  val runIdPartitionColumnName = "run_id"
+
+  // instantiate sdl plugin if configured
+  private[smartdatalake] lazy val sdlPlugin: Option[SDLPlugin] = {
+    EnvironmentUtil.getSdlParameter("pluginClassName")
+      .map(CustomCodeUtil.getClassInstanceByName[SDLPlugin])
+  }
 
   // dynamically shared environment for custom code (see also #106)
   def sparkSession: SparkSession = _sparkSession
