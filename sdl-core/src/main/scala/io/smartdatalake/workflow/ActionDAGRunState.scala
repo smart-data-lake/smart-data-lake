@@ -68,6 +68,7 @@ private[smartdatalake] object ActionDAGRunState {
         // only String and Integer needed for now
         case v: String => v
         case v: Integer => v
+        case v: java.lang.Long => v
       }
     }
     val javaMapStringAnyConfigReader: ConfigReader[ju.Map[String, Any]] = ConfigReader.javaMapConfigReader(implicitly[StringConverter[String]], anyReader)
