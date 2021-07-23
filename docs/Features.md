@@ -18,8 +18,9 @@ The following is a list of implemented and planned (Future) features of Smart Da
 
 ##### Connectivity
 * Spark: diverse connectors (HadoopFS, Hive, DeltaLake, JDBC, Kafka, Splunk, Webservice, JMS) and formats (CSV, JSON, XML, Avro, Parquet, Excel, Access …)
-* File: SFTP, Local
+* File: SFTP, Local, Webservice
 * Easily extendable through implementing predefined scala traits
+* Support for getting secrets from different secret providers
 
 ##### Generic Transformations
 * Spark based: Copy, Historization, Deduplication
@@ -29,11 +30,11 @@ The following is a list of implemented and planned (Future) features of Smart Da
 
 ##### Customizable Transformations
 * Spark Transformations: 
-  * Languages: SQL, Scala (Class, compile from config), Future: Python
+  * Languages: SQL, Scala (Class, compile from config), Python
   * Many input DataFrames to many outputs DataFrames (but only one output recommended normally, in order to define dependencies as detailed as possible (lineage))
 * File Transformations: 
   * Language: Scala
-  * Only one to one (one Input Stream to one OutputStream)
+  * Only one to one (one InputStream to one OutputStream)
 
 ##### Early Validation
 * Execution in 3 phases before execution
@@ -46,7 +47,8 @@ The following is a list of implemented and planned (Future) features of Smart Da
 * Partition parameters: give partition values to process for start nodes as parameter
 * Partition Diff: search missing partitions and use as parameter
 * Spark Streaming Once: incremental processing by using Spark Structured Streaming with Trigger=Once mode
-* Future: Incremental (compare "watermark" column between source and target), Continous (Streaming)
+* Spark Incremental: compare sortable column between source and target, load the difference
+* Future: Spark Streaming
 
 ##### Schema Evolution
 * Automatic evolution of data schemas (new column, removed column, changed datatype)
@@ -55,6 +57,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
 ##### Metrics
 * Number of rows written per DataObject
 * Execution duration per Action
+* StateListener interface to get notified about progress & metrics
 
 ##### Data Catalog
 * Report all DataObjects attributes (incl. foreign keys if defined) for visualisation of data catalog in BI tool
@@ -69,3 +72,15 @@ The following is a list of implemented and planned (Future) features of Smart Da
 * Check & report primary key violations by executing primary key checker action
 * Future: Metadata support for arbitrary data quality checks
 * Future: Report data quality (foreign key matching & arbitrary data quality checks) by executing data quality reporter action
+
+##### Testing
+* Support for CI
+  * Config validation
+  * Custom transformation unit tests
+  * Spark data pipeline simulation (acceptance tests)
+* Support for Deployment
+  * Dry-run
+
+##### Spark Performance
+* Execute multiple Spark jobs in parallel within the same Spark Session to save resources
+* Automatically cache and release intermediate results (DataFrames)

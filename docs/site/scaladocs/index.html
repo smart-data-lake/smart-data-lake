@@ -1,100 +1,174 @@
 <!DOCTYPE html >
 <html>
         <head>
-          <title>Smart Data Lake 1.1.0 API</title>
-          <meta name="description" content="Smart Data Lake 1.1.0 API" />
-          <meta name="keywords" content="Smart Data Lake 1.1.0 API" />
+          <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+          <title>sdl-core 2.0.4 API </title>
+          <meta name="description" content="sdl - core 2.0.4 API " />
+          <meta name="keywords" content="sdl core 2.0.4 API " />
           <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
           
+      
       <link href="lib/index.css" media="screen" type="text/css" rel="stylesheet" />
-      <script type="text/javascript" src="lib/jquery.js"></script>
-      <script type="text/javascript" src="lib/jquery-ui.js"></script>
-      <script type="text/javascript" src="lib/jquery.layout.js"></script>
+      <link href="lib/template.css" media="screen" type="text/css" rel="stylesheet" />
+      <link href="lib/diagrams.css" media="screen" type="text/css" rel="stylesheet" id="diagrams-css" />
+      <script type="text/javascript" src="lib/jquery.min.js"></script>
+      <script type="text/javascript" src="lib/jquery.panzoom.min.js"></script>
+      <script type="text/javascript" src="lib/jquery.mousewheel.min.js"></script>
       <script type="text/javascript" src="lib/index.js"></script>
+      <script type="text/javascript" src="index.js"></script>
       <script type="text/javascript" src="lib/scheduler.js"></script>
+      <script type="text/javascript" src="lib/template.js"></script>
+      
+      <script type="text/javascript">
+        /* this variable can be used by the JS to determine the path to the root document */
+        var toRoot = '';
+      </script>
     
         </head>
         <body>
-      <div id="library">
-        <img class="class icon" alt="class icon" src="lib/class.png" />
-        <img class="trait icon" alt="trait icon" src="lib/trait.png" />
-        <img class="object icon" alt="trait icon" src="lib/object.png" />
-        <img class="package icon" alt="trait icon" src="lib/package.png" />
-      </div>
-      <div id="browser" class="ui-layout-west">
-      <div class="ui-west-center">
-      <div id="filter">
-          <div id="textfilter"></div>
-          <div id="letters"><span>#</span><a target="template" href="index/index-a.html">A</a><a target="template" href="index/index-b.html">B</a><a target="template" href="index/index-c.html">C</a><a target="template" href="index/index-d.html">D</a><a target="template" href="index/index-e.html">E</a><a target="template" href="index/index-f.html">F</a><a target="template" href="index/index-g.html">G</a><a target="template" href="index/index-h.html">H</a><a target="template" href="index/index-i.html">I</a><a target="template" href="index/index-j.html">J</a><a target="template" href="index/index-k.html">K</a><a target="template" href="index/index-l.html">L</a><a target="template" href="index/index-m.html">M</a><a target="template" href="index/index-n.html">N</a><a target="template" href="index/index-o.html">O</a><a target="template" href="index/index-p.html">P</a><a target="template" href="index/index-q.html">Q</a><a target="template" href="index/index-r.html">R</a><a target="template" href="index/index-s.html">S</a><a target="template" href="index/index-t.html">T</a><a target="template" href="index/index-u.html">U</a><a target="template" href="index/index-v.html">V</a><a target="template" href="index/index-w.html">W</a><a target="template" href="index/index-x.html">X</a><span>Y</span><span>Z</span> – <span>deprecated</span></div>
-      </div>
-      <div class="pack" id="tpl">
-            
-            <ol class="templates"></ol>
-            <ol class="packages"> <li class="pack" title="io">
-            <a class="tplshow" href="io/package.html" target="template">io</a>
-            <ol class="templates"></ol>
-            <ol class="packages"> <li class="pack" title="io.smartdatalake">
-            <a class="tplshow" href="io/smartdatalake/package.html" target="template">io.smartdatalake</a>
-            <ol class="templates"></ol>
-            <ol class="packages"> <li class="pack" title="io.smartdatalake.app">
-            <a class="tplshow" href="io/smartdatalake/app/package.html" target="template">io.smartdatalake.app</a>
-            <ol class="templates"><li title="io.smartdatalake.app.DatabricksSmartDataLakeBuilder"><a class="tplshow" href="io/smartdatalake/app/DatabricksSmartDataLakeBuilder$.html" target="template"><span class="object">(object)</span><div class="placeholder"></div><span class="tplLink">DatabricksSmartDataLakeBuilder</span></a></li><li title="io.smartdatalake.app.DefaultSmartDataLakeBuilder"><a class="tplshow" href="io/smartdatalake/app/DefaultSmartDataLakeBuilder$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/app/DefaultSmartDataLakeBuilder.html" target="template"><span class="class">(class)</span><span class="tplLink">DefaultSmartDataLakeBuilder</span></a></li><li title="io.smartdatalake.app.GlobalConfig"><a class="tplshow" href="io/smartdatalake/app/GlobalConfig$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/app/GlobalConfig.html" target="template"><span class="case class">(case class)</span><span class="tplLink">GlobalConfig</span></a></li><li title="io.smartdatalake.app.LocalSmartDataLakeBuilder"><a class="tplshow" href="io/smartdatalake/app/LocalSmartDataLakeBuilder$.html" target="template"><span class="object">(object)</span><div class="placeholder"></div><span class="tplLink">LocalSmartDataLakeBuilder</span></a></li><li title="io.smartdatalake.app.MemoryLogTimerConfig"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/app/MemoryLogTimerConfig.html" target="template"><span class="case class">(case class)</span><span class="tplLink">MemoryLogTimerConfig</span></a></li><li title="io.smartdatalake.app.SmartDataLakeBuilder"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/app/SmartDataLakeBuilder.html" target="template"><span class="class">(class)</span><span class="tplLink">SmartDataLakeBuilder</span></a></li><li title="io.smartdatalake.app.SmartDataLakeBuilderConfig"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/app/SmartDataLakeBuilderConfig.html" target="template"><span class="case class">(case class)</span><span class="tplLink">SmartDataLakeBuilderConfig</span></a></li><li title="io.smartdatalake.app.StateListener"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/app/StateListener.html" target="template"><span class="trait">(trait)</span><span class="tplLink">StateListener</span></a></li><li title="io.smartdatalake.app.StateListenerConfig"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/app/StateListenerConfig.html" target="template"><span class="case class">(case class)</span><span class="tplLink">StateListenerConfig</span></a></li><li title="io.smartdatalake.app.TestMode"><a class="tplshow" href="io/smartdatalake/app/TestMode$.html" target="template"><span class="object">(object)</span><div class="placeholder"></div><span class="tplLink">TestMode</span></a></li></ol>
-            <ol class="packages"> </ol>
-          </li><li class="pack" title="io.smartdatalake.config">
-            <a class="tplshow" href="io/smartdatalake/config/package.html" target="template">io.smartdatalake.config</a>
-            <ol class="templates"><li title="io.smartdatalake.config.ConfigLoader"><a class="tplshow" href="io/smartdatalake/config/ConfigLoader$.html" target="template"><span class="object">(object)</span><div class="placeholder"></div><span class="tplLink">ConfigLoader</span></a></li><li title="io.smartdatalake.config.ConfigToolbox"><a class="tplshow" href="io/smartdatalake/config/ConfigToolbox$.html" target="template"><span class="object">(object)</span><div class="placeholder"></div><span class="tplLink">ConfigToolbox</span></a></li><li title="io.smartdatalake.config.SdlConfigObject"><a class="tplshow" href="io/smartdatalake/config/SdlConfigObject$.html" target="template"><span class="object">(object)</span><div class="placeholder"></div><span class="tplLink">SdlConfigObject</span></a></li></ol>
-            <ol class="packages"> </ol>
-          </li><li class="pack" title="io.smartdatalake.definitions">
-            <a class="tplshow" href="io/smartdatalake/definitions/package.html" target="template">io.smartdatalake.definitions</a>
-            <ol class="templates"><li title="io.smartdatalake.definitions.AuthMode"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/definitions/AuthMode.html" target="template"><span class="trait">(trait)</span><span class="tplLink">AuthMode</span></a></li><li title="io.smartdatalake.definitions.BasicAuthMode"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/definitions/BasicAuthMode.html" target="template"><span class="case class">(case class)</span><span class="tplLink">BasicAuthMode</span></a></li><li title="io.smartdatalake.definitions.DateColumnType"><a class="tplshow" href="io/smartdatalake/definitions/DateColumnType$.html" target="template"><span class="object">(object)</span><div class="placeholder"></div><span class="tplLink">DateColumnType</span></a></li><li title="io.smartdatalake.definitions.DefaultExecutionModeExpressionData"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/definitions/DefaultExecutionModeExpressionData.html" target="template"><span class="case class">(case class)</span><span class="tplLink">DefaultExecutionModeExpressionData</span></a></li><li title="io.smartdatalake.definitions.Environment"><a class="tplshow" href="io/smartdatalake/definitions/Environment$.html" target="template"><span class="object">(object)</span><div class="placeholder"></div><span class="tplLink">Environment</span></a></li><li title="io.smartdatalake.definitions.ExecutionMode"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/definitions/ExecutionMode.html" target="template"><span class="trait">(trait)</span><span class="tplLink">ExecutionMode</span></a></li><li title="io.smartdatalake.definitions.FailIfNoPartitionValuesMode"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/definitions/FailIfNoPartitionValuesMode.html" target="template"><span class="case class">(case class)</span><span class="tplLink">FailIfNoPartitionValuesMode</span></a></li><li title="io.smartdatalake.definitions.HiveConventions"><a class="tplshow" href="io/smartdatalake/definitions/HiveConventions$.html" target="template"><span class="object">(object)</span><div class="placeholder"></div><span class="tplLink">HiveConventions</span></a></li><li title="io.smartdatalake.definitions.HiveTableLocationSuffix"><a class="tplshow" href="io/smartdatalake/definitions/HiveTableLocationSuffix$.html" target="template"><span class="object">(object)</span><div class="placeholder"></div><span class="tplLink">HiveTableLocationSuffix</span></a></li><li title="io.smartdatalake.definitions.OutputType"><a class="tplshow" href="io/smartdatalake/definitions/OutputType$.html" target="template"><span class="object">(object)</span><div class="placeholder"></div><span class="tplLink">OutputType</span></a></li><li title="io.smartdatalake.definitions.PartitionDiffMode"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/definitions/PartitionDiffMode.html" target="template"><span class="case class">(case class)</span><span class="tplLink">PartitionDiffMode</span></a></li><li title="io.smartdatalake.definitions.PartitionDiffModeExpressionData"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/definitions/PartitionDiffModeExpressionData.html" target="template"><span class="case class">(case class)</span><span class="tplLink">PartitionDiffModeExpressionData</span></a></li><li title="io.smartdatalake.definitions.PublicKeyAuthMode"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/definitions/PublicKeyAuthMode.html" target="template"><span class="case class">(case class)</span><span class="tplLink">PublicKeyAuthMode</span></a></li><li title="io.smartdatalake.definitions.SparkIncrementalMode"><a class="tplshow" href="io/smartdatalake/definitions/SparkIncrementalMode$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/definitions/SparkIncrementalMode.html" target="template"><span class="case class">(case class)</span><span class="tplLink">SparkIncrementalMode</span></a></li><li title="io.smartdatalake.definitions.SparkStreamingOnceMode"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/definitions/SparkStreamingOnceMode.html" target="template"><span class="case class">(case class)</span><span class="tplLink">SparkStreamingOnceMode</span></a></li><li title="io.smartdatalake.definitions.SSLCertsAuthMode"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/definitions/SSLCertsAuthMode.html" target="template"><span class="case class">(case class)</span><span class="tplLink">SSLCertsAuthMode</span></a></li><li title="io.smartdatalake.definitions.TechnicalTableColumn"><a class="tplshow" href="io/smartdatalake/definitions/TechnicalTableColumn$.html" target="template"><span class="object">(object)</span><div class="placeholder"></div><span class="tplLink">TechnicalTableColumn</span></a></li><li title="io.smartdatalake.definitions.TokenAuthMode"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/definitions/TokenAuthMode.html" target="template"><span class="case class">(case class)</span><span class="tplLink">TokenAuthMode</span></a></li></ol>
-            <ol class="packages"> </ol>
-          </li><li class="pack" title="io.smartdatalake.util">
-            <a class="tplshow" href="io/smartdatalake/util/package.html" target="template">io.smartdatalake.util</a>
-            <ol class="templates"></ol>
-            <ol class="packages"> <li class="pack" title="io.smartdatalake.util.hdfs">
-            <a class="tplshow" href="io/smartdatalake/util/hdfs/package.html" target="template">io.smartdatalake.util.hdfs</a>
-            <ol class="templates"><li title="io.smartdatalake.util.hdfs.SparkRepartitionDef"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/util/hdfs/SparkRepartitionDef.html" target="template"><span class="case class">(case class)</span><span class="tplLink">SparkRepartitionDef</span></a></li></ol>
-            <ol class="packages"> </ol>
-          </li><li class="pack" title="io.smartdatalake.util.misc">
-            <a class="tplshow" href="io/smartdatalake/util/misc/package.html" target="template">io.smartdatalake.util.misc</a>
-            <ol class="templates"><li title="io.smartdatalake.util.misc.AclDef"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/util/misc/AclDef.html" target="template"><span class="case class">(case class)</span><span class="tplLink">AclDef</span></a></li><li title="io.smartdatalake.util.misc.AclElement"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/util/misc/AclElement.html" target="template"><span class="case class">(case class)</span><span class="tplLink">AclElement</span></a></li><li title="io.smartdatalake.util.misc.DefaultExpressionData"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/util/misc/DefaultExpressionData.html" target="template"><span class="case class">(case class)</span><span class="tplLink">DefaultExpressionData</span></a></li><li title="io.smartdatalake.util.misc.EnvironmentUtil"><a class="tplshow" href="io/smartdatalake/util/misc/EnvironmentUtil$.html" target="template"><span class="object">(object)</span><div class="placeholder"></div><span class="tplLink">EnvironmentUtil</span></a></li><li title="io.smartdatalake.util.misc.MemoryUtils"><a class="tplshow" href="io/smartdatalake/util/misc/MemoryUtils$.html" target="template"><span class="object">(object)</span><div class="placeholder"></div><span class="tplLink">MemoryUtils</span></a></li></ol>
-            <ol class="packages"> </ol>
-          </li><li class="pack" title="io.smartdatalake.util.streaming">
-            <a class="tplshow" href="io/smartdatalake/util/streaming/package.html" target="template">io.smartdatalake.util.streaming</a>
-            <ol class="templates"><li title="io.smartdatalake.util.streaming.DummyStreamProvider"><a class="tplshow" href="io/smartdatalake/util/streaming/DummyStreamProvider$.html" target="template"><span class="object">(object)</span><div class="placeholder"></div><span class="tplLink">DummyStreamProvider</span></a></li></ol>
-            <ol class="packages"> </ol>
-          </li><li class="pack" title="io.smartdatalake.util.webservice">
-            <a class="tplshow" href="io/smartdatalake/util/webservice/package.html" target="template">io.smartdatalake.util.webservice</a>
-            <ol class="templates"><li title="io.smartdatalake.util.webservice.WebserviceException"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/util/webservice/WebserviceException.html" target="template"><span class="class">(class)</span><span class="tplLink">WebserviceException</span></a></li></ol>
-            <ol class="packages"> </ol>
-          </li></ol>
-          </li><li class="pack" title="io.smartdatalake.workflow">
-            <a class="tplshow" href="io/smartdatalake/workflow/package.html" target="template">io.smartdatalake.workflow</a>
-            <ol class="templates"><li title="io.smartdatalake.workflow.DAG"><a class="tplshow" href="io/smartdatalake/workflow/DAG$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/DAG.html" target="template"><span class="case class">(case class)</span><span class="tplLink">DAG</span></a></li><li title="io.smartdatalake.workflow.ExecutionPhase"><a class="tplshow" href="io/smartdatalake/workflow/ExecutionPhase$.html" target="template"><span class="object">(object)</span><div class="placeholder"></div><span class="tplLink">ExecutionPhase</span></a></li><li title="io.smartdatalake.workflow.FileSubFeed"><a class="tplshow" href="io/smartdatalake/workflow/FileSubFeed$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/FileSubFeed.html" target="template"><span class="case class">(case class)</span><span class="tplLink">FileSubFeed</span></a></li><li title="io.smartdatalake.workflow.HadoopFileStateId"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/HadoopFileStateId.html" target="template"><span class="case class">(case class)</span><span class="tplLink">HadoopFileStateId</span></a></li><li title="io.smartdatalake.workflow.InitSubFeed"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/InitSubFeed.html" target="template"><span class="case class">(case class)</span><span class="tplLink">InitSubFeed</span></a></li><li title="io.smartdatalake.workflow.PrimaryKeyConstraintViolationException"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/PrimaryKeyConstraintViolationException.html" target="template"><span class="class">(class)</span><span class="tplLink">PrimaryKeyConstraintViolationException</span></a></li><li title="io.smartdatalake.workflow.ProcessingLogicException"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/ProcessingLogicException.html" target="template"><span class="class">(class)</span><span class="tplLink">ProcessingLogicException</span></a></li><li title="io.smartdatalake.workflow.SparkSubFeed"><a class="tplshow" href="io/smartdatalake/workflow/SparkSubFeed$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/SparkSubFeed.html" target="template"><span class="case class">(case class)</span><span class="tplLink">SparkSubFeed</span></a></li><li title="io.smartdatalake.workflow.SubFeed"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/SubFeed.html" target="template"><span class="trait">(trait)</span><span class="tplLink">SubFeed</span></a></li></ol>
-            <ol class="packages"> <li class="pack" title="io.smartdatalake.workflow.action">
-            <a class="tplshow" href="io/smartdatalake/workflow/action/package.html" target="template">io.smartdatalake.workflow.action</a>
-            <ol class="templates"><li title="io.smartdatalake.workflow.action.ActionMetadata"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/action/ActionMetadata.html" target="template"><span class="case class">(case class)</span><span class="tplLink">ActionMetadata</span></a></li><li title="io.smartdatalake.workflow.action.CopyAction"><a class="tplshow" href="io/smartdatalake/workflow/action/CopyAction$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/action/CopyAction.html" target="template"><span class="case class">(case class)</span><span class="tplLink">CopyAction</span></a></li><li title="io.smartdatalake.workflow.action.CustomFileAction"><a class="tplshow" href="io/smartdatalake/workflow/action/CustomFileAction$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/action/CustomFileAction.html" target="template"><span class="case class">(case class)</span><span class="tplLink">CustomFileAction</span></a></li><li title="io.smartdatalake.workflow.action.CustomSparkAction"><a class="tplshow" href="io/smartdatalake/workflow/action/CustomSparkAction$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/action/CustomSparkAction.html" target="template"><span class="case class">(case class)</span><span class="tplLink">CustomSparkAction</span></a></li><li title="io.smartdatalake.workflow.action.DeduplicateAction"><a class="tplshow" href="io/smartdatalake/workflow/action/DeduplicateAction$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/action/DeduplicateAction.html" target="template"><span class="case class">(case class)</span><span class="tplLink">DeduplicateAction</span></a></li><li title="io.smartdatalake.workflow.action.FileSubFeedAction"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/action/FileSubFeedAction.html" target="template"><span class="class">(class)</span><span class="tplLink">FileSubFeedAction</span></a></li><li title="io.smartdatalake.workflow.action.FileTransferAction"><a class="tplshow" href="io/smartdatalake/workflow/action/FileTransferAction$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/action/FileTransferAction.html" target="template"><span class="case class">(case class)</span><span class="tplLink">FileTransferAction</span></a></li><li title="io.smartdatalake.workflow.action.HistorizeAction"><a class="tplshow" href="io/smartdatalake/workflow/action/HistorizeAction$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/action/HistorizeAction.html" target="template"><span class="case class">(case class)</span><span class="tplLink">HistorizeAction</span></a></li><li title="io.smartdatalake.workflow.action.SparkSubFeedAction"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/action/SparkSubFeedAction.html" target="template"><span class="class">(class)</span><span class="tplLink">SparkSubFeedAction</span></a></li><li title="io.smartdatalake.workflow.action.SparkSubFeedsAction"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/action/SparkSubFeedsAction.html" target="template"><span class="class">(class)</span><span class="tplLink">SparkSubFeedsAction</span></a></li></ol>
-            <ol class="packages"> <li class="pack" title="io.smartdatalake.workflow.action.customlogic">
-            <a class="tplshow" href="io/smartdatalake/workflow/action/customlogic/package.html" target="template">io.smartdatalake.workflow.action.customlogic</a>
-            <ol class="templates"><li title="io.smartdatalake.workflow.action.customlogic.CustomDfCreator"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/action/customlogic/CustomDfCreator.html" target="template"><span class="trait">(trait)</span><span class="tplLink">CustomDfCreator</span></a></li><li title="io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/action/customlogic/CustomDfCreatorConfig.html" target="template"><span class="case class">(case class)</span><span class="tplLink">CustomDfCreatorConfig</span></a></li><li title="io.smartdatalake.workflow.action.customlogic.CustomDfCreatorWrapper"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/action/customlogic/CustomDfCreatorWrapper.html" target="template"><span class="class">(class)</span><span class="tplLink">CustomDfCreatorWrapper</span></a></li><li title="io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/action/customlogic/CustomDfsTransformer.html" target="template"><span class="trait">(trait)</span><span class="tplLink">CustomDfsTransformer</span></a></li><li title="io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/action/customlogic/CustomDfsTransformerConfig.html" target="template"><span class="case class">(case class)</span><span class="tplLink">CustomDfsTransformerConfig</span></a></li><li title="io.smartdatalake.workflow.action.customlogic.CustomDfTransformer"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/action/customlogic/CustomDfTransformer.html" target="template"><span class="trait">(trait)</span><span class="tplLink">CustomDfTransformer</span></a></li><li title="io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/action/customlogic/CustomDfTransformerConfig.html" target="template"><span class="case class">(case class)</span><span class="tplLink">CustomDfTransformerConfig</span></a></li><li title="io.smartdatalake.workflow.action.customlogic.CustomFileTransformer"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/action/customlogic/CustomFileTransformer.html" target="template"><span class="trait">(trait)</span><span class="tplLink">CustomFileTransformer</span></a></li><li title="io.smartdatalake.workflow.action.customlogic.CustomFileTransformerConfig"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/action/customlogic/CustomFileTransformerConfig.html" target="template"><span class="case class">(case class)</span><span class="tplLink">CustomFileTransformerConfig</span></a></li><li title="io.smartdatalake.workflow.action.customlogic.CustomFileTransformerWrapper"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/action/customlogic/CustomFileTransformerWrapper.html" target="template"><span class="class">(class)</span><span class="tplLink">CustomFileTransformerWrapper</span></a></li></ol>
-            <ol class="packages"> </ol>
-          </li></ol>
-          </li><li class="pack" title="io.smartdatalake.workflow.connection">
-            <a class="tplshow" href="io/smartdatalake/workflow/connection/package.html" target="template">io.smartdatalake.workflow.connection</a>
-            <ol class="templates"><li title="io.smartdatalake.workflow.connection.ConnectionMetadata"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/connection/ConnectionMetadata.html" target="template"><span class="case class">(case class)</span><span class="tplLink">ConnectionMetadata</span></a></li><li title="io.smartdatalake.workflow.connection.HadoopFileConnection"><a class="tplshow" href="io/smartdatalake/workflow/connection/HadoopFileConnection$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/connection/HadoopFileConnection.html" target="template"><span class="case class">(case class)</span><span class="tplLink">HadoopFileConnection</span></a></li><li title="io.smartdatalake.workflow.connection.HiveTableConnection"><a class="tplshow" href="io/smartdatalake/workflow/connection/HiveTableConnection$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/connection/HiveTableConnection.html" target="template"><span class="case class">(case class)</span><span class="tplLink">HiveTableConnection</span></a></li><li title="io.smartdatalake.workflow.connection.JdbcTableConnection"><a class="tplshow" href="io/smartdatalake/workflow/connection/JdbcTableConnection$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/connection/JdbcTableConnection.html" target="template"><span class="case class">(case class)</span><span class="tplLink">JdbcTableConnection</span></a></li><li title="io.smartdatalake.workflow.connection.KafkaConnection"><a class="tplshow" href="io/smartdatalake/workflow/connection/KafkaConnection$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/connection/KafkaConnection.html" target="template"><span class="case class">(case class)</span><span class="tplLink">KafkaConnection</span></a></li><li title="io.smartdatalake.workflow.connection.SftpFileRefConnection"><a class="tplshow" href="io/smartdatalake/workflow/connection/SftpFileRefConnection$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/connection/SftpFileRefConnection.html" target="template"><span class="case class">(case class)</span><span class="tplLink">SftpFileRefConnection</span></a></li><li title="io.smartdatalake.workflow.connection.SplunkConnection"><a class="tplshow" href="io/smartdatalake/workflow/connection/SplunkConnection$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/connection/SplunkConnection.html" target="template"><span class="case class">(case class)</span><span class="tplLink">SplunkConnection</span></a></li><li title="io.smartdatalake.workflow.connection.SplunkConnectionService"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/connection/SplunkConnectionService.html" target="template"><span class="trait">(trait)</span><span class="tplLink">SplunkConnectionService</span></a></li></ol>
-            <ol class="packages"> </ol>
-          </li><li class="pack" title="io.smartdatalake.workflow.dataobject">
-            <a class="tplshow" href="io/smartdatalake/workflow/dataobject/package.html" target="template">io.smartdatalake.workflow.dataobject</a>
-            <ol class="templates"><li title="io.smartdatalake.workflow.dataobject.AccessTableDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/AccessTableDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/AccessTableDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">AccessTableDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.ActionsExporterDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/ActionsExporterDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/ActionsExporterDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">ActionsExporterDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.AvroFileDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/AvroFileDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/AvroFileDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">AvroFileDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.ConnectionTestException"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/dataobject/ConnectionTestException.html" target="template"><span class="case class">(case class)</span><span class="tplLink">ConnectionTestException</span></a></li><li title="io.smartdatalake.workflow.dataobject.CsvFileDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/CsvFileDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/CsvFileDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">CsvFileDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.CustomDfDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/CustomDfDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/CustomDfDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">CustomDfDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.DataObjectMetadata"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/dataobject/DataObjectMetadata.html" target="template"><span class="case class">(case class)</span><span class="tplLink">DataObjectMetadata</span></a></li><li title="io.smartdatalake.workflow.dataobject.DataObjectsExporterDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/DataObjectsExporterDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/DataObjectsExporterDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">DataObjectsExporterDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.DatePartitionColumnDef"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/dataobject/DatePartitionColumnDef.html" target="template"><span class="case class">(case class)</span><span class="tplLink">DatePartitionColumnDef</span></a></li><li title="io.smartdatalake.workflow.dataobject.DeltaLakeTableDataObject"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/dataobject/DeltaLakeTableDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">DeltaLakeTableDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.ExcelFileDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/ExcelFileDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/ExcelFileDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">ExcelFileDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.ExcelOptions"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/dataobject/ExcelOptions.html" target="template"><span class="case class">(case class)</span><span class="tplLink">ExcelOptions</span></a></li><li title="io.smartdatalake.workflow.dataobject.ForeignKey"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/dataobject/ForeignKey.html" target="template"><span class="case class">(case class)</span><span class="tplLink">ForeignKey</span></a></li><li title="io.smartdatalake.workflow.dataobject.HiveTableDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/HiveTableDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/HiveTableDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">HiveTableDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.JdbcTableDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/JdbcTableDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/JdbcTableDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">JdbcTableDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.JmsDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/JmsDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/JmsDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">JmsDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.JsonFileDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/JsonFileDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/JsonFileDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">JsonFileDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.KafkaColumnType"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/KafkaColumnType$.html" target="template"><span class="object">(object)</span><div class="placeholder"></div><span class="tplLink">KafkaColumnType</span></a></li><li title="io.smartdatalake.workflow.dataobject.KafkaTopicDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/KafkaTopicDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/KafkaTopicDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">KafkaTopicDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.ParquetFileDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/ParquetFileDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/ParquetFileDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">ParquetFileDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.PKViolatorsDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/PKViolatorsDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/PKViolatorsDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">PKViolatorsDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.QueryTimeInterval"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/dataobject/QueryTimeInterval.html" target="template"><span class="case class">(case class)</span><span class="tplLink">QueryTimeInterval</span></a></li><li title="io.smartdatalake.workflow.dataobject.RawFileDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/RawFileDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/RawFileDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">RawFileDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.SFtpFileRefDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/SFtpFileRefDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/SFtpFileRefDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">SFtpFileRefDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.SplunkDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/SplunkDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/SplunkDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">SplunkDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.SplunkFormatter"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/SplunkFormatter$.html" target="template"><span class="object">(object)</span><div class="placeholder"></div><span class="tplLink">SplunkFormatter</span></a></li><li title="io.smartdatalake.workflow.dataobject.SplunkParams"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/SplunkParams$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/SplunkParams.html" target="template"><span class="case class">(case class)</span><span class="tplLink">SplunkParams</span></a></li><li title="io.smartdatalake.workflow.dataobject.Table"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/dataobject/Table.html" target="template"><span class="case class">(case class)</span><span class="tplLink">Table</span></a></li><li title="io.smartdatalake.workflow.dataobject.TickTockHiveTableDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/TickTockHiveTableDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/TickTockHiveTableDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">TickTockHiveTableDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.WebserviceFileDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/WebserviceFileDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/WebserviceFileDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">WebserviceFileDataObject</span></a></li><li title="io.smartdatalake.workflow.dataobject.WebserviceOptions"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/dataobject/WebserviceOptions.html" target="template"><span class="case class">(case class)</span><span class="tplLink">WebserviceOptions</span></a></li><li title="io.smartdatalake.workflow.dataobject.WebservicePartitionDefinition"><div class="placeholder"></div><a class="tplshow" href="io/smartdatalake/workflow/dataobject/WebservicePartitionDefinition.html" target="template"><span class="case class">(case class)</span><span class="tplLink">WebservicePartitionDefinition</span></a></li><li title="io.smartdatalake.workflow.dataobject.XmlFileDataObject"><a class="tplshow" href="io/smartdatalake/workflow/dataobject/XmlFileDataObject$.html" target="template"><span class="object">(object)</span></a><a class="tplshow" href="io/smartdatalake/workflow/dataobject/XmlFileDataObject.html" target="template"><span class="case class">(case class)</span><span class="tplLink">XmlFileDataObject</span></a></li></ol>
-            <ol class="packages"> </ol>
-          </li></ol>
-          </li></ol>
-          </li></ol>
-          </li></ol>
-          </div></div><script src="index.js"></script>
+      <div id="search">
+        <span id="doc-title">sdl-core 2.0.4 API<span id="doc-version"></span></span>
+        <span class="close-results"><span class="left">&lt;</span> Back</span>
+        <div id="textfilter">
+          <span class="input">
+            <input autocapitalize="none" placeholder="Search" id="index-input" type="text" accesskey="/" />
+            <i class="clear material-icons"></i>
+            <i id="search-icon" class="material-icons"></i>
+          </span>
+        </div>
     </div>
-      <div id="content" class="ui-layout-center">
-        <iframe id="template" name="template" src="package.html"></iframe>
+      <div id="search-results">
+        <div id="search-progress">
+          <div id="progress-fill"></div>
+        </div>
+        <div id="results-content">
+          <div id="entity-results"></div>
+          <div id="member-results"></div>
+        </div>
+      </div>
+      <div id="content-scroll-container" style="-webkit-overflow-scrolling: touch;">
+        <div id="content-container" style="-webkit-overflow-scrolling: touch;">
+          <div id="subpackage-spacer">
+            <div id="packages">
+              <h1>Packages</h1>
+              <ul>
+                <li name="_root_.root" visbl="pub" class="indented0 current" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="_root_"></a><a id="root:_root_"></a>
+      <span class="permalink">
+      <a href="index.html" title="Permalink">
+        <i class="material-icons"></i>
+      </a>
+    </span>
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">package</span>
+      </span>
+      <span class="symbol">
+        <span class="name">root</span>
+      </span>
+      
+      
+    </li><li name="_root_.io" visbl="pub" class="indented1 " data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="io"></a><a id="io:io"></a>
+      <span class="permalink">
+      <a href="io/index.html" title="Permalink">
+        <i class="material-icons"></i>
+      </a>
+    </span>
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">package</span>
+      </span>
+      <span class="symbol">
+        <a title="" href="io/index.html"><span class="name">io</span></a>
+      </span>
+      
+      
+    </li><li name="_root_.scala" visbl="pub" class="indented1 " data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="scala"></a><a id="scala:scala"></a>
+      <span class="permalink">
+      <a href="scala/index.html" title="Permalink">
+        <i class="material-icons"></i>
+      </a>
+    </span>
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">package</span>
+      </span>
+      <span class="symbol">
+        <a title="" href="scala/index.html"><span class="name">scala</span></a>
+      </span>
+      
+      
+    </li>
+              </ul>
+            </div>
+          </div>
+          <div id="content">
+            <body class="package value">
+      <div id="definition">
+        <div class="big-circle package">p</div>
+        
+        <h1>root package<span class="permalink">
+      <a href="index.html" title="Permalink">
+        <i class="material-icons"></i>
+      </a>
+    </span></h1>
+        
+      </div>
+
+      <h4 id="signature" class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">package</span>
+      </span>
+      <span class="symbol">
+        <span class="name">root</span>
+      </span>
+      </h4>
+
+      
+          <div id="comment" class="fullcommenttop"></div>
+        
+
+      
+
+      <div id="template">
+        <div id="allMembers">
+        
+
+        
+
+        
+
+        
+
+        
+
+        
+        </div>
+
+        <div id="inheritedMembers">
+        
+        
+        </div>
+
+        <div id="groupedMembers">
+        <div class="group" name="Ungrouped">
+              <h3>Ungrouped</h3>
+              
+            </div>
+        </div>
+
+      </div>
+
+      <div id="tooltip"></div>
+
+      <div id="footer">  </div>
+    </body>
+          </div>
+        </div>
       </div>
     </body>
       </html>
