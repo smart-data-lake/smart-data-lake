@@ -19,7 +19,7 @@
 package io.smartdatalake.definitions
 
 import java.net.URI
-import io.smartdatalake.app.{GlobalConfig, SDLPlugin}
+import io.smartdatalake.app.{GlobalConfig, SDLPlugin, StateListener}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.{CustomCodeUtil, EnvironmentUtil}
@@ -176,4 +176,10 @@ object Environment {
   def globalConfig: GlobalConfig = _globalConfig
   private [smartdatalake] var _globalConfig: GlobalConfig = _
 
+  // flag to gracefully stop repeated execution of DAG in streaming mode
+  var stopStreamingGracefully: Boolean = false
+
+  // This is for testing only: add state listener programmatically
+  // Note: state listeners should be configured by global section of config files, see also [[GlobalConfig]]
+  private[smartdatalake] var _additionalStateListeners: Seq[StateListener] = Seq()
 }

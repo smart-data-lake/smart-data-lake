@@ -63,7 +63,7 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
-    val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
+    val context1 = ActionPipelineContext(feed, "test", SDLExecutionId.executionId1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id)
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())(session, context1)
@@ -79,7 +79,7 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start 2nd load
     val refTimestamp2 = LocalDateTime.now()
-    val context2 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(refTimestamp2), SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
+    val context2 = ActionPipelineContext(feed, "test", SDLExecutionId.executionId1, instanceRegistry, Some(refTimestamp2), SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
     val l2 = Seq(("doe","john",10)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l2, Seq())(session, context1)
     action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(session, context2)
@@ -121,7 +121,7 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     // prepare & start 1st load
-    val context1 = ActionPipelineContext(feed, "test", 1, 1, instanceRegistry, Some(LocalDateTime.now), SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
+    val context1 = ActionPipelineContext(feed, "test", SDLExecutionId.executionId1, instanceRegistry, Some(LocalDateTime.now), SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, filterClause = Some("lastname='jonson'"))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())(session, context1)

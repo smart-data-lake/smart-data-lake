@@ -20,12 +20,11 @@
 package io.smartdatalake.workflow
 
 import java.time.{Duration, LocalDateTime}
-
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.SdlConfigObject._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.{ResultRuntimeInfo, RuntimeEventState, RuntimeInfo}
+import io.smartdatalake.workflow.action.{ResultRuntimeInfo, RuntimeEventState, RuntimeInfo, SDLExecutionId}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.FunSuite
 
@@ -36,7 +35,7 @@ class ActionDAGRunTest extends FunSuite {
 
   test("convert ActionDAGRunState to json and back") {
     val df = Seq(("a",1)).toDF("txt", "value")
-    val infoA = RuntimeInfo(RuntimeEventState.SUCCEEDED, startTstmp = Some(LocalDateTime.now()), duration = Some(Duration.ofMinutes(5)), msg = Some("test"), results = Seq(ResultRuntimeInfo(SparkSubFeed(Some(df), "do1", partitionValues = Seq(PartitionValues(Map("test"->1)))),Map("test"->1, "test2"->"abc"))))
+    val infoA = RuntimeInfo(SDLExecutionId.executionId1, RuntimeEventState.SUCCEEDED, startTstmp = Some(LocalDateTime.now()), duration = Some(Duration.ofMinutes(5)), msg = Some("test"), results = Seq(ResultRuntimeInfo(SparkSubFeed(Some(df), "do1", partitionValues = Seq(PartitionValues(Map("test"->1)))),Map("test"->1, "test2"->"abc"))))
     val state = ActionDAGRunState(SmartDataLakeBuilderConfig(), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = false)
     val json = state.toJson
     // remove DataFrame from SparkSubFeed, it should not be serialized

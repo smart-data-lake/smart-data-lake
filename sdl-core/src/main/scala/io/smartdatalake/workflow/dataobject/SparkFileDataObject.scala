@@ -26,6 +26,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicExceptio
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions.input_file_name
+import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 import org.apache.spark.sql.types.{StringType, StructType}
 
 /**
@@ -155,7 +156,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
 
     val df = session.readStream
       .format(format)
-      .options(options)
+      .options(options ++ this.options)
       .schema(schema.orElse(pipelineSchema).get)
       .load(hadoopPath.toString)
 
@@ -257,6 +258,24 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    */
   override def compactPartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, actionPipelineContext: ActionPipelineContext): Unit = {
     CompactionUtil.compactHadoopStandardPartitions(this, partitionValues)
+  }
+
+  override def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String,String], checkpointLocation: String, queryName: String, outputMode: OutputMode = OutputMode.Append)
+                             (implicit session: SparkSession, context: ActionPipelineContext): StreamingQuery = {
+
+    // lambda function is ambiguous with foreachBatch in scala 2.12... we need to create a real function...
+    // Note: no partition values supported when writing streaming target
+    def microBatchWriter(dfMicrobatch: Dataset[Row], batchid: Long): Unit = writeDataFrame(dfMicrobatch, Seq())
+
+    df
+      .writeStream
+      .trigger(trigger)
+      .queryName(queryName)
+      .outputMode(outputMode)
+      .option("checkpointLocation", checkpointLocation)
+      .options(streamingOptions ++ options ++ this.options) // options override streamingOptions
+      .foreachBatch(microBatchWriter _)
+      .start()
   }
 
 }

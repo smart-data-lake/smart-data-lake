@@ -19,8 +19,9 @@
 
 package io.smartdatalake.workflow.action
 
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions._
-import io.smartdatalake.metrics.NoMetricsFoundException
+import io.smartdatalake.metrics.{SparkStageMetricsListener, SparkStreamingQueryListener}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
@@ -31,10 +32,11 @@ import io.smartdatalake.workflow.action.sparktransformer._
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.functions.col
-import org.apache.spark.sql.streaming.Trigger
+import org.apache.spark.sql.streaming.{StreamingQuery, StreamingQueryListener, Trigger}
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
 import java.time.Duration
+import java.util.concurrent.Semaphore
 
 private[smartdatalake] abstract class SparkAction extends Action {
 
@@ -54,6 +56,43 @@ private[smartdatalake] abstract class SparkAction extends Action {
    */
   def persist: Boolean
 
+  override def isAsynchronous: Boolean = executionMode.exists(_.isAsynchronous)
+
+  override def getRuntimeDataImpl: RuntimeData = {
+    // override runtime data implementation for SparkStreamingMode
+    if (executionMode.exists(_.isInstanceOf[SparkStreamingMode])) AsynchronousRuntimeData(Option(Environment.globalConfig).map(_.runtimeDataNumberOfExecutionsToKeep).getOrElse(10))
+    else super.getRuntimeDataImpl
+  }
+
+  // stage metrics listener to collect metrics
+  private var _stageMetricsListener: Option[SparkStageMetricsListener] = None
+  private def registerStageMetricsListener(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    if (_stageMetricsListener.isEmpty) {
+      _stageMetricsListener = Some(new SparkStageMetricsListener(this))
+      session.sparkContext.addSparkListener(_stageMetricsListener.get)
+    }
+  }
+  private def unregisterStageMetricsListener(implicit session: SparkSession): Unit = {
+    if (_stageMetricsListener.isDefined) {
+      session.sparkContext.removeSparkListener(_stageMetricsListener.get)
+      _stageMetricsListener = None
+    }
+  }
+
+  // remember streaming query
+  private var streamingQuery: Option[StreamingQuery] = None
+  private[smartdatalake] def notifyStreamingQueryTerminated(): Unit = {
+    streamingQuery = None
+    _stageMetricsListener = None
+  }
+
+  // reset streaming query
+  override private[smartdatalake] def reset(): Unit = {
+    super.reset()
+    streamingQuery = None
+    _stageMetricsListener = None
+  }
+
   override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.prepare
     executionMode.foreach(_.prepare(id))
@@ -69,7 +108,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
     assert(input.id == subFeed.dataObjectId, s"($id) DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
     assert(phase!=ExecutionPhase.Prepare, "Strangely enrichSubFeedDataFrame got called in phase prepare. It should only be called in Init and Exec.")
     executionMode match {
-      case Some(m: SparkStreamingOnceMode) if !context.simulation =>
+      case Some(m: SparkStreamingMode) if !context.simulation =>
         if (subFeed.dataFrame.isEmpty || phase==ExecutionPhase.Exec) { // in exec phase we always needs a fresh streaming DataFrame
           // recreate DataFrame from DataObject
           assert(input.isInstanceOf[CanCreateStreamingDataFrame], s"($id) DataObject ${input.id} doesn't implement CanCreateStreamingDataFrame. Can not create StreamingDataFrame for executionMode=SparkStreamingOnceMode")
@@ -149,10 +188,41 @@ private[smartdatalake] abstract class SparkAction extends Action {
     assert(!subFeed.isDummy, s"($id) Can not write dummy DataFrame to ${output.id}")
     // write
     executionMode match {
-      case Some(m: SparkStreamingOnceMode) =>
-        // Write in streaming mode - use spark streaming with Trigger.Once and awaitTermination
+      case Some(m: SparkStreamingMode) if m.isAsynchronous && context.appConfig.streaming =>
+        // Use spark streaming mode asynchronously - first microbatch is executed synchronously then it runs on asynchronously.
         assert(subFeed.dataFrame.get.isStreaming, s"($id) ExecutionMode ${m.getClass} needs streaming DataFrame in SubFeed")
-        val streamingQuery = output.writeStreamingDataFrame(subFeed.dataFrame.get, Trigger.Once, m.outputOptions, m.checkpointLocation, s"$id writing ${output.id}", m.outputMode)
+        // check if streaming query already started. This is needed if dag is restarted for pseudo-streaming.
+        if (streamingQuery.isEmpty) {
+          // initialize listener to release lock after first progress
+          // semaphore with size=1 used as Lock.
+          val firstProgressWaitLock = new Semaphore(1)
+          // add metrics listener for this action if not yet done
+          val queryName = getStreamingQueryName(output.id)
+          new SparkStreamingQueryListener(this, output.id, queryName, Some(firstProgressWaitLock)) // self-registering, listener will release firstProgressWaitLock after first progress event.
+          // start streaming query
+          val streamingQueryLocalVal = output.writeStreamingDataFrame(subFeed.dataFrame.get, m.trigger, m.outputOptions, m.checkpointLocation, queryName, m.outputMode)
+          // wait for first progress
+          firstProgressWaitLock.acquire() // empty semaphore
+          firstProgressWaitLock.acquire() // wait for SparkStreamingQueryListener releasing a sempahore permit
+          streamingQueryLocalVal.exception.foreach(throw _) // throw exception if failed
+          val noData = streamingQueryLocalVal.lastProgress.numInputRows == 0
+          if (noData) logger.info(s"($id) no data to process for ${output.id} in first micro-batch streaming mode")
+          streamingQuery = Some(streamingQueryLocalVal) // remember streaming query
+          // return
+          noData
+        } else {
+          logger.debug("($id) streaming query already started")
+          false // noData
+        }
+      case Some(m: SparkStreamingMode) =>
+        // Use spark streaming mode synchronously (Trigger.once & awaitTermination)
+        assert(subFeed.dataFrame.get.isStreaming, s"($id) ExecutionMode ${m.getClass} needs streaming DataFrame in SubFeed")
+        // add metrics listener for this action if not yet done
+        val queryName = getStreamingQueryName(output.id)
+        new SparkStreamingQueryListener(this, output.id, queryName)
+        // start streaming query - use Trigger.Once for synchronous one-time execution
+        val streamingQuery = output.writeStreamingDataFrame(subFeed.dataFrame.get, Trigger.Once, m.outputOptions, m.checkpointLocation, queryName, m.outputMode)
+        // wait for termination
         streamingQuery.awaitTermination
         val noData = streamingQuery.lastProgress.numInputRows == 0
         if (noData) logger.info(s"($id) no data to process for ${output.id} in streaming mode")
@@ -166,7 +236,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
           subFeed.persist
         } else subFeed
         // Write in batch mode
-        assert(!preparedSubFeed.dataFrame.get.isStreaming, s"($id) Input from ${preparedSubFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingOnceMode.getClass.getSimpleName}")
+        assert(!preparedSubFeed.dataFrame.get.isStreaming, s"($id) Input from ${preparedSubFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingMode.getClass.getSimpleName}")
         assert(!preparedSubFeed.isDummy, s"($id) Input from ${preparedSubFeed.dataObjectId} is a dummy. Cannot write dummy DataFrame.")
         assert(!preparedSubFeed.isSkipped, s"($id) Input from ${preparedSubFeed.dataObjectId} is a skipped. Cannot write skipped DataFrame.")
         output.writeDataFrame(preparedSubFeed.dataFrame.get, preparedSubFeed.partitionValues, isRecursiveInput)
@@ -175,6 +245,10 @@ private[smartdatalake] abstract class SparkAction extends Action {
       case x => throw new IllegalStateException( s"($id) ExecutionMode $x is not supported")
     }
   }
+  private def getStreamingQueryName(dataObjectId: DataObjectId)(implicit context: ActionPipelineContext) = {
+    s"${context.appConfig.appName} $id writing ${dataObjectId}"
+  }
+
 
   /**
    * apply transformer to partition values
@@ -202,7 +276,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
       columnWhitelist.map(l => WhitelistTransformer(columnWhitelist = l)),
       additionalColumns.map(cs => AdditionalColumnsTransformer(additionalColumns = cs)),
       filterClauseExpr.map(f => DfTransformerFunctionWrapper("filter", df => df.where(f))),
-      (if (standardizeDatatypes) Some(StandardizeDatatypesTransformer()) else None) // currently we cast decimals away only but later we may add further type casts
+      if (standardizeDatatypes) Some(StandardizeDatatypesTransformer()) else None // currently we cast decimals away only but later we may add further type casts
     ).flatten ++ additionalTransformers
   }
 
@@ -284,6 +358,11 @@ private[smartdatalake] abstract class SparkAction extends Action {
     preparedSubFeed
   }
 
+  override def preExec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    registerStageMetricsListener
+    super.preExec(subFeeds)
+  }
+
   override def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.postExec(inputSubFeeds, outputSubFeeds)
     // auto-unpersist DataFrames no longer needed
@@ -295,23 +374,19 @@ private[smartdatalake] abstract class SparkAction extends Action {
           subFeed.dataFrame.foreach(_.unpersist)
         }
     }
+    if (!isAsynchronous) unregisterStageMetricsListener
   }
 
-  def logWritingStarted(subFeed: SparkSubFeed)(implicit session: SparkSession): Unit = {
+  def logWritingStarted(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     val msg = s"writing to ${subFeed.dataObjectId}" + (if (subFeed.partitionValues.nonEmpty) s", partitionValues ${subFeed.partitionValues.mkString(" ")}" else "")
     logger.info(s"($id) start " + msg)
     setSparkJobMetadata(Some(msg))
   }
 
-  def logWritingFinished(subFeed: SparkSubFeed, noData: Boolean, duration: Duration)(implicit session: SparkSession): Unit = {
+  def logWritingFinished(subFeed: SparkSubFeed, noData: Boolean, duration: Duration)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     setSparkJobMetadata()
     val metricsLog = if (noData) ", no data found"
-    else try {
-      getFinalMetrics(subFeed.dataObjectId).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
-    } catch {
-      // for some DataSources Spark optimizer doesn't execute anything if DataFrame is empty
-      case _: NoMetricsFoundException if subFeed.dataFrame.get.isEmpty => ", dataFrame is empty, no metrics found"
-    }
+    else runtimeData.getFinalMetrics(subFeed.dataObjectId).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
     logger.info(s"($id) finished writing DataFrame to ${subFeed.dataObjectId.id}: jobDuration=$duration" + metricsLog)
   }
 

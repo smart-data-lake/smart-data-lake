@@ -49,6 +49,11 @@ import org.apache.spark.sql.custom.ExpressionEvaluator
  *                       which are allowed to overwrite the all partitions of a table if no partition values are set.
  *                       This is used to override/avoid a protective error when using SDLSaveMode.OverwriteOptimized|OverwritePreserveDirectories.
  *                       Define it as a list of DataObject id's.
+ * @param runtimeDataNumberOfExecutionsToKeep Number of Executions to keep runtime data for in streaming mode (default = 10).
+ *                       Must be bigger than 1.
+ * @param synchronousStreamingTriggerIntervalSec Trigger interval for synchronous actions in streaming mode in seconds (default = 60 seconds)
+ *                       The synchronous actions of the DAG will be executed with this interval if possile.
+ *                       Note that for asynchronous actions there are separate settings, e.g. SparkStreamingMode.triggerInterval.
  */
 case class GlobalConfig( kryoClasses: Option[Seq[String]] = None
                        , sparkOptions: Option[Map[String,String]] = None
@@ -60,8 +65,11 @@ case class GlobalConfig( kryoClasses: Option[Seq[String]] = None
                        , pythonUDFs: Option[Map[String,PythonUDFCreatorConfig]] = None
                        , secretProviders: Option[Map[String,SecretProviderConfig]] = None
                        , allowOverwriteAllPartitionsWithoutPartitionValues: Seq[DataObjectId] = Seq()
+                       , runtimeDataNumberOfExecutionsToKeep: Int = 10
+                       , synchronousStreamingTriggerIntervalSec: Int = 60
                        )
 extends SmartDataLakeLogger {
+  assert(runtimeDataNumberOfExecutionsToKeep>1, "GlobalConfig.runtimeDataNumberOfExecutionsToKeep must be bigger than 1.")
 
   // start memory logger, else log memory once
   if (memoryLogTimer.isDefined) {
@@ -84,7 +92,7 @@ extends SmartDataLakeLogger {
     if (Environment._sparkSession != null) logger.warn("Your SparkSession was already set, that should not happen. We will re-initialize it anyway now.")
     // prepare additional spark options
     // enable MemoryLoggerExecutorPlugin if memoryLogTimer is enabled
-    val executorPlugins = (sparkOptions.flatMap(_.get("spark.plugins")).toSeq ++ (if (memoryLogTimer.isDefined) Seq(classOf[MemoryLoggerExecutorPlugin].getName) else Seq()))
+    val executorPlugins = sparkOptions.flatMap(_.get("spark.plugins")).toSeq ++ (if (memoryLogTimer.isDefined) Seq(classOf[MemoryLoggerExecutorPlugin].getName) else Seq())
     // config for MemoryLoggerExecutorPlugin can only be transferred to Executor by spark-options
     val memoryLogOptions = memoryLogTimer.map(_.getAsMap).getOrElse(Map())
     val sparkOptionsExtended = sparkOptions.getOrElse(Map()) ++ memoryLogOptions ++ (if (executorPlugins.nonEmpty) Map("spark.executor.plugins" -> executorPlugins.mkString(",")) else Map())

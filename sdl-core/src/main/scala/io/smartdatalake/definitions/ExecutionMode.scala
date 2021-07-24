@@ -19,13 +19,13 @@
 package io.smartdatalake.definitions
 
 import java.sql.Timestamp
-
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.util.dag.{DAGException, ExceptionSeverity}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{CustomCodeUtil, ProductUtil, SmartDataLakeLogger, SparkExpressionUtil}
-import io.smartdatalake.workflow.DAGHelper.NodeId
-import io.smartdatalake.workflow.ExceptionSeverity.ExceptionSeverity
+import io.smartdatalake.util.dag.DAGHelper.NodeId
+import io.smartdatalake.util.dag.ExceptionSeverity.ExceptionSeverity
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.ActionHelper.{getOptionalDataFrame, searchCommonInits}
@@ -33,7 +33,7 @@ import io.smartdatalake.workflow.action.{NoDataToProcessDontStopWarning, NoDataT
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject, FileRef, FileRefDataObject}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, max}
-import org.apache.spark.sql.streaming.OutputMode
+import org.apache.spark.sql.streaming.{OutputMode, Trigger}
 import org.apache.spark.sql.types._
 
 import scala.reflect.runtime.universe.TypeTag
@@ -99,6 +99,11 @@ sealed trait ExecutionMode extends SmartDataLakeLogger {
       }
     )
   }
+
+  /**
+   * If this execution mode should be run as asynchronous streaming process
+   */
+  private[smartdatalake] def isAsynchronous: Boolean = false
 }
 
 private[smartdatalake] trait ExecutionModeWithMainInputOutput {
@@ -261,19 +266,39 @@ case class PartitionDiffModeExpressionData(feed: String, application: String, ru
 }
 private[smartdatalake] object PartitionDiffModeExpressionData {
   def from(context: ActionPipelineContext): PartitionDiffModeExpressionData = {
-    PartitionDiffModeExpressionData(context.feed, context.application, context.runId, context.attemptId, context.referenceTimestamp.map(Timestamp.valueOf)
+    PartitionDiffModeExpressionData(context.feed, context.application, context.executionId.runId, context.executionId.attemptId, context.referenceTimestamp.map(Timestamp.valueOf)
       , Timestamp.valueOf(context.runStartTime), Timestamp.valueOf(context.attemptStartTime), Seq(), Seq(), Seq(), Seq(), Seq())
   }
 }
 
 /**
- * Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads (trigger=Trigger.Once) and keep track of processed data.
+ * Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads and keep track of processed data.
  * This mode needs a DataObject implementing CanCreateStreamingDataFrame and works only with SparkSubFeeds.
+ * This mode can be executed synchronously in the DAG by using triggerType=Once, or asynchronously as Streaming Query with triggerType = ProcessingTime or Continuous.
  * @param checkpointLocation location for checkpoints of streaming query to keep state
+ * @param triggerType define execution interval of Spark streaming query. Possible values are Once (default), ProcessingTime & Continuous. See [[Trigger]] for details.
+                      Note that this is only applied if SDL is executed in streaming mode. If SDL is executed in normal mode, TriggerType=Once is used always.
+ *                    If triggerType=Once, the action is repeated with Trigger.Once in SDL streaming mode.
+ * @param triggerTime Time as String in triggerType = ProcessingTime or Continuous. See [[Trigger]] for details.
  * @param inputOptions additional option to apply when reading streaming source. This overwrites options set by the DataObjects.
  * @param outputOptions additional option to apply when writing to streaming sink. This overwrites options set by the DataObjects.
  */
-case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[String,String] = Map(), outputOptions: Map[String,String] = Map(), outputMode: OutputMode = OutputMode.Append) extends ExecutionMode
+case class SparkStreamingMode(checkpointLocation: String, triggerType: String = "Once", triggerTime: Option[String] = None, inputOptions: Map[String,String] = Map(), outputOptions: Map[String,String] = Map(), outputMode: OutputMode = OutputMode.Append) extends ExecutionMode {
+  // parse trigger from config attributes
+  private[smartdatalake] val trigger = triggerType.toLowerCase match {
+    case "once" =>
+      assert(triggerTime.isEmpty, "triggerTime must not be set for SparkStreamingMode with triggerType=Once")
+      Trigger.Once()
+    case "processingtime" =>
+      assert(triggerTime.isDefined, "triggerTime must be set for SparkStreamingMode with triggerType=ProcessingTime")
+      Trigger.ProcessingTime(triggerTime.get)
+    case "continuous" =>
+      assert(triggerTime.isDefined, "triggerTime must be set for SparkStreamingMode with triggerType=Continuous")
+      Trigger.Continuous(triggerTime.get)
+  }
+  override private[smartdatalake] def isAsynchronous = trigger != Trigger.Once
+}
+
 
 /**
  * Compares max entry in "compare column" between mainOutput and mainInput and incrementally loads the delta.
@@ -479,7 +504,7 @@ case class DefaultExecutionModeExpressionData( feed: String, application: String
 }
 private[smartdatalake] object DefaultExecutionModeExpressionData {
   def from(context: ActionPipelineContext): DefaultExecutionModeExpressionData = {
-    DefaultExecutionModeExpressionData(context.feed, context.application, context.runId, context.attemptId, context.referenceTimestamp.map(Timestamp.valueOf)
+    DefaultExecutionModeExpressionData(context.feed, context.application, context.executionId.runId, context.executionId.attemptId, context.referenceTimestamp.map(Timestamp.valueOf)
       , Timestamp.valueOf(context.runStartTime), Timestamp.valueOf(context.attemptStartTime), Seq(), isStartNode = false)
   }
 }

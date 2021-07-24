@@ -20,13 +20,13 @@ package io.smartdatalake.workflow
 
 import io.smartdatalake.app.StateListener
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.metrics.SparkStageMetricsListener
+import io.smartdatalake.util.dag.{DAG, DAGEdge, DAGEventListener, DAGException, DAGNode, DAGResult, ExceptionSeverity, TaskPredecessorFailureWarning}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.DAGHelper._
-import io.smartdatalake.workflow.ExecutionPhase.{ExecutionPhase, Value}
+import io.smartdatalake.util.dag.DAGHelper._
+import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
-import io.smartdatalake.workflow.action.{Action, RuntimeEventState, RuntimeInfo, SparkSubFeedsAction}
+import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject, TransactionalSparkTableDataObject}
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
@@ -59,9 +59,9 @@ private[smartdatalake] case class GenericMetrics(id: String, order: Long, mainIn
   }
 }
 
-private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, attemptId: Int, partitionValues: Seq[PartitionValues], parallelism: Int, initialSubFeeds: Seq[SubFeed], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener], actionsSkipped: Map[ActionId, RuntimeInfo]) extends SmartDataLakeLogger {
+private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SDLExecutionId, partitionValues: Seq[PartitionValues], parallelism: Int, initialSubFeeds: Seq[SubFeed], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener], actionsSkipped: Map[ActionId, RuntimeInfo]) extends SmartDataLakeLogger {
 
-  private def createScheduler(parallelism: Int = 1) = Scheduler.fixedPool(s"dag-$runId", parallelism)
+  private def createScheduler(parallelism: Int = 1) = Scheduler.fixedPool(s"dag-${executionId.runId}", parallelism)
 
   private def run[R<:DAGResult](phase: ExecutionPhase, parallelism: Int = 1)(operation: (DAGNode, Seq[R]) => Seq[R])(implicit session: SparkSession, context: ActionPipelineContext): Seq[R] = {
     implicit val scheduler: SchedulerService = createScheduler(parallelism)
@@ -78,7 +78,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
       case ex => throw ex // this should not happen
     }
     // only stop on skipped in init phase if there are no succeeded results, otherwise we want to have those actions run.
-    lazy val existsInitializedActions = dag.getNodes.exists(_.getLatestRuntimeState.contains(RuntimeEventState.INITIALIZED))
+    lazy val existsInitializedActions = dag.getNodes.exists(_.getLatestRuntimeEventState.contains(RuntimeEventState.INITIALIZED))
     val stopSeverity = if (phase == ExecutionPhase.Init && existsInitializedActions) ExceptionSeverity.CANCELLED else ExceptionSeverity.SKIPPED
     val dagExceptionsToStop = dagExceptions.filter(_.severity <= stopSeverity).sortBy(_.severity)
     // log all exceptions
@@ -87,7 +87,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
       case ex => logger.warn(s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessageWithCause}")
     }
     // log dag on error
-    if (dagExceptionsToStop.nonEmpty) ActionDAGRun.logDag(s"$phase ${dagExceptionsToStop.head.severity} for ${context.application} runId=$runId attemptId=$attemptId", dag)
+    if (dagExceptionsToStop.nonEmpty) ActionDAGRun.logDag(s"$phase ${dagExceptionsToStop.head.severity} for ${context.application} runId=$context.runId attemptId=$context.attemptId", dag, Some(executionId))
     // throw most severe exception
     dagExceptionsToStop.foreach{ throw _ }
 
@@ -111,7 +111,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
   def init(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     context.phase = ExecutionPhase.Init
     // initialize state listeners
-    stateListeners.foreach(_.init)
+    stateListeners.foreach(_.init())
     // run init for every node
     val t = run[SubFeed](context.phase) {
       case (node: InitDAGNode, _) =>
@@ -144,9 +144,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
 
   def exec(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     // run exec for every node
-    val stageMetricsListener = new SparkStageMetricsListener(notifyActionMetric)
-    session.sparkContext.addSparkListener(stageMetricsListener)
-    val result = try {
+    val result = {
       context.phase = ExecutionPhase.Exec
       run[SubFeed](context.phase, parallelism) {
         case (node: InitDAGNode, _) =>
@@ -166,12 +164,9 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
           resultSubFeeds
         case x => throw new IllegalStateException(s"Unmatched case $x")
       }
-    } finally {
-      session.sparkContext.removeSparkListener(stageMetricsListener)
     }
     // log dag execution
-    ActionDAGRun.logDag(s"exec SUCCEEDED for dag $runId", dag)
-
+    ActionDAGRun.logDag(s"exec SUCCEEDED for dag ${executionId.runId}", dag, Some(executionId))
     // return
     result
   }
@@ -199,25 +194,27 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
   }
 
   /**
-   * Collect runtime information for every action of the dag
+   * Collect runtime information for every action of the dag and the current executionId
    */
   def getRuntimeInfos : Map[ActionId, RuntimeInfo] = {
-    dag.getNodes.map( a => (a.id, a.getRuntimeInfo.getOrElse(RuntimeInfo(RuntimeEventState.PENDING)))).toMap
+    dag.getNodes.map { a =>
+      (a.id, a.getRuntimeInfo(Some(executionId)).getOrElse(RuntimeInfo(executionId, RuntimeEventState.PENDING)))
+    }.toMap
   }
 
   /**
    * Save state of dag to file and notify stateListeners
    */
   def saveState(isFinal: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    val runtimeInfos = getRuntimeInfos.mapValues( x => x.copy(attemptId = Some(context.attemptId)))
-    val runState = ActionDAGRunState(context.appConfig, runId, attemptId, context.runStartTime, context.attemptStartTime, actionsSkipped ++ runtimeInfos, isFinal)
+    val runtimeInfos = getRuntimeInfos
+    val runState = ActionDAGRunState(context.appConfig, executionId.runId, executionId.attemptId, context.runStartTime, context.attemptStartTime, actionsSkipped ++ runtimeInfos, isFinal)
     stateStore.foreach(_.saveState(runState))
     stateListeners.foreach(_.notifyState(runState, context))
   }
 
   private class ActionEventListener(phase: ExecutionPhase)(implicit session: SparkSession, context: ActionPipelineContext) extends DAGEventListener[Action] with SmartDataLakeLogger {
     override def onNodeStart(node: Action): Unit = {
-      node.addRuntimeEvent(phase, RuntimeEventState.STARTED)
+      node.addRuntimeEvent(executionId, phase, RuntimeEventState.STARTED)
       logger.info(s"${node.toStringShort}: $phase started")
     }
     override def onNodeSuccess(results: Seq[DAGResult])(node: Action): Unit = {
@@ -226,12 +223,12 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
         case ExecutionPhase.Init => RuntimeEventState.INITIALIZED
         case ExecutionPhase.Exec => RuntimeEventState.SUCCEEDED
       }
-      node.addRuntimeEvent(phase, state, results = results.collect{ case x: SubFeed => x })
+      node.addRuntimeEvent(executionId, phase, state, results = results.collect{ case x: SubFeed => x })
       logger.info(s"${node.toStringShort}: $phase succeeded")
       if (phase==ExecutionPhase.Exec) saveState()
     }
     override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
-      node.addRuntimeEvent(phase, RuntimeEventState.FAILED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
+      node.addRuntimeEvent(executionId, phase, RuntimeEventState.FAILED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
       logger.warn(s"${node.toStringShort}: $phase failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
       if (phase==ExecutionPhase.Exec) saveState()
     }
@@ -240,12 +237,11 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
         case _: TaskPredecessorFailureWarning => RuntimeEventState.CANCELLED
         case _ => RuntimeEventState.SKIPPED
       }
-      node.addRuntimeEvent(phase, state, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
+      node.addRuntimeEvent(executionId, phase, state, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
       logger.info(s"${node.toStringShort}: $phase ${state.toString.toLowerCase} because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
       if (phase==ExecutionPhase.Exec) saveState()
     }
   }
-
 
   /**
    * Get Action count per RuntimeEventState
@@ -259,13 +255,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], runId: Int, att
    * This is mainly used for testing.
    */
   def reset(): Unit = {
-    dag.sortedNodes.collect { case n: Action => n }.foreach(_.reset)
-  }
-
-  def notifyActionMetric(actionId: ActionId, dataObjectId: Option[DataObjectId], metrics: ActionMetrics): Unit = {
-    val action = dag.getNodes
-      .find(_.nodeId == actionId.id).getOrElse(throw new IllegalStateException(s"Unknown action $actionId"))
-    action.onRuntimeMetrics(dataObjectId, metrics)
+    dag.sortedNodes.collect { case n: Action => n }.foreach(_.reset())
   }
 
   // Helper methods rename thread so that it includes phase and action id for logging
@@ -290,7 +280,7 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
   /**
    * create ActionDAGRun
    */
-  def apply(actions: Seq[Action], runId: Int, attemptId: Int, actionsSkipped: Map[ActionId,RuntimeInfo] = Map(), partitionValues: Seq[PartitionValues] = Seq(), parallelism: Int = 1, initialSubFeeds: Seq[SubFeed] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, stateListeners: Seq[StateListener] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): ActionDAGRun = {
+  def apply(actions: Seq[Action], actionsSkipped: Map[ActionId,RuntimeInfo] = Map(), partitionValues: Seq[PartitionValues] = Seq(), parallelism: Int = 1, initialSubFeeds: Seq[SubFeed] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, stateListeners: Seq[StateListener] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): ActionDAGRun = {
 
     // prepare edges: list of actions dependencies
     // this can be created by combining input and output ids between actions
@@ -302,7 +292,7 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
 
     // test
     val duplicateEdges = allEdges.groupBy(identity).mapValues(_.size).filter(_._2 > 1).keys
-    assert( duplicateEdges.isEmpty, s"Duplicate edges found: ${duplicateEdges}" )
+    assert( duplicateEdges.isEmpty, s"Duplicate edges found: $duplicateEdges" )
 
     // create init node from input edges
     val inputEdges = allEdges.filter(_._1.isEmpty)
@@ -313,17 +303,20 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
 
     // create dag
     val dag = DAG.create[Action](initAction +: actions, edges)
-    logDag(s"created dag runId=$runId attemptId=$attemptId", dag)
+    logDag(s"created dag runId=${context.executionId.runId} attemptId=${context.executionId.attemptId}", dag)
 
-    // enable runtime metrics
-    actions.foreach(_.enableRuntimeMetrics())
-
-    ActionDAGRun(dag, runId, attemptId, partitionValues, parallelism, initialSubFeeds, stateStore, stateListeners, actionsSkipped)
+    ActionDAGRun(dag, context.executionId, partitionValues, parallelism, initialSubFeeds, stateStore, stateListeners, actionsSkipped)
   }
 
-  def logDag(msg: String, dag: DAG[_]): Unit = {
+  def logDag(msg: String, dag: DAG[_], executionId: Option[ExecutionId] = None): Unit = {
+    def nodeToString(node: DAGNode): String = {
+      node match {
+        case a: Action => a.toString(executionId)
+        case x => x.toString
+      }
+    }
     logger.info(s"""$msg:
-                   |${dag.toString}
+                   |${dag.render(nodeToString)}
     """.stripMargin)
   }
 }
