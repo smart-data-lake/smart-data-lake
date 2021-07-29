@@ -259,7 +259,7 @@ Predefined transformations implement generic logic to be reused in different act
 * WhitelistTransformer (1-to-1): Apply a column whitelist to a DataFrame
 * AdditionalColumnsTransformer (1-to-1): Add additional columns to the DataFrame by extracting information from the context
 * StandardizeDatatypesTransformer (1-to-1): Standardize datatypes of a DataFrame
-* DfTransformerWrapperDfsTransformer (many-to-many): use 1-to-1 transformer as many-to-many transformer by specifying the SubFeeds it should be applied
+* DfTransformerWrapperDfsTransformer (many-to-many): use 1-to-1 transformer as many-to-many transformer by specifying the SubFeeds it should be applied to
 
 ### Custom Transformations
 Custom transformers provide an easy way to define your own spark logic in various languages. 
@@ -286,7 +286,7 @@ For many-to-many transformations use **type = SQLDfsTransformer** and configure 
 
 Example - using options in sql code for 1-to-1 transformation:
 ```
-transformers [{
+transformers = [{
   type = SQLDfTransformer
   name = "test run"
   description = "description of test run..."
@@ -302,7 +302,7 @@ transformers [{
 
 Example - defining a many-to-many transformation:
 ```
-transformers [{
+transformers = [{
   type = SQLDfsTransformer
   code = {
     dataObjectOut1 = "select id,cnt from dataObjectIn1 where group = 'test1'",
@@ -328,7 +328,7 @@ For now using Python for many-to-many transformations is not possible, although 
 
 Example - apply some python calculation as udf:
 ```
-transformers [{
+transformers = [{
   type = PythonCodeDfTransformer 
   code = """
     |from pyspark.sql.functions import *
