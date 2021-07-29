@@ -41,6 +41,13 @@ private[smartdatalake] class InstanceRegistry {
   def register[A <: ConfigObjectId, B <: SdlConfigObject](instancesToAdd: Map[A, B]): Unit = instances ++= instancesToAdd
 
   /**
+   * Add all instances from `instancesToAdd` to this instance registry.
+   *
+   * @param instancesToAdd the instances to add.
+   */
+  def register(instancesToAdd: Seq[SdlConfigObject]): Unit = instancesToAdd.foreach(register)
+
+  /**
    * Register a new instance if an instance with the same id has not been registered before.
    *
    * @param instance the instance to register

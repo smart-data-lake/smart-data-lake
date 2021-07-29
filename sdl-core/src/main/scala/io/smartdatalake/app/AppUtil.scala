@@ -21,7 +21,8 @@ package io.smartdatalake.app
 import java.net.{URI, URL, URLClassLoader}
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{GraphUtil, SmartDataLakeLogger}
+import io.smartdatalake.workflow.action.Action
 import org.apache.hadoop.security.UserGroupInformation
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.util.ChildFirstURLClassLoader
@@ -151,4 +152,58 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
     }
     s"$key=$maskedValue"
   }
+
+  /**
+   * Filter action list with extended syntax: "<prefix:?><regex>;<operation?><prefix:?><regex>;..."
+   * Search behavior can be modified by the following prefixes to a regex expression separated by a colon (:)
+   * - 'feeds': select actions where metadata.feed is matched by regex pattern (default)
+   * - 'names': select actions where metadata.name is matched by regex pattern
+   * - 'ids': select actions where id is matched by regex pattern
+   * - 'layers': select actions where metadata.layer of all output DataObjects is matched by regex pattern
+   * - 'startFromActionIds': select actions which with id is matched by regex pattern and any dependent action (=successors)
+   * - 'endWithActionIds': select actions which with id is matched by regex pattern and their predecessors
+   * - 'startFromDataObjectIds': select actions which have an input DataObject with id is matched by regex pattern and any dependent action (=successors)
+   * - 'endWithDataObjectIds': select actions which have an output DataObject with id is matched by regex pattern and their predecessors
+   * You can combine several pattern by using semicolon (;). Patterns are combined from left to right.
+   * By default combining sets is done with union operation. The operation can be modified by adding one of the following characters before the prefix:
+   * - pipe symbol (|): the two sets are combined by union operation (default)
+   * - ampersand symbol (&): the two sets are combined by intersection operation
+   * - minus symbol (-): the second set is subtracted from the first set
+   * All matching is done case-insensitive.
+   * Example: to filter action 'A' and its successors but only in layer L1 and L2, use the following pattern: "startFromActionIds:a;&layers:(l1|l2)"
+   */
+  def filterActionList(feedSel: String, actions: Set[Action]): Set[Action] = {
+    val patterns = feedSel.toLowerCase.split(';')
+    val opMatcher = "([|&-])?(.*)".r
+    val prefixMatcher = "([a-z]+:)?(.*)".r
+    val inputActionMap = actions.flatMap(a => a.inputs.map(i => (i,a))).toMap
+    val actionGraphEdges = actions.flatMap(a => a.outputs.flatMap(o => inputActionMap.get(o).map(o => (a,o))))
+    val graph = GraphUtil.Graph(actionGraphEdges)
+    patterns.foldLeft(Set[Action]()) {
+      case (result, patternWithOp) =>
+        val (op,pattern) = patternWithOp match {
+          case opMatcher(op,pattern) => (Option(op),pattern)
+        }
+        val selectedActions = pattern match {
+          case prefixMatcher("feeds:", regex) => actions.filter(_.metadata.flatMap(_.feed).exists(_.toLowerCase.matches(regex)))
+          case prefixMatcher("names:", regex) => actions.filter(_.metadata.flatMap(_.name).exists(_.toLowerCase.matches(regex)))
+          case prefixMatcher("ids:", regex) => actions.filter(_.id.id.toLowerCase.matches(regex))
+          case prefixMatcher("layers:", regex) => actions.filter(_.outputs.forall(_.metadata.flatMap(_.layer).exists(_.toLowerCase.matches(regex))))
+          case prefixMatcher("startfromactionids:", regex) => actions.filter(_.id.id.toLowerCase.matches(regex)).flatMap(graph.getConnectedNodesForward)
+          case prefixMatcher("endwithactionids:", regex) => actions.filter(_.id.id.toLowerCase.matches(regex)).flatMap(graph.getConnectedNodesReverse)
+          case prefixMatcher("startfromdataobjectids:", regex) => actions.filter(_.inputs.exists(_.id.id.toLowerCase.matches(regex))).flatMap(graph.getConnectedNodesForward)
+          case prefixMatcher("endwithdataobjectids:", regex) => actions.filter(_.outputs.exists(_.id.id.toLowerCase.matches(regex))).flatMap(graph.getConnectedNodesReverse)
+          case prefixMatcher(null, regex) => actions.filter(_.metadata.flatMap(_.feed).exists(_.toLowerCase.matches(regex))) // default is filter feeds
+          case prefixMatcher(prefix, _) => throw new RuntimeException(s"Unknown prefix $prefix for pattern $pattern in commandline parameter feedSel")
+        }
+        op match {
+          case Some("|") => result.union(selectedActions)
+          case Some("&") => result.intersect(selectedActions)
+          case Some("-") => result.diff(selectedActions)
+          case None => result.union(selectedActions) // default
+          case _ => throw new RuntimeException(s"Unknown operation $op for pattern $pattern in commandline parameter feedSel")
+        }
+    }
+  }
+
 }
