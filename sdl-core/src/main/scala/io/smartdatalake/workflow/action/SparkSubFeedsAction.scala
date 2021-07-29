@@ -23,6 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.ExecutionModeWithMainInputOutput
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
+import io.smartdatalake.workflow.action.sparktransformer.{DfTransformer, DfsTransformer}
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
@@ -76,7 +77,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
   /**
    * Transform partition values
    */
-  def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues]
+  def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Map[PartitionValues,PartitionValues]
 
   private def doTransform(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
     val mainInput = getMainInput(subFeeds)
@@ -178,6 +179,24 @@ abstract class SparkSubFeedsAction extends SparkAction {
     val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id).get
     val mainOutputSubFeed = outputSubFeeds.find(_.dataObjectId == mainOutput.id).get
     executionMode.foreach(_.postExec(id, mainInput, mainOutput, mainInputSubFeed, mainOutputSubFeed))
+  }
+
+  /**
+   * apply transformer to SubFeeds
+   */
+  protected def applyTransformers(transformers: Seq[DfsTransformer], inputPartitionValues: Seq[PartitionValues], inputSubFeeds: Seq[SparkSubFeed], outputSubFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
+    val inputDfsMap = inputSubFeeds.map(subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap
+    val (outputDfsMap, _) = transformers.foldLeft((inputDfsMap,inputPartitionValues)){
+      case ((dfsMap, partitionValues), transformer) => transformer.applyTransformation(id, partitionValues, dfsMap)
+    }
+    // create output subfeeds from transformed dataframes
+    outputDfsMap.map {
+      case (dataObjectId, dataFrame) =>
+        val outputSubFeed = outputSubFeeds.find(_.dataObjectId.id == dataObjectId)
+          .getOrElse(throw ConfigurationException(s"($id) No output found for result ${dataObjectId}. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
+        // get partition values from main input
+        outputSubFeed.copy(dataFrame = Some(dataFrame))
+    }.toSeq
   }
 }
 
