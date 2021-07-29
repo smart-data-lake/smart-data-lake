@@ -130,7 +130,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
           |Expression syntax: "<operation?><prefix:?><regex>"
           |Operations:
           |- pipe symbol (|): the two sets are combined by union operation (default)
-          |- ampersand symbol (&): the tow sets are combined by intersection operation
+          |- ampersand symbol (&): the two sets are combined by intersection operation
           |- minus symbol (-): the second set is subtracted from the first set
           |Prefixes:
           |- 'feeds': select actions where metadata.feed is matched by regex pattern (default)

@@ -167,7 +167,7 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
    * You can combine several pattern by using semicolon (;). Patterns are combined from left to right.
    * By default combining sets is done with union operation. The operation can be modified by adding one of the following characters before the prefix:
    * - pipe symbol (|): the two sets are combined by union operation (default)
-   * - ampersand symbol (&): the tow sets are combined by intersection operation
+   * - ampersand symbol (&): the two sets are combined by intersection operation
    * - minus symbol (-): the second set is subtracted from the first set
    * All matching is done case-insensitive.
    * Example: to filter action 'A' and its successors but only in layer L1 and L2, use the following pattern: "startFromActionIds:a;&layers:(l1|l2)"
