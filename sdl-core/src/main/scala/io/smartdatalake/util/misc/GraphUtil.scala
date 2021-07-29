@@ -19,8 +19,14 @@
 
 package io.smartdatalake.util.misc
 
+/**
+ * Helper functions for Graph traversals and algorithms.
+ */
 private[smartdatalake] object GraphUtil {
 
+  /**
+   * A simple directed graph defined by a list of edges (pairs of connected nodes)
+   */
   case class Graph[A](edges: Set[(A,A)]) {
 
     /**
