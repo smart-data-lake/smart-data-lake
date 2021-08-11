@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
+import io.smartdatalake.workflow.action.sparktransformer.DfTransformer
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
@@ -57,8 +58,9 @@ abstract class SparkSubFeedAction extends SparkAction {
 
   /**
    * Transform partition values
+   * @return Map of input to output partition values. This allows to map partition values forward and backward, which is needed in execution modes.
    */
-  def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues]
+  def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Map[PartitionValues,PartitionValues]
 
   private def doTransform(subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     // convert subfeed to SparkSubFeed type or initialize if not yet existing
@@ -132,4 +134,14 @@ abstract class SparkSubFeedAction extends SparkAction {
     executionMode.foreach(_.postExec(id, input, output, inputSubFeed, outputSubFeed))
   }
 
+  /**
+   * apply transformer to SubFeed
+   */
+  protected def applyTransformers(transformers: Seq[DfTransformer], inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+    val transformedSubFeed = transformers.foldLeft(inputSubFeed){
+      case (subFeed, transformer) => transformer.applyTransformation(id, subFeed)
+    }
+    // Note that transformed partition values are set by execution mode.
+    outputSubFeed.copy(dataFrame = transformedSubFeed.dataFrame)
+  }
 }
