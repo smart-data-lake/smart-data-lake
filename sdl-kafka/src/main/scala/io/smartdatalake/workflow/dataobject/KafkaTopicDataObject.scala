@@ -144,7 +144,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     new KafkaConsumer(props)
   }
 
-  override def prepare(implicit session: SparkSession): Unit = {
+  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.prepare
     // test schema registry connection
     connection.testSchemaRegistry()

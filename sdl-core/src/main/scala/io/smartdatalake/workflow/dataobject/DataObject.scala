@@ -47,11 +47,19 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
   def metadata: Option[DataObjectMetadata]
 
   /**
+   * Configure a housekeeping mode to e.g cleanup, archive and compact partitions.
+   * Default is None.
+   */
+  def housekeepingMode: Option[HousekeepingMode] = None
+
+  /**
    * Prepare & test [[DataObject]]'s prerequisits
    *
    * This runs during the "prepare" operation of the DAG.
    */
-  private[smartdatalake] def prepare(implicit session: SparkSession): Unit = Unit
+  private[smartdatalake] def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    housekeepingMode.foreach(_.prepare(this))
+  }
 
   /**
    * Runs operations before reading from [[DataObject]]
@@ -72,7 +80,9 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
   /**
    * Runs operations after writing to [[DataObject]]
    */
-  private[smartdatalake] def postWrite(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
+  private[smartdatalake] def postWrite(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    housekeepingMode.foreach(_.postWrite(this))
+  }
 
   /**
    * Handle class cast exception when getting objects from instance registry

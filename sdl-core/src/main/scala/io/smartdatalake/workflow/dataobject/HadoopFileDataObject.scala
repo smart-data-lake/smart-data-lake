@@ -18,19 +18,18 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.io.{InputStream, OutputStream}
-
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
-import io.smartdatalake.util.misc.{AclDef, AclUtil, SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.util.misc.DataFrameUtil.arrayToSeq
+import io.smartdatalake.util.misc.{AclDef, AclUtil, SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.HadoopFileConnection
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
 
+import java.io.{InputStream, OutputStream}
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -41,27 +40,14 @@ import scala.util.{Failure, Success, Try}
  *
  * @see [[FileSystem]]
  */
-private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with CanCreateInputStream with CanCreateOutputStream with SmartDataLakeLogger {
+private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with CanCreateInputStream with CanCreateOutputStream with HasHadoopStandardFilestore with SmartDataLakeLogger {
 
   /**
    * Return the [[InstanceRegistry]] parsed from the SDL configuration used for this run.
    *
-   * @return  the current [[InstanceRegistry]].
+   * @return the current [[InstanceRegistry]].
    */
   def instanceRegistry(): InstanceRegistry
-
-  /**
-   * Return a [[String]] specifying the partition layout.
-   *
-   * For Hadoop the default partition layout is colname1=<value1>/colname2=<value2>/.../
-   */
-  final override def partitionLayout(): Option[String] = {
-    if (partitions.nonEmpty) {
-      Some(HdfsUtil.getHadoopPartitionLayout(partitions, separator))
-    } else {
-      None
-    }
-  }
 
   /**
    * Return the ACL definition for the Hadoop path of this DataObject
@@ -90,30 +76,22 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   def failIfFilesMissing: Boolean = false
 
   // these variables are not serializable
-  @transient private[workflow] lazy val hadoopPath = HdfsUtil.prefixHadoopPath(path, connection.map(_.pathPrefix))
-  @transient private var filesystemHolder: FileSystem = _
-  private var serializableHadoopConf: SerializableHadoopConfiguration = _ // we must serialize hadoop config for CustomFileAction running transformation on executors
-  override def getPath: String = hadoopPath.toUri.toString
-
-  /**
-   * Create a hadoop [[FileSystem]] API handle for the provided [[SparkSession]].
-   */
-  def filesystem(implicit session: SparkSession): FileSystem = {
-    if (serializableHadoopConf == null) {
-      serializableHadoopConf = new SerializableHadoopConfiguration(session.sparkContext.hadoopConfiguration)
+  @transient private var hadoopPathHolder: Path = _
+  def hadoopPath(implicit session: SparkSession): Path = {
+    if (hadoopPathHolder == null) { // avoid null-pointer on executors...
+      hadoopPathHolder = HdfsUtil.prefixHadoopPath(path, connection.map(_.pathPrefix))
     }
-    if (filesystemHolder == null) {
-      filesystemHolder = HdfsUtil.getHadoopFsWithConf(hadoopPath, serializableHadoopConf.get)
-    }
-    filesystemHolder
+    hadoopPathHolder
   }
+
+  override def getPath(implicit session: SparkSession): String = hadoopPath.toUri.toString
 
   /**
    * Check if the input files exist.
    *
    * @throws IllegalArgumentException if `failIfFilesMissing` = true and no files found at `path`.
    */
-  protected def checkFilesExisting(implicit session:SparkSession): Boolean = {
+  protected def checkFilesExisting(implicit session: SparkSession): Boolean = {
     val files = if (filesystem.exists(hadoopPath)) {
       arrayToSeq(filesystem.listStatus(hadoopPath))
     } else {
@@ -128,7 +106,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     files.nonEmpty
   }
 
-  override def deleteFileRefs(fileRefs: Seq[FileRef])(implicit session:SparkSession): Unit = {
+  override def deleteFileRefs(fileRefs: Seq[FileRef])(implicit session: SparkSession): Unit = {
     // delete given files on hdfs
     fileRefs.foreach { file =>
       filesystem.delete(new Path(file.fullPath), false) // recursive=false
@@ -164,20 +142,20 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   /**
    * Generate all paths for given partition values exploding undefined partitions before the last given partition value.
    * Use case: Reading all files from a given path with spark cannot contain wildcards.
-   *   If there are partitions without given partition value before the last partition value given, they must be searched with globs.
+   * If there are partitions without given partition value before the last partition value given, they must be searched with globs.
    */
   def getConcretePaths(pv: PartitionValues)(implicit session: SparkSession): Seq[Path] = {
     assert(partitions.nonEmpty)
     // check if valid init of partitions -> then we can read all at once, otherwise we need to search with globs as load doesnt support wildcards
     if (partitions.inits.map(_.toSet).contains(pv.keys)) {
-      val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitions.filter(pv.isDefinedAt), separator)
+      val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitions.filter(pv.isDefinedAt))
       Seq(new Path(hadoopPath, pv.getPartitionString(partitionLayout)))
     } else {
       // get all partition columns until last given partition value
       val givenPartitions = pv.keys
       val initPartitions = partitions.reverse.dropWhile(!givenPartitions.contains(_)).reverse
       // create path with wildcards
-      val partitionLayout = HdfsUtil.getHadoopPartitionLayout(initPartitions, separator)
+      val partitionLayout = HdfsUtil.getHadoopPartitionLayout(initPartitions)
       val globPartitionPath = new Path(hadoopPath, pv.getPartitionString(partitionLayout))
       logger.info(s"($id) getConcretePaths with globs needed because ${pv.keys.mkString(",")} is not an init of partition columns ${partitions.mkString(",")}, path = $globPartitionPath")
       filesystem.globStatus(globPartitionPath).map(_.getPath)
@@ -193,14 +171,14 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
         // get search pattern for root directory
         val pattern = PartitionLayout.replaceTokens(partitionLayout, PartitionValues(Map()))
         // list directories and extract partition values
-        filesystem.globStatus( new Path(hadoopPath, pattern))
-          .filter{fs => fs.isDirectory}
+        filesystem.globStatus(new Path(hadoopPath, pattern))
+          .filter { fs => fs.isDirectory }
           .map(path => PartitionLayout.extractPartitionValues(partitionLayout, "", relativizePath(path.getPath.toString) + separator))
           .toSeq
     }.getOrElse(Seq())
   }
 
-  override def relativizePath(path: String): String = {
+  override def relativizePath(path: String)(implicit session: SparkSession): String = {
     val normalizedPath = new Path(path).toString
     val pathPrefix = (".*"+hadoopPath.toString).r // ignore any absolute path prefix up and including hadoop path
     pathPrefix.replaceFirstIn(normalizedPath, "").stripPrefix(Path.SEPARATOR)
@@ -209,7 +187,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   override def createEmptyPartition(partitionValues: PartitionValues)(implicit session: SparkSession): Unit = {
     // check if valid init of partitions -> otherwise we can not create empty partition as path is not fully defined
     if (partitions.inits.map(_.toSet).contains(partitionValues.keys)) {
-      val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitions.filter(partitionValues.isDefinedAt), separator)
+      val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitions.filter(partitionValues.isDefinedAt))
       val partitionPath = new Path(hadoopPath, partitionValues.getPartitionString(partitionLayout))
       filesystem.mkdirs(partitionPath)
     } else {
@@ -217,13 +195,20 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     }
   }
 
+  override def movePartitions(partitionValuesMapping: Seq[(PartitionValues, PartitionValues)])(implicit session: SparkSession): Unit = {
+    partitionValuesMapping.foreach {
+      case (pvExisting, pvNew) => HdfsUtil.movePartition(hadoopPath, pvExisting, pvNew, fileName, filesystem)
+    }
+    logger.info(s"($id) Archived partitions ${partitionValuesMapping.map(m => s"${m._1}->${m._2}").mkString(", ")}")
+  }
+
   override def getFileRefs(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[FileRef] = {
-    val paths: Seq[(PartitionValues,String)] = getSearchPaths(partitionValues)
+    val paths: Seq[(PartitionValues, String)] = getSearchPaths(partitionValues)
     // search paths and prepare FileRef's
-    paths.flatMap{ case (v, p) =>
+    paths.flatMap { case (v, p) =>
       logger.debug(s"listing $p")
-      filesystem.globStatus( new Path(p))
-        .map{ f =>
+      filesystem.globStatus(new Path(p))
+        .map { f =>
           // check if we have to extract partition values from file path
           val pVs = if (v.keys != partitions.toSet) extractPartitionValuesFromPath(f.getPath.toString)
           else v
@@ -232,10 +217,15 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     }
   }
 
+  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    super.prepare
+    hadoopPath // initialize hadoopPath
+  }
+
   override def preWrite(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.preWrite
     // validate if acl's must be / are configured before writing
-    if (Environment.hadoopAuthoritiesWithAclsRequired.exists( a => filesystem.getUri.toString.contains(a))) {
+    if (Environment.hadoopAuthoritiesWithAclsRequired.exists(a => filesystem.getUri.toString.contains(a))) {
       require(acl().isDefined, s"($id) ACL definitions are required for writing DataObjects on hadoop authority ${filesystem.getUri} by environment setting hadoopAuthoritiesWithAclsRequired")
     }
   }
@@ -268,7 +258,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    * delete all files inside given path recursively
    */
   def deleteAllFiles(path: Path)(implicit session: SparkSession): Unit = {
-    val dirEntries = filesystem.globStatus(new Path(path,"*")).map(_.getPath)
+    val dirEntries = filesystem.globStatus(new Path(path, "*")).map(_.getPath)
     dirEntries.foreach { p =>
       if (filesystem.isDirectory(p)) deleteAllFiles(p)
       else filesystem.delete(p, /*recursive*/ false)

@@ -21,7 +21,7 @@
 
 	<groupId>io.smartdatalake</groupId>
 	<artifactId>sdl-parent</artifactId>
-	<version>2.0.4</version>
+	<version>2.1.0-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
 	<modules>
@@ -221,7 +221,7 @@
 
 		<spark.version>3.1.1</spark.version>
 		<spark.minor.version>3.0</spark.minor.version> <!-- this is used in sdl-snowflake which has no version yet for Spark 3.1 -->
-		<spark-extensions.version>2.0.11</spark-extensions.version>
+		<spark-extensions.version>2.0.12</spark-extensions.version>
 
 		<!-- SPARK-PARENT start: properties copied from spark-parent pom version 2.4.7 for spark-parent import in dependencyManagement -->
 		<!-- attention - manually adapted are: zookeeper, scala.version, scala.binary.version -->
@@ -316,7 +316,7 @@
 		<!-- SPARK-PARENT finished -->
 
 		<!-- other dependency versions -->
-		<scopt.version>3.7.1</scopt.version>
+		<scopt.version>4.0.1</scopt.version>
 		<databricks.spark-xml.version>0.9.0</databricks.spark-xml.version>
 		<spark.excel.version>0.13.5</spark.excel.version>
 		<ucanaccess.version>4.0.4</ucanaccess.version>
@@ -2433,7 +2433,7 @@
 			<dependency>
 				<groupId>org.apache.commons</groupId>
 				<artifactId>commons-compress</artifactId>
-				<version>1.4.1</version>
+				<version>1.21</version>
 			</dependency>
 			<dependency>
 				<groupId>com.typesafe</groupId>

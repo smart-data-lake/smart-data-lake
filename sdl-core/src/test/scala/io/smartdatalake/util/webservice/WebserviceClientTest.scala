@@ -97,7 +97,7 @@ class WebserviceClientTest extends FunSuite with BeforeAndAfterEach  {
 
   test("CustomAuthMode") {
     val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/post/no_auth", authMode = Some(CustomHttpAuthMode(className = classOf[MyCustomHttpAuthMode].getName, options = Map("test"-> "ok"))))
-    webserviceDO.prepare(null)
+    webserviceDO.prepare(null, null)
     val webserviceClient = ScalaJWebserviceClient(webserviceDO)
     assert(webserviceClient.request.headers.toMap.apply("test") == "ok")
   }

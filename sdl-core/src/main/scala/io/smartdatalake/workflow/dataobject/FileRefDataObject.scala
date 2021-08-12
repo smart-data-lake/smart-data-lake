@@ -55,7 +55,7 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
    * This is for instance needed if pathPrefix is defined in a connection.
    * @return
    */
-  def getPath: String = path
+  def getPath(implicit session: SparkSession): String = path
 
   /**
    * List files for given partition values
@@ -108,7 +108,7 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
   /**
    * Extract partition values from a given file path
    */
-  protected def extractPartitionValuesFromPath(filePath: String): PartitionValues = {
+  protected def extractPartitionValuesFromPath(filePath: String)(implicit session: SparkSession): PartitionValues = {
     PartitionLayout.extractPartitionValues(partitionLayout().get, fileName, relativizePath(filePath))
   }
 

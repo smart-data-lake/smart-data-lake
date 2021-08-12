@@ -28,6 +28,7 @@ import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.filetransfer.SshUtil
 import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.SftpFileRefConnection
 import net.schmizz.sshj.sftp.SFTPClient
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -136,11 +137,11 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
     }.getOrElse(Seq())
   }
 
-  override def relativizePath(filePath: String): String = {
+  override def relativizePath(filePath: String)(implicit session: SparkSession): String = {
     filePath.stripPrefix(path+separator)
   }
 
-  override def prepare(implicit session: SparkSession): Unit = try {
+  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = try {
     connection.test()
   } catch {
     case ex: Throwable => throw ConnectionTestException(s"($id) Can not connect. Error: ${ex.getMessage}", ex)

@@ -76,7 +76,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
   override def partitions: Seq[String] = partitionDefs.map(_.name)
   override def expectedPartitionsCondition: Option[String] = None // all partitions are expected to exist
 
-  override def prepare(implicit session: SparkSession): Unit = {
+  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     // prepare auth mode if defined
     authMode.foreach(_.prepare())
   }
@@ -214,7 +214,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
    */
   override def path: String = ""
 
-  override def relativizePath(filePath: String): String = filePath
+  override def relativizePath(filePath: String)(implicit session: SparkSession): String = filePath
 
   override def factory: FromConfigFactory[DataObject] = WebserviceFileDataObject
 

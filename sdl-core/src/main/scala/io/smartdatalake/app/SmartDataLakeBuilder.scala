@@ -38,9 +38,9 @@ import scopt.OptionParser
  * It is populated by parsing command-line arguments.
  * It also specifies default values.
  *
- * @param feedSel         Regex pattern to select the feed to execute.
+ * @param feedSel         Expressions to select the actions to execute. See [[AppUtil.filterActionList()]] or commandline help for syntax description.
  * @param applicationName Application name.
- * @param configuration   A configuration file or a directory containing configuration files.
+ * @param configuration   One or multiple configuration files or directories containing configuration files, separated by comma.
  * @param master          The Spark master URL passed to SparkContext when in local mode.
  * @param deployMode      The Spark deploy mode passed to SparkContext when in local mode.
  * @param username        Kerberos user name (`username`@`kerberosDomain`) for local mode.
@@ -120,19 +120,35 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * Subclasses SmartDataLakeBuilder can define additional options to be extracted.
    */
   protected val parser: OptionParser[SmartDataLakeBuilderConfig] = new OptionParser[SmartDataLakeBuilderConfig](appType) {
-    override def showUsageOnError = true
+    override def showUsageOnError = Some(true)
 
     head(appType, appVersion)
     opt[String]('f', "feed-sel")
       .required
       .action( (arg, config) => config.copy(feedSel = arg) )
-      .text("Regex pattern to select the feed to execute.")
+      .text("""Select actions to execute by one or multiple expressions separated by semicolon (;). Results from multiple expressions are combined from left to right.
+          |Expression syntax: "<operation?><prefix:?><regex>"
+          |Operations:
+          |- pipe symbol (|): the two sets are combined by union operation (default)
+          |- ampersand symbol (&): the two sets are combined by intersection operation
+          |- minus symbol (-): the second set is subtracted from the first set
+          |Prefixes:
+          |- 'feeds': select actions where metadata.feed is matched by regex pattern (default)
+          |- 'names': select actions where metadata.name is matched by regex pattern
+          |- 'ids': select actions where id is matched by regex pattern
+          |- 'layers': select actions where metadata.layer of all output DataObjects is matched by regex pattern
+          |- 'startFromActionIds': select actions which with id is matched by regex pattern and any dependent action (=successors)
+          |- 'endWithActionIds': select actions which with id is matched by regex pattern and their predecessors
+          |- 'startFromDataObjectIds': select actions which have an input DataObject with id is matched by regex pattern and any dependent action (=successors)
+          |- 'endWithDataObjectIds': select actions which have an output DataObject with id is matched by regex pattern and their predecessors
+          |All matching is done case-insensitive.
+          |Example: to filter action 'A' and its successors but only in layer L1 and L2, use the following pattern: "startFromActionIds:a;&layers:(l1|l2)"""".stripMargin)
     opt[String]('n', "name")
       .action( (arg, config) => config.copy(applicationName = Some(arg)) )
       .text("Optional name of the application. If not specified feed-sel is used.")
     opt[String]('c', "config")
       .action( (arg, config) => config.copy(configuration = Some(arg)) )
-      .text("One or multiple configuration files or directories containing configuration files, separated by comma.")
+      .text("One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme \"cp\" which is treated as classpath entry.")
     opt[String]("partition-values")
       .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseSingleColArg(arg))))
       .text(s"Partition values to process in format ${PartitionValues.singleColFormat}.")
@@ -250,7 +266,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     // load config
     val config: Config = appConfig.configuration match {
-      case Some(configuration) => ConfigLoader.loadConfigFromFilesystem(configuration.split(',').toSeq)
+      case Some(configuration) => ConfigLoader.loadConfigFromFilesystem(configuration.split(',').map(_.trim).toSeq)
       case None => ConfigLoader.loadConfigFromClasspath
     }
     require(config.hasPath("actions"), s"No configuration parsed or it does not have a section called actions")
@@ -271,7 +287,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   private[smartdatalake] def exec(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime, actionsToSkip: Map[ActionId, RuntimeInfo], initialSubFeeds: Seq[SubFeed], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener], simulation: Boolean)(implicit instanceRegistry: InstanceRegistry, session: SparkSession) : (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
 
     // select actions by feedSel
-    val actionsSelected = instanceRegistry.getActions.filter(_.metadata.flatMap(_.feed).exists(_.matches(appConfig.feedSel)))
+    val actionsSelected = AppUtil.filterActionList(appConfig.feedSel, instanceRegistry.getActions.toSet).toSeq
     require(actionsSelected.nonEmpty, s"No action matched the given feed selector: ${appConfig.feedSel}. At least one action needs to be selected.")
     logger.info(s"selected actions ${actionsSelected.map(_.id).mkString(", ")}")
     if (appConfig.test.contains(TestMode.Config)) { // stop here if only config check
@@ -287,7 +303,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     val actionIdsSkipped = actionIdsSelected.filter( id => actionIdsToSkip.contains(id))
     val actionsToExec = actionsSelected.filterNot( action => actionIdsToSkip.contains(action.id))
     require(actionsToExec.nonEmpty, s"No actions to execute. All selected actions are skipped (${actionIdsSkipped.mkString(", ")})")
-    logger.info(s"actions to execute ${actionsToExec.map(_.id).mkString(", ")}" + (if (actionIdsSkipped.nonEmpty) s", actions skipped ${actionIdsSkipped.mkString(", ")}" else ""))
+    logger.info(s"actions to execute ${actionsToExec.map(_.id).mkString(", ")}" + (if (actionIdsSkipped.nonEmpty) s"; actions skipped ${actionIdsSkipped.mkString(", ")}" else ""))
 
     // create and execute DAG
     logger.info(s"starting application ${appConfig.appName} runId=$runId attemptId=$attemptId")
