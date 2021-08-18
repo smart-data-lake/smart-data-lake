@@ -77,6 +77,7 @@ object SubFeed {
  * @param dataObjectId id of the DataObject this SubFeed corresponds to
  * @param partitionValues Values of Partitions transported by this SubFeed
  * @param isDAGStart true if this subfeed is a start node of the dag
+ * @param isSkipped true if this subfeed is the result of a skipped action
  * @param isDummy true if this subfeed only contains a dummy DataFrame. Dummy DataFrames can be used for validating the lineage in init phase, but not for the exec phase.
  * @param filter a spark sql filter expression. This is used by SparkIncrementalMode.
  */
@@ -153,6 +154,9 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
   }
 }
 object SparkSubFeed {
+  /**
+   * This method is used to pass an output SubFeed as input SparkSubFeed to the next Action. SubFeed type might need conversion.
+   */
   def fromSubFeed( subFeed: SubFeed )(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     subFeed match {
       case sparkSubFeed: SparkSubFeed => sparkSubFeed.clearFilter() // make sure there is no filter, as filter can not be passed between actions.
@@ -167,6 +171,8 @@ object SparkSubFeed {
  * @param fileRefs path to files to be processed
  * @param dataObjectId id of the DataObject this SubFeed corresponds to
  * @param partitionValues Values of Partitions transported by this SubFeed
+ * @param isDAGStart true if this subfeed is a start node of the dag
+ * @param isSkipped true if this subfeed is the result of a skipped action
  * @param processedInputFileRefs used to remember processed input FileRef's for post processing (e.g. delete after read)
  */
 case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
@@ -214,6 +220,9 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
   }
 }
 object FileSubFeed {
+  /**
+   * This method is used to pass an output SubFeed as input FileSubFeed to the next Action. SubFeed type might need conversion.
+   */
   def fromSubFeed( subFeed: SubFeed ): FileSubFeed = {
     subFeed match {
       case fileSubFeed: FileSubFeed => fileSubFeed
@@ -223,12 +232,16 @@ object FileSubFeed {
 }
 
 /**
- * A InitSubFeed is used to initialize first Nodes of a [[DAG]].
+ * An InitSubFeed is used to initialize first Nodes of a [[DAG]].
  *
  * @param dataObjectId id of the DataObject this SubFeed corresponds to
  * @param partitionValues Values of Partitions transported by this SubFeed
+ * @param isSkipped true if this subfeed is the result of a skipped action
  */
-case class InitSubFeed(override val dataObjectId: DataObjectId, override val partitionValues: Seq[PartitionValues], override val isSkipped: Boolean = false)
+case class InitSubFeed(override val dataObjectId: DataObjectId,
+                       override val partitionValues: Seq[PartitionValues],
+                       override val isSkipped: Boolean = false
+                      )
   extends SubFeed {
   override def isDAGStart: Boolean = true
   override def breakLineage(implicit session: SparkSession, context: ActionPipelineContext): InitSubFeed = this

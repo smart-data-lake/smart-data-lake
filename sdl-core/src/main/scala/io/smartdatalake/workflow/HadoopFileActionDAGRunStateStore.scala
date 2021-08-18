@@ -65,13 +65,13 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
    * Get latest state
    * @param runId optional runId to search for latest state
    */
-  override def getLatestState(runId: Option[Int] = None): HadoopFileStateId = {
+  override def getLatestStateId(runId: Option[Int] = None): Option[HadoopFileStateId] = {
     val latestStateFile = getFiles()
       .filter(x => runId.isEmpty || runId.contains(x.runId))
       .sortBy(_.getSortAttrs).lastOption
-    require(latestStateFile.nonEmpty, s"No state file for application $appName and runId ${runId.getOrElse("latest")} found.")
-    logger.debug(s"got state from file ${latestStateFile}")
-    latestStateFile.get
+    if (latestStateFile.isEmpty) logger.info(s"No state file for application $appName and runId ${runId.getOrElse("latest")} found.")
+    else logger.debug(s"got state from file ${latestStateFile}")
+    latestStateFile
   }
 
   /**
