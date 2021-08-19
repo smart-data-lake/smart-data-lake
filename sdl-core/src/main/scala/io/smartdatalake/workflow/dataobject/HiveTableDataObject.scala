@@ -95,7 +95,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
   @transient private var hadoopPathHolder: Path = _
   def hadoopPath(implicit session: SparkSession): Path = {
     val thisIsTableExisting = isTableExisting
-    require(thisIsTableExisting || path.isDefined, s"HiveTable ${table.fullName} does not exist, so path must be set.")
+    require(thisIsTableExisting || path.isDefined, s"($id) HiveTable ${table.fullName} does not exist, so path must be set.")
 
     if (hadoopPathHolder == null) {
       hadoopPathHolder = {
@@ -110,7 +110,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
         val definedPathNormalized = HiveUtil.normalizePath(path.get)
 
         if (definedPathNormalized != hadoopPathNormalized)
-          logger.warn(s"Table ${table.fullName} exists already with different path. The table will be written with new path definition ${hadoopPathHolder}!")
+          logger.warn(s"($id) Table ${table.fullName} exists already with different path. The table will be written with new path definition ${hadoopPathHolder}!")
       }
     }
     hadoopPathHolder
@@ -120,7 +120,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
     super.prepare
     require(isDbExisting, s"($id) Hive DB ${table.db.get} doesn't exist (needs to be created manually).")
     if (!isTableExisting)
-      require(path.isDefined, "If Hive table does not exist yet, the path must be set.")
+      require(path.isDefined, s"($id) If Hive table does not exist yet, the path must be set.")
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
   }
 
