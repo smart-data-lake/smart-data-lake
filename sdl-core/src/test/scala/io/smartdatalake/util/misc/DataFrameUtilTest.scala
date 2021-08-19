@@ -145,7 +145,7 @@ class DataFrameUtilTest extends org.scalatest.FunSuite with Matchers with SmartD
     assert(actual)
   }
 
-  test("isEqual_false") {
+  test("isEqual_false_data") {
     val df_complex_2 = Seq(
       (1,Seq(("a","A",Seq("a","A")))),
       (2,Seq(("b","B",Seq("b","B")))),
@@ -159,6 +159,18 @@ class DataFrameUtilTest extends org.scalatest.FunSuite with Matchers with SmartD
       dfComplex.symmetricDifference(df_complex_2).show()
     }
     assert(!actual)
+  }
+
+  test("isSchemaEqual_complex_null_true") {
+    assert(dfComplex.isSchemaEqualIgnoreNullabilty(dfComplexWithNull))
+  }
+
+  test("isSchemaEqual_complex_false") {
+    assert(!dfComplex.isSchemaEqualIgnoreNullabilty(dfHierarchy))
+  }
+
+  test("isSchemaEqual_complex_different_order") {
+    assert(dfComplex.isSchemaEqualIgnoreNullabilty(dfComplex.select(dfComplex.columns.reverseMap(col):_*)))
   }
 
   test("isDataFrameDataEqual_df_complex_withNull_df_complex_withNull") {
