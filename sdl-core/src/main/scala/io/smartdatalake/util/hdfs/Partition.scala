@@ -19,7 +19,7 @@
 package io.smartdatalake.util.hdfs
 
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.sql.Column
+import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions._
 
 import scala.util.matching.Regex
@@ -135,6 +135,17 @@ private[smartdatalake] object PartitionValues {
       missingPartitionValuesCurrentCombination ++ diffPartitionValues(inputPartitions, partitionValuesOtherCombination, partitionColCombinations.tail)
     }
     diffPartitionValues(existingPartitionValues, expectedPartitionValues, partitionColCombinations)
+  }
+
+  /**
+   * Read DataFrame and convert to PartitionValues
+   * @param df DataFrame with partition columns only selected. All columns will be handled as string.
+   */
+  def fromDataFrame(df: DataFrame): Seq[PartitionValues] = {
+    val cols = df.columns
+    df.distinct.collect.map {
+      row => PartitionValues(cols.map(c => (c,row.getAs[Any](c).toString)).toMap)
+    }
   }
 
   def oneToOneMapping(partitionValues: Seq[PartitionValues]): Map[PartitionValues,PartitionValues] = partitionValues.map(x => (x,x)).toMap
