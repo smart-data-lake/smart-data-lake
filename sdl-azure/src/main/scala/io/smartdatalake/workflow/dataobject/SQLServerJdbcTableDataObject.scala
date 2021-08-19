@@ -21,13 +21,14 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
+import io.smartdatalake.definitions.SQLServerReliabilityLevel.MssqlReliabilityLevel
+import io.smartdatalake.definitions.{SDLSaveMode, SQLServerReliabilityLevel}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.connection.JdbcTableConnection
+import io.smartdatalake.workflow.connection.SQLServerJdbcTableConnection
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.StructType
@@ -38,6 +39,7 @@ import java.sql.{ResultSet, ResultSetMetaData}
 /**
  * [[DataObject]] of type JDBC.
  * Provides details for an action to access tables in a database through JDBC.
+ *
  * @param id unique name of this data object
  * @param createSql DDL-statement to be executed in prepare phase, using output jdbc connection
  * @param preReadSql SQL-statement to be executed in exec phase before reading input table, using input jdbc connection.
@@ -50,33 +52,37 @@ import java.sql.{ResultSet, ResultSetMetaData}
  *                   Use tokens with syntax %{<spark sql expression>} to substitute with values from [[DefaultExpressionData]].
  * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
  * @param saveMode [[SDLSaveMode]] to use when writing table, default is "Overwrite". Only "Append" and "Overwrite" supported.
- * @param table The jdbc table to be read
- * @param jdbcFetchSize Number of rows to be fetched together by the Jdbc driver
- * @param connectionId Id of JdbcConnection configuration
- * @param jdbcOptions Any jdbc options according to [[https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html]].
- *                    Note that some options above set and override some of this options explicitly.
- * @param virtualPartitions Virtual partition columns. Note that this doesn't need to be the same as the database partition
- *                   columns for this table. But it is important that there is an index on these columns to efficiently
- *                   list existing "partitions".
+ * @param table                       The jdbc table to be read
+ * @param jdbcFetchSize               Number of rows to be fetched together by the Jdbc driver
+ * @param connectionId                Id of JdbcConnection configuration
+ * @param jdbcOptions                 Any jdbc options according to [[https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html]].
+ *                                    Note that some options above set and override some of this options explicitly.
+ * @param virtualPartitions           Virtual partition columns. Note that this doesn't need to be the same as the database partition
+ *                                    columns for this table. But it is important that there is an index on these columns to efficiently
+ *                                    list existing "partitions".
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
  *                                    Default is to expect all partitions to exist.
+ * @param reliabilityLevel            Defines the [[SQLServerReliabilityLevel]] used when inserting data.
+ * @param tableLock                   Implements an insert with TABLOCK option to improve write performance
  */
-case class JdbcTableDataObject(override val id: DataObjectId,
-                               createSql: Option[String] = None,
-                               preReadSql: Option[String] = None,
-                               postReadSql: Option[String] = None,
-                               preWriteSql: Option[String] = None,
-                               postWriteSql: Option[String] = None,
-                               override val schemaMin: Option[StructType] = None,
-                               override var table: Table,
-                               jdbcFetchSize: Int = 1000,
-                               saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
-                               connectionId: ConnectionId,
-                               jdbcOptions: Map[String, String] = Map(),
-                               virtualPartitions: Seq[String] = Seq(),
-                               override val expectedPartitionsCondition: Option[String] = None,
-                               override val metadata: Option[DataObjectMetadata] = None
+case class SQLServerJdbcTableDataObject(override val id: DataObjectId,
+                                        createSql: Option[String] = None,
+                                        preReadSql: Option[String] = None,
+                                        postReadSql: Option[String] = None,
+                                        preWriteSql: Option[String] = None,
+                                        postWriteSql: Option[String] = None,
+                                        override val schemaMin: Option[StructType] = None,
+                                        override var table: Table,
+                                        jdbcFetchSize: Int = 1000,
+                                        saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
+                                        connectionId: ConnectionId,
+                                        jdbcOptions: Map[String, String] = Map(),
+                                        virtualPartitions: Seq[String] = Seq(),
+                                        override val expectedPartitionsCondition: Option[String] = None,
+                                        override val metadata: Option[DataObjectMetadata] = None,
+                                        reliabilityLevel: MssqlReliabilityLevel = SQLServerReliabilityLevel.BEST_EFFORT,
+                                        tableLock: Boolean = false
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalSparkTableDataObject with CanHandlePartitions {
 
@@ -84,7 +90,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
    * Connection defines driver, url and db in central location
    */
   @DeveloperApi
-  val connection: JdbcTableConnection = getConnection[JdbcTableConnection](connectionId)
+  val connection: SQLServerJdbcTableConnection = getConnection[SQLServerJdbcTableConnection](connectionId)
 
   // Define partition columns
   // Virtual partition column name might be quoted to force case sensitivity in database queries
@@ -97,7 +103,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   assert(saveMode==SDLSaveMode.Append || saveMode==SDLSaveMode.Overwrite, s"($id) Only saveMode Append and Overwrite are supported.")
 
   // jdbc column metadata
-  lazy val columns = getJdbcColumnMetadata
+  lazy val columns: Seq[JdbcColumn] = getJdbcColumnMetadata
 
   override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
 
@@ -128,7 +134,9 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
     val queryOrTable = Map(table.query.map(q => ("query",q)).getOrElse("dbtable"->table.fullName))
-    val df = session.read.format("jdbc")
+    val df = session
+      .read
+      .format("com.microsoft.sqlserver.jdbc.spark")
       .options(jdbcOptions)
       .options(
         Map("url" -> connection.url,
@@ -184,7 +192,11 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
     // write table
     // No need to define any partitions as parallelization will be defined according to the data frame's partitions
-    dfWrite.write.mode(SaveMode.Append).format("jdbc")
+    dfWrite.write
+      .mode(SaveMode.Append)
+      .format("com.microsoft.sqlserver.jdbc.spark")
+      .option("reliabilityLevel",reliabilityLevel.toString)
+      .option("tableLock",tableLock)
       .options(jdbcOptions)
       .options(Map(
         "url" -> connection.url,
@@ -314,8 +326,8 @@ private[smartdatalake] object JdbcColumn {
   }
 }
 
-object JdbcTableDataObject extends FromConfigFactory[DataObject] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): JdbcTableDataObject = {
-    extract[JdbcTableDataObject](config)
+object SQLServerJdbcTableDataObject extends FromConfigFactory[DataObject] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SQLServerJdbcTableDataObject = {
+    extract[SQLServerJdbcTableDataObject](config)
   }
 }

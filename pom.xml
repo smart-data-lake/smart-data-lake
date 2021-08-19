@@ -26,6 +26,7 @@
 
 	<modules>
 		<module>sdl-core</module>
+		<module>sdl-azure</module>
 		<module>sdl-kafka</module>
 		<module>sdl-splunk</module>
 		<module>sdl-jms</module>
@@ -332,6 +333,7 @@
 		<keycloak.version>4.5.0.Final</keycloak.version>
 		<delta.version>1.0.0</delta.version>
 		<poi.version>4.1.2</poi.version>
+		<azure.mssql-connector.version>1.1.0</azure.mssql-connector.version>
 
 		<scalatest.test.version>3.0.8</scalatest.test.version>
 		<sshd.test.version>2.3.0</sshd.test.version>
