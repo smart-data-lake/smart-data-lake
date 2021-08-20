@@ -28,4 +28,4 @@ jobs:
         key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
         restore-keys: ${{ runner.os }}-maven-
     - name: Build with Maven for Scala 2.12
-      run: mvn -P scala-2.12 -B clean test --file pom.xml
+      run: mvn -P scala-2.12 -B clean test deploy --file pom.xml
