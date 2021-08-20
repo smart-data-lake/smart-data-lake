@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, SchemaViolationException}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
