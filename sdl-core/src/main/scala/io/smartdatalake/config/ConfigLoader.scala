@@ -176,7 +176,7 @@ object ConfigLoader extends SmartDataLakeLogger {
    */
   private def getFilesInBfsOrder(path: Path)(implicit fs: FileSystem): Seq[ConfigFile] = {
     if (fs.isDirectory(path)) {
-      Try(RemoteIteratorWrapper(fs.listStatusIterator(path))) match {
+      Try(fs.listStatus(path)) match {
         case Failure(exception) =>
           logger.warn(s"Failed to list directory content of ${path.toString}.", exception)
           Seq()
