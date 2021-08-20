@@ -7,6 +7,7 @@ on:
   pull_request:
     branches: 
       - develop
+    types: [opened, synchronize, closed]
 
 jobs:
   build:
@@ -48,14 +49,14 @@ jobs:
           restore-keys: ${{ runner.os }}-maven-
 
       - name: Maven deploy to sonatype for Scala 2.11
-          uses: samuelmeuli/action-maven-publish@v1
-          with:
-            gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-            gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
-            nexus_username: ${{ secrets.SONATYPE_USERNAME }}
-            nexus_password: ${{ secrets.SONATYPE_PASSWORD }}
-            maven_profiles: scala-2.11,release-sonatype
-            maven_args: -B -f pom.xml
+        uses: samuelmeuli/action-maven-publish@v1
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          nexus_username: ${{ secrets.SONATYPE_USERNAME }}
+          nexus_password: ${{ secrets.SONATYPE_PASSWORD }}
+          maven_profiles: scala-2.11,release-sonatype
+          maven_args: -B -f pom.xml
 
       - name: Maven deploy to sonatype for Scala 2.12
         uses: samuelmeuli/action-maven-publish@v1
