@@ -9,6 +9,7 @@ on:
     branches: 
       - develop
       - develop-spark3
+    types: [opened, synchronize, closed]
 
 jobs:
   build:
