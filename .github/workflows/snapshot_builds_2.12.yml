@@ -58,4 +58,4 @@ jobs:
           nexus_username: ${{ secrets.SONATYPE_USERNAME }}
           nexus_password: ${{ secrets.SONATYPE_PASSWORD }}
           maven_profiles: scala-2.12,release-sonatype
-          maven_args: -B -f pom.xml
+          maven_args: -B -DskipTests -f pom.xml
