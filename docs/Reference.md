@@ -104,7 +104,7 @@ and takes the following arguments:
 Usage: DefaultSmartDataLakeBuilder [options]
   -f, --feed-sel <value>   Regex pattern to select the feed to execute.
   -n, --name <value>       Optional name of the application. If not specified feed-sel is used.
-  -c, --config <value>     One or multiple configuration files or directories containing configuration files, separated by comma.
+  -c, --config <value>     One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme "cp" which is treated as classpath entry.
   --partition-values <value>
                            Partition values to process in format <partitionColName>=<partitionValue>[,<partitionValue>,...].
   --multi-partition-values <value>
@@ -241,34 +241,55 @@ To fail above sample log in case there are no records written, specify `"dataObj
 
 By implementing interface StateListener  you can get notified about action results & metrics. To configure state listeners set config attribute `global.stateListeners = [{className = ...}]`.
 
-## Custom Spark Transformations
-To implement custom transformation logic, define the **transformer** attribute of an Action. 
-Note that the definition of the transformation looks different for:
-* **1-to-1** transformations: One input DataFrame is transformed into one output DataFrame. This is the case for CopyAction, DeduplicateAction and HistorizeAction. 
-* **many-to-many** transformations: Many input DataFrames are transformed into many output DataFrames. This is the case for CustomSparkAction. Configuration is defined by a CustomDfsTransformerConfig.
+## Spark Transformations
+To implement custom transformation logic, define the **transformers** attribute of an Action. It allows you to chain several transformation in a linear process, 
+where output SubFeeds from one transformation are use as input for the next.  
+Note that the definition of the transformations looks different for:
+* **1-to-1** transformations (\*DfTransformer): One input DataFrame is transformed into one output DataFrame. This is the case for CopyAction, DeduplicateAction and HistorizeAction. 
+* **many-to-many** transformations (\*DfsTransformer): Many input DataFrames can be transformed into many output DataFrames. This is the case for CustomSparkAction.
 
-The config allows you to define the transformation in various languages and passing static **options** and **runtimeOptions** to the transformation. runtimeOptions are extracted at runtime from the context.
+The configuration allows you to use predefined standard transformations or to define custom transformation in various languages.
+
+**Deprecation Warning**: there has been a refactoring of transformations in Version 2.0.5. The attribute **transformer** is deprecated and will be removed in future versions. Use **transformers** instead.
+
+### Predefined Transformations
+Predefined transformations implement generic logic to be reused in different actions. The following Transformers exist:
+* FilterTransformer (1-to-1): Filter DataFrame with expression
+* BlacklistTransformer (1-to-1): Apply a column blacklist to a DataFrame
+* WhitelistTransformer (1-to-1): Apply a column whitelist to a DataFrame
+* AdditionalColumnsTransformer (1-to-1): Add additional columns to the DataFrame by extracting information from the context
+* StandardizeDatatypesTransformer (1-to-1): Standardize datatypes of a DataFrame
+* DfTransformerWrapperDfsTransformer (many-to-many): use 1-to-1 transformer as many-to-many transformer by specifying the SubFeeds it should be applied to
+
+### Custom Transformations
+Custom transformers provide an easy way to define your own spark logic in various languages. 
+
+You can pass static **options** and **runtimeOptions** to custom transformations. runtimeOptions are extracted at runtime from the context.
 Specifying options allows to reuse a transformation in different settings. 
  
-### Java/Scala
+#### Java/Scala
 You can use Spark Dataset API in Java/Scala to define custom transformations. 
-If you have a Java project, create a class that extends CustomDfTransformer or CustomDfsTransformer and implement `transform` method
+If you have a Java project, create a class that extends CustomDfTransformer or CustomDfsTransformer and implement `transform` method.
+Then use **type = ScalaClassDfTransformer** or **type = ScalaClassDfsTransformer** and configure **className** attribute.
 
 If you work without Java project, it's still possible to define your transformation in Java/Scala and compile it at runtime.
-For a 1-to-1 transformation you have to write a function that takes `session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectName: String` as parameters and returns a `DataFrame`. 
-Use **scalaFile** or **scalaCode** attribute to configure this.
-
-For many-to-many transformations you get a Map[String,DataFrame] with the DataFrames per input DataObject as parameter, and have to return a Map[String,DataFrame] with the DataFrame per output DataObject.
+For a 1-to-1 transformation use **type = ScalaCodeDfTransformer** and configure **code** or **file** as a function that takes `session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectName: String` as parameters and returns a `DataFrame`.
+For many-to-many transformations use **type = ScalaCodeDfsTransformer** and configure **code** or **file** as a function that takes `session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]` with DataFrames per input DataObject as parameter, and returns a `Map[String,DataFrame]` with the DataFrame per output DataObject.
 
 See [sdl-examples](https://github.com/smart-data-lake/sdl-examples) for details.
 
-### SQL
-You can use Spark SQL to define custom transformations by defining **sqlCode** attribute.
+#### SQL
+You can use Spark SQL to define custom transformations.
 Input dataObjects are available as tables to select from. Use tokens %{<key>} to replace with runtimeOptions in SQL code.
+For a 1-to-1 transformation use **type = SQLDfTransformer** and configure **code** as your SQL transformation statement.
+For many-to-many transformations use **type = SQLDfsTransformer** and configure **code** as a Map of "<outputDataObjectId>, <SQL transformation statement>".
 
 Example - using options in sql code for 1-to-1 transformation:
 ```
-transformer {
+transformers = [{
+  type = SQLDfTransformer
+  name = "test run"
+  description = "description of test run..."
   sqlCode = "select id, cnt, '%{test}' as test, %{run_id} as last_run_id from dataObject1"
   options = {
     test = "test run"
@@ -276,22 +297,25 @@ transformer {
   runtimeOptions = {
     last_run_id = "runId - 1" // runtime options are evaluated as spark SQL expressions against DefaultExpressionData
   }
-}
+}]
 ```
 
 Example - defining a many-to-many transformation:
 ```
-transformer.sqlCode {
-  dataObjectOut1 = "select id,cnt from dataObjectIn1 where group = 'test1'",
-  dataObjectOut2 = "select id,cnt from dataObjectIn1 where group = 'test2'"
+transformers = [{
+  type = SQLDfsTransformer
+  code = {
+    dataObjectOut1 = "select id,cnt from dataObjectIn1 where group = 'test1'",
+    dataObjectOut2 = "select id,cnt from dataObjectIn1 where group = 'test2'"
+  }
 }
 ```
 
 See [sdl-examples](https://github.com/smart-data-lake/sdl-examples) for details.
 
-### Python
-It's also possible to use Python to define a custom Spark transformation. 
-Use **pythonFile** or **pythonCode** attribute to define your transformation. 
+#### Python
+It's also possible to use Python to define a custom Spark transformation.
+For a 1-to-1 transformation use **type = PythonCodeDfTransformer** and configure **code** or **file** as a python function.
 PySpark session is initialize and available under variables `sc`, `session`, `sqlContext`.
 Other variables available are
 * `inputDf`: Input DataFrame
@@ -304,13 +328,16 @@ For now using Python for many-to-many transformations is not possible, although 
 
 Example - apply some python calculation as udf:
 ```
-transformer.pythonCode = """
-  |from pyspark.sql.functions import *
-  |udf_multiply = udf(lambda x, y: x * y, "int")
-  |dfResult = inputDf.select(col("name"), col("cnt"))\
-  |  .withColumn("test", udf_multiply(col("cnt").cast("int"), lit(2)))
-  |setOutputDf(dfResult)
-"""
+transformers = [{
+  type = PythonCodeDfTransformer 
+  code = """
+    |from pyspark.sql.functions import *
+    |udf_multiply = udf(lambda x, y: x * y, "int")
+    |dfResult = inputDf.select(col("name"), col("cnt"))\
+    |  .withColumn("test", udf_multiply(col("cnt").cast("int"), lit(2)))
+    |setOutputDf(dfResult)
+  """
+}]
 ```
 
 Requirements: 
@@ -346,3 +373,26 @@ The following list describes specific behaviour of DataObjects:
 Recipes for data pipelines with schema evolution:
 * CopyAction supports schema evolution if all data is processed by overwriting the whole output DataObject. It needs an output DataObject which doesn't have a fixed schema, e.g. HiveTableDataObject.
 * HistorizeAction & DeduplicateAction supports schema evolution for incremental data. They consolidate the existing data & schema of the output DataObject with a potentially new schema of the input DataObject. Then they overwrite the whole output DataObject. They need a TransactionalSparkTableDataObject as output, which doesn't have a fixed schema, e.g. TickTockHiveTableDataObject.
+
+## Housekeeping
+SmartDataLakeBuilder supports housekeeping for DataObjects by specifying the HousekeepingMode.
+
+The following HousekeepingModes are currently implemented:
+* PartitionRetentionMode: Define partitions to keep by configuring a retentionCondition. 
+  retentionCondition is a spark sql expression working with the attributes of PartitionExpressionData returning a boolean with value true if the partition should be kept.
+* PartitionArchiveCompactionMode: Archive and compact old partitions.
+  * Archive partition reduces the number of partitions in the past by moving older partitions into special "archive partitions". 
+    archiveCondition defines a spark sql expression working with the attributes of PartitionExpressionData returning archive partition values as Map\[String,String\].
+    If return value is the same as input partition values, the partition is not touched. Otherwise all files of the partition are moved to the corresponding partition. 
+    Be aware that the value of the partition columns changes for these files/records.
+  * Compact partition reduces the number of files in a partition by rewriting them with Spark.
+    compactPartitionExpression defines a sql expression working with the attributes of PartitionExpressionData returning true if this partition should be compacted.
+    Once a partition is compacted, it is marked as compacted and will not be compacted again. It is therefore ok to return true for all partitions which should be compacted, regardless if they have been compacted already.
+
+Example - cleanup partitions with partition layout dt=<yyyymmdd> after 90 days:
+```
+housekeepingMode = {
+  type = PartitionRetentionMode
+  retentionCondition = "datediff(now(), to_date(elements['dt'], 'yyyyMMdd')) <= 90"
+}
+```

@@ -30,8 +30,10 @@ The following is a list of implemented and planned (Future) features of Smart Da
 
 ##### Customizable Transformations
 * Spark Transformations: 
-  * Languages: SQL, Scala (Class, compile from config), Python
-  * Many input DataFrames to many outputs DataFrames (but only one output recommended normally, in order to define dependencies as detailed as possible (lineage))
+  * Chain predefined standard transformations (e.g. filter, row level data validation and more) and custom transformations within the same action 
+  * Custom Transformation Languages: SQL, Scala (Class, compile from config), Python
+  * Many input DataFrames to many outputs DataFrames (but only one output recommended normally, in order to define dependencies as detailed as possible for the lineage)
+  * Add metadata to each transformation to explain your data pipeline.
 * File Transformations: 
   * Language: Scala
   * Only one to one (one InputStream to one OutputStream)
@@ -84,3 +86,6 @@ The following is a list of implemented and planned (Future) features of Smart Da
 ##### Spark Performance
 * Execute multiple Spark jobs in parallel within the same Spark Session to save resources
 * Automatically cache and release intermediate results (DataFrames)
+
+##### Housekeeping
+* Delete, or archive & compact partitions according to configurable expressions

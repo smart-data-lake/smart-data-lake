@@ -45,6 +45,8 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
+  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+
   // setup some data objects
   val srcTable = Table(Some("default"), "src1")
   val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
@@ -70,8 +72,6 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
 
   val fileEmptyDO = CsvFileDataObject("fileEmptyDO", tempPath+s"/fileTestEmpty", partitions=Seq("lastname"))
   instanceRegistry.register(fileEmptyDO)
-
-  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
   test("PartitionDiffMode default") {
     val executionMode = PartitionDiffMode()
