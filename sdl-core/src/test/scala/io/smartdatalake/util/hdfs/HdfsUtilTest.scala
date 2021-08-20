@@ -31,6 +31,19 @@ class HdfsUtilTest extends FunSuite {
   test("touch file") {
     val file = new Path("target/touch.me")
     val filesystem = file.getFileSystem(new Configuration())
+    filesystem.delete(file, true)
+    HdfsUtil.touchFile(file, filesystem)
+    val stat1 = filesystem.getFileStatus(file)
+    Thread.sleep(1000)
+    HdfsUtil.touchFile(file, filesystem)
+    val stat2 = filesystem.getFileStatus(file)
+    assert(stat1.getModificationTime != stat2.getModificationTime)
+  }
+
+  test("touch file in new directory") {
+    val file = new Path("target/dir1/touch.me")
+    val filesystem = file.getFileSystem(new Configuration())
+    filesystem.delete(file.getParent, true)
     HdfsUtil.touchFile(file, filesystem)
     val stat1 = filesystem.getFileStatus(file)
     Thread.sleep(1000)

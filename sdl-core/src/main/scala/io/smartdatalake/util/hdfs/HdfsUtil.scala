@@ -22,6 +22,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
+import org.apache.hadoop.fs.permission.FsPermission
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import java.net.URI
@@ -276,6 +277,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   }
 
   def touchFile(path: Path, filesystem: FileSystem): Unit = {
+    filesystem.mkdirs(path.getParent)
     val os = filesystem.create(path, /*overwrite*/ true)
     os.close()
   }
