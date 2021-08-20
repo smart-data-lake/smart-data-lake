@@ -19,6 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import java.io.{InputStream, OutputStream}
+
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}

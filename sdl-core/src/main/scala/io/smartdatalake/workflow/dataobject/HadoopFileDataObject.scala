@@ -62,7 +62,6 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    * Connection defines path prefix (scheme, authority, base path) and ACL's in central location.
    */
   def connectionId(): Option[ConnectionId]
-
   protected val connection: Option[HadoopFileConnection] = connectionId().map {
     c => getConnectionReg[HadoopFileConnection](c, instanceRegistry())
   }
@@ -174,8 +173,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
         // list directories and extract partition values
         filesystem.globStatus(new Path(hadoopPath, pattern))
           .filter { fs => fs.isDirectory }
-          .map(_.getPath.toString)
-          .map(path => PartitionLayout.extractPartitionValues(partitionLayout, "", path + separator))
+          .map(path => PartitionLayout.extractPartitionValues(partitionLayout, "", relativizePath(path.getPath.toString) + separator))
           .toSeq
     }.getOrElse(Seq())
   }
