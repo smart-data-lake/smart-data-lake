@@ -233,14 +233,18 @@ private[smartdatalake] object DataFrameUtil {
      * compares df with df2
      *
      * @param df2 : data frame to comapre with
-     * @return true iff both data frames have the same cardinality, schema and an empty symmetric difference
+     * @return true if both data frames have the same cardinality, schema and an empty symmetric difference
      */
     def isEqual(df2: DataFrame): Boolean = {
       // As a set-theoretic function symmetricDifference ignores multiple occurences of the same row.
       // Thus we need also to compare the cardinalities and the schemata of the two data frames.
       // For the schema, the order of columns doesn't need to match.
-      // Note that two schemata equal only if they agree on nullability of their columns.
-      df.schema.fields.toSet == df2.schema.fields.toSet && symmetricDifference(df2).isEmpty && df.count == df2.count
+      // Note that we ignore the nullability of the columns to compare schemata.
+      isSchemaEqualIgnoreNullabilty(df2) && symmetricDifference(df2).isEmpty && df.count == df2.count
+    }
+
+    def isSchemaEqualIgnoreNullabilty(df2: DataFrame): Boolean = {
+      SchemaUtil.schemaDiff(df.schema, df2.schema, ignoreNullable = true).isEmpty && SchemaUtil.schemaDiff(df2.schema, df.schema, ignoreNullable = true).isEmpty
     }
 
     /**
@@ -259,7 +263,7 @@ private[smartdatalake] object DataFrameUtil {
      * @return data frame
      */
     def symmetricDifference(df2: DataFrame, diffColName: String = "_in_first_df"): DataFrame = {
-      require(df.columns.toSet == df2.columns.toSet, "DataFrames must have the same columns for symmetricDifference calculation")
+      require(df.columns.map(_.toLowerCase).toSet == df2.columns.map(_.toLowerCase).toSet, "DataFrames must have the same columns for symmetricDifference calculation")
       // reorder columns according to the original df for calculating symmetricDifference
       val colOrder = df.columns.map(col)
       df.except(df2.select(colOrder:_*)).withColumn(diffColName,lit(true))

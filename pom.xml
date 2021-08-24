@@ -330,7 +330,7 @@
 		<kafka.version>2.4.1</kafka.version>
 		<snowflake.version>2.8.4</snowflake.version>
 		<keycloak.version>4.5.0.Final</keycloak.version>
-		<delta.version>0.8.0</delta.version>
+		<delta.version>1.0.0</delta.version>
 		<poi.version>4.1.2</poi.version>
 
 		<scalatest.test.version>3.0.8</scalatest.test.version>

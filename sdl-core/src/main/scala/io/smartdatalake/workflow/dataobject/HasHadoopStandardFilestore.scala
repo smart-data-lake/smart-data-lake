@@ -27,19 +27,24 @@ import org.apache.spark.sql.SparkSession
 trait HasHadoopStandardFilestore extends CanHandlePartitions { this: DataObject =>
 
   /**
-   * Create a hadoop [[FileSystem]] API handle for the provided [[SparkSession]].
+   * Creates a cached hadoop [[FileSystem]] for the provided [[SparkSession]].
    */
   private[smartdatalake] def filesystem(implicit session: SparkSession): FileSystem = {
-    if (serializableHadoopConf == null) {
-      serializableHadoopConf = new SerializableHadoopConfiguration(session.sparkContext.hadoopConfiguration)
-    }
-    if (filesystemHolder == null) {
-      filesystemHolder = HdfsUtil.getHadoopFsWithConf(hadoopPath, serializableHadoopConf.get)
-    }
+    if (filesystemHolder == null) filesystemHolder = getFilesystem(hadoopPath)
     filesystemHolder
   }
   @transient private var filesystemHolder: FileSystem = _
   private var serializableHadoopConf: SerializableHadoopConfiguration = _ // we must serialize hadoop config for CustomFileAction running transformation on executors
+
+  /**
+   * Creates a hadoop [[FileSystem]] for the provided [[SparkSession]] and [[Path]].
+   */
+  private[smartdatalake] def getFilesystem(path: Path)(implicit session: SparkSession) = {
+    if (serializableHadoopConf == null) {
+      serializableHadoopConf = new SerializableHadoopConfiguration(session.sparkContext.hadoopConfiguration)
+    }
+    HdfsUtil.getHadoopFsWithConf(path, serializableHadoopConf.get)
+  }
 
   /**
    * Return a [[String]] specifying the partition layout.

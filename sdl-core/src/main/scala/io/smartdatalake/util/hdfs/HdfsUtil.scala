@@ -226,6 +226,14 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   }
 
   /**
+   * If path is not absolute, prefix with working dir
+   * @return Absolute hadoop path
+   */
+  def makeAbsolutePath(path: Path)(filesystem: FileSystem) =
+    if (path.isAbsolute) path
+    else new Path(filesystem.getWorkingDirectory, path)
+
+  /**
    * Get Hadoop Filesystem from specified Path.
    * Note that use of this is not optimal as there might be additional configurations missing, which are defined in the SparkSession.
    * Use getHadoopFsFromSpark if there is already a SparkSession.

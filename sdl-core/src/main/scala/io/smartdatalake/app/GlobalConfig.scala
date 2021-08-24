@@ -84,10 +84,14 @@ extends SmartDataLakeLogger {
     if (Environment._sparkSession != null) logger.warn("Your SparkSession was already set, that should not happen. We will re-initialize it anyway now.")
     // prepare additional spark options
     // enable MemoryLoggerExecutorPlugin if memoryLogTimer is enabled
-    val executorPlugins = (sparkOptions.flatMap(_.get("spark.plugins")).toSeq ++ (if (memoryLogTimer.isDefined) Seq(classOf[MemoryLoggerExecutorPlugin].getName) else Seq()))
+    val executorPlugins = sparkOptions.flatMap(_.get("spark.plugins")).toSeq ++ (if (memoryLogTimer.isDefined) Seq(classOf[MemoryLoggerExecutorPlugin].getName) else Seq())
+    val executorPluginOptions = if (executorPlugins.nonEmpty) Map("spark.executor.plugins" -> executorPlugins.mkString(",")) else Map[String,String]()
     // config for MemoryLoggerExecutorPlugin can only be transferred to Executor by spark-options
     val memoryLogOptions = memoryLogTimer.map(_.getAsMap).getOrElse(Map())
-    val sparkOptionsExtended = sparkOptions.getOrElse(Map()) ++ memoryLogOptions ++ (if (executorPlugins.nonEmpty) Map("spark.executor.plugins" -> executorPlugins.mkString(",")) else Map())
+    // get additional options from modules
+    val moduleOptions = ModulePlugin.modules.map(_.additionalSparkProperties()).reduceOption(mergeSparkOptions).getOrElse(Map())
+    // combine all options: custom options will override framework options
+    val sparkOptionsExtended = Seq(moduleOptions, memoryLogOptions, executorPluginOptions).reduceOption(mergeSparkOptions).getOrElse(Map()) ++  sparkOptions.getOrElse(Map())
     Environment._sparkSession = AppUtil.createSparkSession(appName, master, deployMode, kryoClasses, sparkOptionsExtended, enableHive)
     sparkUDFs.getOrElse(Map()).foreach { case (name,config) =>
       val udf = config.getUDF
@@ -102,6 +106,18 @@ extends SmartDataLakeLogger {
     }
     // return
     Environment._sparkSession
+  }
+
+  /**
+   * When merging Spark options special care must be taken for properties which are comma separated lists.
+   */
+  private def mergeSparkOptions(m1: Map[String,String], m2: Map[String,String]): Map[String,String] = {
+    val listOptions = Seq("spark.plugins", "spark.executor.plugins", "spark.sql.extensions")
+    m2.foldLeft(m1) {
+      case (m, (k,v)) =>
+        val mergedV = if (listOptions.contains(k)) (m.getOrElse(k, "").split(',') ++ v.split(',')).distinct.mkString(",") else v
+        m.updated(k, mergedV)
+    }
   }
 }
 object GlobalConfig extends ConfigImplicits {
