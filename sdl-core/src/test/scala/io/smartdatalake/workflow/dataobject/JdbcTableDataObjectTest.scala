@@ -86,9 +86,10 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed))
 
     val dfSrcExpected = Seq(("ext", "doe", "john", 5)
-      , ("preRead", "smith", "testFeed", 3), ("preWrite", "emma", "testFeed", 3)
-      , ("postRead", "smith", "testFeed", 3), ("postWrite", "emma", "testFeed", 3)
+      , ("preRead", "smith", "feedTest", 3), ("preWrite", "emma", "feedTest", 3)
+      , ("postRead", "smith", "feedTest", 3), ("postWrite", "emma", "feedTest", 3)
     ).toDF("type", "lastname", "firstname", "rating")
+    srcDO.getDataFrame().symmetricDifference(dfSrcExpected).show
     assert(srcDO.getDataFrame().symmetricDifference(dfSrcExpected).isEmpty)
   }
 

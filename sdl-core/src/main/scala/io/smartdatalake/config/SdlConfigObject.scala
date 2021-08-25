@@ -70,9 +70,9 @@ object SdlConfigObject {
    * Convention is important for custom sql transformation and Spark metrics parsing.
    */
   def validateId(id: String): Unit = {
-    val regex = "([a-zA-Z0-9_-])+"
-    if (!id.matches(regex)) throw ConfigurationException(s"Id $id is not valid. It must match regex '$regex'.")
+    if (!id.matches(idRegexStr)) throw ConfigurationException(s"Id $id is not valid. It must match regex '$idRegexStr'.")
   }
+  val idRegexStr = "[a-zA-Z0-9_-]+"
 
   implicit def stringToConnectionId(str: String): ConnectionId = ConnectionId(str)
   implicit def stringToDataObjectId(str: String): DataObjectId = DataObjectId(str)

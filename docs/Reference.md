@@ -102,13 +102,30 @@ spark-submit --master yarn --deploy-mode client --class io.smartdatalake.app.Def
 and takes the following arguments:
 ```
 Usage: DefaultSmartDataLakeBuilder [options]
-  -f, --feed-sel <value>   Regex pattern to select the feed to execute.
+  -f, --feed-sel <value>   Select actions to execute by one or multiple expressions separated by semicolon (;). Results from multiple expressions are combined from left to right.
+                           Expression syntax: "<operation?><prefix:?><regex>"
+                           Operations:
+                           - pipe symbol (|): the two sets are combined by union operation (default)
+                           - ampersand symbol (&): the two sets are combined by intersection operation
+                           - minus symbol (-): the second set is subtracted from the first set
+                           Prefixes:
+                           - 'feeds': select actions where metadata.feed is matched by regex pattern (default)
+                           - 'names': select actions where metadata.name is matched by regex pattern
+                           - 'ids': select actions where id is matched by regex pattern
+                           - 'layers': select actions where metadata.layer of all output DataObjects is matched by regex pattern
+                           - 'startFromActionIds': select actions which with id is matched by regex pattern and any dependent action (=successors)
+                           - 'endWithActionIds': select actions which with id is matched by regex pattern and their predecessors
+                           - 'startFromDataObjectIds': select actions which have an input DataObject with id is matched by regex pattern and any dependent action (=successors)
+                           - 'endWithDataObjectIds': select actions which have an output DataObject with id is matched by regex pattern and their predecessors
+                           All matching is done case-insensitive.
+                           Example: to filter action 'A' and its successors but only in layer L1 and L2, use the following pattern: "startFromActionIds:a;&layers:(l1|l2)"
   -n, --name <value>       Optional name of the application. If not specified feed-sel is used.
   -c, --config <value>     One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme "cp" which is treated as classpath entry.
   --partition-values <value>
                            Partition values to process in format <partitionColName>=<partitionValue>[,<partitionValue>,...].
   --multi-partition-values <value>
                            Multi partition values to process in format <partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>[;(<partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>;...].
+  -s, --streaming <value>  Enable streaming mode for continuous processing.
   --parallelism <value>    Parallelism for DAG run.
   --state-path <value>     Path to save run state files. Must be set to enable recovery in case of failures.
   --override-jars <value>  Comma separated list of jars for child-first class loader. The jars must be present in classpath.
@@ -131,6 +148,17 @@ Execution therefore involves the following phases.
 2. DAG prepare: Preconditions are validated. This includes testing Connections and DataObject structures which must exists. 
 3. DAG init: Lineage of Actions according to the DAG is created and validated. For Spark Actions this involves the validation of the DataFrame lineage. A column which doesn't exist but is referenced in a later Action will fail the execution.    
 4. DAG exec: Execution of Actions, data is effectively (and only) transferred during this phase.
+
+## Streaming
+You can execute any DAG in streaming mode by using commandline option `--streaming true`.
+In streaming mode SDL executes the Exec-phase of the same DAG continuously, processing your data incrementally. 
+SDL discerns between synchronous and asynchronous actions:
+- Synchronous actions are executed one after another in the DAG, they are synchronized with their predecessors and successors.
+- Asynchronous actions have their own rhythm. They are executed not synchronized from the other actions, except for the first increment. In the first increment their start is synchronized with their predecessors and the first execution is waited for before starting their successors. This allows to maintain execution order for initial loads, where tables and directories might need to be created one after another.
+
+You can mix synchronous and asynchronous actions in the same DAG. Asynchronous actions are started in the first increment. Synchronous actions are executed in each execution of the DAG.
+
+Whether an action is synchronous or asynchronous depends on the execution engine used. For now only "Spark Structured Streaming" is an asynchronous execution engine. It is configured by setting execution mode SparkStreamingMode to an action. 
 
 ## Execution modes
 Execution modes select the data to be processed. By default, if you start SmartDataLakeBuilder, there is no filter applied. This means every Action reads all data from its input DataObjects.
@@ -180,10 +208,12 @@ Example - only process the last selected partition:
 By defining **alternativeOutputId** attribute you can define another DataObject which will be used to check for already existing data.
 This can be used to select data to process against a DataObject later in the pipeline.
 
-### SparkStreamingOnceMode: Incremental load 
+### SparkStreamingMode: Incremental load 
 Some DataObjects are not partitioned, but nevertheless you dont want to read all data from the input on every run. You want to load it incrementally.
-This can be accomplished by specifying execution mode SparkStreamingOnceMode. Under the hood it uses "Spark Structured Streaming" and triggers a single microbatch (Trigger.Once).
-"Spark Structured Streaming" helps keeping state information about processed data. It needs a checkpointLocation configured which can be given as parameter to SparkStreamingOnceMode.
+This can be accomplished by specifying execution mode SparkStreamingMode. Under the hood it uses "Spark Structured Streaming".
+In streaming mode this an Action with SparkStreamingMode is an asynchronous action. Its rhythm can be configured by setting triggerType and triggerTime. 
+If not in streaming mode SparkStreamingMode triggers a single microbatch by using triggerType=Once and is fully synchronized. Synchronous execution can be forced for streaming mode as well by explicitly setting triggerType=Once.
+"Spark Structured Streaming" is keeping state information about processed data. It needs a checkpointLocation configured which can be given as parameter to SparkStreamingMode.
 
 Note that "Spark Structured Streaming" needs an input DataObject supporting the creation of streaming DataFrames. 
 For the time being, only the input sources delivered with Spark Streaming are supported. 

@@ -18,25 +18,24 @@
  */
 package io.smartdatalake.workflow.action
 
-import java.time.{Duration, LocalDateTime}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
-import io.smartdatalake.definitions.{Condition, DataObjectStateIncrementalMode, ExecutionMode, ExecutionModeResult}
-import io.smartdatalake.metrics.NoMetricsFoundException
+import io.smartdatalake.definitions.{Condition, DataObjectStateIncrementalMode, Environment, ExecutionMode, ExecutionModeResult}
+import io.smartdatalake.util.dag.{DAGNode, TaskSkippedDontStopWarning}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, SparkExpressionUtil}
-import io.smartdatalake.workflow.ExecutionPhase.{ExecutionPhase, Value}
+import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
-import io.smartdatalake.workflow.action.RuntimeEventState.{RuntimeEventState, Value}
+import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.dataobject.{CanCreateIncrementalOutput, DataObject}
-import org.apache.spark.sql.functions.expr
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.custom.ExpressionEvaluator
+import org.apache.spark.sql.functions.expr
 
-import scala.collection.mutable
+import java.time.LocalDateTime
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
-import scala.util.{Success, Try}
+import scala.util.Try
 
 /**
  * An action defines a [[DAGNode]], that is, a transformation from input [[DataObject]]s to output [[DataObject]]s in
@@ -81,7 +80,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   def executionCondition: Option[Condition]
 
   // execution condition is evaluated in init phase and result must be stored for exec phase
-  protected var executionConditionResult: (Boolean,Option[String]) = (true,None)
+  protected var executionConditionResult: Option[(Boolean,Option[String])] = None
 
   /**
    * execution mode for this action.
@@ -89,13 +88,18 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   def executionMode: Option[ExecutionMode]
 
   // execution mode is evaluated in init phase and result must be stored for exec phase
-  protected var executionModeResult: Try[Option[ExecutionModeResult]] = Success(None)
+  protected var executionModeResult: Option[Try[Option[ExecutionModeResult]]] = None
 
   /**
    * Spark SQL condition evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
    * If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
    */
   def metricsFailCondition: Option[String]
+
+  /**
+   * If this Action should be run as asynchronous streaming process
+   */
+  private[smartdatalake] def isAsynchronous: Boolean = false
 
   /**
    * Prepare DataObjects prerequisites.
@@ -106,7 +110,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * This runs during the "prepare" phase of the DAG.
    */
   def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    reset() // reset statistics, this is especially needed in unit tests when the same action is started multiple times
+    reset // reset statistics, this is especially needed in unit tests when the same action is started multiple times
     inputs.foreach(_.prepare)
     outputs.foreach(_.prepare)
 
@@ -126,23 +130,6 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * In this step execution condition is evaluated and Action init is skipped if result is false.
    */
   def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    //noinspection MapGetOrElseBoolean
-    executionConditionResult = executionCondition.map { c =>
-      // evaluate condition if existing
-      val data = SubFeedsExpressionData.fromSubFeeds(subFeeds)
-      if (!c.evaluate(id, Some("executionCondition"), data)) {
-        val descriptionText = c.description.map(d => s""""$d" """).getOrElse("")
-        val msg = s"""($id) execution skipped because of failed executionCondition ${descriptionText}expression="${c.expression}" $data"""
-        (false, Some(msg))
-      } else (true, None)
-    }.getOrElse {
-      // default behaviour: if no executionCondition is defined, Action is executed if no input subFeed is skipped.
-      val skippedSubFeeds = subFeeds.filter(_.isSkipped)
-      if (skippedSubFeeds.nonEmpty) {
-        val msg = s"""($id) execution skipped because input subFeeds are skipped: ${subFeeds.map(_.dataObjectId).mkString(", ")}"""
-        (false, Some(msg))
-      } else (true, None)
-    }
     // initialize dataObjectsState
     val unrelatedStateDataObjectIds = dataObjectsState.map(_.dataObjectId).diff(inputs.map(_.id))
     assert(unrelatedStateDataObjectIds.isEmpty, s"($id) Got state for unrelated DataObjects ${unrelatedStateDataObjectIds.mkString(", ")}")
@@ -153,12 +140,53 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
     } else {
       assert(dataObjectsState.isEmpty, s"($id) Got dataObjectsState but executionMode not ${classOf[DataObjectStateIncrementalMode].getSimpleName}")
     }
+    // check execution condition
+    checkExecutionCondition(subFeeds)
+  }
+
+  /**
+   * Evaluate and check the executionCondition
+   * @throws TaskSkippedDontStopWarning if no data to process
+   */
+  private def checkExecutionCondition(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    // evaluate execution condition in init phase or streaming iteration and store result
+    if (executionConditionResult.isEmpty) {
+      //noinspection MapGetOrElseBoolean
+      executionConditionResult = Some(executionCondition.map { c =>
+        // evaluate condition if existing
+        val data = SubFeedsExpressionData.fromSubFeeds(subFeeds)
+        if (!c.evaluate(id, Some("executionCondition"), data)) {
+          val descriptionText = c.description.map(d => s""""$d" """).getOrElse("")
+          val msg = s"""($id) execution skipped because of failed executionCondition ${descriptionText}expression="${c.expression}" $data"""
+          (false, Some(msg))
+        } else (true, None)
+      }.getOrElse {
+        // default behaviour: if no executionCondition is defined, Action is executed if no input subFeed is skipped.
+        val skippedSubFeeds = subFeeds.filter(_.isSkipped)
+        if (skippedSubFeeds.nonEmpty) {
+          val msg = s"""($id) execution skipped because input subFeeds are skipped: ${subFeeds.map(_.dataObjectId).mkString(", ")}"""
+          (false, Some(msg))
+        } else (true, None)
+      })
+    }
     // check execution condition result
-    if (!executionConditionResult._1 && !context.appConfig.isDryRun) {
+    if (!executionConditionResult.get._1 && !context.appConfig.isDryRun) {
       val outputSubFeeds = outputs.map(output => InitSubFeed(dataObjectId = output.id, partitionValues = Seq(), isSkipped = true))
-      throw new TaskSkippedDontStopWarning(id.id, executionConditionResult._2.get, Some(outputSubFeeds))
+      throw new TaskSkippedDontStopWarning(id.id, executionConditionResult.get._2.get, Some(outputSubFeeds))
     }
   }
+
+  /**
+   * Applies the executionMode and stores result in executionModeResult variable
+   */
+  protected def applyExecutionMode(mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
+                                  , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
+                                  (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    executionModeResult = Some(Try(
+      executionMode.flatMap(_.apply(id, mainInput, mainOutput, subFeed, partitionValuesTransform))
+    ).recover { ActionHelper.getHandleExecutionModeExceptionPartialFunction(outputs) })
+  }
+
 
   /**
    * Initialize Action with [[SubFeed]]'s to be processed.
@@ -178,15 +206,15 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * e.g. JdbcTableDataObjects preWriteSql
    */
   def preExec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    // check execution condition result from init phase
-    if (!executionConditionResult._1) {
-      val outputSubFeeds = outputs.map(output => InitSubFeed(dataObjectId = output.id, partitionValues = Seq(), isSkipped = true))
-      throw new TaskSkippedDontStopWarning(id.id, executionConditionResult._2.get, Some(outputSubFeeds))
-    }
-    //  if execution mode result from init phase is failure, throw corresponding exception
-    if (executionModeResult.isFailure) executionModeResult.get
+    // reset execution condition if not start Action in pipeline, because input for execution results could change between init and exec phase
+    val isStartAction = subFeeds.exists(_.isInstanceOf[InitSubFeed])
+    if (!isStartAction) resetExecutionResult()
+    // check execution condition
+    checkExecutionCondition(subFeeds)
+    // throw execution mode failure exception if any
+    if (executionModeResult.exists(x => x.isFailure)) executionModeResult.get.get
     // init spark jobGroupId to identify metrics
-    setSparkJobMetadata(None)
+    setSparkJobMetadata()
     // otherwise continue processing
     inputs.foreach( input => input.preRead(findSubFeedPartitionValues(input.id, subFeeds)))
     outputs.foreach(_.preWrite) // Note: transformed subFeeds don't exist yet, that's why no partition values can be passed as parameters.
@@ -227,7 +255,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   def getDataObjectsState: Seq[DataObjectState] = {
     // only get state if incremental execution mode *and* action was successfully executed or skipped
     if (executionMode.exists(_.isInstanceOf[DataObjectStateIncrementalMode])
-        && getLatestRuntimeState.exists(state => Seq(RuntimeEventState.SUCCEEDED,RuntimeEventState.INITIALIZED).contains(state))) {
+        && runtimeData.getLatestEventState.exists(state => Seq(RuntimeEventState.SUCCEEDED,RuntimeEventState.INITIALIZED).contains(state))) {
       inputs.collect {
         case input: CanCreateIncrementalOutput => input.getState.map(DataObjectState(input.id, _))
       }.flatten
@@ -240,7 +268,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   private def evaluateMetricsFailCondition(condition: String)(implicit session: SparkSession): Unit = {
     val conditionEvaluator = new ExpressionEvaluator[Metric,Boolean](expr(condition))
     val metrics = {
-      getAllLatestMetrics.flatMap{
+      getRuntimeMetrics().flatMap{
         case (dataObjectId, Some(metrics)) => metrics.getMainInfos.map{ case (k,v) => Metric(dataObjectId.id, Some(k), Some(v.toString))}.toSeq
         case (dataObjectId, _) => Seq(Metric(dataObjectId.id, None, None))
       }.toSeq
@@ -263,8 +291,8 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    *
    * @param operation phase description (be short...)
    */
-  def setSparkJobMetadata(operation: Option[String] = None)(implicit session: SparkSession) : Unit = {
-    session.sparkContext.setJobGroup(s"${this.getClass.getSimpleName}.$id", operation.getOrElse("").take(255))
+  def setSparkJobMetadata(operation: Option[String] = None)(implicit session: SparkSession, context: ActionPipelineContext) : Unit = {
+    session.sparkContext.setJobGroup(s"${context.appConfig.appName} $id runId=${context.executionId.runId} attemptId=${context.executionId.attemptId}", operation.getOrElse("").take(255))
   }
 
   /**
@@ -290,102 +318,85 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   protected def getInputDataObject[T <: DataObject: ClassTag: TypeTag](id: DataObjectId)(implicit registry: InstanceRegistry): T = getDataObject[T](id, "input")
   protected def getOutputDataObject[T <: DataObject: ClassTag: TypeTag](id: DataObjectId)(implicit registry: InstanceRegistry): T = getDataObject[T](id, "output")
 
-  /**
-   * A buffer to collect Action events
-   */
-  private val runtimeEvents = mutable.Buffer[RuntimeEvent]()
 
   /**
-   * Adds an action event
+   * Runtime metrics & events
+   * Implementation of runtimeData can be overridden by subclasses
    */
-  def addRuntimeEvent(phase: ExecutionPhase, state: RuntimeEventState, msg: Option[String] = None, results: Seq[SubFeed] = Seq()): Unit = {
-    runtimeEvents.append(RuntimeEvent(LocalDateTime.now, phase, state, msg, results))
+  private[smartdatalake] val runtimeData: RuntimeData = getRuntimeDataImpl
+  protected def getRuntimeDataImpl: RuntimeData = {
+    SynchronousRuntimeData(Option(Environment.globalConfig).map(_.runtimeDataNumberOfExecutionsToKeep).getOrElse(10))
   }
 
   /**
-   * get latest runtime state
+   * Adds a runtime event for this Action
    */
-  def getLatestRuntimeState: Option[RuntimeEventState] = runtimeEvents.lastOption.map(_.state)
-
-  /**
-   * get latest runtime information for this action
-   */
-  def getRuntimeInfo : Option[RuntimeInfo] = {
-    if (runtimeEvents.nonEmpty) {
-      val lastEvent = runtimeEvents.last
-      val lastResults = runtimeEvents.reverseIterator.map(_.results).find(_.nonEmpty) // on failed actions we take the results from initialization to store what partition values have been tried to process
-      val startEvent = runtimeEvents.reverse.find( event => event.state == RuntimeEventState.STARTED && event.phase == lastEvent.phase )
-      val duration = startEvent.map( start => Duration.between(start.tstmp, lastEvent.tstmp))
-      val mainMetrics = getAllLatestMetrics.map{ case (id, metrics) => (id, metrics.map(_.getMainInfos).getOrElse(Map()))}
-      val outputSubFeeds = if (lastEvent.state != RuntimeEventState.SKIPPED) lastResults.toSeq.flatten
-      else outputs.map(output => InitSubFeed(output.id, partitionValues = Seq(), isSkipped = true)) // fake results for skipped actions for state information
-      val results = outputSubFeeds.map(subFeed => ResultRuntimeInfo(subFeed, mainMetrics(subFeed.dataObjectId)))
-      Some(RuntimeInfo(lastEvent.state, startTstmp = startEvent.map(_.tstmp), duration = duration, msg = lastEvent.msg, results = results, dataObjectsState = getDataObjectsState))
-    } else None
+  def addRuntimeEvent(executionId: ExecutionId, phase: ExecutionPhase, state: RuntimeEventState, msg: Option[String] = None, results: Seq[SubFeed] = Seq(), tstmp: LocalDateTime = LocalDateTime.now): Unit = {
+    runtimeData.addEvent(executionId, RuntimeEvent(tstmp, phase, state, msg, results))
   }
 
   /**
-   * Runtime metrics
-   *
-   * Note: runtime metrics are disabled by default, because they are only collected when running Actions from an ActionDAG.
-   * This is not the case for Tests or other use cases. If enabled exceptions are thrown if metrics are not found.
+   * Get latest runtime state
    */
-  def enableRuntimeMetrics(): Unit = runtimeMetricsEnabled = true
-  def onRuntimeMetrics(dataObjectId: Option[DataObjectId], metrics: ActionMetrics): Unit = {
+  def getLatestRuntimeEventState: Option[RuntimeEventState] = runtimeData.getLatestEventState
+
+  /**
+   * Adds a runtime metric for this Action
+   */
+  def addRuntimeMetrics(executionId: Option[ExecutionId], dataObjectId: Option[DataObjectId], metric: ActionMetrics): Unit = {
     if (dataObjectId.isDefined) {
-      if (outputs.exists(_.id == dataObjectId.get)) {
-        val dataObjectMetrics = dataObjectRuntimeMetricsMap.getOrElseUpdate(dataObjectId.get, mutable.Buffer[ActionMetrics]())
-        dataObjectMetrics.append(metrics)
-        if (dataObjectRuntimeMetricsDelivered.contains(dataObjectId.get)) {
-          logger.error(s"($id) Late arriving metrics for ${dataObjectId.get} detected. Final metrics have already been delivered. Statistics in previous logs might be wrong.")
-        }
-      } else logger.warn(s"($id) Metrics received for ${dataObjectId.get} which doesn't belong to outputs ($metrics")
-    } else logger.debug(s"($id) Metrics received for unspecified DataObject (${metrics.getId})")
-    if (logger.isDebugEnabled) logger.debug(s"($id) Metrics received:\n" + metrics.getAsText)
-  }
-  def getLatestMetrics(dataObjectId: DataObjectId): Option[ActionMetrics] = {
-    if (!runtimeMetricsEnabled) return None
-    // return latest metrics
-    val metrics = dataObjectRuntimeMetricsMap.get(dataObjectId)
-    metrics.flatMap( m => Try(m.maxBy(_.getOrder)).toOption)
-  }
-  def getFinalMetrics(dataObjectId: DataObjectId): Option[ActionMetrics] = {
-    if (!runtimeMetricsEnabled) return None
-    // return latest metrics
-    val latestMetrics = getLatestMetrics(dataObjectId)
-      .orElse {
-        // wait some time and retry, because the metrics might be delivered by another thread...
-        Thread.sleep(500)
-        getLatestMetrics(dataObjectId)
+      if (outputs.exists(_.id == dataObjectId.get)) try {
+        runtimeData.addMetric(executionId, dataObjectId.get, metric)
+      } catch {
+        case e: LateArrivingMetricException => logger.error(s"($id) ${e.msg}")
       }
-      .orElse( throw NoMetricsFoundException(s"($id) Metrics for $dataObjectId not found"))
-    // remember for which data object final metrics has been delivered, so that we can warn on late arriving metrics!
-    dataObjectRuntimeMetricsDelivered += dataObjectId
-    // return
-    latestMetrics
+      else logger.warn(s"($id) Metrics received for ${dataObjectId.get} which doesn't belong to outputs ($metric")
+    } else logger.debug(s"($id) Metrics received for unspecified DataObject (${metric.getId})")
+    if (logger.isDebugEnabled) logger.debug(s"($id) Metrics received:\n" + metric.getAsText)
   }
-  def getAllLatestMetrics: Map[DataObjectId, Option[ActionMetrics]] = outputs.map(dataObject => (dataObject.id, getLatestMetrics(dataObject.id))).toMap
-  private var runtimeMetricsEnabled = false
-  private val dataObjectRuntimeMetricsMap = mutable.Map[DataObjectId,mutable.Buffer[ActionMetrics]]()
-  private val dataObjectRuntimeMetricsDelivered = mutable.Set[DataObjectId]()
+
+  /**
+   * Get the latest metrics for all DataObjects and a given SDLExecutionId.
+   * @param executionId ExecutionId to get metrics for. If empty metrics for last ExecutionId are returned.
+   */
+  def getRuntimeMetrics(executionId: Option[ExecutionId] = None): Map[DataObjectId, Option[ActionMetrics]] = {
+    outputs.map(dataObject => (dataObject.id, runtimeData.getMetrics(dataObject.id, executionId))).toMap
+  }
+
+  /**
+   * Get summarized runtime information for a given ExecutionId.
+   * @param executionId ExecutionId to get runtime information for. If empty runtime information for last ExecutionId are returned.
+   */
+  def getRuntimeInfo(executionId: Option[ExecutionId] = None) : Option[RuntimeInfo] = {
+    runtimeData.getRuntimeInfo(outputs.map(_.id), getDataObjectsState, executionId)
+  }
 
   /**
    * Resets the runtime state of this Action
    * This is mainly used for testing
    */
-  def reset(): Unit = {
-    runtimeEvents.clear
-    dataObjectRuntimeMetricsDelivered.clear
-    dataObjectRuntimeMetricsMap.clear
-    executionConditionResult = (true,None)
-    executionModeResult = Success(None)
+  private[smartdatalake] def reset(implicit session: SparkSession): Unit = {
+    runtimeData.clear()
+    resetExecutionResult()
+  }
+
+  /**
+   * Resets execution results of this Action for repeated execution
+   */
+  private[smartdatalake] def resetExecutionResult(): Unit = {
+    executionConditionResult = None
+    executionModeResult = None
   }
 
   /**
    * This is displayed in ascii graph visualization
    */
   final override def toString: String = {
-   nodeId + getRuntimeInfo.map(" "+_).getOrElse("")
+   nodeId + getRuntimeInfo().map(" "+_).getOrElse("")
+  }
+
+  final def toString(executionId: Option[ExecutionId]): String = {
+    nodeId + getRuntimeInfo(executionId).map(" "+_).getOrElse("")
   }
 
   def toStringShort: String = {
@@ -402,7 +413,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
 }
 
 /**
- * Additional metadata for a Action
+ * Additional metadata for an Action
  * @param name Readable name of the Action
  * @param description Description of the content of the Action
  * @param feed Name of the feed this Action belongs to
@@ -416,23 +427,4 @@ case class ActionMetadata(
                          )
 //TODO: restrict characters possible in name and feed (feed should not contain :;% because of regex feedSel)
 
-/**
- * A structure to collect runtime information
- */
-private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: ExecutionPhase, state: RuntimeEventState, msg: Option[String], results: Seq[SubFeed])
-private[smartdatalake] object RuntimeEventState extends Enumeration {
-  type RuntimeEventState = Value
-  val STARTED, PREPARED, INITIALIZED, SUCCEEDED, FAILED, CANCELLED, SKIPPED, PENDING = Value
-}
-private[smartdatalake] case class RuntimeInfo(state: RuntimeEventState, startTstmp: Option[LocalDateTime] = None, duration: Option[Duration] = None, msg: Option[String] = None, attemptId: Option[Int] = None, results: Seq[ResultRuntimeInfo] = Seq(), dataObjectsState: Seq[DataObjectState] = Seq()) {
-  /**
-   * Completed Actions will be ignored in recovery
-   */
-  def hasCompleted(): Boolean = state==RuntimeEventState.SUCCEEDED || state==RuntimeEventState.SKIPPED
-  override def toString: String = {
-    duration.map(d => s"$state $d")
-      .getOrElse(state.toString)
-  }
-}
-private[smartdatalake] case class ResultRuntimeInfo(subFeed: SubFeed, mainMetrics: Map[String, Any])
 

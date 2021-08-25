@@ -18,8 +18,6 @@
  */
 package io.smartdatalake.workflow.action
 
-import java.sql.Timestamp
-import java.time.LocalDateTime
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
@@ -28,12 +26,14 @@ import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.action.sparktransformer.{DfTransformer, DfTransformerFunctionWrapper, ParsableDfTransformer}
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject, TransactionalSparkTableDataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, TransactionalSparkTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
+import java.sql.Timestamp
+import java.time.LocalDateTime
 import scala.util.{Failure, Success, Try}
 
 /**
