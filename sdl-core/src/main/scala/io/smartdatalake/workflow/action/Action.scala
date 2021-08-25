@@ -19,17 +19,16 @@
 package io.smartdatalake.workflow.action
 
 import java.time.{Duration, LocalDateTime}
-
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
-import io.smartdatalake.definitions.{Condition, ExecutionMode, ExecutionModeResult}
+import io.smartdatalake.definitions.{Condition, DataObjectStateIncrementalMode, ExecutionMode, ExecutionModeResult}
 import io.smartdatalake.metrics.NoMetricsFoundException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, SparkExpressionUtil}
 import io.smartdatalake.workflow.ExecutionPhase.{ExecutionPhase, Value}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.{RuntimeEventState, Value}
-import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.{CanCreateIncrementalOutput, DataObject}
 import org.apache.spark.sql.functions.expr
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.custom.ExpressionEvaluator
@@ -124,9 +123,9 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
 
   /**
    * Checks before initalization of Action
-   * In this step execution condition is evaluated and is Action init is skipped if result is false.
+   * In this step execution condition is evaluated and Action init is skipped if result is false.
    */
-  def preInit(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     //noinspection MapGetOrElseBoolean
     executionConditionResult = executionCondition.map { c =>
       // evaluate condition if existing
@@ -136,13 +135,23 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
         val msg = s"""($id) execution skipped because of failed executionCondition ${descriptionText}expression="${c.expression}" $data"""
         (false, Some(msg))
       } else (true, None)
-    }.getOrElse{
+    }.getOrElse {
       // default behaviour: if no executionCondition is defined, Action is executed if no input subFeed is skipped.
       val skippedSubFeeds = subFeeds.filter(_.isSkipped)
       if (skippedSubFeeds.nonEmpty) {
         val msg = s"""($id) execution skipped because input subFeeds are skipped: ${subFeeds.map(_.dataObjectId).mkString(", ")}"""
         (false, Some(msg))
       } else (true, None)
+    }
+    // initialize dataObjectsState
+    val unrelatedStateDataObjectIds = dataObjectsState.map(_.dataObjectId).diff(inputs.map(_.id))
+    assert(unrelatedStateDataObjectIds.isEmpty, s"($id) Got state for unrelated DataObjects ${unrelatedStateDataObjectIds.mkString(", ")}")
+    if (executionMode.exists(_.isInstanceOf[DataObjectStateIncrementalMode])) {
+      inputs.foreach {
+        case input: CanCreateIncrementalOutput => input.setState(dataObjectsState.find(_.dataObjectId == input.id).map(_.state))
+      }
+    } else {
+      assert(dataObjectsState.isEmpty, s"($id) Got dataObjectsState but executionMode not ${classOf[DataObjectStateIncrementalMode].getSimpleName}")
     }
     // check execution condition result
     if (!executionConditionResult._1 && !context.appConfig.isDryRun) {
@@ -203,6 +212,26 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
     // process postRead/Write hooks
     inputs.foreach( input => input.postRead(findSubFeedPartitionValues(input.id, inputSubFeeds)))
     outputs.foreach( output => output.postWrite(findSubFeedPartitionValues(output.id, outputSubFeeds)))
+    // update DataObjects incremental state in DataObjectStateIncrementalMode
+    if (executionMode.exists(_.isInstanceOf[DataObjectStateIncrementalMode])) {
+      inputs.foreach {
+        case input: CanCreateIncrementalOutput => input.setState(input.getState)
+        case _ => Unit
+      }
+    }
+  }
+
+  /**
+   * Get potential state of input DataObjects when executionMode is DataObjectStateIncrementalMode.
+   */
+  def getDataObjectsState: Seq[DataObjectState] = {
+    // only get state if incremental execution mode *and* action was successfully executed or skipped
+    if (executionMode.exists(_.isInstanceOf[DataObjectStateIncrementalMode])
+        && getLatestRuntimeState.exists(state => Seq(RuntimeEventState.SUCCEEDED,RuntimeEventState.INITIALIZED).contains(state))) {
+      inputs.collect {
+        case input: CanCreateIncrementalOutput => input.getState.map(DataObjectState(input.id, _))
+      }.flatten
+    } else Seq()
   }
 
   /**
@@ -291,7 +320,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
       val outputSubFeeds = if (lastEvent.state != RuntimeEventState.SKIPPED) lastResults.toSeq.flatten
       else outputs.map(output => InitSubFeed(output.id, partitionValues = Seq(), isSkipped = true)) // fake results for skipped actions for state information
       val results = outputSubFeeds.map(subFeed => ResultRuntimeInfo(subFeed, mainMetrics(subFeed.dataObjectId)))
-      Some(RuntimeInfo(lastEvent.state, startTstmp = startEvent.map(_.tstmp), duration = duration, msg = lastEvent.msg, results = results))
+      Some(RuntimeInfo(lastEvent.state, startTstmp = startEvent.map(_.tstmp), duration = duration, msg = lastEvent.msg, results = results, dataObjectsState = getDataObjectsState))
     } else None
   }
 
@@ -395,7 +424,7 @@ private[smartdatalake] object RuntimeEventState extends Enumeration {
   type RuntimeEventState = Value
   val STARTED, PREPARED, INITIALIZED, SUCCEEDED, FAILED, CANCELLED, SKIPPED, PENDING = Value
 }
-private[smartdatalake] case class RuntimeInfo(state: RuntimeEventState, startTstmp: Option[LocalDateTime] = None, duration: Option[Duration] = None, msg: Option[String] = None, attemptId: Option[Int] = None, results: Seq[ResultRuntimeInfo] = Seq()) {
+private[smartdatalake] case class RuntimeInfo(state: RuntimeEventState, startTstmp: Option[LocalDateTime] = None, duration: Option[Duration] = None, msg: Option[String] = None, attemptId: Option[Int] = None, results: Seq[ResultRuntimeInfo] = Seq(), dataObjectsState: Seq[DataObjectState] = Seq()) {
   /**
    * Completed Actions will be ignored in recovery
    */

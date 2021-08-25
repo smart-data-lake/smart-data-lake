@@ -19,24 +19,26 @@
 
 package io.smartdatalake.app
 
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
+
 import java.nio.file.Files
-import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.{Condition, Environment, PartitionDiffMode}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.{Condition, DataObjectStateIncrementalMode, Environment, PartitionDiffMode, SDLSaveMode}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.EnvironmentUtil
 import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, CustomDfTransformerConfig, CustomDfsTransformerConfig, SparkUDFCreator}
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction, CustomSparkAction, DeduplicateAction, RuntimeEventState}
-import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanCreateIncrementalOutput, CsvFileDataObject, DataObject, DataObjectMetadata, HiveTableDataObject, Table, TickTockHiveTableDataObject}
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore, SparkSubFeed, TaskFailedException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.{col, lit, udf}
 import org.apache.spark.sql.types.StringType
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{DataFrame, SparkSession, functions}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
-import io.smartdatalake.workflow.action.sparktransformer.{SQLDfTransformer, SQLDfsTransformer, ScalaClassDfTransformer}
+import io.smartdatalake.workflow.action.sparktransformer.{AdditionalColumnsTransformer, SQLDfTransformer, SQLDfsTransformer, ScalaClassDfTransformer}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 
 /**
@@ -114,7 +116,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // check latest state
     {
       val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
-      val stateFile = stateStore.getLatestState()
+      val stateFile = stateStore.getLatestStateId().get
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
@@ -145,7 +147,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // check latest state
     {
       val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
-      val stateFile = stateStore.getLatestState()
+      val stateFile = stateStore.getLatestStateId().get
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
@@ -209,7 +211,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // check latest state
     {
       val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
-      val stateFile = stateStore.getLatestState()
+      val stateFile = stateStore.getLatestStateId().get
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
@@ -236,7 +238,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // check latest state
     {
       val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
-      val stateFile = stateStore.getLatestState()
+      val stateFile = stateStore.getLatestStateId().get
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
@@ -307,7 +309,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // check latest state
     {
       val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
-      val stateFile = stateStore.getLatestState()
+      val stateFile = stateStore.getLatestStateId().get
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
@@ -341,7 +343,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // check latest state
     {
       val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
-      val stateFile = stateStore.getLatestState()
+      val stateFile = stateStore.getLatestStateId().get
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
@@ -399,7 +401,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // check latest state
     {
       val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
-      val stateFile = stateStore.getLatestState()
+      val stateFile = stateStore.getLatestStateId().get
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
@@ -429,7 +431,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // check latest state
     {
       val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
-      val stateFile = stateStore.getLatestState()
+      val stateFile = stateStore.getLatestStateId().get
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 2)
       assert(runState.attemptId == 1)
@@ -442,6 +444,53 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       assert(stateListener.firstState.isDefined && !stateListener.firstState.get.isFinal)
       assert(stateListener.finalState.isDefined && stateListener.finalState.get.isFinal)
     }
+  }
+
+  test("sdlb run with executionMode=DataObjectStateIncrementalMode") {
+
+    // init sdlb
+    val appName = "sdlb-runId"
+    val feedName = "test"
+
+    HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
+    HdfsUtil.deleteFiles(new Path(tempPath), filesystem, false)
+    val sdlb = new DefaultSmartDataLakeBuilder()
+    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+    implicit val actionPipelineContext : ActionPipelineContext = ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
+
+    // setup DataObjects
+    val srcDO = TestIncrementalDataObject("src1")
+    instanceRegistry.register(srcDO)
+    val tgt1DO = CsvFileDataObject( "tgt1", tempPath+s"/tgt1", saveMode = SDLSaveMode.Append)
+    instanceRegistry.register(tgt1DO)
+
+    // start first dag run
+    val action1 = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(DataObjectStateIncrementalMode())
+      , transformers = Seq(AdditionalColumnsTransformer(additionalColumns = Map("run_id"-> "runId")))
+      , metadata = Some(ActionMetadata(feed = Some(feedName))))
+    instanceRegistry.register(action1.copy())
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
+    sdlb.run(sdlConfig)
+
+    // check results
+    val dfResult1 = tgt1DO.getDataFrame(Seq())
+    assert(dfResult1.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head == (10,10))
+
+    // start second dag run
+    action1.reset()
+    sdlb.run(sdlConfig)
+
+    // check results
+    val dfResult2 = tgt1DO.getDataFrame(Seq())
+    assert(dfResult2.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head == (20,20))
+
+    // start 3rd dag run
+    action1.reset()
+    sdlb.run(sdlConfig)
+
+    // check results
+    val dfResult3 = tgt1DO.getDataFrame(Seq())
+    assert(dfResult3.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head == (30,30))
   }
 
   test("sdlb simulation run") {
@@ -532,3 +581,31 @@ object TestSDLPlugin {
   var startupCalled = false
   var shutdownCalled = false
 }
+
+/**
+ * This test DataObject delivers the 10 next numbers on every increment.
+ */
+case class TestIncrementalDataObject(override val id: DataObjectId, override val metadata: Option[DataObjectMetadata] = None)
+  extends DataObject with CanCreateDataFrame with CanCreateIncrementalOutput {
+
+  // State is the start number of the last delivered increment
+  var previousState: Int = 1
+  var nextState: Option[Int] = None
+
+  override def getDataFrame(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+    import session.implicits._
+    nextState = Some(previousState + 10)
+    (previousState until nextState.get).toDF("nb")
+  }
+
+  override def setState(state: Option[String])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    previousState = state.map(_.toInt).getOrElse(1)
+  }
+
+  override def getState: Option[String] = {
+    nextState.map(_.toString)
+  }
+
+  override def factory: FromConfigFactory[DataObject] = null // this DataObject will not be instantiated from config files...
+}
+

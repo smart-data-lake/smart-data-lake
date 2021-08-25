@@ -100,7 +100,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(action2MainMetrics("num_tasks")==1)
 
     // check state: two actions succeeded
-    val latestState = stateStore.getLatestState()
+    val latestState = stateStore.getLatestStateId().get
     val previousRunState = stateStore.recoverRunState(latestState)
     val previousActionState = previousRunState.actionsState.mapValues(_.state)
     val resultActionState = actions.map( a => (a.id, RuntimeEventState.SUCCEEDED)).toMap
@@ -241,7 +241,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // exec dag
     val sdlb = new DefaultSmartDataLakeBuilder
     val appConfig = SmartDataLakeBuilderConfig(feedSel=feed)
-    sdlb.exec(appConfig, 1, 1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), None, Seq(), simulation = false)
+    sdlb.exec(appConfig, 1, 1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), Seq(), None, Seq(), simulation = false)
 
     val r1 = tgtBDO.getDataFrame()
       .select($"rating")

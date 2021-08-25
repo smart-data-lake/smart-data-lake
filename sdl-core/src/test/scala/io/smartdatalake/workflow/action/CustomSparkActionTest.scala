@@ -324,7 +324,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val srcSubFeed1 = SparkSubFeed(None, "src1", Seq(), isSkipped = true)
     val srcSubFeed2 = SparkSubFeed(None, "src2", Seq(), isSkipped = true)
     val tgtSubFeed1 = SparkSubFeed(None, "tgt1", Seq(), isSkipped = true)
-    intercept[TaskSkippedDontStopWarning[_]](action1.preInit(Seq(srcSubFeed1,srcSubFeed2)))
+    intercept[TaskSkippedDontStopWarning[_]](action1.preInit(Seq(srcSubFeed1,srcSubFeed2), Seq()))
     intercept[TaskSkippedDontStopWarning[_]](action1.preExec(Seq(srcSubFeed1,srcSubFeed2)))
     action1.postExec(Seq(srcSubFeed1,srcSubFeed2), Seq(tgtSubFeed1))
 
@@ -332,7 +332,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val action2 = CustomSparkAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id), transformers = Seq(customTransformerConfig), executionCondition = executionCondition)
     val srcSubFeed3 = SparkSubFeed(None, "src1", Seq(), isSkipped = true)
     val srcSubFeed4 = SparkSubFeed(None, "src2", Seq(), isSkipped = false)
-    action2.preInit(Seq(srcSubFeed3,srcSubFeed4)) // no exception
+    action2.preInit(Seq(srcSubFeed3,srcSubFeed4), Seq()) // no exception
     action2.preExec(Seq(srcSubFeed3,srcSubFeed4)) // no exception
   }
 

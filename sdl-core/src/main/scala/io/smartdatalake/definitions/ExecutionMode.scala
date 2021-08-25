@@ -363,6 +363,11 @@ private[smartdatalake] object SparkIncrementalMode {
 }
 
 /**
+ * An execution mode for incremental processing by remembering DataObjects state from last increment.
+ */
+case class DataObjectStateIncrementalMode() extends ExecutionMode
+
+/**
  * An execution mode which just validates that partition values are given.
  * Note: For start nodes of the DAG partition values can be defined by command line, for subsequent nodes partition values are passed on from previous nodes.
  */

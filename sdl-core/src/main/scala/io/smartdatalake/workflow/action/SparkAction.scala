@@ -158,7 +158,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
         if (noData) logger.info(s"($id) no data to process for ${output.id} in streaming mode")
         // return
         noData
-      case None | Some(_: PartitionDiffMode) | Some(_: SparkIncrementalMode) | Some(_: FailIfNoPartitionValuesMode) | Some(_: CustomPartitionMode) | Some(_: ProcessAllMode) =>
+      case None | Some(_: DataObjectStateIncrementalMode) | Some(_: PartitionDiffMode) | Some(_: SparkIncrementalMode) | Some(_: FailIfNoPartitionValuesMode) | Some(_: CustomPartitionMode) | Some(_: ProcessAllMode) =>
         // Auto persist if dataFrame is reused later
         val preparedSubFeed = if (context.dataFrameReuseStatistics.contains((output.id, subFeed.partitionValues))) {
           val partitionValuesStr = if (subFeed.partitionValues.nonEmpty) s" and partitionValues ${subFeed.partitionValues.mkString(", ")}" else ""
