@@ -7,9 +7,10 @@ The following is a list of implemented and planned (Future) features of Smart Da
 * Flexible structure by splitting over multiple files and subdirectories
 * Easily generateable from third party metadata (e.g. source system table catalog) to automate transformation of huge number of DataObjects
 
-##### Support for complex workflows
+##### Support for complex workflows & streaming
 * Fork, join, parallel execution, multiple start- & end-nodes possible
 * Recovery of failed runs
+* Switch a workflow between batch or streaming execution by using just a command line switch
 
 ##### Execution Engines
 * Spark (DataFrames)
@@ -48,9 +49,9 @@ The following is a list of implemented and planned (Future) features of Smart Da
 * Process all data
 * Partition parameters: give partition values to process for start nodes as parameter
 * Partition Diff: search missing partitions and use as parameter
-* Spark Streaming Once: incremental processing by using Spark Structured Streaming with Trigger=Once mode
 * Spark Incremental: compare sortable column between source and target, load the difference
-* Future: Spark Streaming
+* Spark Streaming: asynchronous incremental processing by using Spark Structured Streaming
+* Spark Streaming Once: synchronous incremental processing by using Spark Structured Streaming with Trigger=Once mode
 
 ##### Schema Evolution
 * Automatic evolution of data schemas (new column, removed column, changed datatype)

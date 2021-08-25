@@ -25,13 +25,14 @@ import java.nio.file.Files
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{Condition, DataObjectStateIncrementalMode, Environment, PartitionDiffMode, SDLSaveMode}
 import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.EnvironmentUtil
 import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, CustomDfTransformerConfig, CustomDfsTransformerConfig, SparkUDFCreator}
-import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction, CustomSparkAction, DeduplicateAction, RuntimeEventState}
+import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction, CustomSparkAction, DeduplicateAction, RuntimeEventState, SDLExecutionId}
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanCreateIncrementalOutput, CsvFileDataObject, DataObject, DataObjectMetadata, HiveTableDataObject, Table, TickTockHiveTableDataObject}
-import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore, SparkSubFeed, TaskFailedException}
+import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore, SparkSubFeed}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.{col, lit, udf}
 import org.apache.spark.sql.types.StringType
@@ -68,7 +69,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext : ActionPipelineContext = ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
+    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     val srcTable = Table(Some("default"), "ap_input")
@@ -151,8 +152,8 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
-      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.attemptId))
-      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SUCCEEDED,Some(1)), action2success.id -> (RuntimeEventState.SUCCEEDED, Some(2)))
+      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.executionId))
+      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SUCCEEDED,SDLExecutionId(1,1)), action2success.id -> (RuntimeEventState.SUCCEEDED,SDLExecutionId(1,2)))
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == selectedPartitions)
       if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
@@ -173,7 +174,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext : ActionPipelineContext = ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
+    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     val srcTable = Table(Some("default"), "ap_input")
@@ -242,8 +243,8 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
-      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.attemptId))
-      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SKIPPED,Some(1)), action2success.id -> (RuntimeEventState.SUCCEEDED, Some(2)))
+      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.executionId))
+      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SKIPPED,SDLExecutionId(1,1)), action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1,2)))
       assert(resultActionsState == expectedActionsState)
       if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
     }
@@ -259,7 +260,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext : ActionPipelineContext = ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
+    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     val srcTable = Table(Some("default"), "ap_input")
@@ -347,12 +348,12 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
-      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.attemptId))
+      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.executionId))
       val expectedActionsState = Map(
-        action1.id -> (RuntimeEventState.SKIPPED,Some(1)),
-        action2success.id -> (RuntimeEventState.SUCCEEDED, Some(2)),
-        action3.id -> (RuntimeEventState.SUCCEEDED, Some(2)),
-        action4.id -> (RuntimeEventState.SKIPPED, Some(2))
+        action1.id -> (RuntimeEventState.SKIPPED,SDLExecutionId(1,1)),
+        action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1,2)),
+        action3.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1,2)),
+        action4.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1,2))
       )
       assert(resultActionsState == expectedActionsState)
       if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
@@ -368,7 +369,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext : ActionPipelineContext = ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
+    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     val srcTable = Table(Some("default"), "ap_input")
@@ -456,7 +457,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     HdfsUtil.deleteFiles(new Path(tempPath), filesystem, false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext : ActionPipelineContext = ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
+    implicit val actionPipelineContext : ActionPipelineContext = ActionPipelineContext("testFeed", "testApp", SDLExecutionId.executionId1, instanceRegistry, None, SmartDataLakeBuilderConfig())
 
     // setup DataObjects
     val srcDO = TestIncrementalDataObject("src1")
@@ -477,7 +478,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     assert(dfResult1.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head == (10,10))
 
     // start second dag run
-    action1.reset()
+    action1.reset
     sdlb.run(sdlConfig)
 
     // check results
@@ -485,7 +486,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     assert(dfResult2.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head == (20,20))
 
     // start 3rd dag run
-    action1.reset()
+    action1.reset
     sdlb.run(sdlConfig)
 
     // check results
@@ -569,7 +570,10 @@ class TestStateListener(options: Map[String,String]) extends StateListener {
 
 class TestUDFAddXCreator() extends SparkUDFCreator {
   override def get(options: Map[String, String]): UserDefinedFunction = {
-    udf((v: Int) => v + options("x").toInt)
+    udf((v: Int) => {
+      if (v==999) throw new IllegalStateException("failing streaming query on input value 999 for testing purposes")
+      else v + options("x").toInt
+    })
   }
 }
 

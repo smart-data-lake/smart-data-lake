@@ -22,10 +22,8 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.action.sparktransformer.DfTransformer
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
-
-import scala.util.Try
 
 abstract class SparkSubFeedAction extends SparkAction {
 
@@ -67,13 +65,10 @@ abstract class SparkSubFeedAction extends SparkAction {
     var inputSubFeed = ActionHelper.updateInputPartitionValues(input, SparkSubFeed.fromSubFeed(subFeed))
     // create output subfeed with transformed partition values
     var outputSubFeed = ActionHelper.updateOutputPartitionValues(output, inputSubFeed.toOutput(output.id), Some(transformPartitionValues))
-    // apply execution mode in init phase and store result
-    if (context.phase == ExecutionPhase.Init) {
-      executionModeResult = Try(
-        executionMode.flatMap(_.apply(id, input, output, inputSubFeed, transformPartitionValues))
-      ).recover { ActionHelper.getHandleExecutionModeExceptionPartialFunction(outputs) }
-    }
-    executionModeResult.get match { // throws exception if execution mode is Failure
+    // (re-)apply execution mode in init phase, streaming iteration or if not first action in pipeline (search for calls to resetExecutionResults for details)
+    if (executionModeResult.isEmpty) applyExecutionMode(input, output, inputSubFeed, transformPartitionValues)
+    // apply execution mode result
+    executionModeResult.get.get match { // throws exception if execution mode is Failure
       case Some(result) =>
         inputSubFeed = inputSubFeed.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false).breakLineage
         outputSubFeed = outputSubFeed.copy(partitionValues = result.outputPartitionValues, filter = result.filter).breakLineage

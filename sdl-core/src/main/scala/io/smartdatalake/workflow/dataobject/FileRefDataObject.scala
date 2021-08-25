@@ -76,7 +76,7 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
         val newFileName = if (f.fileName.matches(this.fileName.replace("*",".*"))) f.fileName
         else f.fileName + this.fileName.replace("*","")
         // prepend path and partition string before fileName
-        val newPath = getPartitionString(f.partitionValues.addKey(Environment.runIdPartitionColumnName, context.runId.toString))
+        val newPath = getPartitionString(f.partitionValues.addKey(Environment.runIdPartitionColumnName, context.executionId.runId.toString))
           .map(partitionString => getPath + separator + partitionString + newFileName)
           .getOrElse(getPath + separator + newFileName)
         f.copy(fullPath = newPath)

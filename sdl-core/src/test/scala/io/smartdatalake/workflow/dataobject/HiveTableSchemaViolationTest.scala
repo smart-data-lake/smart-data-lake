@@ -19,9 +19,9 @@
 package io.smartdatalake.workflow.dataobject
 
 import java.nio.file.Files
-
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.util.misc.{DataFrameUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.{ActionPipelineContext, SchemaViolationException}
@@ -37,7 +37,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val actionPipelineContext : ActionPipelineContext = ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
+  implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString

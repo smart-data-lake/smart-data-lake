@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,13 +16,14 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow
+package io.smartdatalake.util.dag
 
 import com.github.mdr.ascii.graph.Graph
+import io.smartdatalake.util.dag.DAGHelper.NodeId
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.DAGHelper.NodeId
 import monix.eval.Task
 import monix.execution.Scheduler
+
 import scala.annotation.tailrec
 import scala.reflect._
 import scala.util.{Failure, Success, Try}
@@ -73,14 +74,14 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
   /**
    * Create text representation of the graph by using an ASCII graph layout library
    */
-  override def toString: String = {
-    import com.github.mdr.ascii.layout._
+  def render(nodeToString: DAGNode => String): String = {
     val nodesLookup = sortedNodes.map( n => n.nodeId -> n).toMap
     val edges = incomingEdgesMap.values.flatMap {
       incomingEdges => incomingEdges.map(incomingEdge => (nodesLookup(incomingEdge.nodeIdFrom), nodesLookup(incomingEdge.nodeIdTo)))
     }
     val g = new Graph(vertices = sortedNodes.toSet, edges = edges.toList)
-    GraphLayout.renderGraph(g)
+    val renderingStrategy = new NodeRenderingStrategy(nodeToString)
+    GraphLayout.renderGraph(g, renderingStrategy)
   }
 
   /**

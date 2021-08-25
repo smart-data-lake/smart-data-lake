@@ -211,6 +211,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet)
 
     // prepare & start 2nd load
+    action.reset
     val l2 = Seq(("B","pan","peter",11)).toDF("type", "lastname", "firstname", "rating")
     val l2PartitionValues = Seq(PartitionValues(Map("type"->"B")))
     srcDO.writeDataFrame(l2, l2PartitionValues) // prepare testdata
@@ -294,7 +295,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     action1.postExec(Seq(srcSubFeed),resultSubFeeds)(session,contextExec)
 
     // simulate next run
-    action1.reset()
+    action1.reset
     action1.preInit(Seq(srcSubFeed), Seq())
     intercept[NoDataToProcessDontStopWarning](action1.init(Seq(srcSubFeed)))
   }
