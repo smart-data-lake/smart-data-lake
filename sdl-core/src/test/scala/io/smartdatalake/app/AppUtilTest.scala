@@ -59,7 +59,7 @@ class AppUtilTest extends FunSuite {
     assert(AppUtil.filterActionList("feeds:test1", actions1) == Set(actionA, actionC, actionD))
     assert(AppUtil.filterActionList("feeds:test.*", actions1) == Set(actionA, actionB, actionC, actionD))
     assert(AppUtil.filterActionList("feeds:test2", actions1) == Set(actionB))
-    assert(AppUtil.filterActionList("test1;", actions1) == Set(actionA, actionC, actionD)) // empty expression at the end
+    assert(AppUtil.filterActionList("test1,", actions1) == Set(actionA, actionC, actionD)) // empty expression at the end
     assert(AppUtil.filterActionList("|test1", actions1) == Set(actionA, actionC, actionD)) // operation without prefix
     assert(AppUtil.filterActionList("|feeds:test1", actions1) == Set(actionA, actionC, actionD)) // operation and prefix
   }
@@ -94,20 +94,20 @@ class AppUtilTest extends FunSuite {
   }
 
   test("filter action list with complex selector") {
-    assert(AppUtil.filterActionList("endWithDataObjectIds:do5;feeds:test1", actions1) == Set(actionA, actionB, actionC, actionD)) // union is default
-    assert(AppUtil.filterActionList("endWithDataObjectIds:do5;|feeds:test1", actions1) == Set(actionA, actionB, actionC, actionD)) // union
-    assert(AppUtil.filterActionList("endWithDataObjectIds:do5;&feeds:test1", actions1) == Set(actionA, actionC)) // intersection
-    assert(AppUtil.filterActionList("endWithDataObjectIds:do5;-feeds:test1", actions1) == Set(actionB)) // minus
+    assert(AppUtil.filterActionList("endWithDataObjectIds:do5,feeds:test1", actions1) == Set(actionA, actionB, actionC, actionD)) // union is default
+    assert(AppUtil.filterActionList("endWithDataObjectIds:do5,|feeds:test1", actions1) == Set(actionA, actionB, actionC, actionD)) // union
+    assert(AppUtil.filterActionList("endWithDataObjectIds:do5,&feeds:test1", actions1) == Set(actionA, actionC)) // intersection
+    assert(AppUtil.filterActionList("endWithDataObjectIds:do5,-feeds:test1", actions1) == Set(actionB)) // minus
   }
 
   test("filter action list with complex selector 2") {
-    assert(AppUtil.filterActionList("startFromDataObjectIds:do2;|layers:L3", actions1) == Set(actionC, actionD)) // union
-    assert(AppUtil.filterActionList("startFromDataObjectIds:do2;&layers:L3", actions1) == Set(actionD)) // intersection
-    assert(AppUtil.filterActionList("startFromDataObjectIds:do2;-layers:L3", actions1) == Set(actionC)) // minus
+    assert(AppUtil.filterActionList("startFromDataObjectIds:do2,|layers:L3", actions1) == Set(actionC, actionD)) // union
+    assert(AppUtil.filterActionList("startFromDataObjectIds:do2,&layers:L3", actions1) == Set(actionD)) // intersection
+    assert(AppUtil.filterActionList("startFromDataObjectIds:do2,-layers:L3", actions1) == Set(actionC)) // minus
   }
 
   test("filter action list with wrong operation") {
-    intercept[RuntimeException](AppUtil.filterActionList("endWithDataObjectIds:do5;+feeds:test1", actions1))
+    intercept[RuntimeException](AppUtil.filterActionList("endWithDataObjectIds:do5,+feeds:test1", actions1))
   }
 
 }
