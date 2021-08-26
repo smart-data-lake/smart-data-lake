@@ -53,7 +53,7 @@ import java.time.{Duration, LocalDateTime}
  */
 case class SmartDataLakeBuilderConfig(feedSel: String = null,
                                       applicationName: Option[String] = None,
-                                      configuration: Option[String] = None,
+                                      configuration: Option[Seq[String]] = None,
                                       master: Option[String] = None,
                                       deployMode: Option[String] = None,
                                       username: Option[String] = None,
@@ -129,8 +129,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     opt[String]('f', "feed-sel")
       .required
       .action( (arg, config) => config.copy(feedSel = arg) )
-      .text("""Select actions to execute by one or multiple expressions separated by semicolon (;). Results from multiple expressions are combined from left to right.
-          |Expression syntax: "<operation?><prefix:?><regex>"
+      .valueName("<operation?><prefix:?><regex>[,<operation?><prefix:?><regex>...]")
+      .text("""Select actions to execute by one or multiple expressions separated by comma (,). Results from multiple expressions are combined from left to right.
           |Operations:
           |- pipe symbol (|): the two sets are combined by union operation (default)
           |- ampersand symbol (&): the two sets are combined by intersection operation
@@ -145,33 +145,40 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
           |- 'startFromDataObjectIds': select actions which have an input DataObject with id is matched by regex pattern and any dependent action (=successors)
           |- 'endWithDataObjectIds': select actions which have an output DataObject with id is matched by regex pattern and their predecessors
           |All matching is done case-insensitive.
-          |Example: to filter action 'A' and its successors but only in layer L1 and L2, use the following pattern: "startFromActionIds:a;&layers:(l1|l2)"""".stripMargin)
+          |Example: to filter action 'A' and its successors but only in layer L1 and L2, use the following pattern: "startFromActionIds:a,&layers:(l1|l2)"""".stripMargin)
     opt[String]('n', "name")
       .action( (arg, config) => config.copy(applicationName = Some(arg)) )
       .text("Optional name of the application. If not specified feed-sel is used.")
-    opt[String]('c', "config")
+    opt[Seq[String]]('c', "config")
       .action( (arg, config) => config.copy(configuration = Some(arg)) )
+      .valueName("<file1>[,<file2>...]")
       .text("One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme \"cp\" which is treated as classpath entry.")
     opt[String]("partition-values")
       .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseSingleColArg(arg))))
-      .text(s"Partition values to process in format ${PartitionValues.singleColFormat}.")
+      .valueName(PartitionValues.singleColFormat)
+      .text(s"Partition values to process for one single partition column.")
     opt[String]("multi-partition-values")
       .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseMultiColArg(arg))))
-      .text(s"Multi partition values to process in format ${PartitionValues.multiColFormat}.")
-    opt[Boolean]('s', "streaming")
-      .action((arg, config) => config.copy(streaming = arg))
+      .valueName(PartitionValues.multiColFormat)
+      .text(s"Partition values to process for multiple partitoin columns.")
+    opt[Unit]('s', "streaming")
+      .action((_, config) => config.copy(streaming = true))
       .text(s"Enable streaming mode for continuous processing.")
     opt[Int]("parallelism")
       .action((arg, config) => config.copy(parallelism = arg))
+      .valueName("<int>")
       .text(s"Parallelism for DAG run.")
     opt[String]("state-path")
       .action((arg, config) => config.copy(statePath = Some(arg)))
+      .valueName("<path>")
       .text(s"Path to save run state files. Must be set to enable recovery in case of failures.")
-    opt[String]("override-jars")
-      .action((arg, config) => config.copy(overrideJars = Some(arg.split(','))))
-      .text("Comma separated list of jars for child-first class loader. The jars must be present in classpath.")
+    opt[Seq[String]]("override-jars")
+      .action((arg, config) => config.copy(overrideJars = Some(arg)))
+      .valueName("<jar1>[,<jar2>...]")
+      .text("Comma separated list of jar filenames for child-first class loader. The jars must be present in classpath.")
     opt[String]("test")
       .action((arg, config) => config.copy(test = Some(TestMode.withName(arg))))
+      .valueName("<config|dry-run>")
       .text("Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage")
     help("help").text("Display the help text.")
     version("version").text("Display version information.")
@@ -280,7 +287,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     // load config
     val config: Config = appConfig.configuration match {
-      case Some(configuration) => ConfigLoader.loadConfigFromFilesystem(configuration.split(',').map(_.trim).toSeq)
+      case Some(configuration) => ConfigLoader.loadConfigFromFilesystem(configuration.map(_.trim))
       case None => ConfigLoader.loadConfigFromClasspath
     }
     require(config.hasPath("actions"), s"No configuration parsed or it does not have a section called actions")
