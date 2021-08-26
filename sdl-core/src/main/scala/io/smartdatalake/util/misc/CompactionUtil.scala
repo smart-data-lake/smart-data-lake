@@ -19,6 +19,7 @@
 
 package io.smartdatalake.util.misc
 
+import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataobject._
@@ -100,7 +101,7 @@ object CompactionUtil extends SmartDataLakeLogger {
 
     // 4. Rewrite data from partitions to be compacted to temp path
     val dfRewrite = dataObject.getDataFrame(partitionValuesToCompact)
-    dataObject.writeDataFrameToPath(dfRewrite, tempPath) // if defined this uses DataObjects options for repartition definition, otherwise Spark default parameters/optimizations are applied.
+    dataObject.writeDataFrameToPath(dfRewrite, tempPath, SDLSaveMode.Overwrite) // if defined this uses DataObjects options for repartition definition, otherwise Spark default parameters/optimizations are applied.
     logger.info(s"(${dataObject.id}) partitions rewritten")
 
     // 5. Move compacted partitions

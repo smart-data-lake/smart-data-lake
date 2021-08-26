@@ -23,6 +23,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.workflow.SchemaViolationException
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.StructType
 
 /**
@@ -55,10 +56,12 @@ private[smartdatalake] trait SchemaValidation { this: DataObject =>
    * @throws SchemaViolationException is the `schemaMin` does not validate.
    */
   def validateSchemaMin(df: DataFrame, role: String): Unit = {
+    val caseSensitive = SQLConf.get.getConf(SQLConf.CASE_SENSITIVE)
     schemaMin.foreach { schemaExpected =>
       val missingCols = SchemaUtil.schemaDiff(schemaExpected, df.schema,
         ignoreNullable = Environment.schemaValidationIgnoresNullability,
-        deep = Environment.schemaValidationDeepComarison
+        deep = Environment.schemaValidationDeepComarison,
+        caseSensitive = caseSensitive
       )
       if (missingCols.nonEmpty) {
         throw new SchemaViolationException(
@@ -79,13 +82,16 @@ private[smartdatalake] trait SchemaValidation { this: DataObject =>
    * @throws SchemaViolationException is the `schemaMin` does not validate.
    */
   def validateSchema(df: DataFrame, schemaExpected: StructType, role: String): Unit = {
+    val caseSensitive = SQLConf.get.getConf(SQLConf.CASE_SENSITIVE)
     val missingCols = SchemaUtil.schemaDiff(schemaExpected, df.schema,
       ignoreNullable = Environment.schemaValidationIgnoresNullability,
-      deep = Environment.schemaValidationDeepComarison
+      deep = Environment.schemaValidationDeepComarison,
+      caseSensitive = caseSensitive
     )
     val superfluousCols = SchemaUtil.schemaDiff(df.schema, schemaExpected,
       ignoreNullable = Environment.schemaValidationIgnoresNullability,
-      deep = Environment.schemaValidationDeepComarison
+      deep = Environment.schemaValidationDeepComarison,
+      caseSensitive = caseSensitive
     )
     if (missingCols.nonEmpty || superfluousCols.nonEmpty) {
       throw new SchemaViolationException(

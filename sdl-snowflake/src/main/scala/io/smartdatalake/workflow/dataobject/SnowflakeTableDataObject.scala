@@ -22,6 +22,8 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.{SDLSaveMode, SaveModeOptions}
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil
@@ -38,7 +40,7 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
  * @param id           unique name of this data object
  * @param schemaMin    An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
  * @param table        Snowflake table to be written by this output
- * @param saveMode     spark [[SaveMode]] to use when writing files, default is "overwrite"
+ * @param saveMode     spark [[SDLSaveMode]] to use when writing files, default is "overwrite"
  * @param connectionId The SnowflakeTableConnection to use for the table
  * @param comment      An optional comment to add to the table after writing a DataFrame to it
  * @param metadata     meta data
@@ -46,7 +48,7 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     override val schemaMin: Option[StructType] = None,
                                     override var table: Table,
-                                    saveMode: SaveMode = SaveMode.Overwrite,
+                                    saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     connectionId: ConnectionId,
                                     comment: Option[String],
                                     override val metadata: Option[DataObjectMetadata] = None)
@@ -75,17 +77,17 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     df.colNamesLowercase
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     validateSchemaMin(df, "write")
-    writeDataFrame(df, createTableOnly = false, partitionValues)
+    writeDataFrame(df, createTableOnly = false, partitionValues, saveModeOptions)
   }
 
   /**
    * Writes DataFrame to Snowflake
    * Snowflake does not support explicit partitions, so any passed partition values are ignored
    */
-  def writeDataFrame(df: DataFrame, createTableOnly: Boolean, partitionValues: Seq[PartitionValues])
+  def writeDataFrame(df: DataFrame, createTableOnly: Boolean, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions])
                     (implicit session: SparkSession): Unit = {
     val dfPrepared = if (createTableOnly) {
       DataFrameUtil.getEmptyDataFrame(df.schema)
@@ -93,11 +95,12 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
       df
     }
 
+    val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
     dfPrepared.write
       .format(SNOWFLAKE_SOURCE_NAME)
       .options(connection.getSnowflakeOptions(table.db.get))
       .options(Map("dbtable" -> (connection.database + "." + table.fullName)))
-      .mode(saveMode)
+      .mode(finalSaveMode.asSparkSaveMode)
       .save()
 
     if (comment.isDefined) {
@@ -119,16 +122,10 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 
   override def dropTable(implicit session: SparkSession): Unit = throw new NotImplementedError()
 
-  /**
-   * @inheritdoc
-   */
   override def factory: FromConfigFactory[DataObject] = SnowflakeTableDataObject
 }
 
 object SnowflakeTableDataObject extends FromConfigFactory[DataObject] {
-  /**
-   * @inheritdoc
-   */
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SnowflakeTableDataObject = {
     extract[SnowflakeTableDataObject](config)
   }
