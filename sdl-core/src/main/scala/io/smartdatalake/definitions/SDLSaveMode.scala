@@ -18,7 +18,10 @@
  */
 package io.smartdatalake.definitions
 
-import org.apache.spark.sql.SaveMode
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
+import org.apache.spark.sql.functions.expr
+import org.apache.spark.sql.{Column, SaveMode}
+
 import scala.language.implicitConversions
 
 /**
@@ -71,6 +74,14 @@ object SDLSaveMode extends Enumeration {
    */
   val OverwriteOptimized: Value = Value("OverwriteOptimized")
 
+  /**
+   * Merge new data with existing data by insert new records and update (or delete) existing records.
+   * DataObjects need primary key defined to check if a record is new.
+   * To delete existing records add column '_deleted' to DataFrame and set its value to 'true' for the records which should be deleted.
+   *
+   * Note that only few DataObjects are able to merge new data, e.g. DeltaLakeTableDataObject and JdbcTableDataObject
+   */
+  val Merge: Value = Value("Merge")
 
   /* add implicit methods to enumeration, e.g. asSparkSaveMode */
   class SDLSaveModeValue(mode: Value) {
@@ -89,4 +100,38 @@ object SDLSaveMode extends Enumeration {
   }
   implicit def value2SparkSaveMode(mode: Value): SDLSaveModeValue = new SDLSaveModeValue(mode)
 
+}
+
+/**
+ * Override and control detailed behaviour of saveMode, especially SaveMode.Merge for now.
+ */
+sealed trait SaveModeOptions {
+  private[smartdatalake] def saveMode: SDLSaveMode
+}
+
+/**
+ * This class can be used to override save mode without further special parameters.
+ */
+case class SaveModeGenericOptions(override val saveMode: SDLSaveMode) extends SaveModeOptions
+
+/**
+ * Options to control detailed behaviour of SaveMode.Merge.
+ * In Spark expressions use table alias 'existing' to reference columns of the existing table data, and table alias 'new' to reference columns of new data set.
+ * @param deleteCondition A condition to control if matched records are deleted. If no condition is given, *no* records are delete.
+ * @param updateCondition A condition to control if matched records are updated. If no condition is given all matched records are updated.
+ *                        Note that delete is applied before update. Records selected for deletion are automatically excluded from the updates.
+ * @param additionalMergePredicate To optimize performance for SDLSaveMode.Merge it might be interesting to limit the records read from the existing table data, e.g. merge operation might use only the last 7 days.
+ */
+case class SaveModeMergeOptions(deleteCondition: Option[String] = None, updateCondition: Option[String] = None, additionalMergePredicate: Option[String] = None) extends SaveModeOptions {
+  override private[smartdatalake] val saveMode = SDLSaveMode.Merge
+  private[smartdatalake] val deleteConditionExpr = deleteCondition.map(expr)
+  private[smartdatalake] val updateConditionExpr = updateCondition.map(expr)
+  private[smartdatalake] val additionalMergePredicateExpr = additionalMergePredicate.map(expr)
+}
+object SaveModeMergeOptions {
+  def fromSaveModeOptions(saveModeOptions: SaveModeOptions): SaveModeMergeOptions = saveModeOptions match {
+    case m: SaveModeMergeOptions => m
+    case m: SaveModeGenericOptions if (m.saveMode == SDLSaveMode.Merge) => SaveModeMergeOptions()
+    case m => throw new IllegalStateException(s"Cannot convert ${m.getClass.getSimpleName} $m to SaveModeMergeOptions")
+  }
 }

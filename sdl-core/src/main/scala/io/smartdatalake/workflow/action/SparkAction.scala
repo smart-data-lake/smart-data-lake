@@ -20,6 +20,7 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions._
 import io.smartdatalake.metrics.{SparkStageMetricsListener, SparkStreamingQueryListener}
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -57,6 +58,11 @@ private[smartdatalake] abstract class SparkAction extends Action {
   def persist: Boolean
 
   override def isAsynchronous: Boolean = executionMode.exists(_.isAsynchronous)
+
+  /**
+   * Override and parametrize saveMode in output DataObject configurations when writing to DataObjects.
+   */
+  def saveModeOptions: Option[SaveModeOptions] = None
 
   override def getRuntimeDataImpl: RuntimeData = {
     // override runtime data implementation for SparkStreamingMode
@@ -200,7 +206,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
           val queryName = getStreamingQueryName(output.id)
           new SparkStreamingQueryListener(this, output.id, queryName, Some(firstProgressWaitLock)) // self-registering, listener will release firstProgressWaitLock after first progress event.
           // start streaming query
-          val streamingQueryLocalVal = output.writeStreamingDataFrame(subFeed.dataFrame.get, m.trigger, m.outputOptions, m.checkpointLocation, queryName, m.outputMode)
+          val streamingQueryLocalVal = output.writeStreamingDataFrame(subFeed.dataFrame.get, m.trigger, m.outputOptions, m.checkpointLocation, queryName, m.outputMode, saveModeOptions)
           // wait for first progress
           firstProgressWaitLock.acquire() // empty semaphore
           firstProgressWaitLock.acquire() // wait for SparkStreamingQueryListener releasing a sempahore permit
@@ -221,7 +227,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
         val queryName = getStreamingQueryName(output.id)
         new SparkStreamingQueryListener(this, output.id, queryName)
         // start streaming query - use Trigger.Once for synchronous one-time execution
-        val streamingQuery = output.writeStreamingDataFrame(subFeed.dataFrame.get, Trigger.Once, m.outputOptions, m.checkpointLocation, queryName, m.outputMode)
+        val streamingQuery = output.writeStreamingDataFrame(subFeed.dataFrame.get, Trigger.Once, m.outputOptions, m.checkpointLocation, queryName, m.outputMode, saveModeOptions)
         // wait for termination
         streamingQuery.awaitTermination
         val noData = streamingQuery.lastProgress.numInputRows == 0
@@ -239,7 +245,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
         assert(!preparedSubFeed.dataFrame.get.isStreaming, s"($id) Input from ${preparedSubFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingMode.getClass.getSimpleName}")
         assert(!preparedSubFeed.isDummy, s"($id) Input from ${preparedSubFeed.dataObjectId} is a dummy. Cannot write dummy DataFrame.")
         assert(!preparedSubFeed.isSkipped, s"($id) Input from ${preparedSubFeed.dataObjectId} is a skipped. Cannot write skipped DataFrame.")
-        output.writeDataFrame(preparedSubFeed.dataFrame.get, preparedSubFeed.partitionValues, isRecursiveInput)
+        output.writeDataFrame(preparedSubFeed.dataFrame.get, preparedSubFeed.partitionValues, isRecursiveInput, saveModeOptions)
         // return noData
         false
       case x => throw new IllegalStateException( s"($id) ExecutionMode $x is not supported")

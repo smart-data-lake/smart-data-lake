@@ -29,8 +29,6 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * A Transformer to use single DataFrame Transformers as multiple DataFrame Transformers.
  * This works by selecting the SubFeeds (DataFrames) the single DataFrame Transformer should be applied to.
  * All other SubFeeds will be passed through without transformation.
- * @param name Name of the transformation
- * @param description Description of the transformation
  * @param transformer Configuration for a DfTransformer to be applied
  * @param subFeedsToApply Names of SubFeeds the transformation should be applied to.
  */

@@ -18,17 +18,22 @@
  */
 package io.smartdatalake.workflow.connection
 
-import java.sql.{DriverManager, ResultSet, Statement, Connection => SqlConnection}
-
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{AuthMode, BasicAuthMode}
-import io.smartdatalake.util.misc.{SmartDataLakeLogger, TryWithResourcePool}
+import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger, TryWithResourcePool}
 import org.apache.commons.pool2.impl.{DefaultPooledObject, GenericObjectPool}
 import org.apache.commons.pool2.{BasePooledObjectFactory, PooledObject}
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.parser.CatalystSqlParser
+import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
+import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils.getJdbcType
+import org.apache.spark.sql.execution.datasources.jdbc.{JdbcOptionsInWrite, JdbcUtils}
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
+import org.apache.spark.sql.types.{DataType, StructType}
+
+import java.sql.{DriverManager, ResultSet, Statement, Connection => SqlConnection}
 
 /**
  * Connection information for jdbc tables.
@@ -43,7 +48,6 @@ import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
  *                               Note that Spark manages JDBC Connections on its own. This setting only applies to JDBC connection
  *                               used by SDL for validating metadata or pre/postSQL.
  * @param connectionPoolMaxIdleTimeSec timeout to close unused connections in the pool
- * @param metadata
  */
 case class JdbcTableConnection(override val id: ConnectionId,
                                url: String,
@@ -74,12 +78,14 @@ case class JdbcTableConnection(override val id: ConnectionId,
   /**
    * Get a JDBC connection from the pool, create a JDBC statement and execute an arbitrary function
    */
-  def execWithJdbcStatement[A]( func: Statement => A ): A = {
+  def execWithJdbcStatement[A](doCommit: Boolean = false)(func: Statement => A ): A = {
     execWithJdbcConnection { conn =>
       var stmt: Statement = null
       try {
         stmt = conn.createStatement
-        func(stmt)
+        val result = func(stmt)
+        if (doCommit) conn.commit()
+        result
       } finally {
         if (stmt != null) stmt.close()
       }
@@ -90,8 +96,8 @@ case class JdbcTableConnection(override val id: ConnectionId,
    * Execute an SQL statement
    * @return true if the first result is a ResultSet object; false if it is an update count or there are no results
    */
-  def execJdbcStatement(sql:String, logging: Boolean = true) : Boolean = {
-    execWithJdbcStatement { stmt =>
+  def execJdbcStatement(sql:String, logging: Boolean = true, doCommit: Boolean = false) : Boolean = {
+    execWithJdbcStatement(doCommit) { stmt =>
       if (logging) logger.info(s"execJdbcStatement: $sql")
       stmt.execute(sql)
     }
@@ -104,7 +110,7 @@ case class JdbcTableConnection(override val id: ConnectionId,
    * @return the evaluated result
    */
   def execJdbcQuery[A](sql:String, evalResultSet: ResultSet => A ) : A = {
-    execWithJdbcStatement { stmt =>
+    execWithJdbcStatement() { stmt =>
       var rs: ResultSet = null
       try {
         logger.info(s"execJdbcQuery: $sql")
@@ -133,6 +139,47 @@ case class JdbcTableConnection(override val id: ConnectionId,
       case m: BasicAuthMode => Map( "user" -> m.user, "password" -> m.password )
       case _ => throw new IllegalArgumentException(s"${authMode.getClass.getSimpleName} not supported.")
     } else Map()
+  }
+
+  /**
+   * Code partly copied from Spark:JdbcUtils to adapt schemaString method to not quote identifiers if Spark is in case-insensitive mode.
+   */
+  def createTableFromSchema(tableName: String, schema: StructType, rawOptions: Map[String,String])(implicit session: SparkSession): Unit = {
+    def schemaString(
+                      schema: StructType,
+                      caseSensitive: Boolean,
+                      url: String,
+                      createTableColumnTypes: Option[String] = None): String = {
+      val sb = new StringBuilder()
+      val dialect = JdbcDialects.get(url)
+      val userSpecifiedColTypesMap = createTableColumnTypes
+        .map(parseUserSpecifiedCreateTableColumnTypes(schema, caseSensitive, _))
+        .getOrElse(Map.empty[String, String])
+      schema.fields.foreach { field =>
+        // Change is here - dont quote if not case-sensitive and normal characters used:
+        val name = if(!caseSensitive && field.name.matches("[a-zA-Z0-9_]*")) field.name
+          else dialect.quoteIdentifier(field.name)
+        val typ = userSpecifiedColTypesMap
+          .getOrElse(field.name, getJdbcType(field.dataType, dialect).databaseTypeDefinition)
+        val nullable = if (field.nullable) "" else "NOT NULL"
+        sb.append(s", $name $typ $nullable")
+      }
+      if (sb.length < 2) "" else sb.substring(2)
+    }
+    def parseUserSpecifiedCreateTableColumnTypes(schema: StructType, caseSensitive: Boolean, createTableColumnTypes: String): Map[String, String] = {
+      val userSchema = CatalystSqlParser.parseTableSchema(createTableColumnTypes)
+      val userSchemaMap = userSchema.fields.map(f => f.name -> f.dataType.catalogString).toMap
+      if (caseSensitive) userSchemaMap else CaseInsensitiveMap(userSchemaMap)
+    }
+    val options =  new JdbcOptionsInWrite(url, tableName, rawOptions)
+    val strSchema = schemaString(schema, SchemaUtil.isSparkCaseSensitive, options.url, options.createTableColumnTypes)
+    val createTableOptions = options.createTableOptions
+    val sql = s"CREATE TABLE $tableName ($strSchema) $createTableOptions"
+    execJdbcStatement(sql)
+  }
+
+  def dropTable(tableName: String, logging: Boolean = true): Boolean = {
+    execJdbcStatement(s"drop table if exists $tableName", logging = logging)
   }
 
   // setup connection pool
@@ -179,20 +226,49 @@ private[smartdatalake] abstract class SQLCatalog(connection: JdbcTableConnection
   def removeQuotes(s: String) : String = {
     s.stripPrefix(quoteStart).stripSuffix(quoteEnd)
   }
+  // quote identifier for this database
+  def quoteIdentifier(s: String) : String = {
+    jdbcDialect.quoteIdentifier(s)
+  }
+
+  // convert Spark DataType to SQL type
+  def getSqlType(t: DataType, isNullable: Boolean = true): String = {
+    val sqlType = JdbcUtils.getJdbcType(t, jdbcDialect)
+    val nullable = if (!isNullable) " NOT NULL" else ""
+    s"${sqlType.databaseTypeDefinition}$nullable"
+  }
+
+  // create ddl to add a column
+  def getAddColumnSql(table: String, column: String, dataType: String): String = {
+    val sql = jdbcDialect.getAddColumnQuery(table, column, dataType)
+    // we need to fix column name quotation as many dialects always quote them, which is not optimal.
+    sql.replace(quoteIdentifier(column), column)
+  }
+
+  // create ddl to add alter column type
+  def getAlterColumnSql(table: String, column: String, sqlType: String): String = {
+    val sql = jdbcDialect.getUpdateColumnTypeQuery(table, column, sqlType)
+    // we need to fix column name quotation as many dialects always quote them, which is not optimal.
+    sql.replace(quoteIdentifier(column), column)
+  }
+
+  // create ddl to add alter column type
+  def getAlterColumnNullableSql(table: String, column: String, isNullable: Boolean = true): String = {
+    val sql = jdbcDialect.getUpdateColumnNullabilityQuery(table, column, isNullable)
+    // we need to fix column name quotation as many dialects always quote them, which is not optimal.
+    sql.replace(quoteIdentifier(column), column)
+  }
 
   def isDbExisting(db: String)(implicit session: SparkSession): Boolean
-  def isTableExisting(db: String, table: String)(implicit session: SparkSession): Boolean = {
-    val dbPrefix = if (db.equals("")) "" else db + "."
-    val tableExistsQuery = jdbcDialect.getTableExistsQuery(dbPrefix+table)
+  def isTableExisting(tableName: String)(implicit session: SparkSession): Boolean = {
+    val tableExistsQuery = jdbcDialect.getTableExistsQuery(tableName)
     try {
       connection.execJdbcStatement(tableExistsQuery, logging = false)
       true
-    }
-    catch {
-      case _: Throwable => {
-        logger.info("No access on table or table does not exist: " +dbPrefix+table)
+    } catch {
+      case _: Throwable =>
+        logger.debug("No access on table or table does not exist: " +tableName)
         false
-      }
     }
   }
 

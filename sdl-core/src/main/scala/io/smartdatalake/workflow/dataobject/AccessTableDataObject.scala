@@ -18,21 +18,19 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.io.File
-import java.sql.Timestamp
-
 import com.healthmarketscience.jackcess.DatabaseBuilder
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
+import java.io.File
+import java.sql.Timestamp
 import scala.collection.JavaConverters._
 
 /**
@@ -90,14 +88,15 @@ case class AccessTableDataObject(override val id: DataObjectId,
   }
 
   // FIXME for dev purposes only, to visualize to current problem with the [[net.ucanaccess.jdbc.UcanaccessDriver]]
-  def getDataFrameByFramework(doPersist:Boolean)(implicit session: SparkSession) : DataFrame = {
+  def getDataFrameByFramework(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext) : DataFrame = {
     val df = session.read
       .format("jdbc")
       .options(Map("url" -> s"jdbc:ucanaccess://$path",
         "driver" -> "net.ucanaccess.jdbc.UcanaccessDriver",
         "dbtable" -> table.name))
       .load()
-    DataFrameUtil.persistDfIfPossible(df, doPersist)
+    validateSchemaMin(df, "read")
+    df
   }
 
   override def isDbExisting(implicit session: SparkSession): Boolean = {

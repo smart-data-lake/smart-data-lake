@@ -18,18 +18,19 @@
  */
 package io.smartdatalake.workflow.action
 
-import java.nio.file.Files
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.PartitionDiffMode
+import io.smartdatalake.definitions.{PartitionDiffMode, SDLSaveMode, SaveModeGenericOptions}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, CustomDfTransformerConfig}
-import io.smartdatalake.workflow.action.sparktransformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer, ScalaClassDfTransformer, ScalaCodeDfTransformer}
+import io.smartdatalake.workflow.action.customlogic.CustomDfTransformer
+import io.smartdatalake.workflow.action.sparktransformer._
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed, SparkSubFeed}
 import org.apache.spark.sql.functions.{lit, substring}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
+
+import java.nio.file.Files
 
 class CopyActionTest extends FunSuite with BeforeAndAfter {
 
@@ -226,6 +227,57 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet ++ l2PartitionValues.toSet)
   }
 
+  // TODO
+  test("copy load with spark incremental mode and schema evolution") {
+
+    // setup DataObjects
+    val feed = "partitiondiff"
+    val srcTable = Table(Some("default"), "copy_input")
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, partitions = Seq("type"), numInitialHdfsPartitions = 1)
+    srcDO.dropTable
+    instanceRegistry.register(srcDO)
+    val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("type","lastname","firstname")))
+    val tgtDO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable, partitions = Seq("type"), numInitialHdfsPartitions = 1)
+    instanceRegistry.register(tgtDO)
+    tgtDO.dropTable
+
+    // prepare action
+    val action = CopyAction("a1", srcDO.id, tgtDO.id, executionMode = Some(PartitionDiffMode()))
+    val srcSubFeed = InitSubFeed("src1", Seq()) // InitSubFeed needed to test executionMode!
+
+    // prepare & start first load
+    val l1 = Seq(("A","doe","john",5)).toDF("type", "lastname", "firstname", "rating")
+    val l1PartitionValues = Seq(PartitionValues(Map("type"->"A")))
+    srcDO.writeDataFrame(l1, l1PartitionValues) // prepare testdata
+    action.preInit(Seq(srcSubFeed), Seq())
+    val initOutputSubFeeds = action.init(Seq(srcSubFeed))
+    action.preExec(Seq(srcSubFeed))
+    val tgtSubFeed1 = action.exec(Seq(srcSubFeed))(session,contextExec).head
+    action.postExec(Seq(srcSubFeed), Seq(tgtSubFeed1))
+
+    // check first load
+    assert(initOutputSubFeeds.head.asInstanceOf[SparkSubFeed].dataFrame.get.columns.last == "type", "partition columns must be moved last already in init phase")
+    assert(tgtSubFeed1.dataObjectId == tgtDO.id)
+    assert(tgtSubFeed1.partitionValues.toSet == l1PartitionValues.toSet)
+    assert(tgtDO.getDataFrame().count == 1)
+    assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet)
+
+    // prepare & start 2nd load
+    action.reset
+    val l2 = Seq(("B","pan","peter",11)).toDF("type", "lastname", "firstname", "rating")
+    val l2PartitionValues = Seq(PartitionValues(Map("type"->"B")))
+    srcDO.writeDataFrame(l2, l2PartitionValues) // prepare testdata
+    assert(srcDO.getDataFrame().count == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
+    action.init(Seq(srcSubFeed))
+    val tgtSubFeed2 = action.exec(Seq(srcSubFeed))(session,contextExec).head
+
+    // check 2nd load
+    assert(tgtSubFeed2.dataObjectId == tgtDO.id)
+    assert(tgtSubFeed2.partitionValues.toSet == l2PartitionValues.toSet)
+    assert(tgtDO.getDataFrame().count == 2)
+    assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet ++ l2PartitionValues.toSet)
+  }
+
   test("copy load with filter, additional columns and transformer options") {
 
     // setup DataObjects
@@ -300,6 +352,39 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     intercept[NoDataToProcessDontStopWarning](action1.init(Seq(srcSubFeed)))
   }
 
+  test("copy load force saveMode") {
+
+    // setup DataObjects
+    val feed = "copy"
+    val srcTable = Table(Some("default"), "copy_input")
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
+    instanceRegistry.register(srcDO)
+    val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("lastname","firstname")))
+    val tgtDO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), table = tgtTable, numInitialHdfsPartitions = 1, saveMode = SDLSaveMode.Append)
+    tgtDO.dropTable
+    instanceRegistry.register(tgtDO)
+
+    // prepare & start 1st load - force SaveMode.Overwrite instead of Append
+    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, saveModeOptions = Some(SaveModeGenericOptions(SDLSaveMode.Overwrite)))
+    val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
+    srcDO.writeDataFrame(l1, Seq())
+    val srcSubFeed = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe")),PartitionValues(Map("lastname" -> "jonson"))))
+    action1.exec(Seq(srcSubFeed))(session,contextExec).head
+
+    val r1 = tgtDO.getDataFrame()
+      .select($"rating")
+      .as[Int].collect().toSeq
+    assert(r1.toSet == Set(5,3))
+
+    // start 2nd load - data should be overwritten
+    action1.exec(Seq(srcSubFeed))(session,contextExec).head
+
+    val r2 = tgtDO.getDataFrame()
+      .select($"rating")
+      .as[Int].collect().toSeq
+    assert(r2.toSet == Set(5,3))
+  }
 }
 
 class TestDfTransformer extends CustomDfTransformer {

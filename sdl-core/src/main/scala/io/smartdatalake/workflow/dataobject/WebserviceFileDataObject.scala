@@ -207,7 +207,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
    * List partition values defined for this web service.
    * Note that this is a fixed list.
    */
-  override def listPartitions(implicit session: SparkSession): Seq[PartitionValues] = createAllPartitionValues
+  override def listPartitions(implicit session: SparkSession, context: ActionPipelineContext): Seq[PartitionValues] = createAllPartitionValues
 
   /**
    * No root path needed for Webservice. It can be included in webserviceOptions.url.

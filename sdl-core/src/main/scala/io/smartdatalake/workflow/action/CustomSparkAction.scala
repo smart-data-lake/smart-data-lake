@@ -60,7 +60,7 @@ case class CustomSparkAction (override val id: ActionId,
                               override val metadata: Option[ActionMetadata] = None,
                               recursiveInputIds: Seq[DataObjectId] = Seq(),
                               override val inputIdsToIgnoreFilter: Seq[DataObjectId] = Seq()
-)(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedsAction {
+                             )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedsAction {
 
   // checks
   recursiveInputIds.foreach(inputId => assert(outputIds.contains(inputId), s"($id) $inputId from recursiveInputIds is not listed in outputIds of the same action."))
@@ -79,7 +79,7 @@ case class CustomSparkAction (override val id: ActionId,
 
     // Apply custom transformation to all subfeeds
     val partitionValues = mainInputSubFeed.map(_.partitionValues).getOrElse(Seq())
-    applyTransformers(transformers ++ transformer.map(_.impl).toSeq, partitionValues, inputSubFeeds, outputSubFeeds)
+    applyTransformers(transformers ++ transformer.map(_.impl), partitionValues, inputSubFeeds, outputSubFeeds)
   }
 
   override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
