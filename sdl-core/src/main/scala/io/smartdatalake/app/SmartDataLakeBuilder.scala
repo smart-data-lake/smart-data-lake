@@ -18,20 +18,21 @@
  */
 package io.smartdatalake.app
 
-import java.io.File
-import java.time.LocalDateTime
 import com.typesafe.config.Config
-import configs.Result.Try
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.dag.{DAGException, ExceptionSeverity}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SmartDataLakeLogger}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
-import io.smartdatalake.workflow.action.{ResultRuntimeInfo, RuntimeEventState, RuntimeInfo, SparkAction}
+import io.smartdatalake.workflow.action.{Action, RuntimeInfo, SDLExecutionId, SparkAction}
 import org.apache.spark.sql.SparkSession
 import scopt.OptionParser
+
+import java.io.File
+import java.time.{Duration, LocalDateTime}
 
 /**
  * This case class represents a default configuration for the App.
@@ -52,7 +53,7 @@ import scopt.OptionParser
  */
 case class SmartDataLakeBuilderConfig(feedSel: String = null,
                                       applicationName: Option[String] = None,
-                                      configuration: Option[String] = None,
+                                      configuration: Option[Seq[String]] = None,
                                       master: Option[String] = None,
                                       deployMode: Option[String] = None,
                                       username: Option[String] = None,
@@ -63,13 +64,15 @@ case class SmartDataLakeBuilderConfig(feedSel: String = null,
                                       parallelism: Int = 1,
                                       statePath: Option[String] = None,
                                       overrideJars: Option[Seq[String]] = None,
-                                      test: Option[TestMode.Value] = None
+                                      test: Option[TestMode.Value] = None,
+                                      streaming: Boolean = false
                                 ) {
   def validate(): Unit = {
     assert(!applicationName.exists(_.contains({HadoopFileActionDAGRunStateStore.fileNamePartSeparator})), s"Application name must not contain character '${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}' ($applicationName)")
     assert(!master.contains("yarn") || deployMode.nonEmpty, "spark deploy-mode must be set if spark master=yarn")
     assert(partitionValues.isEmpty || multiPartitionValues.isEmpty, "partitionValues and multiPartitionValues cannot be defined at the same time")
     assert(statePath.isEmpty || applicationName.isDefined, "application name must be defined if state path is set")
+    assert(!streaming || statePath.isDefined, "state path must be set if streaming is enabled")
   }
   def getPartitionValues: Option[Seq[PartitionValues]] = partitionValues.orElse(multiPartitionValues)
   val appName: String = applicationName.getOrElse(feedSel)
@@ -126,8 +129,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     opt[String]('f', "feed-sel")
       .required
       .action( (arg, config) => config.copy(feedSel = arg) )
-      .text("""Select actions to execute by one or multiple expressions separated by semicolon (;). Results from multiple expressions are combined from left to right.
-          |Expression syntax: "<operation?><prefix:?><regex>"
+      .valueName("<operation?><prefix:?><regex>[,<operation?><prefix:?><regex>...]")
+      .text("""Select actions to execute by one or multiple expressions separated by comma (,). Results from multiple expressions are combined from left to right.
           |Operations:
           |- pipe symbol (|): the two sets are combined by union operation (default)
           |- ampersand symbol (&): the two sets are combined by intersection operation
@@ -142,30 +145,40 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
           |- 'startFromDataObjectIds': select actions which have an input DataObject with id is matched by regex pattern and any dependent action (=successors)
           |- 'endWithDataObjectIds': select actions which have an output DataObject with id is matched by regex pattern and their predecessors
           |All matching is done case-insensitive.
-          |Example: to filter action 'A' and its successors but only in layer L1 and L2, use the following pattern: "startFromActionIds:a;&layers:(l1|l2)"""".stripMargin)
+          |Example: to filter action 'A' and its successors but only in layer L1 and L2, use the following pattern: "startFromActionIds:a,&layers:(l1|l2)"""".stripMargin)
     opt[String]('n', "name")
       .action( (arg, config) => config.copy(applicationName = Some(arg)) )
       .text("Optional name of the application. If not specified feed-sel is used.")
-    opt[String]('c', "config")
+    opt[Seq[String]]('c', "config")
       .action( (arg, config) => config.copy(configuration = Some(arg)) )
+      .valueName("<file1>[,<file2>...]")
       .text("One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme \"cp\" which is treated as classpath entry.")
     opt[String]("partition-values")
       .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseSingleColArg(arg))))
-      .text(s"Partition values to process in format ${PartitionValues.singleColFormat}.")
+      .valueName(PartitionValues.singleColFormat)
+      .text(s"Partition values to process for one single partition column.")
     opt[String]("multi-partition-values")
       .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseMultiColArg(arg))))
-      .text(s"Multi partition values to process in format ${PartitionValues.multiColFormat}.")
+      .valueName(PartitionValues.multiColFormat)
+      .text(s"Partition values to process for multiple partitoin columns.")
+    opt[Unit]('s', "streaming")
+      .action((_, config) => config.copy(streaming = true))
+      .text(s"Enable streaming mode for continuous processing.")
     opt[Int]("parallelism")
       .action((arg, config) => config.copy(parallelism = arg))
+      .valueName("<int>")
       .text(s"Parallelism for DAG run.")
     opt[String]("state-path")
       .action((arg, config) => config.copy(statePath = Some(arg)))
+      .valueName("<path>")
       .text(s"Path to save run state files. Must be set to enable recovery in case of failures.")
-    opt[String]("override-jars")
-      .action((arg, config) => config.copy(overrideJars = Some(arg.split(','))))
-      .text("Comma separated list of jars for child-first class loader. The jars must be present in classpath.")
+    opt[Seq[String]]("override-jars")
+      .action((arg, config) => config.copy(overrideJars = Some(arg)))
+      .valueName("<jar1>[,<jar2>...]")
+      .text("Comma separated list of jar filenames for child-first class loader. The jars must be present in classpath.")
     opt[String]("test")
       .action((arg, config) => config.copy(test = Some(TestMode.withName(arg))))
+      .valueName("<config|dry-run>")
       .text("Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage")
     help("help").text("Display the help text.")
     version("version").text("Display version information.")
@@ -209,7 +222,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
           assert(appConfig == latestRunState.appConfig, s"There is a failed run to be recovered. Either you clean-up this state fail or the command line parameters given must match the parameters of the run to be recovered (${latestRunState.appConfig}")
           recoverRun(appConfig, stateStore, latestRunState)._2
         } else {
-          startRun(appConfig, runId = latestRunState.runId+1, dataObjectsState = latestRunState.getDataObjectsState, stateStore = Some(stateStore))._2
+          val nextExecutionId = SDLExecutionId(latestRunState.runId + 1)
+          startRun(appConfig, executionId = nextExecutionId, dataObjectsState = latestRunState.getDataObjectsState, stateStore = Some(stateStore))._2
         }
       } else {
         startRun(appConfig, stateStore = Some(stateStore))._2
@@ -229,14 +243,15 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     logger.info(s"recovering application ${appConfig.applicationName.get} runId=${runState.runId} lastAttemptId=${runState.attemptId}")
     // skip all succeeded actions
     val actionsToSkip = runState.actionsState
-      .filter { case (id,info) => info.hasCompleted() }
+      .filter { case (id,info) => info.hasCompleted }
     val initialSubFeeds = actionsToSkip.flatMap(_._2.results.map(_.subFeed)).toSeq
     // get latest DataObject state and overwrite with current DataObject state
     val lastStateId = stateStore.getLatestStateId(Some(runState.runId-1))
     val lastRunState = lastStateId.map(stateStore.recoverRunState)
     val dataObjectsState = (lastRunState.map(_.getDataObjectsState.map(_.getEntry).toMap).getOrElse(Map()) ++ runState.getDataObjectsState.map(_.getEntry).toMap).values.toSeq
     // start run, increase attempt counter
-    startRun(runState.appConfig, runState.runId, runState.attemptId+1, runState.runStartTime, actionsToSkip = actionsToSkip, initialSubFeeds = initialSubFeeds, dataObjectsState = dataObjectsState, stateStore = Some(stateStore))
+    val recoveryExecutionId = SDLExecutionId(runState.runId, runState.attemptId + 1)
+    startRun(runState.appConfig, recoveryExecutionId, runState.runStartTime, actionsToSkip = actionsToSkip, initialSubFeeds = initialSubFeeds, dataObjectsState = dataObjectsState, stateStore = Some(stateStore))
   }
 
   /**
@@ -252,7 +267,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * @return tuple of list of final subfeeds and statistics (action count per RuntimeEventState)
    */
   def startSimulation(appConfig: SmartDataLakeBuilderConfig, initialSubFeeds: Seq[SparkSubFeed], dataObjectsState: Seq[DataObjectState] = Seq())(implicit instanceRegistry: InstanceRegistry, session: SparkSession): (Seq[SparkSubFeed], Map[RuntimeEventState,Int]) = {
-    val (subFeeds, stats) = exec(appConfig, runId = 1, attemptId = 1, runStartTime = LocalDateTime.now, attemptStartTime = LocalDateTime.now, actionsToSkip = Map(), initialSubFeeds = initialSubFeeds, dataObjectsState = dataObjectsState, stateStore = None, stateListeners = Seq(), simulation = true)
+    val (subFeeds, stats) = exec(appConfig, SDLExecutionId.executionId1, runStartTime = LocalDateTime.now, attemptStartTime = LocalDateTime.now, actionsToSkip = Map(), initialSubFeeds = initialSubFeeds, dataObjectsState = dataObjectsState, stateStore = None, stateListeners = Seq(), simulation = true)
     (subFeeds.map(_.asInstanceOf[SparkSubFeed]), stats)
   }
 
@@ -260,19 +275,19 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * Start run.
    * @return tuple of list of final subfeeds and statistics (action count per RuntimeEventState)
    */
-  private[smartdatalake] def startRun(appConfig: SmartDataLakeBuilderConfig, runId: Int = 1, attemptId: Int = 1, runStartTime: LocalDateTime = LocalDateTime.now, attemptStartTime: LocalDateTime = LocalDateTime.now, actionsToSkip: Map[ActionId, RuntimeInfo] = Map(), initialSubFeeds: Seq[SubFeed] = Seq(), dataObjectsState: Seq[DataObjectState] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, simulation: Boolean = false) : (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
+  private[smartdatalake] def startRun(appConfig: SmartDataLakeBuilderConfig, executionId: SDLExecutionId = SDLExecutionId.executionId1, runStartTime: LocalDateTime = LocalDateTime.now, attemptStartTime: LocalDateTime = LocalDateTime.now, actionsToSkip: Map[ActionId, RuntimeInfo] = Map(), initialSubFeeds: Seq[SubFeed] = Seq(), dataObjectsState: Seq[DataObjectState] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, simulation: Boolean = false) : (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
 
     // validate application config
     appConfig.validate()
 
     // log start parameters
-    logger.info(s"Starting run: runId=$runId attemptId=$attemptId feedSel=${appConfig.feedSel} appName=${appConfig.appName} test=${appConfig.test} givenPartitionValues=${appConfig.getPartitionValues.map(x => "("+x.mkString(",")+")").getOrElse("None")}")
+    logger.info(s"Starting run: runId=${executionId.runId} attemptId=${executionId.attemptId} feedSel=${appConfig.feedSel} appName=${appConfig.appName} streaming=${appConfig.streaming} test=${appConfig.test} givenPartitionValues=${appConfig.getPartitionValues.map(x => "("+x.mkString(",")+")").getOrElse("None")}")
     logger.debug(s"Environment: " + sys.env.map(x => x._1 + "=" + x._2).mkString(" "))
     logger.debug(s"System properties: " + sys.props.toMap.map(x => x._1 + "=" + x._2).mkString(" "))
 
     // load config
     val config: Config = appConfig.configuration match {
-      case Some(configuration) => ConfigLoader.loadConfigFromFilesystem(configuration.split(',').map(_.trim).toSeq)
+      case Some(configuration) => ConfigLoader.loadConfigFromFilesystem(configuration.map(_.trim))
       case None => ConfigLoader.loadConfigFromClasspath
     }
     require(config.hasPath("actions"), s"No configuration parsed or it does not have a section called actions")
@@ -281,16 +296,16 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // parse config objects
     Environment._instanceRegistry = ConfigParser.parse(config, instanceRegistry) // share instance registry for custom code
     Environment._globalConfig = GlobalConfig.from(config)
-    val stateListeners = Environment._globalConfig.stateListeners.map(_.listener)
+    val stateListeners = Environment._globalConfig.stateListeners.map(_.listener) ++ Environment._additionalStateListeners
 
     // create Spark Session
     val session: SparkSession = Environment._globalConfig.createSparkSession(appConfig.appName, appConfig.master, appConfig.deployMode)
     LogUtil.setLogLevel(session.sparkContext)
 
-    exec(appConfig, runId, attemptId, runStartTime, attemptStartTime, actionsToSkip, initialSubFeeds, dataObjectsState, stateStore, stateListeners, simulation)(Environment._instanceRegistry, session)
+    exec(appConfig, executionId, runStartTime, attemptStartTime, actionsToSkip, initialSubFeeds, dataObjectsState, stateStore, stateListeners, simulation)(Environment._instanceRegistry, session)
   }
 
-  private[smartdatalake] def exec(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime, actionsToSkip: Map[ActionId, RuntimeInfo], initialSubFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener], simulation: Boolean)(implicit instanceRegistry: InstanceRegistry, session: SparkSession) : (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
+  private[smartdatalake] def exec(appConfig: SmartDataLakeBuilderConfig, executionId: SDLExecutionId, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime, actionsToSkip: Map[ActionId, RuntimeInfo], initialSubFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener], simulation: Boolean)(implicit instanceRegistry: InstanceRegistry, session: SparkSession) : (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
 
     // select actions by feedSel
     val actionsSelected = AppUtil.filterActionList(appConfig.feedSel, instanceRegistry.getActions.toSet).toSeq
@@ -312,33 +327,98 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     logger.info(s"actions to execute ${actionsToExec.map(_.id).mkString(", ")}" + (if (actionIdsSkipped.nonEmpty) s"; actions skipped ${actionIdsSkipped.mkString(", ")}" else ""))
 
     // create and execute DAG
-    logger.info(s"starting application ${appConfig.appName} runId=$runId attemptId=$attemptId")
-    implicit val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appConfig.appName, runId, attemptId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig, runStartTime, attemptStartTime, simulation)
-    val actionDAGRun = ActionDAGRun(actionsToExec, runId, attemptId, actionsToSkip, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)
+    logger.info(s"starting application ${appConfig.appName} runId=${executionId.runId} attemptId=${executionId.attemptId}")
+    val context: ActionPipelineContext = ActionPipelineContext(appConfig.feedSel, appConfig.appName, executionId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig, runStartTime, attemptStartTime, simulation, actionsSelected = actionIdsSelected, actionsSkipped = actionIdsSkipped)
+    val actionDAGRun = ActionDAGRun(actionsToExec, actionsToSkip, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(session,context)
     val finalSubFeeds = try {
       if (simulation) {
         require(actionsToExec.forall(_.isInstanceOf[SparkAction]), s"Simulation needs all selected actions to be instances of SparkAction. This is not the case for ${actionsToExec.filterNot(_.isInstanceOf[SparkAction]).map(_.id).mkString(", ")}")
-        actionDAGRun.init
+        actionDAGRun.init(session,context)
       } else {
-        actionDAGRun.prepare
-        actionDAGRun.init
+        actionDAGRun.prepare(session,context)
+        actionDAGRun.init(session,context)
         if (appConfig.isDryRun) { // stop here if only dry-run
           logger.info(s"${appConfig.test.get}-Test successful")
           return (Seq(), Map())
         }
-        val subFeeds = actionDAGRun.exec
-        subFeeds
+        execActionDAG(actionDAGRun, actionsSelected, context)
       }
     } catch {
       // don't fail on not severe exceptions like having no data to process
-      case ex: DAGException if (ex.severity >= ExceptionSeverity.SKIPPED) =>
+      case ex: DAGException if ex.severity >= ExceptionSeverity.SKIPPED =>
         logger.warn(s"At least one action is ${ex.severity}")
         Seq()
-    } finally {
-      actionDAGRun.saveState(true)
     }
 
     // return result statistics as string
     (finalSubFeeds, actionDAGRun.getStatistics)
+  }
+
+  def execActionDAG(actionDAGRun: ActionDAGRun, actionsSelected: Seq[Action], context: ActionPipelineContext, lastStartTime: Option[LocalDateTime] = None)(implicit session: SparkSession): Seq[SubFeed] = {
+
+    // handle skipped actions for next execution of streaming mode
+    if (context.appConfig.streaming && lastStartTime.nonEmpty && context.actionsSkipped.nonEmpty) {
+      // we have to recreate the action DAG if there are skipped actions in the original DAG
+      val newContext = context.copy(actionsSkipped = Seq())
+      val newDag = ActionDAGRun(actionsSelected, Map[ActionId, RuntimeInfo](), context.appConfig.getPartitionValues.getOrElse(Seq()), context.appConfig.parallelism, actionDAGRun.initialSubFeeds, actionDAGRun.initialDataObjectsState, actionDAGRun.stateStore, actionDAGRun.stateListeners)(session, newContext)
+      execActionDAG(newDag, actionsSelected, newContext)
+    }
+
+    // wait for trigger interval
+    lastStartTime.foreach { t =>
+      val nextStartTime = t.plusSeconds(Environment.globalConfig.synchronousStreamingTriggerIntervalSec)
+      val waitTimeSec = Duration.between(LocalDateTime.now, nextStartTime).getSeconds
+      if (waitTimeSec>0) {
+        logger.info(s"sleeping $waitTimeSec seconds for synchronous streaming trigger interval")
+        Thread.sleep(waitTimeSec * 1000)
+      }
+    }
+
+    // execute DAG
+    val startTime = LocalDateTime.now
+    var subFeeds = try {
+      actionDAGRun.exec(session, context)
+    } finally {
+      actionDAGRun.saveState(true)(session, context)
+    }
+
+    // Iterate execution in streaming mode
+    if (context.appConfig.streaming) {
+      if (actionsSelected.exists(!_.isAsynchronous)) {
+        // if there are synchronous actions, we re-execute the dag
+        if (!Environment.stopStreamingGracefully) {
+          // increment runId
+          val newContext = context.incrementRunId
+          // reset execution result before new execution
+          actionsSelected.foreach(_.resetExecutionResult())
+          // remove spark caches so that new data is read in next iteration
+          //TODO: in the future it might be interesting to keep some DataFrames cached for performance reason...
+          session.sqlContext.clearCache()
+          // iterate execution
+          // note that this re-executes also asynchronous actions - they have to handle by themself that they are already started
+          subFeeds = execActionDAG(actionDAGRun.copy(executionId = newContext.executionId), actionsSelected, newContext, Some(startTime))
+        } else {
+          if (actionsSelected.exists(_.isAsynchronous)) {
+            // stop active streaming queries
+            session.streams.active.foreach(_.stop)
+            // if there were exceptions, throw first one
+            session.streams.awaitAnyTermination() // using awaitAnyTermination is the easiest way to throw exception of first streaming query terminated
+          }
+          // otherwise everything went smooth
+          logger.info("Stopped streaming gracefully")
+        }
+      } else {
+        // if there are no synchronous actions, we wait for termination of asynchronous streaming queries (if we don't wait, the main process will end and kill the streaming query threads...)
+        if (!Environment.stopStreamingGracefully) {
+          session.streams.awaitAnyTermination()
+          session.streams.active.foreach(_.stop) // stopping other streaming queries gracefully
+          actionDAGRun.saveState(true)(session, context) // notify about this asynchronous iteration
+        } else {
+          session.streams.active.foreach(_.stop)
+          logger.info("Stopped streaming gracefully")
+        }
+      }
+    }
+    subFeeds
   }
 }

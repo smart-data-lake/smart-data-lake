@@ -19,14 +19,12 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.definitions.{Environment, ExecutionMode, SDLSaveMode}
+import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
-import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow._
-import org.apache.spark.sql.{SaveMode, SparkSession}
-
-import scala.util.Try
+import io.smartdatalake.workflow.dataobject._
+import org.apache.spark.sql.SparkSession
 
 abstract class FileSubFeedAction extends Action {
 
@@ -73,14 +71,10 @@ abstract class FileSubFeedAction extends Action {
     var inputSubFeed = ActionHelper.updateInputPartitionValues(input, FileSubFeed.fromSubFeed(subFeed))
     // create output subfeed
     var outputSubFeed = ActionHelper.updateOutputPartitionValues(output, inputSubFeed.toOutput(output.id))
-    // apply execution mode in init phase and store result
-    if (context.phase == ExecutionPhase.Init) {
-      executionModeResult = Try(
-        executionMode.flatMap(_.apply(id, input, output, inputSubFeed, PartitionValues.oneToOneMapping))
-      ).recover { ActionHelper.getHandleExecutionModeExceptionPartialFunction(outputs) }
-    }
-    // apply execution mode & prepare output partitions
-    executionModeResult.get match { // throws exception if execution mode is Failure
+    // (re-)apply execution mode in init phase, streaming iteration or if not first action in pipeline (search for calls to resetExecutionResults for details)
+    if (executionModeResult.isEmpty) applyExecutionMode(input, output, inputSubFeed, PartitionValues.oneToOneMapping)
+    // apply execution mode result
+    executionModeResult.get.get match { // throws exception if execution mode is Failure
       case Some(result) =>
         inputSubFeed = inputSubFeed.copy(partitionValues = result.inputPartitionValues, fileRefs = result.fileRefs, isSkipped = false).breakLineage
         outputSubFeed = outputSubFeed.copy(partitionValues = result.outputPartitionValues).breakLineage
@@ -138,8 +132,8 @@ abstract class FileSubFeedAction extends Action {
     logger.info(s"($id) finished writing files to ${output.id}: duration=$d files_written=$filesWritten")
     // make sure empty partitions are created as well
     output.createMissingPartitions(outputSubFeed.partitionValues)
-    // send metric to action (for file subfeeds this has to be done manually while spark subfeeds get's the metrics via a spark events listener)
-    onRuntimeMetrics(Some(output.id), GenericMetrics(s"$id-${output.id}", 1, Map("duration"->d, "files_written"->filesWritten)))
+    // send metric to action (for file subfeeds this has to be done manually while spark subfeeds get's the metrics via spark events listener)
+    addRuntimeMetrics(Some(context.executionId), Some(output.id), GenericMetrics(s"$id-${output.id}", 1, Map("duration"->d, "files_written"->filesWritten)))
     // update subFeed
     Seq(transformedSubFeed)
   }

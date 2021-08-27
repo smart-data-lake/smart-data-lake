@@ -19,12 +19,10 @@
 
 package io.smartdatalake.util.misc
 
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.DefaultExecutionModeExpressionData
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions.udf
@@ -34,8 +32,8 @@ class SparkExpressionUtilTest extends FunSuite {
 
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
 
-  private val registry = new InstanceRegistry
-  private val context = ActionPipelineContext("testFeed", "testApp", 1, 1, registry, None, SmartDataLakeBuilderConfig())
+  private implicit val registry: InstanceRegistry = new InstanceRegistry
+  private val context = TestUtil.getDefaultActionPipelineContext
   private val data = DefaultExecutionModeExpressionData.from(context)
 
   test("evaluate boolean") {
@@ -46,12 +44,12 @@ class SparkExpressionUtilTest extends FunSuite {
 
   test("evaluate string") {
     val result = SparkExpressionUtil.evaluateString(DataObjectId("test"), Some("testCondition"), "concat(feed, '-', application)", data)
-    assert(result.contains("testFeed-testApp"))
+    assert(result.contains("feedTest-appTest"))
   }
 
   test("substitute tokens") {
     val result = SparkExpressionUtil.substitute(DataObjectId("test"), Some("testCondition"), "hello %{concat(feed, '-', application)}, lets make %{runId + attemptId}", data)
-    assert(result.contains("hello testFeed-testApp, lets make 2"))
+    assert(result.contains("hello feedTest-appTest, lets make 2"))
   }
 
   test("substitute options") {

@@ -17,6 +17,19 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.metrics
+package io.smartdatalake.workflow.action
 
-case class NoMetricsFoundException(msg: String) extends RuntimeException(msg)
+import org.scalatest.FunSuite
+
+class ExecutionIdTest extends FunSuite {
+
+  test("SDLExecutionId Ordering") {
+    assert(SDLExecutionId(1,1) < SDLExecutionId(1,2))
+    assert(SDLExecutionId(1,2) < SDLExecutionId(2,1))
+  }
+
+  test("SparkStreamingExecutionId Ordering") {
+    assert(SparkStreamingExecutionId(1) < SparkStreamingExecutionId(2))
+  }
+
+}

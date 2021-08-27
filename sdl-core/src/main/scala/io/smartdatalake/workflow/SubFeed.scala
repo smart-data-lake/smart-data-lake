@@ -19,6 +19,7 @@
 package io.smartdatalake.workflow
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.util.dag.{DAG, DAGResult}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{DataFrameUtil, SmartDataLakeLogger}
