@@ -1,0 +1,180 @@
+<!--
+  ~ Smart Data Lake Examples - Build your data lake the smart way.
+  ~
+  ~ Copyright © 2019 ELCA Informatique SA (<https://www.elca.ch>)
+  ~
+  ~ This program is free software: you can redistribute it and/or modify
+  ~ it under the terms of the GNU General Public License as published by
+  ~ the Free Software Foundation, either version 3 of the License, or
+  ~ (at your option) any later version.
+  ~
+  ~ This program is distributed in the hope that it will be useful,
+  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ~ GNU General Public License for more details.
+  ~
+  ~ You should have received a copy of the GNU General Public License
+  ~ along with this program. If not, see <http://www.gnu.org/licenses/>.
+  -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<!--
+	  By setting sdl-parent as parent you get proper dependency management for Spark and predefined plugin management
+	  Alternatively you could import Spark dependency management from sdl-parent with scope=import (or also directly from spark-parent),
+	  and need to copy all version properties from sdl-parent.pom into this pom.
+	-->
+	<parent>
+		<groupId>io.smartdatalake</groupId>
+		<artifactId>sdl-parent</artifactId>
+		<!--
+		  Set the smartdatalake version to use here.
+		  If version cannot be resolved, make sure maven central repository is defined in settings.xml and the corresponding profile activated.
+		-->
+		<version>2.1.0</version>
+	</parent>
+
+	<groupId>com.company.app</groupId>
+	<artifactId>app-template</artifactId>
+	<version>1.0</version>
+
+	<name>Template Data Lake</name>
+
+	<properties>
+		<!-- default scala version - use predefined maven profiles to override -->
+		<scala.minor.version>2.12</scala.minor.version>
+		<scala.version>${scala.minor.version}.12</scala.version>
+	</properties>
+
+	<build>
+		<sourceDirectory>src/main/scala</sourceDirectory>
+		<outputDirectory>target</outputDirectory>
+		<plugins>
+			<!-- Compiles Scala sources. -->
+			<plugin>
+				<groupId>net.alchim31.maven</groupId>
+				<artifactId>scala-maven-plugin</artifactId>
+			</plugin>
+
+			<!-- Copies files in resources folders to target folder. -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-resources-plugin</artifactId>
+			</plugin>
+
+			<!-- Creates the jar without dependencies -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+			</plugin>
+
+			<!-- Checks for declared but unused and undeclared but used dependencies in the verify stage -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+			</plugin>
+
+			<!-- check for dependency version conflicts -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-enforcer-plugin</artifactId>
+			</plugin>
+
+			<!-- disable sign artifacts with gpg -->
+			<!-- TODO: move to profile in sdl-parent pom -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-gpg-plugin</artifactId>
+				<version>1.6</version>
+				<configuration>
+					<skip>true</skip>
+				</configuration>
+			</plugin>
+
+		</plugins>
+	</build>
+
+	<dependencies>
+
+		<dependency>
+			<groupId>io.smartdatalake</groupId>
+			<artifactId>sdl-core_${scala.minor.version}</artifactId>
+			<version>${project.parent.version}</version>
+		</dependency>
+
+		<!-- override scope for spark dependencies to include/exclude them correctly for the fat-jar -->
+		<!-- note that the corresponding profile defining spark.deps.scope is inherited from sdl-parent -->
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-core_${scala.minor.version}</artifactId>
+			<version>${spark.version}</version>
+			<scope>${spark.deps.scope}</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-sql_${scala.minor.version}</artifactId>
+			<version>${spark.version}</version>
+			<scope>${spark.deps.scope}</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-hive_${scala.minor.version}</artifactId>
+			<version>${spark.version}</version>
+			<scope>${spark.deps.scope}</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-catalyst_${scala.minor.version}</artifactId>
+			<version>${spark.version}</version>
+			<scope>${spark.deps.scope}</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-avro_${scala.minor.version}</artifactId>
+			<version>${spark.version}</version>
+			<scope>${spark.deps.scope}</scope>
+		</dependency>
+
+		<!-- TEST dependencies -->
+		<dependency>
+			<groupId>org.scalatest</groupId>
+			<artifactId>scalatest_${scala.minor.version}</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.smartdatalake</groupId>
+			<artifactId>sdl-core_${scala.minor.version}</artifactId>
+			<version>${project.parent.version}</version>
+			<classifier>test-jar</classifier>
+			<type>test-jar</type>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.sshd</groupId>
+			<artifactId>sshd-sftp</artifactId>
+			<version>${sshd.test.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.sshd</groupId>
+			<artifactId>sshd-common</artifactId>
+			<version>${sshd.test.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.sshd</groupId>
+			<artifactId>sshd-core</artifactId>
+			<version>${sshd.test.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.github.tomakehurst</groupId>
+			<artifactId>wiremock-standalone</artifactId>
+			<version>2.25.1</version>
+			<scope>test</scope>
+		</dependency>
+
+	</dependencies>
+
+</project>
