@@ -294,8 +294,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     require(config.hasPath("dataObjects"), s"No configuration parsed or it does not have a section called dataObjects")
 
     // parse config objects
-    Environment._instanceRegistry = ConfigParser.parse(config, instanceRegistry) // share instance registry for custom code
     Environment._globalConfig = GlobalConfig.from(config)
+    Environment._instanceRegistry = ConfigParser.parse(config, instanceRegistry) // share instance registry for custom code
     val stateListeners = Environment._globalConfig.stateListeners.map(_.listener) ++ Environment._additionalStateListeners
 
     // create Spark Session
