@@ -294,10 +294,11 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtDO.getDataFrame().count == 2)
     action1.postExec(Seq(srcSubFeed),resultSubFeeds)(session,contextExec)
 
-    // simulate next run
+    // simulate next run with no data
     action1.reset
     action1.preInit(Seq(srcSubFeed), Seq())
-    intercept[NoDataToProcessDontStopWarning](action1.init(Seq(srcSubFeed)))
+    val resultSubFeeds2 = intercept[NoDataToProcessWarning](action1.init(Seq(srcSubFeed)))
+    assert(resultSubFeeds2.results.get.head.isSkipped)
   }
 
 }

@@ -25,13 +25,8 @@ import io.smartdatalake.workflow.SubFeed
 import org.apache.spark.annotation.DeveloperApi
 
 /**
- * Execution modes can throw this exception to indicate that there is no data to process, and dependent Actions should not be executed.
+ * Execution modes can throw this exception to indicate that there is no data to process.
+ * @param results SDL might add fake results to this exception to allow further execution of DAG. When creating the exception result should be set to None.
  */
 @DeveloperApi
-case class NoDataToProcessWarning(actionId: NodeId, msg: String) extends TaskSkippedWarning(actionId, msg)
-
-/**
- * Execution modes can throw this exception to indicate that there is no data to process, and dependent Actions should be executed nevertheless.
- */
-@DeveloperApi
-case class NoDataToProcessDontStopWarning(actionId: NodeId, msg: String, results: Option[Seq[SubFeed]] = None) extends TaskSkippedDontStopWarning(actionId, msg, results)
+case class NoDataToProcessWarning(actionId: NodeId, msg: String, results: Option[Seq[SubFeed]] = None) extends TaskSkippedDontStopWarning(actionId, msg, results)

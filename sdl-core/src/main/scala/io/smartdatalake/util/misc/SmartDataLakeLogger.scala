@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.util.misc
 
-import io.smartdatalake.config.ConfigurationException
+import org.slf4j.event.Level
 import org.slf4j.{Logger, LoggerFactory}
 
 private[smartdatalake] trait SmartDataLakeLogger {
@@ -34,5 +34,15 @@ private[smartdatalake] trait SmartDataLakeLogger {
   private[smartdatalake] def logException(e: Exception): Exception = {
     logger.error( s"${e.getClass.getSimpleName} - ${e.getMessage}" )
     e
+  }
+
+  private[smartdatalake] def logWithSeverity(severity: Level, msg: String): Unit = {
+    severity match {
+      case Level.ERROR => logger.error(msg)
+      case Level.WARN => logger.warn(msg)
+      case Level.INFO => logger.info(msg)
+      case Level.DEBUG => logger.debug(msg)
+      case Level.TRACE => logger.trace(msg)
+    }
   }
 }
