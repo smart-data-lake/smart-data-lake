@@ -20,6 +20,7 @@ package io.smartdatalake.workflow
 
 import io.smartdatalake.app.StateListener
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.{DAG, DAGEdge, DAGEventListener, DAGException, DAGNode, DAGResult, ExceptionSeverity, TaskPredecessorFailureWarning}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -31,6 +32,7 @@ import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject, Tr
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import org.apache.spark.sql.SparkSession
+import org.slf4j.event.Level
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -82,9 +84,10 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
     val stopSeverity = if (phase == ExecutionPhase.Init && existsInitializedActions) ExceptionSeverity.CANCELLED else ExceptionSeverity.SKIPPED
     val dagExceptionsToStop = dagExceptions.filter(_.severity <= stopSeverity).sortBy(_.severity)
     // log all exceptions
-    dagExceptions.distinct.foreach {
-      case ex if ex.severity <= ExceptionSeverity.FAILED_DONT_STOP => logger.error(s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessageWithCause}")
-      case ex => logger.warn(s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessageWithCause}")
+    dagExceptions.distinct.foreach { ex =>
+      val loggerSeverity = if (ex.severity <= ExceptionSeverity.FAILED_DONT_STOP) Level.ERROR
+      else Environment.taskSkippedExceptionLogLevel
+      logWithSeverity(loggerSeverity, s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessageWithCause}")
     }
     // log dag on error
     if (dagExceptionsToStop.nonEmpty) ActionDAGRun.logDag(s"$phase ${dagExceptionsToStop.head.severity} for ${context.application} runId=$context.runId attemptId=$context.attemptId", dag, Some(executionId))

@@ -18,13 +18,13 @@
  */
 package io.smartdatalake.definitions
 
-import java.net.URI
 import io.smartdatalake.app.{GlobalConfig, SDLPlugin, StateListener}
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.{CustomCodeUtil, EnvironmentUtil}
-import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
+import org.slf4j.event.Level
+
+import java.net.URI
 
 /**
  * Environment dependent configurations.
@@ -153,6 +153,14 @@ object Environment {
   var enableOverwriteUnpartitionedSparkFileDataObjectAdls: Boolean = {
     EnvironmentUtil.getSdlParameter("enableOverwriteUnpartitionedSparkFileDataObjectAdls")
       .map(_.toBoolean).getOrElse(false)
+  }
+
+  /**
+   * Set log level for exceptions about skipped Actions, e.g. NoDataToProcessWarning (default=info).
+   */
+  var taskSkippedExceptionLogLevel: Level = {
+    EnvironmentUtil.getSdlParameter("taskSkippedExceptionLogLevel")
+      .map(x => Level.valueOf(x.toLowerCase)).getOrElse(Level.INFO)
   }
 
   // static configurations
