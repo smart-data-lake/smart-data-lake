@@ -90,7 +90,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
       logWithSeverity(loggerSeverity, s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessageWithCause}")
     }
     // log dag on error
-    if (dagExceptionsToStop.nonEmpty) ActionDAGRun.logDag(s"$phase ${dagExceptionsToStop.head.severity} for ${context.application} runId=$context.runId attemptId=$context.attemptId", dag, Some(executionId))
+    if (dagExceptionsToStop.nonEmpty) ActionDAGRun.logDag(s"$phase ${dagExceptionsToStop.head.severity} for ${context.application} runId=${context.executionId.runId} attemptId=${context.executionId.runId}", dag, Some(executionId))
     // throw most severe exception
     dagExceptionsToStop.foreach{ throw _ }
 
