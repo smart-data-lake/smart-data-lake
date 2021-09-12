@@ -39,7 +39,7 @@ import scala.util.{Failure, Success, Try}
 /**
  * [[Action]] to deduplicate a subfeed.
  * Deduplication keeps the last record for every key, also after it has been deleted in the source.
- * It needs a transactional table as output with defined primary keys.
+ * It needs a transactional table (e.g. [[TransactionalSparkTableDataObject]]) as output with defined primary keys.
  *
  * @param inputId inputs DataObject
  * @param outputId output DataObject
@@ -49,7 +49,7 @@ import scala.util.{Failure, Success, Try}
  * @param columnBlacklist Remove all columns on blacklist from dataframe
  * @param columnWhitelist Keep only columns on whitelist in dataframe
  * @param additionalColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
- *                          The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
+ *                          The spark sql expressions are evaluated against an instance of [[io.smartdatalake.util.misc.DefaultExpressionData]].
  * @param ignoreOldDeletedColumns if true, remove no longer existing columns in Schema Evolution
  * @param ignoreOldDeletedNestedColumns if true, remove no longer existing columns from nested data types in Schema Evolution.
  *                                      Keeping deleted columns in complex data types has performance impact as all new data
