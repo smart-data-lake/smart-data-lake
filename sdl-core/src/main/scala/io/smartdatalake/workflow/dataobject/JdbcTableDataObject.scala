@@ -25,7 +25,7 @@ import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
-import io.smartdatalake.util.misc.{DefaultExpressionData, SchemaUtil, SparkExpressionUtil}
+import io.smartdatalake.util.misc.{DefaultExpressionData, SchemaUtil, SmartDataLakeLogger, SparkExpressionUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.JdbcTableConnection
 import org.apache.spark.annotation.DeveloperApi
@@ -104,6 +104,14 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   table = table.overrideDb(connection.db)
   if(table.db.isEmpty) throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
 
+  // prepare tmp table used for merge statement
+  private val tmpTable = {
+    val tmpTableName = if (connection.catalog.isQuotedIdentifier(table.name)) {
+      connection.catalog.quoteIdentifier(connection.catalog.removeQuotes(table.name) + "_sdltmp")
+    } else s"${table.name}_sdltmp"
+    table.copy(name = tmpTableName)
+  }
+
   assert(saveMode==SDLSaveMode.Append || saveMode==SDLSaveMode.Overwrite || saveMode==SDLSaveMode.Merge, s"($id) Only saveMode Append, Overwrite and Merge are supported.")
 
   override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
@@ -141,15 +149,16 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     df.colNamesLowercase
   }
 
-  override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def init(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     validateSchemaMin(df, "write")
     validateSchemaHasPartitionCols(df, "write")
     validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
+    val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(df)).getOrElse(df)
     if (isTableExisting) {
-      if (allowSchemaEvolution) evolveTableSchema(df.schema)
-      else validateSchemaOnWrite(df)
+      if (allowSchemaEvolution) evolveTableSchema(saveModeTargetDf.schema)
+      else validateSchemaOnWrite(saveModeTargetDf)
     } else {
-      connection.createTableFromSchema(table.fullName, df.schema, options)
+      connection.createTableFromSchema(table.fullName, saveModeTargetDf.schema, options)
       require(isTableExisting, s"($id) Strangely table ${table.fullName} doesn't exist even though we tried to create it")
     }
   }
@@ -206,12 +215,10 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     validateSchemaMin(df, "write")
     validateSchemaHasPartitionCols(df, "write")
     validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
-    if (!allowSchemaEvolution) validateSchemaOnWrite(df)
+    val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(df)).getOrElse(df)
+    if (!allowSchemaEvolution) validateSchemaOnWrite(saveModeTargetDf)
 
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
-
-    // order DataFrame columns according to existing schema
-    val dfWrite = df.select(df.columns.map(c => col(c)): _*)
 
     // write
     finalSaveMode match {
@@ -220,15 +227,15 @@ case class JdbcTableDataObject(override val id: DataObjectId,
         // cleanup existing data if saveMode=overwrite
         if (partitionValues.nonEmpty) deletePartitions(partitionValues)
         else deleteAllData
-        writeDataFrameInternalWithAppend(dfWrite, table.fullName)
+        writeDataFrameInternalWithAppend(df, table.fullName)
 
       case SDLSaveMode.Merge =>
         // write to tmp-table and merge by primary key
-        mergeDataFrameByPrimaryKey(dfWrite, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
+        mergeDataFrameByPrimaryKey(df, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
 
       case SDLSaveMode.Append =>
         // write target table with SaveMode.Append
-        writeDataFrameInternalWithAppend(dfWrite, table.fullName)
+        writeDataFrameInternalWithAppend(df, table.fullName)
     }
   }
 
@@ -240,34 +247,36 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     assert(table.primaryKey.exists(_.nonEmpty), s"($id) table.primaryKey must be defined to use mergeDataFrameByPrimaryKey")
 
-    val tmpTableName = if (connection.catalog.isQuotedIdentifier(table.name))
-      table.db+"."+connection.catalog.quoteIdentifier(connection.catalog.removeQuotes(table.name) + "_sdltmp")
-    else s"${table.fullName}_sdltmp"
-    require(!connection.catalog.isTableExisting(tmpTableName), s"(id) Temporary table $tmpTableName for merge already exists! There might be a potential conflict with another job. Please clean up manually to continue.")
+    // cleanup temp table if existing
+    if(connection.catalog.isTableExisting(tmpTable.fullName)) {
+      logger.error(s"(id) Temporary table ${tmpTable.fullName} for merge already exists! There might be a potential conflict with another job. It will be dropped and recreated.")
+      connection.dropTable(tmpTable.fullName)
+    }
     try {
       // create & write to temp-table
-      connection.createTableFromSchema(tmpTableName, df.schema, options)
-      writeDataFrameInternalWithAppend(df, tmpTableName)
+      connection.createTableFromSchema(tmpTable.fullName, df.schema, options)
+      writeDataFrameInternalWithAppend(df, tmpTable.fullName)
       // prepare SQL merge statement
-      val additionalMergePredicateStr = saveModeOptions.additionalMergePredicate.map(p => s" $p").getOrElse("")
+      val additionalMergePredicateStr = saveModeOptions.additionalMergePredicate.map(p => s" AND $p").getOrElse("")
       val joinConditionStr = table.primaryKey.get.map(quoteCaseSensitiveColumn).map(colName => s"new.$colName = existing.$colName").reduce(_+" AND "+_)
       val deleteClauseStr = saveModeOptions.deleteCondition.map(c => s"\nWHEN MATCHED AND $c THEN DELETE").getOrElse("")
       val updateConditionStr = saveModeOptions.updateCondition.map(c => s" AND $c").getOrElse("")
-      val updateSpecStr = df.columns.diff(table.primaryKey.get).map(quoteCaseSensitiveColumn).map(colName => s"existing.$colName = new.$colName").reduce(_+", "+_)
-      val insertSpecStr = df.columns.map(quoteCaseSensitiveColumn).reduce(_+", "+_)
-      val insertValueSpecStr = df.columns.map(quoteCaseSensitiveColumn).map(colName => s"new.$colName").reduce(_+", "+_)
+      val updateSpecStr = saveModeOptions.updateColumnsOpt.getOrElse(df.columns.toSeq.diff(table.primaryKey.get)).map(quoteCaseSensitiveColumn).map(colName => s"existing.$colName = new.$colName").reduce(_+", "+_)
+      val insertConditionStr = saveModeOptions.insertCondition.map(c => s" AND $c").getOrElse("")
+      val insertSpecStr = df.columns.diff(saveModeOptions.insertColumnsToIgnore).map(quoteCaseSensitiveColumn).reduce(_+", "+_)
+      val insertValueSpecStr = df.columns.diff(saveModeOptions.insertColumnsToIgnore).map(quoteCaseSensitiveColumn).map(colName => s"new.$colName").reduce(_+", "+_)
       val mergeStmt = s"""
         | MERGE INTO ${table.fullName} as existing
-        | USING (SELECT * from $tmpTableName) as new
+        | USING (SELECT * from ${tmpTable.fullName}) as new
         | ON $joinConditionStr $additionalMergePredicateStr $deleteClauseStr
         | WHEN MATCHED $updateConditionStr THEN UPDATE SET $updateSpecStr
-        | WHEN NOT MATCHED THEN INSERT ($insertSpecStr) VALUES ($insertValueSpecStr)
+        | WHEN NOT MATCHED $insertConditionStr THEN INSERT ($insertSpecStr) VALUES ($insertValueSpecStr)
         """.stripMargin
       // execute
-      connection.execJdbcStatement(mergeStmt)
+      connection.execJdbcStatement(mergeStmt, doCommit = true)
     } finally {
       // cleanup temp table
-      connection.dropTable(tmpTableName)
+      connection.dropTable(tmpTable.fullName)
     }
   }
 
@@ -422,8 +431,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
         else column
       } else {
         // quote identifier if it contains special characters
-        if (JdbcTableDataObject.hasIdentifierSpecialChars(column)) column
-        else connection.catalog.quoteIdentifier(column)
+        if (JdbcTableDataObject.hasIdentifierSpecialChars(column)) connection.catalog.quoteIdentifier(column)
+        else column
       }
     }
   }
@@ -456,6 +465,6 @@ object JdbcTableDataObject extends FromConfigFactory[DataObject] {
     extract[JdbcTableDataObject](config)
   }
   private[smartdatalake] def hasIdentifierSpecialChars(colName: String): Boolean = {
-    colName.matches("[a-zA-Z0-9_]*")
+    !colName.matches("[a-zA-Z][a-zA-Z0-9_]*")
   }
 }

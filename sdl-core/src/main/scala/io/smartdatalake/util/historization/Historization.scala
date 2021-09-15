@@ -19,16 +19,16 @@
 package io.smartdatalake.util.historization
 
 import java.time.LocalDateTime
-
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions
 import io.smartdatalake.definitions.{HiveConventions, TechnicalTableColumn}
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.misc.{DataFrameUtil, SmartDataLakeLogger}
-import org.apache.spark.sql.functions._
+import org.apache.spark.sql.functions.{lit, when, _}
 import org.apache.spark.sql.types.{StructType, TimestampType}
 import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 
+import java.sql.Timestamp
 import scala.util.hashing.MurmurHash3
 
 /**
@@ -36,164 +36,267 @@ import scala.util.hashing.MurmurHash3
  */
 private[smartdatalake] object Historization extends SmartDataLakeLogger {
 
-  private val ts1: java.time.LocalDateTime => Column = t => lit(t.toString).cast(TimestampType)
+  private[smartdatalake] val historizeHashColName = "dl_hash" // incrementalHistorize adds hash col to target schema for comparing changes
+  private[smartdatalake] val historizeOperationColName = "dl_operation" // incrementalHistorize needs operation col for merge statement. It is temporary and is not added to target schema.
+
+  // High value - symbolic value of timestamp with meaning of "without expiry date"
+  //val doomsday = new java.sql.Timestamp(new java.util.Date("9999/12/31").getTime)
+  private[smartdatalake] val doomsday = localDateTimeToCol(definitions.HiveConventions.getHistorizationSurrogateTimestamp)
+
+  // "Tick" offset used to delimit timestamps of old and new values
+  val offsetNs = 1000000L
+
 
   /**
    * Historizes data by merging the current load with the existing history
    *
-   * @param historyDf exsisting history of data
-   * @param newFeedDf current load of feed
+   * Expects dfHistory and dfNew having the same schema. Use [[SchemaEvolution.process]] for preparation.
+   *
+   * @param dfHistory exsisting history of data
+   * @param dfNew current load of feed
    * @param primaryKeyColumns Primary keys to join history with current load
    * @param historizeBlacklist optional list of columns to ignore when comparing two records. Can not be used together with historizeWhitelist.
    * @param historizeWhitelist optional final list of columns to use when comparing two records. Can not be used together with historizeBlacklist.
    * @return current feed merged with history
   */
-  def getHistorized(historyDf: DataFrame, newFeedDf: DataFrame, primaryKeyColumns: Seq[String],
+  def fullHistorize(dfHistory: DataFrame, dfNew: DataFrame, primaryKeyColumns: Seq[String],
                     referenceTimestamp: LocalDateTime,
                     historizeWhitelist: Option[Seq[String]],
                     historizeBlacklist: Option[Seq[String]]
                    )(implicit session: SparkSession): DataFrame = {
 
     // Name for Hive column "last updated on ..."
-    val lastUpdateCol = TechnicalTableColumn.captured.toString
+    val lastUpdateCol = TechnicalTableColumn.captured
 
     // Name for Hive column "Replaced on ..."
-    val expiryDateCol = TechnicalTableColumn.delimited.toString
-
-    // "Tick" offset used to delimit timestamps of old and new values
-    val offsetNs = 1000000L
-
-    // High value - symbolic value of timestamp with meaning of "without expiry date"
-    //val doomsday = new java.sql.Timestamp(new java.util.Date("9999/12/31").getTime)
-    val doomsday = definitions.HiveConventions.getHistorizationSurrogateTimestamp
+    val expiryDateCol = TechnicalTableColumn.delimited
 
     // Current timestamp (used for insert and update operations, for "new" value)
-    val timestampNew = referenceTimestamp
+    val timestampNew = localDateTimeToCol(referenceTimestamp)
 
     // Shortly before the current timestamp ("Tick") used for existing, old records
-    val timestampOld = timestampNew.minusNanos(offsetNs)
+    val timestampOld = localDateTimeToCol(referenceTimestamp.minusNanos(offsetNs))
 
     // make sure history schema is equal to new feed schema
     val colsToIgnore = Seq(lastUpdateCol, expiryDateCol, "dl_dt")
-    assert(SchemaEvolution.hasSameColNamesAndTypes( StructType(historyDf.schema.filterNot( n => colsToIgnore.contains(n.name))), newFeedDf.schema))
+    assert(SchemaEvolution.hasSameColNamesAndTypes( StructType(dfHistory.schema.filterNot(n => colsToIgnore.contains(n.name))), dfNew.schema))
 
     // Records in history that still existed during the last execution
-    //val lastHist = historyPersisted.where(s"$expiryDateCol = '$doomsday'")
-    val lastHistDf = historyDf.where(col(expiryDateCol) === s"$doomsday")
+    val dfLastHist = dfHistory.where(col(expiryDateCol) === doomsday)
 
     // Records in history that already didn't exist during last execution
-    //val restHist = historyDf.except(lastHistDf)
-    val restHist = historyDf.where(col(expiryDateCol) =!= s"$doomsday")
+    val restHist = dfHistory.where(col(expiryDateCol) =!= doomsday)
 
-    val historizeHashCols = (historizeWhitelist, historizeBlacklist) match {
-      case (Some(w), None) => w.sorted
-      case (None, Some(b)) => newFeedDf.columns.diff(b).sorted.toSeq
-      case (None, None) => newFeedDf.columns.sorted.toSeq
-      case (Some(_), Some(_)) => throw new ConfigurationException("historizeWhitelist and historizeBlacklist mustn't be used at the same time.")
-    }
+    // add hash-column to easily compare changed records
+    val colsToCompare = getCompareColumns(dfNew.columns, historizeWhitelist, historizeBlacklist)
+    val dfNewHashed = dfNew.withColumn(historizeHashColName, colsComparisionExpr(colsToCompare))
+    val dfLastHistHashed = dfLastHist.withColumn(historizeHashColName, colsComparisionExpr(colsToCompare))
+    val hashColEqualsExpr = col(s"newFeed.$historizeHashColName") === col(s"lastHist.$historizeHashColName")
 
-    // Generic column expression to compare a list of columns
-    def colsComparisionExpr(cols: Seq[String]): Column = struct(cols.map(col): _*)
-
-    val newFeedHashed = newFeedDf.withColumn("hash", colsComparisionExpr(historizeHashCols))
-
-    // columns used to build hash according to newFeedDf (lastHistDf contains dl_captured/delimited)
-    val colsToUseLastHistDf = lastHistDf.columns.diff(colsToIgnore).sorted
-    val lastHistHashed = (historizeWhitelist, historizeBlacklist) match {
-      case (Some(w), None) =>
-        val w_diff = w.diff(colsToIgnore)
-        val colsToUse = colsToUseLastHistDf.intersect(w_diff).sorted // merged columns from whitelist und lastHistDf without technical columns
-        lastHistDf.withColumn("hash", colsComparisionExpr(colsToUse))
-      case (None, Some(b)) =>
-        val colsToUse = colsToUseLastHistDf.diff(b).sorted
-        lastHistDf.withColumn("hash", colsComparisionExpr(colsToUse))
-      case (None, None) =>
-        val colsToUse = colsToUseLastHistDf.sorted
-        lastHistDf.withColumn("hash", colsComparisionExpr(colsToUse))
-      case (Some(_), Some(_)) => throw new ConfigurationException("historize-whitelist and historize-blacklist mustn't be used at the same time.")
-    }
-
-    val joined = newFeedHashed.as("newFeed")
-      .join(lastHistHashed.as("lastHist"), joinCols(newFeedHashed, lastHistHashed, primaryKeyColumns), "full")
+    val joined = dfNewHashed.as("newFeed")
+      .join(dfLastHistHashed.as("lastHist"), joinCols(dfNewHashed, dfLastHistHashed, primaryKeyColumns), "full")
 
     val newRows = joined.where(col(expiryDateCol).isNull)
-      .select(newFeedDf("*"))
-      .withColumn(lastUpdateCol, ts1(timestampNew))
-      .withColumn(expiryDateCol, ts1(doomsday))
+      .select(dfNew("*"))
+      .withColumn(lastUpdateCol, timestampNew)
+      .withColumn(expiryDateCol, doomsday)
 
     val notInFeedAnymore = joined.where(nullTableCols("newFeed", primaryKeyColumns))
-      .select(lastHistDf("*"))
-      .withColumn(expiryDateCol, ts1(timestampOld))
+      .select(dfLastHist("*"))
+      .withColumn(expiryDateCol, timestampOld)
 
     val noUpdates = joined
-      .where(col("newFeed.hash") === col("lastHist.hash"))
-      .select(lastHistDf("*"))
+      .where(hashColEqualsExpr)
+      .select(dfLastHist("*"))
 
     val updated = joined
       .where(nonNullTableCols("newFeed", primaryKeyColumns))
-      .where(col("newFeed.hash") =!= col("lastHist.hash"))
+      .where(!hashColEqualsExpr)
 
-    val updatedNew = updated.select(newFeedDf("*"))
-      .withColumn(lastUpdateCol, ts1(timestampNew))
-      .withColumn(expiryDateCol, ts1(doomsday))
+    val updatedNew = updated.select(dfNew("*"))
+      .withColumn(lastUpdateCol, timestampNew)
+      .withColumn(expiryDateCol, doomsday)
 
-    val updatedOld = updated.select(lastHistDf("*"))
-      .withColumn(expiryDateCol, ts1(timestampOld))
+    val updatedOld = updated.select(dfLastHist("*"))
+      .withColumn(expiryDateCol, timestampOld)
 
     // column order is used here!
-    val tenantNewHist = SchemaEvolution.sortColumns(notInFeedAnymore, historyDf.columns)
-      .union(SchemaEvolution.sortColumns(newRows, historyDf.columns))
-      .union(SchemaEvolution.sortColumns(updatedNew, historyDf.columns))
-      .union(SchemaEvolution.sortColumns(updatedOld, historyDf.columns))
-      .union(SchemaEvolution.sortColumns(noUpdates, historyDf.columns))
-      .union(SchemaEvolution.sortColumns(restHist, historyDf.columns))
+    val dfNewHist = SchemaEvolution.sortColumns(notInFeedAnymore, dfHistory.columns)
+      .union(SchemaEvolution.sortColumns(newRows, dfHistory.columns))
+      .union(SchemaEvolution.sortColumns(updatedNew, dfHistory.columns))
+      .union(SchemaEvolution.sortColumns(updatedOld, dfHistory.columns))
+      .union(SchemaEvolution.sortColumns(noUpdates, dfHistory.columns))
+      .union(SchemaEvolution.sortColumns(restHist, dfHistory.columns))
 
     if (logger.isDebugEnabled) {
-      logger.debug(s"Count previous history: ${historyDf.count}")
-      logger.debug(s"Count current load of feed: ${newFeedDf.count}")
+      logger.debug(s"Count previous history: ${dfHistory.count}")
+      logger.debug(s"Count current load of feed: ${dfNew.count}")
       logger.debug(s"Count rows not in current feed anymore: ${notInFeedAnymore.count}")
       logger.debug(s"Count new rows: ${newRows.count}")
       logger.debug(s"Count updated rows new: ${updatedNew.count}")
       logger.debug(s"Count updated rows old: ${updatedOld.count}")
       logger.debug(s"Count no updates old: ${noUpdates.count}")
       logger.debug(s"Count rows from remaining history: ${restHist.count}")
-      logger.debug(s"Summary count rows new history: ${tenantNewHist.count}")
+      logger.debug(s"Summary count rows new history: ${dfNewHist.count}")
     }
 
-    tenantNewHist
+    dfNewHist
   }
 
+  /**
+   * Historizes data by merging the current load with the existing history, generating records to update and insert for a SQL Upsert Statement.
+   *
+   * SQL Upsert statement has great performance potential, but also its limitation:
+   * - matched records can be updated or deleted
+   * - unmatched records can be inserted
+   *
+   * Implementing historization with one SQL statement is not possible
+   *  - update matched records (close version if column changed) -> supported
+   *  - insert matched records (new version if columns changed) -> '''insert on match is not supported'''
+   *  - insert unmatched records (new record) -> supported
+   *  - update unmatched records in source (deleted record) -> '''not supported in SQL standard''' (MS SQL would have some extension with its MATCHED BY SOURCE/TARGET clause)
+   *
+   * This functions joins new data with existing current data and generates update and insert records for an SQL Upsert statement.
+   * A full outer join between new and existing current data is made and the following records generated:
+   *  1. primary key matched and attributes have changed -> update record to close existing version, insert record to create new version
+   *  1. primary key unmatched, record only in new data -> insert record
+   *  1. primary key unmatched, record only in existing data -> update record to close existing version
+   *
+   * Existing and new DataFrame are not required to have the same schema, as schema evolution is handled by output DataObject.
+   *
+   * Compared with fullHistorized the following performance optimizations are implemented:
+   *  - only current existing data needs to be read (delimited=doomsday)
+   *  - only changed data needs to be written
+   *  - a Column with hash-value calculated from all attributes is added to the target table, allowing to use only primary key and hashColumn for joining new data with existing data and detecting changes
+   *
+   *  Note that the use of hashColumn to detect changed records will create new version for every record on schema evolution.
+   *  This behaviour is different from fullHistorize.
+   */
+  def incrementalHistorize(dfExisting: DataFrame,
+                           dfNew: DataFrame,
+                           primaryKey: Seq[String],
+                           referenceTimestamp: LocalDateTime,
+                           historizeWhitelist: Option[Seq[String]],
+                           historizeBlacklist: Option[Seq[String]])
+                          (implicit session: SparkSession): DataFrame = {
+    import session.implicits._
+    // Current timestamp (used for insert and update operations, for "new" value)
+    val timestampNew = localDateTimeToCol(referenceTimestamp)
+    // Shortly before the current timestamp ("Tick") used for existing, old records
+    val timestampOld = localDateTimeToCol(referenceTimestamp.minusNanos(offsetNs))
+    // prepare columns
+    val existingCapturedCol = col(s"existing.${TechnicalTableColumn.captured}")
+    val existingDelimitedCol = col(s"existing.${TechnicalTableColumn.delimited}")
+    val existingHashCol = col(s"existing.$historizeHashColName")
+    val newHashCol = col(s"new.$historizeHashColName")
+    val hashColEqualsExpr = existingHashCol === newHashCol
+    // add hash column
+    val dfNewHashed = addHashCol(dfNew, historizeWhitelist, historizeBlacklist, useHash = true)
+    // join existing with new and determine operations needed
+    val dfOperations = dfExisting.as("existing")
+      .where(existingDelimitedCol === doomsday) // only current records needed
+      .select((primaryKey :+ TechnicalTableColumn.captured :+ historizeHashColName).map(col):_*)
+      .join(dfNewHashed.as("new"), primaryKey, "full")
+      .withColumn("_operations",
+         // 1. primary key matched and attributes have changed -> update record to close existing version, insert record to create new version
+         when(existingHashCol.isNotNull and newHashCol.isNotNull and !hashColEqualsExpr,
+           array(lit(HistorizationRecordOperations.updateClose), lit(lit(HistorizationRecordOperations.insertNew))))
+         // 2. record only in new data -> insert new record
+        .when(existingHashCol.isNull and newHashCol.isNotNull,
+           array(lit(HistorizationRecordOperations.insertNew)))
+         // 3. record only in existing data -> update record to close existing version
+        .when(existingHashCol.isNotNull and newHashCol.isNull,
+           array(lit(HistorizationRecordOperations.updateClose)))
+      )
+    // add versioning data
+    val dfOperationVersioned = dfOperations
+      .withColumn(historizeOperationColName, explode($"_operations")) // note: this filters records with no action
+      .drop($"_operations")
+      .drop(existingHashCol)
+      .withColumn(TechnicalTableColumn.captured,
+         when(col(historizeOperationColName) === HistorizationRecordOperations.insertNew, timestampNew)
+        .when(col(historizeOperationColName) === HistorizationRecordOperations.updateClose, existingCapturedCol)
+      )
+      .withColumn(TechnicalTableColumn.delimited,
+         when(col(historizeOperationColName) === HistorizationRecordOperations.insertNew, doomsday)
+        .when(col(historizeOperationColName) === HistorizationRecordOperations.updateClose, timestampOld)
+      )
+      .drop(existingCapturedCol)
+    // return
+    dfOperationVersioned
+  }
 
   /**
-   * Creates initial history of feed
+   * Creates initial history of feed for fullHistorization
    *
-   * @param newFeed current run of feed
+   * @param df current run of feed
    * @param referenceTimestamp timestamp to use
    * @return initial history, identical with data from current run
    */
-  def getInitialHistory(newFeed: DataFrame, referenceTimestamp: LocalDateTime)(implicit session: SparkSession): DataFrame = {
-    session.sparkContext.setJobDescription("Historization.getInitialHistory")
-    val expiryDate = HiveConventions.getHistorizationSurrogateTimestamp
-    val lastUpdateCol = TechnicalTableColumn.captured.toString
-    val expiryDateCol = TechnicalTableColumn.delimited.toString
-    val newRows = newFeed
-      .select("*")
-      .withColumn(s"$lastUpdateCol", ts1(referenceTimestamp))
-      .withColumn(s"$expiryDateCol", ts1(expiryDate))
-    logger.debug(s"Initial history used for $lastUpdateCol: $referenceTimestamp")
-
-    newRows
+  def getFullInitialHistory(df: DataFrame, referenceTimestamp: LocalDateTime)(implicit session: SparkSession): DataFrame = {
+    logger.debug(s"Initial history used for ${TechnicalTableColumn.captured}: $referenceTimestamp")
+    addVersionCols(df, referenceTimestamp, HiveConventions.getHistorizationSurrogateTimestamp)
   }
 
-  private def joinCols(left: DataFrame, right: DataFrame, cols: Seq[String]) = {
-    cols.map(c => left(c) === right(c)).reduce(_ && _)
+  /**
+   * Creates initial history of feed for incrementalHistorization
+   *
+   * @param df current run of feed
+   * @param referenceTimestamp timestamp to use
+   * @return initial history, identical with data from current run
+   */
+  def getIncrementalInitialHistory(df: DataFrame, referenceTimestamp: LocalDateTime, historizeWhitelist: Option[Seq[String]], historizeBlacklist: Option[Seq[String]])(implicit session: SparkSession): DataFrame = {
+    logger.debug(s"Initial history used for ${TechnicalTableColumn.captured}: $referenceTimestamp")
+    val df1 = addHashCol(df, historizeWhitelist, historizeBlacklist, useHash = true)
+    addVersionCols(df1, referenceTimestamp, HiveConventions.getHistorizationSurrogateTimestamp)
+      .withColumn(historizeOperationColName, lit(HistorizationRecordOperations.insertNew))
   }
 
-  private def nullTableCols(table: String, cols: Seq[String]) = {
-    cols.map(c => s"$table.$c is null").reduce((a, b) => s"$a and $b")
+  private[smartdatalake] def addVersionCols(df: DataFrame, captured: LocalDateTime, delimited: LocalDateTime)(implicit session: SparkSession): DataFrame = {
+    df.withColumn(TechnicalTableColumn.captured, localDateTimeToCol(captured))
+      .withColumn(TechnicalTableColumn.delimited, localDateTimeToCol(delimited))
   }
 
-  private def nonNullTableCols(table: String, cols: Seq[String]) = {
-    cols.map(c => s"$table.$c is not null").reduce((a, b) => s"$a and $b")
+  private def joinCols(left: DataFrame, right: DataFrame, cols: Seq[String]): Column = {
+    cols.map(c => left(c) === right(c)).reduce(_ and _)
   }
+
+  private def nullTableCols(table: String, cols: Seq[String]): Column = {
+    cols.map(c => col(s"$table.$c").isNull).reduce(_ and _)
+  }
+
+  private def nonNullTableCols(table: String, cols: Seq[String]): Column = {
+    cols.map(c => col(s"$table.$c").isNotNull).reduce(_ and _)
+  }
+
+  private[smartdatalake] def localDateTimeToTstmp(dateTime: LocalDateTime): Timestamp = Timestamp.valueOf(dateTime)
+  private[smartdatalake] def localDateTimeToCol(dateTime: LocalDateTime): Column = lit(Timestamp.valueOf(dateTime))
+
+  private[smartdatalake] def getCompareColumns(colsToUse: Seq[String], historizeWhitelist: Option[Seq[String]], historizeBlacklist: Option[Seq[String]]): Seq[String] = {
+    val colsToCompare = (historizeWhitelist, historizeBlacklist) match {
+      case (Some(w), None) => colsToUse.intersect(w) // merged columns from whitelist und dfLastHist without technical columns
+      case (None, Some(b)) => colsToUse.diff(b)
+      case (None, None) => colsToUse
+      case (Some(_), Some(_)) => throw new ConfigurationException("historize-whitelist and historize-blacklist must not be used at the same time.")
+    }
+    colsToCompare.toSeq.sorted
+  }
+
+  // Generic column expression to compare a list of columns
+  private[smartdatalake] def colsComparisionExpr(cols: Seq[String], useHash: Boolean = false): Column = {
+    logger.debug(s"using hash columns ${cols.sorted.mkString(",")}")
+    if (useHash) udfHashStruct(struct(cols.sorted.map(col): _*))
+    else struct(cols.sorted.map(col): _*)
+  }
+  private val udfHashStruct = udf((row: Row) => row.hashCode())
+
+  private[smartdatalake] def addHashCol(df: DataFrame, historizeWhitelist: Option[Seq[String]], historizeBlacklist: Option[Seq[String]], useHash: Boolean, colsToIgnore: Seq[String] = Seq()): DataFrame = {
+    val colsToCompare = getCompareColumns(df.columns.diff(colsToIgnore), historizeWhitelist, historizeBlacklist)
+    df.withColumn(historizeHashColName, colsComparisionExpr(colsToCompare, useHash))
+  }
+}
+
+private[smartdatalake] object HistorizationRecordOperations {
+  val updateClose = "updateClose"
+  val insertNew = "insertNew"
 }

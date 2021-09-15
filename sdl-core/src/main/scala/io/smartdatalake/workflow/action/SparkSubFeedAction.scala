@@ -94,7 +94,7 @@ abstract class SparkSubFeedAction extends SparkAction {
     // transform
     val transformedSubFeed = doTransform(subFeed)
     // check output
-    output.init(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
+    output.init(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues, saveModeOptions)
     // return
     Seq(transformedSubFeed)
   }

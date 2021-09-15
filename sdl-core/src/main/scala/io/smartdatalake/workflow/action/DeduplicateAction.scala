@@ -107,7 +107,7 @@ case class DeduplicateAction(override val id: ActionId,
   } catch {
     case ex: Exception => throw new ConfigurationException(s"($id) Cannot parse mergeModeAdditionalJoinPredicate as Spark expression: ${ex.getClass.getSimpleName} ${ex.getMessage}", Some(s"{$id.id}.mergeModeAdditionalJoinPredicate"), ex)
   }
-  if (mergeModeEnable || mergeModeAdditionalJoinPredicateExpr.isEmpty) logger.warn(s"($id) Configuration of mergeModeAdditionalJoinPredicate as no effect if mergeModeEnable = false")
+  if (!mergeModeEnable && mergeModeAdditionalJoinPredicateExpr.nonEmpty) logger.warn(s"($id) Configuration of mergeModeAdditionalJoinPredicate as no effect if mergeModeEnable = false")
 
   // force SDLSaveMode.Merge if mergeModeEnable = true
   override def saveModeOptions: Option[SaveModeOptions] = if (mergeModeEnable) {
@@ -198,7 +198,7 @@ object DeduplicateAction extends FromConfigFactory[Action] {
    */
   def deduplicate(baseDf: DataFrame, newDf: DataFrame, keyColumns: Seq[String])(implicit session: SparkSession): DataFrame = {
     baseDf.unionByName(newDf)
-      .withColumn(rnkColName, row_number().over(Window.partitionBy(keyColumns.map(col): _*).orderBy(col(TechnicalTableColumn.captured.toString).desc)))
+      .withColumn(rnkColName, row_number().over(Window.partitionBy(keyColumns.map(col): _*).orderBy(col(TechnicalTableColumn.captured).desc)))
       .where(col(rnkColName) === 1)
       .drop(rnkColName)
   }
@@ -207,7 +207,7 @@ object DeduplicateAction extends FromConfigFactory[Action] {
    * enhance DataFrame with captured column
    */
   def enhanceDataFrame(refTimestamp: LocalDateTime)(df: DataFrame)(implicit session: SparkSession): DataFrame = {
-    df.withColumn(TechnicalTableColumn.captured.toString, ActionHelper.ts1(refTimestamp))
+    df.withColumn(TechnicalTableColumn.captured, ActionHelper.ts1(refTimestamp))
   }
 
   private val rnkColName = "__rnk"
