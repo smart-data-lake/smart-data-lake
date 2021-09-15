@@ -22,6 +22,7 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
 import org.apache.hadoop.fs.Path
@@ -52,7 +53,7 @@ class HousekeepingModeTest extends FunSuite with BeforeAndAfter {
   test("PartitionRetentionMode") {
     val srcDO = CsvFileDataObject("srcDO", tempPath+s"/src0", partitions=Seq("dt"))
     val tgtDO = CsvFileDataObject("tgtDO", tempPath+s"/tgt1", partitions=Seq("dt")
-      , housekeepingMode = Some(PartitionRetentionMode("to_date(elements.dt, 'yyyyMMdd') >= to_date('20201201', 'yyyyMMdd')"))
+      , housekeepingMode = Some(PartitionRetentionMode("elements.dt >= 20201201"))
     )
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
@@ -89,7 +90,11 @@ class HousekeepingModeTest extends FunSuite with BeforeAndAfter {
     // check partition dt=20201201 is archived and dt=20201101 is compacted
     assert(tgtDO.listPartitions == Seq(PartitionValues(Map("dt" -> "20201101"))))
     assert(tgtDO.filesystem.exists(new Path(tgtDO.hadoopPath, "dt=20201101/_SDL_COMPACTED")))
-    assert(TestUtil.isDataFrameDataEqual(tgtDO.getDataFrame(), df1.withColumn("dt", lit("20201101"))))
+    val actual = tgtDO.getDataFrame()
+    val expected = df1.withColumn("dt", lit(20201101)).withColumn("rating", $"rating".cast("string"))
+    val resultat = actual.isEqual(expected)
+    if (!resultat) TestUtil.printFailedTestResult("historize 1st load mergeModeEnable")(actual)(expected)
+    assert(resultat)
   }
 
   test("PartitionArchiveCompactionMode with HiveTableDataObject") {
@@ -114,7 +119,7 @@ class HousekeepingModeTest extends FunSuite with BeforeAndAfter {
     // check partition dt=20201201 is archived and dt=20201101 is compacted
     assert(tgtDO.listPartitions == Seq(PartitionValues(Map("dt" -> "20201101"))))
     assert(tgtDO.filesystem.exists(new Path(tgtDO.hadoopPath, "dt=20201101/_SDL_COMPACTED")))
-    assert(TestUtil.isDataFrameDataEqual(tgtDO.getDataFrame(), df1.withColumn("dt", lit("20201101"))))
+    assert(tgtDO.getDataFrame().isEqual(df1.withColumn("dt", lit("20201101"))))
   }
 
 }

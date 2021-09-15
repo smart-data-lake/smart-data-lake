@@ -292,6 +292,11 @@ private[smartdatalake] object DataFrameUtil {
       if (colName.isDefined) df.withColumn(colName.get, expr)
       else df
     }
+
+    /**
+     * Execute df.show and return it as String instead of printing it directly
+     */
+    def showString(): String = DatasetHelper.showString(df)
   }
 
   /**

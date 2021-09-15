@@ -22,7 +22,7 @@ import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.workflow.SparkSubFeed
 import io.smartdatalake.workflow.action.CopyAction
-import io.smartdatalake.workflow.connection.{DefaultSQLCatalog, JdbcTableConnection}
+import io.smartdatalake.workflow.connection.{DefaultJdbcCatalog, JdbcTableConnection}
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 
 class JdbcTableDataObjectTest extends DataObjectTestSuite {
@@ -143,8 +143,8 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
       val dfReadTable = dataObjectTable.getDataFrame(Seq())
 
       val df = Seq(("test_data")).toDF("test_column")
-      assert(jdbcConnection.catalog.asInstanceOf[DefaultSQLCatalog].isTableExisting(s"$db.${view.name}"))
-      assert(jdbcConnection.catalog.asInstanceOf[DefaultSQLCatalog].isTableExisting(s"$db.${table.name}"))
+      assert(jdbcConnection.catalog.asInstanceOf[DefaultJdbcCatalog].isTableExisting(s"$db.${view.name}"))
+      assert(jdbcConnection.catalog.asInstanceOf[DefaultJdbcCatalog].isTableExisting(s"$db.${table.name}"))
       assert(dfReadView.symmetricDifference(df).isEmpty)
       assert(dfReadTable.symmetricDifference(df).isEmpty)
 

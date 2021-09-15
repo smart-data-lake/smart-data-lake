@@ -23,8 +23,9 @@ import io.delta.tables.DeltaTable
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
-import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
+import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
+import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.DataFrameUtil.arrayToSeq
 import io.smartdatalake.util.misc.{AclDef, AclUtil, DataFrameUtil, PerformanceUtils}
@@ -143,7 +144,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     df
   }
 
-  override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def init(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.init(df, partitionValues)
     validateSchemaMin(df, "write")
     validateSchemaHasPartitionCols(df, "write")
@@ -179,13 +180,14 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     } else df
 
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
-    val dfWriter = dfPrepared.write
+    val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(df)).getOrElse(df) // remove auxiliary columns to validate schema and create table if it doesnt exist
+    val dfWriter = saveModeTargetDf.write
       .format("delta")
       .options(options.getOrElse(Map()))
       .option("path", hadoopPath.toString)
 
     if (isTableExisting) {
-      if (!allowSchemaEvolution) validateSchema(df, session.table(table.fullName).schema, "write")
+      if (!allowSchemaEvolution) validateSchema(saveModeTargetDf, session.table(table.fullName).schema, "write")
       if (finalSaveMode == SDLSaveMode.Merge) {
         mergeDataFrameByPrimaryKey(df, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
       } else {
@@ -226,7 +228,9 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   /**
    * Merges DataFrame with existing table data by using DeltaLake Upsert-statement.
+   *
    * Table.primaryKey is used as condition to check if a record is matched or not. If it is matched it gets updated (or deleted), otherwise it is inserted.
+   *
    * This all is done in one transaction.
    */
   def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
@@ -244,9 +248,11 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       // add delete clause if configured
       saveModeOptions.deleteConditionExpr.foreach(c => mergeStmt = mergeStmt.whenMatched(c).delete())
       // add update and insert clause
+      val updateCols = saveModeOptions.updateColumnsOpt.getOrElse(df.columns.toSeq.diff(table.primaryKey.get))
+      val insertCols = df.columns.diff(saveModeOptions.insertColumnsToIgnore)
       mergeStmt
-        .whenMatched(saveModeOptions.updateConditionExpr.getOrElse(lit(true))).updateAll()
-        .whenNotMatched().insertAll()
+        .whenMatched(saveModeOptions.updateConditionExpr.getOrElse(lit(true))).update(updateCols.map(c => c -> col(s"new.$c")).toMap)
+        .whenNotMatched(saveModeOptions.insertConditionExpr.getOrElse(lit(true))).insert(insertCols.map(c => c -> col(s"new.$c")).toMap)
         .execute()
     }
   }

@@ -23,6 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{AuthMode, BasicAuthMode}
 import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger, TryWithResourcePool}
+import io.smartdatalake.workflow.dataobject.JdbcTableDataObject
 import org.apache.commons.pool2.impl.{DefaultPooledObject, GenericObjectPool}
 import org.apache.commons.pool2.{BasePooledObjectFactory, PooledObject}
 import org.apache.spark.sql.SparkSession
@@ -64,7 +65,7 @@ case class JdbcTableConnection(override val id: ConnectionId,
   require(authMode.isEmpty || supportedAuths.contains(authMode.get.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
 
   // prepare catalog implementation
-  val catalog: SQLCatalog = SQLCatalog.fromJdbcDriver(driver, this)
+  val catalog: JdbcCatalog = JdbcCatalog.fromJdbcDriver(driver, this)
 
   /**
    * Get a connection from the pool and execute an arbitrary function
@@ -157,8 +158,8 @@ case class JdbcTableConnection(override val id: ConnectionId,
         .getOrElse(Map.empty[String, String])
       schema.fields.foreach { field =>
         // Change is here - dont quote if not case-sensitive and normal characters used:
-        val name = if(!caseSensitive && field.name.matches("[a-zA-Z0-9_]*")) field.name
-          else dialect.quoteIdentifier(field.name)
+        val name = if(caseSensitive || JdbcTableDataObject.hasIdentifierSpecialChars(field.name)) dialect.quoteIdentifier(field.name)
+          else field.name
         val typ = userSpecifiedColTypesMap
           .getOrElse(field.name, getJdbcType(field.dataType, dialect).databaseTypeDefinition)
         val nullable = if (field.nullable) "" else "NOT NULL"
@@ -199,135 +200,5 @@ case class JdbcTableConnection(override val id: ConnectionId,
 object JdbcTableConnection extends FromConfigFactory[Connection] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): JdbcTableConnection = {
     extract[JdbcTableConnection](config)
-  }
-}
-
-
-/**
- * SQL JDBC Catalog query method definition.
- * Implementations may vary depending on the concrete DB system.
- */
-private[smartdatalake] abstract class SQLCatalog(connection: JdbcTableConnection) extends SmartDataLakeLogger  {
-  // get spark jdbc dialect definitions
-  protected val jdbcDialect: JdbcDialect = JdbcDialects.get(connection.url)
-  protected val isNoopDialect: Boolean = jdbcDialect.getClass.getSimpleName.startsWith("NoopDialect") // The default implementation is used for unknown url types
-  // use jdbcDialect to define identifiers used for quoting
-  protected val (quoteStart,quoteEnd) = {
-    val dbUnquoted = jdbcDialect.quoteIdentifier("dummy")
-    val quoteStart = dbUnquoted.replaceFirst("dummy.*", "")
-    val quoteEnd = dbUnquoted.replaceFirst(".*dummy", "")
-    (quoteStart, quoteEnd)
-  }
-  // true if the given identifier is quoted
-  def isQuotedIdentifier(s: String) : Boolean = {
-    s.startsWith(quoteStart) && s.endsWith(quoteEnd)
-  }
-  // returns the string with quotes removed
-  def removeQuotes(s: String) : String = {
-    s.stripPrefix(quoteStart).stripSuffix(quoteEnd)
-  }
-  // quote identifier for this database
-  def quoteIdentifier(s: String) : String = {
-    jdbcDialect.quoteIdentifier(s)
-  }
-
-  // convert Spark DataType to SQL type
-  def getSqlType(t: DataType, isNullable: Boolean = true): String = {
-    val sqlType = JdbcUtils.getJdbcType(t, jdbcDialect)
-    val nullable = if (!isNullable) " NOT NULL" else ""
-    s"${sqlType.databaseTypeDefinition}$nullable"
-  }
-
-  // create ddl to add a column
-  def getAddColumnSql(table: String, column: String, dataType: String): String = {
-    val sql = jdbcDialect.getAddColumnQuery(table, column, dataType)
-    // we need to fix column name quotation as many dialects always quote them, which is not optimal.
-    sql.replace(quoteIdentifier(column), column)
-  }
-
-  // create ddl to add alter column type
-  def getAlterColumnSql(table: String, column: String, sqlType: String): String = {
-    val sql = jdbcDialect.getUpdateColumnTypeQuery(table, column, sqlType)
-    // we need to fix column name quotation as many dialects always quote them, which is not optimal.
-    sql.replace(quoteIdentifier(column), column)
-  }
-
-  // create ddl to add alter column type
-  def getAlterColumnNullableSql(table: String, column: String, isNullable: Boolean = true): String = {
-    val sql = jdbcDialect.getUpdateColumnNullabilityQuery(table, column, isNullable)
-    // we need to fix column name quotation as many dialects always quote them, which is not optimal.
-    sql.replace(quoteIdentifier(column), column)
-  }
-
-  def isDbExisting(db: String)(implicit session: SparkSession): Boolean
-  def isTableExisting(tableName: String)(implicit session: SparkSession): Boolean = {
-    val tableExistsQuery = jdbcDialect.getTableExistsQuery(tableName)
-    try {
-      connection.execJdbcStatement(tableExistsQuery, logging = false)
-      true
-    } catch {
-      case _: Throwable =>
-        logger.debug("No access on table or table does not exist: " +tableName)
-        false
-    }
-  }
-
-  protected def evalRecordExists( rs:ResultSet ) : Boolean = {
-    rs.next
-    rs.getInt(1) == 1
-  }
-}
-private[smartdatalake] object SQLCatalog {
-  def fromJdbcDriver(driver: String, connection: JdbcTableConnection): SQLCatalog = {
-    driver match {
-      case d if d.toLowerCase.contains("oracle") => new OracleSQLCatalog(connection)
-      case d if d.toLowerCase.contains("com.sap.db") => new SapHanaSQLCatalog(connection)
-      case _ => new DefaultSQLCatalog(connection)
-    }
-  }
-}
-
-/**
- * Default SQL JDBC Catalog query implementation using INFORMATION_SCHEMA
- */
-private[smartdatalake] class DefaultSQLCatalog(connection: JdbcTableConnection) extends SQLCatalog(connection) {
-  override def isDbExisting(db: String)(implicit session: SparkSession): Boolean = {
-    val cntTableInCatalog = if(isQuotedIdentifier(db)) {
-      s"select count(*) from INFORMATION_SCHEMA.SCHEMATA where TABLE_SCHEMA='${removeQuotes(db)}'"
-    }
-    else {
-      s"select count(*) from INFORMATION_SCHEMA.SCHEMATA where UPPER(TABLE_SCHEMA)=UPPER('$db')"
-    }
-    connection.execJdbcQuery(cntTableInCatalog, evalRecordExists )
-  }
-}
-
-/**
- * Oracle SQL JDBC Catalog query implementation
- */
-private[smartdatalake] class OracleSQLCatalog(connection: JdbcTableConnection) extends SQLCatalog(connection) {
-  override def isDbExisting(db: String)(implicit session: SparkSession): Boolean = {
-    val cntTableInCatalog = if(isQuotedIdentifier(db))  {
-      s"select count(*) from ALL_USERS where USERNAME='${removeQuotes(db)}'"
-    }
-    else {
-      s"select count(*) from ALL_USERS where UPPER(USERNAME)=UPPER('$db')"
-    }
-    connection.execJdbcQuery(cntTableInCatalog, evalRecordExists)
-  }
-}
-
-/**
- * SAP HANA JDBC Catalog query implementation
- */
-private[smartdatalake] class SapHanaSQLCatalog(connection: JdbcTableConnection) extends SQLCatalog(connection) {
-  override def isDbExisting(db: String)(implicit session: SparkSession): Boolean = {
-    val cntTableInCatalog = if(isQuotedIdentifier(db))  {
-      s"select count(*) from PUBLIC.SCHEMAS where SCHEMA_NAME='${removeQuotes(db)}'"
-    }
-    else {
-      s"select count(*) from PUBLIC.SCHEMAS where upper(SCHEMA_NAME)=upper('$db')"
-    }
-    connection.execJdbcQuery(cntTableInCatalog, evalRecordExists)
   }
 }
