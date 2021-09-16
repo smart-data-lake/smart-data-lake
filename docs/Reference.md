@@ -387,12 +387,12 @@ How it works: under the hood a PySpark DataFrame is a proxy for a Java Spark Dat
 ## Schema Evolution
 SmartDataLakeBuilder is built to support schema evolution where possible. This means that data pipelines adapt themselves automatically to additional or removed columns and changes of data types if possible.
 The following cases can be distinguished:
-* Overwrite all (CopyAction): if all data of a DataObject is overwritten, the schema can replaced: additional columns are added, removed columns are removed and data types are changed. Requirements: 
+* Overwrite all (CopyAction): if all data of a DataObject is overwritten, the schema can be replaced: additional columns are added, removed columns are removed and data types are changed. Requirements: 
   * Output DataObject needs to be able to replace schema.
 * Overwrite all keeping existing data (Historize- & DeduplicateAction): Action consolidates new data with existing data. The schema needs to be evolved: additional columns are added with null value for existing records, removed columns are kept with null values for new records and data types are changed to new data type if supported. Requirements: 
   * Output DataObject needs to be able to replace schema.
   * Output DataObject must be a TransactionalSparkTableDataObject (read existing data and overwrite new data in the same SparkJob, preventing data loss in case of errors).
-* Overwrite incremental using merge (CopyAction, DeduplicateAction): Action incrementally merges new data int existing data. The schema needs to be evolved: additional columns are added with null value for existing records, removed columns are kept with null values for new records and data types are changed to new data type if supported. Requirements:
+* Overwrite incremental using merge (CopyAction, DeduplicateAction): Action incrementally merges new data into existing data. The schema needs to be evolved: additional columns are added with null value for existing records, removed columns are kept with null values for new records and data types are changed to new data type if supported. Requirements:
   * Output DataObject needs to support CanEvolveSchema (alter schema automatically when writing to this DataObject with different schema)
   * Output DataObject needs to support CanMergeDataFrame (use SQL merge statement to update and insert records transactionally)
 
