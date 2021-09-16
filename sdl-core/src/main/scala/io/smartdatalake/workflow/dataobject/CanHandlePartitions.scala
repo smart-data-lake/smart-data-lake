@@ -19,6 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.SchemaViolationException
 import org.apache.spark.annotation.DeveloperApi
@@ -65,7 +66,7 @@ trait CanHandlePartitions { this: DataObject =>
   /**
    * list partition values
    */
-  def listPartitions(implicit session: SparkSession): Seq[PartitionValues]
+  def listPartitions(implicit session: SparkSession, context: ActionPipelineContext): Seq[PartitionValues]
 
   /**
    * create empty partition
@@ -75,7 +76,7 @@ trait CanHandlePartitions { this: DataObject =>
   /**
    * Create empty partitions for partition values not yet existing
    */
-  private[smartdatalake] final def createMissingPartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+  private[smartdatalake] final def createMissingPartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     val partitionValuesCols = partitionValues.map(_.keys).reduceOption(_ ++ _).getOrElse(Set()).toSeq
     partitionValues.diff(listPartitions.map(_.filterKeys(partitionValuesCols)))
       .foreach(createEmptyPartition)
@@ -103,7 +104,21 @@ trait CanHandlePartitions { this: DataObject =>
    * @throws SchemaViolationException if the partitions columns are not included.
    */
   def validateSchemaHasPartitionCols(df: DataFrame, role: String): Unit = {
-    val missingCols = partitions.diff(df.columns)
+    val missingCols = if (SchemaUtil.isSparkCaseSensitive) partitions.diff(df.columns)
+    else partitions.map(_.toLowerCase).diff(df.columns.map(_.toLowerCase))
     if (missingCols.nonEmpty) throw new SchemaViolationException(s"($id) DataFrame is missing partition cols ${missingCols.mkString(", ")} on $role")
+  }
+
+  /**
+   * Validate the schema of a given Spark Data Frame `df` that it contains the specified primary key columns
+   *
+   * @param df The data frame to validate.
+   * @param role role used in exception message. Set to read or write.
+   * @throws SchemaViolationException if the partitions columns are not included.
+   */
+  def validateSchemaHasPrimaryKeyCols(df: DataFrame, primaryKeyCols: Seq[String], role: String): Unit = {
+    val missingCols = if (SchemaUtil.isSparkCaseSensitive) primaryKeyCols.diff(df.columns)
+    else primaryKeyCols.map(_.toLowerCase).diff(df.columns.map(_.toLowerCase))
+    if (missingCols.nonEmpty) throw new SchemaViolationException(s"($id) DataFrame is missing primary key cols ${missingCols.mkString(", ")} on $role")
   }
 }

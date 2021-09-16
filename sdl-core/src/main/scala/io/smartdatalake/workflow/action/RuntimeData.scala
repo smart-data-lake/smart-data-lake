@@ -240,17 +240,17 @@ private[smartdatalake] sealed trait ExecutionId extends Ordered[ExecutionId]
 /**
  * Standard execution id for actions that are executed synchronous by SDL.
  */
-private[smartdatalake] case class SDLExecutionId(runId: Int, attemptId: Int = 1) extends ExecutionId {
+case class SDLExecutionId(runId: Int, attemptId: Int = 1) extends ExecutionId {
   override def toString: String = s"$runId-$attemptId"
   override def compare(that: ExecutionId): Int = that match {
     case that: SDLExecutionId => SDLExecutionId.ordering.compare(this, that)
     case _ => throw new RuntimeException(s"SDLExecutionId cannot be compare with ${that.getClass.getSimpleName}")
   }
-  def incrementRunId: SDLExecutionId = this.copy(runId = runId + 1, attemptId = 1)
-  def incrementAttemptId: SDLExecutionId = this.copy(attemptId = this.attemptId + 1)
+  private[smartdatalake] def incrementRunId: SDLExecutionId = this.copy(runId = runId + 1, attemptId = 1)
+  private[smartdatalake] def incrementAttemptId: SDLExecutionId = this.copy(attemptId = this.attemptId + 1)
 }
-private[smartdatalake] object SDLExecutionId {
-  val ordering: Ordering[SDLExecutionId] = Ordering.by(x => (x.runId, x.attemptId))
+object SDLExecutionId {
+  private[smartdatalake] val ordering: Ordering[SDLExecutionId] = Ordering.by(x => (x.runId, x.attemptId))
   val executionId1: SDLExecutionId = SDLExecutionId(1)
 }
 
@@ -258,7 +258,7 @@ private[smartdatalake] object SDLExecutionId {
  * Execution id for spark streaming jobs.
  * They need a different execution id as they are executed asynchronous.
  */
-private[smartdatalake] case class SparkStreamingExecutionId(batchId: Long) extends ExecutionId {
+case class SparkStreamingExecutionId(batchId: Long) extends ExecutionId {
   override def toString: String = s"$batchId"
   override def compare(that: ExecutionId): Int = that match {
     case that: SparkStreamingExecutionId => SparkStreamingExecutionId.ordering.compare(this, that)
@@ -272,7 +272,7 @@ private[smartdatalake] object SparkStreamingExecutionId {
 /**
  * Summarized runtime information
  */
-private[smartdatalake] case class RuntimeInfo(
+case class RuntimeInfo(
                                                executionId: ExecutionId,
                                                state: RuntimeEventState,
                                                startTstmp: Option[LocalDateTime] = None,

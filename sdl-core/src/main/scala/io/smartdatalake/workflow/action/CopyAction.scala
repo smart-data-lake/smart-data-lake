@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{Condition, ExecutionMode}
+import io.smartdatalake.definitions.{Condition, ExecutionMode, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.action.sparktransformer.{DfTransformer, ParsableDfTransformer}
@@ -49,6 +49,7 @@ import scala.util.{Failure, Success, Try}
  * @param executionCondition     optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
+ * @param saveModeOptions override and parametrize saveMode set in output DataObject configurations when writing to DataObjects.
  */
 case class CopyAction(override val id: ActionId,
                       inputId: DataObjectId,
@@ -72,6 +73,7 @@ case class CopyAction(override val id: ActionId,
                       override val executionMode: Option[ExecutionMode] = None,
                       override val executionCondition: Option[Condition] = None,
                       override val metricsFailCondition: Option[String] = None,
+                      override val saveModeOptions: Option[SaveModeOptions] = None,
                       override val metadata: Option[ActionMetadata] = None
                      )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedAction {
 

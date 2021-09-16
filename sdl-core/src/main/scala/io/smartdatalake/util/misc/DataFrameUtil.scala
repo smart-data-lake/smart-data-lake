@@ -282,7 +282,7 @@ private[smartdatalake] object DataFrameUtil {
      * @return the set of columns contained in `otherSchema` but not in `this.schema`.
      */
     def schemaDiffTo(schemaOther: StructType, ignoreNullable: Boolean = false, deep: Boolean = false): Set[StructField] = {
-      SchemaUtil.schemaDiff(schemaOther, df.schema, ignoreNullable, deep)
+      SchemaUtil.schemaDiff(schemaOther, df.schema, ignoreNullable = ignoreNullable, deep = deep)
     }
 
     /**
