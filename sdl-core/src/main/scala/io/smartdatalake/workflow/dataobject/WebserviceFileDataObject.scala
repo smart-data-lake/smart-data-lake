@@ -37,7 +37,7 @@ import org.apache.tika.Tika
 
 import scala.util.{Failure, Success, Try}
 
-case class WebservicePartitionDefinition( name: String, values: Seq[String])
+case class WebservicePartitionDefinition(name: String, values: Seq[String])
 
 case class HttpProxyConfig(host: String, port: Int)
 
@@ -48,12 +48,13 @@ case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int)
  * This is implemented as FileRefDataObject because the response is treated as some file content.
  * FileRefDataObjects support partitioned data. For a WebserviceFileDataObject partitions are mapped as query parameters to create query string.
  * All possible query parameter values must be given in configuration.
- * @param partitionDefs list of partitions with list of possible values for every entry
+ *
+ * @param partitionDefs   list of partitions with list of possible values for every entry
  * @param partitionLayout definition of partitions in query string. Use %<partitionColName>% as placeholder for partition column value in layout.
  */
 case class WebserviceFileDataObject(override val id: DataObjectId,
                                     url: String,
-                                    additionalHeaders: Map[String,String] = Map(),
+                                    additionalHeaders: Map[String, String] = Map(),
                                     timeouts: Option[HttpTimeoutConfig] = None,
                                     readTimeoutMs: Option[Int] = None,
                                     authMode: Option[AuthMode] = None,
@@ -74,6 +75,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
   override val saveMode: SDLSaveMode = SDLSaveMode.Append
 
   override def partitions: Seq[String] = partitionDefs.map(_.name)
+
   override def expectedPartitionsCondition: Option[String] = None // all partitions are expected to exist
 
   override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
@@ -82,13 +84,13 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
   }
 
   /**
-   *  Calls webservice and returns response
-    *
+   * Calls webservice and returns response
+   *
    * @param query optional URL with replaced placeholders to call
-    * @return Response as Array[Byte]
-    */
-  def getResponse(query: Option[String] = None) : Array[Byte] = {
-    val webserviceClient = ScalaJWebserviceClient(this, query.map(url+_))
+   * @return Response as Array[Byte]
+   */
+  def getResponse(query: Option[String] = None): Array[Byte] = {
+    val webserviceClient = ScalaJWebserviceClient(this, query.map(url + _))
 
     webserviceClient.get() match {
       case Success(c) => c
@@ -99,12 +101,13 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
 
   /**
    * Calls webservice POST method with binary data as body
-   * @param body post body as Byte Array, type will be determined by Tika
+   *
+   * @param body  post body as Byte Array, type will be determined by Tika
    * @param query optional URL with replaced placeholders to call
    * @return Response as Array[Byte]
    */
-  def postResponse(body: Array[Byte], query: Option[String] = None) : Array[Byte] = {
-    val webserviceClient = ScalaJWebserviceClient(this, query.map(url+_))
+  def postResponse(body: Array[Byte], query: Option[String] = None): Array[Byte] = {
+    val webserviceClient = ScalaJWebserviceClient(this, query.map(url + _))
 
     // Try to extract Mime Type
     // JSON is detected as text/plain, try to parse it as JSON to more precisely define it as
@@ -142,9 +145,9 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
 
   /**
    *
-   * @param path is ignored for webservices
+   * @param path      is ignored for webservices
    * @param overwrite is ignored for webservices
-   * @param session implicit spark session
+   * @param session   implicit spark session
    * @return outputstream that writes to WebService once it's closed
    */
   override def createOutputStream(path: String, overwrite: Boolean)(implicit session: SparkSession): OutputStream = {
@@ -184,10 +187,16 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
    */
   private def createFileRef(partitionValues: PartitionValues)(implicit session: SparkSession): FileRef = {
     val queryString = getPartitionString(partitionValues)
+
     // translate urls special characters into a regular filename
-    def translate( s: String, translation: Map[Char,Char] ): String = s.map( c => translation.getOrElse(c,c))
+    def translate(s: String, translation: Map[Char, Char]): String = s.map(c => translation.getOrElse(c, c))
+
     val translationMap = Map('?' -> '.', '&' -> '.', '=' -> '-')
-    FileRef( fullPath = queryString.getOrElse(""), fileName = translate(queryString.getOrElse("result"), translationMap), partitionValues)
+
+    val translatedFileName = translate(queryString.getOrElse("result"), translationMap)
+      .replaceAll("^\\.", "") //Prevent file names starting with "."
+
+    FileRef(fullPath = queryString.getOrElse(""), fileName = translatedFileName, partitionValues)
   }
 
   /**
