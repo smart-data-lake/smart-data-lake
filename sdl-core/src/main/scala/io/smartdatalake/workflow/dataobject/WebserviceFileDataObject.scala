@@ -189,12 +189,14 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
     val queryString = getPartitionString(partitionValues)
 
     // translate urls special characters into a regular filename
-    def translate(s: String, translation: Map[Char, Char]): String = s.map(c => translation.getOrElse(c, c))
-
     val translationMap = Map('?' -> '.', '&' -> '.', '=' -> '-')
+    def translate(s: String): String = {
+      s.map(c => translationMap.getOrElse(c, c))
+        .replaceAll("[^A-Za-z0-9\\-._]","")
+    }
 
-    val translatedFileName = translate(queryString.getOrElse("result"), translationMap)
-      .replaceAll("^\\.", "") //Prevent file names starting with "."
+    val translatedFileName = translate(queryString.getOrElse("result"))
+      .dropWhile(_ == '.') // Prevent file names starting with "."
 
     FileRef(fullPath = queryString.getOrElse(""), fileName = translatedFileName, partitionValues)
   }
