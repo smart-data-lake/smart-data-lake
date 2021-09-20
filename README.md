@@ -1,6 +1,10 @@
 # Code for Getting Started With Smart DataLake
 ## Introduction
-This the code used in the Step-By-Step Walk Through Guide to get started with Smart Data Lake
+This the code used in the Step-By-Step Walk Through Guide to get started with Smart Data Lake Builder (SDL).
+
+There are multiple ways to run the example code.
+If you are coming from the getting started guide, 
+just follow "Run with Docker".
 
 ## Run with Docker
 
