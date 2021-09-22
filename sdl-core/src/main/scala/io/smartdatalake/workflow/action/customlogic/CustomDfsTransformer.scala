@@ -25,7 +25,6 @@ import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig.f
 import io.smartdatalake.workflow.action.sparktransformer.{DfsTransformer, SQLDfsTransformer, ScalaClassDfsTransformer, ScalaCodeDfsTransformer}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-//TODO: deprecated since version 2.0.5
 /**
  * Interface to define a custom Spark-DataFrame transformation (n:m)
  * Same trait as [[CustomDfTransformer]], but multiple input and outputs supported.

@@ -24,7 +24,6 @@ import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig.fn
 import io.smartdatalake.workflow.action.sparktransformer._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-//TODO: deprecated since version 2.0.5
 /**
  * Interface to define a custom Spark-DataFrame transformation (1:1)
  */
