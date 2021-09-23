@@ -12,7 +12,7 @@ just follow "Run with Docker".
 
     docker build -t sdl-gs-part-1 .
 
-## Run docker image
+### Run docker image
 
 
     docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config sdl-gs-part-1:latest -c /mnt/config --feed-sel download.*
