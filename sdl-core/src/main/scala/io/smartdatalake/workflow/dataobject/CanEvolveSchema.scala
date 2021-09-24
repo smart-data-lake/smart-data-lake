@@ -16,17 +16,14 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
-package io.smartdatalake.workflow.action
-
-import io.smartdatalake.util.dag.DAGHelper.NodeId
-import io.smartdatalake.util.dag.{TaskSkippedDontStopWarning, TaskSkippedWarning}
-import io.smartdatalake.workflow.SubFeed
-import org.apache.spark.annotation.DeveloperApi
+package io.smartdatalake.workflow.dataobject
 
 /**
- * Execution modes can throw this exception to indicate that there is no data to process.
- * @param results SDL might add fake results to this exception to allow further execution of DAG. When creating the exception result should be set to None.
+ * Marker interface to let Actions know that a DataObject can evolve its schema
  */
-@DeveloperApi
-case class NoDataToProcessWarning(actionId: NodeId, msg: String, results: Option[Seq[SubFeed]] = None) extends TaskSkippedDontStopWarning(actionId, msg, results)
+private[smartdatalake] trait CanEvolveSchema {
+  /**
+   * If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
+   */
+  def allowSchemaEvolution: Boolean
+}

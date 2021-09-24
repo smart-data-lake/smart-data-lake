@@ -22,6 +22,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
 * File: SFTP, Local, Webservice
 * Easily extendable through implementing predefined scala traits
 * Support for getting secrets from different secret providers
+* Support for SQL update & merge (Jdbc, DeltaLake) 
 
 ##### Generic Transformations
 * Spark based: Copy, Historization, Deduplication
@@ -56,6 +57,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
 ##### Schema Evolution
 * Automatic evolution of data schemas (new column, removed column, changed datatype)
 * Support for changes in complex datatypes (e.g. new column in array of struct)
+* Automatic adaption of DataObjects with fixed schema (Jdbc, DeltaLake) 
 
 ##### Metrics
 * Number of rows written per DataObject

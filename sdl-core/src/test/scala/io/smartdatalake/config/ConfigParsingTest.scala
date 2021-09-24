@@ -313,7 +313,6 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         | executionMode = {
         |  type = PartitionDiffMode
         |  partitionColNb = 2
-        |  stop-if-no-data = true
         | }
         |}
         |

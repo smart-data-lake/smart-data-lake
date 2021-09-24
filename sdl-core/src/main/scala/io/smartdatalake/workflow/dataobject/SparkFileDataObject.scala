@@ -18,7 +18,8 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.definitions.{Environment, SDLSaveMode}
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
+import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
 import io.smartdatalake.util.misc.{CompactionUtil, DataFrameUtil}
@@ -184,7 +185,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * @param partitionValues The partition layout to write.
    * @param session the current [[SparkSession]].
    */
-  final override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
+  final override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     require(!isRecursiveInput, "($id) SparkFileDataObject cannot write dataframe when dataobject is also used as recursive input ")
 
@@ -194,7 +195,8 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
       .getOrElse(dfPrepared)
 
     // apply special save modes
-    saveMode match {
+    val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
+    finalSaveMode match {
       case SDLSaveMode.Overwrite =>
         if (partitionValues.nonEmpty) { // delete concerned partitions if existing, as Spark dynamic partitioning doesn't delete empty partitions
           deletePartitions(filterPartitionsExisting(partitionValues))
@@ -224,7 +226,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     }
 
     // write
-    writeDataFrameToPath(dfPrepared, hadoopPath)
+    writeDataFrameToPath(dfPrepared, hadoopPath, finalSaveMode)
 
     // make sure empty partitions are created as well
     createMissingPartitions(partitionValues)
@@ -233,12 +235,12 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     sparkRepartition.foreach(_.renameFiles(getFileRefs(partitionValues))(filesystem))
   }
 
-  override private[smartdatalake] def writeDataFrameToPath(df: DataFrame, path: Path)(implicit session: SparkSession): Unit = {
+  override private[smartdatalake] def writeDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit session: SparkSession): Unit = {
     val hadoopPathString = path.toString
     logger.info(s"($id) Writing DataFrame to $hadoopPathString")
 
     df.write.format(format)
-      .mode(saveMode.asSparkSaveMode)
+      .mode(finalSaveMode.asSparkSaveMode)
       .options(options)
       .optionalPartitionBy(partitions)
       .save(hadoopPathString)
@@ -248,7 +250,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * Filters only existing partition.
    * Note that partition values to check don't need to have a key/value defined for every partition column.
    */
-  def filterPartitionsExisting(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[PartitionValues]  = {
+  def filterPartitionsExisting(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Seq[PartitionValues]  = {
     val partitionValueKeys = PartitionValues.getPartitionValuesKeys(partitionValues).toSeq
     partitionValues.intersect(listPartitions.map(_.filterKeys(partitionValueKeys)))
   }
@@ -260,12 +262,12 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     CompactionUtil.compactHadoopStandardPartitions(this, partitionValues)
   }
 
-  override def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String,String], checkpointLocation: String, queryName: String, outputMode: OutputMode = OutputMode.Append)
+  override def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String,String], checkpointLocation: String, queryName: String, outputMode: OutputMode = OutputMode.Append, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit session: SparkSession, context: ActionPipelineContext): StreamingQuery = {
 
     // lambda function is ambiguous with foreachBatch in scala 2.12... we need to create a real function...
     // Note: no partition values supported when writing streaming target
-    def microBatchWriter(dfMicrobatch: Dataset[Row], batchid: Long): Unit = writeDataFrame(dfMicrobatch, Seq())
+    def microBatchWriter(dfMicrobatch: Dataset[Row], batchid: Long): Unit = writeDataFrame(dfMicrobatch, Seq(), saveModeOptions = saveModeOptions)
 
     df
       .writeStream

@@ -99,7 +99,7 @@ private[smartdatalake] object SchemaEvolution extends SmartDataLakeLogger {
    * - char and boolean to string
    * - decimal with precision <= 7 to float
    * - decimal with precision <= 16 to double
-   * - numerical type to to numerical type with higher precision, e.g int to long
+   * - numerical type to numerical type with higher precision, e.g int to long
    * - delete column in complex type (array, struct, map)
    * - new column in complex type (array, struct, map)
    * - changed data type in complex type (array, struct, map) according to the rules above
@@ -133,7 +133,7 @@ private[smartdatalake] object SchemaEvolution extends SmartDataLakeLogger {
    * - New columns: newDf contains additional columns, all other columns are the same as in in oldDf
    * - Renamed columns: this is a combination of a deleted column and a new column
    * - Changed data type: see method [[convertDataType]] for allowed changes of data type. In case of unsupported changes
-   *   of data types an [[SchemaEvolutionException]] is thrown
+   *   of data types a [[SchemaEvolutionException]] is thrown
    *
    * @param oldDf [[DataFrame]] with old data
    * @param newDf [[DataFrame]] with new data with potential changes in schema
@@ -142,7 +142,7 @@ private[smartdatalake] object SchemaEvolution extends SmartDataLakeLogger {
    * @param ignoreOldDeletedNestedColumns if true, remove no longer existing columns in result DataFrame's. Keeping deleted
    *                                      columns in complex data types has performance impact as all new data in the future
    *                                      has to be converted by a complex function.
-   * @return tuple of (newDf,oldDf) evolved to new schema
+   * @return tuple of (oldExtendedDf, newExtendedDf) evolved to new schema
    */
   def process(oldDf: DataFrame, newDf: DataFrame, colsToIgnore: Seq[String] = Seq(), ignoreOldDeletedColumns: Boolean = false, ignoreOldDeletedNestedColumns: Boolean = true): (DataFrame, DataFrame) = {
     // internal structure and functions

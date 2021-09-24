@@ -72,7 +72,7 @@ object SdlConfigObject {
   def validateId(id: String): Unit = {
     if (!id.matches(idRegexStr)) throw ConfigurationException(s"Id $id is not valid. It must match regex '$idRegexStr'.")
   }
-  val idRegexStr = "[a-zA-Z0-9_-]+"
+  private[smartdatalake] val idRegexStr = "[a-zA-Z0-9_-]+"
 
   implicit def stringToConnectionId(str: String): ConnectionId = ConnectionId(str)
   implicit def stringToDataObjectId(str: String): DataObjectId = DataObjectId(str)
