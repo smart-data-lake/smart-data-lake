@@ -383,6 +383,11 @@ private[smartdatalake] abstract class SparkAction extends Action {
     if (!isAsynchronous) unregisterStageMetricsListener
   }
 
+  override def postExecFailed(implicit session: SparkSession): Unit = {
+    super.postExecFailed
+    unregisterStageMetricsListener
+  }
+
   def logWritingStarted(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     val msg = s"writing to ${subFeed.dataObjectId}" + (if (subFeed.partitionValues.nonEmpty) s", partitionValues ${subFeed.partitionValues.mkString(" ")}" else "")
     logger.info(s"($id) start " + msg)

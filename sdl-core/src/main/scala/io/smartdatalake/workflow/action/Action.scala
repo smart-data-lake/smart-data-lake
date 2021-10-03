@@ -250,6 +250,11 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   }
 
   /**
+   * Executes operations needed to cleanup after executing an action failed.
+   */
+  def postExecFailed(implicit session: SparkSession): Unit = Unit
+
+  /**
    * Get potential state of input DataObjects when executionMode is DataObjectStateIncrementalMode.
    */
   def getDataObjectsState: Seq[DataObjectState] = {
@@ -349,6 +354,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
         runtimeData.addMetric(executionId, dataObjectId.get, metric)
       } catch {
         case e: LateArrivingMetricException => logger.error(s"($id) ${e.msg}")
+        case e: AssertionError => logger.error(s"($id) ${e.getMessage}")
       }
       else logger.warn(s"($id) Metrics received for ${dataObjectId.get} which doesn't belong to outputs ($metric")
     } else logger.debug(s"($id) Metrics received for unspecified DataObject (${metric.getId})")

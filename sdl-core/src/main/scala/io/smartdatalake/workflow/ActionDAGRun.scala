@@ -161,6 +161,10 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
             val resultSubFeeds = node.exec(deduplicatedSubFeeds)
             node.postExec(deduplicatedSubFeeds, resultSubFeeds)
             resultSubFeeds
+          } catch {
+            case ex: Exception =>
+              node.postExecFailed
+              throw ex
           } finally {
             setThreadName(previousThreadName)
           }
