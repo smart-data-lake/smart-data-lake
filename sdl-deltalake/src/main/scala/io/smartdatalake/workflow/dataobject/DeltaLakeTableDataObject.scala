@@ -189,9 +189,10 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       if (finalSaveMode == SDLSaveMode.Merge) {
         mergeDataFrameByPrimaryKey(df, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
       } else {
-        if (partitions.isEmpty && finalSaveMode != SDLSaveMode.Append) {
+        if (partitions.isEmpty) {
           dfWriter
             .option("overwriteSchema", allowSchemaEvolution) // allow overwriting schema when overwriting whole table
+            .option("mergeSchema", allowSchemaEvolution)
             .mode(finalSaveMode.asSparkSaveMode)
             .saveAsTable(table.fullName)
         } else {
