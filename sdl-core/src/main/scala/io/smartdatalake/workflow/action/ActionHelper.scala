@@ -185,19 +185,12 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
   }
 
   def getHandleExecutionModeExceptionPartialFunction(outputs: Seq[DataObject]): PartialFunction[Throwable, Option[ExecutionModeResult]] = {
-    // return empty output subfeeds if "no data"
+    // return skipped output subfeeds if "no data"
     case ex: NoDataToProcessWarning =>
-      // This exception is changed to a NoDataToProcessDontStopWarning but subFeeds have isSkipped set to true
-      // The following action's executionCondition will stop by default if there is a skipped input subFeed. The executionCondition can be set to "true" to get stopIfNoData=false behaviour.
+      // create fake results (subFeeds with isSkipped=true)
       val outputSubFeeds = outputs.map(output => InitSubFeed(dataObjectId = output.id, partitionValues = Seq(), isSkipped = true))
-      // throw NoDataToProcessDontStopWarning with fake results added. The DAG will pass the fake results to further actions.
-      throw NoDataToProcessDontStopWarning(ex.actionId, ex.msg, results = Some(outputSubFeeds))
-    case ex: NoDataToProcessDontStopWarning =>
-      // in this case subFeed isSkipped is set to false to be backward compatible with executionMode stopIfNoData=false
-      //TODO: This can be removed once executionMode stopIfNoData is removed.
-      val outputSubFeeds = outputs.map(output => InitSubFeed(dataObjectId = output.id, partitionValues = Seq()))
-      // rethrow exception with fake results added. The DAG will pass the fake results to further actions.
-      throw ex.copy(results = Some(outputSubFeeds))
+      // Add fake results to exception. The DAG will pass the fake results to further actions, which can decide if the want to stop if input subFeeds are skipped by defining an executionCondition.
+      throw NoDataToProcessWarning(ex.actionId, ex.msg, results = Some(outputSubFeeds))
   }
 }
 

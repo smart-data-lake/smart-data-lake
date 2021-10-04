@@ -27,18 +27,18 @@ import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.sparktransformer.{SQLDfTransformer, ScalaClassDfTransformer}
-import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction, RuntimeEventState, SDLExecutionId, SparkStreamingExecutionId}
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, CanWriteDataFrame, CsvFileDataObject, DataObject, HiveTableDataObject, Table}
+import io.smartdatalake.workflow.action._
+import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.streaming.{StreamingQueryException, StreamingQueryListener}
 import org.apache.spark.sql.types.StructType
-import org.scalatest.FunSuite
+import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import java.nio.file.Files
 
-class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogger {
+class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogger with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
   import session.implicits._
@@ -49,6 +49,13 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
   val statePath = "target/streamingStateTest/"
   val checkpointPath = "target/streamingCheckpointTest/"
   val filesystem = HdfsUtil.getHadoopFs(new Path(statePath))
+
+  after {
+    // ensure cleanup
+    session.streams.listListeners().foreach(session.streams.removeListener)
+    session.streams.resetTerminated() // reset terminated streaming query list
+    Environment.stopStreamingGracefully = false // reset stopping gracefully
+  }
 
   test("sdlb streaming run with normal action, executionMode=PartitionDiffMode") {
 
@@ -198,7 +205,6 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     session.streams.resetTerminated() // reset terminated streaming query list
     Environment.stopStreamingGracefully = false
     sdlb.run(sdlConfig)
-    session.streams.removeListener(testStreamingQueryListener)
     Environment.stopStreamingGracefully = false
 
     // check data after streaming is terminated
@@ -304,7 +310,6 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     session.streams.resetTerminated() // reset terminated streaming query list
     Environment.stopStreamingGracefully = false
     sdlb.run(sdlConfig)
-    session.streams.removeListener(testStreamingQueryListener)
     Environment.stopStreamingGracefully = false
 
     // check data after streaming is terminated
@@ -401,9 +406,6 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     // check data after streaming is terminated
     assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101","20190101"))
     assert(tgt2DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6,11)) // +1 because of udfAddX
-
-    // cleanup
-    session.streams.removeListener(testStreamingQueryListener)
   }
 
   test("sdlb spark streaming failure, synchronous action before asynchronously streaming action, asynchronous action failing after first run") {
@@ -474,9 +476,6 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     Environment.stopStreamingGracefully = false
     intercept[StreamingQueryException](sdlb.run(sdlConfig))
     Environment.stopStreamingGracefully = false
-
-    // cleanup
-    session.streams.removeListener(testStreamingQueryListener)
   }
 
   test("sdlb streaming recovery, asynchronously action failing before synchronous streaming action") {
@@ -655,9 +654,6 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // check data after streaming is terminated
     assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101", "20180102", "20190101"))
-
-    // cleanup
-    session.streams.removeListener(testStreamingQueryListener)
   }
 }
 

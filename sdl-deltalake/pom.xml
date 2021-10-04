@@ -76,12 +76,6 @@
 			<artifactId>spark-tags_${scala.minor.version}</artifactId>
 			<scope>compile</scope>
 		</dependency>
-		<dependency>
-			<groupId>org.apache.spark</groupId>
-			<artifactId>spark-sql-kafka-0-10_${scala.minor.version}</artifactId>
-			<version>${spark.version}</version>
-			<scope>runtime</scope>
-		</dependency>
 
 		<dependency>
 			<groupId>io.delta</groupId>

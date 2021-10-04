@@ -964,7 +964,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(action2MainMetrics("records_written")==2) // without execution mode always the whole table is processed
   }
 
-  test("action dag with 2 actions in sequence, first is executionMode=SparkIncrementalMode stopIfNoData=false, second is normal") {
+  test("action dag with 2 actions in sequence, first is executionMode=SparkIncrementalMode, second with executionCondition=true und executionMode=ProcessAllMode") {
     // setup DataObjects
     val feed = "actionpipeline"
     val tempDir = Files.createTempDirectory(feed)
@@ -980,15 +980,16 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgt2DO)
 
     // prepare DAG
-    val refTimestamp1 = LocalDateTime.now()
     val df1 = Seq(("doe","john",5, Timestamp.from(Instant.now))).toDF("lastname", "firstname", "rating", "tstmp")
     srcDO.writeDataFrame(df1, Seq())
     val df2 = Seq(("doe","john","waikiki beach")).toDF("lastname", "firstname", "address")
     src2DO.writeDataFrame(df2, Seq())
 
-    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkIncrementalMode(compareCol = "tstmp", stopIfNoData = false)))
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id
+      , executionMode = Some(SparkIncrementalMode(compareCol = "tstmp")))
     val action2 = CustomSparkAction("b", Seq(tgt1DO.id,src2DO.id), Seq(tgt2DO.id)
-      , Some(CustomDfsTransformerConfig.apply(sqlCode = Some(Map(tgt2DO.id -> "select * from src2 join tgt1 using (lastname, firstname)")))))
+      , executionCondition = Some(Condition("true")), executionMode = Some(ProcessAllMode()) // process everything, also if predecessor skipped
+      , transformer = Some(CustomDfsTransformerConfig.apply(sqlCode = Some(Map(tgt2DO.id -> "select * from src2 join tgt1 using (lastname, firstname)")))))
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1,action2))
 
     // first dag run, first file processed
@@ -1022,7 +1023,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(action2MainMetrics("records_written")==1)
   }
 
-  test("action dag with 2 actions in sequence, first is executionMode=SparkIncrementalMode stopIfNoData=true, second with executionCondition=true") {
+  test("action dag with 2 actions in sequence, first is executionMode=SparkIncrementalMode, second with executionCondition=true") {
     // setup DataObjects
     val feed = "actionpipeline"
     val tempDir = Files.createTempDirectory(feed)
@@ -1045,7 +1046,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     src2DO.writeDataFrame(df2, Seq())
 
     val transformation = CustomDfsTransformerConfig.apply(sqlCode = Some(Map(tgt2DO.id -> "select * from src2 join tgt1 using (lastname, firstname)")))
-    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkIncrementalMode(compareCol = "tstmp", stopIfNoData = true)))
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkIncrementalMode(compareCol = "tstmp")))
     val action2 = CustomSparkAction("b", Seq(tgt1DO.id,src2DO.id), Seq(tgt2DO.id), Some(transformation), executionCondition = Some(Condition("true")))
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1,action2))
 
@@ -1077,7 +1078,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(action2MainMetrics("records_written")==0)
   }
 
-  test("action dag with 2 actions in sequence, first is executionMode=SparkIncrementalMode stopIfNoData=true, second with executionCondition=true and ProcessAll mode") {
+  test("action dag with 2 actions in sequence, first is executionMode=SparkIncrementalMode, second with executionCondition=true and ProcessAll mode") {
     // setup DataObjects
     val feed = "actionpipeline"
     val tempDir = Files.createTempDirectory(feed)
@@ -1100,7 +1101,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     src2DO.writeDataFrame(df2, Seq())
 
     val transformation = CustomDfsTransformerConfig.apply(sqlCode = Some(Map(tgt2DO.id -> "select * from src2 join tgt1 using (lastname, firstname)")))
-    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkIncrementalMode(compareCol = "tstmp", stopIfNoData = true)))
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkIncrementalMode(compareCol = "tstmp")))
     val action2 = CustomSparkAction("b", Seq(tgt1DO.id,src2DO.id), Seq(tgt2DO.id), Some(transformation), executionCondition = Some(Condition("true")), executionMode = Some(ProcessAllMode()))
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1,action2))
 

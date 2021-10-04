@@ -62,16 +62,14 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
     registry
   }
 
-  def getConnectionConfigMap(config: Config) = {
-    config.get[Map[String, Config]]("connections").valueOrElse(Map.empty)
-  }
-
-  def getDataObjectConfigMap(config: Config) = {
-    config.get[Map[String, Config]]("dataObjects").valueOrElse(Map.empty)
-  }
-
-  def getActionConfigMap(config: Config) = {
-    config.get[Map[String, Config]]("actions").valueOrElse(Map.empty)
+  def getConnectionConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, "connections")
+  def getDataObjectConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, "dataObjects")
+  def getActionConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, "actions")
+  def extractConfigMap(config: Config, entry: String): Map[String, Config] = {
+    if (config.hasPath(entry)) {
+      config.get[Map[String, Config]](entry)
+        .valueOrThrow(e => new ConfigurationException(s"Error extracting $entry: ${e.messages.mkString(", ")}", Some(s"$entry")))
+    } else Map()
   }
 
   /**

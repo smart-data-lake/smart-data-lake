@@ -221,7 +221,7 @@
 
 		<spark.version>3.1.1</spark.version>
 		<spark.minor.version>3.0</spark.minor.version> <!-- this is used in sdl-snowflake which has no version yet for Spark 3.1 -->
-		<spark-extensions.version>2.0.12</spark-extensions.version>
+		<spark-extensions.version>2.0.13</spark-extensions.version>
 
 		<!-- SPARK-PARENT start: properties copied from spark-parent pom version 2.4.7 for spark-parent import in dependencyManagement -->
 		<!-- attention - manually adapted are: zookeeper, scala.version, scala.binary.version -->
@@ -355,6 +355,14 @@
 			<id>confluent</id>
 			<name>Confluent Schema Repository</name>
 			<url>https://packages.confluent.io/maven/</url>
+		</repository>
+		<!-- smartdatalake snapshots -->
+		<repository>
+			<id>ossrh</id>
+			<name>ossrh snapshots</name>
+			<url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+			<releases><enabled>false</enabled></releases>
+			<snapshots><enabled>true</enabled></snapshots>
 		</repository>
 	</repositories>
 

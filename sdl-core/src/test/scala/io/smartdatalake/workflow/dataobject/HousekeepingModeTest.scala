@@ -53,7 +53,7 @@ class HousekeepingModeTest extends FunSuite with BeforeAndAfter {
   test("PartitionRetentionMode") {
     val srcDO = CsvFileDataObject("srcDO", tempPath+s"/src0", partitions=Seq("dt"))
     val tgtDO = CsvFileDataObject("tgtDO", tempPath+s"/tgt1", partitions=Seq("dt")
-      , housekeepingMode = Some(PartitionRetentionMode("elements.dt >= 20201201"))
+      , housekeepingMode = Some(PartitionRetentionMode("to_date(elements.dt, 'yyyyMMdd') >= to_date('20201201', 'yyyyMMdd')"))
     )
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)

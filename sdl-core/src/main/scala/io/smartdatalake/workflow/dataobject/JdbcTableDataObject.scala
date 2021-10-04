@@ -174,7 +174,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     val newColumns = newSchema.fieldNames.diff(existingSchema.fieldNames) // add new column
     val missingNotNullColumns = existingSchema.fieldNames.diff(newSchema.fieldNames) // make missing columns nullable
       .filter { col =>
-        // as Spark doesn't now if a field is nullable in the database, but we can check jdbc metadata
+        // as Spark doesn't know if a field is nullable in the database, but we can check jdbc metadata
         val jdbcColumn = getJdbcColumn(col)
         !jdbcColumn.flatMap(_.isNullable).getOrElse(false)
       }
