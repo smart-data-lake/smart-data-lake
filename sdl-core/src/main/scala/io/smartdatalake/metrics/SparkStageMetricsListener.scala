@@ -88,7 +88,7 @@ private[smartdatalake] class SparkStageMetricsListener(action: Action)(implicit 
         case dataObjectIdRegex(id) => Some(DataObjectId(id))
         case _ => None // there are some stages which are created by Spark DataFrame operations which dont manipulate Actions target DataObject's, e.g. pivot operator
       }
-      // note that executionId might is empty for asynchronous actions
+      // note that executionId might be empty for asynchronous actions
       action.addRuntimeMetrics(jobInfo.executionId, dataObjectId, sparkStageMetrics)
     }
   }
