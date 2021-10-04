@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.SDLSaveMode
+import io.smartdatalake.definitions.{SDLSaveMode, SaveModeMergeOptions}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.custom.TestCustomDfCreator
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -27,7 +27,7 @@ import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, ProcessingLogicException, SparkSubFeed}
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{AnalysisException, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import java.nio.file.Files
@@ -235,4 +235,37 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     if (!resultat2) TestUtil.printFailedTestResult("SaveMode merge",Seq())(actual2)(expected2)
     assert(resultat2)
   }
+
+  // Note that this is not possible with DeltaLake 1.0, as schema evolution with mergeStmt.insertExpr is not properly supported.
+  // Unfortunately this is needed by HistorizeAction with merge.
+  // We test for failure to be notified once it is working...
+  test("SaveMode merge with updateCols and schema evolution - fails in deltalake 1.0") {
+    val targetTable = Table(db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
+    val targetTablePath = tempPath+s"/${targetTable.fullName}"
+    val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Merge, options = Some(Map("mergeSchema" -> "true")), allowSchemaEvolution = true)
+    targetDO.dropTable
+
+    // first load
+    val df1 = Seq(("ext","doe","john",5),("ext","smith","peter",3))
+      .toDF("type", "lastname", "firstname", "rating")
+    targetDO.writeDataFrame(df1)
+    val actual = targetDO.getDataFrame()
+    val resultat = df1.isEqual(actual)
+    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    assert(resultat)
+
+    // 2nd load: merge data by primary key with different schema
+    // - column 'rating' deleted -> existing records will keep column rating untouched (values are preserved and not set to null), new records will get new column rating set to null.
+    // - column 'rating2' added -> existing records will get new column rating2 set to null
+    val df2 = Seq(("ext","doe","john",10),("int","emma","brown",7))
+      .toDF("type", "lastname", "firstname", "rating2")
+    intercept[AnalysisException](targetDO.writeDataFrame(df2, saveModeOptions = Some(SaveModeMergeOptions(updateColumns = Seq("lastname", "firstname", "rating", "rating2")))))
+    //val actual2 = targetDO.getDataFrame()
+    //val expected2 = Seq(("ext","doe","john",Some(5),Some(10)),("ext","smith","peter",Some(3),None),("int","emma","brown",None,Some(7)))
+    //  .toDF("type", "lastname", "firstname", "rating", "rating2")
+    //val resultat2: Boolean = expected2.isEqual(actual2)
+    //if (!resultat2) TestUtil.printFailedTestResult("SaveMode merge",Seq())(actual2)(expected2)
+    //assert(resultat2)
+  }
+
 }

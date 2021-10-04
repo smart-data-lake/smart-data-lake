@@ -25,7 +25,6 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.DataFrameUtil.arrayToSeq
 import io.smartdatalake.util.misc.{AclDef, AclUtil, DataFrameUtil, PerformanceUtils}
@@ -34,7 +33,8 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicExceptio
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 
 /**
  * [[DataObject]] of type DeltaLakeTableDataObject.
@@ -240,20 +240,28 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     // this is done in a synchronized block because DataObjects with or without autoMerge enabled can be mixed and executed in parallel in a DAG
     DeltaLakeTableDataObject.synchronized { // note that this is synchronizing on the object (singleton)
       session.conf.set("spark.databricks.delta.schema.autoMerge.enabled", allowSchemaEvolution)
-
-      // execute delta lake merge statement
+      val deltaTable = DeltaTable.forName(session, table.fullName).as("existing")
+      // prepare join condition
       val joinCondition = table.primaryKey.get.map(colName => col(s"new.$colName") === col(s"existing.$colName")).reduce(_ and _)
-      var mergeStmt = DeltaTable.forName(session, table.fullName).as("existing")
-        .merge(df.as("new"), joinCondition and saveModeOptions.additionalMergePredicateExpr.getOrElse(lit(true)))
+      var mergeStmt = deltaTable.merge(df.as("new"), joinCondition and saveModeOptions.additionalMergePredicateExpr.getOrElse(lit(true)))
       // add delete clause if configured
       saveModeOptions.deleteConditionExpr.foreach(c => mergeStmt = mergeStmt.whenMatched(c).delete())
-      // add update and insert clause
-      val updateCols = saveModeOptions.updateColumnsOpt.getOrElse(df.columns.toSeq.diff(table.primaryKey.get))
-      val insertCols = df.columns.diff(saveModeOptions.insertColumnsToIgnore)
-      mergeStmt
-        .whenMatched(saveModeOptions.updateConditionExpr.getOrElse(lit(true))).update(updateCols.map(c => c -> col(s"new.$c")).toMap)
-        .whenNotMatched(saveModeOptions.insertConditionExpr.getOrElse(lit(true))).insert(insertCols.map(c => c -> col(s"new.$c")).toMap)
-        .execute()
+      // add update clause - insertExpr does not support referring new columns in existing table on schema evolution, thats why we use it only when needed, and insertAll otherwise
+      mergeStmt = if (saveModeOptions.updateColumnsOpt.isDefined) {
+        val updateCols = saveModeOptions.updateColumnsOpt.getOrElse(df.columns.toSeq.diff(table.primaryKey.get))
+        mergeStmt.whenMatched(saveModeOptions.updateConditionExpr.getOrElse(lit(true))).updateExpr(updateCols.map(c => c -> s"new.$c").toMap)
+      } else {
+        mergeStmt.whenMatched(saveModeOptions.updateConditionExpr.getOrElse(lit(true))).updateAll()
+      }
+      // add insert clause - insertExpr does not support referring new columns in existing table on schema evolution, thats why we use it only when needed, and insertAll otherwise
+      mergeStmt = if (saveModeOptions.insertColumnsToIgnore.nonEmpty) {
+        val insertCols = df.columns.diff(saveModeOptions.insertColumnsToIgnore)
+        mergeStmt.whenNotMatched(saveModeOptions.insertConditionExpr.getOrElse(lit(true))).insertExpr(insertCols.map(c => c -> s"new.$c").toMap)
+      } else {
+        mergeStmt.whenNotMatched(saveModeOptions.insertConditionExpr.getOrElse(lit(true))).insertAll()
+      }
+      // execute delta lake statement
+      mergeStmt.execute()
     }
   }
 
