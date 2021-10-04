@@ -40,7 +40,7 @@ private[smartdatalake] class SparkStageMetricsListener(action: Action)(implicit 
 
   // parses job group
   private val jobGroupRegex = (s"${context.appConfig.appName} ${action.id} runId=([0-9]+) attemptId=([0-9]+)").r.unanchored
-  // for spark streaming jobs we cant set the jobGroup, but only the description. They also have no run/attemptId.
+  // for spark streaming jobs we cant set the jobGroup, but only the description. They also have no executionId.
   private val jobDescriptionRegex = (s"${context.appConfig.appName} ${action.id}").r.unanchored
 
   /**
@@ -51,7 +51,7 @@ private[smartdatalake] class SparkStageMetricsListener(action: Action)(implicit 
     val jobDescription = jobStart.properties.getProperty("spark.job.description")
     val jobInfo = (jobGroup, jobDescription) match {
       case (jobGroupRegex(runId,attemptId), _) => Some(JobInfo(jobStart.jobId, jobGroup, jobDescription, Some(SDLExecutionId(runId.toInt, attemptId.toInt))))
-      case (_, jobDescriptionRegex()) => Some(JobInfo(jobStart.jobId, jobGroup, jobDescription, None))
+      case (_, jobDescriptionRegex()) => Some(JobInfo(jobStart.jobId, jobGroup, jobDescription, None)) // spark streaming job info is read from description, has no executionId information.
       case _ => None
     }
     jobInfo.foreach(i => jobStart.stageIds.foreach(stageId => jobInfoLookupTable(stageId) = i))
@@ -88,7 +88,7 @@ private[smartdatalake] class SparkStageMetricsListener(action: Action)(implicit 
         case dataObjectIdRegex(id) => Some(DataObjectId(id))
         case _ => None // there are some stages which are created by Spark DataFrame operations which dont manipulate Actions target DataObject's, e.g. pivot operator
       }
-      if (jobInfo.executionId.isEmpty) logger.error(s"ExecutionId is empty: jobGroup=${jobInfo.group} jobDesc=${jobInfo.description}")
+      // note that executionId might be empty for asynchronous actions
       action.addRuntimeMetrics(jobInfo.executionId, dataObjectId, sparkStageMetrics)
     }
   }
