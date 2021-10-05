@@ -192,6 +192,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         if (partitions.isEmpty) {
           dfWriter
             .option("overwriteSchema", allowSchemaEvolution) // allow overwriting schema when overwriting whole table
+            .option("mergeSchema", allowSchemaEvolution)
             .mode(finalSaveMode.asSparkSaveMode)
             .saveAsTable(table.fullName)
         } else {
