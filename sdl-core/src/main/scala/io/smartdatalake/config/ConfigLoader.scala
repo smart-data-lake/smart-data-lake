@@ -104,9 +104,9 @@ object ConfigLoader extends SmartDataLakeLogger {
     // check for duplicate first class object definitions (connections, data objects, actions)
     if (Environment.enableCheckConfigDuplicates) {
       val objectIdLocationMap =
-        sortedConfigs.flatMap { case (file, config) => ConfigParser.getActionConfigMap(config).keys.map(objName => (ActionId(objName), file)) } ++
-          sortedConfigs.flatMap { case (file, config) => ConfigParser.getDataObjectConfigMap(config).keys.map(objName => (DataObjectId(objName), file)) } ++
-          sortedConfigs.flatMap { case (file, config) => ConfigParser.getConnectionConfigMap(config).keys.map(objName => (ConnectionId(objName), file)) }
+        sortedConfigs.flatMap { case (file, config) => ConfigParser.getActionsEntries(config).map(objName => (ActionId(objName), file)) } ++
+          sortedConfigs.flatMap { case (file, config) => ConfigParser.getDataObjectsEntries(config).map(objName => (DataObjectId(objName), file)) } ++
+          sortedConfigs.flatMap { case (file, config) => ConfigParser.getConnectionEntries(config).map(objName => (ConnectionId(objName), file)) }
       val duplicates = objectIdLocationMap.groupBy(_._1)
         .filter(_._2.size > 1)
         .mapValues(_.map(_._2))
