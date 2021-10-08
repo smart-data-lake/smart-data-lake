@@ -87,4 +87,9 @@ class ConfigLoaderTest extends FlatSpec with Matchers {
   it should "fail on duplicate configuration object IDs" in {
     a [ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/configWithDuplicates").toString))
   }
+
+  it must "should load configurations with templates" in {
+    val config = ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/configWithTemplates").toString))
+    config.getString("dataObjects.testDataObjectFromConfig.type") shouldBe "io.smartdatalake.config.TestDataObject"
+  }
 }
