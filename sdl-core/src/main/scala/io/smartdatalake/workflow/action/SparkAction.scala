@@ -109,8 +109,10 @@ private[smartdatalake] abstract class SparkAction extends Action {
    *
    * @param input input data object.
    * @param subFeed input SubFeed.
+   * @param phase current execution phase
+   * @param isRecursive true if this input is a recursive input
    */
-  def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, phase: ExecutionPhase)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, phase: ExecutionPhase, isRecursive: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     assert(input.id == subFeed.dataObjectId, s"($id) DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
     assert(phase!=ExecutionPhase.Prepare, "Strangely enrichSubFeedDataFrame got called in phase prepare. It should only be called in Init and Exec.")
     executionMode match {
@@ -144,8 +146,13 @@ private[smartdatalake] abstract class SparkAction extends Action {
                 assert(missingPartitionValues.isEmpty, s"($id) partitions ${missingPartitionValues.mkString(", ")} missing for ${input.id}")
               case _ => Unit
             }
+            // check if data is existing, otherwise create empty dataframe for recursive input
+            val isDataExisting = input match {
+              case tableInput: TableDataObject => tableInput.isTableExisting
+              case _ => true // default is that data is existing
+            }
             // recreate DataFrame from DataObject if not skipped
-            val df = if (!subFeed.isSkipped) {
+            val df = if (!subFeed.isSkipped && (!isRecursive || isDataExisting)) {
               logger.info(s"($id) getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
               input.getDataFrame(subFeed.partitionValues)
                 .colNamesLowercase // convert to lower case by default
@@ -177,8 +184,12 @@ private[smartdatalake] abstract class SparkAction extends Action {
 
   def createEmptyDataFrame(dataObject: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
     val schema = dataObject match {
-      case sparkFileInput: SparkFileDataObject => sparkFileInput.getSchema(false).map(dataObject.createReadSchema)
-      case userDefInput: UserDefinedSchema => userDefInput.schema.map(dataObject.createReadSchema)
+      case input: SparkFileDataObject if input.getSchema(false).isDefined =>
+        input.getSchema(false).map(dataObject.createReadSchema)
+      case input: UserDefinedSchema if input.schema.isDefined =>
+        input.schema.map(dataObject.createReadSchema)
+      case input: SchemaValidation if input.schemaMin.isDefined =>
+        input.schemaMin.map(dataObject.createReadSchema)
       case _ => None
     }
     schema.map( s => DataFrameUtil.getEmptyDataFrame(s))
