@@ -170,7 +170,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
       .getOrElse(writeSchema)
   }
 
-  override def init(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def init(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     validateSchemaMin(df, "write")
     schema.foreach(schemaExpected => validateSchema(df, schemaExpected, "write"))
   }

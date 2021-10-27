@@ -18,7 +18,6 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.SaveModeMergeOptions
 import io.smartdatalake.testutils.TestUtil
@@ -30,8 +29,6 @@ import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import java.nio.file.Files
-import java.sql.Timestamp
-import java.time.LocalDateTime
 
 class CopyWithMergeActionTest extends FunSuite with BeforeAndAfter {
 

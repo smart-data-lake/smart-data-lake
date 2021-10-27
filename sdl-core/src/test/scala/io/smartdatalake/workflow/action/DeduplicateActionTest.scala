@@ -151,7 +151,7 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
     val df1 = createDf(Map(
       colId -> 1,
       colValueOld -> "X",
-      TechnicalTableColumn.captured.toString -> ts("2020-07-01 10:00")
+      TechnicalTableColumn.captured -> ts("2020-07-01 10:00")
     ))
 
     val df2 = createDf(Map(
@@ -182,7 +182,7 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
       colId -> 1,
       colValueOld -> "B",
       colValueNew -> dec(200),
-      TechnicalTableColumn.captured.toString -> ts("2020-08-16 10:00")
+      TechnicalTableColumn.captured -> ts("2020-08-16 10:00")
     ))
 
     assertDataFramesEqual(dfExpected, dfResult2)

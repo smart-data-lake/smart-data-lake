@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,19 +16,24 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.definitions
+
+package io.smartdatalake.workflow.connection
+
+import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcType}
+import org.apache.spark.sql.types.{DataType, StringType}
+
+import java.util.Locale
 
 /**
- * Column names specific to historization of Hive tables
+ * Customization for HSQLDb.
+ * Overrides default SQL-datatype for Spark-StringType to LONGVARCHAR
  */
-object TechnicalTableColumn {
-  /**
-   * Name of column that marks the creation date of a record
-   */
-  val captured = "dl_ts_captured"
+private object HSQLDbDialect extends JdbcDialect {
+  override def canHandle(url: String): Boolean =
+    url.toLowerCase(Locale.ROOT).startsWith("jdbc:hsqldb")
 
-  /**
-   * Name of column that marks the end of validity of a record
-   */
-  val delimited = "dl_ts_delimited"
+  override def getJDBCType(dt: DataType): Option[JdbcType] = dt match {
+    case _:StringType => Some(JdbcType("LONGVARCHAR", java.sql.Types.LONGVARCHAR))
+    case _ => None
+  }
 }
