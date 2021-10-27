@@ -53,6 +53,8 @@ sealed trait SubFeed extends DAGResult with SmartDataLakeLogger {
 
   def clearDAGStart(): SubFeed
 
+  def clearSkipped(): SubFeed
+
   def toOutput(dataObjectId: DataObjectId): SubFeed
 
   def union(other: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SubFeed
@@ -114,6 +116,9 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
   }
   override def clearDAGStart(): SparkSubFeed = {
     this.copy(isDAGStart = false)
+  }
+  override def clearSkipped(): SparkSubFeed = {
+    this.copy(isSkipped = false)
   }
   override def toOutput(dataObjectId: DataObjectId): SparkSubFeed = {
     this.copy(dataFrame = None, filter=None, isDAGStart = false, isSkipped = false, isDummy = false, dataObjectId = dataObjectId)
@@ -206,6 +211,9 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
   override def clearDAGStart(): FileSubFeed = {
     this.copy(isDAGStart = false)
   }
+  override def clearSkipped(): FileSubFeed = {
+    this.copy(isSkipped = false)
+  }
   override def toOutput(dataObjectId: DataObjectId): FileSubFeed = {
     this.copy(fileRefs = None, processedInputFileRefs = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId)
   }
@@ -260,6 +268,7 @@ case class InitSubFeed(override val dataObjectId: DataObjectId,
     } else this.copy(partitionValues = updatedPartitionValues)
   }
   override def clearDAGStart(): InitSubFeed = throw new NotImplementedException() // calling clearDAGStart makes no sense on InitSubFeed
+  override def clearSkipped(): InitSubFeed = throw new NotImplementedException() // calling clearSkipped makes no sense on InitSubFeed
   override def toOutput(dataObjectId: DataObjectId): FileSubFeed = throw new NotImplementedException()
   override def union(other: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SubFeed = other match {
     case x => this.copy(partitionValues = unionPartitionValues(x.partitionValues))
