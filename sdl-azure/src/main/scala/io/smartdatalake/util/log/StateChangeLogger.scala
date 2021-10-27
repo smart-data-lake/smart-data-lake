@@ -40,6 +40,9 @@ import java.time.LocalDateTime
         ]
 */
 
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected the corresponding MIT license
+ */
 class StateChangeLogger(options: Map[String,String]) extends StateListener with SmartDataLakeLogger {
 
   assert(options.contains("primaryKey"))
@@ -83,17 +86,17 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
         state = aState._2.state.toString,
         message = aState._2.msg.getOrElse(" no message"))
 
-      val optResults : Seq[Option[ResultRuntimeInfo]] = {   // we generate at least one log entry, and one log entry per result
+      val optResults = {   // we generate at least one log entry, and one log entry per result
         if (aState._2.results.nonEmpty) aState._2.results.map({result : ResultRuntimeInfo => Some(result)})
         else Seq(None)
       }
       optResults.map(optResult => {
-        val result : Option[Result] = optResult.map(
+        val result = optResult.map(
           {result : ResultRuntimeInfo =>
 
-            val to_metadata : TargetObjectMetadata = {
+            val to_metadata = {
               val metadata = context.instanceRegistry.get[DataObject](result.subFeed.dataObjectId).metadata
-              def extractString(attribute: DataObjectMetadata => Option[String]): String = metadata.map(attribute(_).getOrElse("")).getOrElse("")
+              def extractString(attribute: DataObjectMetadata => Option[String]) = metadata.map(attribute(_).getOrElse("")).getOrElse("")
 
               TargetObjectMetadata(name = extractString(_.name),
                 layer = extractString(_.layer),
