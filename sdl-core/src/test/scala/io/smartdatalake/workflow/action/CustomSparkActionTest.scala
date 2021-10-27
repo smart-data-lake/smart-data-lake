@@ -147,6 +147,39 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
 
   }
 
+  test("spark action with skipped input subfeed but ignore filter") {
+    // setup DataObjects
+    val srcTable1 = Table(Some("default"), "copy_input1")
+    val srcDO1 = TickTockHiveTableDataObject("src1", Some(tempPath + s"/${srcTable1.fullName}"), table = srcTable1, numInitialHdfsPartitions = 1, partitions = Seq("lastname"))
+    srcDO1.dropTable
+    instanceRegistry.register(srcDO1)
+
+    val tgtTable1 = Table(Some("default"), "copy_output1", None, Some(Seq("lastname", "firstname")))
+    val tgtDO1 = TickTockHiveTableDataObject("tgt1", Some(tempPath + s"/${tgtTable1.fullName}"), table = tgtTable1, numInitialHdfsPartitions = 1, partitions = Seq("lastname"))
+    tgtDO1.dropTable
+    instanceRegistry.register(tgtDO1)
+
+    val customTransformer = SQLDfsTransformer(code = Map(tgtDO1.id -> s"select * from ${srcDO1.id.id}"))
+    val action1 = CustomSparkAction("action1", List(srcDO1.id), List(tgtDO1.id), transformers = Seq(customTransformer))
+    val action1IgnoreFilter = CustomSparkAction("action1", List(srcDO1.id), List(tgtDO1.id), inputIdsToIgnoreFilter = Seq(srcDO1.id), transformers = Seq(customTransformer))
+    val l1 = Seq(("doe", "john", 5),("be", "bob", 3)).toDF("lastname", "firstname", "rating")
+    srcDO1.writeDataFrame(l1, Seq())
+
+    // nothing processed if input is skipped and filters not ignored
+    val tgtSubFeeds = action1.exec(Seq(SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe"))), isSkipped = true)))(session, contextExec)
+    assert(tgtSubFeeds.map(_.dataObjectId) == Seq(tgtDO1.id))
+    session.table(s"${tgtTable1.fullName}")
+      .isEmpty
+
+    // input is processed if filters are ignored, even if input subfeed is skipped
+    val tgtSubFeedsIgnoreFilter = action1IgnoreFilter.exec(Seq(SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "test"))), isSkipped = true)))(session, contextExec)
+    assert(tgtSubFeedsIgnoreFilter.map(_.dataObjectId) == Seq(tgtDO1.id))
+    val r2 = session.table(s"${tgtTable1.fullName}")
+      .select($"rating")
+      .as[Int].collect().toSeq
+    assert(r2.toSet == Set(5,3))
+  }
+
   test("copy with partition diff execution mode 2 iterations") {
 
     // setup DataObjects
