@@ -58,7 +58,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
     prioritizedMainInputCandidates
     mainOutput
     // check inputIdsToIgnoreFilters
-    val unknownInputIdsToIgnoreFilter = inputIdsToIgnoreFilter.diff(inputs.map(_.id))
+    val unknownInputIdsToIgnoreFilter = inputIdsToIgnoreFilter.diff(inputs.map(_.id)).diff(recursiveInputs.map(_.id))
     assert(unknownInputIdsToIgnoreFilter.isEmpty, s"($id) Unknown inputIdsToIgnoreFilter ${unknownInputIdsToIgnoreFilter.mkString(", ")}")
   }
 
@@ -110,7 +110,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
       val ignoreFilter = inputIdsToIgnoreFilter.contains(subFeed.dataObjectId)
       val preparedSubFeed = prepareInputSubFeed(input, subFeed, ignoreFilter)
       // enrich with fresh DataFrame if needed
-      enrichSubFeedDataFrame(input, preparedSubFeed, context.phase)
+      enrichSubFeedDataFrame(input, preparedSubFeed, context.phase, isRecursive = recursiveInputs.exists(_.id == input.id))
     }
     // transform
     outputSubFeeds = transform(inputSubFeeds, outputSubFeeds)
