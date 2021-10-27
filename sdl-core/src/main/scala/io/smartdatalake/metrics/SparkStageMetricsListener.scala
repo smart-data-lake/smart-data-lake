@@ -27,6 +27,7 @@ import io.smartdatalake.workflow.{ActionMetrics, ActionPipelineContext}
 import org.apache.spark.scheduler.{SparkListener, SparkListenerJobStart, SparkListenerStageCompleted}
 
 import scala.collection.mutable
+import scala.util.matching.Regex
 
 /**
  * Collects spark metrics for spark stages.
@@ -39,9 +40,9 @@ private[smartdatalake] class SparkStageMetricsListener(action: Action)(implicit 
   val jobInfoLookupTable: mutable.Map[Int, JobInfo] = mutable.Map.empty
 
   // parses job group
-  private val jobGroupRegex = (s"${context.appConfig.appName} ${action.id} runId=([0-9]+) attemptId=([0-9]+)").r.unanchored
+  private val jobGroupRegex = (s"${Regex.quote(context.appConfig.appName)} ${action.id} runId=([0-9]+) attemptId=([0-9]+)").r.unanchored
   // for spark streaming jobs we cant set the jobGroup, but only the description. They also have no executionId.
-  private val jobDescriptionRegex = (s"${context.appConfig.appName} ${action.id}").r.unanchored
+  private val jobDescriptionRegex = (s"${Regex.quote(context.appConfig.appName)} ${action.id}").r.unanchored
 
   /**
    * On job start, register the job ids and stage ids.
