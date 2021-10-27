@@ -260,12 +260,6 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     val df2 = Seq(("ext","doe","john",10),("int","emma","brown",7))
       .toDF("type", "lastname", "firstname", "rating2")
     intercept[AnalysisException](targetDO.writeDataFrame(df2, saveModeOptions = Some(SaveModeMergeOptions(updateColumns = Seq("lastname", "firstname", "rating", "rating2")))))
-    //val actual2 = targetDO.getDataFrame()
-    //val expected2 = Seq(("ext","doe","john",Some(5),Some(10)),("ext","smith","peter",Some(3),None),("int","emma","brown",None,Some(7)))
-    //  .toDF("type", "lastname", "firstname", "rating", "rating2")
-    //val resultat2: Boolean = expected2.isEqual(actual2)
-    //if (!resultat2) TestUtil.printFailedTestResult("SaveMode merge",Seq())(actual2)(expected2)
-    //assert(resultat2)
   }
 
 }
