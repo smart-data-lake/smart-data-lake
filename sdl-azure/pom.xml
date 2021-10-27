@@ -30,11 +30,11 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>sdl-azure-log</artifactId>
+    <artifactId>sdl-azure</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
 
-    <name>sdl-azure-log</name>
+    <name>sdl-azure</name>
 
     <profiles>
         <profile>
@@ -53,15 +53,26 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.jsuereth</groupId>
+            <artifactId>scala-arm_${scala.minor.version}</artifactId>
+            <version>${scala-arm.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-streaming_${scala.minor.version}</artifactId>
+            <version>${spark.version}</version>
+            <scope>${spark.deps.scope}</scope>
+        </dependency>
+        <dependency>
+            <groupId>commons-codec</groupId>
+            <artifactId>commons-codec</artifactId>
+            <version>1.15</version>
+        </dependency>
+        <dependency>
             <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-core_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
             <scope>${sdl-core.scope}</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.jsuereth</groupId>
-            <artifactId>scala-arm_${scala.minor.version}</artifactId>
-            <version>${scala-arm.version}</version>
         </dependency>
     </dependencies>
 

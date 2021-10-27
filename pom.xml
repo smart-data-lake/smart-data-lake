@@ -31,6 +31,7 @@
 		<module>sdl-jms</module>
 		<module>sdl-deltalake</module>
 		<module>sdl-snowflake</module>
+		<module>sdl-azure</module>
 	</modules>
 
 	<licenses>
