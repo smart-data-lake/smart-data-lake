@@ -41,10 +41,11 @@ private[smartdatalake] trait SchemaValidation { this: DataObject =>
    *  - Column nullability is ignored.
    *  - Duplicate columns in terms of name and data type are eliminated (set semantics).
    *
-   * Note: This is only used by the functionality defined in [[CanCreateDataFrame]] and [[CanWriteDataFrame]], that is,
+   * Note: This is mainly used by the functionality defined in [[CanCreateDataFrame]] and [[CanWriteDataFrame]], that is,
    * when reading or writing Spark data frames from/to the underlying data container.
-   * [[io.smartdatalake.workflow.action.Action]]s that bypass Spark data frames ignore the `schemaMin` attribute
+   * [[io.smartdatalake.workflow.action.Action]]s that work with files ignore the `schemaMin` attribute
    * if it is defined.
+   * Additionally schemaMin can be used to define the schema used if there is no data or table doesn't yet exist.
    */
   def schemaMin: Option[StructType]
 
