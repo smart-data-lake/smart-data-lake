@@ -342,6 +342,40 @@
 
 		<pluginManagement>
 			<plugins>
+
+				<!-- add scala sources, if we have also java sources using sourceDirectory / testSourceDirectory tag -->
+				<plugin>
+					<groupId>org.codehaus.mojo</groupId>
+					<artifactId>build-helper-maven-plugin</artifactId>
+					<version>3.2.0</version>
+					<executions>
+						<execution>
+							<id>add-source</id>
+							<phase>generate-sources</phase>
+							<goals>
+								<goal>add-source</goal>
+							</goals>
+							<configuration>
+								<sources>
+									<source>src/main/scala</source>
+								</sources>
+							</configuration>
+						</execution>
+						<execution>
+							<id>add-test-source</id>
+							<phase>generate-test-sources</phase>
+							<goals>
+								<goal>add-test-source</goal>
+							</goals>
+							<configuration>
+								<sources>
+									<source>src/test/scala</source>
+								</sources>
+							</configuration>
+						</execution>
+					</executions>
+				</plugin>
+
 				<!-- Compiles Scala sources. -->
 				<plugin>
 					<groupId>net.alchim31.maven</groupId>
@@ -1953,7 +1987,6 @@
 				<groupId>org.apache.orc</groupId>
 				<artifactId>orc-core</artifactId>
 				<version>${orc.version}</version>
-				<classifier>${orc.classifier}</classifier>
 				<scope>${orc.deps.scope}</scope>
 				<exclusions>
 					<exclusion>
@@ -1978,7 +2011,6 @@
 				<groupId>org.apache.orc</groupId>
 				<artifactId>orc-mapreduce</artifactId>
 				<version>${orc.version}</version>
-				<classifier>${orc.classifier}</classifier>
 				<scope>${orc.deps.scope}</scope>
 				<exclusions>
 					<exclusion>

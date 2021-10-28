@@ -1,3 +1,22 @@
+/*
+ * Smart Data Lake - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package org.apache.spark.metrics.sink.loganalytics
 
 import java.time.Instant
@@ -192,11 +211,11 @@ class LogAnalyticsReporter(val registry: MetricRegistry, val workspaceId: String
       return
     }
     val now = Instant.now
-    import scala.collection.JavaConversions._
+    import scala.collection.JavaConverters._
 
     val ambientProperties = SparkInformation.get() + ("SparkEventTime" -> now.toString)
-    val metrics = gauges.retain((_, v) => v.getValue != null).toSeq ++
-      counters.toSeq ++ histograms.toSeq ++ meters.toSeq ++ timers.toSeq
+    val metrics = gauges.asScala.retain((_, v) => v.getValue != null).toSeq ++
+      counters.asScala.toSeq ++ histograms.asScala.toSeq ++ meters.asScala.toSeq ++ timers.asScala.toSeq
     for ((name, metric) <- metrics) {
       try {
         this.logAnalyticsBufferedClient.sendMessage(

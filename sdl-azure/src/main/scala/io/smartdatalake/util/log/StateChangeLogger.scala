@@ -24,8 +24,9 @@ import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
 import io.smartdatalake.workflow.action.ResultRuntimeInfo
 import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata}
 import io.smartdatalake.app.StateListener
-
 import com.google.gson.Gson
+import com.microsoft.pnp.client.loganalytics.LogAnalyticsClient
+
 import java.time.LocalDateTime
 
 /**
@@ -47,7 +48,7 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
 
   assert(options.contains("primaryKey"))
   assert(options.contains("secondaryKey"))
-  private val azureLogClient = new AzureLogClient(options("primaryKey"), options("secondaryKey"))
+  private val azureLogClient = new LogAnalyticsClient(options("primaryKey"), options("secondaryKey"))
 
   val logType : String = options.getOrElse("logType", "StateChange")
 
