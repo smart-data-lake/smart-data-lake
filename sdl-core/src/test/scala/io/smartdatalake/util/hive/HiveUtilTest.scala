@@ -29,6 +29,7 @@ import org.scalatest.{BeforeAndAfter, FunSuite}
 import org.apache.hadoop.fs.{Path => HadoopPath}
 
 import scala.util.Try
+import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 
 /**
  * Unit tests for HiveUtil
@@ -86,11 +87,11 @@ class HiveUtilTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger
       // AnalysisException expected because table is not partitioned
       HiveUtil.getTablePartitions(hiveTable).isEmpty
     }
-    assert(TestUtil.isDataFrameEqual( session.table(hiveTable.fullName), testDataA ))
+    assert(session.table(hiveTable.fullName).isEqual(testDataA ))
 
     logger.info("Overwriting data in existing table")
     HiveUtil.writeDfToHive(testDataA, hdfsTablePath, hiveTable, partitions, SaveMode.Overwrite)
-    assert(TestUtil.isDataFrameEqual( session.table(hiveTable.fullName), testDataA ))
+    assert(session.table(hiveTable.fullName).isEqual(testDataA))
   }
 
   test("Create unpartitioned external table and overwrite data with schema evolution without Tick-Tock") {
@@ -103,11 +104,11 @@ class HiveUtilTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger
       // AnalysisException expected because table is not partitioned
       HiveUtil.getTablePartitions(hiveTable).isEmpty
     }
-    assert(TestUtil.isDataFrameEqual( session.table(hiveTable.fullName), testDataA ))
+    assert(session.table(hiveTable.fullName).isEqual(testDataA ))
 
     logger.info("Overwriting data in existing table with modified schema without Tick-Tock")
     HiveUtil.writeDfToHive(testDataB, hdfsTablePath, hiveTable, partitions, SaveMode.Overwrite)
-    assert(TestUtil.isDataFrameEqual( session.table(hiveTable.fullName), testDataB ))
+    assert(session.table(hiveTable.fullName).isEqual(testDataB ))
   }
 
   test("Create unpartitioned external table and overwrite data with schema evolution with TickTock") {
@@ -120,11 +121,11 @@ class HiveUtilTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger
       // AnalysisException expected because table is not partitioned
       HiveUtil.getTablePartitions(hiveTable).isEmpty
     }
-    assert(TestUtil.isDataFrameEqual( session.table(hiveTable.fullName), testDataA ))
+    assert(session.table(hiveTable.fullName).isEqual(testDataA ))
 
     logger.info("Overwriting data in existing table with modified schema with Tick-Tock")
     HiveUtil.writeDfToHiveWithTickTock(testDataB, hdfsTablePath, hiveTable, partitions, SaveMode.Overwrite)
-    assert(TestUtil.isDataFrameEqual( session.table(hiveTable.fullName), testDataB ))
+    assert(session.table(hiveTable.fullName).isEqual(testDataB ))
   }
 
   test("Create partitioned external table and overwrite data") {
@@ -133,12 +134,12 @@ class HiveUtilTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger
     logger.info("Creating table")
     HiveUtil.writeDfToHive(testDataA, hdfsTablePath, hiveTable, partitions, SaveMode.Overwrite)
     assert(checkPartitionsExpected(hiveTable, Seq(Map( "part" -> "X"), Map("part" -> "Y"))))
-    assert(TestUtil.isDataFrameEqual( session.table(hiveTable.fullName), testDataA ))
+    assert(session.table(hiveTable.fullName).isEqual(testDataA ))
 
     logger.info("Overwriting data in existing table with modified schema with Tick-Tock")
     HiveUtil.writeDfToHive(testDataA, hdfsTablePath, hiveTable, partitions, SaveMode.Overwrite)
     assert(checkPartitionsExpected(hiveTable, Seq(Map( "part" -> "X"), Map("part" -> "Y"))))
-    assert(TestUtil.isDataFrameEqual( session.table(hiveTable.fullName), testDataA ))
+    assert(session.table(hiveTable.fullName).isEqual(testDataA ))
   }
 
   test("Create partitioned table and overwrite data with schema evolution with TickTock") {
@@ -147,12 +148,12 @@ class HiveUtilTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger
     logger.info("Creating table")
     HiveUtil.writeDfToHiveWithTickTock(testDataA, hdfsTablePath, hiveTable, partitions, SaveMode.Overwrite)
     assert(HiveUtil.getTablePartitions(hiveTable).toSet.equals(Set(Map( "part" -> "X"), Map("part" -> "Y"))))
-    assert(TestUtil.isDataFrameEqual( session.table(hiveTable.fullName), testDataA ))
+    assert(session.table(hiveTable.fullName).isEqual(testDataA ))
 
     logger.info("Overwriting data in existing table with modified schema and Tick-Tock")
     HiveUtil.writeDfToHiveWithTickTock(testDataB, hdfsTablePath, hiveTable, partitions, SaveMode.Overwrite)
     assert(HiveUtil.getTablePartitions(hiveTable).toSet.equals(Set(Map( "part" -> "Y"), Map("part" -> "Z"))))
-    assert(TestUtil.isDataFrameEqual( session.table(hiveTable.fullName), testDataB ))
+    assert(session.table(hiveTable.fullName).isEqual(testDataB ))
   }
 
   test("Creating a partitioned table and overwriting data with schema evolution with TickTock aborts") {
@@ -161,7 +162,7 @@ class HiveUtilTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger
     logger.info("Creating table")
     HiveUtil.writeDfToHive(testDataA, hdfsTablePath, hiveTable, partitions, SaveMode.Overwrite)
     assert(HiveUtil.getTablePartitions(hiveTable).toSet.equals(Set(Map( "part" -> "X"), Map("part" -> "Y"))))
-    assert(TestUtil.isDataFrameEqual( session.table(hiveTable.fullName), testDataA ))
+    assert(session.table(hiveTable.fullName).isEqual(testDataA ))
 
     logger.info("Overwriting data in existing table with modified schema and Tick-Tock")
     intercept[IllegalArgumentException] {

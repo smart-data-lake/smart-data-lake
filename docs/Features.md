@@ -25,7 +25,7 @@ The following is a list of implemented and planned (Future) features of Smart Da
 * Support for SQL update & merge (Jdbc, DeltaLake) 
 
 ##### Generic Transformations
-* Spark based: Copy, Historization, Deduplication
+* Spark based: Copy, Historization, Deduplication (incl. incremental update/merge mode for streaming)
 * File based: FileTransfer
 * Easily extendable through implementing predefined scala traits
 * Future: applying MLFlow machine learning models
