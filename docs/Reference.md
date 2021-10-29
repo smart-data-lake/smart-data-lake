@@ -162,6 +162,9 @@ You can mix synchronous and asynchronous actions in the same DAG. Asynchronous a
 
 Whether an action is synchronous or asynchronous depends on the execution engine used. For now only "Spark Structured Streaming" is an asynchronous execution engine. It is configured by setting execution mode SparkStreamingMode to an action. 
 
+You can control the minimum delay between synchronous streaming runs by setting configuration `global.synchronousStreamingTriggerIntervalSec` to a certain amount of seconds.
+For asynchronous streaming actions this is controlled by the corresponding streaming mode, e.g. SparkStreamingMode.
+
 ## Execution modes
 Execution modes select the data to be processed. By default, if you start SmartDataLakeBuilder, there is no filter applied. This means every Action reads all data from its input DataObjects.
 
