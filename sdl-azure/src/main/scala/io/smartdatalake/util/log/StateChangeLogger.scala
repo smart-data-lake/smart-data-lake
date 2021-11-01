@@ -32,15 +32,13 @@ import java.time.LocalDateTime
 /**
  * usage:
  * in global config section, integrate the following:
-
-        stateListeners = [
-          { className = "io.smartdatalake.util.log.StateChangeLogger"
-            options = { primaryKey : "xxx",    // primary key found under azure log analytics workspace's 'agents management' section
-                        secondaryKey : "xxx",   // secondary key found under azure log analytics workspace's 'agents management' section
-                        logType : "__yourLogType__"} }
-        ]
- *
- * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+  *
+  *        stateListeners = [
+  *         { className = "io.smartdatalake.util.log.StateChangeLogger"
+  *           options = { primaryKey : "xxx",    // primary key found under azure log analytics workspace's 'agents management' section
+ *                        secondaryKey : "xxx",   // secondary key found under azure log analytics workspace's 'agents management' section
+ *                        logType : "__yourLogType__"} }
+ *        ]
  */
 class StateChangeLogger(options: Map[String,String]) extends StateListener with SmartDataLakeLogger {
 

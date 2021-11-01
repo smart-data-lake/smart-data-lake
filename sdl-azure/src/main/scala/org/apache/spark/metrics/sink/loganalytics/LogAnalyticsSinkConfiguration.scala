@@ -40,6 +40,9 @@ private[spark] object LogAnalyticsSinkConfiguration {
   private[spark] val LOGANALYTICS_DEFAULT_UNIT = "SECONDS"
 }
 
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+ */
 private[spark] class LogAnalyticsSinkConfiguration(properties: Properties)
   extends LogAnalyticsConfiguration {
 
