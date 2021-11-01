@@ -19,7 +19,7 @@
 
 package org.apache.spark.metrics.sink.loganalytics
 
-import com.codahale.metrics._
+import com.codahale.metrics.{Timer, _}
 import com.codahale.metrics.json.MetricsModule
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
