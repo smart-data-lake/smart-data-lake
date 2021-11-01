@@ -32,6 +32,10 @@ import org.json4s.JsonAST.JValue
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods.{compact, parse, render}
 import scala.util.control.NonFatal
+
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+ */
 object LogAnalyticsReporter {
   /**
    * Returns a new {@link Builder} for {@link LogAnalyticsReporter}.
@@ -165,6 +169,10 @@ object LogAnalyticsReporter {
     }
   }
 }
+
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+ */
 class LogAnalyticsReporter(val registry: MetricRegistry, val workspaceId: String, val workspaceKey: String, val logType: String, val clock: Clock, val prefix: String, val rateUnit: TimeUnit, val durationUnit: TimeUnit, val filter: MetricFilter)//, var additionalFields: util.Map[String, AnyRef]) //this.logType);
   extends ScheduledReporter(registry, "loganalytics-reporter", filter, rateUnit, durationUnit)
     with Logging {
