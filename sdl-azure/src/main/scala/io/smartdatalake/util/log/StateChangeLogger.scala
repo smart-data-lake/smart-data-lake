@@ -25,7 +25,7 @@ import io.smartdatalake.workflow.action.ResultRuntimeInfo
 import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata}
 import io.smartdatalake.app.StateListener
 import com.google.gson.Gson
-import com.microsoft.pnp.client.loganalytics.LogAnalyticsClient
+import io.smartdatalake.util.azure.client.loganalytics.LogAnalyticsClient
 
 import java.time.LocalDateTime
 

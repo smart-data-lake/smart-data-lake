@@ -1,4 +1,4 @@
-package com.microsoft.pnp.client.loganalytics;
+package io.smartdatalake.util.azure.client.loganalytics;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;

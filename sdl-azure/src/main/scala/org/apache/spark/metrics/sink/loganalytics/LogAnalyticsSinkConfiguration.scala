@@ -19,7 +19,9 @@
 
 package org.apache.spark.metrics.sink.loganalytics
 
-import com.microsoft.pnp.{LogAnalyticsConfiguration, LogAnalyticsEnvironment}
+import io.smartdatalake.util.azure.LogAnalyticsEnvironment
+import org.apache.spark.metrics.sink.LogAnalyticsConfiguration
+import  org.apache.spark.metrics.sink.util.Logging
 
 import java.util.Properties
 import java.util.concurrent.TimeUnit
@@ -44,7 +46,7 @@ private[spark] object LogAnalyticsSinkConfiguration {
  * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
  */
 private[spark] class LogAnalyticsSinkConfiguration(properties: Properties)
-  extends LogAnalyticsConfiguration {
+  extends LogAnalyticsConfiguration with Logging {
 
   import LogAnalyticsSinkConfiguration._
 
@@ -64,14 +66,14 @@ private[spark] class LogAnalyticsSinkConfiguration(properties: Properties)
 
   val pollPeriod: Int = {
     val value = properties.getProperty(LOGANALYTICS_KEY_PERIOD, LOGANALYTICS_DEFAULT_PERIOD).toInt
-    logInfo(s"Setting polling period to $value")
+    logger.info(s"Setting polling period to $value")
     value
   }
 
   val pollUnit: TimeUnit = {
     val value = TimeUnit.valueOf(
       properties.getProperty(LOGANALYTICS_KEY_UNIT, LOGANALYTICS_DEFAULT_UNIT).toUpperCase)
-    logInfo(s"Setting polling unit to $value")
+    logger.info(s"Setting polling unit to $value")
     value
   }
 }

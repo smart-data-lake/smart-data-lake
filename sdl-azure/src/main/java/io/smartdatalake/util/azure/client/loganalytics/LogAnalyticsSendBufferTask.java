@@ -17,9 +17,9 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.microsoft.pnp.client.loganalytics;
+package io.smartdatalake.util.azure.client.loganalytics;
 
-import com.microsoft.pnp.client.GenericSendBufferTask;
+import io.smartdatalake.util.azure.client.GenericSendBufferTask;
 
 import java.util.List;
 
