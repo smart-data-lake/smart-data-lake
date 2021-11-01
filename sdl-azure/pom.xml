@@ -30,7 +30,7 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>sdl-azure</artifactId>
+    <artifactId>sdl-azure_${scala.minor.version}</artifactId>
     <packaging>jar</packaging>
 
     <name>sdl-azure</name>
