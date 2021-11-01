@@ -52,9 +52,9 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
     logger.debug("io.smartdatalake.util.log.StateChangeLogger init done, logType: " + logType)
   }
 
-  case class StateLogEventContext(thread: String, notification_time: String, executionId: String, phase: String, actionId: String, state: String, message: String)
+  case class StateLogEventContext(thread: String, notificationTime: String, executionId: String, phase: String, actionId: String, state: String, message: String)
   case class TargetObjectMetadata(name: String, layer: String, subjectArea: String, description: String)
-  case class Result(targetObjectMetadata: TargetObjectMetadata, records_written: Long, stageDuration: String)
+  case class Result(targetObjectMetadata: TargetObjectMetadata, recordsWritten: Long, stageDuration: String)
   case class StateLogEvent(context: StateLogEventContext, result: Result)
 
   private val gson = new Gson
@@ -74,11 +74,11 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
   def extractLogEvents(state: ActionDAGRunState, context: ActionPipelineContext): Seq[StateLogEvent] = {
     assert(state.actionsState.nonEmpty)
 
-    val notification_time = LocalDateTime.now
+    val notificationTime = LocalDateTime.now
 
     state.actionsState.map(aState => {
-      val log_context = StateLogEventContext(Thread.currentThread().getName,
-        notification_time.toString,
+      val logContext = StateLogEventContext(Thread.currentThread().getName,
+        notificationTime.toString,
         executionId = aState._2.executionId.toString,
         phase = context.phase.toString,
         actionId = aState._1.toString,
@@ -93,7 +93,7 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
         val result = optResult.map(
           {result : ResultRuntimeInfo =>
 
-            val to_metadata = {
+            val toMetadata = {
               val metadata = context.instanceRegistry.get[DataObject](result.subFeed.dataObjectId).metadata
               def extractString(attribute: DataObjectMetadata => Option[String]) = metadata.map(attribute(_).getOrElse("")).getOrElse("")
 
@@ -103,10 +103,10 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
                 description = extractString(_.description))
             }
 
-            Result(to_metadata, result.mainMetrics.getOrElse("records_written", null).asInstanceOf[Long], result.mainMetrics.getOrElse("stageDuration",null).toString)
+            Result(toMetadata, result.mainMetrics.getOrElse("records_written", null).asInstanceOf[Long], result.mainMetrics.getOrElse("stageDuration",null).toString)
           })
 
-        StateLogEvent(log_context, result.orNull)
+        StateLogEvent(logContext, result.orNull)
       })
     }).toSeq.flatten
   }
