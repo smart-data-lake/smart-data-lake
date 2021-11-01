@@ -33,6 +33,10 @@ import  org.apache.spark.metrics.sink.util.Logging
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 import scala.util.control.NonFatal
+
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+ */
 object LogAnalyticsReporter {
   /**
    * Returns a new {@link Builder} for {@link LogAnalyticsReporter}.
@@ -166,6 +170,10 @@ object LogAnalyticsReporter {
     }
   }
 }
+
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+ */
 class LogAnalyticsReporter(val registry: MetricRegistry, val workspaceId: String, val workspaceKey: String, val logType: String, val clock: Clock, val prefix: String, val rateUnit: TimeUnit, val durationUnit: TimeUnit, val filter: MetricFilter)//, var additionalFields: util.Map[String, AnyRef]) //this.logType);
   extends ScheduledReporter(registry, "loganalytics-reporter", filter, rateUnit, durationUnit)
     with Logging {
