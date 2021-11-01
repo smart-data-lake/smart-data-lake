@@ -51,7 +51,7 @@ object LogAnalyticsReporter {
    * events/second, converting durations to milliseconds, and not filtering metrics. The default
    * Log Analytics log type is DropWizard
    */
-  class Builder(val registry: MetricRegistry) extends Logging {
+  class Builder(val registry: MetricRegistry) extends SmartDataLakeLogger {
     private var clock = Clock.defaultClock
     private var prefix: String = null
     private var rateUnit = TimeUnit.SECONDS
