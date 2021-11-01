@@ -21,8 +21,7 @@ package org.apache.spark.metrics.sink.loganalytics
 
 import io.smartdatalake.util.azure.LogAnalyticsEnvironment
 import org.apache.spark.metrics.sink.LogAnalyticsConfiguration
-import  org.apache.spark.metrics.sink.util.Logging
-
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import java.util.Properties
 import java.util.concurrent.TimeUnit
 
@@ -46,7 +45,7 @@ private[spark] object LogAnalyticsSinkConfiguration {
  * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
  */
 private[spark] class LogAnalyticsSinkConfiguration(properties: Properties)
-  extends LogAnalyticsConfiguration with Logging {
+  extends LogAnalyticsConfiguration with SmartDataLakeLogger {
 
   import LogAnalyticsSinkConfiguration._
 

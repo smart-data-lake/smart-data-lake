@@ -1,10 +1,11 @@
 package org.apache.spark.metrics.sink
 
-import  org.apache.spark.metrics.sink.util.Logging
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+
 /**
  * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
  */
-trait LogAnalyticsConfiguration extends Logging {
+trait LogAnalyticsConfiguration extends SmartDataLakeLogger {
   protected def getWorkspaceId: Option[String]
 
   protected def getSecret: Option[String]
