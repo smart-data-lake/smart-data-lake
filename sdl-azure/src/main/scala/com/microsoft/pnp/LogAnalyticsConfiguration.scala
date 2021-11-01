@@ -21,6 +21,9 @@ package com.microsoft.pnp
 
 import org.apache.spark.internal.Logging
 
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+ */
 trait LogAnalyticsConfiguration extends Logging {
   protected def getWorkspaceId: Option[String]
 

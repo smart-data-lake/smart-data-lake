@@ -34,6 +34,9 @@ import org.json4s.jackson.JsonMethods.{compact, parse, render}
 
 import scala.util.control.NonFatal
 
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+ */
 object LogAnalyticsReporter {
   /**
     * Returns a new {@link Builder} for {@link LogAnalyticsReporter}.
@@ -50,21 +53,17 @@ object LogAnalyticsReporter {
     */
   class Builder(val registry: MetricRegistry) extends Logging {
     private var clock = Clock.defaultClock
-    private var prefix: String = null
+    private var prefix = null
     private var rateUnit = TimeUnit.SECONDS
     private var durationUnit = TimeUnit.MILLISECONDS
     private var filter = MetricFilter.ALL
     private var filterRegex = sys.env.getOrElse("LA_SPARKMETRIC_REGEX", "")
-    if(filterRegex != "") {
-      filter = new MetricFilter() {
-        override def matches(name: String, metric: Metric): Boolean = {
-          name.matches(filterRegex)
-        }
-      }
+    if(filterRegex != "") filter = new MetricFilter() {
+      override def matches(name: String, metric: Metric): Boolean = name.matches(filterRegex)
     }
     private var logType = "SparkMetrics"
-    private var workspaceId: String = null
-    private var workspaceKey: String = null
+    private var workspaceId = null
+    private var workspaceKey = null
 
     /**
       * Use the given {@link Clock} instance for the time. Usually the default clock is sufficient.

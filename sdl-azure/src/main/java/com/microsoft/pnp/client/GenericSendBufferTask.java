@@ -32,6 +32,7 @@ import java.util.concurrent.TimeUnit;
  * <p>
  * Instances of this class (and subclasses) are thread-safe.
  *
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
  */
 public abstract class GenericSendBufferTask<T> implements Runnable {
 

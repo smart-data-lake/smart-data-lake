@@ -15,6 +15,9 @@ import java.lang.reflect.Field;
 
 import static org.mockito.Mockito.*;
 
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+ */
 public class LogAnalyticsClientTester {
 
     @Mock

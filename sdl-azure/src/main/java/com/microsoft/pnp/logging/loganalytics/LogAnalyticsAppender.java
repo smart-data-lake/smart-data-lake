@@ -31,6 +31,9 @@ import org.apache.log4j.spi.LoggingEvent;
 
 import static com.microsoft.pnp.logging.JSONLayout.TIMESTAMP_FIELD_NAME;
 
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+ */
 public class LogAnalyticsAppender extends AppenderSkeleton {
     private static final String LA_SPARKLOGGINGEVENT_NAME_REGEX=System.getenv().getOrDefault("LA_SPARKLOGGINGEVENT_NAME_REGEX", "");
     private static final String LA_SPARKLOGGINGEVENT_MESSAGE_REGEX=System.getenv().getOrDefault("LA_SPARKLOGGINGEVENT_MESSAGE_REGEX", "");

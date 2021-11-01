@@ -40,6 +40,9 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
 
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+ */
 public class LogAnalyticsClient implements Closeable {
     private static final String HashAlgorithm = "HmacSHA256";
     private static final String HttpVerb = "POST";
