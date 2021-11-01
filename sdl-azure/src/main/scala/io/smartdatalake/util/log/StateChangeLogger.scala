@@ -61,6 +61,8 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
 
   override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext): Unit = {
 
+    if (state.isFinal) return  // final notification is redundant -> skip
+
     val logEvents = extractLogEvents(state, context)
     val jsonEvents = logEvents.map{le:StateLogEvent => gson.toJson(le)}.mkString(",")
 
