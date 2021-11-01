@@ -19,7 +19,7 @@
 
 package org.apache.spark.metrics.sink.loganalytics
 
-import com.codahale.metrics._
+import com.codahale.metrics.{Timer, _}
 import com.codahale.metrics.json.MetricsModule
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -208,11 +208,9 @@ class LogAnalyticsReporter(val registry: MetricRegistry, val workspaceId: String
     import scala.collection.JavaConverters._
 
     val ambientProperties = SparkInformation.get() + ("SparkEventTime" -> now.toString)
-    val metricss = gauges.retain((_, v) => v.getValue != null).toSeq ++
-      counters.toSeq ++ histograms.toSeq ++ meters.toSeq ++ timers.toSeq
     val metrics = gauges.asScala.retain((_, v) => v.getValue != null).toSeq ++
       counters.asScala.toSeq ++ histograms.asScala.toSeq ++ meters.asScala.toSeq ++ timers.asScala.toSeq
-    for ((name, metric) <- metricss) {
+    for ((name, metric) <- metrics) {
       try {
         this.logAnalyticsBufferedClient.sendMessage(
           compact(this.addProperties(name, metric, ambientProperties)),
