@@ -1,12 +1,11 @@
 package org.apache.spark.metrics.sink.loganalytics
 
-import java.util.Properties
-import java.util.concurrent.TimeUnit
-
 import com.codahale.metrics.MetricRegistry
-import org.apache.spark.internal.Logging
 import org.apache.spark.metrics.sink.Sink
-import org.apache.spark.{SecurityManager, SparkException}
+import  org.apache.spark.metrics.sink.util.Logging
+
+import java.util.Properties
+
 
 /**
  * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
@@ -29,12 +28,12 @@ private class LogAnalyticsMetricsSink(
 
   override def start(): Unit = {
     reporter.start(config.pollPeriod, config.pollUnit)
-    logInfo(s"LogAnalyticsMetricsSink started")
+    logger.info(s"LogAnalyticsMetricsSink started")
   }
 
   override def stop(): Unit = {
     reporter.stop()
-    logInfo("LogAnalyticsMetricsSink stopped.")
+    logger.info("LogAnalyticsMetricsSink stopped.")
   }
 
   override def report(): Unit = {

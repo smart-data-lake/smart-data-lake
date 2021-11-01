@@ -19,18 +19,19 @@
 
 package org.apache.spark.metrics.sink.loganalytics
 
-import java.time.Instant
-import java.util.concurrent.TimeUnit
-import com.codahale.metrics.{Timer, _}
+import com.codahale.metrics._
 import com.codahale.metrics.json.MetricsModule
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import com.microsoft.pnp.SparkInformation
-import com.microsoft.pnp.client.loganalytics.{LogAnalyticsClient, LogAnalyticsSendBufferClient}
-import org.apache.spark.internal.Logging
+import io.smartdatalake.util.azure.client.loganalytics.{LogAnalyticsClient, LogAnalyticsSendBufferClient}
+import org.apache.spark.metrics.sink.SparkInformation
 import org.json4s.JsonAST.JValue
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods.{compact, parse, render}
+import  org.apache.spark.metrics.sink.util.Logging
+
+import java.time.Instant
+import java.util.concurrent.TimeUnit
 import scala.util.control.NonFatal
 object LogAnalyticsReporter {
   /**
@@ -119,7 +120,7 @@ object LogAnalyticsReporter {
      * @return { @code this}
      */
     def withLogType(logType: String): LogAnalyticsReporter.Builder = {
-      logInfo(s"Setting logType to '${logType}'")
+      logger.info(s"Setting logType to '${logType}'")
       this.logType = logType
       this
     }
@@ -130,7 +131,7 @@ object LogAnalyticsReporter {
      * @return { @code this}
      */
     def withWorkspaceId(workspaceId: String): LogAnalyticsReporter.Builder = {
-      logInfo(s"Setting workspaceId to '${workspaceId}'")
+      logger.info(s"Setting workspaceId to '${workspaceId}'")
       this.workspaceId = workspaceId
       this
     }
@@ -150,7 +151,7 @@ object LogAnalyticsReporter {
      * @return a { @link LogAnalyticsReporter}
      */
     def build(): LogAnalyticsReporter = {
-      logDebug("Creating LogAnalyticsReporter")
+      logger.info("Creating LogAnalyticsReporter")
       new LogAnalyticsReporter(
         registry,
         workspaceId,
@@ -188,10 +189,10 @@ class LogAnalyticsReporter(val registry: MetricRegistry, val workspaceId: String
                        histograms: java.util.SortedMap[String, Histogram],
                        meters: java.util.SortedMap[String, Meter],
                        timers: java.util.SortedMap[String, Timer]): Unit = {
-    logDebug("Reporting metrics")
+    logger.debug("Reporting metrics")
     // nothing to do if we don't have any metrics to report
     if (gauges.isEmpty && counters.isEmpty && histograms.isEmpty && meters.isEmpty && timers.isEmpty) {
-      logInfo("All metrics empty, nothing to report")
+      logger.info("All metrics empty, nothing to report")
       return
     }
     val now = Instant.now
@@ -199,11 +200,11 @@ class LogAnalyticsReporter(val registry: MetricRegistry, val workspaceId: String
     import scala.collection.JavaConverters._
 
     val ambientProperties = SparkInformation.get() + ("SparkEventTime" -> now.toString)
-    val metrics = gauges.retain((_, v) => v.getValue != null).toSeq ++
+    val metricss = gauges.retain((_, v) => v.getValue != null).toSeq ++
       counters.toSeq ++ histograms.toSeq ++ meters.toSeq ++ timers.toSeq
     val metrics = gauges.asScala.retain((_, v) => v.getValue != null).toSeq ++
       counters.asScala.toSeq ++ histograms.asScala.toSeq ++ meters.asScala.toSeq ++ timers.asScala.toSeq
-    for ((name, metric) <- metrics) {
+    for ((name, metric) <- metricss) {
       try {
         this.logAnalyticsBufferedClient.sendMessage(
           compact(this.addProperties(name, metric, ambientProperties)),
@@ -211,7 +212,7 @@ class LogAnalyticsReporter(val registry: MetricRegistry, val workspaceId: String
         )
       } catch {
         case NonFatal(e) =>
-          logError(s"Error serializing metric to JSON", e)
+          logger.error(s"Error serializing metric to JSON", e)
           None
       }
     }

@@ -17,19 +17,19 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.microsoft.pnp.logging.loganalytics;
+package io.smartdatalake.util.azure.logging.loganalytics;
 
-import com.microsoft.pnp.LogAnalyticsEnvironment;
-import com.microsoft.pnp.client.loganalytics.LogAnalyticsClient;
-import com.microsoft.pnp.client.loganalytics.LogAnalyticsSendBufferClient;
-import com.microsoft.pnp.logging.JSONLayout;
+import io.smartdatalake.util.azure.LogAnalyticsEnvironment;
+import io.smartdatalake.util.azure.client.loganalytics.LogAnalyticsClient;
+import io.smartdatalake.util.azure.client.loganalytics.LogAnalyticsSendBufferClient;
+import io.smartdatalake.util.azure.logging.JSONLayout;
 import org.apache.log4j.AppenderSkeleton;
 import org.apache.log4j.Layout;
 import org.apache.log4j.helpers.LogLog;
 import org.apache.log4j.spi.Filter;
 import org.apache.log4j.spi.LoggingEvent;
 
-import static com.microsoft.pnp.logging.JSONLayout.TIMESTAMP_FIELD_NAME;
+import static io.smartdatalake.util.azure.logging.JSONLayout.TIMESTAMP_FIELD_NAME;
 
 /**
  * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license

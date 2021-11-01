@@ -17,21 +17,20 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.microsoft.pnp.logging;
-
-import org.apache.log4j.PropertyConfigurator;
-
-import java.io.InputStream;
+package io.smartdatalake.util.azure;
 
 /**
  * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
  */
-public class Log4jConfiguration {
-    public static void configure(String configFilename) {
-        PropertyConfigurator.configure(configFilename);
+public class LogAnalyticsEnvironment {
+    public static final String LOG_ANALYTICS_WORKSPACE_ID = "LOG_ANALYTICS_WORKSPACE_ID";
+    public static final String LOG_ANALYTICS_WORKSPACE_KEY = "LOG_ANALYTICS_WORKSPACE_KEY";
+
+    public static String getWorkspaceId() {
+        return System.getenv(LOG_ANALYTICS_WORKSPACE_ID);
     }
 
-    public static void configure(InputStream inputStream) {
-        PropertyConfigurator.configure(inputStream);
+    public static String getWorkspaceKey() {
+        return System.getenv(LOG_ANALYTICS_WORKSPACE_KEY);
     }
 }

@@ -17,45 +17,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.microsoft.pnp
+package io.smartdatalake.util.azure.logging;
 
-import org.apache.spark.internal.Logging
-
+import com.fasterxml.jackson.databind.ObjectMapper;
 /**
  * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
  */
-trait LogAnalyticsConfiguration extends Logging {
-  protected def getWorkspaceId: Option[String]
-
-  protected def getSecret: Option[String]
-
-  protected def getLogType: String
-
-  protected def getTimestampFieldName: Option[String]
-
-  val workspaceId: String = {
-    val value = getWorkspaceId
-    require(value.isDefined, "A Log Analytics Workspace ID is required")
-    logInfo(s"Setting workspaceId to ${value.get}")
-    value.get
-
-  }
-
-  val secret: String = {
-    val value = getSecret
-    require(value.isDefined, "A Log Analytics Workspace Key is required")
-    value.get
-  }
-
-  val logType: String = {
-    val value = getLogType
-    logInfo(s"Setting logType to $value")
-    value
-  }
-
-  val timestampFieldName: String = {
-    val value = getTimestampFieldName
-    logInfo(s"Setting timestampNameField to $value")
-    value.orNull
-  }
+public interface JSONConfiguration {
+    void configure(ObjectMapper objectMapper);
 }

@@ -17,7 +17,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.microsoft.pnp.client.loganalytics;
+package io.smartdatalake.util.azure.client.loganalytics;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.http.HttpHeaders;

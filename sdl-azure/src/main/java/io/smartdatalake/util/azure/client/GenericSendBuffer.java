@@ -17,7 +17,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.microsoft.pnp.client;
+package io.smartdatalake.util.azure.client;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;

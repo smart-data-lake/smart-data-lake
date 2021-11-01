@@ -1,4 +1,4 @@
-package com.microsoft.pnp.logging.loganalytics;
+package io.smartdatalake.util.azure.logging.loganalytics;
 
 import org.apache.log4j.spi.Filter;
 import org.apache.log4j.spi.LoggingEvent;
