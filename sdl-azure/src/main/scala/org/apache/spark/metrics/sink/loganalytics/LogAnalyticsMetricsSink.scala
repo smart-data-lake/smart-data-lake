@@ -2,7 +2,7 @@ package org.apache.spark.metrics.sink.loganalytics
 
 import com.codahale.metrics.MetricRegistry
 import org.apache.spark.metrics.sink.Sink
-import  org.apache.spark.metrics.sink.util.Logging
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 
 import java.util.Properties
 
@@ -14,7 +14,7 @@ private class LogAnalyticsMetricsSink(
                                 val property: Properties,
                                 val registry: MetricRegistry,
                                 securityMgr: SecurityManager)
-  extends Sink with Logging {
+  extends Sink with SmartDataLakeLogger {
 
   private val config = new LogAnalyticsSinkConfiguration(property)
 

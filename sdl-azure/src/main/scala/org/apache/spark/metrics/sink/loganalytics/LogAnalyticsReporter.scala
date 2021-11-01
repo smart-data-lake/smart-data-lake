@@ -25,7 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import io.smartdatalake.util.azure.client.loganalytics.{LogAnalyticsClient, LogAnalyticsSendBufferClient}
 import org.apache.spark.metrics.sink.SparkInformation
-import org.apache.spark.metrics.sink.util.Logging
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.json4s.JsonAST.JValue
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods.{compact, parse, render}
@@ -177,7 +177,7 @@ object LogAnalyticsReporter {
  */
 class LogAnalyticsReporter(val registry: MetricRegistry, val workspaceId: String, val workspaceKey: String, val logType: String, val clock: Clock, val prefix: String, val rateUnit: TimeUnit, val durationUnit: TimeUnit, val filter: MetricFilter)//, var additionalFields: util.Map[String, AnyRef]) //this.logType);
   extends ScheduledReporter(registry, "loganalytics-reporter", filter, rateUnit, durationUnit)
-    with Logging {
+    with SmartDataLakeLogger {
   private val mapper = new ObjectMapper()
     .registerModules(
       DefaultScalaModule,
