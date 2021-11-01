@@ -23,6 +23,9 @@ import com.microsoft.pnp.client.GenericSendBufferTask;
 
 import java.util.List;
 
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+ */
 public class LogAnalyticsSendBufferTask extends GenericSendBufferTask<String> {
 
     private final LogAnalyticsClient client;

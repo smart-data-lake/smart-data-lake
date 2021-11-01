@@ -24,6 +24,9 @@ import com.microsoft.pnp.{LogAnalyticsConfiguration, LogAnalyticsEnvironment}
 import java.util.Properties
 import java.util.concurrent.TimeUnit
 
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+ */
 private[spark] object LogAnalyticsSinkConfiguration {
   private[spark] val LOGANALYTICS_KEY_WORKSPACEID = "workspaceId"
   private[spark] val LOGANALYTICS_KEY_SECRET = "secret"

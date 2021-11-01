@@ -31,6 +31,9 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+ */
 public class JSONLayout extends Layout {
 
     public static final String TIMESTAMP_FIELD_NAME = "timestamp";

@@ -39,10 +39,8 @@ import java.time.LocalDateTime
                         secondaryKey : "xxx",   // secondary key found under azure log analytics workspace's 'agents management' section
                         logType : "__yourLogType__"} }
         ]
-*/
-
-/**
- * This code originates from https://github.com/mspnp/spark-monitoring and is protected the corresponding MIT license
+ *
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
  */
 class StateChangeLogger(options: Map[String,String]) extends StateListener with SmartDataLakeLogger {
 

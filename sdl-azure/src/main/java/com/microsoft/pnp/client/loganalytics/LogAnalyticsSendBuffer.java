@@ -22,6 +22,9 @@ package com.microsoft.pnp.client.loganalytics;
 import com.microsoft.pnp.client.GenericSendBuffer;
 import com.microsoft.pnp.client.GenericSendBufferTask;
 
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+ */
 public class LogAnalyticsSendBuffer extends GenericSendBuffer<String> {
     // We will leave this at 25MB, since the Log Analytics limit is 30MB.
     public static final int DEFAULT_MAX_MESSAGE_SIZE_IN_BYTES = 1024 * 1024 * 25;

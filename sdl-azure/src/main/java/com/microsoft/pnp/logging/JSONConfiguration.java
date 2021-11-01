@@ -20,7 +20,9 @@
 package com.microsoft.pnp.logging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+ */
 public interface JSONConfiguration {
     void configure(ObjectMapper objectMapper);
 }

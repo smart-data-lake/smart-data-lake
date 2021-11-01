@@ -23,6 +23,9 @@ import com.microsoft.pnp.client.GenericSendBuffer;
 
 import java.util.LinkedHashMap;
 
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+ */
 public class LogAnalyticsSendBufferClient implements AutoCloseable {
     private final LinkedHashMap<String, LogAnalyticsSendBuffer> buffers = new LinkedHashMap<>();
 

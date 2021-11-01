@@ -8,6 +8,9 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.metrics.sink.Sink
 import org.apache.spark.{SecurityManager, SparkException}
 
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+ */
 private class LogAnalyticsMetricsSink(
                                 val property: Properties,
                                 val registry: MetricRegistry,

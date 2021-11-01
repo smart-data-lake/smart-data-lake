@@ -23,6 +23,9 @@ import org.apache.log4j.PropertyConfigurator;
 
 import java.io.InputStream;
 
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+ */
 public class Log4jConfiguration {
     public static void configure(String configFilename) {
         PropertyConfigurator.configure(configFilename);

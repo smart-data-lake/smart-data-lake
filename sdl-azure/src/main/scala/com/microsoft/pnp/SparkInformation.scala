@@ -21,6 +21,9 @@ package com.microsoft.pnp
 
 import org.apache.spark.SparkEnv
 
+/**
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
+ */
 object SparkInformation {
   // Spark Configuration
   // NOTE - In Spark versions > 2.4.0, many settings have been, or will likely be, replaced with values
