@@ -25,13 +25,14 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import io.smartdatalake.util.azure.client.loganalytics.{LogAnalyticsClient, LogAnalyticsSendBufferClient}
 import org.apache.spark.metrics.sink.SparkInformation
+import org.apache.spark.metrics.sink.util.Logging
 import org.json4s.JsonAST.JValue
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods.{compact, parse, render}
-import  org.apache.spark.metrics.sink.util.Logging
 
 import java.time.Instant
 import java.util.concurrent.TimeUnit
+import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
 
 /**
@@ -204,15 +205,10 @@ class LogAnalyticsReporter(val registry: MetricRegistry, val workspaceId: String
       return
     }
     val now = Instant.now
-    import scala.collection.JavaConversions._
-    import scala.collection.JavaConverters._
-
     val ambientProperties = SparkInformation.get() + ("SparkEventTime" -> now.toString)
-    val metricss = gauges.retain((_, v) => v.getValue != null).toSeq ++
-      counters.toSeq ++ histograms.toSeq ++ meters.toSeq ++ timers.toSeq
     val metrics = gauges.asScala.retain((_, v) => v.getValue != null).toSeq ++
       counters.asScala.toSeq ++ histograms.asScala.toSeq ++ meters.asScala.toSeq ++ timers.asScala.toSeq
-    for ((name, metric) <- metricss) {
+    for ((name, metric) <- metrics) {
       try {
         this.logAnalyticsBufferedClient.sendMessage(
           compact(this.addProperties(name, metric, ambientProperties)),
