@@ -34,17 +34,17 @@ import java.time.LocalDateTime
  * in global config section, integrate the following:
  *
  *        stateListeners = [
- *         { className = "io.smartdatalake.util.log.StateChangeLogger"
- *           options = { primaryKey : "xxx",    // primary key found under azure log analytics workspace's 'agents management' section
- *                        secondaryKey : "xxx",   // secondary key found under azure log analytics workspace's 'agents management' section
+ *         { className = "io.smartdatalake.util.azure.StateChangeLogger"
+ *           options = { workspaceID : "xxx",    // Workspace ID found under azure log analytics workspace's 'agents management' section
+ *                       secondaryKey : "xxx",   // secondary key found under azure log analytics workspace's 'agents management' section
  *                        logType : "__yourLogType__"} }
  *        ]
  */
 class StateChangeLogger(options: Map[String,String]) extends StateListener with SmartDataLakeLogger {
 
-  assert(options.contains("primaryKey"))
+  assert(options.contains("workspaceID"))
   assert(options.contains("secondaryKey"))
-  private val azureLogClient = new LogAnalyticsClient(options("primaryKey"), options("secondaryKey"))
+  private val azureLogClient = new LogAnalyticsClient(options("workspaceID"), options("secondaryKey"))
 
   val logType : String = options.getOrElse("logType", "StateChange")
 
@@ -54,7 +54,7 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
 
   case class StateLogEventContext(thread: String, notificationTime: String, executionId: String, phase: String, actionId: String, state: String, message: String)
   case class TargetObjectMetadata(name: String, layer: String, subjectArea: String, description: String)
-  case class Result(targetObjectMetadata: TargetObjectMetadata, recordsWritten: Long, stageDuration: String)
+  case class Result(targetObjectMetadata: TargetObjectMetadata, recordsWritten: String, stageDuration: String)
   case class StateLogEvent(context: StateLogEventContext, result: Result)
 
   private val gson = new Gson
@@ -66,7 +66,7 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
     val logEvents = extractLogEvents(state, context)
     val jsonEvents = logEvents.map{le:StateLogEvent => gson.toJson(le)}.mkString(",")
 
-    logger.debug("logType " + logType+ " sending: " + jsonEvents)
+    logger.debug("logType " + logType+ " sending: " + jsonEvents.toString())
     azureLogClient.send("[ " + jsonEvents + " ]", logType)
     logger.debug("sending completed")
   }
@@ -103,7 +103,7 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
                 description = extractString(_.description))
             }
 
-            Result(toMetadata, result.mainMetrics.getOrElse("records_written", null).asInstanceOf[Long], result.mainMetrics.getOrElse("stageDuration",null).toString)
+            Result(toMetadata, result.mainMetrics.getOrElse("records_written", -1).toString, result.mainMetrics.getOrElse("stageDuration", -1).toString)
           })
 
         StateLogEvent(logContext, result.orNull)
