@@ -18,16 +18,16 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.io.File
-import java.nio.file.Files
-
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
-import org.apache.commons.io.FileUtils
+import org.apache.commons.io.{FileUtils, IOUtils}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SaveMode}
 
+import java.io.{File, FileInputStream}
+import java.nio.file.Files
+import java.util.zip.ZipInputStream
 import scala.util.Random
 
 /**
@@ -240,6 +240,31 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     val resultFileRefs = tgtDO.getFileRefs(Seq())
     resultFileRefs.map(_.fileName).sorted shouldBe Seq("data.csv","data.csv")
   }
+
+  test("Writing and reading zip file") {
+    val tempDir = Files.createTempDirectory("csv")
+    val testFilename = "data.csv.zip"
+    val df = Seq(("A", "B"), ("B", "1")).toDF("a", "b")
+
+    // write
+    val dataObject = CsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), csvOptions = Map("compression" -> classOf[ZipCsvCodec].getName), sparkRepartition=Some(SparkRepartitionDef(numberOfTasksPerPartition=1, filename = Some(testFilename))))
+    dataObject.writeDataFrame(df)
+
+    // verify file
+    val zipInputStream = new ZipInputStream(new FileInputStream(tempDir.resolve(testFilename).toFile))
+    assert(zipInputStream.getNextEntry != null)
+    val readString = new String(IOUtils.toByteArray(zipInputStream))
+    zipInputStream.close()
+
+    // reading with custom codec is not implemented in Spark for now.
+    /**
+    val dfRead = dataObject.getDataFrame()
+    val result = df.isEqual(dfRead)
+    if (!result) TestUtil.printFailedTestResult("")(dfRead)(df)
+    assert(result)
+    **/
+  }
+
 
   def createDataObject(options: Map[String, String])(path: String, schemaOpt: Option[StructType]): CsvFileDataObject = {
     val dataObj = CsvFileDataObject(id = "schemaTestCsvDO", path = path, schema = schemaOpt, csvOptions = options)
