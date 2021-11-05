@@ -289,7 +289,7 @@
 
 		<!-- other dependency versions -->
 		<scopt.version>4.0.1</scopt.version>
-		<databricks.spark-xml.version>0.9.0</databricks.spark-xml.version>
+		<databricks.spark-xml.version>0.13.0</databricks.spark-xml.version>
 		<spark.excel.version>0.13.5</spark.excel.version>
 		<ucanaccess.version>5.0.1</ucanaccess.version>
 		<hsqldb.version>2.5.2</hsqldb.version>
