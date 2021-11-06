@@ -345,8 +345,15 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       }
     } catch {
       case ex: DAGException if ex.severity >= ExceptionSeverity.SKIPPED =>
+        // don't fail on not severe exceptions like having no data to process
         logger.warn(s"At least one action is ${ex.severity}")
         Seq()
+      case ex: AnalysisException if Environment.simplifyFinalExceptionLog =>
+        // reduce logical plan output to 5 lines
+        throw new SimplifiedAnalysisException(ex)
+      case ex: Throwable if Environment.simplifyFinalExceptionLog =>
+        // simplify stacktrace of exceptions thrown... filter all entries once an entry appears from monix (the parallel execution framework SDL uses)
+        throw LogUtil.simplifyStackTrace(ex)
     }
 
     // return result statistics as string
