@@ -44,6 +44,7 @@ private[smartdatalake] case class ActionDAGRunState(appConfig: SmartDataLakeBuil
   def toJson: String = ActionDAGRunState.toJson(this)
   def isFailed: Boolean = actionsState.exists(_._2.state==RuntimeEventState.FAILED)
   def isSucceeded: Boolean = isFinal && !isFailed
+  def isSkipped: Boolean = isFinal && actionsState.forall(_._2.state==RuntimeEventState.SKIPPED)
   def getDataObjectsState: Seq[DataObjectState] = {
     actionsState.flatMap{ case (actionId, info) => info.dataObjectsState }.toSeq
   }
