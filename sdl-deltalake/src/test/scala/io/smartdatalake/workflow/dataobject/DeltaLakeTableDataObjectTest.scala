@@ -112,12 +112,37 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     assert(resultat)
 
     // 2nd load: overwrite all with different schema
-    val df2 = Seq(("ext","doe","john",10),("ext","smith","peter",1))
-      .toDF("type", "lastname", "firstname", "rating2")
+    val df2 = Seq(("ext","doe","john",10,"test"),("ext","smith","peter",1,"test"))
+      .toDF("type", "lastname", "firstname", "rating2", "test")
     targetDO.writeDataFrame(df2)
     val actual2 = targetDO.getDataFrame()
     val resultat2: Boolean = df2.isEqual(actual2)
     if (!resultat2) TestUtil.printFailedTestResult("SaveMode overwrite",Seq())(actual2)(df2)
+    assert(resultat2)
+  }
+
+  test("SaveMode append with different schema") {
+    val targetTable = Table(db = Some("default"), name = "test_append", query = None)
+    val targetTablePath = tempPath+s"/${targetTable.fullName}"
+    val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Append, allowSchemaEvolution = true)
+    targetDO.dropTable
+
+    // first load
+    val df1 = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7))
+      .toDF("type", "lastname", "firstname", "rating")
+    targetDO.writeDataFrame(df1)
+    val actual = targetDO.getDataFrame()
+    val resultat: Boolean = df1.isEqual(actual)
+    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    assert(resultat)
+
+    // 2nd load: append all with different schema
+    val df2 = Seq(("ext","doe","john",10,"test"),("ext","smith","peter",1,"test"))
+      .toDF("type", "lastname", "firstname", "rating2", "test")
+    targetDO.writeDataFrame(df2)
+    val actual2 = targetDO.getDataFrame().filter($"lastname" === "doe")
+    val resultat2: Boolean = actual2.count() == 2
+    if (!resultat2) TestUtil.printFailedTestResult("SaveMode append",Seq())(actual2)(df2)
     assert(resultat2)
   }
 

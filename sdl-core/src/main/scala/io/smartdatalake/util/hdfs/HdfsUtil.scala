@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.permission.FsPermission
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import java.net.URI
+import scala.collection.AbstractIterator
 import scala.io.Source
 
 /**
@@ -288,5 +289,13 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
     filesystem.mkdirs(path.getParent)
     val os = filesystem.create(path, /*overwrite*/ true)
     os.close()
+  }
+
+  /**
+   * Wrapper for Hadoop RemoteIterator to use it with Scala style
+   */
+  case class RemoteIteratorWrapper[T](underlying: RemoteIterator[T]) extends AbstractIterator[T] with Iterator[T] {
+    def hasNext: Boolean = underlying.hasNext
+    def next(): T = underlying.next()
   }
 }
