@@ -559,7 +559,11 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     session.streams.resetTerminated() // reset terminated streaming query list
     Environment._additionalStateListeners = Seq(stateListener)
     Environment.stopStreamingGracefully = false
-    sdlb.run(sdlConfig)
+    try {
+      sdlb.run(sdlConfig)
+    } catch {
+      case _: java.lang.InterruptedException => Unit // Ignore - this occurs on Spark 2.x only when stopping streaming queries
+    }
     Environment.stopStreamingGracefully = false
     Environment._additionalStateListeners = Seq()
 
