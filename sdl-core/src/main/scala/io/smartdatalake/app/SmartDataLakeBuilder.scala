@@ -28,7 +28,7 @@ import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SmartDataLakeLogger}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{Action, RuntimeInfo, SDLExecutionId, SparkAction}
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{AnalysisException, SparkSession}
 import scopt.OptionParser
 
 import java.io.File
@@ -344,7 +344,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         execActionDAG(actionDAGRun, actionsSelected, context)
       }
     } catch {
-      // don't fail on not severe exceptions like having no data to process
       case ex: DAGException if ex.severity >= ExceptionSeverity.SKIPPED =>
         logger.warn(s"At least one action is ${ex.severity}")
         Seq()
@@ -376,10 +375,11 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     // execute DAG
     val startTime = LocalDateTime.now
+    var finalRunState: ActionDAGRunState = null
     var subFeeds = try {
       actionDAGRun.exec(session, context)
     } finally {
-      actionDAGRun.saveState(true)(session, context)
+      finalRunState = actionDAGRun.saveState(true)(session, context)
     }
 
     // Iterate execution in streaming mode
@@ -387,8 +387,13 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       if (actionsSelected.exists(!_.isAsynchronous)) {
         // if there are synchronous actions, we re-execute the dag
         if (!Environment.stopStreamingGracefully) {
-          // increment runId
-          val newContext = context.incrementRunId
+          // increment runId only if not all actions are skipped
+          val newContext = if (!finalRunState.isSkipped) {
+            context.incrementRunId
+          } else {
+            logger.info(s"As all actions of run_id ${context.executionId.runId} are skipped, run_id is not incremented for next execution")
+            context
+          }
           // reset execution result before new execution
           actionsSelected.foreach(_.resetExecutionResult())
           // remove spark caches so that new data is read in next iteration
