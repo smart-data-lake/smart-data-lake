@@ -27,6 +27,7 @@ import org.apache.spark.sql.AnalysisException
  */
 class SimplifiedAnalysisException (analysisException: AnalysisException)
   extends Exception(analysisException.message, analysisException.cause.orNull) with Serializable {
+  setStackTrace(analysisException.getStackTrace)
   private val logicalPlanMaxLines = 5
   override def getMessage: String = {
     val planAnnotation = Option(analysisException.plan).map(p => limitLines(s";\n$p", logicalPlanMaxLines)).getOrElse("")
