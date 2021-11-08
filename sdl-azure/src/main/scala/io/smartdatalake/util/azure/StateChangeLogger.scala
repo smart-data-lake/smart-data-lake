@@ -26,6 +26,7 @@ import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata}
 import io.smartdatalake.app.StateListener
 import com.google.gson.Gson
 import io.smartdatalake.util.azure.client.loganalytics.LogAnalyticsClient
+import io.smartdatalake.util.secrets.SecretsUtil
 
 import java.time.LocalDateTime
 
@@ -36,20 +37,23 @@ import java.time.LocalDateTime
  *        stateListeners = [
  *         { className = "io.smartdatalake.util.azure.StateChangeLogger"
  *           options = { workspaceID : "xxx",    // Workspace ID found under azure log analytics workspace's 'agents management' section
- *                       secondaryKey : "xxx",   // secondary key found under azure log analytics workspace's 'agents management' section
+ *                       logAnalyticsKey : "xxx",   // primary or secondary key found under azure log analytics workspace's 'agents management' section
  *                        logType : "__yourLogType__"} }
  *        ]
  */
 class StateChangeLogger(options: Map[String,String]) extends StateListener with SmartDataLakeLogger {
 
   assert(options.contains("workspaceID"))
-  assert(options.contains("secondaryKey"))
-  private val azureLogClient = new LogAnalyticsClient(options("workspaceID"), options("secondaryKey"))
+  assert(options.contains("logAnalyticsKey"))
 
   val logType : String = options.getOrElse("logType", "StateChange")
 
+  lazy private val logAnalyticsKey: String = SecretsUtil.getSecret(options("logAnalyticsKey"))
+  lazy private val azureLogClient = new LogAnalyticsClient(options("workspaceID"), logAnalyticsKey)
+
   override def init(): Unit = {
-    logger.debug("io.smartdatalake.util.log.StateChangeLogger init done, logType: " + logType)
+    logger.info(s"io.smartdatalake.util.log.StateChangeLogger init done, " +
+                 s"logType: $logType, key: _${logAnalyticsKey.substring(0,4)} .. ${logAnalyticsKey.substring(logAnalyticsKey.length-4)}_ ")
   }
 
   case class StateLogEventContext(thread: String, notificationTime: String, executionId: String, phase: String, actionId: String, state: String, message: String)
