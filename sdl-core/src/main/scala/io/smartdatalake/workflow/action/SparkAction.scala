@@ -59,7 +59,9 @@ private[smartdatalake] abstract class SparkAction extends Action {
 
   override def isAsynchronous: Boolean = executionMode.exists(_.isAsynchronous)
 
-  /**
+  override def isAsynchronousProcessStarted: Boolean = isAsynchronous && streamingQuery.nonEmpty
+
+      /**
    * Override and parametrize saveMode in output DataObject configurations when writing to DataObjects.
    */
   def saveModeOptions: Option[SaveModeOptions] = None
