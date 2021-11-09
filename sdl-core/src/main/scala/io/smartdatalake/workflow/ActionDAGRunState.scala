@@ -28,7 +28,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
-import io.smartdatalake.workflow.action.{ResultRuntimeInfo, RuntimeEventState, RuntimeInfo}
+import io.smartdatalake.workflow.action.{ResultRuntimeInfo, RuntimeEventState, RuntimeInfo, SDLExecutionId}
 import org.apache.spark.sql.DataFrame
 
 import java.time.{Duration, LocalDateTime}
@@ -44,7 +44,8 @@ private[smartdatalake] case class ActionDAGRunState(appConfig: SmartDataLakeBuil
   def toJson: String = ActionDAGRunState.toJson(this)
   def isFailed: Boolean = actionsState.exists(_._2.state==RuntimeEventState.FAILED)
   def isSucceeded: Boolean = isFinal && !isFailed
-  def isSkipped: Boolean = isFinal && actionsState.forall(_._2.state==RuntimeEventState.SKIPPED)
+  def isSkipped: Boolean = isFinal &&
+    actionsState.filter(_._2.executionId.isInstanceOf[SDLExecutionId]).forall(_._2.state==RuntimeEventState.SKIPPED)
   def getDataObjectsState: Seq[DataObjectState] = {
     actionsState.flatMap{ case (actionId, info) => info.dataObjectsState }.toSeq
   }

@@ -357,6 +357,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     (finalSubFeeds, actionDAGRun.getStatistics)
   }
 
+  // TODO: make tail recursive to avoid stack overflow
   def execActionDAG(actionDAGRun: ActionDAGRun, actionsSelected: Seq[Action], context: ActionPipelineContext, lastStartTime: Option[LocalDateTime] = None)(implicit session: SparkSession): Seq[SubFeed] = {
 
     // handle skipped actions for next execution of streaming mode
