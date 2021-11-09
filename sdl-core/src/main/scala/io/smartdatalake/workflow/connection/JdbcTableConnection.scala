@@ -29,8 +29,8 @@ import org.apache.commons.pool2.{BasePooledObjectFactory, PooledObject}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.parser.CatalystSqlParser
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
-import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils.getJdbcType
-import org.apache.spark.sql.execution.datasources.jdbc.{JdbcOptionsInWrite, JdbcUtils}
+import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils.getCommonJDBCType
+import org.apache.spark.sql.execution.datasources.jdbc.JdbcOptionsInWrite
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 import org.apache.spark.sql.types.{DataType, StructType}
 
@@ -161,15 +161,14 @@ case class JdbcTableConnection(override val id: ConnectionId,
         val name = if(caseSensitive || JdbcTableDataObject.hasIdentifierSpecialChars(field.name)) dialect.quoteIdentifier(field.name)
           else field.name
         val typ = userSpecifiedColTypesMap
-          .getOrElse(field.name, getJdbcType(field.dataType, dialect).databaseTypeDefinition)
+          .getOrElse(field.name, catalog.getSqlType(field.dataType))
         val nullable = if (field.nullable) "" else "NOT NULL"
         sb.append(s", $name $typ $nullable")
       }
       if (sb.length < 2) "" else sb.substring(2)
     }
     def parseUserSpecifiedCreateTableColumnTypes(schema: StructType, caseSensitive: Boolean, createTableColumnTypes: String): Map[String, String] = {
-      val userSchema = CatalystSqlParser.parseTableSchema(createTableColumnTypes)
-      val userSchemaMap = userSchema.fields.map(f => f.name -> f.dataType.catalogString).toMap
+      val userSchemaMap = createTableColumnTypes.split(",").map(s => (s.takeWhile(_ != ' '), s.dropWhile(_ != ' '))).toMap
       if (caseSensitive) userSchemaMap else CaseInsensitiveMap(userSchemaMap)
     }
     val options =  new JdbcOptionsInWrite(url, tableName, rawOptions)

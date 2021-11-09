@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.connection
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils
+import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils.getCommonJDBCType
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 import org.apache.spark.sql.types.DataType
 
@@ -58,28 +58,29 @@ private[smartdatalake] abstract class JdbcCatalog(connection: JdbcTableConnectio
 
   // convert Spark DataType to SQL type
   def getSqlType(t: DataType, isNullable: Boolean = true): String = {
-    val sqlType = JdbcUtils.getJdbcType(t, jdbcDialect)
+    val sqlType = jdbcDialect.getJDBCType(t).orElse(getCommonJDBCType(t)).getOrElse(
+      throw new IllegalArgumentException(s"Can't get JDBC type for ${t.catalogString}"))
     val nullable = if (!isNullable) " NOT NULL" else ""
     s"${sqlType.databaseTypeDefinition}$nullable"
   }
 
   // create ddl to add a column
   def getAddColumnSql(table: String, column: String, dataType: String): String = {
-    val sql = jdbcDialect.getAddColumnQuery(table, column, dataType)
+    val sql = s"ALTER TABLE $table ADD $column $dataType"
     // we need to fix column name quotation as many dialects always quote them, which is not optimal.
     sql.replace(quoteIdentifier(column), column)
   }
 
   // create ddl to add alter column type
   def getAlterColumnSql(table: String, column: String, sqlType: String): String = {
-    val sql = jdbcDialect.getUpdateColumnTypeQuery(table, column, sqlType)
+    val sql = s"ALTER TABLE $table MODIFY $column $sqlType"
     // we need to fix column name quotation as many dialects always quote them, which is not optimal.
     sql.replace(quoteIdentifier(column), column)
   }
 
   // create ddl to add alter column type
   def getAlterColumnNullableSql(table: String, column: String, isNullable: Boolean = true): String = {
-    val sql = jdbcDialect.getUpdateColumnNullabilityQuery(table, column, isNullable)
+    val sql = s"ALTER TABLE $table ALTER $column SET ${if (isNullable) "NULL" else "NOT NULL"}"
     // we need to fix column name quotation as many dialects always quote them, which is not optimal.
     sql.replace(quoteIdentifier(column), column)
   }

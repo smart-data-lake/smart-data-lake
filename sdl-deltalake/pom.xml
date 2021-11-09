@@ -47,6 +47,7 @@
 	</properties>
 
 	<dependencies>
+
 		<dependency>
 			<groupId>io.smartdatalake</groupId>
 			<artifactId>sdl-core_${scala.minor.version}</artifactId>
@@ -57,15 +58,18 @@
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
+			<scope>${sdl-core.scope}</scope>
 		</dependency>
 
 		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-sql_${scala.minor.version}</artifactId>
+			<scope>${sdl-core.scope}</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-catalyst_${scala.minor.version}</artifactId>
+			<scope>${sdl-core.scope}</scope>
 		</dependency>
 		<!--
 		 	prevent hitting missing dependency exception
@@ -75,10 +79,6 @@
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-tags_${scala.minor.version}</artifactId>
 			<scope>compile</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.spark</groupId>
-			<artifactId>spark-tags_${scala.minor.version}</artifactId>
 		</dependency>
 
 		<dependency>
@@ -90,10 +90,23 @@
 		<dependency>
 			<groupId>org.scala-lang</groupId>
 			<artifactId>scala-library</artifactId>
+			<scope>${sdl-core.scope}</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.scala-lang</groupId>
 			<artifactId>scala-reflect</artifactId>
+			<scope>${sdl-core.scope}</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>com.typesafe</groupId>
+			<artifactId>config</artifactId>
+			<scope>${sdl-core.scope}</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.github.kxbmap</groupId>
+			<artifactId>configs_${scala.minor.version}</artifactId>
+			<scope>${sdl-core.scope}</scope>
 		</dependency>
 
 

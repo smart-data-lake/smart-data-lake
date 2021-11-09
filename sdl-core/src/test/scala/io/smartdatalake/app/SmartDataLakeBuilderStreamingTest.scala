@@ -52,7 +52,8 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
   after {
     // ensure cleanup
-    session.streams.listListeners().foreach(session.streams.removeListener)
+    // listListeners not available in Spark 2.4
+    //session.streams.listListeners().foreach(session.streams.removeListener)
     session.streams.resetTerminated() // reset terminated streaming query list
     Environment.stopStreamingGracefully = false // reset stopping gracefully
   }
@@ -206,6 +207,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     Environment.stopStreamingGracefully = false
     sdlb.run(sdlConfig)
     Environment.stopStreamingGracefully = false
+    session.streams.removeListener(testStreamingQueryListener)
 
     // check data after streaming is terminated
     assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Seq("20180101","20190101").toSet)
@@ -311,6 +313,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     Environment.stopStreamingGracefully = false
     sdlb.run(sdlConfig)
     Environment.stopStreamingGracefully = false
+    session.streams.removeListener(testStreamingQueryListener)
 
     // check data after streaming is terminated
     assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101","20190101"))
@@ -402,6 +405,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     session.streams.resetTerminated() // reset terminated streaming query list
     sdlb.run(sdlConfig)
     Environment.stopStreamingGracefully = false
+    session.streams.removeListener(testStreamingQueryListener)
 
     // check data after streaming is terminated
     assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101","20190101"))
@@ -476,6 +480,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     Environment.stopStreamingGracefully = false
     intercept[StreamingQueryException](sdlb.run(sdlConfig))
     Environment.stopStreamingGracefully = false
+    session.streams.removeListener(testStreamingQueryListener)
   }
 
   test("sdlb streaming recovery, asynchronously action failing before synchronous streaming action") {
@@ -651,6 +656,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     sdlb.run(sdlConfig)
     Environment.stopStreamingGracefully = false
     Environment._additionalStateListeners = Seq()
+    session.streams.removeListener(testStreamingQueryListener)
 
     // check data after streaming is terminated
     assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101", "20180102", "20190101"))

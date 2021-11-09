@@ -49,17 +49,18 @@ class SparkStreamingQueryListener(action: SparkAction, dataObjectId: DataObjectI
   override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
     if (event.progress.id == id) {
       val noData = event.progress.durationMs.size == 2 // if only 2 phases have run, there was no data...
-      logger.info(s"(${event.progress.name}) streaming query ${if (noData) "had no data" else "made progress"}: batchId=${event.progress.batchId} duration=${Duration.ofMillis(event.progress.batchDuration)}")
+      logger.info(s"(${event.progress.name}) streaming query ${if (noData) "had no data" else "made progress"}: batchId=${event.progress.batchId} duration=${Duration.ofMillis(event.progress.durationMs.get("triggerExecution"))}")
       val executionId = SparkStreamingExecutionId(event.progress.batchId)
       val endTstmp = LocalDateTime.ofInstant(Instant.parse(event.progress.timestamp), ZoneId.systemDefault) // String is in UTC. It must be converted to local timezone.
-      val startTstmp = endTstmp.minus(event.progress.batchDuration, ChronoUnit.MILLIS) // start time is not stored in event...
+      val startTstmp = endTstmp.minus(event.progress.durationMs.get("triggerExecution"), ChronoUnit.MILLIS) // start time is not stored in event...
       action.addRuntimeEvent(executionId, ExecutionPhase.Exec, RuntimeEventState.STARTED, tstmp = startTstmp)
       if (!noData) {
-        if (event.progress.sink.numOutputRows >= 0) { // -1 if reporting metrics is not supported by sink
+        // reporting sink metrics is not supported in Spark 2.4
+        /* if (event.progress.sink.numOutputRows >= 0) { // -1 if reporting metrics is not supported by sink
           // if there are streaming metrics, they have highest prio (9999)
           val metrics = GenericMetrics(s"streaming-${event.progress.batchId}", 9999, Map("batchDuration" -> event.progress.batchDuration / 1000, "records_written" -> event.progress.sink.numOutputRows))
           action.addRuntimeMetrics(Some(SparkStreamingExecutionId(event.progress.batchId)), Some(dataObjectId), metrics)
-        }
+        }*/
         action.addRuntimeEvent(executionId, ExecutionPhase.Exec, RuntimeEventState.SUCCEEDED, tstmp = endTstmp, results = Seq(InitSubFeed(dataObjectId, partitionValues = Seq()))) // dummy results provided for runtime info
       }
       releaseFirstProgressWaitLock()

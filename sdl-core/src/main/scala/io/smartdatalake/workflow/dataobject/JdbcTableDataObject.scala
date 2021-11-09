@@ -94,7 +94,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   private val options = jdbcOptions ++ Map(
     "url" -> connection.url,
     "driver" -> connection.driver,
-    "fetchSize" -> jdbcFetchSize.toString,
+    "fetchSize" -> jdbcFetchSize.toString
   )
 
   // Define partition columns
