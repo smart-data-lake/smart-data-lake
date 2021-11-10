@@ -101,6 +101,8 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    */
   private[smartdatalake] def isAsynchronous: Boolean = false
 
+  private[smartdatalake] def isAsynchronousProcessStarted: Boolean = false
+
   /**
    * Prepare DataObjects prerequisites.
    * In this step preconditions are prepared & tested:
@@ -206,6 +208,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * e.g. JdbcTableDataObjects preWriteSql
    */
   def preExec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    if (isAsynchronousProcessStarted) return Unit
     // reset execution condition if not start Action in pipeline, because input for execution results could change between init and exec phase
     val isStartAction = subFeeds.exists(_.isInstanceOf[InitSubFeed])
     if (!isStartAction) resetExecutionResult()
@@ -235,6 +238,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * e.g. JdbcTableDataObjects postWriteSql or CopyActions deleteInputData.
    */
   def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    if (isAsynchronousProcessStarted) return Unit
     // evaluate metrics fail condition if defined
     metricsFailCondition.foreach( c => evaluateMetricsFailCondition(c))
     // process postRead/Write hooks

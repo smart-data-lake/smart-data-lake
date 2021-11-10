@@ -39,4 +39,14 @@ private[smartdatalake] object LogUtil {
     }
   }
 
+  /**
+   * Simplify stack trace by removing unneeded entries
+   * Works recursively through all causes
+   * - truncate stacktrace starting from "monix.*" entries
+   */
+  def simplifyStackTrace(ex: Throwable): Throwable = {
+    ex.setStackTrace(ex.getStackTrace.takeWhile(!_.getClassName.startsWith("monix")))
+    Option(ex.getCause).foreach(simplifyStackTrace)
+    ex
+  }
 }
