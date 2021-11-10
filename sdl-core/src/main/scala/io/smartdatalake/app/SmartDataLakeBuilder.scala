@@ -28,11 +28,12 @@ import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SmartDataLakeLogger}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{Action, RuntimeInfo, SDLExecutionId, SparkAction}
-import org.apache.spark.sql.{AnalysisException, SparkSession}
+import org.apache.spark.sql.SparkSession
 import scopt.OptionParser
 
 import java.io.File
 import java.time.{Duration, LocalDateTime}
+import scala.annotation.tailrec
 
 /**
  * This case class represents a default configuration for the App.
@@ -357,78 +358,87 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     (finalSubFeeds, actionDAGRun.getStatistics)
   }
 
-  // TODO: make tail recursive to avoid stack overflow
-  def execActionDAG(actionDAGRun: ActionDAGRun, actionsSelected: Seq[Action], context: ActionPipelineContext, lastStartTime: Option[LocalDateTime] = None)(implicit session: SparkSession): Seq[SubFeed] = {
+  /**
+   * Execute one action DAG iteration and call recursion if streaming mode
+   * Must be implemented with tail recursion to avoid stack overflow error for long running streaming jobs.
+   */
+  @tailrec
+  final def execActionDAG(actionDAGRun: ActionDAGRun, actionsSelected: Seq[Action], context: ActionPipelineContext, lastStartTime: Option[LocalDateTime] = None)(implicit session: SparkSession): Seq[SubFeed] = {
 
     // handle skipped actions for next execution of streaming mode
-    if (context.appConfig.streaming && lastStartTime.nonEmpty && context.actionsSkipped.nonEmpty) {
+    val nextExec: Option[(ActionDAGRun,ActionPipelineContext,Option[LocalDateTime])] = if (context.appConfig.streaming && lastStartTime.nonEmpty && context.actionsSkipped.nonEmpty) {
       // we have to recreate the action DAG if there are skipped actions in the original DAG
       val newContext = context.copy(actionsSkipped = Seq())
       val newDag = ActionDAGRun(actionsSelected, Map[ActionId, RuntimeInfo](), context.appConfig.getPartitionValues.getOrElse(Seq()), context.appConfig.parallelism, actionDAGRun.initialSubFeeds, actionDAGRun.initialDataObjectsState, actionDAGRun.stateStore, actionDAGRun.stateListeners)(session, newContext)
-      execActionDAG(newDag, actionsSelected, newContext)
-    }
+      Some(newDag, newContext, None)
+    } else {
 
-    // wait for trigger interval
-    lastStartTime.foreach { t =>
-      val nextStartTime = t.plusSeconds(Environment.globalConfig.synchronousStreamingTriggerIntervalSec)
-      val waitTimeSec = Duration.between(LocalDateTime.now, nextStartTime).getSeconds
-      if (waitTimeSec>0) {
-        logger.info(s"sleeping $waitTimeSec seconds for synchronous streaming trigger interval")
-        Thread.sleep(waitTimeSec * 1000)
+      // wait for trigger interval
+      lastStartTime.foreach { t =>
+        val nextStartTime = t.plusSeconds(Environment.globalConfig.synchronousStreamingTriggerIntervalSec)
+        val waitTimeSec = Duration.between(LocalDateTime.now, nextStartTime).getSeconds
+        if (waitTimeSec > 0) {
+          logger.info(s"sleeping $waitTimeSec seconds for synchronous streaming trigger interval")
+          Thread.sleep(waitTimeSec * 1000)
+        }
       }
-    }
 
-    // execute DAG
-    val startTime = LocalDateTime.now
-    var finalRunState: ActionDAGRunState = null
-    var subFeeds = try {
-      actionDAGRun.exec(session, context)
-    } finally {
-      finalRunState = actionDAGRun.saveState(true)(session, context)
-    }
+      // execute DAG
+      val startTime = LocalDateTime.now
+      var finalRunState: ActionDAGRunState = null
+      var subFeeds = try {
+        actionDAGRun.exec(session, context)
+      } finally {
+        finalRunState = actionDAGRun.saveState(true)(session, context)
+      }
 
-    // Iterate execution in streaming mode
-    if (context.appConfig.streaming) {
-      if (actionsSelected.exists(!_.isAsynchronous)) {
-        // if there are synchronous actions, we re-execute the dag
-        if (!Environment.stopStreamingGracefully) {
-          // increment runId only if not all actions are skipped
-          val newContext = if (!finalRunState.isSkipped) {
-            context.incrementRunId
+      // Iterate execution in streaming mode
+      if (context.appConfig.streaming) {
+        if (actionsSelected.exists(!_.isAsynchronous)) {
+          // if there are synchronous actions, we re-execute the dag
+          if (!Environment.stopStreamingGracefully) {
+            // increment runId only if not all actions are skipped
+            val newContext = if (!finalRunState.isSkipped) {
+              context.incrementRunId
+            } else {
+              logger.info(s"As all actions of run_id ${context.executionId.runId} are skipped, run_id is not incremented for next execution")
+              context
+            }
+            // reset execution result before new execution
+            actionsSelected.foreach(_.resetExecutionResult())
+            // remove spark caches so that new data is read in next iteration
+            //TODO: in the future it might be interesting to keep some DataFrames cached for performance reason...
+            session.sqlContext.clearCache()
+            // iterate execution
+            // note that this re-executes also asynchronous actions - they have to handle by themself that they are already started
+            Some(actionDAGRun.copy(executionId = newContext.executionId), newContext, Some(startTime))
           } else {
-            logger.info(s"As all actions of run_id ${context.executionId.runId} are skipped, run_id is not incremented for next execution")
-            context
+            if (actionsSelected.exists(_.isAsynchronous)) {
+              // stop active streaming queries
+              session.streams.active.foreach(_.stop)
+              // if there were exceptions, throw first one
+              session.streams.awaitAnyTermination() // using awaitAnyTermination is the easiest way to throw exception of first streaming query terminated
+            }
+            // otherwise everything went smooth
+            logger.info("Stopped streaming gracefully")
+            None
           }
-          // reset execution result before new execution
-          actionsSelected.foreach(_.resetExecutionResult())
-          // remove spark caches so that new data is read in next iteration
-          //TODO: in the future it might be interesting to keep some DataFrames cached for performance reason...
-          session.sqlContext.clearCache()
-          // iterate execution
-          // note that this re-executes also asynchronous actions - they have to handle by themself that they are already started
-          subFeeds = execActionDAG(actionDAGRun.copy(executionId = newContext.executionId), actionsSelected, newContext, Some(startTime))
         } else {
-          if (actionsSelected.exists(_.isAsynchronous)) {
-            // stop active streaming queries
+          // if there are no synchronous actions, we wait for termination of asynchronous streaming queries (if we don't wait, the main process will end and kill the streaming query threads...)
+          if (!Environment.stopStreamingGracefully) {
+            session.streams.awaitAnyTermination()
+            session.streams.active.foreach(_.stop) // stopping other streaming queries gracefully
+            actionDAGRun.saveState(true)(session, context) // notify about this asynchronous iteration
+          } else {
             session.streams.active.foreach(_.stop)
-            // if there were exceptions, throw first one
-            session.streams.awaitAnyTermination() // using awaitAnyTermination is the easiest way to throw exception of first streaming query terminated
+            logger.info("Stopped streaming gracefully")
           }
-          // otherwise everything went smooth
-          logger.info("Stopped streaming gracefully")
+          None
         }
-      } else {
-        // if there are no synchronous actions, we wait for termination of asynchronous streaming queries (if we don't wait, the main process will end and kill the streaming query threads...)
-        if (!Environment.stopStreamingGracefully) {
-          session.streams.awaitAnyTermination()
-          session.streams.active.foreach(_.stop) // stopping other streaming queries gracefully
-          actionDAGRun.saveState(true)(session, context) // notify about this asynchronous iteration
-        } else {
-          session.streams.active.foreach(_.stop)
-          logger.info("Stopped streaming gracefully")
-        }
-      }
+      } else None
     }
-    subFeeds
+    // execute tail recursion
+    if (nextExec.isDefined) execActionDAG(nextExec.get._1, actionsSelected, nextExec.get._2, nextExec.get._3)
+    else Seq()
   }
 }
