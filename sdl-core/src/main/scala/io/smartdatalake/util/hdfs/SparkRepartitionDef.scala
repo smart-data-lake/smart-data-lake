@@ -50,7 +50,7 @@ import org.apache.spark.sql.types.IntegerType
 case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
                                keyCols: Seq[String] = Seq(),
                                sortCols: Seq[String] = Seq(),
-                               filename: Option[String] = None,
+                               filename: Option[String] = None
                               ) extends SmartDataLakeLogger {
   import SparkRepartitionDef._
   assert(numberOfTasksPerPartition > 0, s"numberOfTasksPerPartition must be greater than 0")

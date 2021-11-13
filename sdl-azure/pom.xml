@@ -52,11 +52,6 @@
 
     <dependencies>
         <dependency>
-            <groupId>commons-codec</groupId>
-            <artifactId>commons-codec</artifactId>
-            <version>1.15</version>
-        </dependency>
-        <dependency>
             <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-core_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
@@ -88,7 +83,6 @@
             <artifactId>applicationinsights-logging-log4j1_2</artifactId>
             <version>2.6.2</version>
         </dependency>
-
 
         <!-- test dependencies -->
         <dependency>
