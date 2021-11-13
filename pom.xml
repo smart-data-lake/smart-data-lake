@@ -201,7 +201,7 @@
 		<parquet.deps.scope>compile</parquet.deps.scope>
 		<parquet.test.deps.scope>test</parquet.test.deps.scope>
 
-		<spark.version>2.4.7</spark.version>
+		<spark.version>2.4.8</spark.version>
 		<spark.minor.version>2.4</spark.minor.version>
 		<spark-extensions.version>1.2.8</spark-extensions.version>
 
