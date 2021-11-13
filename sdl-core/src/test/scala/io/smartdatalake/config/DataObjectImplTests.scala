@@ -31,7 +31,7 @@ import org.scalatest.{FlatSpec, Matchers}
 
 import scala.reflect.runtime.universe.{MethodSymbol, typeOf}
 
-class DataObjectImplTests extends FlatSpec with Matchers with ConfigImplicits {
+class DataObjectImplTests extends FlatSpec with Matchers {
 
   "AvroFileDataObject" should "be parsable" in {
 

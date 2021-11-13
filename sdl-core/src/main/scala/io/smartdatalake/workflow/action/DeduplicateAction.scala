@@ -41,7 +41,7 @@ import scala.util.{Failure, Success, Try}
  * DeduplicateAction adds an additional Column [[TechnicalTableColumn.captured]]. It contains the timestamp of the last occurrence of the record in the source.
  * This creates lots of updates. Especially when using saveMode.Merge it is better to set [[TechnicalTableColumn.captured]] to the last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to enable this optimization.
  *
- * DeduplicateAction needs a transactional table as output with defined primary keys.
+ * DeduplicateAction needs a transactional table (e.g. [[TransactionalSparkTableDataObject]]) as output with defined primary keys.
  * If output implements [[CanMergeDataFrame]], saveMode.Merge can be enabled by setting mergeModeEnable = true. This allows for much better performance.
  *
  * @param inputId inputs DataObject
