@@ -243,7 +243,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
   test("sdlb streaming run with synchronously and asynchronously streaming action, csv files") {
 
     // init sdlb
-    val appName = "sdlb-streaming"
+    val appName = "sdlb-streaming2"
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(tempPath), filesystem, false)
@@ -323,7 +323,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
   test("sdlb streaming recovery, synchronous action failing before asynchronously streaming action") {
 
     // init sdlb
-    val appName = "sdlb-streaming"
+    val appName = "sdlb-streaming3"
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(tempPath), filesystem, false)
@@ -415,7 +415,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
   test("sdlb spark streaming failure, synchronous action before asynchronously streaming action, asynchronous action failing after first run") {
 
     // init sdlb
-    val appName = "sdlb-streaming"
+    val appName = "sdlb-streaming4"
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(tempPath), filesystem, false)
@@ -486,7 +486,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
   test("sdlb streaming recovery, asynchronously action failing before synchronous streaming action") {
 
     // init sdlb
-    val appName = "sdlb-streaming"
+    val appName = "sdlb-streaming5"
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(tempPath), filesystem, false)
@@ -575,7 +575,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
   test("sdlb streaming restart, synchronous action skipped before asynchronously streaming action") {
 
     // init sdlb
-    val appName = "sdlb-streaming"
+    val appName = "sdlb-streaming6"
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(tempPath), filesystem, false)
