@@ -562,7 +562,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     try {
       sdlb.run(sdlConfig)
     } catch {
-      case _: java.lang.InterruptedException => Unit // Ignore - this occurs on Spark 2.x only when stopping streaming queries
+      case e: StreamingQueryException if getRootCause(e).isInstanceOf[java.lang.InterruptedException] => Unit // Ignore - this occurs on Spark 2.x only when stopping streaming queries
     }
     Environment.stopStreamingGracefully = false
     Environment._additionalStateListeners = Seq()
@@ -664,6 +664,10 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // check data after streaming is terminated
     assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101", "20180102", "20190101"))
+  }
+
+  def getRootCause(cause: Throwable): Throwable = {
+    Option(cause.getCause).map(getRootCause).getOrElse(cause)
   }
 }
 
