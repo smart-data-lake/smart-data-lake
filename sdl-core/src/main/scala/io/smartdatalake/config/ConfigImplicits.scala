@@ -109,7 +109,7 @@ trait ConfigImplicits {
   }
 
   /**
-   * A reader that reads [[ParsableDfTransformer]] values.
+   * A reader that reads [[ParsableDfsTransformer]] values.
    * Note that DfSparkTransformer must be parsed according to it's 'type' attribute by using SDL ConfigParser.
    */
   implicit val dfsTransformerReader: ConfigReader[ParsableDfsTransformer] = ConfigReader.fromTry { (c, p) =>

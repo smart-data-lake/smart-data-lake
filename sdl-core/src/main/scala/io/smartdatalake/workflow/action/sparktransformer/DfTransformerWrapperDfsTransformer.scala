@@ -19,7 +19,7 @@
 
 package io.smartdatalake.workflow.action.sparktransformer
 import com.typesafe.config.Config
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, SdlConfigObject}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry, SdlConfigObject}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -29,8 +29,6 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * A Transformer to use single DataFrame Transformers as multiple DataFrame Transformers.
  * This works by selecting the SubFeeds (DataFrames) the single DataFrame Transformer should be applied to.
  * All other SubFeeds will be passed through without transformation.
- * @param name Name of the transformation
- * @param description Description of the transformation
  * @param transformer Configuration for a DfTransformer to be applied
  * @param subFeedsToApply Names of SubFeeds the transformation should be applied to.
  */
@@ -38,6 +36,8 @@ case class DfTransformerWrapperDfsTransformer(transformer: ParsableDfTransformer
   override def name: String = transformer.name
   override def description: Option[String] = transformer.description
   override def transform(actionId: SdlConfigObject.ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame])(implicit session: SparkSession, context: ActionPipelineContext): Map[String, DataFrame] = {
+    val missingSubFeeds = subFeedsToApply.toSet.diff(dfs.keySet)
+    assert(missingSubFeeds.isEmpty, s"($actionId) [transformation.$name] subFeedsToApply to apply not found in input dfs: ${missingSubFeeds.mkString(", ")}")
     dfs.map { case (subFeedName,df) => if (subFeedsToApply.contains(subFeedName)) (subFeedName, transformer.transform(actionId, partitionValues, df, DataObjectId(subFeedName))) else (subFeedName, df)}.toMap
   }
   override def transformPartitionValues(actionId: SdlConfigObject.ActionId, partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {

@@ -133,6 +133,6 @@ case class PartitionArchiveCompactionMode(archivePartitionExpression: Option[Str
 case class PartitionExpressionData(feed: String, application: String, runId: Int, runStartTime: Timestamp, dataObjectId: String, elements: Map[String,String])
 private[smartdatalake] object PartitionExpressionData {
   def from(context: ActionPipelineContext, dataObjectId: DataObjectId, partitionValues: PartitionValues): PartitionExpressionData = {
-    PartitionExpressionData(context.feed, context.application, context.runId, Timestamp.valueOf(context.runStartTime), dataObjectId.id, partitionValues.getMapString)
+    PartitionExpressionData(context.feed, context.application, context.executionId.runId, Timestamp.valueOf(context.runStartTime), dataObjectId.id, partitionValues.getMapString)
   }
 }

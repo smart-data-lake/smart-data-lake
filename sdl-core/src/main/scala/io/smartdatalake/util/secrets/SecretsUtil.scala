@@ -28,7 +28,10 @@ import scala.collection.mutable
 object SecretsUtil extends SmartDataLakeLogger {
 
   private val providers = mutable.Map[String, SecretProvider]()
-  def registerProvider(id: String, provider: SecretProvider): Unit = providers.put(id, provider)
+  def registerProvider(id: String, provider: SecretProvider): Unit = {
+    logger.debug(s"Register secret provider $id")
+    providers.put(id, provider)
+  }
 
   // register default secret providers
   registerProvider("CLEAR", ClearTextSecretProvider)

@@ -24,11 +24,11 @@ import configs.Result.{Failure, Success}
 import configs._
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.config.SdlConfigObject.ActionId
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
-import io.smartdatalake.workflow.action.{ResultRuntimeInfo, RuntimeEventState, RuntimeInfo}
+import io.smartdatalake.workflow.action.{ResultRuntimeInfo, RuntimeEventState, RuntimeInfo, SDLExecutionId}
 import org.apache.spark.sql.DataFrame
 
 import java.time.{Duration, LocalDateTime}
@@ -44,6 +44,14 @@ private[smartdatalake] case class ActionDAGRunState(appConfig: SmartDataLakeBuil
   def toJson: String = ActionDAGRunState.toJson(this)
   def isFailed: Boolean = actionsState.exists(_._2.state==RuntimeEventState.FAILED)
   def isSucceeded: Boolean = isFinal && !isFailed
+  def isSkipped: Boolean = isFinal &&
+    actionsState.filter(_._2.executionId.isInstanceOf[SDLExecutionId]).forall(_._2.state==RuntimeEventState.SKIPPED)
+  def getDataObjectsState: Seq[DataObjectState] = {
+    actionsState.flatMap{ case (actionId, info) => info.dataObjectsState }.toSeq
+  }
+}
+private[smartdatalake] case class DataObjectState(dataObjectId: DataObjectId, state: String) {
+  def getEntry: (DataObjectId, DataObjectState) = (dataObjectId, this)
 }
 private[smartdatalake] object ActionDAGRunState {
 
@@ -125,9 +133,10 @@ private[smartdatalake] trait ActionDAGRunStateStore[A <: StateId] extends SmartD
 
   /**
    * Get latest state
-   * @param runId optional runId to search for latest state
+   * @param runId optional runId to search for latest StateId
+   * @return latest StateId for given runId or latest runId, none if it doesn't exist.
    */
-  def getLatestState(runId: Option[Int] = None): A
+  def getLatestStateId(runId: Option[Int] = None): Option[A]
 
   /**
    * Get latest runId

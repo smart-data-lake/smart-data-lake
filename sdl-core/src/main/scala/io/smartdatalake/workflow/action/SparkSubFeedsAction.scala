@@ -23,12 +23,10 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.ExecutionModeWithMainInputOutput
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
-import io.smartdatalake.workflow.action.sparktransformer.{DfTransformer, DfsTransformer}
+import io.smartdatalake.workflow.action.sparktransformer.DfsTransformer
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
-
-import scala.util.Try
 
 abstract class SparkSubFeedsAction extends SparkAction {
 
@@ -60,7 +58,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
     prioritizedMainInputCandidates
     mainOutput
     // check inputIdsToIgnoreFilters
-    val unknownInputIdsToIgnoreFilter = inputIdsToIgnoreFilter.diff(inputs.map(_.id))
+    val unknownInputIdsToIgnoreFilter = inputIdsToIgnoreFilter.diff(inputs.map(_.id)).diff(recursiveInputs.map(_.id))
     assert(unknownInputIdsToIgnoreFilter.isEmpty, s"($id) Unknown inputIdsToIgnoreFilter ${unknownInputIdsToIgnoreFilter.mkString(", ")}")
   }
 
@@ -90,14 +88,10 @@ abstract class SparkSubFeedsAction extends SparkAction {
     val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id).get
     // create output subfeeds with transformed partition values from main input
     var outputSubFeeds = outputs.map(output => ActionHelper.updateOutputPartitionValues(output, mainInputSubFeed.toOutput(output.id), Some(transformPartitionValues)))
-    // apply execution mode in init phase and store result
-    if (context.phase == ExecutionPhase.Init) {
-      executionModeResult = Try(
-        executionMode.flatMap(_.apply(id, mainInput, mainOutput, mainInputSubFeed, transformPartitionValues))
-      ).recover { ActionHelper.getHandleExecutionModeExceptionPartialFunction(outputs) }
-    }
-    // apply execution mode
-    executionModeResult.get match { // throws exception if execution mode is Failure
+    // (re-)apply execution mode in init phase, streaming iteration or if not first action in pipeline (search for calls to resetExecutionResults for details)
+    if (executionModeResult.isEmpty) applyExecutionMode(mainInput, mainOutput, mainInputSubFeed, transformPartitionValues)
+    // apply execution mode result
+    executionModeResult.get.get match { // throws exception if execution mode is Failure
       case Some(result) =>
         inputSubFeeds = inputSubFeeds.map { subFeed =>
           val inputFilter = if (subFeed.dataObjectId == mainInput.id) result.filter else None
@@ -116,7 +110,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
       val ignoreFilter = inputIdsToIgnoreFilter.contains(subFeed.dataObjectId)
       val preparedSubFeed = prepareInputSubFeed(input, subFeed, ignoreFilter)
       // enrich with fresh DataFrame if needed
-      enrichSubFeedDataFrame(input, preparedSubFeed, context.phase)
+      enrichSubFeedDataFrame(input, preparedSubFeed, context.phase, isRecursive = recursiveInputs.exists(_.id == input.id))
     }
     // transform
     outputSubFeeds = transform(inputSubFeeds, outputSubFeeds)
@@ -140,7 +134,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
       output =>
         val subFeed = transformedSubFeeds.find(_.dataObjectId == output.id)
           .getOrElse(throw new IllegalStateException(s"subFeed for output ${output.id} not found"))
-        output.init(subFeed.dataFrame.get, subFeed.partitionValues)
+        output.init(subFeed.dataFrame.get, subFeed.partitionValues, saveModeOptions)
     }
     // return
     transformedSubFeeds
@@ -153,6 +147,8 @@ abstract class SparkSubFeedsAction extends SparkAction {
     assert(subFeeds.size == inputs.size + recursiveInputs.size, s"Number of subFeed's must match number of inputs for SparkSubFeedActions (Action $id, subfeed's ${subFeeds.map(_.dataObjectId).mkString(",")}, inputs ${inputs.map(_.id).mkString(",")})")
     val mainInput = getMainInput(subFeeds)
     val mainInputSubFeed = subFeeds.find(_.dataObjectId == mainInput.id).getOrElse(throw new IllegalStateException(s"subFeed for main input ${mainInput.id} not found"))
+    if (isAsynchronousProcessStarted) return outputs.map(output => SparkSubFeed(None, output.id, Seq())) // empty output subfeeds if asynchronous action started
+
     // transform
     val transformedSubFeeds = doTransform(subFeeds)
     // write output
@@ -160,7 +156,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
       val subFeed = transformedSubFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"subFeed for output ${output.id} not found"))
       logWritingStarted(subFeed)
       val isRecursiveInput = recursiveInputs.exists(_.id == subFeed.dataObjectId)
-      val (noData,d) = PerformanceUtils.measureDuration {
+      val (noData, d) = PerformanceUtils.measureDuration {
         writeSubFeed(subFeed, output, isRecursiveInput)
       }
       logWritingFinished(subFeed, noData, d)

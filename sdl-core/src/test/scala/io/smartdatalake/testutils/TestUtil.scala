@@ -23,7 +23,6 @@ import java.math.BigDecimal
 import java.nio.file.Files
 import java.sql.{Date, Timestamp}
 import java.time.{Instant, LocalDateTime}
-
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration._
@@ -31,6 +30,7 @@ import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.action.SDLExecutionId
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
 import org.apache.commons.io.FileUtils
@@ -77,7 +77,7 @@ object TestUtil extends SmartDataLakeLogger {
   lazy val sessionWithoutHive : SparkSession = sparkSessionBuilder().getOrCreate
 
   def getDefaultActionPipelineContext(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
-    ActionPipelineContext("feedTest", "appTest", 1, 1, instanceRegistry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Init)
+    ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, instanceRegistry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig("feedTest", Some("appTest")), phase = ExecutionPhase.Init)
   }
 
   // write DataFrame to table
@@ -99,25 +99,6 @@ object TestUtil extends SmartDataLakeLogger {
     instanceRegistry.register(hTabDo)
     prepareHiveTable(table,path,df,partitionCols)
     hTabDo
-  }
-
-  // compare column name and type of two dataframes
-  def isDataFrameSchemaEqual( df1:DataFrame, df2:DataFrame ) : Boolean = {
-    val fields1 = df1.schema.fields.map(f => (f.name.toLowerCase, f.dataType)).toSet
-    val fields2 = df2.schema.fields.map(f => (f.name.toLowerCase, f.dataType)).toSet
-    fields1.equals(fields2)
-  }
-
-  // compare column name and type of two dataframes
-  def isDataFrameDataEqual( df1:DataFrame, df2:DataFrame ) : Boolean = {
-    df1.union(df2).except(df1.intersect(df2))
-      .count == 0
-  }
-
-  // compare two dataframes
-  def isDataFrameEqual(df1:DataFrame, df2:DataFrame) : Boolean = {
-    //df1.except(df2).count == 0 && df2.except(df1).count == 0
-    isDataFrameSchemaEqual(df1,df2) && isDataFrameDataEqual(df1,df2)
   }
 
   def copyResourceToFile( resource: String, tgtFile: File): Unit = {
@@ -196,7 +177,7 @@ object TestUtil extends SmartDataLakeLogger {
 
   }
 
-  def printFailedTestResult(testName: String, arguments: Seq[DataFrame])(actual: DataFrame)(expected: DataFrame): Unit = {
+  def printFailedTestResult(testName: String, arguments: Seq[DataFrame] = Seq())(actual: DataFrame)(expected: DataFrame): Unit = {
     def printDf(df: DataFrame): Unit = {
       logger.error(df.schema.simpleString)
       df.printSchema()

@@ -32,8 +32,6 @@ object HiveConventions {
    * @return timestamp with symbolic date 31.12.9999
    */
   def getHistorizationSurrogateTimestamp: LocalDateTime = {
-    //val surrogateTimestamp = new java.sql.Timestamp(new Date("9999/12/31").getTime)
-    val surrogateTimestamp = LocalDateTime.of(9999, 12, 31, 0, 0, 0, 0)
-    surrogateTimestamp
+    LocalDateTime.of(9999, 12, 31, 0, 0, 0, 0)
   }
 }

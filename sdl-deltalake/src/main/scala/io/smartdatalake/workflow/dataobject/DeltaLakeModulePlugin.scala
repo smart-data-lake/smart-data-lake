@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,28 +16,21 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.util.json
 
-import io.smartdatalake.util.misc.ParserUtil
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{DataFrame, SparkSession}
+package io.smartdatalake.workflow.dataobject
 
-/**
- * Provides utility functions for JSON.
- */
-private[smartdatalake] object JsonUtil {
+import io.smartdatalake.app.ModulePlugin
+
+class DeltaLakeModulePlugin extends ModulePlugin {
 
   /**
-   * Parses a [[RDD]] as JSON and returns a [[DataFrame]]
-   *
-   * @param className FQCN of xml parser to load
-   * @param session Spark [[SparkSession]]
-   * @param rdd Spark [[RDD]] with JSON
-   * @return [[DataFrame]] with JSON
+   * Additional spark properties to be added when creating SparkSession.
    */
-  def callJsonParser(className: String, session: SparkSession, rdd: RDD[(String, String)]): DataFrame = {
-    ParserUtil.callParser(className, session, rdd)
-  }
-
+  override def additionalSparkProperties(): Map[String, String] = Map(
+    // DeltaLake Spark SQL extensions
+    "spark.sql.extensions" -> "io.delta.sql.DeltaSparkSessionExtension",
+    // Default catalog implementation supporting DeltaLake
+    "spark.sql.catalog.spark_catalog" -> "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+  )
 
 }

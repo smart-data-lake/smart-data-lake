@@ -64,7 +64,7 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
       username = sys.env.get("SDL_KERBEROS_USER"),
       kerberosDomain = sys.env.get("SDL_KERBEROS_DOMAIN"),
       keytabPath = sys.env.get("SDL_KEYTAB_PATH").map(new File(_)),
-      configuration = sys.env.get("SDL_CONFIGURATION"),
+      configuration = sys.env.get("SDL_CONFIGURATION").map(_.split(',')),
       parallelism = sys.env.get("SDL_PARALELLISM").map(_.toInt).getOrElse(1),
       statePath = sys.env.get("SDL_STATE_PATH")
     )

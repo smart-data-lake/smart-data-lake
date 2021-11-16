@@ -154,7 +154,7 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
   }
 
   /**
-   * Filter action list with extended syntax: "<prefix:?><regex>;<operation?><prefix:?><regex>;..."
+   * Filter action list with extended syntax: "<prefix:?><regex>,<operation?><prefix:?><regex>;..."
    * Search behavior can be modified by the following prefixes to a regex expression separated by a colon (:)
    * - 'feeds': select actions where metadata.feed is matched by regex pattern (default)
    * - 'names': select actions where metadata.name is matched by regex pattern
@@ -173,7 +173,7 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
    * Example: to filter action 'A' and its successors but only in layer L1 and L2, use the following pattern: "startFromActionIds:a;&layers:(l1|l2)"
    */
   def filterActionList(feedSel: String, actions: Set[Action]): Set[Action] = {
-    val patterns = feedSel.toLowerCase.split(';')
+    val patterns = feedSel.toLowerCase.split(',')
     val opMatcher = "([|&-])?(.*)".r
     val prefixMatcher = "([a-z]+:)?(.*)".r
     val inputActionMap = actions.flatMap(a => a.inputs.map(i => (i,a))).toMap

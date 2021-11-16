@@ -19,21 +19,21 @@
 package io.smartdatalake.definitions
 
 import java.sql.Timestamp
-
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.util.dag.{DAGException, ExceptionSeverity}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{CustomCodeUtil, ProductUtil, SmartDataLakeLogger, SparkExpressionUtil}
-import io.smartdatalake.workflow.DAGHelper.NodeId
-import io.smartdatalake.workflow.ExceptionSeverity.ExceptionSeverity
+import io.smartdatalake.util.dag.DAGHelper.NodeId
+import io.smartdatalake.util.dag.ExceptionSeverity.ExceptionSeverity
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.ActionHelper.{getOptionalDataFrame, searchCommonInits}
-import io.smartdatalake.workflow.action.{NoDataToProcessDontStopWarning, NoDataToProcessWarning}
+import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject, FileRef, FileRefDataObject}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, max}
-import org.apache.spark.sql.streaming.OutputMode
+import org.apache.spark.sql.streaming.{OutputMode, Trigger}
 import org.apache.spark.sql.types._
 
 import scala.reflect.runtime.universe.TypeTag
@@ -99,6 +99,11 @@ sealed trait ExecutionMode extends SmartDataLakeLogger {
       }
     )
   }
+
+  /**
+   * If this execution mode should be run as asynchronous streaming process
+   */
+  private[smartdatalake] def isAsynchronous: Boolean = false
 }
 
 private[smartdatalake] trait ExecutionModeWithMainInputOutput {
@@ -123,8 +128,6 @@ private[smartdatalake] trait ExecutionModeWithMainInputOutput {
  * @param failConditions            List of conditions to fail application of execution mode if true. Define as spark sql expressions working with attributes of [[PartitionDiffModeExpressionData]] returning a boolean.
  *                                  Default is that the application of the PartitionDiffMode does not fail the action. If there is no data to process, the following actions are skipped.
  *                                  Multiple conditions are evaluated individually and every condition may fail the execution mode (or-logic)
- * @param stopIfNoData              Optional setting if further actions should be skipped if this action has no data to process (default).
- *                                  Set stopIfNoData=false if you want to run further actions nevertheless. They will receive output dataObject unfiltered as input.
  * @param selectExpression          optional expression to define or refine the list of selected output partitions. Define a spark sql expression working with the attributes of [[PartitionDiffModeExpressionData]] returning a list<map<string,string>>.
  *                                  Default is to return the originally selected output partitions found in attribute selectedOutputPartitionValues.
  * @param applyPartitionValuesTransform If true applies the partition values transform of custom transformations on input partition values before comparison with output partition values.
@@ -141,7 +144,6 @@ case class PartitionDiffMode( partitionColNb: Option[Int] = None
                             , applyCondition: Option[String] = None
                             , failCondition: Option[String] = None
                             , failConditions: Seq[Condition] = Seq()
-                            , @deprecated("use following actions executionCondition=true & executionMode=ProcessAll instead", "2.0.3") stopIfNoData: Boolean = true
                             , selectExpression: Option[String] = None
                             , applyPartitionValuesTransform: Boolean = false
                             , selectAdditionalInputExpression: Option[String] = None
@@ -229,10 +231,7 @@ case class PartitionDiffMode( partitionColNb: Option[Int] = None
               evaluateFailConditions(actionId, data) // throws exception on failed condition
               // skip processing if no new data
               val warnMsg = if (selectedOutputPartitionValues.isEmpty) Some(s"($actionId) No partitions to process found for ${input.id}") else None
-              warnMsg.foreach { msg =>
-                if (stopIfNoData) throw NoDataToProcessWarning(actionId.id, msg)
-                else throw NoDataToProcessDontStopWarning(actionId.id, msg)
-              }
+              warnMsg.foreach(msg => throw NoDataToProcessWarning(actionId.id, msg))
               //return
               val inputPartitionLog = if (selectedInputPartitionValues != selectedOutputPartitionValues) s" by using input partitions ${selectedInputPartitionValues.mkString(", ")}" else ""
               logger.info(s"($actionId) PartitionDiffMode selected output partition values ${selectedOutputPartitionValues.mkString(", ")} to process$inputPartitionLog.")
@@ -261,19 +260,39 @@ case class PartitionDiffModeExpressionData(feed: String, application: String, ru
 }
 private[smartdatalake] object PartitionDiffModeExpressionData {
   def from(context: ActionPipelineContext): PartitionDiffModeExpressionData = {
-    PartitionDiffModeExpressionData(context.feed, context.application, context.runId, context.attemptId, context.referenceTimestamp.map(Timestamp.valueOf)
+    PartitionDiffModeExpressionData(context.feed, context.application, context.executionId.runId, context.executionId.attemptId, context.referenceTimestamp.map(Timestamp.valueOf)
       , Timestamp.valueOf(context.runStartTime), Timestamp.valueOf(context.attemptStartTime), Seq(), Seq(), Seq(), Seq(), Seq())
   }
 }
 
 /**
- * Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads (trigger=Trigger.Once) and keep track of processed data.
+ * Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads and keep track of processed data.
  * This mode needs a DataObject implementing CanCreateStreamingDataFrame and works only with SparkSubFeeds.
+ * This mode can be executed synchronously in the DAG by using triggerType=Once, or asynchronously as Streaming Query with triggerType = ProcessingTime or Continuous.
  * @param checkpointLocation location for checkpoints of streaming query to keep state
+ * @param triggerType define execution interval of Spark streaming query. Possible values are Once (default), ProcessingTime & Continuous. See [[Trigger]] for details.
+                      Note that this is only applied if SDL is executed in streaming mode. If SDL is executed in normal mode, TriggerType=Once is used always.
+ *                    If triggerType=Once, the action is repeated with Trigger.Once in SDL streaming mode.
+ * @param triggerTime Time as String in triggerType = ProcessingTime or Continuous. See [[Trigger]] for details.
  * @param inputOptions additional option to apply when reading streaming source. This overwrites options set by the DataObjects.
  * @param outputOptions additional option to apply when writing to streaming sink. This overwrites options set by the DataObjects.
  */
-case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[String,String] = Map(), outputOptions: Map[String,String] = Map(), outputMode: OutputMode = OutputMode.Append) extends ExecutionMode
+case class SparkStreamingMode(checkpointLocation: String, triggerType: String = "Once", triggerTime: Option[String] = None, inputOptions: Map[String,String] = Map(), outputOptions: Map[String,String] = Map(), outputMode: OutputMode = OutputMode.Append) extends ExecutionMode {
+  // parse trigger from config attributes
+  private[smartdatalake] val trigger = triggerType.toLowerCase match {
+    case "once" =>
+      assert(triggerTime.isEmpty, "triggerTime must not be set for SparkStreamingMode with triggerType=Once")
+      Trigger.Once()
+    case "processingtime" =>
+      assert(triggerTime.isDefined, "triggerTime must be set for SparkStreamingMode with triggerType=ProcessingTime")
+      Trigger.ProcessingTime(triggerTime.get)
+    case "continuous" =>
+      assert(triggerTime.isDefined, "triggerTime must be set for SparkStreamingMode with triggerType=Continuous")
+      Trigger.Continuous(triggerTime.get)
+  }
+  override private[smartdatalake] def isAsynchronous = trigger != Trigger.Once
+}
+
 
 /**
  * Compares max entry in "compare column" between mainOutput and mainInput and incrementally loads the delta.
@@ -281,14 +300,11 @@ case class SparkStreamingOnceMode(checkpointLocation: String, inputOptions: Map[
  * @param compareCol a comparable column name existing in mainInput and mainOutput used to identify the delta. Column content should be bigger for newer records.
  * @param alternativeOutputId optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
  *                            It can be used to ensure processing all partitions over multiple actions in case of errors.
- * @param stopIfNoData optional setting if further actions should be skipped if this action has no data to process (default).
- *                     Set stopIfNoData=false if you want to run further actions nevertheless. They will receive output dataObject unfiltered as input.
  * @param applyCondition Condition to decide if execution mode should be applied or not. Define a spark sql expression working with attributes of [[DefaultExecutionModeExpressionData]] returning a boolean.
  *                       Default is to apply the execution mode if given partition values (partition values from command line or passed from previous action) are not empty.
  */
 case class SparkIncrementalMode( compareCol: String
                                , override val alternativeOutputId: Option[DataObjectId] = None
-                               , @deprecated("use dependent action executionCondition=true & executionMode=ProcessAll instead", "2.0.3") stopIfNoData: Boolean = true
                                , applyCondition: Option[Condition] = None
                                ) extends ExecutionMode with ExecutionModeWithMainInputOutput {
   private[smartdatalake] override val applyConditionsDef = applyCondition.toSeq
@@ -329,10 +345,7 @@ case class SparkIncrementalMode( compareCol: String
               } else if (outputLatestValue == inputLatestValue) {
                 Some(s"($actionId) No increment to process found for ${output.id} column $compareCol (lastestValue=$outputLatestValue)")
               } else None
-              warnMsg.foreach { msg =>
-                if (stopIfNoData) throw NoDataToProcessWarning(actionId.id, msg)
-                else throw NoDataToProcessDontStopWarning(actionId.id, msg)
-              }
+              warnMsg.foreach(msg => throw NoDataToProcessWarning(actionId.id, msg))
               // prepare filter
               val dataFilter = if (outputLatestValue != null) {
                 logger.info(s"($actionId) SparkIncrementalMode selected increment for writing to ${output.id}: column $compareCol} from $outputLatestValue to $inputLatestValue to process")
@@ -348,10 +361,8 @@ case class SparkIncrementalMode( compareCol: String
               Some(ExecutionModeResult())
             // otherwise no data to process
             case _ =>
-              logger.info(s"($actionId) SparkIncrementalMode selected all records for writing to ${output.id}, because output DataObject is still empty.")
               val warnMsg = s"($actionId) No increment to process found for ${output.id}, because ${input.id} is still empty."
-              if (stopIfNoData) throw NoDataToProcessWarning(actionId.id, warnMsg)
-              else throw NoDataToProcessDontStopWarning(actionId.id, warnMsg)
+              throw NoDataToProcessWarning(actionId.id, warnMsg)
           }
         case _ => throw ConfigurationException(s"$actionId has set executionMode = $SparkIncrementalMode but $input or $output does not support creating Spark DataFrames!")
       }
@@ -361,6 +372,11 @@ case class SparkIncrementalMode( compareCol: String
 private[smartdatalake] object SparkIncrementalMode {
   val allowedDataTypes = Seq(StringType, LongType, IntegerType, ShortType, FloatType, DoubleType, TimestampType)
 }
+
+/**
+ * An execution mode for incremental processing by remembering DataObjects state from last increment.
+ */
+case class DataObjectStateIncrementalMode() extends ExecutionMode
 
 /**
  * An execution mode which just validates that partition values are given.
@@ -427,15 +443,14 @@ trait CustomPartitionModeLogic {
  * Execution mode to incrementally process file-based DataObjects.
  * It takes all existing files in the input DataObject and removes (deletes) them after processing.
  * Input partition values are applied when searching for files and also used as output partition values.
- * @param stopIfNoData optional setting if further actions should be skipped if this action has no data to process (default).
- *                     Set stopIfNoData=false if you want to run further actions nevertheless. They will receive output dataObject unfiltered as input.
  */
-case class FileIncrementalMoveMode(stopIfNoData: Boolean = true) extends ExecutionMode {
+case class FileIncrementalMoveMode() extends ExecutionMode {
 
   /**
    * Check for files in input data object.
    */
-  private[smartdatalake] override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
+  private[smartdatalake] override def apply(actionId: ActionId, mainInput: DataObject
+                                            , mainOutput: DataObject, subFeed: SubFeed
                                             , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
                                            (implicit session: SparkSession, context: ActionPipelineContext): Option[ExecutionModeResult] = {
     (mainInput,subFeed) match {
@@ -446,10 +461,7 @@ case class FileIncrementalMoveMode(stopIfNoData: Boolean = true) extends Executi
         val warnMsg = if (fileRefs.isEmpty) {
           Some(s"($actionId) No files to process found for ${inputDataObject.id}, partitionValues=${inputSubFeed.partitionValues.mkString(", ")}")
         } else None
-        warnMsg.foreach { msg =>
-          if (stopIfNoData) throw NoDataToProcessWarning(actionId.id, msg)
-          else throw NoDataToProcessDontStopWarning(actionId.id, msg)
-        }
+        warnMsg.foreach(msg => throw NoDataToProcessWarning(actionId.id, msg))
         Some(ExecutionModeResult(fileRefs = Some(fileRefs), inputPartitionValues = inputSubFeed.partitionValues, outputPartitionValues = inputSubFeed.partitionValues))
       case _ => throw ConfigurationException(s"($actionId) FileIncrementalMoveMode needs FileRefDataObject and FileSubFeed as input")
     }
@@ -479,7 +491,7 @@ case class DefaultExecutionModeExpressionData( feed: String, application: String
 }
 private[smartdatalake] object DefaultExecutionModeExpressionData {
   def from(context: ActionPipelineContext): DefaultExecutionModeExpressionData = {
-    DefaultExecutionModeExpressionData(context.feed, context.application, context.runId, context.attemptId, context.referenceTimestamp.map(Timestamp.valueOf)
+    DefaultExecutionModeExpressionData(context.feed, context.application, context.executionId.runId, context.executionId.attemptId, context.referenceTimestamp.map(Timestamp.valueOf)
       , Timestamp.valueOf(context.runStartTime), Timestamp.valueOf(context.attemptStartTime), Seq(), isStartNode = false)
   }
 }

@@ -20,8 +20,9 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
-import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.testutils.custom.{TestCustomDfCreator, TestCustomDfCreatorWithSchema}
+import io.smartdatalake.workflow.action.SDLExecutionId
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
 import org.scalatest.Matchers
@@ -35,8 +36,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     // prepare
     val config = CustomDfCreatorConfig(Option(customDfCreatorWithSchemaClassName))
     val customDfDataObject = CustomDfDataObject("testId", config)
-    val context: ActionPipelineContext =
-      ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Init)
+    val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // run
     val df = customDfDataObject.getDataFrame(Seq())(session, context)
@@ -50,7 +50,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     val config = CustomDfCreatorConfig(Option(customDfCreatorWithSchemaClassName))
     val customDfDataObject = CustomDfDataObject("testId", config)
     val context: ActionPipelineContext =
-      ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
+      ActionPipelineContext("testFeed", "testApp", SDLExecutionId.executionId1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
 
     // run
     val df = customDfDataObject.getDataFrame(Seq())(session, context)
@@ -63,8 +63,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     // prepare
     val config = CustomDfCreatorConfig(Option(customDfCreatorWithSchemaClassName))
     val customDfDataObject = CustomDfDataObject("testId", config)
-    val context: ActionPipelineContext =
-      ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Init)
+    val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // run
     val df = customDfDataObject.getDataFrame(Seq())(session, context)
@@ -78,7 +77,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     val config = CustomDfCreatorConfig(Option(customDfCreatorWithSchemaClassName))
     val customDfDataObject = CustomDfDataObject("testId", config)
     val context: ActionPipelineContext =
-      ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
+      ActionPipelineContext("testFeed", "testApp", SDLExecutionId.executionId1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
 
     // run
     val df = customDfDataObject.getDataFrame(Seq())(session, context)
@@ -91,8 +90,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     // prepare
     val config = CustomDfCreatorConfig(Option(customDfCreatorClassName))
     val customDfDataObject = CustomDfDataObject("testId", config)
-    val context: ActionPipelineContext =
-      ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Init)
+    val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // run
     val df = customDfDataObject.getDataFrame(Seq())(session, context)
@@ -106,7 +104,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     val config = CustomDfCreatorConfig(Option(customDfCreatorClassName))
     val customDfDataObject = CustomDfDataObject("testId", config)
     val context: ActionPipelineContext =
-      ActionPipelineContext("testFeed", "testApp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
+      ActionPipelineContext("testFeed", "testApp", SDLExecutionId.executionId1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
 
     // run
     val df = customDfDataObject.getDataFrame(Seq())(session, context)

@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,27 +16,22 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.util.xml
 
-import io.smartdatalake.util.misc.ParserUtil
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{DataFrame, SparkSession}
+package io.smartdatalake.util.azure.logging;
+
+import org.apache.log4j.PropertyConfigurator;
+
+import java.io.InputStream;
 
 /**
- * Provides utility functionality for XML files.
+ * This code originates from https://github.com/mspnp/spark-monitoring and is protected by its corresponding MIT license
  */
-private[smartdatalake] object XmlUtil {
+public class Log4jConfiguration {
+    public static void configure(String configFilename) {
+        PropertyConfigurator.configure(configFilename);
+    }
 
-  /**
-   * Parses an [[RDD]] as XML and returns a [[DataFrame]].
-   *
-   * @param className FQCN of XML parser to use
-   * @param session [[SparkSession]]
-   * @param rdd Spark [[RDD]] with XML
-   * @return [[DataFrame]] of XML content
-   */
-  def callXmlParser(className: String, session: SparkSession, rdd: RDD[(String, String)]): DataFrame = {
-    ParserUtil.callParser(className, session, rdd)
-  }
-
+    public static void configure(InputStream inputStream) {
+        PropertyConfigurator.configure(inputStream);
+    }
 }

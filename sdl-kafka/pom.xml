@@ -22,7 +22,7 @@
 	<parent>
 		<groupId>io.smartdatalake</groupId>
 		<artifactId>sdl-parent</artifactId>
-		<version>1.3.0</version>
+		<version>1.3.1-SNAPSHOT</version>
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
@@ -83,10 +83,12 @@
 		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-sql_${scala.minor.version}</artifactId>
+			<scope>${sdl-core.scope}</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-catalyst_${scala.minor.version}</artifactId>
+			<scope>${sdl-core.scope}</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.spark</groupId>
@@ -115,25 +117,31 @@
 			<groupId>io.smartdatalake</groupId>
 			<artifactId>spark-extensions_${scala.minor.version}</artifactId>
 			<version>${spark-extensions.version}</version>
+			<scope>${sdl-core.scope}</scope>
 		</dependency>
 
 		<dependency>
 			<groupId>com.typesafe</groupId>
 			<artifactId>config</artifactId>
+			<scope>${sdl-core.scope}</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.github.kxbmap</groupId>
 			<artifactId>configs_${scala.minor.version}</artifactId>
+			<scope>${sdl-core.scope}</scope>
 		</dependency>
 
 		<dependency>
 			<groupId>org.scala-lang</groupId>
 			<artifactId>scala-library</artifactId>
+			<scope>${sdl-core.scope}</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.scala-lang</groupId>
 			<artifactId>scala-reflect</artifactId>
+			<scope>${sdl-core.scope}</scope>
 		</dependency>
+
 		<!-- this is needed for running kafka/scala_2.12 on java8, unit tests fail otherwise -->
 		<dependency>
 			<groupId>org.scala-lang.modules</groupId>

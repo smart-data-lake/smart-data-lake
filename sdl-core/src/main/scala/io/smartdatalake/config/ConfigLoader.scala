@@ -22,6 +22,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.HdfsUtil
+import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path, RemoteIterator}
@@ -104,9 +105,9 @@ object ConfigLoader extends SmartDataLakeLogger {
     // check for duplicate first class object definitions (connections, data objects, actions)
     if (Environment.enableCheckConfigDuplicates) {
       val objectIdLocationMap =
-        sortedConfigs.flatMap { case (file, config) => ConfigParser.getActionConfigMap(config).keys.map(objName => (ActionId(objName), file)) } ++
-          sortedConfigs.flatMap { case (file, config) => ConfigParser.getDataObjectConfigMap(config).keys.map(objName => (DataObjectId(objName), file)) } ++
-          sortedConfigs.flatMap { case (file, config) => ConfigParser.getConnectionConfigMap(config).keys.map(objName => (ConnectionId(objName), file)) }
+        sortedConfigs.flatMap { case (file, config) => ConfigParser.getActionsEntries(config).map(objName => (ActionId(objName), file)) } ++
+          sortedConfigs.flatMap { case (file, config) => ConfigParser.getDataObjectsEntries(config).map(objName => (DataObjectId(objName), file)) } ++
+          sortedConfigs.flatMap { case (file, config) => ConfigParser.getConnectionEntries(config).map(objName => (ConnectionId(objName), file)) }
       val duplicates = objectIdLocationMap.groupBy(_._1)
         .filter(_._2.size > 1)
         .mapValues(_.map(_._2))
@@ -198,14 +199,6 @@ object ConfigLoader extends SmartDataLakeLogger {
       logger.debug(s"Ignoring file '$path'.")
       Seq()
     }
-  }
-
-  /**
-   * Wrapper for Hadoop RemoteIterator to use it with Scala style
-   */
-  private case class RemoteIteratorWrapper[T](underlying: RemoteIterator[T]) extends AbstractIterator[T] with Iterator[T] {
-    def hasNext: Boolean = underlying.hasNext
-    def next(): T = underlying.next()
   }
 
   // Helper classes to handle different location types

@@ -19,18 +19,18 @@
 package io.smartdatalake.config
 
 import com.typesafe.config.{Config, ConfigException, ConfigValueFactory, ConfigValueType}
-import configs.{ConfigError, Result}
 import configs.syntax._
-import io.smartdatalake.config.SdlConfigObject.{ActionId, ConfigObjectId, ConnectionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataobject.DataObject
 
+import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe._
+import scala.util.Try
 import scala.util.matching.Regex
-import scala.util.{Failure, Success, Try}
 
 /**
  * Entry point for SDL config object parsing.
@@ -62,16 +62,24 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
     registry
   }
 
-  def getConnectionConfigMap(config: Config) = {
-    config.get[Map[String, Config]]("connections").valueOrElse(Map.empty)
+  final val CONFIG_SECTION_CONNECTIONS = "connections"
+  final val CONFIG_SECTION_DATAOBJECTS = "dataObjects"
+  final val CONFIG_SECTION_ACTIONS = "actions"
+  def getConnectionEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_CONNECTIONS)
+  def getDataObjectsEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_DATAOBJECTS)
+  def getActionsEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_ACTIONS)
+  def extractConfigKeys(config: Config, entry: String): Seq[String] = {
+    if (config.hasPath(entry)) config.getObject(entry).keySet().asScala.toSeq
+    else Seq()
   }
-
-  def getDataObjectConfigMap(config: Config) = {
-    config.get[Map[String, Config]]("dataObjects").valueOrElse(Map.empty)
-  }
-
-  def getActionConfigMap(config: Config) = {
-    config.get[Map[String, Config]]("actions").valueOrElse(Map.empty)
+  def getConnectionConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, CONFIG_SECTION_CONNECTIONS)
+  def getDataObjectConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, CONFIG_SECTION_DATAOBJECTS)
+  def getActionConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, CONFIG_SECTION_ACTIONS)
+  def extractConfigMap(config: Config, entry: String): Map[String, Config] = {
+    if (config.hasPath(entry)) {
+      config.get[Map[String, Config]](entry)
+        .valueOrThrow(e => new ConfigurationException(s"Error extracting $entry: ${e.messages.mkString(", ")}", Some(s"$entry")))
+    } else Map()
   }
 
   /**
