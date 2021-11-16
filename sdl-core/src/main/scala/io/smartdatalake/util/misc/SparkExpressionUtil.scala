@@ -158,7 +158,7 @@ case class DefaultExpressionData( feed: String, application: String, runId: Int,
                                   , runStartTime: Timestamp, attemptStartTime: Timestamp, partitionValues: Seq[Map[String,String]])
 object DefaultExpressionData {
   def from(context: ActionPipelineContext, partitionValues: Seq[PartitionValues]): DefaultExpressionData = {
-    DefaultExpressionData(context.feed, context.application, context.runId, context.attemptId, context.phase.toString
+    DefaultExpressionData(context.feed, context.application, context.executionId.runId, context.executionId.attemptId, context.phase.toString
       , context.referenceTimestamp.map(Timestamp.valueOf), Timestamp.valueOf(context.runStartTime)
       , Timestamp.valueOf(context.attemptStartTime), partitionValues.map(_.elements.mapValues(_.toString)))
   }

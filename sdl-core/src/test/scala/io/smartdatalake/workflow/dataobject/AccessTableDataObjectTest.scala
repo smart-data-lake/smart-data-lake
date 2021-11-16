@@ -103,12 +103,12 @@ class AccessTableDataObjectTest extends DataObjectTestSuite {
 
         // run
         val thrown = intercept[Exception] {
-          val df = dataObj.getDataFrameByFramework(doPersist = false)
+          val df = dataObj.getDataFrameByFramework()
           df.collect()
         }
 
         // check
-        thrown.getCause.getMessage shouldEqual "UCAExc:::4.0.4 incompatible data type in conversion: from SQL type CHARACTER to java.lang.Integer, value: ID"
+        thrown.getCause.getMessage shouldEqual "UCAExc:::5.0.1 incompatible data type in conversion: from SQL type CHARACTER to java.lang.Integer, value: ID"
     } finally {
         Logger.getLogger("org.apache.spark.executor.Executor").setLevel(executorLogLevel)
         Logger.getLogger("org.apache.spark.scheduler.TaskSetManager").setLevel(taskSetManagerLogLevel)

@@ -22,10 +22,8 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.action.sparktransformer.DfTransformer
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
-
-import scala.util.Try
 
 abstract class SparkSubFeedAction extends SparkAction {
 
@@ -67,13 +65,10 @@ abstract class SparkSubFeedAction extends SparkAction {
     var inputSubFeed = ActionHelper.updateInputPartitionValues(input, SparkSubFeed.fromSubFeed(subFeed))
     // create output subfeed with transformed partition values
     var outputSubFeed = ActionHelper.updateOutputPartitionValues(output, inputSubFeed.toOutput(output.id), Some(transformPartitionValues))
-    // apply execution mode in init phase and store result
-    if (context.phase == ExecutionPhase.Init) {
-      executionModeResult = Try(
-        executionMode.flatMap(_.apply(id, input, output, inputSubFeed, transformPartitionValues))
-      ).recover { ActionHelper.getHandleExecutionModeExceptionPartialFunction(outputs) }
-    }
-    executionModeResult.get match { // throws exception if execution mode is Failure
+    // (re-)apply execution mode in init phase, streaming iteration or if not first action in pipeline (search for calls to resetExecutionResults for details)
+    if (executionModeResult.isEmpty) applyExecutionMode(input, output, inputSubFeed, transformPartitionValues)
+    // apply execution mode result
+    executionModeResult.get.get match { // throws exception if execution mode is Failure
       case Some(result) =>
         inputSubFeed = inputSubFeed.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false).breakLineage
         outputSubFeed = outputSubFeed.copy(partitionValues = result.outputPartitionValues, filter = result.filter).breakLineage
@@ -99,7 +94,7 @@ abstract class SparkSubFeedAction extends SparkAction {
     // transform
     val transformedSubFeed = doTransform(subFeed)
     // check output
-    output.init(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues)
+    output.init(transformedSubFeed.dataFrame.get, transformedSubFeed.partitionValues, saveModeOptions)
     // return
     Seq(transformedSubFeed)
   }
@@ -110,12 +105,14 @@ abstract class SparkSubFeedAction extends SparkAction {
   override final def exec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == 1, s"Only one subfeed allowed for SparkSubFeedActions (Action $id, inputSubfeed's ${subFeeds.map(_.dataObjectId).mkString(",")})")
     val subFeed = subFeeds.head
+    if (isAsynchronousProcessStarted) return Seq(SparkSubFeed(None, output.id, Seq())) // empty output subfeed if asynchronous action started
+
     // transform
     val transformedSubFeed = doTransform(subFeed)
     // write output
     logWritingStarted(transformedSubFeed)
     val isRecursiveInput = recursiveInputs.exists(_.id == output.id)
-    val (noData,d) = PerformanceUtils.measureDuration {
+    val (noData, d) = PerformanceUtils.measureDuration {
       writeSubFeed(transformedSubFeed, output, isRecursiveInput)
     }
     logWritingFinished(transformedSubFeed, noData, d)
@@ -124,6 +121,7 @@ abstract class SparkSubFeedAction extends SparkAction {
   }
 
   override final def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    if (isAsynchronousProcessStarted) return Unit
     super.postExec(inputSubFeeds, outputSubFeeds)
     assert(inputSubFeeds.size == 1, s"Only one inputSubFeed allowed for SparkSubFeedActions (Action $id, inputSubfeed's ${inputSubFeeds.map(_.dataObjectId).mkString(",")})")
     assert(outputSubFeeds.size == 1, s"Only one outputSubFeed allowed for SparkSubFeedActions (Action $id, inputSubfeed's ${outputSubFeeds.map(_.dataObjectId).mkString(",")})")

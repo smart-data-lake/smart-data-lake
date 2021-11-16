@@ -18,9 +18,12 @@
  */
 package io.smartdatalake.util.misc
 
+import org.apache.spark.annotation.DeveloperApi
+
 import java.time.Duration
 
-private[smartdatalake] object PerformanceUtils {
+@DeveloperApi
+object PerformanceUtils {
   /**
    * Measures time for some code block in seconds (float)
    * @param code2exec code block to be executed

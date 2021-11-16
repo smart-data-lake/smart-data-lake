@@ -23,6 +23,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.workflow.SchemaViolationException
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.StructType
 
 /**
@@ -40,10 +41,11 @@ private[smartdatalake] trait SchemaValidation { this: DataObject =>
    *  - Column nullability is ignored.
    *  - Duplicate columns in terms of name and data type are eliminated (set semantics).
    *
-   * Note: This is only used by the functionality defined in [[CanCreateDataFrame]] and [[CanWriteDataFrame]], that is,
+   * Note: This is mainly used by the functionality defined in [[CanCreateDataFrame]] and [[CanWriteDataFrame]], that is,
    * when reading or writing Spark data frames from/to the underlying data container.
-   * [[io.smartdatalake.workflow.action.Action]]s that bypass Spark data frames ignore the `schemaMin` attribute
+   * [[io.smartdatalake.workflow.action.Action]]s that work with files ignore the `schemaMin` attribute
    * if it is defined.
+   * Additionally schemaMin can be used to define the schema used if there is no data or table doesn't yet exist.
    */
   def schemaMin: Option[StructType]
 
@@ -55,10 +57,12 @@ private[smartdatalake] trait SchemaValidation { this: DataObject =>
    * @throws SchemaViolationException is the `schemaMin` does not validate.
    */
   def validateSchemaMin(df: DataFrame, role: String): Unit = {
+    val caseSensitive = SQLConf.get.getConf(SQLConf.CASE_SENSITIVE)
     schemaMin.foreach { schemaExpected =>
       val missingCols = SchemaUtil.schemaDiff(schemaExpected, df.schema,
         ignoreNullable = Environment.schemaValidationIgnoresNullability,
-        deep = Environment.schemaValidationDeepComarison
+        deep = Environment.schemaValidationDeepComarison,
+        caseSensitive = caseSensitive
       )
       if (missingCols.nonEmpty) {
         throw new SchemaViolationException(
@@ -79,13 +83,16 @@ private[smartdatalake] trait SchemaValidation { this: DataObject =>
    * @throws SchemaViolationException is the `schemaMin` does not validate.
    */
   def validateSchema(df: DataFrame, schemaExpected: StructType, role: String): Unit = {
+    val caseSensitive = SQLConf.get.getConf(SQLConf.CASE_SENSITIVE)
     val missingCols = SchemaUtil.schemaDiff(schemaExpected, df.schema,
       ignoreNullable = Environment.schemaValidationIgnoresNullability,
-      deep = Environment.schemaValidationDeepComarison
+      deep = Environment.schemaValidationDeepComarison,
+      caseSensitive = caseSensitive
     )
     val superfluousCols = SchemaUtil.schemaDiff(df.schema, schemaExpected,
       ignoreNullable = Environment.schemaValidationIgnoresNullability,
-      deep = Environment.schemaValidationDeepComarison
+      deep = Environment.schemaValidationDeepComarison,
+      caseSensitive = caseSensitive
     )
     if (missingCols.nonEmpty || superfluousCols.nonEmpty) {
       throw new SchemaViolationException(

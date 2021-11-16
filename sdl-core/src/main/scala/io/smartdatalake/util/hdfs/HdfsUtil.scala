@@ -25,6 +25,7 @@ import org.apache.hadoop.fs._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import java.net.URI
+import scala.collection.AbstractIterator
 import scala.io.Source
 
 /**
@@ -226,6 +227,14 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   }
 
   /**
+   * If path is not absolute, prefix with working dir
+   * @return Absolute hadoop path
+   */
+  def makeAbsolutePath(path: Path)(filesystem: FileSystem) =
+    if (path.isAbsolute) path
+    else new Path(filesystem.getWorkingDirectory, path)
+
+  /**
    * Get Hadoop Filesystem from specified Path.
    * Note that use of this is not optimal as there might be additional configurations missing, which are defined in the SparkSession.
    * Use getHadoopFsFromSpark if there is already a SparkSession.
@@ -278,5 +287,13 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   def touchFile(path: Path, filesystem: FileSystem): Unit = {
     val os = filesystem.create(path, /*overwrite*/ true)
     os.close()
+  }
+
+  /**
+   * Wrapper for Hadoop RemoteIterator to use it with Scala style
+   */
+  case class RemoteIteratorWrapper[T](underlying: RemoteIterator[T]) extends AbstractIterator[T] with Iterator[T] {
+    def hasNext: Boolean = underlying.hasNext
+    def next(): T = underlying.next()
   }
 }

@@ -365,7 +365,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       if (withSchemaEvolution && partitions.nonEmpty) {
         val existingPartitions = df_existing.select(array(partitions.map(col): _*)).distinct.collect.map( _.getSeq[String](0))
         val newPartitions = df_new.select(array(partitions.map(col): _*)).distinct.collect.map( _.getSeq[String](0))
-        assert(existingPartitions.diff(newPartitions).nonEmpty, "(${table.fullName}) writeDfToHive: schema evolution with partitions needs all existing data in new dataframe, but partition data of existing dataframe is missing in new data frame!")
+        assert(existingPartitions.diff(newPartitions).nonEmpty, s"(${table.fullName}) writeDfToHive: schema evolution with partitions needs all existing data in new dataframe, but partition data of existing dataframe is missing in new data frame!")
       }
 
       // move partition cols last, retain current column ordering if not schema evolution

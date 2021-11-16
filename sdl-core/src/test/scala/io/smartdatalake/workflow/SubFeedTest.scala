@@ -28,7 +28,7 @@ import org.scalatest.FunSuite
 class SubFeedTest extends FunSuite {
 
   implicit val session = TestUtil.sessionHiveCatalog
-  implicit val context1: ActionPipelineContext = ActionPipelineContext("testfeed", "testapp", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig())
+  implicit val context1: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext(null)
 
   test("FileSubFeed to SparkSubFeed") {
     val fileSubFeed = FileSubFeed(None, "test1", Seq(PartitionValues(Map("dt"->"20190101"))))

@@ -19,11 +19,11 @@
 package io.smartdatalake.workflow.dataobject
 
 import java.nio.file.{Files, Path}
-
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.BasicAuthMode
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.SftpFileRefConnection
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
@@ -34,6 +34,7 @@ class SFtpFileRefDataObjectTest extends FunSuite with Matchers with BeforeAndAft
 
   implicit val session: SparkSession = TestUtil.sessionHiveCatalog
   implicit val registry: InstanceRegistry = new InstanceRegistry
+  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
   private var sshd: SshServer = _
   val sshPort = 8001

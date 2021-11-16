@@ -18,13 +18,13 @@
  */
 package io.smartdatalake.definitions
 
-import java.net.URI
-import io.smartdatalake.app.{GlobalConfig, SDLPlugin}
+import io.smartdatalake.app.{GlobalConfig, SDLPlugin, StateListener}
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.{CustomCodeUtil, EnvironmentUtil}
-import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
+import org.slf4j.event.Level
+
+import java.net.URI
 
 /**
  * Environment dependent configurations.
@@ -155,6 +155,24 @@ object Environment {
       .map(_.toBoolean).getOrElse(false)
   }
 
+  /**
+   * Set log level for exceptions about skipped Actions, e.g. NoDataToProcessWarning (default=info).
+   */
+  var taskSkippedExceptionLogLevel: Level = {
+    EnvironmentUtil.getSdlParameter("taskSkippedExceptionLogLevel")
+      .map(x => Level.valueOf(x.toLowerCase)).getOrElse(Level.INFO)
+  }
+
+  /**
+   * Simplify final exception for better usability of log
+   * - truncate stacktrace starting from "monix.*" entries
+   * - limit logical plan in AnalysisException to 5 lines
+   */
+  var simplifyFinalExceptionLog: Boolean = {
+    EnvironmentUtil.getSdlParameter("simplifyFinalExceptionLog")
+      .map(_.toBoolean).getOrElse(true)
+  }
+
   // static configurations
   val configPathsForLocalSubstitution: Seq[String] = Seq(
       "path", "table.name"
@@ -176,4 +194,10 @@ object Environment {
   def globalConfig: GlobalConfig = _globalConfig
   private [smartdatalake] var _globalConfig: GlobalConfig = _
 
+  // flag to gracefully stop repeated execution of DAG in streaming mode
+  var stopStreamingGracefully: Boolean = false
+
+  // This is for testing only: add state listener programmatically
+  // Note: state listeners should be configured by global section of config files, see also [[GlobalConfig]]
+  private[smartdatalake] var _additionalStateListeners: Seq[StateListener] = Seq()
 }

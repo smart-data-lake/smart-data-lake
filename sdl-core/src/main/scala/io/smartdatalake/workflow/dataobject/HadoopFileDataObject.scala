@@ -165,7 +165,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   /**
    * List partitions on data object's root path
    */
-  override def listPartitions(implicit session: SparkSession): Seq[PartitionValues] = {
+  override def listPartitions(implicit session: SparkSession, context: ActionPipelineContext): Seq[PartitionValues] = {
     partitionLayout().map {
       partitionLayout =>
         // get search pattern for root directory

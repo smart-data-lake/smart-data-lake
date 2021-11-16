@@ -21,16 +21,14 @@ package io.smartdatalake.definitions
 /**
  * Column names specific to historization of Hive tables
  */
-object TechnicalTableColumn extends Enumeration {
-  type TechnicalTableColumn = Value
-
+object TechnicalTableColumn {
   /**
    * Name of column that marks the creation date of a record
    */
-  val captured = Value("dl_ts_captured")
+  val captured = "dl_ts_captured"
 
   /**
    * Name of column that marks the end of validity of a record
    */
-  val delimited = Value("dl_ts_delimited")
+  val delimited = "dl_ts_delimited"
 }

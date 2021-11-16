@@ -19,10 +19,10 @@
 package io.smartdatalake.workflow
 
 import java.util.concurrent.atomic.AtomicInteger
-
 import io.smartdatalake.util.misc.PerformanceUtils.measureTime
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.DAGHelper.NodeId
+import io.smartdatalake.util.dag.DAGHelper.NodeId
+import io.smartdatalake.util.dag.{DAG, DAGEdge, DAGEventListener, DAGNode, DAGResult, TaskPredecessorFailureWarning}
 import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
 import org.scalatest.{BeforeAndAfter, FunSuite}

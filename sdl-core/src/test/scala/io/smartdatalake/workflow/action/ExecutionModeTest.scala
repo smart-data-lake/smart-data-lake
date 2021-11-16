@@ -184,13 +184,6 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
     intercept[NoDataToProcessWarning](executionMode.apply(ActionId("test"), tgt2DO, tgt2DO, subFeed, PartitionValues.oneToOneMapping))
   }
 
-  test("SparkIncrementalMode no data to process don't stop") {
-    val executionMode = SparkIncrementalMode(compareCol = "rating", stopIfNoData = false)
-    executionMode.prepare(ActionId("test"))
-    val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, tgt2DO.id, partitionValues = Seq())
-    intercept[NoDataToProcessDontStopWarning](executionMode.apply(ActionId("test"), tgt2DO, tgt2DO, subFeed, PartitionValues.oneToOneMapping))
-  }
-
   test("CustomPartitionMode alternativeOutputId") {
     val executionMode = CustomPartitionMode(className = classOf[TestCustomPartitionMode].getName, alternativeOutputId = Some("tgt2"))
     executionMode.prepare(ActionId("test"))
@@ -213,18 +206,11 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
     val subFeed: FileSubFeed = FileSubFeed(fileRefs = None, dataObjectId = fileEmptyDO.id, partitionValues = Seq())
     intercept[NoDataToProcessWarning](executionMode.apply(ActionId("test"), fileEmptyDO, fileEmptyDO, subFeed, PartitionValues.oneToOneMapping))
   }
-
-  test("FileIncrementalMoveMode no data to process don't stop") {
-    val executionMode = FileIncrementalMoveMode(stopIfNoData = false)
-    executionMode.prepare(ActionId("test"))
-    val subFeed: FileSubFeed = FileSubFeed(fileRefs = None, dataObjectId = fileEmptyDO.id, partitionValues = Seq())
-    intercept[NoDataToProcessDontStopWarning](executionMode.apply(ActionId("test"), fileEmptyDO, fileEmptyDO, subFeed, PartitionValues.oneToOneMapping))
-  }
 }
 
 class TestCustomPartitionMode() extends CustomPartitionModeLogic {
   override def apply(session: SparkSession, options: Map[String, String], actionId: ActionId, input: DataObject with CanHandlePartitions, output: DataObject with CanHandlePartitions, givenPartitionValues: Seq[Map[String, String]], context: ActionPipelineContext): Option[Seq[Map[String, String]]] = {
-    val partitionValuesToProcess = input.listPartitions(session).diff(output.listPartitions(session))
+    val partitionValuesToProcess = input.listPartitions(session, context).diff(output.listPartitions(session, context))
     Some(partitionValuesToProcess.map(_.getMapString))
   }
 }
