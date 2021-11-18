@@ -91,7 +91,6 @@ jobs:
     - name: Develop Git Push Release
       uses: ad-m/github-push-action@master
       with:
-        branch: develop
         github_token: ${{ secrets.PAT_ACTIONS }}
     
     - name: Develop Get Next Version
