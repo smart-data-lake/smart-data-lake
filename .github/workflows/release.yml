@@ -85,7 +85,7 @@ jobs:
         git checkout ${GITHUB_HEAD_REF}
     - name: Git Merge to develop
       run: |
-        git merge origin/master
+        git merge ${GITHUB_BASE_REF}
         git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
     
     - name: Develop Git Push Release
