@@ -85,14 +85,9 @@ jobs:
         git checkout ${GITHUB_HEAD_REF}
     - name: Git Merge to develop
       run: |
-        git merge ${GITHUB_BASE_REF}
+        git merge origin/${GITHUB_BASE_REF}
         git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
-    
-    - name: Develop Git Push Release
-      uses: ad-m/github-push-action@master
-      with:
-        github_token: ${{ secrets.PAT_ACTIONS }}
-    
+
     - name: Develop Get Next Version
       id: bump_version
       uses: christian-draeger/increment-semantic-version@1.0.1
