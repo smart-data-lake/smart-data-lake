@@ -213,11 +213,11 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
   /**
    * Save state of dag to file and notify stateListeners
    */
-  def saveState(isFinal: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  def saveState(actionId: Option[ActionId] = None, isFinal: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     val runtimeInfos = getRuntimeInfos
     val runState = ActionDAGRunState(context.appConfig, executionId.runId, executionId.attemptId, context.runStartTime, context.attemptStartTime, actionsSkipped ++ runtimeInfos, isFinal)
     stateStore.foreach(_.saveState(runState))
-    stateListeners.foreach(_.notifyState(runState, context))
+    stateListeners.foreach(_.notifyState(runState, context, actionId))
   }
 
   private class ActionEventListener(phase: ExecutionPhase)(implicit session: SparkSession, context: ActionPipelineContext) extends DAGEventListener[Action] with SmartDataLakeLogger {
@@ -233,12 +233,12 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
       }
       node.addRuntimeEvent(executionId, phase, state, results = results.collect{ case x: SubFeed => x })
       logger.info(s"${node.toStringShort}: $phase succeeded")
-      if (phase==ExecutionPhase.Exec) saveState()
+      if (phase==ExecutionPhase.Exec) saveState(Some(node.id))
     }
     override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
       node.addRuntimeEvent(executionId, phase, RuntimeEventState.FAILED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
       logger.warn(s"${node.toStringShort}: $phase failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
-      if (phase==ExecutionPhase.Exec) saveState()
+      if (phase==ExecutionPhase.Exec) saveState(Some(node.id))
     }
     override def onNodeSkipped(exception: Throwable)(node: Action): Unit = {
       val state = exception match {
@@ -247,7 +247,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
       }
       node.addRuntimeEvent(executionId, phase, state, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
       logger.info(s"${node.toStringShort}: $phase ${state.toString.toLowerCase} because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
-      if (phase==ExecutionPhase.Exec) saveState()
+      if (phase==ExecutionPhase.Exec) saveState(Some(node.id))
     }
   }
 

@@ -22,6 +22,7 @@ package io.smartdatalake.app
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
+import io.smartdatalake.config.SdlConfigObject.ActionId
 
 /**
  * Configuration to notify interested parties about action results & metric
@@ -54,5 +55,5 @@ trait StateListener {
   /**
    * notifyState is called whenever an action is finished (succeeded or failed)
    */
-  def notifyState(state: ActionDAGRunState, context: ActionPipelineContext): Unit
+  def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, actionId : Option[ActionId]): Unit
 }

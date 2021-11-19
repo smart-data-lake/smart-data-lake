@@ -27,6 +27,8 @@ import io.smartdatalake.app.StateListener
 import com.google.gson.Gson
 import io.smartdatalake.util.azure.client.loganalytics.LogAnalyticsClient
 import io.smartdatalake.util.secrets.SecretsUtil
+import io.smartdatalake.config.SdlConfigObject.ActionId
+import io.smartdatalake.workflow.action.RuntimeInfo
 
 import java.time.LocalDateTime
 
@@ -63,11 +65,14 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
 
   private val gson = new Gson
 
-  override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext): Unit = {
-
+  override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, oActionId : Option[ActionId]): Unit = {
     if (state.isFinal) return  // final notification is redundant -> skip
+    if (oActionId.isEmpty) return  // we log only action specific events -> skip
 
-    val logEvents = extractLogEvents(state, context)
+    val actionId = oActionId.get
+    assert(state.actionsState.get(actionId).isDefined)
+
+    val logEvents = extractLogEvents(actionId, state.actionsState(actionId), context)
     val jsonEvents = logEvents.map{le:StateLogEvent => gson.toJson(le)}.mkString(",")
 
     logger.debug("logType " + logType+ " sending: " + jsonEvents.toString())
@@ -75,43 +80,40 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
     logger.debug("sending completed")
   }
 
-  def extractLogEvents(state: ActionDAGRunState, context: ActionPipelineContext): Seq[StateLogEvent] = {
-    assert(state.actionsState.nonEmpty)
+  def extractLogEvents(actionId: ActionId, runtimeInfo: RuntimeInfo, context: ActionPipelineContext): Seq[StateLogEvent] = {
 
     val notificationTime = LocalDateTime.now
 
-    state.actionsState.map(aState => {
-      val logContext = StateLogEventContext(Thread.currentThread().getName,
-        notificationTime.toString,
-        executionId = aState._2.executionId.toString,
-        phase = context.phase.toString,
-        actionId = aState._1.toString,
-        state = aState._2.state.toString,
-        message = aState._2.msg.getOrElse(" no message"))
+    val logContext = StateLogEventContext(Thread.currentThread().getName,
+      notificationTime.toString,
+      executionId = runtimeInfo.executionId.toString,
+      phase = context.phase.toString,
+      actionId = actionId.toString,
+      state = runtimeInfo.state.toString,
+      message = runtimeInfo.msg.getOrElse(" no message"))
 
-      val optResults = {   // we generate at least one log entry, and one log entry per result
-        if (aState._2.results.nonEmpty) aState._2.results.map({result : ResultRuntimeInfo => Some(result)})
-        else Seq(None)
-      }
-      optResults.map(optResult => {
-        val result = optResult.map(
-          {result : ResultRuntimeInfo =>
+    val optResults = {   // we generate at least one log entry, and one log entry per result
+      if (runtimeInfo.results.nonEmpty) runtimeInfo.results.map({result : ResultRuntimeInfo => Some(result)})
+      else Seq(None)
+    }
+    optResults.map(optResult => {
+      val result = optResult.map(
+        {result : ResultRuntimeInfo =>
 
-            val toMetadata = {
-              val metadata = context.instanceRegistry.get[DataObject](result.subFeed.dataObjectId).metadata
-              def extractString(attribute: DataObjectMetadata => Option[String]) = metadata.map(attribute(_).getOrElse("")).getOrElse("")
+          val toMetadata = {
+            val metadata = context.instanceRegistry.get[DataObject](result.subFeed.dataObjectId).metadata
+            def extractString(attribute: DataObjectMetadata => Option[String]) = metadata.map(attribute(_).getOrElse("")).getOrElse("")
 
-              TargetObjectMetadata(name = extractString(_.name),
-                layer = extractString(_.layer),
-                subjectArea = extractString(_.subjectArea),
-                description = extractString(_.description))
-            }
+            TargetObjectMetadata(name = extractString(_.name),
+              layer = extractString(_.layer),
+              subjectArea = extractString(_.subjectArea),
+              description = extractString(_.description))
+          }
 
-            Result(toMetadata, result.mainMetrics.getOrElse("records_written", -1).toString, result.mainMetrics.getOrElse("stageDuration", -1).toString)
-          })
+          Result(toMetadata, result.mainMetrics.getOrElse("records_written", -1).toString, result.mainMetrics.getOrElse("stageDuration", -1).toString)
+        })
 
-        StateLogEvent(logContext, result.orNull)
-      })
-    }).toSeq.flatten
+      StateLogEvent(logContext, result.orNull)
+    })
   }
 }
