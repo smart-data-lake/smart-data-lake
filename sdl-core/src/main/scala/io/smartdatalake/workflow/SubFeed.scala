@@ -241,6 +241,62 @@ object FileSubFeed {
 }
 
 /**
+ * A ScriptSubFeed is used to notify DataObjects and subsequent actions about the completion of a script.
+ * It allows to pass on arbitrary informations as key/values.
+ *
+ * @param dataObjectId id of the DataObject this SubFeed corresponds to
+ * @param partitionValues Values of Partitions transported by this SubFeed
+ * @param isDAGStart true if this subfeed is a start node of the dag
+ * @param isSkipped true if this subfeed is the result of a skipped action
+ * @param parameters arbitrary informations as key/value to pass on
+ */
+case class ScriptSubFeed(parameters: Option[Map[String,String]] = None,
+                         override val dataObjectId: DataObjectId,
+                         override val partitionValues: Seq[PartitionValues],
+                         override val isDAGStart: Boolean = false,
+                         override val isSkipped: Boolean = false
+                        )
+  extends SubFeed {
+  override def breakLineage(implicit session: SparkSession, context: ActionPipelineContext): ScriptSubFeed = this
+  override def clearPartitionValues(breakLineageOnChange: Boolean = true)(implicit session: SparkSession, context: ActionPipelineContext): ScriptSubFeed = {
+    this.copy(partitionValues = Seq())
+  }
+  override def updatePartitionValues(partitions: Seq[String], breakLineageOnChange: Boolean = true, newPartitionValues: Option[Seq[PartitionValues]] = None)(implicit session: SparkSession, context: ActionPipelineContext): ScriptSubFeed = {
+    val updatedPartitionValues = SubFeed.filterPartitionValues(newPartitionValues.getOrElse(partitionValues), partitions)
+    this.copy(partitionValues = updatedPartitionValues)
+  }
+  override def clearDAGStart(): ScriptSubFeed = {
+    this.copy(isDAGStart = false)
+  }
+  override def clearSkipped(): ScriptSubFeed = {
+    this.copy(isSkipped = false)
+  }
+  override def toOutput(dataObjectId: DataObjectId): ScriptSubFeed = {
+    this.copy(dataObjectId = dataObjectId, parameters = None, isDAGStart = false, isSkipped = false)
+  }
+  override def union(other: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SubFeed = other match {
+    case subFeed: ScriptSubFeed =>
+      this.copy(
+        parameters = optionalizeMap(this.parameters.getOrElse(Map()) ++ subFeed.parameters.getOrElse(Map())),
+        partitionValues = unionPartitionValues(subFeed.partitionValues), isDAGStart = this.isDAGStart || subFeed.isDAGStart
+      )
+    case x => this.copy(parameters = None, partitionValues = unionPartitionValues(x.partitionValues), isDAGStart = this.isDAGStart || x.isDAGStart)
+  }
+  private def optionalizeMap(m: Map[String,String]): Option[Map[String,String]] = if (m.isEmpty) None else Some(m)
+}
+object ScriptSubFeed {
+  /**
+   * This method is used to pass an output SubFeed as input FileSubFeed to the next Action. SubFeed type might need conversion.
+   */
+  def fromSubFeed( subFeed: SubFeed ): ScriptSubFeed = {
+    subFeed match {
+      case subFeed: ScriptSubFeed => subFeed
+      case _ => ScriptSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
+    }
+  }
+}
+
+/**
  * An InitSubFeed is used to initialize first Nodes of a [[DAG]].
  *
  * @param dataObjectId id of the DataObject this SubFeed corresponds to
