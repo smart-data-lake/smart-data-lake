@@ -561,7 +561,7 @@ class ExecFailTransformer extends CustomDfTransformer {
 class TestStateListener(options: Map[String,String]) extends StateListener {
   var firstState: Option[ActionDAGRunState] = None
   var finalState: Option[ActionDAGRunState] = None
-  override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, actionId : Option[ActionId]): Unit = {
+  override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId : Option[ActionId]): Unit = {
     if (firstState.isEmpty) firstState = Some(state)
     finalState = Some(state)
   }

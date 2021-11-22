@@ -54,6 +54,10 @@ trait StateListener {
 
   /**
    * notifyState is called whenever an action is finished (succeeded or failed)
+   *
+   * @param state of the currently active part of the DAG
+   * @param context information
+   * @param changedActionId : single action whose state changed, if applicable. (Final notification provides the final state of the whole DAG.)
    */
-  def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, actionId : Option[ActionId]): Unit
+  def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId : Option[ActionId]): Unit
 }

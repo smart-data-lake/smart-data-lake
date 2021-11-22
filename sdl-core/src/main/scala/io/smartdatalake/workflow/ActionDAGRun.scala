@@ -212,12 +212,15 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
 
   /**
    * Save state of dag to file and notify stateListeners
+   *
+   * @param changedActionId : single action whose state changed, if applicable
+   * @param isFinal : set to true if this is the final save for this DAG run
    */
-  def saveState(actionId: Option[ActionId] = None, isFinal: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  def saveState(changedActionId: Option[ActionId] = None, isFinal: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     val runtimeInfos = getRuntimeInfos
     val runState = ActionDAGRunState(context.appConfig, executionId.runId, executionId.attemptId, context.runStartTime, context.attemptStartTime, actionsSkipped ++ runtimeInfos, isFinal)
     stateStore.foreach(_.saveState(runState))
-    stateListeners.foreach(_.notifyState(runState, context, actionId))
+    stateListeners.foreach(_.notifyState(runState, context, changedActionId))
   }
 
   private class ActionEventListener(phase: ExecutionPhase)(implicit session: SparkSession, context: ActionPipelineContext) extends DAGEventListener[Action] with SmartDataLakeLogger {

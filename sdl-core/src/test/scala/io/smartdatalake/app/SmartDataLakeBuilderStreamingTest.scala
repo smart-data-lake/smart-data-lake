@@ -93,7 +93,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // create state listener to control execution
     val stateListener = new StateListener with SmartDataLakeLogger {
-      override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, actionId : Option[ActionId]): Unit = {
+      override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId : Option[ActionId]): Unit = {
         assert(state.runId == context.executionId.runId && state.attemptId == context.executionId.attemptId)
         logger.info(s"Received metrics for runId=${state.runId} attemptId=${state.attemptId} final=${state.isFinal}")
         // check results after runId=1
@@ -529,7 +529,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // create state listener for controlling execution
     val stateListener = new StateListener with SmartDataLakeLogger {
-      override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, actionId : Option[ActionId]): Unit = {
+      override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId : Option[ActionId]): Unit = {
         assert(state.runId == context.executionId.runId && state.attemptId == context.executionId.attemptId)
         logger.info(s"Received metrics for runId=${state.runId} attemptId=${state.attemptId} final=${state.isFinal}")
         // add additional source partition after for runId=4
@@ -666,7 +666,7 @@ class PartitionStreamingTestStateListener2(runIdToAddData: Int) extends StateLis
   override def init(): Unit = {
     srcDO = Environment.instanceRegistry.get[CsvFileDataObject](DataObjectId("src1"))
   }
-  override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, actionId : Option[ActionId]): Unit = {
+  override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId : Option[ActionId]): Unit = {
     implicit val _context = context
     implicit val _sparkSession = Environment.sparkSession
     import _sparkSession.implicits._

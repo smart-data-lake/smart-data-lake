@@ -65,14 +65,14 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
 
   private val gson = new Gson
 
-  override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, oActionId : Option[ActionId]): Unit = {
+  override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, oChangedActionId : Option[ActionId]): Unit = {
     if (state.isFinal) return  // final notification is redundant -> skip
-    if (oActionId.isEmpty) return  // we log only action specific events -> skip
+    if (oChangedActionId.isEmpty) return  // we log only action specific events -> skip
 
-    val actionId = oActionId.get
-    assert(state.actionsState.get(actionId).isDefined)
+    val changedActionId = oChangedActionId.get
+    assert(state.actionsState.get(changedActionId).isDefined)
 
-    val logEvents = extractLogEvents(actionId, state.actionsState(actionId), context)
+    val logEvents = extractLogEvents(changedActionId, state.actionsState(changedActionId), context)
     val jsonEvents = logEvents.map{le:StateLogEvent => gson.toJson(le)}.mkString(",")
 
     logger.debug("logType " + logType+ " sending: " + jsonEvents.toString())
