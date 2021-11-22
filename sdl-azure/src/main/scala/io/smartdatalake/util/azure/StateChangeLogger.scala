@@ -58,7 +58,7 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
                  s"logType: $logType, key: _${logAnalyticsKey.substring(0,4)} .. ${logAnalyticsKey.substring(logAnalyticsKey.length-4)}_ ")
   }
 
-  case class StateLogEventContext(thread: String, notificationTime: String, executionId: String, phase: String, actionId: String, state: String, message: String)
+  case class StateLogEventContext(thread: String, notificationTime: String, application: String, executionId: String, phase: String, actionId: String, state: String, message: String)
   case class TargetObjectMetadata(name: String, layer: String, subjectArea: String, description: String)
   case class Result(targetObjectMetadata: TargetObjectMetadata, recordsWritten: String, stageDuration: String)
   case class StateLogEvent(context: StateLogEventContext, result: Result)
@@ -86,6 +86,7 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
 
     val logContext = StateLogEventContext(Thread.currentThread().getName,
       notificationTime.toString,
+      application = context.application,
       executionId = runtimeInfo.executionId.toString,
       phase = context.phase.toString,
       actionId = actionId.toString,
