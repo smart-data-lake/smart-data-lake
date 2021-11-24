@@ -21,8 +21,6 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.util.hdfs.PartitionValues
 import org.apache.spark.sql.SparkSession
 
-import java.io.OutputStream
-
 private[smartdatalake] trait CanReceiveScriptNotification {
 
   def scriptNotification(parameters: Map[String,String], partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): Unit

@@ -71,7 +71,7 @@ import java.time.LocalDateTime
      val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
      srcDO.writeDataFrame(l1, Seq())(session, context1)
      val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-     action1.init(Seq(srcSubFeed))(session, context1).head
+     action1.init(Seq(srcSubFeed))(session, context1.copy(phase = ExecutionPhase.Init)).head
      action1.exec(Seq(srcSubFeed))(session,context1).head
 
      {

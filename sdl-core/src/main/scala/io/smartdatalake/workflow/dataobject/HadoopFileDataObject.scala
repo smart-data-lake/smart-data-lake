@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
-import io.smartdatalake.definitions.Environment
+import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.DataFrameUtil.arrayToSeq
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SerializableHadoopConfiguration, SmartDataLakeLogger}
@@ -242,11 +242,25 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     }
   }
 
-  override def createOutputStream(path: String, overwrite: Boolean)(implicit session: SparkSession): OutputStream = {
+  override def startWritingOutputStreams(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    if (saveMode == SDLSaveMode.Overwrite) {
+      if (partitions.nonEmpty)
+        if (partitionValues.nonEmpty) deletePartitions(partitionValues)
+        else logger.warn(s"($id) Cannot delete data from partitioned data object as no partition values are given but saveMode=overwrite")
+      else deleteAll
+    }
+  }
+
+  override def createOutputStream(path: String, overwrite: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): OutputStream = {
     Try(filesystem.create(new Path(path), overwrite)) match {
       case Success(r) => r
       case Failure(e) => throw new RuntimeException(s"Can't create OutputStream for $id and $path: : ${e.getClass.getSimpleName} - ${e.getMessage}", e)
     }
+  }
+
+  override def endWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    // make sure empty partitions are created as well
+    if (partitionValues.nonEmpty) createMissingPartitions(partitionValues)
   }
 
   override def deleteAll(implicit session: SparkSession): Unit = {
