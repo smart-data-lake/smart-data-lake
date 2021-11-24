@@ -75,7 +75,7 @@ case class CopyAction(override val id: ActionId,
                       override val metricsFailCondition: Option[String] = None,
                       override val saveModeOptions: Option[SaveModeOptions] = None,
                       override val metadata: Option[ActionMetadata] = None
-                     )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedAction {
+                     )(implicit instanceRegistry: InstanceRegistry) extends SparkOneToOneActionImpl {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
   override val output: DataObject with CanWriteDataFrame = getOutputDataObject[DataObject with CanWriteDataFrame](outputId)
@@ -87,6 +87,8 @@ case class CopyAction(override val id: ActionId,
     case Success(result) => result
     case Failure(e) => throw new ConfigurationException(s"(${id}) Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
   }
+
+  validateConfig()
 
   private def getTransformers(implicit session: SparkSession, context: ActionPipelineContext): Seq[DfTransformer] = {
     getTransformers(transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, transformers, filterClauseExpr)

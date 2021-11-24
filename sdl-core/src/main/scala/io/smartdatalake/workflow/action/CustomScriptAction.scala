@@ -21,12 +21,9 @@ package io.smartdatalake.workflow.action
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{Condition, ExecutionMode, SparkStreamingMode}
-import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig
-import io.smartdatalake.workflow.action.sparktransformer.{ParsableDfsTransformer, SQLDfsTransformer}
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanReceiveScriptNotification, CanWriteDataFrame, DataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
+import io.smartdatalake.definitions.{Condition, ExecutionMode}
+import io.smartdatalake.workflow.dataobject.{CanReceiveScriptNotification, DataObject}
+import io.smartdatalake.workflow.{ActionPipelineContext, ScriptSubFeed}
 import org.apache.spark.sql.SparkSession
 
 /**
@@ -51,13 +48,19 @@ case class CustomScriptAction(override val id: ActionId,
                               override val executionCondition: Option[Condition] = None,
                               override val metricsFailCondition: Option[String] = None,
                               override val metadata: Option[ActionMetadata] = None
-                       )(implicit instanceRegistry: InstanceRegistry) extends ScriptSubFeedsAction {
+                       )(implicit instanceRegistry: InstanceRegistry) extends ScriptActionImpl {
 
   // checks
   override val inputs: Seq[DataObject] = inputIds.map(getInputDataObject[DataObject])
   override val outputs: Seq[DataObject with CanReceiveScriptNotification] = outputIds.map(getOutputDataObject[DataObject with CanReceiveScriptNotification])
 
+  override protected def transform(inputSubFeeds: Seq[ScriptSubFeed], outputSubFeeds: Seq[ScriptSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[ScriptSubFeed] = {
+    // noop for now
+    outputSubFeeds
+  }
+
   override def factory: FromConfigFactory[Action] = CustomScriptAction
+
 }
 
 object CustomScriptAction extends FromConfigFactory[Action] {

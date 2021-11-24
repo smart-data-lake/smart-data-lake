@@ -180,13 +180,8 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
   }
 
   private def getRecursiveSubFeeds(node: Action)(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
-    assert(node.recursiveInputs.map(_.isInstanceOf[TransactionalSparkTableDataObject]).forall(_==true), "Recursive inputs only work for TransactionalSparkTableDataObjects.")
-    // recursive inputs are only passed as input SubFeeds for SparkSubFeedsAction, which can take more than one input SubFeed
-    // for SparkSubFeedAction (e.g. Deduplicate and HistorizeAction) which implicitly use a recursive input, the Action is responsible the get the SubFeed.
-    node match {
-      case _: SparkSubFeedsAction => node.recursiveInputs.map(dataObject => getInitialSubFeed(dataObject.id))
-      case _ => Seq()
-    }
+    if (node.handleRecursiveInputsAsSubFeeds) node.recursiveInputs.map(dataObject => getInitialSubFeed(dataObject.id))
+    else Seq()
   }
 
   private def getInitialSubFeed(dataObjectId: DataObjectId)(implicit session: SparkSession, context: ActionPipelineContext) = {

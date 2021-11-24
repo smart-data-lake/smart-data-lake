@@ -143,14 +143,14 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
     new ByteArrayInputStream(getResponse(Some(query)))
   }
 
+  override def startWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
+
   /**
-   *
    * @param path      is ignored for webservices
    * @param overwrite is ignored for webservices
-   * @param session   implicit spark session
    * @return outputstream that writes to WebService once it's closed
    */
-  override def createOutputStream(path: String, overwrite: Boolean)(implicit session: SparkSession): OutputStream = {
+  override def createOutputStream(path: String, overwrite: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): OutputStream = {
     new ByteArrayOutputStream() {
       override def close(): Unit = Try {
         super.close()
@@ -162,6 +162,8 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
       }
     }
   }
+
+  override def endWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
 
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)
@@ -228,7 +230,6 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
   override def relativizePath(filePath: String)(implicit session: SparkSession): String = filePath
 
   override def factory: FromConfigFactory[DataObject] = WebserviceFileDataObject
-
 }
 
 object WebserviceFileDataObject extends FromConfigFactory[DataObject] with SmartDataLakeLogger {

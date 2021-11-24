@@ -27,7 +27,7 @@ import io.smartdatalake.util.misc.{SmartDataLakeLogger, SparkExpressionUtil}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
-import io.smartdatalake.workflow.dataobject.{CanCreateIncrementalOutput, DataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateIncrementalOutput, DataObject, TransactionalSparkTableDataObject}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions.expr
@@ -60,13 +60,19 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   def inputs: Seq[DataObject]
 
   /**
-   * Recursive Inputs are DataObjects that are used as Output and Input in the same action
+   * Recursive Inputs are DataObjects that are used as Output and Input in the same action.
    * This is usually prohibited as it creates loops in the DAG.
-   * In special cases this makes sense, i.e. when building a complex delta logic
+   * In special cases this makes sense, i.e. when building a complex comparision/update logic.
    *
-   * @return
+   * Usage: add DataObjects used as Output and Input as outputIds and recursiveInputIds, but not as inputIds.
    */
-  def recursiveInputs: Seq[DataObject]
+  def recursiveInputs: Seq[DataObject] = Seq()
+
+  /**
+   * Define if recursive inputs should be prepared as input SubFeed by ActionDAG or if this is handled by the action internally.
+   * Default is to prepare & expect it as input SubFeed, but this can be overriden by subclasses
+   */
+  private[smartdatalake] def handleRecursiveInputsAsSubFeeds: Boolean = true
 
   /**
    * Output [[DataObject]]s
@@ -104,6 +110,20 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   private[smartdatalake] def isAsynchronousProcessStarted: Boolean = false
 
   /**
+   * Validate configuration.
+   * Put validation logic here which will run on class instantiation. It has to be put into a separate method because like that
+   * it can be called from the final Action case class. This makes sure that everything is initialized, e.g. abstract method "inputs" is defined.
+   *
+   * This must be called by every Action in initialization code of the case class.
+   */
+  def validateConfig(): Unit = {
+    recursiveInputs.foreach{ input =>
+      assert(outputs.exists(_.id == input.id), s"($id) Recursive input ${input.id} is not listed in outputIds of the same action.")
+      assert(input.isInstanceOf[TransactionalSparkTableDataObject], s"($id) Recursive input ${input.id} is not a TransactionalSparkTableDataObjects.")
+    }
+  }
+
+  /**
    * Prepare DataObjects prerequisites.
    * In this step preconditions are prepared & tested:
    * - connections can be created
@@ -115,6 +135,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
     reset // reset statistics, this is especially needed in unit tests when the same action is started multiple times
     inputs.foreach(_.prepare)
     outputs.foreach(_.prepare)
+    executionMode.foreach(_.prepare(id))
 
     // Make sure that data object names are still unique when replacing special characters with underscore
     // Requirement from SQL transformations because temp view names can not contain special characters
@@ -122,6 +143,9 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
       dataObj => ActionHelper.replaceSpecialCharactersWithUnderscore(dataObj.id.id)
     }.groupBy(identity).collect { case (x, List(_,_,_*)) => x }.toList
     require(duplicateNames.isEmpty, s"The names of your DataObjects are not unique when replacing special characters with underscore. Duplicates: ${duplicateNames.mkString(",")}")
+
+    // validate executionCondition
+    executionCondition.foreach(_.syntaxCheck[SubFeedsExpressionData](id, Some("executionCondition")))
 
     // validate metricsFailCondition
     metricsFailCondition.foreach(c => SparkExpressionUtil.syntaxCheck[Metric,Boolean](id, Some("metricsFailCondition"), c))
@@ -208,7 +232,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * e.g. JdbcTableDataObjects preWriteSql
    */
   def preExec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    if (isAsynchronousProcessStarted) return Unit
+    if (isAsynchronousProcessStarted) return
     // reset execution condition if not start Action in pipeline, because input for execution results could change between init and exec phase
     val isStartAction = subFeeds.exists(_.isInstanceOf[InitSubFeed])
     if (!isStartAction) resetExecutionResult()
@@ -238,7 +262,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * e.g. JdbcTableDataObjects postWriteSql or CopyActions deleteInputData.
    */
   def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    if (isAsynchronousProcessStarted) return Unit
+    if (isAsynchronousProcessStarted) return
     // evaluate metrics fail condition if defined
     metricsFailCondition.foreach( c => evaluateMetricsFailCondition(c))
     // process postRead/Write hooks

@@ -145,7 +145,7 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
         |   transformer = {
         |     class-name = io.smartdatalake.config.objects.TestFileTransformer
         |   }
-        |   deleteDataAfterRead = true
+        |   breakFileRefLineage = true
         | }
         |}
         |""".stripMargin).withFallback(dataObjectConfig).resolve
@@ -156,7 +156,7 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
       id = "123",
       inputId = "tdo3",
       outputId = "tdo4",
-      deleteDataAfterRead = true,
+      breakFileRefLineage = true,
       transformer = CustomFileTransformerConfig(
         className = Some("io.smartdatalake.config.objects.TestFileTransformer")
       )
@@ -175,7 +175,6 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
         |   transformer = {
         |     class-name = io.smartdatalake.config.objects.TestFileTransformer
         |   }
-        |   deleteDataAfterRead = true
         | }
         |}
         |""".stripMargin).withFallback(dataObjectConfig).resolve

@@ -127,6 +127,7 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
     invalidCharacters.replaceAllIn(str, "_")
   }
 
+  // TODO: remove
   def getMainDataObjectCandidates[T <: DataObject](mainId: Option[DataObjectId], dataObjects: Seq[T], dataObjectIdsToIgnoreFilter: Seq[DataObjectId], inputOutput: String, mainNeeded: Boolean, actionId: ActionId): Seq[T] = {
     if (mainId.isDefined) {
       // if mainInput is defined -> return only that DataObject
@@ -144,6 +145,7 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
    * Updates the partition values of a SubFeed to the partition columns of the given input data object:
    * - remove not existing columns from the partition values
    */
+  // TODO: remove
   def updateInputPartitionValues[T <: SubFeed](dataObject: DataObject, subFeed: T)(implicit session: SparkSession, context: ActionPipelineContext): T = {
     dataObject match {
       case partitionedDO: CanHandlePartitions =>
@@ -160,6 +162,7 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
    * - add run_id_partition value if needed
    * - removing not existing columns from the partition values.
    */
+  // TODO: remove
   def updateOutputPartitionValues[T <: SubFeed](dataObject: DataObject, subFeed: T, partitionValuesTransform: Option[Seq[PartitionValues] => Map[PartitionValues,PartitionValues]] = None)(implicit session: SparkSession, context: ActionPipelineContext): T =
     dataObject match {
       case partitionedDO: CanHandlePartitions =>
@@ -172,6 +175,7 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
         subFeed.clearPartitionValues(breakLineageOnChange = false).asInstanceOf[T]
     }
 
+  // TODO: remove
   def addRunIdPartitionIfNeeded[T <: SubFeed](dataObject: DataObject, subFeed: T)(implicit session: SparkSession, context: ActionPipelineContext): T = {
     dataObject match {
       case partitionedDO: CanHandlePartitions =>
