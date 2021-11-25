@@ -57,7 +57,7 @@ trait StateListener {
    *
    * @param state of the currently active part of the DAG
    * @param context information
-   * @param changedActionId : single action whose state changed, if applicable. (Final notification provides the final state of the whole DAG.)
+   * @param changedActionId : if notification is triggered by an action state changes, this is the action corresponding.
    */
   def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId : Option[ActionId]): Unit
 }
