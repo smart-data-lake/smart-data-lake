@@ -53,7 +53,9 @@ trait StateListener {
   def init(): Unit = Unit
 
   /**
-   * notifyState is called whenever an action is finished (succeeded or failed)
+   * notifyState is called whenever an action is finished (succeeded or failed) and at the end of the DAG execution (success or failure).
+   * It always includes the state of all actions of the DAG.
+   * At the end of the DAG execution notifyState is called with the final state. In this case state.isFinal = true and changedActionId is empty.
    *
    * @param state of the currently active part of the DAG
    * @param context information
