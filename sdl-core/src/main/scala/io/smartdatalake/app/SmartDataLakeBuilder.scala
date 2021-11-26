@@ -383,14 +383,14 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         }
       }
 
-      // execute DAG
-      val startTime = LocalDateTime.now
-      var finalRunState: ActionDAGRunState = null
-      var subFeeds = try {
-        actionDAGRun.exec(session, context)
-      } finally {
-        finalRunState = actionDAGRun.saveState(true)(session, context)
-      }
+    // execute DAG
+    val startTime = LocalDateTime.now
+    var finalRunState: ActionDAGRunState = null
+    var subFeeds = try {
+      actionDAGRun.exec(session, context)
+    } finally {
+      finalRunState = actionDAGRun.saveState(changedActionId = None, isFinal = true)(session, context)
+    }
 
       // Iterate execution in streaming mode
       if (context.appConfig.streaming) {
@@ -428,7 +428,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
           if (!Environment.stopStreamingGracefully) {
             session.streams.awaitAnyTermination()
             session.streams.active.foreach(_.stop) // stopping other streaming queries gracefully
-            actionDAGRun.saveState(true)(session, context) // notify about this asynchronous iteration
+            actionDAGRun.saveState(changedActionId = None, isFinal = true)(session, context) // notify about this asynchronous iteration
           } else {
             session.streams.active.foreach(_.stop)
             logger.info("Stopped streaming gracefully")

@@ -212,12 +212,15 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
 
   /**
    * Save state of dag to file and notify stateListeners
+   *
+   * @param changedActionId : single action whose state changed, if applicable
+   * @param isFinal : set to true if this is the final save for this DAG run
    */
-  def saveState(isFinal: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): ActionDAGRunState = {
+  def saveState(changedActionId: Option[ActionId] = None, isFinal: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): ActionDAGRunState = {
     val runtimeInfos = getRuntimeInfos
     val runState = ActionDAGRunState(context.appConfig, executionId.runId, executionId.attemptId, context.runStartTime, context.attemptStartTime, actionsSkipped ++ runtimeInfos, isFinal)
     stateStore.foreach(_.saveState(runState))
-    stateListeners.foreach(_.notifyState(runState, context))
+    stateListeners.foreach(_.notifyState(runState, context, changedActionId))
     // return
     runState
   }
@@ -235,14 +238,14 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
       }
       node.addRuntimeEvent(executionId, phase, state, results = results.collect{ case x: SubFeed => x })
       logger.info(s"${node.toStringShort}: $phase succeeded")
-      if (phase==ExecutionPhase.Exec) saveState()
+      if (phase==ExecutionPhase.Exec) saveState(Some(node.id))
     }
     override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
       // only first line of message included as logical plan of AnalysisException might have several 100 lines...
-      val exceptionMsg = s"${exception.getClass.getSimpleName}: ${exception.getMessage.lines.next}"
+      val exceptionMsg = s"${exception.getClass.getSimpleName}: ${exception.getMessage.linesIterator.next}"
       node.addRuntimeEvent(executionId, phase, RuntimeEventState.FAILED, Some(exceptionMsg))
       logger.warn(s"${node.toStringShort}: $phase failed with $exceptionMsg")
-      if (phase==ExecutionPhase.Exec) saveState()
+      if (phase==ExecutionPhase.Exec) saveState(Some(node.id))
     }
     override def onNodeSkipped(exception: Throwable)(node: Action): Unit = {
       val state = exception match {
@@ -251,7 +254,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
       }
       node.addRuntimeEvent(executionId, phase, state, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
       logger.info(s"${node.toStringShort}: $phase ${state.toString.toLowerCase} because of ${exception.getClass.getSimpleName}: ${exception.getMessage}")
-      if (phase==ExecutionPhase.Exec) saveState()
+      if (phase==ExecutionPhase.Exec) saveState(Some(node.id))
     }
   }
 
