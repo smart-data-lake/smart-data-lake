@@ -140,6 +140,6 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
         logger.info("logType " + logType+ " sending: " + jsonEvents.toString())
         azureLogClient.send("[ " + jsonEvents + " ]", logType)
     }
-    logger.debug("sending completed")
+    logger.info("sending completed")
   }
 }
