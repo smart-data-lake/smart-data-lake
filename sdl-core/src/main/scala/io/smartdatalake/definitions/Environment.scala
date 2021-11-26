@@ -163,6 +163,16 @@ object Environment {
       .map(x => Level.valueOf(x.toLowerCase)).getOrElse(Level.INFO)
   }
 
+  /**
+   * Simplify final exception for better usability of log
+   * - truncate stacktrace starting from "monix.*" entries
+   * - limit logical plan in AnalysisException to 5 lines
+   */
+  var simplifyFinalExceptionLog: Boolean = {
+    EnvironmentUtil.getSdlParameter("simplifyFinalExceptionLog")
+      .map(_.toBoolean).getOrElse(true)
+  }
+
   // static configurations
   val configPathsForLocalSubstitution: Seq[String] = Seq(
       "path", "table.name"

@@ -147,6 +147,8 @@ abstract class SparkSubFeedsAction extends SparkAction {
     assert(subFeeds.size == inputs.size + recursiveInputs.size, s"Number of subFeed's must match number of inputs for SparkSubFeedActions (Action $id, subfeed's ${subFeeds.map(_.dataObjectId).mkString(",")}, inputs ${inputs.map(_.id).mkString(",")})")
     val mainInput = getMainInput(subFeeds)
     val mainInputSubFeed = subFeeds.find(_.dataObjectId == mainInput.id).getOrElse(throw new IllegalStateException(s"subFeed for main input ${mainInput.id} not found"))
+    if (isAsynchronousProcessStarted) return outputs.map(output => SparkSubFeed(None, output.id, Seq())) // empty output subfeeds if asynchronous action started
+
     // transform
     val transformedSubFeeds = doTransform(subFeeds)
     // write output
@@ -154,7 +156,7 @@ abstract class SparkSubFeedsAction extends SparkAction {
       val subFeed = transformedSubFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"subFeed for output ${output.id} not found"))
       logWritingStarted(subFeed)
       val isRecursiveInput = recursiveInputs.exists(_.id == subFeed.dataObjectId)
-      val (noData,d) = PerformanceUtils.measureDuration {
+      val (noData, d) = PerformanceUtils.measureDuration {
         writeSubFeed(subFeed, output, isRecursiveInput)
       }
       logWritingFinished(subFeed, noData, d)

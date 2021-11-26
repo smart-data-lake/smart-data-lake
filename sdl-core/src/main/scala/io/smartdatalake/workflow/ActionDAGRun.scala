@@ -87,7 +87,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
     dagExceptions.distinct.foreach { ex =>
       val loggerSeverity = if (ex.severity <= ExceptionSeverity.FAILED_DONT_STOP) Level.ERROR
       else Environment.taskSkippedExceptionLogLevel
-      logWithSeverity(loggerSeverity, s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessageWithCause}")
+      logWithSeverity(loggerSeverity, s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
     }
     // log dag on error
     if (dagExceptionsToStop.nonEmpty) ActionDAGRun.logDag(s"$phase ${dagExceptionsToStop.head.severity} for ${context.application} runId=${context.executionId.runId} attemptId=${context.executionId.runId}", dag, Some(executionId))
@@ -216,11 +216,13 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
    * @param changedActionId : single action whose state changed, if applicable
    * @param isFinal : set to true if this is the final save for this DAG run
    */
-  def saveState(changedActionId: Option[ActionId] = None, isFinal: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  def saveState(changedActionId: Option[ActionId] = None, isFinal: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): ActionDAGRunState = {
     val runtimeInfos = getRuntimeInfos
     val runState = ActionDAGRunState(context.appConfig, executionId.runId, executionId.attemptId, context.runStartTime, context.attemptStartTime, actionsSkipped ++ runtimeInfos, isFinal)
     stateStore.foreach(_.saveState(runState))
     stateListeners.foreach(_.notifyState(runState, context, changedActionId))
+    // return
+    runState
   }
 
   private class ActionEventListener(phase: ExecutionPhase)(implicit session: SparkSession, context: ActionPipelineContext) extends DAGEventListener[Action] with SmartDataLakeLogger {
@@ -239,8 +241,10 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
       if (phase==ExecutionPhase.Exec) saveState(Some(node.id))
     }
     override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
-      node.addRuntimeEvent(executionId, phase, RuntimeEventState.FAILED, Some(s"${exception.getClass.getSimpleName}: ${exception.getMessage}"))
-      logger.warn(s"${node.toStringShort}: $phase failed with ${exception.getClass.getSimpleName}: ${exception.getMessage}")
+      // only first line of message included as logical plan of AnalysisException might have several 100 lines...
+      val exceptionMsg = s"${exception.getClass.getSimpleName}: ${exception.getMessage.linesIterator.next}"
+      node.addRuntimeEvent(executionId, phase, RuntimeEventState.FAILED, Some(exceptionMsg))
+      logger.warn(s"${node.toStringShort}: $phase failed with $exceptionMsg")
       if (phase==ExecutionPhase.Exec) saveState(Some(node.id))
     }
     override def onNodeSkipped(exception: Throwable)(node: Action): Unit = {

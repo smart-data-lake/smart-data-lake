@@ -24,21 +24,31 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions._
+import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
-import io.smartdatalake.util.misc.DataFrameUtil.arrayToSeq
 import io.smartdatalake.util.misc.{AclDef, AclUtil, DataFrameUtil, PerformanceUtils}
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.{col, lit}
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
-import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import org.apache.spark.sql.types.{StringType, StructField, StructType}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
  * [[DataObject]] of type DeltaLakeTableDataObject.
- * Provides details to access Hive tables to an Action
+ * Provides details to access Tables in delta format to an Action.
+ *
+ * Delta format maintains a transaction log in a separate _delta_log subfolder.
+ * The schema is registered in Metastore by DeltaLakeTableDataObject.
+ *
+ * The following anomalies might occur:
+ * - table is registered in metastore but path does not exist -> table is dropped from metastore
+ * - table is registered in metastore but path is empty -> error is thrown. Delete the path to clean up
+ * - table is registered and path contains parquet files, but _delta_log subfolder is missing -> path is converted to delta format
+ * - table is not registered but path contains parquet files and _delta_log subfolder -> Table is registered
+ * - table is not registered but path contains parquet files without _delta_log subfolder -> path is converted to delta format and table is registered
+ * - table is not registered and path does not exists -> table is created on write
  *
  * @param id unique name of this data object
  * @param path hadoop directory for this table. If it doesn't contain scheme and authority, the connections pathPrefix is applied.
@@ -84,6 +94,8 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   // prepare final path and table
   @transient private var hadoopPathHolder: Path = _
 
+  val filetype: String = ".parquet"
+
   def hadoopPath(implicit session: SparkSession): Path = {
     val thisIsTableExisting = isTableExisting
     require(thisIsTableExisting || path.isDefined, s"($id) DeltaTable ${table.fullName} does not exist, so path must be set.")
@@ -91,24 +103,26 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     if (hadoopPathHolder == null) {
       hadoopPathHolder = {
         if (thisIsTableExisting) new Path(session.sql(s"DESCRIBE DETAIL ${table.fullName}").head.getAs[String]("location"))
-        else {
-          val prefixedPath = HdfsUtil.prefixHadoopPath(path.get, connection.map(_.pathPrefix))
-          val filesystem = getFilesystem(prefixedPath)
-          HdfsUtil.makeAbsolutePath(prefixedPath)(filesystem)
-        }
+        else getAbsolutePath
       }
 
       // For existing tables, check to see if we write to the same directory. If not, issue a warning.
       if (thisIsTableExisting && path.isDefined) {
         // Normalize both paths before comparing them (remove tick / tock folder and trailing slash)
         val hadoopPathNormalized = HiveUtil.normalizePath(hadoopPathHolder.toString)
-        val definedPathNormalized = HiveUtil.normalizePath(path.get)
+        val definedPathNormalized = HiveUtil.normalizePath(getAbsolutePath.toString)
 
         if (definedPathNormalized != hadoopPathNormalized)
           logger.warn(s"($id) Table ${table.fullName} exists already with different path. The table will be written with new path definition ${hadoopPathHolder}!")
       }
     }
     hadoopPathHolder
+  }
+
+  private def getAbsolutePath(implicit session: SparkSession) = {
+    val prefixedPath = HdfsUtil.prefixHadoopPath(path.get, connection.map(_.pathPrefix))
+    val filesystem = getFilesystem(prefixedPath)
+    HdfsUtil.makeAbsolutePath(prefixedPath)(filesystem)
   }
 
   table = table.overrideDb(connection.map(_.db))
@@ -128,13 +142,42 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     if (!isTableExisting) {
       require(path.isDefined, s"($id) If DeltaLake table does not exist yet, path must be set.")
       if (filesystem.exists(hadoopPath)) {
-        // define a delta table, metadata can be read from files.
-        require(DeltaTable.isDeltaTable(session, hadoopPath.toString), s"($id) Path $hadoopPath is not a delta table.")
-        DeltaTable.create(session).tableName(table.fullName).location(hadoopPath.toString).execute()
-        logger.info(s"($id) Creating delta table ${table.fullName} for existing path $hadoopPath")
+        if (DeltaTable.isDeltaTable(session, hadoopPath.toString)) {
+          // define a delta table, metadata can be read from files.
+          DeltaTable.create(session).tableName(table.fullName).location(hadoopPath.toString).execute()
+          logger.info(s"($id) Creating delta table ${table.fullName} for existing path $hadoopPath")
+        } else {
+          // if path has existing parquet files, convert to delta table
+          require(checkFilesExisting, s"($id) Path $hadoopPath exists but contains no parquet files. Delete whole base path to reset delta table.")
+          convertPathToDeltaFormat
+          DeltaTable.create(session).tableName(table.fullName).location(hadoopPath.toString).execute()
+        }
       }
+    } else if (filesystem.exists(hadoopPath)) {
+      if (!DeltaTable.isDeltaTable(session, hadoopPath.toString)) {
+        // if path has existing parquet files but not in delta format, convert to delta format
+        require(checkFilesExisting, s"($id) Path $hadoopPath exists but contains no parquet files. Delete whole base path to reset delta table.")
+        convertPathToDeltaFormat
+        logger.info(s"($id) Converted existing path $hadoopPath to delta table ${table.fullName}")
+      }
+    } else {
+      dropTable
+      logger.info(s"($id) Dropped existing delta table ${table.fullName} because path was missing")
     }
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
+  }
+
+  /**
+   * converts an existing path with parquet files to delta format
+   */
+  private[smartdatalake] def convertPathToDeltaFormat(implicit session: SparkSession): Unit = {
+    val deltaPath = s"parquet.`$hadoopPath`"
+    if (partitions.isEmpty) {
+      DeltaTable.convertToDelta(session, deltaPath)
+    } else {
+      val partitionSchema = StructType(partitions.map(p => StructField(p, StringType)))
+      DeltaTable.convertToDelta(session, deltaPath, partitionSchema)
+    }
   }
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
@@ -297,18 +340,13 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    * @throws IllegalArgumentException if `failIfFilesMissing` = true and no files found at `path`.
    */
   protected def checkFilesExisting(implicit session:SparkSession): Boolean = {
-    val files = if (filesystem.exists(hadoopPath.getParent)) {
-      arrayToSeq(filesystem.globStatus(hadoopPath))
-    } else {
-      Seq.empty
-    }
-
-    if (files.isEmpty) {
+    val hasFiles = filesystem.exists(hadoopPath.getParent) &&
+      RemoteIteratorWrapper(filesystem.listFiles(hadoopPath, true)).exists(_.getPath.getName.endsWith(filetype))
+    if (!hasFiles) {
       logger.warn(s"($id) No files found at $hadoopPath. Can not import any data.")
       require(!failIfFilesMissing, s"($id) failIfFilesMissing is enabled and no files to process have been found in $hadoopPath.")
     }
-
-    files.nonEmpty
+    hasFiles
   }
 
   protected val separator: Char = Path.SEPARATOR_CHAR

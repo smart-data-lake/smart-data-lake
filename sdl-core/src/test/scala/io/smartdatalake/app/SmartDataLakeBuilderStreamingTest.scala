@@ -102,14 +102,14 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
           assert(tgt1DO.listPartitions.map(_.apply("dt")) == Seq("20180101"))
           assert(tgt1DO.getDataFrame(Seq()).select($"lastname").as[String].collect().toSeq == Seq("doe"))
         }
-        // add additional source partition after for runId=4
-        if (state.isFinal && state.runId==3) {
+        // add additional source partition in runId=2 for runId=3
+        if (state.isFinal && state.runId==2) {
           val dfSrc2 = Seq(("20180102", "company", "olmo","-",10)) // second partition 20190101
             .toDF("dt", "type", "lastname", "firstname", "rating")
           srcDO.writeDataFrame(dfSrc2, Seq())
         }
-        // stop after runId=4
-        if (state.isFinal && state.runId>=4) {
+        // stop after runId=3
+        if (state.isFinal && state.runId>=3) {
           Environment.stopStreamingGracefully = true
         }
       }
@@ -131,12 +131,12 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
       val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
       val stateId = stateStore.getLatestStateId().get
       val runState = stateStore.recoverRunState(stateId)
-      assert(runState.runId >= 4)
+      assert(runState.runId >= 3)
       assert(runState.attemptId == 1)
       val resultActionsState = runState.actionsState.mapValues(_.state)
-      val expectedActionsState = Map((action1.id , RuntimeEventState.SUCCEEDED))
+      val expectedActionsState = Map((action1.id , RuntimeEventState.SKIPPED))
       assert(resultActionsState == expectedActionsState)
-      assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == Seq(PartitionValues(Map("dt"->"20180102"))))
+      assert(runState.actionsState.head._2.results.head.subFeed.partitionValues.isEmpty)
     }
   }
 
@@ -241,7 +241,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
   test("sdlb streaming run with synchronously and asynchronously streaming action, csv files") {
 
     // init sdlb
-    val appName = "sdlb-streaming"
+    val appName = "sdlb-streaming2"
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(tempPath), filesystem, false)
@@ -320,7 +320,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
   test("sdlb streaming recovery, synchronous action failing before asynchronously streaming action") {
 
     // init sdlb
-    val appName = "sdlb-streaming"
+    val appName = "sdlb-streaming3"
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(tempPath), filesystem, false)
@@ -411,7 +411,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
   test("sdlb spark streaming failure, synchronous action before asynchronously streaming action, asynchronous action failing after first run") {
 
     // init sdlb
-    val appName = "sdlb-streaming"
+    val appName = "sdlb-streaming4"
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(tempPath), filesystem, false)
@@ -481,7 +481,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
   test("sdlb streaming recovery, asynchronously action failing before synchronous streaming action") {
 
     // init sdlb
-    val appName = "sdlb-streaming"
+    val appName = "sdlb-streaming5"
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(tempPath), filesystem, false)
@@ -532,14 +532,14 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
       override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId : Option[ActionId]): Unit = {
         assert(state.runId == context.executionId.runId && state.attemptId == context.executionId.attemptId)
         logger.info(s"Received metrics for runId=${state.runId} attemptId=${state.attemptId} final=${state.isFinal}")
-        // add additional source partition after for runId=4
-        if (state.isFinal && state.runId==3) {
+        // add additional source partition for runId=2
+        if (state.isFinal && state.runId==2) {
           val dfSrc2 = Seq(("20180102", "company", "olmo","-",10)) // second partition 20190101
             .toDF("dt", "type", "lastname", "firstname", "rating")
           srcDO.writeDataFrame(dfSrc2, Seq())
         }
-        // stop after runId=5
-        if (state.isFinal && state.runId>=5) {
+        // stop after runId=3
+        if (state.isFinal && state.runId>=3) {
           Environment.stopStreamingGracefully = true
         }
       }
@@ -566,7 +566,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
   test("sdlb streaming restart, synchronous action skipped before asynchronously streaming action") {
 
     // init sdlb
-    val appName = "sdlb-streaming"
+    val appName = "sdlb-streaming6"
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(tempPath), filesystem, false)

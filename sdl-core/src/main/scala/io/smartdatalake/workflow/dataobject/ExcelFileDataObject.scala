@@ -60,7 +60,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  */
 case class ExcelFileDataObject(override val id: DataObjectId,
                                override val path: String,
-                               excelOptions: ExcelOptions  = ExcelOptions(),
+                               excelOptions: ExcelOptions = ExcelOptions(),
                                override val partitions: Seq[String] = Seq(),
                                override val schema: Option[StructType] = None,
                                override val schemaMin: Option[StructType] = None,

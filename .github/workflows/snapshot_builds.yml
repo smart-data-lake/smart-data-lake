@@ -1,12 +1,12 @@
-name: Smart Data Lake Snapshot Build 2.11
+name: Snapshot Build
 
 on:
   push:
-    branches: 
-      - develop
+    branches:
+      - 'develop-spark*'
   pull_request:
-    branches: 
-      - develop
+    branches:
+      - 'develop-spark*'
     types: [opened, synchronize, closed]
 
 jobs:
@@ -21,13 +21,19 @@ jobs:
       with:
         java-version: 1.8
     - name: Cache Maven
-      uses: actions/cache@v1.1.2
+      uses: actions/cache@v2
       with:
         path: ~/.m2/repository
         key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
         restore-keys: ${{ runner.os }}-maven-
-    - name: Build with Maven for Scala 2.11
-      run: mvn -B -P scala-2.11 clean test --file pom.xml
+
+    - name: Build with Maven for Scala 2.12
+      run: mvn -P scala-2.12 -B clean test --file pom.xml
+
+    - name: Build with Maven for Scala 2.11, only if on develop-spark2* branch
+      if: ${{ contains(github.base_ref, 'develop-spark2') || contains(github.ref, 'develop-spark2') }}
+      run: mvn -P scala-2.11 -B clean test --file pom.xml
+
 
   deploy:
     needs: build
@@ -48,16 +54,6 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-maven-
 
-      - name: Maven deploy to sonatype for Scala 2.11
-        uses: samuelmeuli/action-maven-publish@v1
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
-          nexus_username: ${{ secrets.SONATYPE_USERNAME }}
-          nexus_password: ${{ secrets.SONATYPE_PASSWORD }}
-          maven_profiles: scala-2.11,release-sonatype
-          maven_args: -B -DskipTests -f pom.xml
-
       - name: Maven deploy to sonatype for Scala 2.12
         uses: samuelmeuli/action-maven-publish@v1
         with:
@@ -66,5 +62,15 @@ jobs:
           nexus_username: ${{ secrets.SONATYPE_USERNAME }}
           nexus_password: ${{ secrets.SONATYPE_PASSWORD }}
           maven_profiles: scala-2.12,release-sonatype
+          maven_args: -B -DskipTests -f pom.xml
+
+      - name: Maven deploy to sonatype for Scala 2.11
+        uses: samuelmeuli/action-maven-publish@v1
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          nexus_username: ${{ secrets.SONATYPE_USERNAME }}
+          nexus_password: ${{ secrets.SONATYPE_PASSWORD }}
+          maven_profiles: scala-2.11,release-sonatype
           # exclude sdl-parent as it is already uploaded with previous deploy, stays the same and cannot be replaced in remote repository
           maven_args: -B -DskipTests -pl '!.' -f pom.xml

@@ -408,7 +408,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val actions = Seq(
       CopyAction("A", srcDO.id, tgtADO.id),
       CopyAction("B", srcDO.id, tgtADO.id),
-      CopyAction("C", tgtADO.id, tgtCDO.id),
+      CopyAction("C", tgtADO.id, tgtCDO.id)
     )
     val dag = ActionDAGRun(actions)
 

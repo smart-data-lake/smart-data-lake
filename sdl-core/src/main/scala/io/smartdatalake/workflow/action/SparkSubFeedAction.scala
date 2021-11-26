@@ -105,12 +105,14 @@ abstract class SparkSubFeedAction extends SparkAction {
   override final def exec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
     assert(subFeeds.size == 1, s"Only one subfeed allowed for SparkSubFeedActions (Action $id, inputSubfeed's ${subFeeds.map(_.dataObjectId).mkString(",")})")
     val subFeed = subFeeds.head
+    if (isAsynchronousProcessStarted) return Seq(SparkSubFeed(None, output.id, Seq())) // empty output subfeed if asynchronous action started
+
     // transform
     val transformedSubFeed = doTransform(subFeed)
     // write output
     logWritingStarted(transformedSubFeed)
     val isRecursiveInput = recursiveInputs.exists(_.id == output.id)
-    val (noData,d) = PerformanceUtils.measureDuration {
+    val (noData, d) = PerformanceUtils.measureDuration {
       writeSubFeed(transformedSubFeed, output, isRecursiveInput)
     }
     logWritingFinished(transformedSubFeed, noData, d)
@@ -119,6 +121,7 @@ abstract class SparkSubFeedAction extends SparkAction {
   }
 
   override final def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    if (isAsynchronousProcessStarted) return Unit
     super.postExec(inputSubFeeds, outputSubFeeds)
     assert(inputSubFeeds.size == 1, s"Only one inputSubFeed allowed for SparkSubFeedActions (Action $id, inputSubfeed's ${inputSubFeeds.map(_.dataObjectId).mkString(",")})")
     assert(outputSubFeeds.size == 1, s"Only one outputSubFeed allowed for SparkSubFeedActions (Action $id, inputSubfeed's ${outputSubFeeds.map(_.dataObjectId).mkString(",")})")

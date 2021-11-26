@@ -22,6 +22,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.HdfsUtil
+import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path, RemoteIterator}
@@ -198,14 +199,6 @@ object ConfigLoader extends SmartDataLakeLogger {
       logger.debug(s"Ignoring file '$path'.")
       Seq()
     }
-  }
-
-  /**
-   * Wrapper for Hadoop RemoteIterator to use it with Scala style
-   */
-  private case class RemoteIteratorWrapper[T](underlying: RemoteIterator[T]) extends AbstractIterator[T] with Iterator[T] {
-    def hasNext: Boolean = underlying.hasNext
-    def next(): T = underlying.next()
   }
 
   // Helper classes to handle different location types
