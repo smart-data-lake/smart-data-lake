@@ -55,7 +55,7 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
   lazy private val azureLogClient = new LogAnalyticsClient(options("workspaceID"), logAnalyticsKey)
 
   override def init(): Unit = {
-    logger.info(s"io.smartdatalake.util.log.StateChangeLogger init done, " +
+    logger.debug(s"io.smartdatalake.util.log.StateChangeLogger init done, " +
                  s"logType: $logType, key: _${logAnalyticsKey.substring(0,4)} .. ${logAnalyticsKey.substring(logAnalyticsKey.length-4)}_ ")
   }
 
@@ -137,9 +137,9 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
     {
       logEvents =>
         val jsonEvents = logEvents.map{le:StateLogEvent => gson.toJson(le)}.mkString(",")
-        logger.info("logType " + logType+ " sending: " + jsonEvents.toString())
+        logger.debug("logType " + logType+ " sending: " + jsonEvents.toString())
         azureLogClient.send("[ " + jsonEvents + " ]", logType)
     }
-    logger.info("sending completed")
+    logger.debug("sending completed")
   }
 }
