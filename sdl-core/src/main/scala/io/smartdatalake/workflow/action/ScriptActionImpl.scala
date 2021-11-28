@@ -20,12 +20,12 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.ExecutionModeWithMainInputOutput
+import io.smartdatalake.definitions.{ExecutionMode, ExecutionModeWithMainInputOutput}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow.action.sparktransformer.DfsTransformer
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanReceiveScriptNotification, CanWriteDataFrame, DataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, ScriptSubFeed, SparkSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, ScriptSubFeed, SparkSubFeed, SubFeed}
 import org.apache.spark.sql.SparkSession
 
 /**
@@ -35,6 +35,21 @@ abstract class ScriptActionImpl extends ActionSubFeedsImpl[ScriptSubFeed] {
 
   override def inputs: Seq[DataObject]
   override def outputs: Seq[DataObject with CanReceiveScriptNotification]
+
+  override val executionMode: Option[ExecutionMode] = None // no use for execution mode with scripts so far
+  override def metricsFailCondition: Option[String] = None // no metrics for script execution so far
+
+  /**
+   * To be implemented by sub-classes
+   */
+  protected def execScript(inputSubFeeds: Seq[ScriptSubFeed], outputSubFeeds: Seq[ScriptSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[ScriptSubFeed]
+
+  override protected def transform(inputSubFeeds: Seq[ScriptSubFeed], outputSubFeeds: Seq[ScriptSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[ScriptSubFeed] = {
+    // execute scripts in exec phase
+    if (context.phase == ExecutionPhase.Exec) {
+      execScript(inputSubFeeds, outputSubFeeds)
+    } else outputSubFeeds
+  }
 
   override def writeSubFeed(subFeed: ScriptSubFeed, isRecursive: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): WriteSubFeedResult = {
     val output = outputs.find(_.id == subFeed.dataObjectId).getOrElse(throw new IllegalStateException(s"($id) output for subFeed ${subFeed.dataObjectId} not found"))

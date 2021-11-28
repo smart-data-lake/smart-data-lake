@@ -23,6 +23,7 @@ import io.smartdatalake.config.SdlConfigObject._
 import io.smartdatalake.workflow.action
 import io.smartdatalake.workflow.action.TestDfTransformer
 import io.smartdatalake.workflow.action.customlogic.CustomFileTransformerConfig
+import io.smartdatalake.workflow.action.script.CmdScript
 import io.smartdatalake.workflow.action.sparktransformer._
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -160,6 +161,33 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
       transformer = CustomFileTransformerConfig(
         className = Some("io.smartdatalake.config.objects.TestFileTransformer")
       )
+    )
+  }
+
+  "CustomScriptAction" should "be parsable" in {
+
+    val config = ConfigFactory.parseString(
+      """
+        |actions = {
+        | 123 = {
+        |   type = CustomScriptAction
+        |   inputIds = [tdo1]
+        |   outputIds = [tdo2]
+        |   scripts = [{
+        |     type = CmdScript
+        |     winCmd = test
+        |   }]
+        | }
+        |}
+        |""".stripMargin).withFallback(dataObjectConfig).resolve
+
+    implicit val registry: InstanceRegistry = ConfigParser.parse(config)
+
+    registry.getActions.head shouldBe action.CustomScriptAction(
+      id = "123",
+      inputIds = Seq("tdo1"),
+      outputIds = Seq("tdo2"),
+      scripts = Seq(CmdScript(winCmd = Some("test")))
     )
   }
 
