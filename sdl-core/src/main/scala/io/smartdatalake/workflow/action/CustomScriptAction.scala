@@ -20,43 +20,52 @@ package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, ParsableFromConfig}
 import io.smartdatalake.definitions.{Condition, ExecutionMode}
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.script.ParsableScriptDef
+import io.smartdatalake.workflow.action.sparktransformer.FilterTransformer.extract
+import io.smartdatalake.workflow.action.sparktransformer.{DfsTransformer, FilterTransformer, ParsableDfTransformer, PartitionValueTransformer}
 import io.smartdatalake.workflow.dataobject.{CanReceiveScriptNotification, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, ScriptSubFeed}
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
  * [[Action]] execute script after multiple input DataObjects are ready, notifying multiple output DataObjects when script succeeded.
  *
  * @param inputIds               input DataObject's
  * @param outputIds              output DataObject's
- * //TODO @param scripts            scripts to apply...
- * @param mainInputId            optional selection of main inputId used for execution mode and partition values propagation. Only needed if there are multiple input DataObject's.
- * @param mainOutputId           optional selection of main outputId used for execution mode and partition values propagation. Only needed if there are multiple output DataObject's.
- * @param executionMode          optional execution mode for this Action
+ * @param scripts                definition of scripts to execute
  * @param executionCondition     optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
- * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  */
 case class CustomScriptAction(override val id: ActionId,
                               inputIds: Seq[DataObjectId],
                               outputIds: Seq[DataObjectId],
-                              override val mainInputId: Option[DataObjectId] = None,
-                              override val mainOutputId: Option[DataObjectId] = None,
-                              override val executionMode: Option[ExecutionMode] = None,
+                              scripts: Seq[ParsableScriptDef] = Seq(),
                               override val executionCondition: Option[Condition] = None,
-                              override val metricsFailCondition: Option[String] = None,
                               override val metadata: Option[ActionMetadata] = None
                        )(implicit instanceRegistry: InstanceRegistry) extends ScriptActionImpl {
 
-  // checks
   override val inputs: Seq[DataObject] = inputIds.map(getInputDataObject[DataObject])
   override val outputs: Seq[DataObject with CanReceiveScriptNotification] = outputIds.map(getOutputDataObject[DataObject with CanReceiveScriptNotification])
 
-  override protected def transform(inputSubFeeds: Seq[ScriptSubFeed], outputSubFeeds: Seq[ScriptSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[ScriptSubFeed] = {
-    // noop for now
-    outputSubFeeds
+  validateConfig()
+
+  override protected def execScript(inputSubFeeds: Seq[ScriptSubFeed], outputSubFeeds: Seq[ScriptSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[ScriptSubFeed] = {
+    val inputParameters = inputSubFeeds.flatMap(_.parameters).reduceLeftOption(_ ++ _).getOrElse(Map())
+    val mainPartitionValues = getMainPartitionValues(inputSubFeeds)
+    val outputParameters = scripts.foldLeft(inputParameters) {
+      case (p, script) =>
+        val stdOut = script.execStdOut(id, mainPartitionValues, p)
+        parseLastLine(stdOut)
+    }
+    outputSubFeeds.map(_.copy(parameters = Some(outputParameters)))
+  }
+
+  private def parseLastLine(stdOut: String): Map[String,String] = {
+    val lastLine = stdOut.linesIterator.toIterable.lastOption
+    lastLine.map(_.split(' ').map(_.split('=')).filter(_.length==2).map{case Array(k,v) => (k,v)}.toMap).getOrElse(Map())
   }
 
   override def factory: FromConfigFactory[Action] = CustomScriptAction
