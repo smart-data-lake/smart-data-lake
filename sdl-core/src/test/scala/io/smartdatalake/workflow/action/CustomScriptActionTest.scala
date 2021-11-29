@@ -64,7 +64,7 @@ class CustomScriptActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start load
     val action1 = CustomScriptAction(id = "a1", Seq(src1DO.id, src2DO.id), Seq(tgtDO.id),
-      scripts = Seq(CmdScript(winCmd = Some("cmd /C echo test=OK"), linuxCmd = Some("sh -c echo test=OK"))))
+      scripts = Seq(CmdScript(winCmd = Some("echo test=OK"), linuxCmd = Some("echo test=OK"))))
     val src1SubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
     val src2SubFeed = SparkSubFeed(None, "src2", partitionValues = Seq())
     val tgtSubFeed = action1.exec(Seq(src1SubFeed, src2SubFeed)).head

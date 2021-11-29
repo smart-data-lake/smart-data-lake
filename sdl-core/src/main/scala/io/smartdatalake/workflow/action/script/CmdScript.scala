@@ -23,7 +23,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.EnvironmentUtil
+import io.smartdatalake.util.misc.{EnvironmentUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.SparkSession
 
@@ -36,22 +36,25 @@ import org.apache.spark.sql.SparkSession
  *
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
- * @param winCmd       Cmd to execute on windows operating systems
- * @param linuxCmd     Cmd to execute on linux operating systems
+ * @param winCmd       Cmd to execute on windows operating systems - note that it is executed with "cmd /C" prefixed
+ * @param linuxCmd     Cmd to execute on linux operating systems - note that it is executed with "sh -c" prefixed.
  */
-case class CmdScript(override val name: String = "shell", override val description: Option[String] = None, winCmd: Option[String] = None, linuxCmd: Option[String] = None) extends ParsableScriptDef {
-  assert(EnvironmentUtil.isWindowsOS || linuxCmd.isDefined)
-  assert(!EnvironmentUtil.isWindowsOS || winCmd.isDefined)
+case class CmdScript(override val name: String = "cmd", override val description: Option[String] = None, winCmd: Option[String] = None, linuxCmd: Option[String] = None) extends ParsableScriptDef with SmartDataLakeLogger {
+  if (EnvironmentUtil.isWindowsOS) assert(winCmd.isDefined, s"($name) winCmd must be defined when running on Windows")
+  if (!EnvironmentUtil.isWindowsOS) assert(linuxCmd.isDefined, s"($name) linuxCmd must be defined when running on Linux")
 
   override def execStdOut(actionId: ActionId, partitionValues: Seq[PartitionValues], parameters: Map[String,String])(implicit session: SparkSession, context: ActionPipelineContext): String = {
     import sys.process._
-    val stdOut = if (EnvironmentUtil.isWindowsOS) {
-      winCmd.get.!!
-    } else {
-      linuxCmd.get.!!
-    }
-    stdOut
+    val cmd = getCmd
+    logger.info(s"($actionId) executing command: ${cmd.mkString(" ")}")
+    cmd.!!
   }
+
+  private def getCmd: Seq[String] = {
+    if (EnvironmentUtil.isWindowsOS) Seq("cmd", "/C", winCmd.get)
+    else Seq("sh", "-c", linuxCmd.get)
+  }
+
   override def factory: FromConfigFactory[ParsableScriptDef] = CmdScript
 }
 

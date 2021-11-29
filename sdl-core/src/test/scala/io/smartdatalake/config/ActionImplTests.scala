@@ -176,6 +176,7 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
         |   scripts = [{
         |     type = CmdScript
         |     winCmd = test
+        |     linuxCmd = test
         |   }]
         | }
         |}
@@ -187,7 +188,7 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
       id = "123",
       inputIds = Seq("tdo1"),
       outputIds = Seq("tdo2"),
-      scripts = Seq(CmdScript(winCmd = Some("test")))
+      scripts = Seq(CmdScript(winCmd = Some("test"), linuxCmd = Some("test")))
     )
   }
 
