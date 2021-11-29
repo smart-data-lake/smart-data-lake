@@ -20,7 +20,7 @@
 package io.smartdatalake.util.azure
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
+import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, ExecutionPhase}
 import io.smartdatalake.workflow.action.ResultRuntimeInfo
 import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata}
 import io.smartdatalake.app.StateListener
@@ -49,12 +49,13 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
   assert(options.contains("logAnalyticsKey"))
 
   val logType : String = options.getOrElse("logType", "StateChange")
+  val maxDocumentsNumber = 100   // azure log analytics' limit
 
   lazy private val logAnalyticsKey: String = SecretsUtil.getSecret(options("logAnalyticsKey"))
   lazy private val azureLogClient = new LogAnalyticsClient(options("workspaceID"), logAnalyticsKey)
 
   override def init(): Unit = {
-    logger.info(s"io.smartdatalake.util.log.StateChangeLogger init done, " +
+    logger.debug(s"io.smartdatalake.util.log.StateChangeLogger init done, " +
                  s"logType: $logType, key: _${logAnalyticsKey.substring(0,4)} .. ${logAnalyticsKey.substring(logAnalyticsKey.length-4)}_ ")
   }
 
@@ -66,18 +67,17 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
   private val gson = new Gson
 
   override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, oChangedActionId : Option[ActionId]): Unit = {
-    if (state.isFinal) return  // final notification is redundant -> skip
-    if (oChangedActionId.isEmpty) return  // we log only action specific events -> skip
 
-    val changedActionId = oChangedActionId.get
-    assert(state.actionsState.get(changedActionId).isDefined)
+    if (state.isFinal) {
+      sendLogEvents(state.actionsState.flatMap { aStateEntry => extractLogEvents(aStateEntry._1, aStateEntry._2, context) }.toSeq)
+    }
+    else if (oChangedActionId.isDefined)
+    {
+      val changedActionId = oChangedActionId.get
+      assert(state.actionsState.get(changedActionId).isDefined)
 
-    val logEvents = extractLogEvents(changedActionId, state.actionsState(changedActionId), context)
-    val jsonEvents = logEvents.map{le:StateLogEvent => gson.toJson(le)}.mkString(",")
-
-    logger.debug("logType " + logType+ " sending: " + jsonEvents.toString())
-    azureLogClient.send("[ " + jsonEvents + " ]", logType)
-    logger.debug("sending completed")
+      sendLogEvents(extractLogEvents(changedActionId, state.actionsState(changedActionId), context))
+    }
   }
 
   def extractLogEvents(actionId: ActionId, runtimeInfo: RuntimeInfo, context: ActionPipelineContext): Seq[StateLogEvent] = {
@@ -116,5 +116,30 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
 
       StateLogEvent(logContext, result.orNull)
     })
+  }
+
+  private def sendLogEvents(logEvents: Seq[StateLogEvent]) : Unit =
+  {
+
+    val (list_of_list, last_list) : (List[List[StateLogEvent]], List[StateLogEvent]) =
+      logEvents.foldLeft((List[List[StateLogEvent]](), List[StateLogEvent]()))  // build batches of maxDocumentsNumber entries
+      { (accumulator, stateLogEvent) =>
+        val (outputDone, outputOngoing) = accumulator
+
+        if (outputOngoing.size >= maxDocumentsNumber)
+          (outputDone :+ outputOngoing, List[StateLogEvent](stateLogEvent))
+        else
+          (outputDone, outputOngoing :+ stateLogEvent)
+      }
+
+    val full_list = list_of_list :+ last_list
+    full_list.foreach // and then handle each batch separately
+    {
+      logEvents =>
+        val jsonEvents = logEvents.map{le:StateLogEvent => gson.toJson(le)}.mkString(",")
+        logger.debug("logType " + logType+ " sending: " + jsonEvents.toString())
+        azureLogClient.send("[ " + jsonEvents + " ]", logType)
+    }
+    logger.debug("sending completed")
   }
 }
