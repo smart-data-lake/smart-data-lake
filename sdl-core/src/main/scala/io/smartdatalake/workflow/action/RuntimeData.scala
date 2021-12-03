@@ -273,14 +273,14 @@ private[smartdatalake] object SparkStreamingExecutionId {
  * Summarized runtime information
  */
 case class RuntimeInfo(
-                                               executionId: ExecutionId,
-                                               state: RuntimeEventState,
-                                               startTstmp: Option[LocalDateTime] = None,
-                                               duration: Option[Duration] = None,
-                                               msg: Option[String] = None,
-                                               results: Seq[ResultRuntimeInfo] = Seq(),
-                                               dataObjectsState: Seq[DataObjectState] = Seq()
-                                             ) {
+                       executionId: ExecutionId,
+                       state: RuntimeEventState,
+                       startTstmp: Option[LocalDateTime] = None,
+                       duration: Option[Duration] = None,
+                       msg: Option[String] = None,
+                       results: Seq[ResultRuntimeInfo] = Seq(),
+                       dataObjectsState: Seq[DataObjectState] = Seq()
+                     ) {
   /**
    * Completed Actions will be ignored in recovery
    */

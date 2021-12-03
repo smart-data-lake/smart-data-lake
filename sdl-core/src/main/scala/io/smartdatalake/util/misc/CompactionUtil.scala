@@ -23,7 +23,8 @@ import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataobject._
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.permission.FsPermission
+import org.apache.hadoop.fs.{FileContext, Path}
 import org.apache.spark.sql.SparkSession
 
 object CompactionUtil extends SmartDataLakeLogger {
@@ -106,16 +107,19 @@ object CompactionUtil extends SmartDataLakeLogger {
 
     // 5. Move compacted partitions
     partitionValuesToCompact.foreach { pv =>
+      val filesystem = dataObject.filesystem
       val partitionDir = pv.getPartitionString(partitionLayout)
       val tempPartitionPath = new Path(tempPath, partitionDir)
       val targetPartitionPath = new Path(dataObject.hadoopPath, partitionDir)
       val trashPartitionPath = new Path(trashPath, partitionDir)
-      HdfsUtil.touchFile(new Path(targetPartitionPath, movingFileName), dataObject.filesystem)
-      dataObject.filesystem.rename(targetPartitionPath, trashPartitionPath)
-      dataObject.filesystem.rename(tempPartitionPath, targetPartitionPath)
-      HdfsUtil.touchFile(new Path(targetPartitionPath, compactedFileName), dataObject.filesystem)
-      dataObject.filesystem.delete(new Path(targetPartitionPath, movingFileName), /*recursive*/ false)
-      dataObject.filesystem.delete(trashPartitionPath, /*recursive*/ true)
+      HdfsUtil.touchFile(new Path(targetPartitionPath, movingFileName), filesystem)
+      filesystem.mkdirs(trashPath) // this is needed with Hadoop 2.7.4 on windows
+      filesystem.mkdirs(tempPath) // this is needed with Hadoop 2.7.4 on windows
+      filesystem.rename(targetPartitionPath, trashPartitionPath)
+      filesystem.rename(tempPartitionPath, targetPartitionPath)
+      HdfsUtil.touchFile(new Path(targetPartitionPath, compactedFileName), filesystem)
+      filesystem.delete(new Path(targetPartitionPath, movingFileName), /*recursive*/ false)
+      filesystem.delete(trashPartitionPath, /*recursive*/ true)
     }
     HdfsUtil.deletePath(tempPath, dataObject.filesystem, doWarn = true)
     HdfsUtil.deletePath(trashPath, dataObject.filesystem, doWarn = true)

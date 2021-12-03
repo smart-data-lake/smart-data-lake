@@ -48,7 +48,6 @@ case class CustomFileAction(override val id: ActionId,
                             inputId: DataObjectId,
                             outputId: DataObjectId,
                             transformer: CustomFileTransformerConfig,
-                            @deprecated("use executionMode = FileIncrementalMoveMode instead", "2.0.3") override val deleteDataAfterRead: Boolean = false,
                             filesPerPartition: Int = 10,
                             override val breakFileRefLineage: Boolean = false,
                             override val executionMode: Option[ExecutionMode] = None,
@@ -56,7 +55,7 @@ case class CustomFileAction(override val id: ActionId,
                             override val metricsFailCondition: Option[String] = None,
                             override val metadata: Option[ActionMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)
-  extends FileSubFeedAction with SmartDataLakeLogger {
+  extends FileOneToOneActionImpl with SmartDataLakeLogger {
 
   assert(filesPerPartition>0, s"($id) filesPerPartition must be greater than 0. Current value: $filesPerPartition")
 
@@ -65,21 +64,26 @@ case class CustomFileAction(override val id: ActionId,
   override val inputs: Seq[HadoopFileDataObject] = Seq(input)
   override val outputs: Seq[HadoopFileDataObject] = Seq(output)
 
-  override def doTransform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed, doExec: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
-    import session.implicits._
-    assert(inputSubFeed.fileRefs.nonEmpty, "inputSubFeed.fileRefs must be defined for CustomFileAction.doTransform")
+  override def transform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
+    assert(inputSubFeed.fileRefs.nonEmpty, "inputSubFeed.fileRefs must be defined for FileTransferAction.doTransform")
     val inputFileRefs = inputSubFeed.fileRefs.get
-    val tgtFileRefs = output.translateFileRefs(inputFileRefs)
+    outputSubFeed.copy(fileRefMapping = Some(output.translateFileRefs(inputFileRefs)))
+  }
 
-    // transform files in distributed mode with Spark
-    if (doExec) {
+
+  override def writeSubFeed(subFeed: FileSubFeed, isRecursive: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): WriteSubFeedResult = {
+    val fileRefMapping = subFeed.fileRefMapping.getOrElse(throw new IllegalStateException(s"($id) file mapping is not defined"))
+    output.startWritingOutputStreams(subFeed.partitionValues)
+    if (fileRefMapping.nonEmpty) {
+      import session.implicits._
+
       // Create a Dataset of files to be processed
       val srcDO = input // avoid serialization of whole action by assigning input to local variable
       srcDO.filesystem // init filesystem to prepare hadoop conf serialization
       val tgtDO = output // avoid serialization of whole action by assigning output to local variable
       tgtDO.filesystem // init filesystem to prepare hadoop conf serialization
       val transformerVal = transformer // avoid serialization of whole action by assigning transformer to local variable
-      val filePathPairs = inputFileRefs.map(_.fullPath).zip(tgtFileRefs.map(_.fullPath))
+      val filePathPairs = fileRefMapping.map{ m => (m.src.fullPath, m.tgt.fullPath)}
       val nbOfPartitions = math.max(filePathPairs.size / filesPerPartition, 1)
       val transformedDs = filePathPairs.toDS.repartition(nbOfPartitions)
         .map { case (srcPath, tgtPath) =>
@@ -98,9 +102,10 @@ case class CustomFileAction(override val id: ActionId,
         else logger.error(s"transformed $tgt with error $ex")
       }
     }
-
-    // return
-    outputSubFeed.copy(fileRefs = Some(tgtFileRefs), processedInputFileRefs = Some(inputFileRefs))
+    output.endWritingOutputStreams(subFeed.partitionValues)
+    // return metric to action
+    val metrics = Map("files_written"->fileRefMapping.size.toLong)
+    WriteSubFeedResult(Some(fileRefMapping.isEmpty), Some(metrics))
   }
 
   override def factory: FromConfigFactory[Action] = CustomFileAction

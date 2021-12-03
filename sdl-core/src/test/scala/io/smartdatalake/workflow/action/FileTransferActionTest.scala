@@ -265,9 +265,10 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id)
     val action1dontExpectPartitions = FileTransferAction("fta", srcDOdontExpectPartitions.id, tgtDO.id)
     val partitionValuesFilter = PartitionValues(Map("date"->datePartitionVal, "town"->"NYC", "year"->"0001"))
-    val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq(partitionValuesFilter))
-    intercept[AssertionError](action1.exec(Seq(srcSubFeed)))
-    action1dontExpectPartitions.exec(Seq(srcSubFeed))
+    val srcSubFeed1 = FileSubFeed(None, "src1", partitionValues = Seq(partitionValuesFilter))
+    intercept[AssertionError](action1.exec(Seq(srcSubFeed1)))
+    val srcSubFeed1a = FileSubFeed(None, "src1a", partitionValues = Seq(partitionValuesFilter))
+    action1dontExpectPartitions.exec(Seq(srcSubFeed1a))
 
     val r1 = tgtDO.getFileRefs(Seq())
     assert(r1.isEmpty)

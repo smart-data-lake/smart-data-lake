@@ -18,12 +18,29 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.io.OutputStream
-
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.SparkSession
+
+import java.io.OutputStream
 
 private[smartdatalake] trait CanCreateOutputStream {
 
-  def createOutputStream(path: String, overwrite: Boolean)(implicit session: SparkSession): OutputStream
+  /**
+   * This is called before any output stream is created to initialize writing.
+   * It is used to apply SaveMode, e.g. deleting existing partitions.
+   */
+  def startWritingOutputStreams(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): Unit
+
+  /**
+   * Create an OutputStream for a given path, that the Action can use to write data into.
+   */
+  def createOutputStream(path: String, overwrite: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): OutputStream
+
+  /**
+   * This is called after all output streams have been written.
+   * It is used for e.g. making sure empty partitions are created as well.
+   */
+  def endWritingOutputStreams(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): Unit
 
 }

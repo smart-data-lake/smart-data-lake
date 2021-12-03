@@ -95,7 +95,7 @@ case class DeduplicateAction(override val id: ActionId,
                              override val executionCondition: Option[Condition] = None,
                              override val metricsFailCondition: Option[String] = None,
                              override val metadata: Option[ActionMetadata] = None
-)(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedAction {
+)(implicit instanceRegistry: InstanceRegistry) extends SparkOneToOneActionImpl {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
   override val output: TransactionalSparkTableDataObject = getOutputDataObject[TransactionalSparkTableDataObject](outputId)
@@ -123,6 +123,8 @@ case class DeduplicateAction(override val id: ActionId,
   // If mergeModeEnabled=false, output is used as recursive input in DeduplicateAction to get existing data. This override is needed to force tick-tock write operation.
   override val recursiveInputs: Seq[TransactionalSparkTableDataObject] = if (!mergeModeEnable) Seq(output) else Seq()
 
+  private[smartdatalake] override val handleRecursiveInputsAsSubFeeds: Boolean = false
+
   // check preconditions
   require(output.table.primaryKey.isDefined, s"($id) Primary key must be defined for output DataObject")
   require(mergeModeEnable || !updateCapturedColumnOnlyWhenChanged, s"($id) updateCapturedColumnOnlyWhenChanged = true is not yet implemented for mergeModeEnable = false")
@@ -132,6 +134,8 @@ case class DeduplicateAction(override val id: ActionId,
     case Success(result) => result
     case Failure(e) => throw new ConfigurationException(s"($id) Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
   }
+
+  validateConfig()
 
   private def getTransformers(implicit session: SparkSession, context: ActionPipelineContext): Seq[DfTransformer] = {
     val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
