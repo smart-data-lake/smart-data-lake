@@ -65,6 +65,7 @@ jobs:
           maven_args: -B -DskipTests -f pom.xml
 
       - name: Maven deploy to sonatype for Scala 2.11
+        if: ${{ contains(github.base_ref, 'develop-spark2') }}
         uses: samuelmeuli/action-maven-publish@v1
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
