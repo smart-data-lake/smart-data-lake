@@ -77,6 +77,10 @@ object SubFeed {
     partitionValues.map( pvs => PartitionValues(pvs.elements.filterKeys(partitions.contains))).filter(_.nonEmpty)
   }
 }
+
+/**
+ * An interface to be implemented by SubFeed companion objects for subfeed conversion
+ */
 trait SubFeedConverter[S <: SubFeed] {
   def fromSubFeed(subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): S
   def get(subFeed: SubFeed): S = subFeed match {
@@ -272,6 +276,10 @@ object FileSubFeed extends SubFeedConverter[FileSubFeed] {
     }
   }
 }
+
+/**
+ * Src/Tgt tuple representing the mapping of a file reference
+ */
 case class FileRefMapping(src: FileRef, tgt: FileRef)
 
 /**

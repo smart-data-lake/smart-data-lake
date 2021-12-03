@@ -210,7 +210,14 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
                                   (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     executionModeResult = Some(Try(
       executionMode.flatMap(_.apply(id, mainInput, mainOutput, subFeed, partitionValuesTransform))
-    ).recover { ActionHelper.getHandleExecutionModeExceptionPartialFunction(outputs) })
+    ).recover {
+      // return skipped output subfeeds if "no data"
+      case ex: NoDataToProcessWarning =>
+        // create fake results (subFeeds with isSkipped=true)
+        val outputSubFeeds = outputs.map(output => InitSubFeed(dataObjectId = output.id, partitionValues = Seq(), isSkipped = true))
+        // Add fake results to exception. The DAG will pass the fake results to further actions, which can decide if the want to stop if input subFeeds are skipped by defining an executionCondition.
+        throw NoDataToProcessWarning(ex.actionId, ex.msg, results = Some(outputSubFeeds))
+    })
   }
 
 
@@ -460,5 +467,3 @@ case class ActionMetadata(
                            tags: Seq[String] = Seq()
                          )
 //TODO: restrict characters possible in name and feed (feed should not contain :;% because of regex feedSel)
-
-

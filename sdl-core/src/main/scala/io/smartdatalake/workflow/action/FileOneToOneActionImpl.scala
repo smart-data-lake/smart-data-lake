@@ -26,6 +26,9 @@ import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
 
+/**
+ * Implementation of logic needed to use FileSubFeeds with only one input and one output SubFeed.
+ */
 abstract class FileOneToOneActionImpl extends ActionSubFeedsImpl[FileSubFeed] {
 
   /**
