@@ -97,7 +97,7 @@ case class HistorizeAction(
                             override val executionCondition: Option[Condition] = None,
                             override val metricsFailCondition: Option[String] = None,
                             override val metadata: Option[ActionMetadata] = None
-                          )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedAction {
+                          )(implicit instanceRegistry: InstanceRegistry) extends SparkOneToOneActionImpl {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
   override val output: TransactionalSparkTableDataObject = getOutputDataObject[TransactionalSparkTableDataObject](outputId)
@@ -126,6 +126,8 @@ case class HistorizeAction(
   // Output is used as recursive input in DeduplicateAction to get existing data. This override is needed to force tick-tock write operation.
   override val recursiveInputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
 
+  private[smartdatalake] override val handleRecursiveInputsAsSubFeeds: Boolean = false
+
   // historize black/white list
   require(historizeWhitelist.isEmpty || historizeBlacklist.isEmpty, s"(${id}) HistorizeWhitelist and historizeBlacklist mustn't be used at the same time")
   // primary key
@@ -136,6 +138,8 @@ case class HistorizeAction(
     case Success(result) => result
     case Failure(e) => throw new ConfigurationException(s"(${id}) Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
   }
+
+  validateConfig()
 
   private def getTransformers(implicit session: SparkSession, context: ActionPipelineContext): Seq[DfTransformer] = {
     val capturedTs = context.referenceTimestamp.getOrElse(LocalDateTime.now)

@@ -19,9 +19,11 @@
 package io.smartdatalake.workflow
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.definitions.ExecutionModeResult
 import io.smartdatalake.util.dag.{DAG, DAGResult}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.hive.HiveUtil
+import io.smartdatalake.util.misc.ScalaUtil.optionalizeMap
 import io.smartdatalake.util.misc.{DataFrameUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.streaming.DummyStreamProvider
 import io.smartdatalake.workflow.dataobject.FileRef
@@ -66,10 +68,23 @@ sealed trait SubFeed extends DAGResult with SmartDataLakeLogger {
     if (this.partitionValues.nonEmpty && otherPartitionValues.nonEmpty) (this.partitionValues ++ otherPartitionValues).distinct
     else Seq()
   }
+
+  def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit session: SparkSession, context: ActionPipelineContext): SubFeed
+  def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit session: SparkSession, context: ActionPipelineContext): SubFeed
 }
 object SubFeed {
   def filterPartitionValues(partitionValues: Seq[PartitionValues], partitions: Seq[String]): Seq[PartitionValues] = {
     partitionValues.map( pvs => PartitionValues(pvs.elements.filterKeys(partitions.contains))).filter(_.nonEmpty)
+  }
+}
+
+/**
+ * An interface to be implemented by SubFeed companion objects for subfeed conversion
+ */
+trait SubFeedConverter[S <: SubFeed] {
+  def fromSubFeed(subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): S
+  def get(subFeed: SubFeed): S = subFeed match {
+    case specificSubFeed: S @unchecked => specificSubFeed
   }
 }
 
@@ -158,12 +173,20 @@ case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
     }
     this.copy(dataFrame = dummyDf, isDummy = true)
   }
+  override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+    // apply input filter
+    val inputFilter = if (this.dataObjectId == mainInputId) result.filter else None
+    this.copy(partitionValues = result.inputPartitionValues, filter = inputFilter, isSkipped = false).breakLineage // breaklineage keeps DataFrame schema without content
+  }
+  override def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+    this.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false, dataFrame = None)
+  }
 }
-object SparkSubFeed {
+object SparkSubFeed extends SubFeedConverter[SparkSubFeed] {
   /**
    * This method is used to pass an output SubFeed as input SparkSubFeed to the next Action. SubFeed type might need conversion.
    */
-  def fromSubFeed( subFeed: SubFeed )(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  override def fromSubFeed( subFeed: SubFeed )(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
     subFeed match {
       case sparkSubFeed: SparkSubFeed => sparkSubFeed.clearFilter() // make sure there is no filter, as filter can not be passed between actions.
       case _ => SparkSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
@@ -179,25 +202,27 @@ object SparkSubFeed {
  * @param partitionValues Values of Partitions transported by this SubFeed
  * @param isDAGStart true if this subfeed is a start node of the dag
  * @param isSkipped true if this subfeed is the result of a skipped action
- * @param processedInputFileRefs used to remember processed input FileRef's for post processing (e.g. delete after read)
+ * @param fileRefMapping store mapping of input to output file references. This is also used for post processing (e.g. delete after read).
  */
 case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
                        override val dataObjectId: DataObjectId,
                        override val partitionValues: Seq[PartitionValues],
                        override val isDAGStart: Boolean = false,
                        override val isSkipped: Boolean = false,
-                       processedInputFileRefs: Option[Seq[FileRef]] = None
+                       fileRefMapping: Option[Seq[FileRefMapping]] = None
                       )
   extends SubFeed {
   override def breakLineage(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
-    this.copy(fileRefs = None, processedInputFileRefs = None)
+    this.copy(fileRefs = None, fileRefMapping = None)
   }
+
   override def clearPartitionValues(breakLineageOnChange: Boolean = true)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
     if (breakLineageOnChange && partitionValues.nonEmpty) {
       logger.info(s"($dataObjectId) breakLineage called for SubFeed from clearPartitionValues")
       this.copy(partitionValues = Seq()).breakLineage
     } else this.copy(partitionValues = Seq())
   }
+
   override def updatePartitionValues(partitions: Seq[String], breakLineageOnChange: Boolean = true, newPartitionValues: Option[Seq[PartitionValues]] = None)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
     val updatedPartitionValues = SubFeed.filterPartitionValues(newPartitionValues.getOrElse(partitionValues), partitions)
     if (breakLineageOnChange && partitionValues != updatedPartitionValues) {
@@ -205,18 +230,23 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
       this.copy(partitionValues = updatedPartitionValues).breakLineage
     } else this.copy(partitionValues = updatedPartitionValues)
   }
+
   def checkPartitionValuesColsExisting(partitions: Set[String]): Boolean = {
-    partitionValues.forall( pvs => partitions.diff(pvs.keys).isEmpty)
+    partitionValues.forall(pvs => partitions.diff(pvs.keys).isEmpty)
   }
+
   override def clearDAGStart(): FileSubFeed = {
     this.copy(isDAGStart = false)
   }
+
   override def clearSkipped(): FileSubFeed = {
     this.copy(isSkipped = false)
   }
+
   override def toOutput(dataObjectId: DataObjectId): FileSubFeed = {
-    this.copy(fileRefs = None, processedInputFileRefs = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId)
+    this.copy(fileRefs = None, fileRefMapping = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId)
   }
+
   override def union(other: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SubFeed = other match {
     case fileSubFeed: FileSubFeed if this.fileRefs.isDefined && fileSubFeed.fileRefs.isDefined =>
       this.copy(fileRefs = this.fileRefs.map(_ ++ fileSubFeed.fileRefs.get)
@@ -227,15 +257,88 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
         , isDAGStart = this.isDAGStart || fileSubFeed.isDAGStart)
     case x => this.copy(fileRefs = None, partitionValues = unionPartitionValues(x.partitionValues), isDAGStart = this.isDAGStart || x.isDAGStart)
   }
+
+  override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
+    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false, fileRefs = result.fileRefs, fileRefMapping = None)
+  }
+  override def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
+    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false, fileRefs = None, fileRefMapping = None)
+  }
 }
-object FileSubFeed {
+object FileSubFeed extends SubFeedConverter[FileSubFeed] {
   /**
    * This method is used to pass an output SubFeed as input FileSubFeed to the next Action. SubFeed type might need conversion.
    */
-  def fromSubFeed( subFeed: SubFeed ): FileSubFeed = {
+  override def fromSubFeed( subFeed: SubFeed )(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
     subFeed match {
       case fileSubFeed: FileSubFeed => fileSubFeed
       case _ => FileSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
+    }
+  }
+}
+
+/**
+ * Src/Tgt tuple representing the mapping of a file reference
+ */
+case class FileRefMapping(src: FileRef, tgt: FileRef)
+
+/**
+ * A ScriptSubFeed is used to notify DataObjects and subsequent actions about the completion of a script.
+ * It allows to pass on arbitrary informations as key/values.
+ *
+ * @param dataObjectId id of the DataObject this SubFeed corresponds to
+ * @param partitionValues Values of Partitions transported by this SubFeed
+ * @param isDAGStart true if this subfeed is a start node of the dag
+ * @param isSkipped true if this subfeed is the result of a skipped action
+ * @param parameters arbitrary informations as key/value to pass on
+ */
+case class ScriptSubFeed(parameters: Option[Map[String,String]] = None,
+                         override val dataObjectId: DataObjectId,
+                         override val partitionValues: Seq[PartitionValues],
+                         override val isDAGStart: Boolean = false,
+                         override val isSkipped: Boolean = false
+                        )
+  extends SubFeed {
+  override def breakLineage(implicit session: SparkSession, context: ActionPipelineContext): ScriptSubFeed = this
+  override def clearPartitionValues(breakLineageOnChange: Boolean = true)(implicit session: SparkSession, context: ActionPipelineContext): ScriptSubFeed = {
+    this.copy(partitionValues = Seq())
+  }
+  override def updatePartitionValues(partitions: Seq[String], breakLineageOnChange: Boolean = true, newPartitionValues: Option[Seq[PartitionValues]] = None)(implicit session: SparkSession, context: ActionPipelineContext): ScriptSubFeed = {
+    val updatedPartitionValues = SubFeed.filterPartitionValues(newPartitionValues.getOrElse(partitionValues), partitions)
+    this.copy(partitionValues = updatedPartitionValues)
+  }
+  override def clearDAGStart(): ScriptSubFeed = {
+    this.copy(isDAGStart = false)
+  }
+  override def clearSkipped(): ScriptSubFeed = {
+    this.copy(isSkipped = false)
+  }
+  override def toOutput(dataObjectId: DataObjectId): ScriptSubFeed = {
+    this.copy(dataObjectId = dataObjectId, parameters = None, isDAGStart = false, isSkipped = false)
+  }
+  override def union(other: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SubFeed = other match {
+    case subFeed: ScriptSubFeed =>
+      this.copy(
+        parameters = optionalizeMap(this.parameters.getOrElse(Map()) ++ subFeed.parameters.getOrElse(Map())),
+        partitionValues = unionPartitionValues(subFeed.partitionValues), isDAGStart = this.isDAGStart || subFeed.isDAGStart
+      )
+    case x => this.copy(parameters = None, partitionValues = unionPartitionValues(x.partitionValues), isDAGStart = this.isDAGStart || x.isDAGStart)
+  }
+  override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit session: SparkSession, context: ActionPipelineContext): ScriptSubFeed = {
+    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false)
+  }
+  override def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit session: SparkSession, context: ActionPipelineContext): ScriptSubFeed = {
+    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false, parameters = None)
+  }
+}
+object ScriptSubFeed extends SubFeedConverter[ScriptSubFeed] {
+  /**
+   * This method is used to pass an output SubFeed as input FileSubFeed to the next Action. SubFeed type might need conversion.
+   */
+  override def fromSubFeed( subFeed: SubFeed )(implicit session: SparkSession, context: ActionPipelineContext): ScriptSubFeed = {
+    subFeed match {
+      case subFeed: ScriptSubFeed => subFeed
+      case _ => ScriptSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
     }
   }
 }
@@ -272,5 +375,11 @@ case class InitSubFeed(override val dataObjectId: DataObjectId,
   override def toOutput(dataObjectId: DataObjectId): FileSubFeed = throw new NotImplementedException()
   override def union(other: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SubFeed = other match {
     case x => this.copy(partitionValues = unionPartitionValues(x.partitionValues))
+  }
+  def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit session: SparkSession, context: ActionPipelineContext): SubFeed = {
+    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false)
+  }
+  def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit session: SparkSession, context: ActionPipelineContext): SubFeed = {
+    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false)
   }
 }

@@ -227,7 +227,6 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet ++ l2PartitionValues.toSet)
   }
 
-  // TODO
   test("copy load with spark incremental mode and schema evolution") {
 
     // setup DataObjects

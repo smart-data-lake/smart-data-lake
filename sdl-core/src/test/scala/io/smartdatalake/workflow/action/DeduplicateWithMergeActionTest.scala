@@ -70,7 +70,7 @@ class DeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("doe","john",5),("pan","peter",5),("hans","muster",5)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())(session, context1)
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    action1.init(Seq(srcSubFeed))(session, context1).head
+    action1.init(Seq(srcSubFeed))(session, context1.copy(phase = ExecutionPhase.Init)).head
     action1.exec(Seq(srcSubFeed))(session, context1).head
 
     {
@@ -122,7 +122,7 @@ class DeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("doe","john",Some(5)),("pan","peter",Some(5)),("pan","peter2",None),("hans","muster",Some(5))).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())(session, context1)
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    action1.init(Seq(srcSubFeed))(session, context1).head
+    action1.init(Seq(srcSubFeed))(session, context1.copy(phase = ExecutionPhase.Init)).head
     action1.exec(Seq(srcSubFeed))(session, context1).head
 
     {

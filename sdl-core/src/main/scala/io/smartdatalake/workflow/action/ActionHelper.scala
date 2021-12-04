@@ -32,6 +32,9 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.TimestampType
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, SparkSession}
 
+/**
+ * Collection of helper functions for Actions
+ */
 private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
 
   /**
@@ -125,72 +128,6 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
   def replaceSpecialCharactersWithUnderscore(str: String) : String = {
     val invalidCharacters = "[^a-zA-Z0-9_]".r
     invalidCharacters.replaceAllIn(str, "_")
-  }
-
-  def getMainDataObjectCandidates[T <: DataObject](mainId: Option[DataObjectId], dataObjects: Seq[T], dataObjectIdsToIgnoreFilter: Seq[DataObjectId], inputOutput: String, mainNeeded: Boolean, actionId: ActionId): Seq[T] = {
-    if (mainId.isDefined) {
-      // if mainInput is defined -> return only that DataObject
-      Seq(dataObjects.find(_.id == mainId.get).getOrElse(throw ConfigurationException(s"($actionId) main${inputOutput}Id ${mainId.get} not found in ${inputOutput}s")))
-    } else {
-      // prioritize DataObjects by number of partition columns
-      dataObjects.sortBy {
-        case x: CanHandlePartitions if !dataObjectIdsToIgnoreFilter.contains(x.id) => x.partitions.size
-        case _ => 0
-      }.reverse
-    }
-  }
-
-  /**
-   * Updates the partition values of a SubFeed to the partition columns of the given input data object:
-   * - remove not existing columns from the partition values
-   */
-  def updateInputPartitionValues[T <: SubFeed](dataObject: DataObject, subFeed: T)(implicit session: SparkSession, context: ActionPipelineContext): T = {
-    dataObject match {
-      case partitionedDO: CanHandlePartitions =>
-        // remove superfluous partitionValues
-        subFeed.updatePartitionValues(partitionedDO.partitions, newPartitionValues = Some(subFeed.partitionValues)).asInstanceOf[T]
-      case _ =>
-        subFeed.clearPartitionValues().asInstanceOf[T]
-    }
-  }
-
-  /**
-   * Updates the partition values of a SubFeed to the partition columns of the given output data object:
-   * - transform partition values
-   * - add run_id_partition value if needed
-   * - removing not existing columns from the partition values.
-   */
-  def updateOutputPartitionValues[T <: SubFeed](dataObject: DataObject, subFeed: T, partitionValuesTransform: Option[Seq[PartitionValues] => Map[PartitionValues,PartitionValues]] = None)(implicit session: SparkSession, context: ActionPipelineContext): T =
-    dataObject match {
-      case partitionedDO: CanHandlePartitions =>
-        // transform partition values
-        val newPartitionValues = partitionValuesTransform.map(fn => fn(subFeed.partitionValues).values.toSeq.distinct)
-          .getOrElse(subFeed.partitionValues)
-        // remove superfluous partitionValues
-        subFeed.updatePartitionValues(partitionedDO.partitions, breakLineageOnChange = false, newPartitionValues = Some(newPartitionValues)).asInstanceOf[T]
-      case _ =>
-        subFeed.clearPartitionValues(breakLineageOnChange = false).asInstanceOf[T]
-    }
-
-  def addRunIdPartitionIfNeeded[T <: SubFeed](dataObject: DataObject, subFeed: T)(implicit session: SparkSession, context: ActionPipelineContext): T = {
-    dataObject match {
-      case partitionedDO: CanHandlePartitions =>
-        if (partitionedDO.partitions.contains(Environment.runIdPartitionColumnName)) {
-          val newPartitionValues = if (subFeed.partitionValues.nonEmpty) subFeed.partitionValues.map(_.addKey(Environment.runIdPartitionColumnName, context.executionId.runId.toString))
-          else Seq(PartitionValues(Map(Environment.runIdPartitionColumnName -> context.executionId.runId.toString)))
-          subFeed.updatePartitionValues(partitionedDO.partitions, breakLineageOnChange = false, newPartitionValues = Some(newPartitionValues)).asInstanceOf[T]
-        } else subFeed
-      case _ => subFeed
-    }
-  }
-
-  def getHandleExecutionModeExceptionPartialFunction(outputs: Seq[DataObject]): PartialFunction[Throwable, Option[ExecutionModeResult]] = {
-    // return skipped output subfeeds if "no data"
-    case ex: NoDataToProcessWarning =>
-      // create fake results (subFeeds with isSkipped=true)
-      val outputSubFeeds = outputs.map(output => InitSubFeed(dataObjectId = output.id, partitionValues = Seq(), isSkipped = true))
-      // Add fake results to exception. The DAG will pass the fake results to further actions, which can decide if the want to stop if input subFeeds are skipped by defining an executionCondition.
-      throw NoDataToProcessWarning(ex.actionId, ex.msg, results = Some(outputSubFeeds))
   }
 }
 

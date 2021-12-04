@@ -361,8 +361,11 @@
 		<delta.version>1.1.0</delta.version>
 		<poi.version>4.1.2</poi.version>
 
+		<json4s.version>3.7.0-M11</json4s.version>
+
 		<scalatest.test.version>3.0.8</scalatest.test.version>
 		<sshd.test.version>2.3.0</sshd.test.version>
+
 
 	</properties>
 
@@ -1202,7 +1205,7 @@
 			<dependency>
 				<groupId>org.json4s</groupId>
 				<artifactId>json4s-jackson_${scala.binary.version}</artifactId>
-				<version>3.7.0-M11</version>
+				<version>${json4s.version}</version>
 				<exclusions>
 					<exclusion>
 						<groupId>com.fasterxml.jackson.core</groupId>

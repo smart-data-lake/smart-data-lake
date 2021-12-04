@@ -27,7 +27,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SmartDataLakeLogger}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
-import io.smartdatalake.workflow.action.{Action, RuntimeInfo, SDLExecutionId, SparkAction}
+import io.smartdatalake.workflow.action.{Action, RuntimeInfo, SDLExecutionId, SparkActionImpl}
 import org.apache.spark.sql.SparkSession
 import scopt.OptionParser
 
@@ -333,7 +333,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     val actionDAGRun = ActionDAGRun(actionsToExec, actionsToSkip, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(session,context)
     val finalSubFeeds = try {
       if (simulation) {
-        require(actionsToExec.forall(_.isInstanceOf[SparkAction]), s"Simulation needs all selected actions to be instances of SparkAction. This is not the case for ${actionsToExec.filterNot(_.isInstanceOf[SparkAction]).map(_.id).mkString(", ")}")
+        require(actionsToExec.forall(_.isInstanceOf[SparkActionImpl]), s"Simulation needs all selected actions to be instances of SparkActionImpl. This is not the case for ${actionsToExec.filterNot(_.isInstanceOf[SparkActionImpl]).map(_.id).mkString(", ")}")
         actionDAGRun.init(session,context)
       } else {
         actionDAGRun.prepare(session,context)
@@ -383,14 +383,14 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         }
       }
 
-      // execute DAG
-      val startTime = LocalDateTime.now
-      var finalRunState: ActionDAGRunState = null
-      var subFeeds = try {
-        actionDAGRun.exec(session, context)
-      } finally {
-        finalRunState = actionDAGRun.saveState(true)(session, context)
-      }
+    // execute DAG
+    val startTime = LocalDateTime.now
+    var finalRunState: ActionDAGRunState = null
+    var subFeeds = try {
+      actionDAGRun.exec(session, context)
+    } finally {
+      finalRunState = actionDAGRun.saveState(ExecutionPhase.Exec, changedActionId = None, isFinal = true)(session, context)
+    }
 
       // Iterate execution in streaming mode
       if (context.appConfig.streaming) {
@@ -428,7 +428,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
           if (!Environment.stopStreamingGracefully) {
             session.streams.awaitAnyTermination()
             session.streams.active.foreach(_.stop) // stopping other streaming queries gracefully
-            actionDAGRun.saveState(true)(session, context) // notify about this asynchronous iteration
+            actionDAGRun.saveState(ExecutionPhase.Exec, changedActionId = None, isFinal = true)(session, context) // notify about this asynchronous iteration
           } else {
             session.streams.active.foreach(_.stop)
             logger.info("Stopped streaming gracefully")
