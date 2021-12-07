@@ -22,6 +22,7 @@ package io.smartdatalake.workflow.action.sparktransformer
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.AuthMode
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData}
 import io.smartdatalake.util.webservice.ScalaJWebserviceClient
@@ -44,16 +45,17 @@ import scala.util.{Failure, Success}
  * @param description    Optional description of the transformer
  * @param url            Url to download notebook in IPYNB-format, which defines transformation.
  * @param functionName   The notebook needs to contain a Scala-function with these name which type is [[fnTransformType]].
+ * @param authMode       optional authentication information for webservice, e.g. BasicAuthMode for user/pw authentication
  * @param options        Options to pass to the transformation
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
-case class ScalaNotebookDfTransformer(override val name: String = "scalaTransform", override val description: Option[String] = None, url: String, functionName: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsDfTransformer {
+case class ScalaNotebookDfTransformer(override val name: String = "scalaTransform", override val description: Option[String] = None, url: String, functionName: String, authMode: Option[AuthMode] = None, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsDfTransformer {
   import ScalaNotebookDfTransformer._
   private var _fnTransform: Option[fnTransformType] = None
   override def prepare(actionId: ActionId)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     try {
-      val notebookCode = prepareFunction(parseNotebook(downloadNotebook(url)), functionName)
+      val notebookCode = prepareFunction(parseNotebook(downloadNotebook(url, authMode)), functionName)
       _fnTransform = Some(compileCode(notebookCode))
     } catch {
       case ex: Exception => throw new ConfigurationException(s"($actionId) " + ex.getMessage, None, ex)
@@ -76,10 +78,12 @@ object ScalaNotebookDfTransformer extends FromConfigFactory[ParsableDfTransforme
   /**
    * Download Notebook content from url
    */
-  def downloadNotebook(url: String): String = {
+  def downloadNotebook(url: String, authMode: Option[AuthMode]): String = {
+    import ScalaJWebserviceClient._
     val client = new ScalaJWebserviceClient(Http(url)
+      .applyAuthMode(authMode)
       .option(HttpOptions.followRedirects(true))
-      .header("Accept", "application/x-ipynb+json")
+      .header("Accept", "application/x-ipynb+json; application/json")
     )
     client.get() match {
       case Success(content) => new String(content)
