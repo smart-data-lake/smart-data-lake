@@ -20,10 +20,12 @@
 package io.smartdatalake.workflow.action.sparktransformer
 
 import com.fasterxml.jackson.core.JsonParseException
+import io.smartdatalake.workflow.action.sparktransformer.ScalaNotebookDfTransformer.{compileCode, downloadNotebook, parseNotebook, prepareFunction}
 import org.scalatest.FunSuite
-import scalaj.http.{Http, HttpOptions}
+import scalaj.http.Http
 
-import java.io.InputStream
+import java.net.URLConnection
+import scala.io.Source
 
 class ScalaNotebookDfTransformerTest extends FunSuite {
 
@@ -94,6 +96,29 @@ class ScalaNotebookDfTransformerTest extends FunSuite {
     }
     """
 
+  val testNotebookContentToCompile = """
+    {
+      "nbformat" : 4,
+      "nbformat_minor" : 0,
+      "cells" : [
+        {
+          "cell_type" : "code",
+          "source" : [
+            "val t = \"test\""
+          ]
+        },
+        {
+          "cell_type" : "code",
+          "source" : [
+            "def testTransform(spark: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String): DataFrame = {\r\n",
+            "  df\r\n",
+            "}"
+          ]
+        }
+      ]
+    }
+    """
+
   test("parse notebook") {
     val notebookCode = ScalaNotebookDfTransformer.parseNotebook(testNotebookContent)
     val expectedNotebookCode = """
@@ -103,7 +128,6 @@ class ScalaNotebookDfTransformerTest extends FunSuite {
     assert(notebookCode == expectedNotebookCode)
   }
 
-
   test("parse notebook fails if not json") {
     intercept[JsonParseException](ScalaNotebookDfTransformer.parseNotebook("<html></html>"))
   }
@@ -112,18 +136,14 @@ class ScalaNotebookDfTransformerTest extends FunSuite {
     intercept[IllegalArgumentException](ScalaNotebookDfTransformer.prepareFunction(ScalaNotebookDfTransformer.parseNotebook(testNotebookContent), "abc"))
   }
 
-  test("load notebook") {
-    //ScalaNotebookDfTransformer(url = "http://localhost:8192/notebook/Test.ipynb?download=true", functionName = "test")
-    import sun.util.logging.PlatformLogger
-    val logger = PlatformLogger.getLogger("sun.net.www.protocol.http.HttpURLConnection")
-    logger.setLevel(PlatformLogger.Level.FINEST)
-    val request = Http("http://localhost:8192/notebook/Test.ipynb?download=true")
-      .option(HttpOptions.followRedirects(true))
-      .header("Accept", "application/x-ipynb+json")
-      .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36 Edg/94.0.992.37")
-      .header("Accept-Encoding", "gzip, deflate, br")
-      .header("Accept-Language", "en-US,en;q=0.9")
-    println(request.asString)
+  test("compile transform function") {
+    val notebookCode = prepareFunction(parseNotebook(testNotebookContentToCompile), "testTransform")
+    compileCode(notebookCode)
   }
 
+  ignore("load notebook") {
+    // test loading from Polynote installation
+    // note that java has some problems to connect to Polynote running in WSL2 over localhost/127.0.0.1
+    ScalaNotebookDfTransformer(url = "http://172.17.125.205:8192/notebook/Test.ipynb?download=true", functionName = "testTransform")
+  }
 }

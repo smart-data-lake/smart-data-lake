@@ -25,6 +25,7 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData}
 import io.smartdatalake.util.webservice.ScalaJWebserviceClient
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig.fnTransformType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.json4s._
@@ -49,10 +50,18 @@ import scala.util.{Failure, Success}
  */
 case class ScalaNotebookDfTransformer(override val name: String = "scalaTransform", override val description: Option[String] = None, url: String, functionName: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsDfTransformer {
   import ScalaNotebookDfTransformer._
-  private val notebookCode = prepareFunction(parseNotebook(downloadNotebook(url)), functionName)
-  private val fnTransform = CustomCodeUtil.compileCode[fnTransformType](notebookCode)
+  private var _fnTransform: Option[fnTransformType] = None
+  override def prepare(actionId: ActionId)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    try {
+      val notebookCode = prepareFunction(parseNotebook(downloadNotebook(url)), functionName)
+      _fnTransform = Some(compileCode(notebookCode))
+    } catch {
+      case ex: Exception => throw new ConfigurationException(s"($actionId) " + ex.getMessage, None, ex)
+    }
+  }
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit session: SparkSession): DataFrame = {
-    fnTransform(session, options, df, dataObjectId.id)
+    assert(_fnTransform.isDefined, s"($actionId) prepare() must be called before transformWithOptions()")
+    _fnTransform.map(_(session, options, df, dataObjectId.id)).get
   }
   override def factory: FromConfigFactory[ParsableDfTransformer] = ScalaNotebookDfTransformer
 }
@@ -70,7 +79,7 @@ object ScalaNotebookDfTransformer extends FromConfigFactory[ParsableDfTransforme
   def downloadNotebook(url: String): String = {
     val client = new ScalaJWebserviceClient(Http(url)
       .option(HttpOptions.followRedirects(true))
-      .header("Accept", "text/html,application/xhtml+xml,application/xml")
+      .header("Accept", "application/x-ipynb+json")
     )
     client.get() match {
       case Success(content) => new String(content)
@@ -87,7 +96,6 @@ object ScalaNotebookDfTransformer extends FromConfigFactory[ParsableDfTransforme
     implicit val formats: Formats = Serialization.formats(NoTypeHints)
     val notebookCells = (notebookJson \ "cells")
       .filter(_ \ "cell_type" == JString("code"))
-      .filter(_ \ "language" == JString("scala"))
     val notebookCode = notebookCells
       .map(_ \ "source")
       .map {
@@ -106,8 +114,15 @@ object ScalaNotebookDfTransformer extends FromConfigFactory[ParsableDfTransforme
    */
   def prepareFunction(notebookCode: String, functionName: String): String = {
     require(notebookCode.contains(functionName), s"Notebook code doesnt contain a function with name $functionName")
+    val defaultImports = """
+        |import org.apache.spark.sql.{DataFrame, SparkSession}
+        |""".stripMargin
     // return function as last statement of notebook code block
-    notebookCode + System.lineSeparator() + s"$functionName _"
+    defaultImports + System.lineSeparator() + notebookCode + System.lineSeparator() + s"$functionName _"
+  }
+
+  def compileCode(code: String): fnTransformType = {
+    CustomCodeUtil.compileCode[fnTransformType](code)
   }
 }
 
