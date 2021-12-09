@@ -30,20 +30,25 @@ trait HasHadoopStandardFilestore extends CanHandlePartitions { this: DataObject 
    * Creates a cached hadoop [[FileSystem]] with the Hadoop configuration of the context.
    */
   private[smartdatalake] def filesystem(implicit context: ActionPipelineContext): FileSystem = {
-    if (filesystemHolder == null) filesystemHolder = getFilesystem(hadoopPath)
+    if (filesystemHolder == null) {
+      serializableHadoopConfHolder = context.serializableHadoopConf
+      filesystemHolder = getFilesystem(hadoopPath)
+    }
     filesystemHolder
   }
+
+  // filesystem holder
   @transient private var filesystemHolder: FileSystem = _
-  private var serializableHadoopConf: SerializableHadoopConfiguration = _ // we must serialize hadoop config for CustomFileAction running transformation on executors
+
+  // hadoop configuration holder
+  private var serializableHadoopConfHolder: SerializableHadoopConfiguration = _ // we must serialize hadoop config for CustomFileAction running transformation on executors
 
   /**
-   * Creates a hadoop [[FileSystem]] for [[Path]] with the Hadoop configuration of the context.
+   * Creates a hadoop [[FileSystem]] for [[Path]] with a given serializable hadoop configuration.
    */
-  private[smartdatalake] def getFilesystem(path: Path)(implicit context: ActionPipelineContext): FileSystem = {
-    if (serializableHadoopConf == null) {
-      serializableHadoopConf = context.serializableHadoopConf
-    }
-    HdfsUtil.getHadoopFsWithConf(path)(serializableHadoopConf.get) // this must use serializable HadoopConfiguration to be distributed.
+  private[smartdatalake] def getFilesystem(path: Path): FileSystem = {
+    assert(serializableHadoopConfHolder != null, "serializableHadoopConfHolder must be initialized before using getFilesystem")
+    HdfsUtil.getHadoopFsWithConf(path)(serializableHadoopConfHolder.get) // this must use serializable HadoopConfiguration to be distributed.
   }
 
   /**
