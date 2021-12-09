@@ -41,7 +41,7 @@ case class FilterTransformer(override val name: String = "filter", override val 
     case Success(result) => result
     case Failure(e) => throw new ConfigurationException(s"Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
   }
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
     df.where(filterClauseExpr)
   }
   override def factory: FromConfigFactory[ParsableDfTransformer] = FilterTransformer

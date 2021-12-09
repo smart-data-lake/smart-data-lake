@@ -64,7 +64,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     // prepare & start load
     val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id)
     val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
-    testAction.exec(Seq(srcSubFeed))(session, contextExec)
+    testAction.exec(Seq(srcSubFeed))(contextExec)
 
     val expected = sourceDO.getDataFrame()
     val actual = targetDO.getDataFrame()
@@ -87,7 +87,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     // prepare & start load
     val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id)
     val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
-    testAction.exec(Seq(srcSubFeed))(session, contextExec)
+    testAction.exec(Seq(srcSubFeed))(contextExec)
 
     val expected = sourceDO.getDataFrame()
     val actual = targetDO.getDataFrame()

@@ -75,7 +75,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   private lazy val outputMap = outputs.map(i => i.id -> i).toMap
   private val subFeedConverter = ScalaUtil.companionOf[S, SubFeedConverter[S]]
 
-  def prepareInputSubFeeds(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): (Seq[S],Seq[S]) = {
+  def prepareInputSubFeeds(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): (Seq[S],Seq[S]) = {
     val mainInput = getMainInput(subFeeds)
     // convert subfeeds to SparkSubFeed type or initialize if not yet existing
     var inputSubFeeds: Seq[S] = subFeeds.map( subFeed =>
@@ -110,7 +110,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     (inputSubFeeds, outputSubFeeds)
   }
 
-  def postprocessOutputSubFeeds(subFeeds: Seq[S])(implicit session: SparkSession, context: ActionPipelineContext): Seq[S] = {
+  def postprocessOutputSubFeeds(subFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S] = {
     // assert all outputs have a subFeed
     outputs.foreach{ output =>
         subFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"($id) subFeed for output ${output.id} not found"))
@@ -122,7 +122,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     }
   }
 
-  def writeOutputSubFeeds(subFeeds: Seq[S])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  def writeOutputSubFeeds(subFeeds: Seq[S])(implicit context: ActionPipelineContext): Unit = {
     outputs.foreach { output =>
       val subFeed = subFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"($id) subFeed for output ${output.id} not found"))
       logWritingStarted(subFeed)
@@ -135,7 +135,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     }
   }
 
-  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
     // check main input/output by triggering lazy values
     prioritizedMainInputCandidates
@@ -149,7 +149,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     assert(superfluousSubFeeds.isEmpty && missingSubFeeds.isEmpty, s"($id) input SubFeed's must match input DataObjects: superfluous=${superfluousSubFeeds.mkString(",")} missing=${missingSubFeeds.mkString(",")})")
   }
 
-  override final def init(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
+  override final def init(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = {
     validateInputSubFeeds(subFeeds)
     // prepare
     var (inputSubFeeds, outputSubFeeds) = prepareInputSubFeeds(subFeeds)
@@ -161,7 +161,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     outputSubFeeds
   }
 
-  override final def exec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = {
+  override final def exec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = {
     validateInputSubFeeds(subFeeds)
     if (isAsynchronousProcessStarted) return outputs.map(output => SparkSubFeed(None, output.id, Seq())) // empty output subfeeds if asynchronous action started
     // prepare
@@ -176,7 +176,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     outputSubFeeds
   }
 
-  override def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
     if (isAsynchronousProcessStarted) return
     super.postExec(inputSubFeeds, outputSubFeeds)
     val mainInput = getMainInput(inputSubFeeds)
@@ -185,12 +185,12 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     executionMode.foreach(_.postExec(id, mainInput, mainOutput, mainInputSubFeed, mainOutputSubFeed))
   }
 
-  protected def logWritingStarted(subFeed: S)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  protected def logWritingStarted(subFeed: S)(implicit context: ActionPipelineContext): Unit = {
     val msg = s"writing to ${subFeed.dataObjectId}" + (if (subFeed.partitionValues.nonEmpty) s", partitionValues ${subFeed.partitionValues.mkString(" ")}" else "")
     logger.info(s"($id) start " + msg)
   }
 
-  protected def logWritingFinished(subFeed: S, noData: Option[Boolean], duration: Duration)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  protected def logWritingFinished(subFeed: S, noData: Option[Boolean], duration: Duration)(implicit context: ActionPipelineContext): Unit = {
     val metricsLog = if (noData.contains(true)) ", no data found"
     else runtimeData.getFinalMetrics(subFeed.dataObjectId).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
     logger.info(s"($id) finished writing DataFrame to ${subFeed.dataObjectId.id}: jobDuration=$duration" + metricsLog)
@@ -213,7 +213,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
    * Updates the partition values of a SubFeed to the partition columns of the given input data object:
    * - remove not existing columns from the partition values
    */
-  private def updateInputPartitionValues(dataObject: DataObject, subFeed: S)(implicit session: SparkSession, context: ActionPipelineContext): S = {
+  private def updateInputPartitionValues(dataObject: DataObject, subFeed: S)(implicit context: ActionPipelineContext): S = {
     dataObject match {
       case partitionedDO: CanHandlePartitions =>
         // remove superfluous partitionValues
@@ -229,7 +229,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
    * - add run_id_partition value if needed
    * - removing not existing columns from the partition values.
    */
-  private def updateOutputPartitionValues(dataObject: DataObject, subFeed: S, partitionValuesTransform: Option[Seq[PartitionValues] => Map[PartitionValues,PartitionValues]] = None)(implicit session: SparkSession, context: ActionPipelineContext): S = {
+  private def updateOutputPartitionValues(dataObject: DataObject, subFeed: S, partitionValuesTransform: Option[Seq[PartitionValues] => Map[PartitionValues,PartitionValues]] = None)(implicit context: ActionPipelineContext): S = {
     dataObject match {
       case partitionedDO: CanHandlePartitions =>
         // transform partition values
@@ -242,7 +242,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     }
   }
 
-  private def addRunIdPartitionIfNeeded(dataObject: DataObject, subFeed: S)(implicit session: SparkSession, context: ActionPipelineContext): S = {
+  private def addRunIdPartitionIfNeeded(dataObject: DataObject, subFeed: S)(implicit context: ActionPipelineContext): S = {
     dataObject match {
       case partitionedDO: CanHandlePartitions =>
         if (partitionedDO.partitions.contains(Environment.runIdPartitionColumnName)) {
@@ -254,7 +254,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     }
   }
 
-  protected def validatePartitionValuesExisting(dataObject: DataObject with CanHandlePartitions, subFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  protected def validatePartitionValuesExisting(dataObject: DataObject with CanHandlePartitions, subFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = {
     // Existing partitions can only be checked if Action is at start of the DAG or if we are in Exec phase (previous Actions have been executed)
     if (subFeed.partitionValues.nonEmpty && (context.phase == ExecutionPhase.Exec || subFeed.isDAGStart)) {
       val expectedPartitions = dataObject.filterExpectedPartitionValues(subFeed.partitionValues)
@@ -269,25 +269,25 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
    * @param ignoreFilter If filters should be ignored for this feed
    * @param isRecursive If subfeed is recursive (input & output)
    */
-  protected def preprocessInputSubFeedCustomized(subFeed: S, ignoreFilter: Boolean, isRecursive: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): S = subFeed
+  protected def preprocessInputSubFeedCustomized(subFeed: S, ignoreFilter: Boolean, isRecursive: Boolean)(implicit context: ActionPipelineContext): S = subFeed
 
   /**
    * Implement additional processing logic for SubFeeds after transformation.
    * Can be implemented by subclass.
    */
-  protected def postprocessOutputSubFeedCustomized(subFeed: S)(implicit session: SparkSession, context: ActionPipelineContext): S = subFeed
+  protected def postprocessOutputSubFeedCustomized(subFeed: S)(implicit context: ActionPipelineContext): S = subFeed
 
   /**
    * Transform partition values.
    * Can be implemented by subclass.
    */
-  protected def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = PartitionValues.oneToOneMapping(partitionValues)
+  protected def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = PartitionValues.oneToOneMapping(partitionValues)
 
   /**
    * Transform subfeed content
    * To be implemented by subclass.
    */
-  protected def transform(inputSubFeeds: Seq[S], outputSubFeeds: Seq[S])(implicit session: SparkSession, context: ActionPipelineContext): Seq[S]
+  protected def transform(inputSubFeeds: Seq[S], outputSubFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S]
 
   /**
    * Write subfeed data to output.
@@ -295,7 +295,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
    * @param isRecursive If subfeed is recursive (input & output)
    * @return false if there was no data to process, otherwise true.
    */
-  protected def writeSubFeed(subFeed: S, isRecursive: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): WriteSubFeedResult
+  protected def writeSubFeed(subFeed: S, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult
 
 }
 

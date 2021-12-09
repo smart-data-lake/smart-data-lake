@@ -35,12 +35,12 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 case class DfTransformerWrapperDfsTransformer(transformer: ParsableDfTransformer, subFeedsToApply: Seq[String]) extends ParsableDfsTransformer {
   override def name: String = transformer.name
   override def description: Option[String] = transformer.description
-  override def transform(actionId: SdlConfigObject.ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame])(implicit session: SparkSession, context: ActionPipelineContext): Map[String, DataFrame] = {
+  override def transform(actionId: SdlConfigObject.ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame])(implicit context: ActionPipelineContext): Map[String, DataFrame] = {
     val missingSubFeeds = subFeedsToApply.toSet.diff(dfs.keySet)
     assert(missingSubFeeds.isEmpty, s"($actionId) [transformation.$name] subFeedsToApply to apply not found in input dfs: ${missingSubFeeds.mkString(", ")}")
     dfs.map { case (subFeedName,df) => if (subFeedsToApply.contains(subFeedName)) (subFeedName, transformer.transform(actionId, partitionValues, df, DataObjectId(subFeedName))) else (subFeedName, df)}.toMap
   }
-  override def transformPartitionValues(actionId: SdlConfigObject.ActionId, partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {
+  override def transformPartitionValues(actionId: SdlConfigObject.ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {
     transformer.transformPartitionValues(actionId, partitionValues)
   }
 

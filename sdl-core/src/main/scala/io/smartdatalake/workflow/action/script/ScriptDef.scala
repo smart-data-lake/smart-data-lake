@@ -40,7 +40,7 @@ trait ScriptDef {
    * @param parameters key-value parameters
    * @return standard output of script
    */
-  def execStdOut(actionId: ActionId, partitionValues: Seq[PartitionValues], parameters: Map[String,String])(implicit session: SparkSession, context: ActionPipelineContext): String
+  def execStdOut(actionId: ActionId, partitionValues: Seq[PartitionValues], parameters: Map[String,String])(implicit context: ActionPipelineContext): String
 }
 
 trait ParsableScriptDef extends ScriptDef with ParsableFromConfig[ParsableScriptDef]

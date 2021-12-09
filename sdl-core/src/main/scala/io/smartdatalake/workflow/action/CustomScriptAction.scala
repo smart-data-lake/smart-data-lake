@@ -52,7 +52,7 @@ case class CustomScriptAction(override val id: ActionId,
 
   validateConfig()
 
-  override protected def execScript(inputSubFeeds: Seq[ScriptSubFeed], outputSubFeeds: Seq[ScriptSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[ScriptSubFeed] = {
+  override protected def execScript(inputSubFeeds: Seq[ScriptSubFeed], outputSubFeeds: Seq[ScriptSubFeed])(implicit context: ActionPipelineContext): Seq[ScriptSubFeed] = {
     val inputParameters = inputSubFeeds.flatMap(_.parameters).reduceLeftOption(_ ++ _).getOrElse(Map())
     val mainPartitionValues = getMainPartitionValues(inputSubFeeds)
     val outputParameters = scripts.foldLeft(inputParameters) {

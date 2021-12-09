@@ -36,13 +36,13 @@ case class CustomFileDataObject(override val id: DataObjectId,
                                )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with FileRefDataObject with CanCreateInputStream {
 
-  override def createInputStream(path: String)(implicit session: SparkSession): InputStream = {
+  override def createInputStream(path: String)(implicit context: ActionPipelineContext): InputStream = {
     creator.exec
   }
 
   override def partitionLayout(): Option[String] = None
 
-  override def getFileRefs(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[FileRef] = {
+  override def getFileRefs(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[FileRef] = {
     Seq(FileRef("custom", "custom", PartitionValues(Map())))
   }
 
@@ -56,9 +56,9 @@ case class CustomFileDataObject(override val id: DataObjectId,
 
   override def expectedPartitionsCondition: Option[String] = None
 
-  override def listPartitions(implicit session: SparkSession, context: ActionPipelineContext): Seq[PartitionValues] = Seq()
+  override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = Seq()
 
-  override def relativizePath(filePath: String)(implicit session: SparkSession): String = filePath
+  override def relativizePath(filePath: String)(implicit context: ActionPipelineContext): String = filePath
 
   override def factory: FromConfigFactory[DataObject] = CustomFileDataObject
 }

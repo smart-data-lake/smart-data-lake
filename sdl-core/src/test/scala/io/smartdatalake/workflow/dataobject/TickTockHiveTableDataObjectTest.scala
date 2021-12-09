@@ -70,7 +70,7 @@ class TickTockHiveTableDataObjectTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq((1, "john", 5)).toDF("id", "name", "rating")
     srcDO.writeDataFrame(l1, Seq())
 
-    action.exec(Seq(SparkSubFeed(None, "input", Seq()), SparkSubFeed(None, "output", Seq())))(session, contextExec)
+    action.exec(Seq(SparkSubFeed(None, "input", Seq()), SparkSubFeed(None, "output", Seq())))(contextExec)
 
     val r = session.table(s"${tgtTable.fullName}")
       .select($"rating")

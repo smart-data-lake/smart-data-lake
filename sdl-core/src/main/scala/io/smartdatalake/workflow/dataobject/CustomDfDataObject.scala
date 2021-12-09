@@ -40,7 +40,8 @@ case class CustomDfDataObject(override val id: DataObjectId,
                              )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with SchemaValidation {
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+    implicit val session = context.sparkSession
 
     // During the init phase, we want to enable getting the schema without creating the entire DataFrame
     // Because during the exec phase, the DataFrame will be created again anyway, leading to multiple calls to creator.exec

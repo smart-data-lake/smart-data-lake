@@ -42,10 +42,10 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  */
 case class ScalaClassDfTransformer(override val name: String = "scalaTransform", override val description: Option[String] = None, className: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsDfTransformer {
   private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDfTransformer](className)
-  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit session: SparkSession): DataFrame = {
-    customTransformer.transform(session, options, df, dataObjectId.id)
+  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit context: ActionPipelineContext): DataFrame = {
+    customTransformer.transform(context.sparkSession, options, df, dataObjectId.id)
   }
-  override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit session: SparkSession): Option[Map[PartitionValues,PartitionValues]] = {
+  override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = {
    customTransformer.transformPartitionValues(options, partitionValues)
   }
   override def factory: FromConfigFactory[ParsableDfTransformer] = ScalaClassDfTransformer

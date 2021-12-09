@@ -22,11 +22,14 @@ import java.time.LocalDateTime
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.{Action, SDLExecutionId}
+import org.apache.hadoop.conf.Configuration
 import org.apache.spark.annotation.DeveloperApi
+import org.apache.spark.sql.SparkSession
 
 import scala.collection.mutable
 
@@ -61,7 +64,8 @@ case class ActionPipelineContext (
                                   var phase: ExecutionPhase = ExecutionPhase.Prepare,
                                   dataFrameReuseStatistics: mutable.Map[(DataObjectId, Seq[PartitionValues]), Seq[ActionId]] = mutable.Map(),
                                   actionsSelected: Seq[ActionId] = Seq(),
-                                  actionsSkipped: Seq[ActionId] = Seq()
+                                  actionsSkipped: Seq[ActionId] = Seq(),
+                                  serializableHadoopConf: SerializableHadoopConfiguration
 ) extends SmartDataLakeLogger {
   private[smartdatalake] def getReferenceTimestampOrNow: LocalDateTime = referenceTimestamp.getOrElse(LocalDateTime.now)
   private[smartdatalake] def rememberDataFrameReuse(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], actionId: ActionId): Int = dataFrameReuseStatistics.synchronized {
@@ -83,4 +87,26 @@ case class ActionPipelineContext (
   // manage executionId
   private[smartdatalake] def incrementRunId = this.copy(executionId = this.executionId.incrementRunId, runStartTime = LocalDateTime.now, attemptStartTime = LocalDateTime.now)
   private[smartdatalake] def incrementAttemptId = this.copy(executionId = this.executionId.incrementAttemptId, attemptStartTime = LocalDateTime.now)
+  // helper method to access hadoop configuration
+  def hadoopConf: Configuration = serializableHadoopConf.get
+
+  // private holder for spark session
+  private[smartdatalake] var _sparkSession: Option[SparkSession] = None
+
+  /**
+   * Return SparkSession
+   * Create SparkSession if not yet done, but only if it is used.
+   */
+  def sparkSession: SparkSession = {
+    if (_sparkSession.isEmpty) {
+      assert(Environment._globalConfig != null, "Cannot create SparkSession because Environment.globalConfig is not initialized. Please create ActionPipelineContext with SparkSession passed as parameter.")
+      _sparkSession = Some(Environment._globalConfig.createSparkSession(appConfig.appName, appConfig.master, appConfig.deployMode))
+    }
+    _sparkSession.get
+  }
+
+  /**
+   * Check if a SparkSession has been created
+   */
+  def hasSparkSession: Boolean = _sparkSession.isDefined
 }

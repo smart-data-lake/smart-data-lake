@@ -67,7 +67,8 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
 
   // prepare final path
   @transient private var hadoopPathHolder: Path = _
-  def hadoopPath(implicit session: SparkSession): Path = {
+  def hadoopPath(implicit context: ActionPipelineContext): Path = {
+    implicit val session: SparkSession = context.sparkSession
     val thisIsTableExisting = isTableExisting
     require(thisIsTableExisting || path.isDefined, s"TickTockHiveTable ${table.fullName} does not exist, so path must be set.")
 
@@ -91,14 +92,16 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   }
 
   @transient private var filesystemHolder: FileSystem = _
-  def filesystem(implicit session: SparkSession): FileSystem = {
+  def filesystem(implicit context: ActionPipelineContext): FileSystem = {
+    implicit val session: SparkSession = context.sparkSession
     if (filesystemHolder == null) {
       filesystemHolder = HdfsUtil.getHadoopFsFromSpark(hadoopPath)
     }
     filesystemHolder
   }
 
-  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def prepare(implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
     super.prepare
     require(isDbExisting, s"($id) Hive DB ${table.db.get} doesn't exist (needs to be created manually).")
     if (!isTableExisting)
@@ -106,13 +109,14 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
   }
 
-  override def init(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def init(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
     super.init(df, partitionValues)
     validateSchemaMin(df, "write")
     validateSchemaHasPartitionCols(df, "write")
   }
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+    implicit val session: SparkSession = context.sparkSession
     val df = if(!isTableExisting && schemaMin.isDefined) {
       logger.info(s"Table ${table.fullName} does not exist but schemaMin was provided. Creating empty DataFrame.")
       DataFrameUtil.getEmptyDataFrame(schemaMin.get)
@@ -126,7 +130,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     df
   }
 
-  override def preWrite(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def preWrite(implicit context: ActionPipelineContext): Unit = {
     super.preWrite
     // validate if acl's must be / are configured before writing
     if (Environment.hadoopAuthoritiesWithAclsRequired.exists( a => filesystem.getUri.toString.contains(a))) {
@@ -135,7 +139,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   }
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+                             (implicit context: ActionPipelineContext): Unit = {
     validateSchemaMin(df, "write")
     validateSchemaHasPartitionCols(df, "write")
     writeDataFrameInternal(df, createTableOnly=false, partitionValues, isRecursiveInput, saveModeOptions)
@@ -150,7 +154,8 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
    * or only a few HDFS files that are too large.
    */
   def writeDataFrameInternal(df: DataFrame, createTableOnly: Boolean, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])
-                            (implicit session: SparkSession): Unit = {
+                            (implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
     val dfPrepared = if (createTableOnly) {
       // create empty df with existing df's schema
       DataFrameUtil.getEmptyDataFrame(df.schema)
@@ -180,32 +185,36 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def isDbExisting(implicit session: SparkSession): Boolean = {
-    session.catalog.databaseExists(table.db.get)
+  override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
+    context.sparkSession.catalog.databaseExists(table.db.get)
   }
 
-  override def isTableExisting(implicit session: SparkSession): Boolean = {
-    session.catalog.tableExists(table.db.get, table.name)
+  override def isTableExisting(implicit context: ActionPipelineContext): Boolean = {
+    context.sparkSession.catalog.tableExists(table.db.get, table.name)
   }
 
   /**
    * list hive table partitions
    */
-  override def listPartitions(implicit session: SparkSession, context: ActionPipelineContext): Seq[PartitionValues] = {
+  override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
+    implicit val session: SparkSession = context.sparkSession
     if(isTableExisting) HiveUtil.listPartitions(table, partitions)
     else Seq()
   }
 
-  override def createEmptyPartition(partitionValues: PartitionValues)(implicit session: SparkSession): Unit = {
+  override def createEmptyPartition(partitionValues: PartitionValues)(implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
     if (partitionValues.keys == partitions.toSet) HiveUtil.createEmptyPartition(table, partitionValues)
     else logger.warn(s"($id) No empty partition was created for $partitionValues because there are not all partition columns defined")
   }
 
-  override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+  override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
     partitionValues.foreach( pv => HiveUtil.dropPartition(table, hadoopPath, pv, filesystem))
   }
 
-  override def dropTable(implicit session: SparkSession): Unit = {
+  override def dropTable(implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
     HiveUtil.dropTable(table, hadoopPath, filesystem = Some(filesystem))
   }
 

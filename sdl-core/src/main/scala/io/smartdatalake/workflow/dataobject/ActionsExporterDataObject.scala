@@ -61,7 +61,8 @@ case class ActionsExporterDataObject(id: DataObjectId,
    * @param session SparkSession to use
    * @return DataFrame including all Actions in the instanceRegistry, used for exporting the metadata
    */
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+    val session: SparkSession = context.sparkSession
     import session.implicits._
 
     val listElementsSeparator = ","
@@ -69,7 +70,7 @@ case class ActionsExporterDataObject(id: DataObjectId,
     // Get all actions from registry
     val actions: Seq[Action with Product] = config match {
       case Some(configLocation) =>
-        val config = ConfigLoader.loadConfigFromFilesystem(configLocation.split(',').toSeq)
+        val config = ConfigLoader.loadConfigFromFilesystem(configLocation.split(',').toSeq, context.hadoopConf)
         ConfigParser.parse(config).getActions.map(_.asInstanceOf[Action with Product])
       case None => instanceRegistry.getActions.map(_.asInstanceOf[Action with Product])
     }

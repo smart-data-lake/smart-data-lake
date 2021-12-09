@@ -79,7 +79,7 @@ class CustomScriptActionTest extends FunSuite with BeforeAndAfter {
 case class TestScriptNotificationDataObject(override val id: DataObjectId, notifyFunc: String => Unit) extends DataObject with CanReceiveScriptNotification {
   override def metadata: Option[DataObjectMetadata] = None
 
-  override def scriptNotification(parameters: Map[String, String], partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+  override def scriptNotification(parameters: Map[String, String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     notifyFunc(parameters("test"))
   }
 

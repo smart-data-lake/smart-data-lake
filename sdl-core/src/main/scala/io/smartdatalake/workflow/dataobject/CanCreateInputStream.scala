@@ -18,12 +18,12 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.io.InputStream
+import io.smartdatalake.workflow.ActionPipelineContext
 
-import org.apache.spark.sql.SparkSession
+import java.io.InputStream
 
 private[smartdatalake] trait CanCreateInputStream {
 
-  def createInputStream(path: String)(implicit session: SparkSession): InputStream
+  def createInputStream(path: String)(implicit context: ActionPipelineContext): InputStream
 
 }

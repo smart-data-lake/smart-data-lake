@@ -33,7 +33,7 @@ import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, Custom
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction, CustomSparkAction, DeduplicateAction, RuntimeEventState, SDLExecutionId}
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanCreateIncrementalOutput, CsvFileDataObject, DataObject, DataObjectMetadata, HiveTableDataObject, Table, TickTockHiveTableDataObject}
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore, SparkSubFeed}
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.functions.{col, lit, udf}
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.sql.{DataFrame, SparkSession, functions}
@@ -54,7 +54,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
   private val tempPath = tempDir.toAbsolutePath.toString
 
   val statePath = "target/stateTest/"
-  val filesystem = HdfsUtil.getHadoopFs(new Path(statePath))
+  implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithDefaultConf(new Path(statePath))
 
 
   test("sdlb run with 2 actions and positive top-level partition values filter, recovery after action 2 failed the first time") {
@@ -66,7 +66,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // configure SDLPlugin for testing
     System.setProperty("sdl.pluginClassName", classOf[TestSDLPlugin].getName)
 
-    HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
+    HdfsUtil.deleteFiles(new Path(statePath), false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
@@ -116,7 +116,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // check latest state
     {
-      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName, session.sparkContext.hadoopConfiguration)
       val stateFile = stateStore.getLatestStateId().get
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
@@ -147,7 +147,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // check latest state
     {
-      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName, session.sparkContext.hadoopConfiguration)
       val stateFile = stateStore.getLatestStateId().get
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
@@ -171,7 +171,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val appName = "sdlb-recovery2"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
+    HdfsUtil.deleteFiles(new Path(statePath), false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
@@ -211,7 +211,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // check latest state
     {
-      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName, session.sparkContext.hadoopConfiguration)
       val stateFile = stateStore.getLatestStateId().get
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
@@ -238,7 +238,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // check latest state
     {
-      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName, session.sparkContext.hadoopConfiguration)
       val stateFile = stateStore.getLatestStateId().get
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
@@ -257,7 +257,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val appName = "sdlb-recovery3"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
+    HdfsUtil.deleteFiles(new Path(statePath), false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
@@ -309,7 +309,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // check latest state
     {
-      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName, session.sparkContext.hadoopConfiguration)
       val stateFile = stateStore.getLatestStateId().get
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
@@ -343,7 +343,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // check latest state
     {
-      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName, session.sparkContext.hadoopConfiguration)
       val stateFile = stateStore.getLatestStateId().get
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
@@ -366,7 +366,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val appName = "sdlb-runId"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
+    HdfsUtil.deleteFiles(new Path(statePath), false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
@@ -401,7 +401,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // check latest state
     {
-      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName, session.sparkContext.hadoopConfiguration)
       val stateFile = stateStore.getLatestStateId().get
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
@@ -431,7 +431,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // check latest state
     {
-      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName)
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName, session.sparkContext.hadoopConfiguration)
       val stateFile = stateStore.getLatestStateId().get
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 2)
@@ -453,11 +453,11 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val appName = "sdlb-runId"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
-    HdfsUtil.deleteFiles(new Path(tempPath), filesystem, false)
+    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(new Path(tempPath), false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext : ActionPipelineContext = ActionPipelineContext("testFeed", "testApp", SDLExecutionId.executionId1, instanceRegistry, None, SmartDataLakeBuilderConfig())
+    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     val srcDO = TestIncrementalDataObject("src1")
@@ -500,9 +500,10 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val appName = "sdlb-simulation"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), filesystem, false)
+    HdfsUtil.deleteFiles(new Path(statePath), false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     val srcTable = Table(Some("default"), "ap_input")
@@ -596,13 +597,14 @@ case class TestIncrementalDataObject(override val id: DataObjectId, override val
   var previousState: Int = 1
   var nextState: Option[Int] = None
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
+    val session = context.sparkSession
     import session.implicits._
     nextState = Some(previousState + 10)
     (previousState until nextState.get).toDF("nb")
   }
 
-  override def setState(state: Option[String])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
     previousState = state.map(_.toInt).getOrElse(1)
   }
 

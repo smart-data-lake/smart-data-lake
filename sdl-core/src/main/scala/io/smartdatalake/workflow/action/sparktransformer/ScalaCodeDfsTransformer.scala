@@ -24,8 +24,10 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData}
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig.fnTransformType
+import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -42,11 +44,14 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
 case class ScalaCodeDfsTransformer(override val name: String = "scalaTransform", override val description: Option[String] = None, code: Option[String] = None, file: Option[String] = None, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsDfsTransformer {
-  private val fnTransform = file.map(file => CustomCodeUtil.compileCode[fnTransformType](HdfsUtil.readHadoopFile(file)))
-    .orElse(code.map(code => CustomCodeUtil.compileCode[fnTransformType](code)))
-    .getOrElse(throw ConfigurationException(s"Either file or code must be defined for ScalaCodeTransformer"))
-  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame], options: Map[String, String])(implicit session: SparkSession): Map[String,DataFrame] = {
-    fnTransform(session, options, dfs)
+  private val fnTransform = {
+    implicit val defaultHadoopConf: Configuration = new Configuration()
+    file.map(file => CustomCodeUtil.compileCode[fnTransformType](HdfsUtil.readHadoopFile(file)))
+      .orElse(code.map(code => CustomCodeUtil.compileCode[fnTransformType](code)))
+      .getOrElse(throw ConfigurationException(s"Either file or code must be defined for ScalaCodeTransformer"))
+  }
+  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String,DataFrame] = {
+    fnTransform(context.sparkSession, options, dfs)
   }
   override def factory: FromConfigFactory[ParsableDfsTransformer] = ScalaCodeDfsTransformer
 }

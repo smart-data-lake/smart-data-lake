@@ -35,7 +35,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param description  Optional description of the transformer
  */
 case class StandardizeDatatypesTransformer(override val name: String = "standardizeDatatypes", override val description: Option[String] = None) extends ParsableDfTransformer {
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
     df.castAllDecimal2IntegralFloat
   }
   override def factory: FromConfigFactory[ParsableDfTransformer] = StandardizeDatatypesTransformer

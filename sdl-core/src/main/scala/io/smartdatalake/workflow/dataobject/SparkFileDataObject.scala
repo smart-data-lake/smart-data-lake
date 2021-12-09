@@ -66,7 +66,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    *
    * Default is to validate the `schemaMin` and not apply any modification.
    */
-  def beforeWrite(df: DataFrame)(implicit session: SparkSession): DataFrame = {
+  def beforeWrite(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
     validateSchemaMin(df, "write")
     validateSchemaHasPartitionCols(df, "write")
     schema.foreach(schemaExpected => validateSchema(df, schemaExpected, "write"))
@@ -78,7 +78,8 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    *
    * Default is to validate the `schemaMin` and not apply any modification.
    */
-  def afterRead(df: DataFrame)(implicit session: SparkSession): DataFrame = {
+  def afterRead(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
+    implicit val session: SparkSession = context.sparkSession
     validateSchemaMin(df, "read")
     validateSchemaHasPartitionCols(df, "read")
     schema.map(createReadSchema).foreach(schemaExpected => validateSchema(df, schemaExpected, "read"))
@@ -104,7 +105,8 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * @param session the current [[SparkSession]].
    * @return a new [[DataFrame]] containing the data stored in the file at `path`
    */
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+    implicit val session: SparkSession = context.sparkSession
     import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 
     val wrongPartitionValues = PartitionValues.checkWrongPartitionValues(partitionValues, partitions)
@@ -149,7 +151,8 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     afterRead(df)
   }
 
-  override def getStreamingDataFrame(options: Map[String, String], pipelineSchema: Option[StructType])(implicit session: SparkSession): DataFrame = {
+  override def getStreamingDataFrame(options: Map[String, String], pipelineSchema: Option[StructType])(implicit context: ActionPipelineContext): DataFrame = {
+    implicit val session: SparkSession = context.sparkSession
     require(schema.orElse(pipelineSchema).isDefined, s"($id}) Schema must be defined for streaming SparkFileDataObject")
     // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
     if (!filesystem.exists(hadoopPath.getParent)) filesystem.mkdirs(hadoopPath)
@@ -163,13 +166,13 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     afterRead(df)
   }
 
-  override def createReadSchema(writeSchema: StructType)(implicit session: SparkSession): StructType = {
+  override def createReadSchema(writeSchema: StructType)(implicit context: ActionPipelineContext): StructType = {
     // add additional columns created by SparkFileDataObject
     filenameColumn.map(colName => addFieldIfNotExisting(writeSchema, colName, StringType))
       .getOrElse(writeSchema)
   }
 
-  override def init(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def init(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
     validateSchemaMin(df, "write")
     schema.foreach(schemaExpected => validateSchema(df, schemaExpected, "write"))
   }
@@ -185,7 +188,8 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * @param session the current [[SparkSession]].
    */
   final override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+                             (implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
     require(!isRecursiveInput, "($id) SparkFileDataObject cannot write dataframe when dataobject is also used as recursive input ")
 
     // prepare data
@@ -234,7 +238,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     sparkRepartition.foreach(_.renameFiles(getFileRefs(partitionValues))(filesystem))
   }
 
-  override private[smartdatalake] def writeDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit session: SparkSession): Unit = {
+  override private[smartdatalake] def writeDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
     val hadoopPathString = path.toString
     logger.info(s"($id) Writing DataFrame to $hadoopPathString")
 
@@ -249,7 +253,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * Filters only existing partition.
    * Note that partition values to check don't need to have a key/value defined for every partition column.
    */
-  def filterPartitionsExisting(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Seq[PartitionValues]  = {
+  def filterPartitionsExisting(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[PartitionValues]  = {
     val partitionValueKeys = PartitionValues.getPartitionValuesKeys(partitionValues).toSeq
     partitionValues.intersect(listPartitions.map(_.filterKeys(partitionValueKeys)))
   }
@@ -257,12 +261,12 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
   /**
    * Compact partitions using Spark
    */
-  override def compactPartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, actionPipelineContext: ActionPipelineContext): Unit = {
+  override def compactPartitions(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     CompactionUtil.compactHadoopStandardPartitions(this, partitionValues)
   }
 
   override def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String,String], checkpointLocation: String, queryName: String, outputMode: OutputMode = OutputMode.Append, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit session: SparkSession, context: ActionPipelineContext): StreamingQuery = {
+                             (implicit context: ActionPipelineContext): StreamingQuery = {
 
     // lambda function is ambiguous with foreachBatch in scala 2.12... we need to create a real function...
     // Note: no partition values supported when writing streaming target

@@ -43,7 +43,7 @@ case class CmdScript(override val name: String = "cmd", override val description
   if (EnvironmentUtil.isWindowsOS) assert(winCmd.isDefined, s"($name) winCmd must be defined when running on Windows")
   if (!EnvironmentUtil.isWindowsOS) assert(linuxCmd.isDefined, s"($name) linuxCmd must be defined when running on Linux")
 
-  override def execStdOut(actionId: ActionId, partitionValues: Seq[PartitionValues], parameters: Map[String,String])(implicit session: SparkSession, context: ActionPipelineContext): String = {
+  override def execStdOut(actionId: ActionId, partitionValues: Seq[PartitionValues], parameters: Map[String,String])(implicit context: ActionPipelineContext): String = {
     import sys.process._
     val cmd = getCmd
     logger.info(s"($actionId) executing command: ${cmd.mkString(" ")}")

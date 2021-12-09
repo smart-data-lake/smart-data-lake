@@ -22,6 +22,7 @@ package io.smartdatalake.workflow.action.customlogic
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.{PythonSparkEntryPoint, PythonUtil}
+import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.SparkSession
 
 /**
@@ -37,7 +38,10 @@ import org.apache.spark.sql.SparkSession
 case class PythonUDFCreatorConfig(pythonFile: Option[String] = None, pythonCode: Option[String] = None, options: Option[Map[String,String]] = None) {
   require(pythonFile.isDefined || pythonCode.isDefined, "Either pythonFile or pythonCode must be defined for SparkUDFCreatorConfig")
 
-  private val functionCode = pythonFile.map(HdfsUtil.readHadoopFile).orElse(pythonCode.map(_.stripMargin)).get
+  private val functionCode = {
+    implicit val defaultHadoopConf: Configuration = new Configuration()
+    pythonFile.map(HdfsUtil.readHadoopFile).orElse(pythonCode.map(_.stripMargin)).get
+  }
 
   private[smartdatalake] def registerUDF(functionName: String, session: SparkSession): Unit = {
     val entryPoint = new PythonSparkEntryPoint(session, options.getOrElse(Map()))

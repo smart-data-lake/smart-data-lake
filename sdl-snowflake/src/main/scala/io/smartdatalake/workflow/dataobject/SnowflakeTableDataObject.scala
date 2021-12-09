@@ -65,9 +65,9 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     throw ConfigurationException(s"($id) A SnowFlake schema name must be added as the 'db' parameter of a SnowflakeTableDataObject.")
   }
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     val queryOrTable = Map(table.query.map(q => ("query", q)).getOrElse("dbtable" -> (connection.database + "." + table.fullName)))
-    val df = session
+    val df = context.sparkSession
       .read
       .format(SNOWFLAKE_SOURCE_NAME)
       .options(connection.getSnowflakeOptions(table.db.get))
@@ -78,7 +78,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   }
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+                             (implicit context: ActionPipelineContext): Unit = {
     validateSchemaMin(df, "write")
     writeDataFrame(df, createTableOnly = false, partitionValues, saveModeOptions)
   }
@@ -88,7 +88,8 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
    * Snowflake does not support explicit partitions, so any passed partition values are ignored
    */
   def writeDataFrame(df: DataFrame, createTableOnly: Boolean, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions])
-                    (implicit session: SparkSession): Unit = {
+                    (implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
     val dfPrepared = if (createTableOnly) {
       DataFrameUtil.getEmptyDataFrame(df.schema)
     } else {
@@ -109,18 +110,18 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def isDbExisting(implicit session: SparkSession): Boolean = {
+  override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
     val sql = s"SHOW DATABASES LIKE '${connection.database}'"
     connection.execSnowflakeStatement(sql).next()
   }
 
 
-  override def isTableExisting(implicit session: SparkSession): Boolean = {
+  override def isTableExisting(implicit context: ActionPipelineContext): Boolean = {
     val sql = s"SHOW TABLES LIKE '${table.name}' IN SCHEMA ${connection.database}.${table.db.get}"
     connection.execSnowflakeStatement(sql).next()
   }
 
-  override def dropTable(implicit session: SparkSession): Unit = throw new NotImplementedError()
+  override def dropTable(implicit context: ActionPipelineContext): Unit = throw new NotImplementedError()
 
   override def factory: FromConfigFactory[DataObject] = SnowflakeTableDataObject
 }

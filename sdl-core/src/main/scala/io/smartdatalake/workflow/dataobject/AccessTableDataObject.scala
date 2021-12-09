@@ -46,7 +46,8 @@ case class AccessTableDataObject(override val id: DataObjectId,
                                 )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends TableDataObject {
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext) : DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext) : DataFrame = {
+    val session = context.sparkSession
 
     // currently, only the schema is being inferred using [[net.ucanaccess.jdbc.UcanaccessDriver]]...
     val tableSchema = session.read
@@ -88,8 +89,8 @@ case class AccessTableDataObject(override val id: DataObjectId,
   }
 
   // FIXME for dev purposes only, to visualize to current problem with the [[net.ucanaccess.jdbc.UcanaccessDriver]]
-  def getDataFrameByFramework(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext) : DataFrame = {
-    val df = session.read
+  def getDataFrameByFramework(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext) : DataFrame = {
+    val df = context.sparkSession.read
       .format("jdbc")
       .options(Map("url" -> s"jdbc:ucanaccess://$path",
         "driver" -> "net.ucanaccess.jdbc.UcanaccessDriver",
@@ -99,23 +100,23 @@ case class AccessTableDataObject(override val id: DataObjectId,
     df
   }
 
-  override def isDbExisting(implicit session: SparkSession): Boolean = {
+  override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
     // if we can open the db, it is existing
-    val db = openDb(session)
+    val db = openDb(context.sparkSession)
     db.close()
     //return
     true
   }
 
-  override def isTableExisting(implicit session: SparkSession): Boolean = {
-    val db = openDb(session)
+  override def isTableExisting(implicit context: ActionPipelineContext): Boolean = {
+    val db = openDb(context.sparkSession)
     val tableExisting = db.getTableNames.contains(table.name)
     db.close()
     //return
     tableExisting
   }
 
-  override def dropTable(implicit session: SparkSession): Unit = throw new NotImplementedError
+  override def dropTable(implicit context: ActionPipelineContext): Unit = throw new NotImplementedError
 
   override def factory: FromConfigFactory[DataObject] = AccessTableDataObject
 }

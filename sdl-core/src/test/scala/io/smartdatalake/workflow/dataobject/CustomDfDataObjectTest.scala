@@ -32,6 +32,8 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
   private val customDfCreatorClassName = classOf[TestCustomDfCreator].getName
   private val customDfCreatorWithSchemaClassName = classOf[TestCustomDfCreatorWithSchema].getName
 
+  private val context = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
+
   test("During init where a schema method is provided, the schema of the schema method should be returned") {
     // prepare
     val config = CustomDfCreatorConfig(Option(customDfCreatorWithSchemaClassName))
@@ -39,7 +41,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // run
-    val df = customDfDataObject.getDataFrame(Seq())(session, context)
+    val df = customDfDataObject.getDataFrame(Seq())(context)
 
     // check
     assert(df.schema.equals(customDfDataObject.creator.schema.get))
@@ -49,11 +51,9 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     // prepare
     val config = CustomDfCreatorConfig(Option(customDfCreatorWithSchemaClassName))
     val customDfDataObject = CustomDfDataObject("testId", config)
-    val context: ActionPipelineContext =
-      ActionPipelineContext("testFeed", "testApp", SDLExecutionId.executionId1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
 
     // run
-    val df = customDfDataObject.getDataFrame(Seq())(session, context)
+    val df = customDfDataObject.getDataFrame(Seq())(context)
 
     // check
     assert(df.schema.equals(customDfDataObject.creator.exec.schema))
@@ -66,7 +66,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // run
-    val df = customDfDataObject.getDataFrame(Seq())(session, context)
+    val df = customDfDataObject.getDataFrame(Seq())(context)
 
     // check
     assert(df.count() == 0)
@@ -76,11 +76,9 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     // prepare
     val config = CustomDfCreatorConfig(Option(customDfCreatorWithSchemaClassName))
     val customDfDataObject = CustomDfDataObject("testId", config)
-    val context: ActionPipelineContext =
-      ActionPipelineContext("testFeed", "testApp", SDLExecutionId.executionId1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
 
     // run
-    val df = customDfDataObject.getDataFrame(Seq())(session, context)
+    val df = customDfDataObject.getDataFrame(Seq())(context)
 
     // check
     assert(df.count() == 2)
@@ -93,7 +91,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // run
-    val df = customDfDataObject.getDataFrame(Seq())(session, context)
+    val df = customDfDataObject.getDataFrame(Seq())(context)
 
     // check
     assert(df.count() == 2)
@@ -103,11 +101,9 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     // prepare
     val config = CustomDfCreatorConfig(Option(customDfCreatorClassName))
     val customDfDataObject = CustomDfDataObject("testId", config)
-    val context: ActionPipelineContext =
-      ActionPipelineContext("testFeed", "testApp", SDLExecutionId.executionId1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
 
     // run
-    val df = customDfDataObject.getDataFrame(Seq())(session, context)
+    val df = customDfDataObject.getDataFrame(Seq())(context)
 
     // check
     assert(df.count() == 2)

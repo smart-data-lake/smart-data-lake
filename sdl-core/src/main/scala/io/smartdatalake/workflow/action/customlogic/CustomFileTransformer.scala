@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.action.customlogic
 
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.{CustomCodeUtil, SmartDataLakeLogger}
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
 import org.slf4j.Logger
 
@@ -55,6 +56,7 @@ case class CustomFileTransformerConfig( className: Option[String] = None, scalaF
   }.orElse{
     scalaFile.map {
       file =>
+        implicit val defaultHadoopConf: Configuration = new Configuration()
         val fnTransform = CustomCodeUtil.compileCode[(Map[String,String], FSDataInputStream, FSDataOutputStream, Logger) => Option[Exception]](HdfsUtil.readHadoopFile(file))
         new CustomFileTransformerWrapper( fnTransform )
     }
