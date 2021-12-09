@@ -65,6 +65,7 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
   test("action dag with 2 actions in sequence where 2nd action reads different schema than produced by last action") {
     // Note: Some DataObjects remove & add columns on read (e.g. KafkaTopicDataObject, SparkFileDataObject)
     // In this cases we have to break the lineage und create a dummy DataFrame in init phase.
+    implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     val feed = "actionpipeline"
@@ -82,9 +83,6 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
     instanceRegistry.register(tgt2DO)
 
     // prepare DAG
-    val refTimestamp1 = LocalDateTime.now()
-    val appName = "test"
-    implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
     val l1 = Seq(("doe-john", 5)).toDF("key", "value")
     srcDO.writeDataFrame(l1, Seq())
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id)

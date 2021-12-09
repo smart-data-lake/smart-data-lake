@@ -114,7 +114,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
   assert(saveMode==SDLSaveMode.Append || saveMode==SDLSaveMode.Overwrite || saveMode==SDLSaveMode.Merge, s"($id) Only saveMode Append, Overwrite and Merge are supported.")
 
-  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def prepare(implicit context: ActionPipelineContext): Unit = {
 
     // test connection
     try {
@@ -138,9 +138,9 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     val queryOrTable = Map(table.query.map(q => ("query",q)).getOrElse("dbtable"->table.fullName))
-    val df = session.read.format("jdbc")
+    val df = context.sparkSession.read.format("jdbc")
       .options(options)
       .options(connection.getAuthModeSparkOptions)
       .options(queryOrTable)
@@ -149,7 +149,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     df.colNamesLowercase
   }
 
-  override def init(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def init(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
     validateSchemaMin(df, "write")
     validateSchemaHasPartitionCols(df, "write")
     validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
@@ -167,7 +168,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
    * SDL Schema evolution allows to add new columns or change datatypes.
    * Deleted columns will remain in the table and are made nullable.
    */
-  private def evolveTableSchema(newSchemaRaw: StructType)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  private def evolveTableSchema(newSchemaRaw: StructType)(implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
     val existingSchema = getExistingSchema.get
     val newSchema = if (SchemaUtil.isSparkCaseSensitive) newSchemaRaw else StructType(SchemaUtil.prepareSchemaForDiff(newSchemaRaw, ignoreNullable = false, caseSensitive = false))
     // prepare changes
@@ -210,7 +212,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+                             (implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
     require(table.query.isEmpty, s"($id) Cannot write to jdbc DataObject defined by a query.")
     validateSchemaMin(df, "write")
     validateSchemaHasPartitionCols(df, "write")
@@ -244,7 +247,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
    * Table.primaryKey is used as condition to check if a record is matched or not. If it is matched it gets updated (or deleted), otherwise it is inserted.
    * This all is done in one transaction.
    */
-  def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
     assert(table.primaryKey.exists(_.nonEmpty), s"($id) table.primaryKey must be defined to use mergeDataFrameByPrimaryKey")
 
     // cleanup temp table if existing
@@ -289,23 +293,23 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       .save
   }
 
-  override def preRead(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def preRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.preRead(partitionValues)
     prepareAndExecSql(preReadSql, Some("preReadSql"), partitionValues)
   }
-  override def postRead(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def postRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postRead(partitionValues)
     prepareAndExecSql(postReadSql, Some("postReadSql"), partitionValues)
   }
-  override def preWrite(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def preWrite(implicit context: ActionPipelineContext): Unit = {
     super.preWrite
     prepareAndExecSql(preWriteSql, Some("preWriteSql"), Seq()) // no partition values here...
   }
-  override def postWrite(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)
     prepareAndExecSql(postWriteSql, Some("postWriteSql"), partitionValues)
   }
-  private def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  private def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     sqlOpt.foreach { sql =>
       val data = DefaultExpressionData.from(context, partitionValues)
       val preparedSql = SparkExpressionUtil.substitute(id, configName, sql, data)
@@ -316,7 +320,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
   // cache response to avoid jdbc query.
   private var cachedIsDbExisting: Option[Boolean] = None
-  override def isDbExisting(implicit session: SparkSession): Boolean = {
+  override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
+    implicit val session: SparkSession = context.sparkSession
     cachedIsDbExisting.getOrElse {
       cachedIsDbExisting = Option(connection.catalog.isDbExisting(table.db.get))
       cachedIsDbExisting.get
@@ -324,7 +329,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
   // cache if table is existing to avoid jdbc query.
   private var cachedIsTableExisting: Option[Boolean] = None
-  override def isTableExisting(implicit session: SparkSession): Boolean = {
+  override def isTableExisting(implicit context: ActionPipelineContext): Boolean = {
+    implicit val session: SparkSession = context.sparkSession
     cachedIsTableExisting.getOrElse {
       val existing = connection.catalog.isTableExisting(table.fullName)
       if (existing) cachedIsTableExisting = Some(existing) // only cache if existing, otherwise query again later
@@ -333,7 +339,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
   // cache response to avoid jdbc query.
   private var cachedExistingSchema: Option[StructType] = None
-  private def getExistingSchema(implicit session: SparkSession, context: ActionPipelineContext): Option[StructType] = {
+  private def getExistingSchema(implicit context: ActionPipelineContext): Option[StructType] = {
     if (isTableExisting && cachedExistingSchema.isEmpty) {
       cachedExistingSchema = Some(getDataFrame().schema)
       // convert to lowercase when Spark is in non-casesensitive mode
@@ -342,15 +348,15 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     cachedExistingSchema
   }
 
-  private def validateSchemaOnWrite(df: DataFrame)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  private def validateSchemaOnWrite(df: DataFrame)(implicit context: ActionPipelineContext): Unit = {
     getExistingSchema.foreach(schema => validateSchema(df, schema, "write"))
   }
 
-  def deleteAllData(implicit session: SparkSession): Unit = {
+  def deleteAllData(): Unit = {
     connection.execJdbcStatement(s"delete from ${table.fullName}")
   }
 
-  override def dropTable(implicit session: SparkSession): Unit = {
+  override def dropTable(implicit context: ActionPipelineContext): Unit = {
     connection.dropTable(table.fullName)
   }
 
@@ -359,7 +365,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   /**
    * Listing virtual partitions by a "select distinct partition-columns" query
    */
-  override def listPartitions(implicit session: SparkSession, context: ActionPipelineContext): Seq[PartitionValues] = {
+  override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     if (partitions.nonEmpty) {
       PartitionValues.fromDataFrame(getDataFrame().select(partitions.map(col):_*).distinct)
     } else Seq()
@@ -368,7 +374,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   /**
    * Delete virtual partitions by "delete from" statement
    */
-  override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = {
+  override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     if (partitionValues.nonEmpty) {
       val partitionsColss = partitionValues.map(_.keys).distinct
       assert(partitionsColss.size == 1, "All partition values must have the same set of partition columns defined!")
@@ -385,7 +391,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
   // jdbc column metadata - exact column metadata needed to check schema with case-sensitive column names
   private var _cachedJdbcColumnMetadata: Option[Seq[JdbcColumn]] = None
-  private def jdbcColumnMetadata(implicit session: SparkSession): Option[Seq[JdbcColumn]] = {
+  private def jdbcColumnMetadata(implicit context: ActionPipelineContext): Option[Seq[JdbcColumn]] = {
     if (isTableExisting && _cachedJdbcColumnMetadata.isEmpty) {
       // try reading from jdbc database metadata
       _cachedJdbcColumnMetadata = if (table.query.isEmpty) Try {
@@ -416,13 +422,13 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
     _cachedJdbcColumnMetadata
   }
-  private def getJdbcColumn(sparkColName: String)(implicit session: SparkSession): Option[JdbcColumn] = {
+  private def getJdbcColumn(sparkColName: String)(implicit context: ActionPipelineContext): Option[JdbcColumn] = {
     if (SchemaUtil.isSparkCaseSensitive) jdbcColumnMetadata.flatMap(_.find(_.name == sparkColName))
     else jdbcColumnMetadata.flatMap(_.find(_.nameEqualsIgnoreCaseSensitive(sparkColName)))
   }
 
   // if we generate sql statements with column names we need to care about quoting them properly
-  private def quoteCaseSensitiveColumn(column: String)(implicit session: SparkSession): String = {
+  private def quoteCaseSensitiveColumn(column: String)(implicit context: ActionPipelineContext): String = {
     if (SchemaUtil.isSparkCaseSensitive) connection.catalog.quoteIdentifier(column)
     else {
       val jdbcColumn = getJdbcColumn(column)

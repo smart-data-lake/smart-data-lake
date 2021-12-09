@@ -47,9 +47,9 @@ abstract class SparkOneToOneActionImpl extends SparkActionImpl {
    * @param outputSubFeed [[SparkSubFeed]] to be enriched with transformed result
    * @return transformed output [[SparkSubFeed]]
    */
-  def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed
+  def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit context: ActionPipelineContext): SparkSubFeed
 
-  override final def transform(inputSubFeeds: Seq[SparkSubFeed], outputSubFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
+  override final def transform(inputSubFeeds: Seq[SparkSubFeed], outputSubFeeds: Seq[SparkSubFeed])(implicit context: ActionPipelineContext): Seq[SparkSubFeed] = {
     assert(inputSubFeeds.size == 1, s"($id) Only one inputSubFeed allowed")
     assert(outputSubFeeds.size == 1, s"($id) Only one outputSubFeed allowed")
     val transformedSubFeed = transform(inputSubFeeds.head, outputSubFeeds.head)
@@ -66,7 +66,7 @@ abstract class SparkOneToOneActionImpl extends SparkActionImpl {
                       standardizeDatatypes: Boolean,
                       additionalTransformers: Seq[DfTransformer],
                       filterClauseExpr: Option[Column] = None)
-                     (implicit session: SparkSession, context: ActionPipelineContext): Seq[DfTransformer] = {
+                     (implicit context: ActionPipelineContext): Seq[DfTransformer] = {
     Seq(
       transformation.map(t => t.impl),
       columnBlacklist.map(l => BlacklistTransformer(columnBlacklist = l)),
@@ -77,7 +77,7 @@ abstract class SparkOneToOneActionImpl extends SparkActionImpl {
     ).flatten ++ additionalTransformers
   }
 
-  override final def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override final def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
     assert(inputSubFeeds.size == 1, s"($id) Only one inputSubFeed allowed")
     assert(outputSubFeeds.size == 1, s"($id) Only one outputSubFeed allowed")
     if (isAsynchronousProcessStarted) return
@@ -89,12 +89,12 @@ abstract class SparkOneToOneActionImpl extends SparkActionImpl {
    * Executes operations needed after executing an action for the SubFeed.
    * Can be implemented by sub classes.
    */
-  def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
+  def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = Unit
 
   /**
    * apply transformer to SubFeed
    */
-  protected def applyTransformers(transformers: Seq[DfTransformer], inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  protected def applyTransformers(transformers: Seq[DfTransformer], inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit context: ActionPipelineContext): SparkSubFeed = {
     val transformedSubFeed = transformers.foldLeft(inputSubFeed){
       case (subFeed, transformer) => transformer.applyTransformation(id, subFeed)
     }

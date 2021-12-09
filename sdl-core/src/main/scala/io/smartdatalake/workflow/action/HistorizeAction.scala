@@ -18,11 +18,10 @@
  */
 package io.smartdatalake.workflow.action
 
-import java.time.LocalDateTime
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{Condition, ExecutionMode, HiveConventions, SaveModeMergeOptions, SaveModeOptions, TechnicalTableColumn}
+import io.smartdatalake.definitions._
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.historization.{Historization, HistorizationRecordOperations}
@@ -33,6 +32,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
+import java.time.LocalDateTime
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -141,7 +141,7 @@ case class HistorizeAction(
 
   validateConfig()
 
-  private def getTransformers(implicit session: SparkSession, context: ActionPipelineContext): Seq[DfTransformer] = {
+  private def getTransformers(implicit context: ActionPipelineContext): Seq[DfTransformer] = {
     val capturedTs = context.referenceTimestamp.getOrElse(LocalDateTime.now)
     val pks = output.table.primaryKey.get // existance is validated earlier
 
@@ -160,15 +160,16 @@ case class HistorizeAction(
     getTransformers(transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, transformers :+ historizeTransformer)
   }
 
-  override def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  override def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit context: ActionPipelineContext): SparkSubFeed = {
     applyTransformers(getTransformers, inputSubFeed, outputSubFeed)
   }
 
-  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
     applyTransformers(getTransformers, partitionValues)
   }
 
-  protected def fullHistorizeDataFrame(existingDf: Option[DataFrame], pks: Seq[String], refTimestamp: LocalDateTime)(newDf: DataFrame)(implicit session: SparkSession): DataFrame = {
+  protected def fullHistorizeDataFrame(existingDf: Option[DataFrame], pks: Seq[String], refTimestamp: LocalDateTime)(newDf: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
+    implicit val session: SparkSession = context.sparkSession
 
     val newFeedDf = newDf.dropDuplicates(pks)
 
@@ -192,7 +193,8 @@ case class HistorizeAction(
     } else Historization.getFullInitialHistory(newFeedDf, refTimestamp)
   }
 
-  protected def incrementalHistorizeDataFrame(existingDf: Option[DataFrame], pks: Seq[String], refTimestamp: LocalDateTime)(newDf: DataFrame)(implicit session: SparkSession): DataFrame = {
+  protected def incrementalHistorizeDataFrame(existingDf: Option[DataFrame], pks: Seq[String], refTimestamp: LocalDateTime)(newDf: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
+    implicit val session: SparkSession = context.sparkSession
 
     val newFeedDf = newDf.dropDuplicates(pks)
 

@@ -34,7 +34,7 @@ private[smartdatalake] trait FileDataObject extends DataObject with CanHandlePar
     */
   protected val separator = Path.SEPARATOR_CHAR // default is to use hadoop separator. DataObjects can override this if not suitable.
 
-  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
   }
@@ -42,5 +42,5 @@ private[smartdatalake] trait FileDataObject extends DataObject with CanHandlePar
   /**
    * Make a given path relative to this DataObjects base path
    */
-  def relativizePath(filePath: String)(implicit session: SparkSession): String
+  def relativizePath(filePath: String)(implicit context: ActionPipelineContext): String
 }

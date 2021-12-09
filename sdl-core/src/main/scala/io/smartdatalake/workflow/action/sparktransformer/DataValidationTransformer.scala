@@ -37,7 +37,7 @@ import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 case class DataValidationTransformer(override val name: String = "dataValidation", override val description: Option[String] = None, rules: Seq[ValidationRule], errorsColumn: String = "errors") extends ParsableDfTransformer {
   // check that rules are parsable
   rules.foreach(_.getValidationColumn)
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
     df.withColumn(errorsColumn, flatten(array(rules.map(rule => array(rule.getValidationColumn)): _*))) // nested array and flatten is used to eliminate null entries
   }
   override def factory: FromConfigFactory[ParsableDfTransformer] = DataValidationTransformer
@@ -50,7 +50,7 @@ object DataValidationTransformer extends FromConfigFactory[ParsableDfTransformer
 }
 
 sealed trait ValidationRule {
-  def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
+  def prepare(implicit context: ActionPipelineContext): Unit = Unit
   def getValidationColumn: Column
 }
 

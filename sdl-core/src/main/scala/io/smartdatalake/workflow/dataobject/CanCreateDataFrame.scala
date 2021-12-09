@@ -25,14 +25,14 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 
 private[smartdatalake] trait CanCreateDataFrame {
 
-  def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext) : DataFrame
+  def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext) : DataFrame
 
   /**
    * Creates the read schema based on a given write schema.
    * Normally this is the same, but some DataObjects can remove & add columns on read (e.g. KafkaTopicDataObject, SparkFileDataObject)
    * In this cases we have to break the DataFrame lineage und create a dummy DataFrame in init phase.
    */
-  def createReadSchema(writeSchema: StructType)(implicit session: SparkSession): StructType = writeSchema
+  def createReadSchema(writeSchema: StructType)(implicit context: ActionPipelineContext): StructType = writeSchema
 
   protected def addFieldIfNotExisting(writeSchema: StructType, colName: String, dataType: DataType): StructType = {
     if (!writeSchema.fieldNames.contains(colName)) writeSchema.add(colName, dataType)

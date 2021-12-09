@@ -21,15 +21,15 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.SerializableHadoopConfiguration
+import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.spark.sql.SparkSession
 
 trait HasHadoopStandardFilestore extends CanHandlePartitions { this: DataObject =>
 
   /**
-   * Creates a cached hadoop [[FileSystem]] for the provided [[SparkSession]].
+   * Creates a cached hadoop [[FileSystem]] with the Hadoop configuration of the context.
    */
-  private[smartdatalake] def filesystem(implicit session: SparkSession): FileSystem = {
+  private[smartdatalake] def filesystem(implicit context: ActionPipelineContext): FileSystem = {
     if (filesystemHolder == null) filesystemHolder = getFilesystem(hadoopPath)
     filesystemHolder
   }
@@ -37,13 +37,13 @@ trait HasHadoopStandardFilestore extends CanHandlePartitions { this: DataObject 
   private var serializableHadoopConf: SerializableHadoopConfiguration = _ // we must serialize hadoop config for CustomFileAction running transformation on executors
 
   /**
-   * Creates a hadoop [[FileSystem]] for the provided [[SparkSession]] and [[Path]].
+   * Creates a hadoop [[FileSystem]] for [[Path]] with the Hadoop configuration of the context.
    */
-  private[smartdatalake] def getFilesystem(path: Path)(implicit session: SparkSession) = {
+  private[smartdatalake] def getFilesystem(path: Path)(implicit context: ActionPipelineContext): FileSystem = {
     if (serializableHadoopConf == null) {
-      serializableHadoopConf = new SerializableHadoopConfiguration(session.sparkContext.hadoopConfiguration)
+      serializableHadoopConf = context.serializableHadoopConf
     }
-    HdfsUtil.getHadoopFsWithConf(path, serializableHadoopConf.get)
+    HdfsUtil.getHadoopFsWithConf(path)(serializableHadoopConf.get) // this must use serializable HadoopConfiguration to be distributed.
   }
 
   /**
@@ -55,5 +55,5 @@ trait HasHadoopStandardFilestore extends CanHandlePartitions { this: DataObject 
     else None
   }
 
-  private[smartdatalake] def hadoopPath(implicit session: SparkSession): Path
+  private[smartdatalake] def hadoopPath(implicit context: ActionPipelineContext): Path
 }

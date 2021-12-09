@@ -71,12 +71,12 @@ case class CustomSparkAction (override val id: ActionId,
 
   validateConfig()
 
-  override def transform(inputSubFeeds: Seq[SparkSubFeed], outputSubFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
+  override def transform(inputSubFeeds: Seq[SparkSubFeed], outputSubFeeds: Seq[SparkSubFeed])(implicit context: ActionPipelineContext): Seq[SparkSubFeed] = {
     val partitionValues = getMainPartitionValues(inputSubFeeds)
     applyTransformers(transformers ++ transformer.map(_.impl), partitionValues, inputSubFeeds, outputSubFeeds)
   }
 
-  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
     applyTransformers(transformers ++ transformer.map(_.impl).toSeq, partitionValues)
   }
 

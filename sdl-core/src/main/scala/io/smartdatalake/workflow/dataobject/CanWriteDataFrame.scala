@@ -35,7 +35,7 @@ private[smartdatalake] trait CanWriteDataFrame {
    * Called during init phase for checks and initialization.
    * If possible dont change the system until execution phase.
    */
-  def init(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
+  def init(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = Unit
 
   /**
    * Write DataFrame to DataObject
@@ -43,14 +43,14 @@ private[smartdatalake] trait CanWriteDataFrame {
    * @param partitionValues partition values included in DataFrames data
    * @param isRecursiveInput if DataFrame needs this DataObject as input - special treatment might be needed in this case.
    */
-  def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)(implicit session: SparkSession, context: ActionPipelineContext): Unit
+  def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit
 
   /**
    * Write DataFrame to specific Path with properties of this DataObject.
    * This is needed for compacting partitions by housekeeping.
    * Note: this is optional to implement.
    */
-  private[smartdatalake] def writeDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit session: SparkSession): Unit = throw new RuntimeException("writeDataFrameToPath not implemented")
+  private[smartdatalake] def writeDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = throw new RuntimeException("writeDataFrameToPath not implemented")
 
   /**
    * Write Spark structured streaming DataFrame
@@ -62,7 +62,7 @@ private[smartdatalake] trait CanWriteDataFrame {
    * @param checkpointLocation location for checkpoints of streaming query
    */
   def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String,String], checkpointLocation: String, queryName: String, outputMode: OutputMode = OutputMode.Append, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit session: SparkSession, context: ActionPipelineContext): StreamingQuery = {
+                             (implicit context: ActionPipelineContext): StreamingQuery = {
 
     // lambda function is ambiguous with foreachBatch in scala 2.12... we need to create a real function...
     // Note: no partition values supported when writing streaming target
