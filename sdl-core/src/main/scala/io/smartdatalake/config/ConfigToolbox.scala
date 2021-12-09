@@ -20,6 +20,7 @@
 package io.smartdatalake.config
 
 import io.smartdatalake.app.GlobalConfig
+import org.apache.hadoop.conf.Configuration
 
 /**
  * Helper methods to use config outside of SmartDataLakeBuilder, e.g. Notebooks
@@ -34,7 +35,8 @@ object ConfigToolbox {
    */
   def loadAndParseConfig(locations: Seq[String]): (InstanceRegistry, GlobalConfig) = {
     // load config
-    val config = ConfigLoader.loadConfigFromFilesystem(locations)
+    val defaultHadoopConf: Configuration = new Configuration()
+    val config = ConfigLoader.loadConfigFromFilesystem(locations, defaultHadoopConf)
     val globalConfig = GlobalConfig.from(config)
     val registry = ConfigParser.parse(config)
     (registry, globalConfig)

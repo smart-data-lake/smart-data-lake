@@ -37,7 +37,7 @@ trait DfsTransformer extends PartitionValueTransformer {
   /**
    * Optional function to implement validations in prepare phase.
    */
-  def prepare(actionId: ActionId)(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
+  def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = Unit
   /**
    * Function to be implemented to define the transformation between many inputs and many outputs (n:m)
    * @param actionId id of the action which executes this transformation. This is mainly used to prefix error messages.
@@ -45,9 +45,9 @@ trait DfsTransformer extends PartitionValueTransformer {
    * @param dfs Map of (dataObjectId, DataFrame) tuples available as input
    * @return Map of transformed (dataObjectId, DataFrame) tuples
    */
-  def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame])(implicit session: SparkSession, context: ActionPipelineContext): Map[String,DataFrame]
+  def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame])(implicit context: ActionPipelineContext): Map[String,DataFrame]
 
-  private[smartdatalake] def applyTransformation(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame])(implicit session: SparkSession, context: ActionPipelineContext): (Map[String,DataFrame], Seq[PartitionValues]) = {
+  private[smartdatalake] def applyTransformation(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame])(implicit context: ActionPipelineContext): (Map[String,DataFrame], Seq[PartitionValues]) = {
     val transformedDfs = transform(actionId, partitionValues, dfs)
     val transformedPartitionValues = transformPartitionValues(actionId, partitionValues).map(_.values.toSeq.distinct)
       .getOrElse(partitionValues)
@@ -70,7 +70,7 @@ trait OptionsDfsTransformer extends ParsableDfsTransformer {
    * see also [[DfsTransformer.transform()]]
    * @param options Options specified in the configuration for this transformation, including evaluated runtimeOptions
    */
-  def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame], options: Map[String,String])(implicit session: SparkSession): Map[String,DataFrame]
+  def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame], options: Map[String,String])(implicit context: ActionPipelineContext): Map[String,DataFrame]
 
   /**
    * Optional function to define the transformation of input to output partition values.
@@ -79,15 +79,15 @@ trait OptionsDfsTransformer extends ParsableDfsTransformer {
    * see also [[DfsTransformer.transformPartitionValues()]]
    * @param options Options specified in the configuration for this transformation, including evaluated runtimeOptions
    */
-  def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String,String])(implicit session: SparkSession): Option[Map[PartitionValues,PartitionValues]] = None
+  def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String,String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = None
 
-  override def transformPartitionValues(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = {
+  override def transformPartitionValues(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = {
     // replace runtime options
     val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
     // transform
     transformPartitionValuesWithOptions(actionId, partitionValues, options ++ runtimeOptionsReplaced)
   }
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame])(implicit session: SparkSession, context: ActionPipelineContext): Map[String,DataFrame] = {
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame])(implicit context: ActionPipelineContext): Map[String,DataFrame] = {
     // replace runtime options
     val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
     // transform

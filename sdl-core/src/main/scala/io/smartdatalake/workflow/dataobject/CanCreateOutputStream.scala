@@ -30,17 +30,17 @@ private[smartdatalake] trait CanCreateOutputStream {
    * This is called before any output stream is created to initialize writing.
    * It is used to apply SaveMode, e.g. deleting existing partitions.
    */
-  def startWritingOutputStreams(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): Unit
+  def startWritingOutputStreams(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): Unit
 
   /**
    * Create an OutputStream for a given path, that the Action can use to write data into.
    */
-  def createOutputStream(path: String, overwrite: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): OutputStream
+  def createOutputStream(path: String, overwrite: Boolean)(implicit context: ActionPipelineContext): OutputStream
 
   /**
    * This is called after all output streams have been written.
    * It is used for e.g. making sure empty partitions are created as well.
    */
-  def endWritingOutputStreams(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): Unit
+  def endWritingOutputStreams(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): Unit
 
 }

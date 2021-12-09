@@ -35,7 +35,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  */
 
 case class WhitelistTransformer(override val name: String = "whitelist", override val description: Option[String] = None, columnWhitelist: Seq[String]) extends ParsableDfTransformer {
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
     ActionHelper.filterWhitelist(columnWhitelist)(df)
   }
   override def factory: FromConfigFactory[ParsableDfTransformer] = WhitelistTransformer

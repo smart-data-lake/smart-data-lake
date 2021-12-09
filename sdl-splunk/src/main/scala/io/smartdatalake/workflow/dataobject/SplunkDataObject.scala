@@ -60,21 +60,22 @@ case class SplunkDataObject(override val id: DataObjectId,
   private implicit val rowSeqEncoder: Encoder[Seq[Row]] = Encoders.kryo[Seq[Row]]
   private implicit val queryTimeIntervalEncoder: Encoder[QueryTimeInterval] = Encoders.kryo[QueryTimeInterval]
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit spark: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     readFromSplunk(params)
   }
 
-  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = try {
+  override def prepare(implicit context: ActionPipelineContext): Unit = try {
     connection.test()
   } catch {
     case ex: Throwable => throw ConnectionTestException(s"($id) Can not connect. Error: ${ex.getMessage}", ex)
   }
 
-  private def readFromSplunk(params: SplunkParams)(implicit spark: SparkSession): DataFrame = {
+  private def readFromSplunk(params: SplunkParams)(implicit context: ActionPipelineContext): DataFrame = {
+    implicit val session: SparkSession = context.sparkSession
     val queryTimeIntervals = splitQueryTimes(params.queryFrom, params.queryTo, params.queryTimeInterval).repartition(params.parallelRequests)
     val searchResultRdd = queryTimeIntervals.map(interval => readRowsFromSplunk(interval, params)).as[Seq[Row]].rdd
     val searchResultRddFlattened = searchResultRdd.flatMap(identity)
-    val searchResultDf = spark.createDataFrame(searchResultRddFlattened, params.schema)
+    val searchResultDf = session.createDataFrame(searchResultRddFlattened, params.schema)
     searchResultDf
   }
 

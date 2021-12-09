@@ -96,7 +96,8 @@ case class XmlFileDataObject(override val id: DataObjectId,
    *   .load("partitionedDataObjectPath")
    *   .show
    */
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+    implicit val session: SparkSession = context.sparkSession
     import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 
     val wrongPartitionValues = PartitionValues.checkWrongPartitionValues(partitionValues, partitions)
@@ -148,7 +149,7 @@ case class XmlFileDataObject(override val id: DataObjectId,
     afterRead(df)
   }
 
-  override def afterRead(df: DataFrame)(implicit session: SparkSession): DataFrame  = {
+  override def afterRead(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame  = {
     val dfSuper = super.afterRead(df)
     if (flatten) {
       val parser = new DefaultFlatteningParser()
@@ -156,7 +157,7 @@ case class XmlFileDataObject(override val id: DataObjectId,
     } else dfSuper
   }
 
-  override def writeDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit session: SparkSession): Unit = {
+  override def writeDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
     assert(partitions.isEmpty, "writing XML-Files with partitions is not supported by spark-xml")
     super.writeDataFrameToPath(df, path, finalSaveMode)
   }

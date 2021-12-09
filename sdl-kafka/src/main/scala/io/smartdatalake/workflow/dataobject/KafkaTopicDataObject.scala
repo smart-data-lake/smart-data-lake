@@ -145,7 +145,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     new KafkaConsumer(props)
   }
 
-  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
     // test schema registry connection
     connection.testSchemaRegistry()
@@ -154,15 +154,15 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
   }
 
-  override def init(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def init(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
     // check schema compatibility
     require(df.columns.toSet == Set("key","value"), s"(${id}) Expects columns key, value in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
     convertToKafka(keyType, df("key"), SubjectType.key, eagerCheck = true)
     convertToKafka(valueType, df("value"), SubjectType.value, eagerCheck = true)
   }
 
-  override def getStreamingDataFrame(options: Map[String,String], schema: Option[StructType])(implicit session: SparkSession): DataFrame = {
-    val dfRaw = session
+  override def getStreamingDataFrame(options: Map[String,String], schema: Option[StructType])(implicit context: ActionPipelineContext): DataFrame = {
+    val dfRaw = context.sparkSession
       .readStream
       .format("kafka")
       .options(instanceOptions ++ options) // options override kafkaOptions override connection.kafkaOptions
@@ -187,7 +187,8 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     df
   }
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+    implicit val session: SparkSession = context.sparkSession
 
     // get DataFrame from topic
     val dfRaw = if (partitionValues.nonEmpty) {
@@ -275,7 +276,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+                             (implicit context: ActionPipelineContext): Unit = {
     convertToWriteDataFrame(df)
       .write
       .format("kafka")
@@ -285,7 +286,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   override def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String, String], checkpointLocation: String, queryName: String, outputMode: OutputMode, saveModeOptions: Option[SaveModeOptions] = None)
-                                      (implicit session: SparkSession, context: ActionPipelineContext): StreamingQuery = {
+                                      (implicit context: ActionPipelineContext): StreamingQuery = {
     convertToWriteDataFrame(df)
       .writeStream
       .format("kafka")
@@ -319,7 +320,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     }
   }
 
-  override def listPartitions(implicit session: SparkSession, context: ActionPipelineContext): Seq[PartitionValues] = {
+  override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     require(datePartitionCol.isDefined, s"(${id}) datePartitionCol column must be defined for listing partition values")
     val maxEmptyConsecutive: Int = 10 // number of empty partitions to stop searching for partitions
     val pctChronoUnitWaitToComplete = 0.02 // percentage of one chrono unit to wait after partition end date until the partition is assumed to be complete. This is to handle kafka late data.
@@ -362,7 +363,8 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       .map( startTime => PartitionValues(Map(datePartitionCol.get.colName -> datePartitionCol.get.format(startTime))))
   }
 
-  override def createReadSchema(writeSchema: StructType)(implicit session: SparkSession): StructType = {
+  override def createReadSchema(writeSchema: StructType)(implicit context: ActionPipelineContext): StructType = {
+    implicit val session: SparkSession = context.sparkSession
     // add additional columns created by kafka source
     val readSchemaRaw = writeSchema
       .add("topic", StringType)

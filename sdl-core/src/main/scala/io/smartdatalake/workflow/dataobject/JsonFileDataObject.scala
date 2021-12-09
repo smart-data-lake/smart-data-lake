@@ -26,6 +26,7 @@ import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -80,12 +81,12 @@ case class JsonFileDataObject( override val id: DataObjectId,
   private val formatOptionsDefault = Map("multiLine" -> "true")
   override val options: Map[String, String] = formatOptionsDefault ++ jsonOptions.getOrElse(Map())
 
-  override def afterRead(df: DataFrame)(implicit session: SparkSession): DataFrame  = {
+  override def afterRead(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame  = {
     val dfSuper = super.afterRead(df)
     if (stringify) dfSuper.castAll2String else dfSuper
   }
 
-  override def beforeWrite(df: DataFrame)(implicit session: SparkSession): DataFrame  = {
+  override def beforeWrite(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame  = {
     val dfSuper = super.beforeWrite(df)
     if (stringify) dfSuper.castAll2String else dfSuper
   }

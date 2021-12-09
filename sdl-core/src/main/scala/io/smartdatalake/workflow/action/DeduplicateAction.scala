@@ -137,7 +137,7 @@ case class DeduplicateAction(override val id: ActionId,
 
   validateConfig()
 
-  private def getTransformers(implicit session: SparkSession, context: ActionPipelineContext): Seq[DfTransformer] = {
+  private def getTransformers(implicit context: ActionPipelineContext): Seq[DfTransformer] = {
     val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
 
     val deduplicateTransformer = if (mergeModeEnable) {
@@ -158,12 +158,12 @@ case class DeduplicateAction(override val id: ActionId,
 
   }
 
-  override def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  override def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit context: ActionPipelineContext): SparkSubFeed = {
     checkRecordChangedColumns = inputSubFeed.dataFrame.map(_.columns.toSeq).getOrElse(Seq())
     applyTransformers(getTransformers, inputSubFeed, outputSubFeed)
   }
 
-  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
     applyTransformers(getTransformers, partitionValues)
   }
 
@@ -179,7 +179,7 @@ object DeduplicateAction extends FromConfigFactory[Action] {
   /**
    * deduplicates a SubFeed.
    */
-  def deduplicateDataFrame(existingDf: Option[DataFrame], pks: Seq[String], refTimestamp: LocalDateTime, ignoreOldDeletedColumns: Boolean, ignoreOldDeletedNestedColumns: Boolean)(df: DataFrame)(implicit session: SparkSession): DataFrame = {
+  def deduplicateDataFrame(existingDf: Option[DataFrame], pks: Seq[String], refTimestamp: LocalDateTime, ignoreOldDeletedColumns: Boolean, ignoreOldDeletedNestedColumns: Boolean)(df: DataFrame): DataFrame = {
     assert(!df.columns.contains(rnkColName), s"Column $rnkColName not allowed in DataFrame for DeduplicateAction")
 
     // enhance
@@ -200,7 +200,7 @@ object DeduplicateAction extends FromConfigFactory[Action] {
    * @param newDf  new data
    * @return deduplicated data
    */
-  def deduplicate(baseDf: DataFrame, newDf: DataFrame, keyColumns: Seq[String])(implicit session: SparkSession): DataFrame = {
+  def deduplicate(baseDf: DataFrame, newDf: DataFrame, keyColumns: Seq[String]): DataFrame = {
     baseDf.unionByName(newDf)
       .withColumn(rnkColName, row_number().over(Window.partitionBy(keyColumns.map(col): _*).orderBy(col(TechnicalTableColumn.captured).desc)))
       .where(col(rnkColName) === 1)
@@ -210,7 +210,7 @@ object DeduplicateAction extends FromConfigFactory[Action] {
   /**
    * enhance DataFrame with captured column
    */
-  def enhanceDataFrame(refTimestamp: LocalDateTime)(df: DataFrame)(implicit session: SparkSession): DataFrame = {
+  def enhanceDataFrame(refTimestamp: LocalDateTime)(df: DataFrame): DataFrame = {
     df.withColumn(TechnicalTableColumn.captured, ActionHelper.ts1(refTimestamp))
   }
 

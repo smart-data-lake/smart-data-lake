@@ -24,6 +24,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData}
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, CustomDfsTransformer}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -41,10 +42,10 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  */
 case class ScalaClassDfsTransformer(override val name: String = "scalaTransform", override val description: Option[String] = None, className: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsDfsTransformer {
   private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDfsTransformer](className)
-  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame], options: Map[String, String])(implicit session: SparkSession): Map[String,DataFrame] = {
-    customTransformer.transform(session, options, dfs)
+  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String,DataFrame] = {
+    customTransformer.transform(context.sparkSession, options, dfs)
   }
-  override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit session: SparkSession): Option[Map[PartitionValues,PartitionValues]] = {
+  override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = {
    customTransformer.transformPartitionValues(options, partitionValues)
   }
   override def factory: FromConfigFactory[ParsableDfsTransformer] = ScalaClassDfsTransformer

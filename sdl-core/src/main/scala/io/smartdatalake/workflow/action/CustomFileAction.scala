@@ -37,7 +37,6 @@ import org.apache.spark.sql.SparkSession
  * @param inputId inputs DataObject
  * @param outputId output DataObject
  * @param transformer a custom file transformer, which reads a file from HadoopFileDataObject and writes it back to another HadoopFileDataObject
- * @param deleteDataAfterRead if the input files should be deleted after processing successfully
  * @param filesPerPartition number of files per Spark partition
  * @param executionMode optional execution mode for this Action
  * @param executionCondition     optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
@@ -64,17 +63,18 @@ case class CustomFileAction(override val id: ActionId,
   override val inputs: Seq[HadoopFileDataObject] = Seq(input)
   override val outputs: Seq[HadoopFileDataObject] = Seq(output)
 
-  override def transform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
+  override def transform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {
     assert(inputSubFeed.fileRefs.nonEmpty, "inputSubFeed.fileRefs must be defined for FileTransferAction.doTransform")
     val inputFileRefs = inputSubFeed.fileRefs.get
     outputSubFeed.copy(fileRefMapping = Some(output.translateFileRefs(inputFileRefs)))
   }
 
 
-  override def writeSubFeed(subFeed: FileSubFeed, isRecursive: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): WriteSubFeedResult = {
+  override def writeSubFeed(subFeed: FileSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult = {
     val fileRefMapping = subFeed.fileRefMapping.getOrElse(throw new IllegalStateException(s"($id) file mapping is not defined"))
     output.startWritingOutputStreams(subFeed.partitionValues)
     if (fileRefMapping.nonEmpty) {
+      val session = context.sparkSession
       import session.implicits._
 
       // Create a Dataset of files to be processed

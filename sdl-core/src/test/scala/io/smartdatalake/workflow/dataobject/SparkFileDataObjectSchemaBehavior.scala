@@ -32,7 +32,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
 
   def readNonExistingSources(createDataObject: (String, Option[StructType]) => DataObject with CanCreateDataFrame with UserDefinedSchema,
                                      fileExtension: String = null)
-                                         (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+                                         (implicit context: ActionPipelineContext): Unit = {
 
     test("It is not possible to read from an non-existing file without user-defined-schema.") {
       val path = tempFilePath(fileExtension)
@@ -43,7 +43,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
 
   def readEmptySources(createDataObject: (String, Option[StructType]) => DataObject with CanCreateDataFrame with UserDefinedSchema,
                        fileExtension: String = null)
-                      (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+                      (implicit context: ActionPipelineContext): Unit = {
 
     test("Reading from an empty file with user-defined schema results in an empty data frame.") {
       val schema = Seq(
@@ -52,6 +52,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
       )
 
       val path = tempFilePath(fileExtension)
+      val session = context.sparkSession
       import session.implicits._
       createFile(path, Seq.empty[String].toDF())
       try {
@@ -71,7 +72,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
 
   def readEmptySourcesWithEmbeddedSchema(createDataObject: (String, Option[StructType]) => DataObject with CanCreateDataFrame with UserDefinedSchema,
                        fileExtension: String = null)
-                      (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+                      (implicit context: ActionPipelineContext): Unit = {
 
     test("Reading an empty file creates an empty data frame with the user-defined schema.") {
       val embeddedSchema = Seq(
@@ -83,6 +84,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
       )
 
       val path = tempFilePath(fileExtension)
+      implicit val session: SparkSession = context.sparkSession
       createFile(path, DataFrameUtil.getEmptyDataFrame(StructType(embeddedSchema)))
       try {
         val dataObj = createDataObject(path, Some(StructType(userSchema)))
@@ -104,6 +106,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
       )
 
       val path = tempFilePath(fileExtension)
+      implicit val session: SparkSession = context.sparkSession
       createFile(path, DataFrameUtil.getEmptyDataFrame(StructType(embeddedSchema)))
       try {
         val dataObj = createDataObject(path, None)
@@ -122,7 +125,10 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
 
   def validateSchemaMinOnWrite(createDataObject: (String, Option[StructType], Option[StructType]) => DataObject with CanWriteDataFrame,
                                fileExtension: String = null)
-                              (implicit session: SparkSession, context: ActionPipelineContext) : Unit = {
+                              (implicit context: ActionPipelineContext) : Unit = {
+
+    implicit val session: SparkSession = context.sparkSession
+    import session.implicits._
 
     val schemaMin = Seq(
       StructField("id", StringType, nullable = true),
@@ -130,7 +136,6 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
     )
 
     test("Write - SchemaMin full match is valid.") {
-      import session.implicits._
       val path = tempFilePath(fileExtension)
       try {
         val df = Seq(
@@ -151,7 +156,6 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
     }
 
     test("Write - SchemaMin subset is valid.") {
-      import session.implicits._
       val path = tempFilePath(fileExtension)
       try {
         val df = Seq(
@@ -172,7 +176,6 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
     }
 
     test("Write - SchemaMin violation: invalid column name.") {
-      import session.implicits._
       val path = tempFilePath(fileExtension)
       try {
         val df = Seq(
@@ -194,7 +197,6 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
     }
 
     test("Write - SchemaMin violation: invalid data type.") {
-      import session.implicits._
       val path = tempFilePath(fileExtension)
       try {
         val df = Seq(
@@ -216,7 +218,6 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
     }
 
     test("Write - SchemaMin violation: missing columns.") {
-      import session.implicits._
       val path = tempFilePath(fileExtension)
       try {
         val df = Seq(
@@ -262,7 +263,10 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
 
   def validateSchemaMinOnRead(createDataObject: (String, Option[StructType], Option[StructType]) => DataObject with CanCreateDataFrame,
                                fileExtension: String = null)
-                              (implicit session: SparkSession, context: ActionPipelineContext) : Unit = {
+                              (implicit context: ActionPipelineContext) : Unit = {
+
+    implicit val session: SparkSession = context.sparkSession
+    import session.implicits._
 
     val schemaMin = Seq(
       StructField("id", StringType, nullable = true),
@@ -270,7 +274,6 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
     )
 
     test("Read - SchemaMin full match is valid.") {
-      import session.implicits._
       val path = tempFilePath(fileExtension)
       try {
         val df = Seq(
@@ -292,7 +295,6 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
     }
 
     test("Read - SchemaMin subset is valid.") {
-      import session.implicits._
       val path = tempFilePath(fileExtension)
       try {
         val df = Seq(
@@ -314,7 +316,6 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
     }
 
     test("Read - SchemaMin violation: invalid column name.") {
-      import session.implicits._
       val path = tempFilePath(fileExtension)
       try {
         val df = Seq(
@@ -337,7 +338,6 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
     }
 
     test("Read - SchemaMin violation: invalid data type.") {
-      import session.implicits._
       val path = tempFilePath(fileExtension)
       try {
         val df = Seq(
@@ -360,7 +360,6 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
     }
 
     test("Read - SchemaMin violation: missing columns.") {
-      import session.implicits._
       val path = tempFilePath(fileExtension)
       try {
         val df = Seq(
