@@ -20,7 +20,7 @@
 package io.smartdatalake.util.hdfs
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.SdlConfigObject.{ConfigObjectId, DataObjectId}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.dataobject.FileRef
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -50,12 +50,12 @@ import org.apache.spark.sql.types.IntegerType
 case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
                                keyCols: Seq[String] = Seq(),
                                sortCols: Seq[String] = Seq(),
-                               filename: Option[String] = None,
+                               filename: Option[String] = None
                               ) extends SmartDataLakeLogger {
+  import SparkRepartitionDef._
   assert(numberOfTasksPerPartition > 0, s"numberOfTasksPerPartition must be greater than 0")
 
   /**
-   *
    * @param df DataFrame to repartition
    * @param partitions DataObjects partition columns
    * @param partitionValues PartitionsValues to be written with this DataFrame
@@ -63,54 +63,12 @@ case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
    * @return
    */
   def prepareDataFrame(df: DataFrame, partitions: Seq[String], partitionValues: Seq[PartitionValues], dataObjectId: DataObjectId): DataFrame = {
-    // count partition values having all partition columns specified
+    // filter partition values having all partition columns specified
     val partitionsSet = partitions.toSet
-    val nbOfCompletePartitionValues = partitionValues.count(_.keys == partitionsSet)
-    // repartition spark DataFrame
-    val dfRepartitioned = if (partitions.nonEmpty) {
-      if (nbOfCompletePartitionValues == 0) { // writing partitioned data object with no partition values given
-        logger.info(s"($dataObjectId) SparkRepartitionDef: cannot multiply numberOfTasksPerPartition when writing with no partitions values to partitioned table. Will let spark decide about the number of tasks created, but use keyCols/rand to limit number of tasks with data.")
-        repartitionForMultiplePartitionValues(df, partitions, None, dataObjectId)
-      } else if (nbOfCompletePartitionValues == 1) { // writing partitioned data object with 1 partition value
-        repartitionForOnePartitionValue(df) // this is the same as writing an un-partitioned data object
-      } else { // nbOfPartitionValues > 1 -> writing partitioned data object with multiple partition values given
-        repartitionForMultiplePartitionValues(df, partitions, Some(nbOfCompletePartitionValues), dataObjectId)
-      }
-    } else { // un-partitioned data object
-      repartitionForOnePartitionValue(df) // this is the same as writing only one partition value
-    }
-    // sort within spark partitions
-    if (sortCols.nonEmpty) {
-      val sortColDirRegex = "([^\\s]+)\\s([^\\s]+)".r
-      val sortColRegex = "([^\\s]+)".r
-      val sortExprs = sortCols.map {
-        case sortColDirRegex(colName, sortDir) if sortDir == "asc" => col(colName).asc
-        case sortColDirRegex(colName, sortDir) if sortDir == "desc" => col(colName).desc
-        case sortColDirRegex(colName, sortDir) => throw new ConfigurationException(s"""($dataObjectId) Wrong sort direction ($sortDir) provided in [sparkRepartition.sortCols] entry "$sortCols". Sort direction must be asc or desc.""", Some("sparkRepartition.sortCols"))
-        case sortColRegex(colName) => col(colName).asc
-        case entry => throw new ConfigurationException(s"""($dataObjectId) Too many arguments provided in [sparkRepartition.sortCols] entry "$entry". Just provide colName or colName and sortDir separated by whitespace.""")
-      }
-      dfRepartitioned.sortWithinPartitions(sortExprs:_*)
-    }
-    else dfRepartitioned
-  }
-
-  private def repartitionForOnePartitionValue(df: DataFrame): DataFrame = {
-    if (keyCols.isEmpty || numberOfTasksPerPartition == 1) df.repartition(numberOfTasksPerPartition)
-    else df.repartition(numberOfTasksPerPartition, keyCols.map(col):_*)
-  }
-
-  private def repartitionForMultiplePartitionValues(df: DataFrame, partitions: Seq[String], nbOfPartitionValues: Option[Int], dataObjectId: DataObjectId): DataFrame = {
-    if (numberOfTasksPerPartition > 1 && keyCols.isEmpty) logger.info(s"($dataObjectId) SparkRepartitionDef: distribution of records over Spark tasks within Hadoop partitions not defined, using random value now. Define keyCols to have better control over the distribution.")
-    // to distribute records across tasks within partitions, we need calculate a task number from keyCols
-    val repartitionCols = if (numberOfTasksPerPartition == 1) partitions.map(col)
-    else if (keyCols.nonEmpty) partitions.map(col) :+ pmod(hash(keyCols.map(col): _*), lit(numberOfTasksPerPartition))
-    else partitions.map(col) :+ floor(rand * numberOfTasksPerPartition).cast(IntegerType)
-    if (nbOfPartitionValues.isDefined) {
-      df.repartition(numberOfTasksPerPartition * nbOfPartitionValues.get, repartitionCols: _*)
-    } else {
-      df.repartition(repartitionCols: _*)
-    }
+    val completePartitionValues = partitionValues.filter(_.keys == partitionsSet)
+    // process Dataframe
+    val dfRepartitioned = repartitionDataFrame(df, completePartitionValues, dataObjectId, keyCols, numberOfTasksPerPartition)
+    sortDataFrame(dfRepartitioned, dataObjectId, sortCols)
   }
 
   def renameFiles(fileRefs: Seq[FileRef])(implicit filesystem: FileSystem): Unit = {
@@ -126,6 +84,60 @@ case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
         }
       }
     }
+  }
+}
+
+object SparkRepartitionDef extends SmartDataLakeLogger {
+
+  def repartitionDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], configObjectId: ConfigObjectId, keyCols: Seq[String], numberOfTasksPerPartition: Int): DataFrame = {
+    val partitions = partitionValues.flatMap(_.keys)
+    if (partitions.nonEmpty) {
+      if (partitionValues.isEmpty) { // writing partitioned data object with no partition values given
+        logger.info(s"($configObjectId) SparkRepartitionDef: cannot multiply numberOfTasksPerPartition when writing with no partitions values to partitioned table. Will let spark decide about the number of tasks created, but use keyCols/rand to limit number of tasks with data.")
+        repartitionForMultiplePartitionValues(df, partitions, None, configObjectId, keyCols, numberOfTasksPerPartition)
+      } else if (partitionValues.size == 1) { // writing partitioned data object with 1 partition value
+        repartitionForOnePartitionValue(df, keyCols, numberOfTasksPerPartition) // this is the same as writing an un-partitioned data object
+      } else { // nbOfPartitionValues > 1 -> writing partitioned data object with multiple partition values given
+        repartitionForMultiplePartitionValues(df, partitions, Some(partitionValues.size), configObjectId, keyCols, numberOfTasksPerPartition)
+      }
+    } else { // un-partitioned data object
+      repartitionForOnePartitionValue(df, keyCols, numberOfTasksPerPartition) // this is the same as writing only one partition value
+    }
+  }
+
+  private def repartitionForOnePartitionValue(df: DataFrame, keyCols: Seq[String], numberOfTasksPerPartition: Int): DataFrame = {
+    if (keyCols.isEmpty || numberOfTasksPerPartition == 1) df.repartition(numberOfTasksPerPartition)
+    else df.repartition(numberOfTasksPerPartition, keyCols.map(col):_*)
+  }
+
+  private def repartitionForMultiplePartitionValues(df: DataFrame, partitions: Seq[String], nbOfPartitionValues: Option[Int], configObjectId: ConfigObjectId, keyCols: Seq[String], numberOfTasksPerPartition: Int): DataFrame = {
+    if (numberOfTasksPerPartition > 1 && keyCols.isEmpty) logger.info(s"($configObjectId) SparkRepartitionDef: distribution of records over Spark tasks within Hadoop partitions not defined, using random value now. Define keyCols to have better control over the distribution.")
+    // to distribute records across tasks within partitions, we need calculate a task number from keyCols
+    val repartitionCols = if (numberOfTasksPerPartition == 1) partitions.map(col)
+    else if (keyCols.nonEmpty) partitions.map(col) :+ pmod(hash(keyCols.map(col): _*), lit(numberOfTasksPerPartition))
+    else partitions.map(col) :+ floor(rand * numberOfTasksPerPartition).cast(IntegerType)
+    if (nbOfPartitionValues.isDefined) {
+      df.repartition(numberOfTasksPerPartition * nbOfPartitionValues.get, repartitionCols: _*)
+    } else {
+      df.repartition(repartitionCols: _*)
+    }
+  }
+
+  def sortDataFrame(df: DataFrame, configObjectId: ConfigObjectId, sortCols: Seq[String]): DataFrame = {
+    // sort within spark partitions
+    if (sortCols.nonEmpty) {
+      val sortColDirRegex = "([^\\s]+)\\s([^\\s]+)".r
+      val sortColRegex = "([^\\s]+)".r
+      val sortExprs = sortCols.map {
+        case sortColDirRegex(colName, sortDir) if sortDir == "asc" => col(colName).asc
+        case sortColDirRegex(colName, sortDir) if sortDir == "desc" => col(colName).desc
+        case sortColDirRegex(colName, sortDir) => throw new ConfigurationException(s"""($configObjectId) Wrong sort direction ($sortDir) provided in sortCols entry "$sortCols". Sort direction must be asc or desc.""", Some("sparkRepartition.sortCols"))
+        case sortColRegex(colName) => col(colName).asc
+        case entry => throw new ConfigurationException(s"""($configObjectId) Too many arguments provided in [sparkRepartition.sortCols] entry "$entry". Just provide colName or colName and sortDir separated by whitespace.""")
+      }
+      df.sortWithinPartitions(sortExprs: _*)
+    }
+    else df
   }
 
   private def renameFile(fileRef: FileRef, filename: String, idxOpt: Option[Int] = None)(implicit filesystem: FileSystem): Unit = {

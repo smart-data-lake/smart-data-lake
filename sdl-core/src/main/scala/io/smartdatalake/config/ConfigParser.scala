@@ -19,18 +19,18 @@
 package io.smartdatalake.config
 
 import com.typesafe.config.{Config, ConfigException, ConfigValueFactory, ConfigValueType}
-import configs.Result
 import configs.syntax._
-import io.smartdatalake.config.SdlConfigObject.{ActionId, ConfigObjectId, ConnectionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataobject.DataObject
 
+import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe._
+import scala.util.Try
 import scala.util.matching.Regex
-import scala.util.{Failure, Success, Try}
 
 /**
  * Entry point for SDL config object parsing.
@@ -48,30 +48,38 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
     implicit val registry: InstanceRegistry = instanceRegistry
 
     val connections: Map[ConnectionId, Connection] = getConnectionConfigMap(config)
-      .map{ case (id, config) => (ConnectionId(id), parseConfigObject[Connection](id, config))}
+      .map{ case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config))}
     registry.register(connections)
 
     val dataObjects: Map[DataObjectId, DataObject] = getDataObjectConfigMap(config)
-      .map{ case (id, config) => (DataObjectId(id), parseConfigObject[DataObject](id, config))}
+      .map{ case (id, config) => (DataObjectId(id), parseConfigObjectWithId[DataObject](id, config))}
     registry.register(dataObjects)
 
     val actions: Map[ActionId, Action] = getActionConfigMap(config)
-      .map{ case (id, config) => (ActionId(id), parseConfigObject[Action](id, config))}
+      .map{ case (id, config) => (ActionId(id), parseConfigObjectWithId[Action](id, config))}
     registry.register(actions)
 
     registry
   }
 
-  def getConnectionConfigMap(config: Config) = {
-    config.get[Map[String, Config]]("connections").valueOrElse(Map.empty)
+  final val CONFIG_SECTION_CONNECTIONS = "connections"
+  final val CONFIG_SECTION_DATAOBJECTS = "dataObjects"
+  final val CONFIG_SECTION_ACTIONS = "actions"
+  def getConnectionEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_CONNECTIONS)
+  def getDataObjectsEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_DATAOBJECTS)
+  def getActionsEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_ACTIONS)
+  def extractConfigKeys(config: Config, entry: String): Seq[String] = {
+    if (config.hasPath(entry)) config.getObject(entry).keySet().asScala.toSeq
+    else Seq()
   }
-
-  def getDataObjectConfigMap(config: Config) = {
-    config.get[Map[String, Config]]("dataObjects").valueOrElse(Map.empty)
-  }
-
-  def getActionConfigMap(config: Config) = {
-    config.get[Map[String, Config]]("actions").valueOrElse(Map.empty)
+  def getConnectionConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, CONFIG_SECTION_CONNECTIONS)
+  def getDataObjectConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, CONFIG_SECTION_DATAOBJECTS)
+  def getActionConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, CONFIG_SECTION_ACTIONS)
+  def extractConfigMap(config: Config, entry: String): Map[String, Config] = {
+    if (config.hasPath(entry)) {
+      config.get[Map[String, Config]](entry)
+        .valueOrThrow(e => new ConfigurationException(s"Error extracting $entry: ${e.messages.mkString(", ")}", Some(s"$entry")))
+    } else Map()
   }
 
   /**
@@ -79,53 +87,92 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
    *
    * The config is expected to contain only the settings for this instance.
    *
-   * @param id        the id to assign to this [[SdlConfigObject]].
    * @param config    the "local" config specifying this [[SdlConfigObject]].
+   * @param configPath the current path in the configuration. Note that this is only used for error messages.
+   * @param additionalConfigValues additional configuration values to add to the config before parsing.
    * @param registry  the [[InstanceRegistry]] to pass to the [[SdlConfigObject]] instance.
    * @tparam A        the abstract type this object, i.e.: [[Action]] or [[DataObject]]
    * @return          a new instance of this [[SdlConfigObject]].
    */
-  def parseConfigObject[A <: SdlConfigObject with ParsableFromConfig[A] : TypeTag](id: String, config: Config)
-                                                                        (implicit registry: InstanceRegistry): A = {
-    val configObjectType = typeOf[A]
-    val errId = configObjectType.typeSymbol.name.toString + "~" + id
-    try {
+  def parseConfigObject[A <: ParsableFromConfig[A] : TypeTag](config: Config, configPath: Option[String] = None, additionalConfigValues : Map[String,AnyRef] = Map())
+                                                             (implicit registry: InstanceRegistry): A = try {
+    // get class & module
+    val configuredType = config.get[String]("type")
+      .mapError(error => throw ConfigurationException(s"Required configuration setting 'type' is missing.", None, error.configException))
+      .value
+    val clazz = Class.forName(className(configuredType))
+    val mirror = runtimeMirror(clazz.getClassLoader)
+    val classSymbol = mirror.classSymbol(clazz)
+    require(classSymbol.companion.isModule, s"Can not instantiate ${classOf[DataObject].getSimpleName} of class '${clazz.getTypeName}'. It does not have a companion object.")
+    val companionObjectSymbol = classSymbol.companion.asModule
 
-      // get class & module
-      val clazz = Class.forName(className(id, config))
-      val mirror = runtimeMirror(clazz.getClassLoader)
-      val classSymbol = mirror.classSymbol(clazz)
-      require(classSymbol.companion.isModule, s"($errId) Can not instantiate ${classOf[DataObject].getSimpleName} of class '${clazz.getTypeName}'. It does not have a companion object.")
-      val companionObjectSymbol = classSymbol.companion.asModule
+    // get factory method
+    logger.debug(s"Instance requested for '${clazz.getTypeName}'. Extracting factory method from companion object.")
+    val factoryMethod: FactoryMethod[A] = new FactoryMethod(companionObjectSymbol, FactoryMethodExtractor.extract(companionObjectSymbol))
 
-      // get factory method
-      logger.debug(s"Instance requested for '${clazz.getTypeName}'. Extracting factory method from companion object.")
-      val factoryMethod: FactoryMethod[A] = new FactoryMethod(companionObjectSymbol, FactoryMethodExtractor.extract(companionObjectSymbol))
-
-      // prepare refined config
-      val configWithId = config
-        .withValue("id", ConfigValueFactory.fromAnyRef(id))
-        .withoutPath("type")
-      val refinedConfig = Environment.configPathsForLocalSubstitution.foldLeft(configWithId) {
-        case (config, path) => try {
+    // prepare refined config
+    val configExtended = additionalConfigValues.foldLeft(config){
+      case (config, (key,value)) => config.withValue(key, ConfigValueFactory.fromAnyRef(value))
+    }
+    .withoutPath("type")
+    val configSubstituted = Environment.configPathsForLocalSubstitution.foldLeft(configExtended) {
+      case (config, path) => try {
           localSubstitution(config, path)
         } catch {
-          case e: ConfigurationException => throw ConfigurationException(s"($errId) Error in local config substitution for object with id='$id' and path='$path': ${e.message}", Some(s"$id.$path"), e)
+          case e: ConfigurationException => throw ConfigurationException(s"Error in local config substitution for path='$path': ${e.message}", Some(s"$configPath.$path"), e)
         }
-      }
-
-      // create object
-      logger.debug(s"Invoking extracted method: $factoryMethod.")
-      Try(factoryMethod.invoke(refinedConfig, registry, mirror)).recoverWith {
-        case e =>
-          logger.debug(s"Failed to invoke '$factoryMethod' with '$config'.", e)
-          throw Option(e.getCause).getOrElse(e)
-      }.get
-    } catch {
-      case e: ConfigException if e.getMessage.contains(errId) => throw e
-      case e: ConfigException => throw new ConfigurationException(s"($errId) ${e.getMessage}", throwable = e)
-      case e: Exception => throw new ConfigurationException(s"($errId) ${e.getClass.getSimpleName}: ${e.getMessage}", throwable = e)
     }
+
+    // create object
+    logger.debug(s"Invoking extracted method: $factoryMethod.")
+    Try(factoryMethod.invoke(configSubstituted, registry, mirror)).recoverWith {
+      case e =>
+        logger.debug(s"Failed to invoke '$factoryMethod' with '$config'.", e)
+        throw Option(e.getCause).getOrElse(e)
+    }.get
+
+  } catch {
+    case e: Exception => throw enrichExceptionMessageConfigPath(enrichExceptionMessageClassName(e), configPath)
+  }
+  def parseConfigObjectWithId[A <: ParsableFromConfig[A] : TypeTag](id: String, config: Config)(implicit registry: InstanceRegistry): A = {
+    parseConfigObject[A](config, Some(getIdWithClassNamePrefixed[A](id)), Map("id" -> id))
+  }
+
+  /**
+   * Add exceptions class name to exception message if not yet included.
+   */
+  private def enrichExceptionMessageClassName(e: Exception): Exception = {
+    // recursively get root cause of exception
+    def getRootCause(cause: Throwable): Throwable = {
+      Option(cause.getCause).map(getRootCause).getOrElse(cause)
+    }
+    val rootCause = getRootCause(e)
+    if (!rootCause.isInstanceOf[ConfigException]) {
+      val rootCauseClassName = rootCause.getClass.getSimpleName
+      if (!e.getMessage.contains(rootCauseClassName)) e match {
+        case c: ConfigurationException => c.copy(message = s"${rootCauseClassName}: ${c.getMessage}")
+        case e => ConfigurationException(s"${rootCauseClassName}: ${e.getMessage}", throwable = e)
+      } else e
+    } else e
+  }
+
+  /**
+   * Add optional configuration path to exception message it not yet included.
+   */
+  private def enrichExceptionMessageConfigPath(e: Exception, configPath: Option[String]): Exception = {
+    if (configPath.isDefined && !e.getMessage.contains(configPath.get)) e match {
+      case c: ConfigurationException => c.copy(message = s"(${configPath.get}) ${c.getMessage}")
+      case e => ConfigurationException(s"(${configPath.get}) ${e.getMessage}", configPath, e)
+    } else e
+  }
+
+  /**
+   * Adds the class name to a given Id as prefix.
+   * This is mainly used for error messages.
+   */
+  def getIdWithClassNamePrefixed[A : TypeTag](id: String): String = {
+    val configObjectType = typeOf[A]
+    configObjectType.typeSymbol.name.toString + "~" + id
   }
 
   /**
@@ -134,31 +181,17 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
    * If a "short name" is provided without package specification, it prepends the package name of its abstract type
    * inferred from the short name (xxxAction or yyyDataObject).
    *
-   * @param id            the [[ConfigObjectId]] of this class.
-   * @param config        the "local" config of this class..
-   * @tparam A            the abstract type this object, i.e.: [[Action]] or [[DataObject]]
-   * @return              the fully qualified class name of this class.s
+   * @param configuredType type attribute from configuration.
+   * @tparam A            the abstract type of this object, i.e.: [[Action]] or [[DataObject]]
+   * @return              the fully qualified class name of this class.
    */
-  def className[A <: SdlConfigObject](id: String, config: Config): String = config.get[String]("type") match {
-    case Result.Success(className) =>
-      require(className.nonEmpty, s"Configuration setting 'type' must not be empty for config object with id='$id'.")
-      val cleanClassName = className.stripPrefix(".").stripSuffix(".")
-      if (cleanClassName.count(_.equals('.')) == 0) {
-        val abstractSymbol = cleanClassName.toLowerCase match {
-          case cn if cn.contains("connection") => symbolOf[Connection]
-          case cn if cn.contains("dataobject") => symbolOf[DataObject]
-          case cn if cn.contains("action") => symbolOf[Action]
-          case _ => throw new IllegalArgumentException(s"Can not infer fully qualified class name from short name $cleanClassName. " +
-            s"Specify the full class name for config object with id='$id'.")
-        }
-        val abstractOwner = Iterator.iterate(abstractSymbol)(_.owner.asType).takeWhile(!_.isPackage).toSeq.last
-        s"${abstractOwner.fullName.split('.').dropRight(1).mkString(".")}.$cleanClassName"
-      }
-      else {
-        cleanClassName
-      }
-    case Result.Failure(error) =>
-      throw new IllegalArgumentException(s"Required configuration setting 'type' is missing for config object with id='$id'.", error.configException)
+  private def className[A <: ParsableFromConfig[_] : TypeTag](configuredType: String): String = {
+    // if no package name is given, prefix with package name of abstract type
+    if (!configuredType.contains('.')) {
+      val abstractSymbol = symbolOf[A]
+      val abstractOwner = Iterator.iterate(abstractSymbol)(_.owner.asType).takeWhile(!_.isPackage).toSeq.last
+      s"${abstractOwner.fullName.split('.').dropRight(1).mkString(".")}.$configuredType"
+    } else configuredType
   }
 
   /**

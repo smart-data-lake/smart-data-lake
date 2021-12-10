@@ -313,7 +313,6 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         | executionMode = {
         |  type = PartitionDiffMode
         |  partitionColNb = 2
-        |  stop-if-no-data = true
         | }
         |}
         |
@@ -323,7 +322,17 @@ class ConfigParsingTest extends FlatSpec with Matchers {
     val testAction = TestAction.fromConfig(config.getConfig("a"))
     val expected = TestAction(id = "a", arg1 = None, inputId = "tdo1", outputId = "tdo2", executionMode = Some(PartitionDiffMode(partitionColNb = Some(2))))
     testAction shouldEqual expected
+  }
 
+  "Parser" should "fail if entry is not of type object" in {
+    val dataObjectsConfig = ConfigFactory.parseString(
+      """
+        |dataObjects = {
+        | test = config-error
+        |}
+      """.stripMargin).resolve
+
+    intercept[ConfigurationException](ConfigParser.parse(dataObjectsConfig))
   }
 
   "TestAction" should "fail on superfluous key" in {

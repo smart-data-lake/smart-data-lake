@@ -20,13 +20,13 @@
 package io.smartdatalake.workflow.dataobject
 
 import java.io.InputStream
-
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.customlogic.CustomFileCreatorConfig
 import org.apache.spark.sql.{SaveMode, SparkSession}
 
@@ -56,9 +56,9 @@ case class CustomFileDataObject(override val id: DataObjectId,
 
   override def expectedPartitionsCondition: Option[String] = None
 
-  override def listPartitions(implicit session: SparkSession): Seq[PartitionValues] = Seq()
+  override def listPartitions(implicit session: SparkSession, context: ActionPipelineContext): Seq[PartitionValues] = Seq()
 
-  override def relativizePath(filePath: String): String = filePath
+  override def relativizePath(filePath: String)(implicit session: SparkSession): String = filePath
 
   override def factory: FromConfigFactory[DataObject] = CustomFileDataObject
 }

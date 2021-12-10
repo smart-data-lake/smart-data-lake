@@ -32,9 +32,8 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
 
   val hdfs = FileSystem.get(session.sparkContext.hadoopConfiguration)
 
-  case class Data(name: String, age: Int)
-
-  case class DataObj(id: String, seq: Seq[Data])
+  private case class Data(name: String, age: Int)
+  private case class DataObj(id: String, seq: Seq[Data])
 
   test("test stringify") {
 

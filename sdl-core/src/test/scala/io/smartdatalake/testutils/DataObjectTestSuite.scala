@@ -19,10 +19,10 @@
 package io.smartdatalake.testutils
 
 import java.nio.file.Files
-
 import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.workflow.action.SDLExecutionId
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql._
 import org.scalatest.{BeforeAndAfter, FunSuite, Matchers}
@@ -42,7 +42,7 @@ trait DataObjectTestSuite extends FunSuite with Matchers with BeforeAndAfter {
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
   // prepare contexts to reuse
-  implicit val contextInit: ActionPipelineContext = ActionPipelineContext("testFeed", "testSource", 1, 1, instanceRegistry, None, SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Init)
+  implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
   protected def createTempDir = Files.createTempDirectory("test")

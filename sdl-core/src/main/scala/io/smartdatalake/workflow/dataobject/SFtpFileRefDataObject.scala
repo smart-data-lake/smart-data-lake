@@ -28,6 +28,7 @@ import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.filetransfer.SshUtil
 import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.SftpFileRefConnection
 import net.schmizz.sshj.sftp.SFTPClient
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -106,7 +107,21 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
     }
   }
 
-  override def createOutputStream(path: String, overwrite: Boolean)(implicit session: SparkSession): OutputStream = {
+  override def startWritingOutputStreams(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    if (saveMode == SDLSaveMode.Overwrite) {
+      if (partitions.nonEmpty)
+        if (partitionValues.nonEmpty) deletePartitions(partitionValues)
+        else logger.warn(s"($id) Cannot delete data from partitioned data object as no partition values are given but saveMode=overwrite")
+      else deleteAll
+    }
+  }
+
+  override def endWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    // make sure empty partitions are created as well
+    if (partitionValues.nonEmpty) createMissingPartitions(partitionValues)
+  }
+
+  override def createOutputStream(path: String, overwrite: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): OutputStream = {
     Try {
       implicit val sftp = connection.pool.borrowObject
       SshUtil.getOutputStream(path, () => Try(connection.pool.returnObject(sftp)))
@@ -122,7 +137,7 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
   /**
    * List partitions on data object's root path
    */
-  override def listPartitions(implicit session: SparkSession): Seq[PartitionValues] = {
+  override def listPartitions(implicit session: SparkSession, context: ActionPipelineContext): Seq[PartitionValues] = {
     partitionLayout.map {
       partitionLayout =>
         connection.execWithSFtpClient {
@@ -136,11 +151,11 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
     }.getOrElse(Seq())
   }
 
-  override def relativizePath(filePath: String): String = {
+  override def relativizePath(filePath: String)(implicit session: SparkSession): String = {
     filePath.stripPrefix(path+separator)
   }
 
-  override def prepare(implicit session: SparkSession): Unit = try {
+  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = try {
     connection.test()
   } catch {
     case ex: Throwable => throw ConnectionTestException(s"($id) Can not connect. Error: ${ex.getMessage}", ex)

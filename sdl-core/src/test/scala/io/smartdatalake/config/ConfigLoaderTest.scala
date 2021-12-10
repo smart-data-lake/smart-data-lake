@@ -29,7 +29,14 @@ class ConfigLoaderTest extends FlatSpec with Matchers {
     config.getString("config") shouldBe "config"
   }
 
-  it must "parse all configuration files in a directory and its sub-directories" in {
+  it must "parse all configuration files in a directory and its sub-directories without trailing slash" in {
+    val config = ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config").toString))
+    config.getString("config") shouldBe "config"
+    config.getString("config2") shouldBe "config2"
+    config.getString("foo") shouldBe "foo"
+  }
+
+  it must "parse all configuration files in a directory and its sub-directories with trailing slash" in {
     val config = ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config").toString))
     config.getString("config") shouldBe "config"
     config.getString("config2") shouldBe "config2"
@@ -43,12 +50,25 @@ class ConfigLoaderTest extends FlatSpec with Matchers {
     config.getString("overwrite2") shouldBe "overwritten by bar"
   }
 
+  it must "parse a special classpath entry" in {
+    val config = ConfigLoader.loadConfigFromFilesystem(Seq("cp:/config/config.conf"))
+    config.getString("config") shouldBe "config"
+  }
+
   it must "fail parsing a non-existing location" in {
-    an [IllegalArgumentException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq("foo/bar"))
+    an [ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq("foo/bar"))
+  }
+
+  it must "fail parsing a non-existing classpath entry" in {
+    a [ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq("cp:/foo/bar.conf"))
+  }
+
+  it must "fail parsing a classpath entry with wrong extension" in {
+    a [ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq("cp:/foo/bar"))
   }
 
   it must "not parse a file that is not a config file" in {
-    val config = ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/subdirectory/file.txt").toString))
+    val config = ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/subdirectory").toString))
     a [ConfigException] should be thrownBy config.getString("noconfig")
   }
 
@@ -66,5 +86,10 @@ class ConfigLoaderTest extends FlatSpec with Matchers {
 
   it should "fail on duplicate configuration object IDs" in {
     a [ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/configWithDuplicates").toString))
+  }
+
+  it must "should load configurations with templates" in {
+    val config = ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/configWithTemplates").toString))
+    config.getString("dataObjects.testDataObjectFromConfig.type") shouldBe "io.smartdatalake.config.TestDataObject"
   }
 }

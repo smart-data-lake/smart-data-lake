@@ -59,4 +59,21 @@ class PartitionValuesTest extends FunSuite {
     )
 
   }
+
+  test("check expected partition values") {
+    val partitionValues3 = Seq(PartitionValues(Map("date" -> "20190101", "town" -> "NYC", "year" -> "2019")))
+    val partitionValues3a = Seq(PartitionValues(Map("date" -> "20190101", "town" -> "NYC", "year" -> "2020")))
+    val partitionValues2 = Seq(PartitionValues(Map("date" -> "20190101", "town" -> "NYC")))
+    val partitionValues2r = Seq(PartitionValues(Map("town" -> "NYC", "date" -> "20190101")))
+    val partitionValues1 = Seq(PartitionValues(Map("date" -> "20190101")))
+    assert(PartitionValues.checkExpectedPartitionValues(partitionValues3, partitionValues3).isEmpty)
+    assert(PartitionValues.checkExpectedPartitionValues(partitionValues3, partitionValues2).isEmpty)
+    assert(PartitionValues.checkExpectedPartitionValues(partitionValues3, partitionValues2r).isEmpty)
+    assert(PartitionValues.checkExpectedPartitionValues(partitionValues2, partitionValues3).nonEmpty)
+    assert(PartitionValues.checkExpectedPartitionValues(partitionValues3, partitionValues1).isEmpty)
+    assert(PartitionValues.checkExpectedPartitionValues(partitionValues1, partitionValues3).nonEmpty)
+    assert(PartitionValues.checkExpectedPartitionValues(partitionValues3 ++ partitionValues3a, partitionValues3 ++ partitionValues3a).isEmpty)
+    assert(PartitionValues.checkExpectedPartitionValues(partitionValues3 ++ partitionValues3a, partitionValues3).isEmpty)
+    assert(PartitionValues.checkExpectedPartitionValues(partitionValues3, partitionValues3 ++ partitionValues3a).nonEmpty)
+  }
 }

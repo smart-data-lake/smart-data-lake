@@ -145,7 +145,7 @@ class DataFrameUtilTest extends org.scalatest.FunSuite with Matchers with SmartD
     assert(actual)
   }
 
-  test("isEqual_false") {
+  test("isEqual_false_data") {
     val df_complex_2 = Seq(
       (1,Seq(("a","A",Seq("a","A")))),
       (2,Seq(("b","B",Seq("b","B")))),
@@ -161,21 +161,16 @@ class DataFrameUtilTest extends org.scalatest.FunSuite with Matchers with SmartD
     assert(!actual)
   }
 
-  test("isDataFrameDataEqual_df_complex_withNull_df_complex_withNull") {
-    val actual: Boolean = isDataFrameDataEqual(dfComplexWithNull,dfComplexWithNull)
+  test("isSchemaEqual_complex_null_true") {
+    assert(dfComplex.isSchemaEqualIgnoreNullabilty(dfComplexWithNull))
+  }
 
-    if (!actual) {
-      logger.error(s"actual                     = $actual")
-      logger.error(s"df_complex_withNull.schema = ${dfComplexWithNull.schema.simpleString}")
-      dfComplexWithNull.printSchema()
-      dfComplexWithNull.show()
-      logger.error(s"!!! We let this test pass even though it failed !!!")
-      logger.error(s"Recommendation:")
-      logger.error(s"Do not use function isDataFrameDataEqual anymore as it does not work with empty cells.")
-    }
-    // Do not name boolean parameter even if IntelliJ tells you to do so!
-    // otherwise: [Error] macro applications do not support named and/or default arguments
-    assert(true)
+  test("isSchemaEqual_complex_false") {
+    assert(!dfComplex.isSchemaEqualIgnoreNullabilty(dfHierarchy))
+  }
+
+  test("isSchemaEqual_complex_different_order") {
+    assert(dfComplex.isSchemaEqualIgnoreNullabilty(dfComplex.select(dfComplex.columns.reverseMap(col):_*)))
   }
 
   // other tests

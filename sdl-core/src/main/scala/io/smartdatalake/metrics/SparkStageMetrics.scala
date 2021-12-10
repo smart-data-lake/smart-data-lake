@@ -21,10 +21,10 @@ package io.smartdatalake.metrics
 
 import java.time.format.DateTimeFormatter
 import java.time.{Duration, Instant, ZoneId}
-
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionMetrics
+import io.smartdatalake.workflow.action.SDLExecutionId
 import org.apache.spark.scheduler.{AccumulableInfo, SparkListener, SparkListenerJobStart, SparkListenerStageCompleted}
 
 import scala.collection.mutable
@@ -119,4 +119,4 @@ private[smartdatalake] case class SparkStageMetrics(jobInfo: JobInfo, stageId: I
     Map("stageDuration" -> stageRuntime, "records_written" -> recordsWritten, "bytes_written" -> bytesWritten, "num_tasks" -> numTasks.toLong, "stage" -> stageName.split(' ').head )
   }
 }
-private[smartdatalake] case class JobInfo(id: Int, group: String, description: String)
+private[smartdatalake] case class JobInfo(id: Int, group: String, description: String, executionId: Option[SDLExecutionId])

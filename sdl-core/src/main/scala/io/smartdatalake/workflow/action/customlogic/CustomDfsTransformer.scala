@@ -18,12 +18,11 @@
  */
 package io.smartdatalake.workflow.action.customlogic
 
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData, SparkExpressionUtil}
-import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.ActionHelper
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.DefaultExpressionData
 import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig.fnTransformType
+import io.smartdatalake.workflow.action.sparktransformer.{DfsTransformer, SQLDfsTransformer, ScalaClassDfsTransformer, ScalaCodeDfsTransformer}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -53,13 +52,13 @@ trait CustomDfsTransformer extends Serializable {
    * @param options Options specified in the configuration for this transformation
    * @return a map of input partition values to output partition values
    */
-  def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Map[PartitionValues,PartitionValues] = PartitionValues.oneToOneMapping(partitionValues)
+  def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Option[Map[PartitionValues,PartitionValues]] = None
 
 }
 
 /**
- * Configuration of a custom Spark-DataFrame transformation between several inputs and outputs (n:m).
- * Define a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and as
+ * Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m).
+ * Define a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and has
  * to return a map of output DataObjectIds with DataFrames, see also trait [[CustomDfsTransformer]].
  *
  * @param className Optional class name implementing trait [[CustomDfsTransformer]]
@@ -76,74 +75,20 @@ case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFi
   require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || sqlCode.isDefined, "Either className, scalaFile, scalaCode or sqlCode must be defined for CustomDfsTransformer")
 
   // Load Transformer code from appropriate location
-  val impl: Option[CustomDfsTransformer] = className.map {
-    clazz => CustomCodeUtil.getClassInstanceByName[CustomDfsTransformer](clazz)
-  }.orElse{
-    scalaFile.map {
-      file =>
-        val fnTransform = CustomCodeUtil.compileCode[fnTransformType](HdfsUtil.readHadoopFile(file))
-        new CustomDfsTransformerWrapper( fnTransform )
-    }
-  }.orElse{
-    scalaCode.map {
-      code =>
-        val fnTransform = CustomCodeUtil.compileCode[fnTransformType](code)
-        new CustomDfsTransformerWrapper( fnTransform )
-    }
-  }.orElse{
-    sqlCode.map {
-      code =>
-        def sqlTransform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
-          // register all input DataObjects as temporary table
-          dfs.foreach {
-            case (dataObjectId,df) =>
-              val objectId =  ActionHelper.replaceSpecialCharactersWithUnderscore(dataObjectId)
-              // Using createTempView does not work because the same data object might be created more than once
-              df.createOrReplaceTempView(objectId)
-          }
-          // execute all queries and return them under corresponding dataObjectId
-          code.map {
-            case (dataObjectId,sql) => {
-              val df = try {
-                val preparedSql = SparkExpressionUtil.substituteOptions(dataObjectId, Some("transformation.sqlCode"), sql, options)
-                session.sql(preparedSql)
-              } catch {
-                case e : Throwable => throw new SQLTransformationException(s"(transformation for $dataObjectId) Could not execute SQL query. Check your query and remember that special characters are replaced by underscores. Error: ${e.getMessage}")
-              }
-              (dataObjectId.id, df)
-            }
-          }
-        }
-        new CustomDfsTransformerWrapper( sqlTransform )
-    }
-  }
+  val impl: DfsTransformer = className.map(clazz => ScalaClassDfsTransformer(className = clazz, options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
+    .orElse {
+      scalaFile.map(file => ScalaCodeDfsTransformer(file = Some(file), options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
+    }.orElse{
+    scalaCode.map(code => ScalaCodeDfsTransformer(code = Some(code), options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
+  }.orElse {
+    sqlCode.map(code => SQLDfsTransformer(code = code, options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
+  }.get
 
   override def toString: String = {
     if(className.isDefined)       "className: "+className.get
     else if(scalaFile.isDefined)  "scalaFile: "+scalaFile.get
     else if(scalaCode.isDefined)  "scalaCode: "+scalaCode.get
-    else                          "sqlCode: "+sqlCode
-  }
-
-  def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame])(implicit session: SparkSession, context: ActionPipelineContext) : Map[String,DataFrame] = {
-    // replace runtime options
-    val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
-    // transform
-    impl.get.transform(session, options.getOrElse(Map()) ++ runtimeOptionsReplaced, dfs)
-  }
-
-  def transformPartitionValues(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
-    // replace runtime options
-    val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
-    // transform
-    impl.get.transformPartitionValues(options.getOrElse(Map()) ++ runtimeOptionsReplaced, partitionValues)
-  }
-
-  private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[String,String] = {
-    lazy val data = DefaultExpressionData.from(context, partitionValues)
-    runtimeOptions.getOrElse(Map()).mapValues {
-      expr => SparkExpressionUtil.evaluateString(actionId, Some("transformation.runtimeOptions"), expr, data)
-    }.filter(_._2.isDefined).mapValues(_.get)
+    else                          "sqlCode: "+sqlCode.get
   }
 }
 

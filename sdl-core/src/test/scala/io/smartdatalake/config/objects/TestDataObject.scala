@@ -21,6 +21,7 @@ package io.smartdatalake.config.objects
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataobject._
@@ -41,13 +42,13 @@ case class TestDataObject( id: DataObjectId,
                            connectionId: Option[ConnectionId] = None,
                            override val metadata: Option[DataObjectMetadata] = None)
                          ( implicit val instanceRegistry: InstanceRegistry)
-  extends DataObject with TransactionalSparkTableDataObject {
+  extends DataObject with TransactionalSparkTableDataObject with CanReceiveScriptNotification {
 
   private val connection = connectionId.map( c => getConnection[TestConnection](c))
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = null
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false)
+  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit session: SparkSession, context: ActionPipelineContext): Unit = {}
 
   override var table: Table = Table(db=Some("testdb"), name="testtable")
@@ -58,7 +59,10 @@ case class TestDataObject( id: DataObjectId,
 
   override def dropTable(implicit session: SparkSession): Unit = throw new NotImplementedError()
 
+  override def scriptNotification(parameters: Map[String, String], partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = Unit
+
   override def factory: FromConfigFactory[DataObject] = TestDataObject
+
 }
 
 object TestDataObject extends FromConfigFactory[DataObject] {

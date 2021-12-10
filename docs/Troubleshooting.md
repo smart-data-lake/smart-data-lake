@@ -9,7 +9,7 @@ Extract binaries for desired hadoop version into folder (e.g. hadoop-2.8.1\bin)
 set HADOOP_HOME evironment variable (e.g. HADOOP_HOME=...\hadoop-2.8.1).  
 Note that the binary files need to be located at %HADOOP_HOME%\bin!
 
-## Windows: `/tmp/hive` is not writable
+## Windows: `/tmp/hive` is not writable / RuntimeException: Error while running command to get file permissions
 Solution: Change to `%HADOOP_HOME%\bin` and execute `winutils chmod 777 /tmp/hive`.
 
 ## Windows: winutils.exe is not working correctly

@@ -18,40 +18,51 @@
  */
 package io.smartdatalake.workflow.action
 
-import java.sql.Timestamp
-import java.time.LocalDateTime
-
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{Condition, ExecutionMode, TechnicalTableColumn}
+import io.smartdatalake.definitions._
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject, TransactionalSparkTableDataObject}
+import io.smartdatalake.workflow.action.sparktransformer.{DfTransformer, DfTransformerFunctionWrapper, ParsableDfTransformer}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanMergeDataFrame, DataObject, TransactionalSparkTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
-import org.apache.spark.sql.expressions.UserDefinedFunction
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
+import java.time.LocalDateTime
 import scala.util.{Failure, Success, Try}
 
 /**
  * [[Action]] to deduplicate a subfeed.
  * Deduplication keeps the last record for every key, also after it has been deleted in the source.
- * It needs a transactional table as output with defined primary keys.
+ * DeduplicateAction adds an additional Column [[TechnicalTableColumn.captured]]. It contains the timestamp of the last occurrence of the record in the source.
+ * This creates lots of updates. Especially when using saveMode.Merge it is better to set [[TechnicalTableColumn.captured]] to the last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to enable this optimization.
+ *
+ * DeduplicateAction needs a transactional table (e.g. [[TransactionalSparkTableDataObject]]) as output with defined primary keys.
+ * If output implements [[CanMergeDataFrame]], saveMode.Merge can be enabled by setting mergeModeEnable = true. This allows for much better performance.
  *
  * @param inputId inputs DataObject
  * @param outputId output DataObject
  * @param transformer optional custom transformation to apply
+ * @param transformers optional list of transformations to apply before deduplication. See [[sparktransformer]] for a list of included Transformers.
+ *                     The transformations are applied according to the lists ordering.
  * @param columnBlacklist Remove all columns on blacklist from dataframe
  * @param columnWhitelist Keep only columns on whitelist in dataframe
  * @param additionalColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
- *                          The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
+ *                          The spark sql expressions are evaluated against an instance of [[io.smartdatalake.util.misc.DefaultExpressionData]].
  * @param ignoreOldDeletedColumns if true, remove no longer existing columns in Schema Evolution
  * @param ignoreOldDeletedNestedColumns if true, remove no longer existing columns from nested data types in Schema Evolution.
  *                                      Keeping deleted columns in complex data types has performance impact as all new data
  *                                      in the future has to be converted by a complex function.
+ * @param updateCapturedColumnOnlyWhenChanged Set to true to enable update Column [[TechnicalTableColumn.captured]] only if Record has changed in the source, instead of updating it with every execution (default=false).
+ *                                            This results in much less records updated with saveMode.Merge.
+ * @param mergeModeEnable Set to true to use saveMode.Merge for much better performance. Output DataObject must implement [[CanMergeDataFrame]] if enabled (default = false).
+ * @param mergeModeAdditionalJoinPredicate To optimize performance it might be interesting to limit the records read from the existing table data, e.g. it might be sufficient to use only the last 7 days.
+ *                                Specify a condition to select existing data to be used in transformation as Spark SQL expression.
+ *                                Use table alias 'existing' to reference columns of the existing table data.
  * @param executionMode optional execution mode for this Action
  * @param executionCondition optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
@@ -60,54 +71,100 @@ import scala.util.{Failure, Success, Try}
 case class DeduplicateAction(override val id: ActionId,
                              inputId: DataObjectId,
                              outputId: DataObjectId,
+                             @deprecated("Use transformers instead.", "2.0.5")
                              transformer: Option[CustomDfTransformerConfig] = None,
+                             transformers: Seq[ParsableDfTransformer] = Seq(),
+                             @deprecated("Use transformers instead.", "2.0.5")
                              columnBlacklist: Option[Seq[String]] = None,
+                             @deprecated("Use transformers instead.", "2.0.5")
                              columnWhitelist: Option[Seq[String]] = None,
+                             @deprecated("Use transformers instead.", "2.0.5")
                              additionalColumns: Option[Map[String,String]] = None,
+                             @deprecated("Use transformers instead.", "2.0.5")
                              filterClause: Option[String] = None,
+                             @deprecated("Use transformers instead.", "2.0.5")
                              standardizeDatatypes: Boolean = false,
                              ignoreOldDeletedColumns: Boolean = false,
                              ignoreOldDeletedNestedColumns: Boolean = true,
+                             updateCapturedColumnOnlyWhenChanged: Boolean = false,
+                             mergeModeEnable: Boolean = false,
+                             mergeModeAdditionalJoinPredicate: Option[String] = None,
                              override val breakDataFrameLineage: Boolean = false,
                              override val persist: Boolean = false,
                              override val executionMode: Option[ExecutionMode] = None,
                              override val executionCondition: Option[Condition] = None,
                              override val metricsFailCondition: Option[String] = None,
                              override val metadata: Option[ActionMetadata] = None
-)(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedAction {
+)(implicit instanceRegistry: InstanceRegistry) extends SparkOneToOneActionImpl {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
   override val output: TransactionalSparkTableDataObject = getOutputDataObject[TransactionalSparkTableDataObject](outputId)
   override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
   override val outputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
 
-  // Output is used as recursive input in DeduplicateAction to get existing data. This override is needed to force tick-tock write operation.
-  override val recursiveInputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
+  private val mergeModeAdditionalJoinPredicateExpr: Option[Column] = try {
+    mergeModeAdditionalJoinPredicate.map(expr)
+  } catch {
+    case ex: Exception => throw new ConfigurationException(s"($id) Cannot parse mergeModeAdditionalJoinPredicate as Spark expression: ${ex.getClass.getSimpleName} ${ex.getMessage}", Some(s"{$id.id}.mergeModeAdditionalJoinPredicate"), ex)
+  }
+  if (!mergeModeEnable && mergeModeAdditionalJoinPredicateExpr.nonEmpty) logger.warn(s"($id) Configuration of mergeModeAdditionalJoinPredicate as no effect if mergeModeEnable = false")
 
-  // assert primary key is defined
-  require(output.table.primaryKey.isDefined, s"(${id}) Primary key must be defined for output DataObject")
+  // force SDLSaveMode.Merge if mergeModeEnable = true
+  override def saveModeOptions: Option[SaveModeOptions] = if (mergeModeEnable) {
+    assert(output.isInstanceOf[CanMergeDataFrame], s"($id) output DataObject must support SaveMode.Merge (implement CanMergeDataFrame) if mergeModeEnable = true")
+    // customize update condition
+    val updateCondition = if (updateCapturedColumnOnlyWhenChanged) Some(checkRecordChangedColumns.map(c => s"existing.$c != new.$c").mkString(" or "))
+    else None
+    Some(SaveModeMergeOptions(updateCondition = updateCondition, additionalMergePredicate = mergeModeAdditionalJoinPredicate))
+  } else None
+  // DataFrame columns are needed in order to generate update condition for SaveModeMergeOptions. Unfortunately they are not available here. A variable is needed which gets updated in transform(...).
+  private var checkRecordChangedColumns: Seq[String] = Seq()
+
+  // If mergeModeEnabled=false, output is used as recursive input in DeduplicateAction to get existing data. This override is needed to force tick-tock write operation.
+  override val recursiveInputs: Seq[TransactionalSparkTableDataObject] = if (!mergeModeEnable) Seq(output) else Seq()
+
+  private[smartdatalake] override val handleRecursiveInputsAsSubFeeds: Boolean = false
+
+  // check preconditions
+  require(output.table.primaryKey.isDefined, s"($id) Primary key must be defined for output DataObject")
+  require(mergeModeEnable || !updateCapturedColumnOnlyWhenChanged, s"($id) updateCapturedColumnOnlyWhenChanged = true is not yet implemented for mergeModeEnable = false")
 
   // parse filter clause
   private val filterClauseExpr = Try(filterClause.map(expr)) match {
     case Success(result) => result
-    case Failure(e) => throw new ConfigurationException(s"(${id}) Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
+    case Failure(e) => throw new ConfigurationException(s"($id) Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
+  }
+
+  validateConfig()
+
+  private def getTransformers(implicit session: SparkSession, context: ActionPipelineContext): Seq[DfTransformer] = {
+    val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
+
+    val deduplicateTransformer = if (mergeModeEnable) {
+      // deduplication & schema evolution is done by merge stmt, only captured column needs to added before
+      val enhanceFunction = DeduplicateAction.enhanceDataFrame(timestamp) _
+      DfTransformerFunctionWrapper("enhanceForMergeDeduplicate", enhanceFunction)
+    } else {
+      // get existing data
+      // Note that DeduplicateAction needs to read/write all existing data for tick-tock operation, even if only specific partitions have changed
+      val existingDf = if (output.isTableExisting) Some(output.getDataFrame())
+      else None
+      val pks = output.table.primaryKey.get // existance is validated earlier
+      val deduplicateFunction = DeduplicateAction.deduplicateDataFrame(existingDf, pks, timestamp, ignoreOldDeletedColumns, ignoreOldDeletedNestedColumns) _
+      DfTransformerFunctionWrapper("deduplicate", deduplicateFunction)
+    }
+
+    getTransformers(transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, transformers :+ deduplicateTransformer, filterClauseExpr)
+
   }
 
   override def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
-    val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
-    val pks = output.table.primaryKey.get // existance is validated earlier
-    // get existing data
-    // Note that DeduplicateAction needs to read/write all existing data for tick-tock operation, even if only specific partitions have changed
-    val existingDf = if (output.isTableExisting) Some(output.getDataFrame())
-    else None
-    val deduplicateTransformer = DeduplicateAction.deduplicateDataFrame(existingDf, pks, timestamp, ignoreOldDeletedColumns, ignoreOldDeletedNestedColumns) _
-    val transformedDf = applyTransformations(inputSubFeed, transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, Seq(deduplicateTransformer), filterClauseExpr)
-    outputSubFeed.copy(dataFrame = Some(transformedDf))
+    checkRecordChangedColumns = inputSubFeed.dataFrame.map(_.columns.toSeq).getOrElse(Seq())
+    applyTransformers(getTransformers, inputSubFeed, outputSubFeed)
   }
 
-  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
-    if (transformer.isDefined) transformer.get.transformPartitionValues(id, partitionValues)
-    else PartitionValues.oneToOneMapping(partitionValues)
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+    applyTransformers(getTransformers, partitionValues)
   }
 
   override def factory: FromConfigFactory[Action] = DeduplicateAction
@@ -123,8 +180,10 @@ object DeduplicateAction extends FromConfigFactory[Action] {
    * deduplicates a SubFeed.
    */
   def deduplicateDataFrame(existingDf: Option[DataFrame], pks: Seq[String], refTimestamp: LocalDateTime, ignoreOldDeletedColumns: Boolean, ignoreOldDeletedNestedColumns: Boolean)(df: DataFrame)(implicit session: SparkSession): DataFrame = {
+    assert(!df.columns.contains(rnkColName), s"Column $rnkColName not allowed in DataFrame for DeduplicateAction")
+
     // enhance
-    val enhancedDf = df.withColumn(TechnicalTableColumn.captured.toString, ActionHelper.ts1(refTimestamp))
+    val enhancedDf = enhanceDataFrame(refTimestamp)(df)
 
     // deduplicate
     if (existingDf.isDefined) {
@@ -138,26 +197,22 @@ object DeduplicateAction extends FromConfigFactory[Action] {
    * deduplicate -> keep latest record per key
    *
    * @param baseDf existing data
-   * @param newDf new data
+   * @param newDf  new data
    * @return deduplicated data
    */
-  def deduplicate(baseDf: DataFrame, newDf:DataFrame, keyColumns: Seq[String])(implicit session: SparkSession) : DataFrame = {
-    import session.implicits._
-    import udfs._
-
+  def deduplicate(baseDf: DataFrame, newDf: DataFrame, keyColumns: Seq[String])(implicit session: SparkSession): DataFrame = {
     baseDf.unionByName(newDf)
-      .groupBy(keyColumns.map(col):_*)
-      .agg(collect_list(struct("*")).as("rows"))
-      .withColumn("latestRowIndex", udf_getLatestRowIndex($"rows"))
-      .withColumn("latestRow", $"rows"($"latestRowIndex"))
-      .select($"latestRow.*")
+      .withColumn(rnkColName, row_number().over(Window.partitionBy(keyColumns.map(col): _*).orderBy(col(TechnicalTableColumn.captured).desc)))
+      .where(col(rnkColName) === 1)
+      .drop(rnkColName)
   }
 
-  // keep udf's in separate object to avoid Spark serialization error for DeduplicateAction
-  object udfs extends Serializable {
-    private def getLatestRowIndex(rows: Seq[Row]): Int = {
-      rows.map(_.getAs[Timestamp](TechnicalTableColumn.captured.toString)).zipWithIndex.maxBy(_._1.getTime)._2
-    }
-    val udf_getLatestRowIndex: UserDefinedFunction = udf(getLatestRowIndex _)
+  /**
+   * enhance DataFrame with captured column
+   */
+  def enhanceDataFrame(refTimestamp: LocalDateTime)(df: DataFrame)(implicit session: SparkSession): DataFrame = {
+    df.withColumn(TechnicalTableColumn.captured, ActionHelper.ts1(refTimestamp))
   }
+
+  private val rnkColName = "__rnk"
 }

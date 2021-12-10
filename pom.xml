@@ -21,7 +21,7 @@
 
 	<groupId>io.smartdatalake</groupId>
 	<artifactId>sdl-parent</artifactId>
-	<version>2.0.5-SNAPSHOT</version>
+	<version>2.2.0-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
 	<modules>
@@ -31,6 +31,7 @@
 		<module>sdl-jms</module>
 		<module>sdl-deltalake</module>
 		<module>sdl-snowflake</module>
+		<module>sdl-azure</module>
 	</modules>
 
 	<licenses>
@@ -221,7 +222,7 @@
 
 		<spark.version>3.1.1</spark.version>
 		<spark.minor.version>3.0</spark.minor.version> <!-- this is used in sdl-snowflake which has no version yet for Spark 3.1 -->
-		<spark-extensions.version>2.0.11</spark-extensions.version>
+		<spark-extensions.version>2.0.13</spark-extensions.version>
 
 		<!-- SPARK-PARENT start: properties copied from spark-parent pom version 2.4.7 for spark-parent import in dependencyManagement -->
 		<!-- attention - manually adapted are: zookeeper, scala.version, scala.binary.version -->
@@ -316,10 +317,11 @@
 		<!-- SPARK-PARENT finished -->
 
 		<!-- other dependency versions -->
-		<scopt.version>3.7.1</scopt.version>
-		<databricks.spark-xml.version>0.9.0</databricks.spark-xml.version>
+		<scopt.version>4.0.1</scopt.version>
+		<databricks.spark-xml.version>0.13.0</databricks.spark-xml.version>
 		<spark.excel.version>0.13.5</spark.excel.version>
-		<ucanaccess.version>4.0.4</ucanaccess.version>
+		<ucanaccess.version>5.0.1</ucanaccess.version>
+		<hsqldb.version>2.5.2</hsqldb.version>
 		<!-- when changing config version, remember to update it in DatabricksSmartDataLakeBuilder main method -->
 		<typesafe.config.version>1.4.1</typesafe.config.version>
 		<kxbmap.configs.version>0.6.1</kxbmap.configs.version>
@@ -330,11 +332,14 @@
 		<kafka.version>2.4.1</kafka.version>
 		<snowflake.version>2.8.4</snowflake.version>
 		<keycloak.version>4.5.0.Final</keycloak.version>
-		<delta.version>0.8.0</delta.version>
+		<delta.version>1.0.0</delta.version>
 		<poi.version>4.1.2</poi.version>
+
+		<json4s.version>3.6.6</json4s.version>
 
 		<scalatest.test.version>3.0.8</scalatest.test.version>
 		<sshd.test.version>2.3.0</sshd.test.version>
+
 
 	</properties>
 
@@ -355,12 +360,54 @@
 			<name>Confluent Schema Repository</name>
 			<url>https://packages.confluent.io/maven/</url>
 		</repository>
+		<!-- smartdatalake snapshots -->
+		<repository>
+			<id>ossrh</id>
+			<name>ossrh snapshots</name>
+			<url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+			<releases><enabled>false</enabled></releases>
+			<snapshots><enabled>true</enabled></snapshots>
+		</repository>
 	</repositories>
 
 	<build>
 
 		<pluginManagement>
 			<plugins>
+
+				<!-- add scala sources, if we have also java sources using sourceDirectory / testSourceDirectory tag -->
+				<plugin>
+					<groupId>org.codehaus.mojo</groupId>
+					<artifactId>build-helper-maven-plugin</artifactId>
+					<version>3.2.0</version>
+					<executions>
+						<execution>
+							<id>add-source</id>
+							<phase>generate-sources</phase>
+							<goals>
+								<goal>add-source</goal>
+							</goals>
+							<configuration>
+								<sources>
+									<source>src/main/scala</source>
+								</sources>
+							</configuration>
+						</execution>
+						<execution>
+							<id>add-test-source</id>
+							<phase>generate-test-sources</phase>
+							<goals>
+								<goal>add-test-source</goal>
+							</goals>
+							<configuration>
+								<sources>
+									<source>src/test/scala</source>
+								</sources>
+							</configuration>
+						</execution>
+					</executions>
+				</plugin>
+
 				<!-- Compiles Scala sources. -->
 				<plugin>
 					<groupId>net.alchim31.maven</groupId>
@@ -1126,7 +1173,7 @@
 			<dependency>
 				<groupId>org.json4s</groupId>
 				<artifactId>json4s-jackson_${scala.binary.version}</artifactId>
-				<version>3.6.6</version>
+				<version>${json4s.version}</version>
 				<exclusions>
 					<exclusion>
 						<groupId>com.fasterxml.jackson.core</groupId>
@@ -2212,7 +2259,6 @@
 				<groupId>org.apache.orc</groupId>
 				<artifactId>orc-core</artifactId>
 				<version>${orc.version}</version>
-				<classifier>${orc.classifier}</classifier>
 				<scope>${orc.deps.scope}</scope>
 				<exclusions>
 					<exclusion>
@@ -2237,7 +2283,6 @@
 				<groupId>org.apache.orc</groupId>
 				<artifactId>orc-mapreduce</artifactId>
 				<version>${orc.version}</version>
-				<classifier>${orc.classifier}</classifier>
 				<scope>${orc.deps.scope}</scope>
 				<exclusions>
 					<exclusion>
@@ -2433,7 +2478,7 @@
 			<dependency>
 				<groupId>org.apache.commons</groupId>
 				<artifactId>commons-compress</artifactId>
-				<version>1.4.1</version>
+				<version>1.21</version>
 			</dependency>
 			<dependency>
 				<groupId>com.typesafe</groupId>

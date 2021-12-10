@@ -18,8 +18,7 @@
  */
 package io.smartdatalake.config
 
-import com.typesafe.config.{ConfigException, ConfigFactory, ConfigValueFactory}
-import configs.ConfigKeyNaming
+import com.typesafe.config.{ConfigException, ConfigFactory}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.{DateColumnType, KeycloakClientSecretAuthMode, SDLSaveMode}
 import io.smartdatalake.testutils.custom.TestCustomDfCreator
@@ -27,7 +26,6 @@ import io.smartdatalake.util.misc.{AclDef, AclElement}
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.connection.JdbcTableConnection
 import io.smartdatalake.workflow.dataobject.{Table, _}
-import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -36,11 +34,6 @@ import scala.reflect.runtime.universe.{MethodSymbol, typeOf}
 class DataObjectImplTests extends FlatSpec with Matchers {
 
   "AvroFileDataObject" should "be parsable" in {
-
-    val t = typeOf[AvroFileDataObject].members.collect {
-      case (m: MethodSymbol @unchecked) if m.isCaseAccessor => m
-    }
-    val names = t.map(_.name.decodedName)
 
     val config = ConfigFactory.parseString(
       """

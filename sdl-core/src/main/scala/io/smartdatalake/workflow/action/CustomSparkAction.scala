@@ -20,10 +20,11 @@ package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{Condition, ExecutionMode, SparkStreamingOnceMode}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.{Condition, ExecutionMode, SparkStreamingMode}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig
+import io.smartdatalake.workflow.action.sparktransformer.{ParsableDfsTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
 import org.apache.spark.sql.SparkSession
@@ -47,7 +48,8 @@ import org.apache.spark.sql.SparkSession
 case class CustomSparkAction (override val id: ActionId,
                               inputIds: Seq[DataObjectId],
                               outputIds: Seq[DataObjectId],
-                              transformer: CustomDfsTransformerConfig,
+                              transformer: Option[CustomDfsTransformerConfig] = None,
+                              transformers: Seq[ParsableDfsTransformer] = Seq(),
                               override val breakDataFrameLineage: Boolean = false,
                               override val persist: Boolean = false,
                               override val mainInputId: Option[DataObjectId] = None,
@@ -58,38 +60,24 @@ case class CustomSparkAction (override val id: ActionId,
                               override val metadata: Option[ActionMetadata] = None,
                               recursiveInputIds: Seq[DataObjectId] = Seq(),
                               override val inputIdsToIgnoreFilter: Seq[DataObjectId] = Seq()
-)(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedsAction {
-
-  // checks
-  recursiveInputIds.foreach(inputId => assert(outputIds.contains(inputId), s"($id) $inputId from recursiveInputIds is not listed in outputIds of the same action."))
-  inputIdsToIgnoreFilter.foreach(inputId => assert((inputIds++recursiveInputIds).contains(inputId), s"($id) $inputId from inputIdsToIgnoreFilter is not listed in inputIds of the same action."))
+                             )(implicit instanceRegistry: InstanceRegistry) extends SparkActionImpl {
 
   override val recursiveInputs: Seq[DataObject with CanCreateDataFrame] = recursiveInputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
   override val inputs: Seq[DataObject with CanCreateDataFrame] = inputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
   override val outputs: Seq[DataObject with CanWriteDataFrame] = outputIds.map(getOutputDataObject[DataObject with CanWriteDataFrame])
 
-  if (executionMode.exists(_.isInstanceOf[SparkStreamingOnceMode]) && transformer.sqlCode.nonEmpty)
+  if (executionMode.exists(_.isInstanceOf[SparkStreamingMode]) && (transformer.exists(_.sqlCode.nonEmpty) || transformers.exists(_.isInstanceOf[SQLDfsTransformer])))
     logger.warn("Defining custom stateful streaming operations with sqlCode is not well supported by Spark and can create strange errors or effects. Use scalaCode to be safe.")
 
-  override def transform(inputSubFeeds: Seq[SparkSubFeed], outputSubFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
-    val mainInput = getMainInput(inputSubFeeds)
-    val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId==mainInput.id)
+  validateConfig()
 
-    // Apply custom transformation to all subfeeds
-    val partitionValues = mainInputSubFeed.map(_.partitionValues).getOrElse(Seq())
-    val outputDfs = transformer.transform(id, partitionValues, inputSubFeeds.map( subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap)
-    // create output subfeeds from transformed dataframes
-    outputDfs.map {
-      case (dataObjectId, dataFrame) =>
-        val outputSubFeed = outputSubFeeds.find(_.dataObjectId.id == dataObjectId)
-          .getOrElse(throw ConfigurationException(s"($id) No output found for result ${dataObjectId}. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
-        // get partition values from main input
-        outputSubFeed.copy(dataFrame = Some(dataFrame))
-    }.toSeq
+  override def transform(inputSubFeeds: Seq[SparkSubFeed], outputSubFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
+    val partitionValues = getMainPartitionValues(inputSubFeeds)
+    applyTransformers(transformers ++ transformer.map(_.impl), partitionValues, inputSubFeeds, outputSubFeeds)
   }
 
-  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
-    transformer.transformPartitionValues(id, partitionValues)
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+    applyTransformers(transformers ++ transformer.map(_.impl).toSeq, partitionValues)
   }
 
   override def factory: FromConfigFactory[Action] = CustomSparkAction

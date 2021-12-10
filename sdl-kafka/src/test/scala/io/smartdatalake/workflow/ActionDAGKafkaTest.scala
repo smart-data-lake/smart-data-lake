@@ -20,11 +20,10 @@ package io.smartdatalake.workflow
 
 import java.nio.file.Files
 import java.time.LocalDateTime
-
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.workflow.action.CopyAction
+import io.smartdatalake.workflow.action.{CopyAction, SDLExecutionId}
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataobject._
@@ -85,12 +84,12 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
     // prepare DAG
     val refTimestamp1 = LocalDateTime.now()
     val appName = "test"
-    implicit val context: ActionPipelineContext = ActionPipelineContext(feed, appName, 1, 1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig())
+    implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
     val l1 = Seq(("doe-john", 5)).toDF("key", "value")
     srcDO.writeDataFrame(l1, Seq())
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id)
     val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, transformer = Some(CustomDfTransformerConfig(sqlCode = Some("select 'test' as key, value from kafka1"))))
-    val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2), 1, 1)
+    val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2))
 
     // exec dag
     dag.prepare
