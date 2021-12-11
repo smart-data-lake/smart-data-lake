@@ -122,7 +122,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   private def getAbsolutePath(implicit context: ActionPipelineContext) = {
     val prefixedPath = HdfsUtil.prefixHadoopPath(path.get, connection.map(_.pathPrefix))
-    val filesystem = getFilesystem(prefixedPath)
     HdfsUtil.makeAbsolutePath(prefixedPath)(filesystem)
   }
 
