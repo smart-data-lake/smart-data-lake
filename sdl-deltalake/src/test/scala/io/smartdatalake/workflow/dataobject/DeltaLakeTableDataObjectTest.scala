@@ -18,8 +18,9 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import io.smartdatalake.app.GlobalConfig
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.{SDLSaveMode, SaveModeMergeOptions}
+import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeMergeOptions}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.custom.TestCustomDfCreator
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -40,6 +41,9 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
       case (builder, config) => builder.config(config._1, config._2)
     }.getOrCreate()
   import session.implicits._
+
+  // initialize empty Global Config in Environment
+  if (Environment._globalConfig == null) Environment._globalConfig = GlobalConfig()
 
   val tempDir = Files.createTempDirectory("tempHadoopDO")
   val tempPath: String = tempDir.toAbsolutePath.toString
