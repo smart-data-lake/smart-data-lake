@@ -84,7 +84,9 @@ private[smartdatalake] object ActionDAGRunState {
   }
   implicit val seqPartitionValuesReader: ConfigReader[Seq[PartitionValues]] = getSeqReader[PartitionValues]
   // DataFrames are not stored to Json -> always read none
+  // (Prevent build error "cannot derive for `Option[A]`: `A` is not a ConfigReader instance")
   implicit val dataFrameReader: ConfigReader[Option[DataFrame]] = ConfigReader.successful(None)
+  implicit val snowparkDataFrameReader: ConfigReader[Option[com.snowflake.snowpark.DataFrame]] = ConfigReader.successful(None)
   implicit val seqResultRuntimeInfoReader: ConfigReader[Seq[ResultRuntimeInfo]] = getSeqReader[ResultRuntimeInfo]
   implicit val durationReader: ConfigReader[Duration] = ConfigReader.fromStringConfigReader
 
@@ -95,7 +97,9 @@ private[smartdatalake] object ActionDAGRunState {
   }
   implicit val partitionValuesConfigWriter: ConfigWriter[PartitionValues] = ConfigWriter.derive[PartitionValues]
   // DataFrames are not stored to Json -> always write none
+  // (Prevent build error "cannot derive for `Option[A]`: `A` is not a ConfigReader instance")
   implicit val dataFrameWriter: ConfigWriter[Option[DataFrame]] = ConfigWriter.from(_ => ConfigValue.Null)
+  implicit val snowparkDataFrameWriter: ConfigWriter[Option[com.snowflake.snowpark.DataFrame]] = ConfigWriter.from(_ => ConfigValue.Null)
   implicit val seqResultRuntimeInfoWriter: ConfigWriter[Seq[ResultRuntimeInfo]] = getSeqWriter[ResultRuntimeInfo]
   implicit val durationWriter: ConfigWriter[Duration] = ConfigWriter.stringConfigWriter.contramap(durationStringConverter.toString)
 

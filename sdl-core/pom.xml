@@ -334,6 +334,12 @@
 			<scope>test</scope>
 		</dependency>
 
+		<dependency>
+			<groupId>com.snowflake</groupId>
+			<artifactId>snowpark</artifactId>
+			<version>${snowflake-snowpark.version}</version>
+		</dependency>
+
 	</dependencies>
 
 	<build>

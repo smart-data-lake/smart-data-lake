@@ -357,7 +357,9 @@
 		<splunk.version>1.6.5.0</splunk.version>
 		<sshj.version>0.21.1</sshj.version>
 		<kafka.version>2.8.0</kafka.version>
-		<snowflake.version>2.8.4</snowflake.version>
+		<snowflake-spark.version>2.9.2</snowflake-spark.version>
+		<snowflake-jdbc.version>3.13.11</snowflake-jdbc.version>
+		<snowflake-snowpark.version>0.11.0</snowflake-snowpark.version>
 		<keycloak.version>15.0.2</keycloak.version>
 		<delta.version>1.1.0</delta.version>
 		<poi.version>4.1.2</poi.version>
