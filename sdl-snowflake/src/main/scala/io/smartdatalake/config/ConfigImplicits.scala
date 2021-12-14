@@ -40,6 +40,6 @@ trait ConfigImplicits {
   // see: https://github.com/kxbmap/configs/issues/44
   // TODO: check periodically if still needed, should not be needed with scala 2.13+
   // --------------------------------------------------------------------------------
-  implicit val customSnowparkDfCreatorConfigReader: ConfigReader[CustomSnowparkDfCreatorConfig] = ConfigReader.derive[CustomDfCreatorConfig]
+  implicit val customSnowparkDfCreatorConfigReader: ConfigReader[CustomSnowparkDfCreatorConfig] = ConfigReader.derive[CustomSnowparkDfCreatorConfig]
   // --------------------------------------------------------------------------------
 }
