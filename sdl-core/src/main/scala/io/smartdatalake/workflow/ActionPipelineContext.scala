@@ -99,8 +99,8 @@ case class ActionPipelineContext (
    */
   def sparkSession: SparkSession = {
     if (_sparkSession.isEmpty) {
-      assert(Environment._globalConfig != null, "Cannot create SparkSession because Environment.globalConfig is not initialized. Please create ActionPipelineContext with SparkSession passed as parameter.")
-      _sparkSession = Some(Environment._globalConfig.createSparkSession(appConfig.appName, appConfig.master, appConfig.deployMode))
+      assert(Environment.globalConfig != null, "Cannot create SparkSession because Environment.globalConfig is not initialized. Please create ActionPipelineContext with SparkSession passed as parameter.")
+      _sparkSession = Some(Environment.globalConfig.createSparkSession(appConfig.appName, appConfig.master, appConfig.deployMode))
     }
     _sparkSession.get
   }

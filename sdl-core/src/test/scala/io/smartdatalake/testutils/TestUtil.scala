@@ -26,8 +26,9 @@ import java.time.{Instant, LocalDateTime}
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration._
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
+import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.DataFrameUtil.{DfSDL, defaultPersistDf}
 import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.SDLExecutionId
@@ -55,9 +56,11 @@ import scala.util.Try
  */
 object TestUtil extends SmartDataLakeLogger {
 
-  def sparkSessionBuilder( withHive : Boolean = false ) : SparkSession.Builder = {
+  def sparkSessionBuilder(withHive : Boolean = false, additionalSparkProperties: Map[String,String] = Map()) : SparkSession.Builder = {
     // create builder
-    val builder = SparkSession.builder()
+    val builder = additionalSparkProperties.foldLeft(SparkSession.builder()) {
+      case (builder, config) => builder.config(config._1, config._2)
+    }
       .config("hive.exec.dynamic.partition", "true")
       .config("hive.exec.dynamic.partition.mode", "nonstrict")
       .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
@@ -78,9 +81,14 @@ object TestUtil extends SmartDataLakeLogger {
   lazy val sessionWithoutHive : SparkSession = sparkSessionBuilder().getOrCreate
 
   def getDefaultActionPipelineContext(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
+    if (Environment.globalConfig == null) Environment._globalConfig = GlobalConfig()
+    getDefaultActionPipelineContext(sessionHiveCatalog) // initialize with Spark session incl. Hive support
+  }
+
+  def getDefaultActionPipelineContext(sparkSession: SparkSession)(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
     val defaultHadoopConf = new SerializableHadoopConfiguration(new Configuration())
     val context = ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, instanceRegistry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig("feedTest", Some("appTest")), phase = ExecutionPhase.Init, serializableHadoopConf = defaultHadoopConf)
-    context._sparkSession = Some(sessionHiveCatalog) // initialize with Spark session incl. Hive support
+    context._sparkSession = Some(sparkSession)
     context
   }
 
