@@ -48,7 +48,14 @@ trait HasHadoopStandardFilestore extends CanHandlePartitions { this: DataObject 
    */
   private[smartdatalake] def getFilesystem(path: Path): FileSystem = {
     assert(serializableHadoopConfHolder != null, "serializableHadoopConfHolder must be initialized before using getFilesystem")
-    HdfsUtil.getHadoopFsWithConf(path)(serializableHadoopConfHolder.get) // this must use serializable HadoopConfiguration to be distributed.
+    getFilesystem(path, serializableHadoopConfHolder)
+  }
+
+  /**
+   * Creates a hadoop [[FileSystem]] for [[Path]] with a given serializable hadoop configuration.
+   */
+  private[smartdatalake] def getFilesystem(path: Path, hadoopConf: SerializableHadoopConfiguration): FileSystem = {
+    HdfsUtil.getHadoopFsWithConf(path)(hadoopConf.get) // this must use serializable HadoopConfiguration to be distributed.
   }
 
   /**

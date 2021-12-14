@@ -122,7 +122,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   private def getAbsolutePath(implicit context: ActionPipelineContext) = {
     val prefixedPath = HdfsUtil.prefixHadoopPath(path.get, connection.map(_.pathPrefix))
-    HdfsUtil.makeAbsolutePath(prefixedPath)(filesystem)
+    HdfsUtil.makeAbsolutePath(prefixedPath)(getFilesystem(prefixedPath, context.serializableHadoopConf)) // dont use "filesystem" to avoid loop
   }
 
   table = table.overrideDb(connection.map(_.db))
@@ -293,7 +293,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       var mergeStmt = deltaTable.merge(df.as("new"), joinCondition and saveModeOptions.additionalMergePredicateExpr.getOrElse(lit(true)))
       // add delete clause if configured
       saveModeOptions.deleteConditionExpr.foreach(c => mergeStmt = mergeStmt.whenMatched(c).delete())
-      // add update clause - insertExpr does not support referring new columns in existing table on schema evolution, thats why we use it only when needed, and insertAll otherwise
+      // add update clause - updateExpr does not support referring new columns in existing table on schema evolution, thats why we use it only when needed, and updateAll otherwise
       mergeStmt = if (saveModeOptions.updateColumnsOpt.isDefined) {
         val updateCols = saveModeOptions.updateColumnsOpt.getOrElse(df.columns.toSeq.diff(table.primaryKey.get))
         mergeStmt.whenMatched(saveModeOptions.updateConditionExpr.getOrElse(lit(true))).updateExpr(updateCols.map(c => c -> s"new.$c").toMap)
