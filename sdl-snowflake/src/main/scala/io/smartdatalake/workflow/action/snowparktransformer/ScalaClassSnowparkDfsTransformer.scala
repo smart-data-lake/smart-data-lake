@@ -20,8 +20,8 @@
 package io.smartdatalake.workflow.action.snowparktransformer
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.ActionId
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.smartdatalake.SnowparkDataFrame
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -43,9 +43,9 @@ case class ScalaClassSnowparkDfsTransformer(override val name: String = "snowpar
 }
 
 
-object ScalaClassSnowparkDfsTransformer extends FromConfigFactory[ParsableSnowparkDfsTransformer] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry):
-  ScalaClassSnowparkDfsTransformer = {
-    extract[ScalaClassSnowparkDfsTransformer](config)
-  }
-}
+//object ScalaClassSnowparkDfsTransformer extends FromConfigFactory[ParsableSnowparkDfsTransformer] {
+//  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry):
+//  ScalaClassSnowparkDfsTransformer = {
+//    extract[ScalaClassSnowparkDfsTransformer](config)
+//  }
+//}

@@ -44,41 +44,16 @@ trait SnowparkDfsTransformer {
 trait ParsableSnowparkDfsTransformer extends SnowparkDfsTransformer with ParsableFromConfig[ParsableSnowparkDfsTransformer]
 
 
-trait OptionsDfsTransformer extends ParsableSnowparkDfsTransformer {
-  def options: Map[String,String]
-  def runtimeOptions: Map[String,String]
+trait OptionsSnowparkDfsTransformer extends ParsableSnowparkDfsTransformer {
+  def options: Map[String, String]
 
-  /**
-   * Function to be implemented to define the transformation between many inputs and many outputs (n:m)
-   * see also [[DfsTransformer.transform()]]
-   * @param options Options specified in the configuration for this transformation, including evaluated runtimeOptions
-   */
-  def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame], options: Map[String,String])(implicit context: ActionPipelineContext): Map[String,DataFrame]
+  def runtimeOptions: Map[String, String]
 
-  /**
-   * Optional function to define the transformation of input to output partition values.
-   * For example this enables to implement aggregations where multiple input partitions are combined into one output partition.
-   * Note that the default value is input = output partition values, which should be correct for most use cases.
-   * see also [[DfsTransformer.transformPartitionValues()]]
-   * @param options Options specified in the configuration for this transformation, including evaluated runtimeOptions
-   */
-  def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String,String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = None
+  def transformWithOptions(actionId: ActionId, dfs: Map[String, SnowparkDataFrame], options: Map[String, String])
+                          (implicit context: ActionPipelineContext): Map[String, SnowparkDataFrame]
 
-  override def transformPartitionValues(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = {
-    // replace runtime options
-    val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
-    // transform
-    transformPartitionValuesWithOptions(actionId, partitionValues, options ++ runtimeOptionsReplaced)
+  override def transform(actionId: ActionId, dfs: Map[String, SnowparkDataFrame])
+                        (implicit context: ActionPipelineContext): Map[String, SnowparkDataFrame] = {
+    transformWithOptions(actionId, dfs, options)
   }
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame])(implicit context: ActionPipelineContext): Map[String,DataFrame] = {
-    // replace runtime options
-    val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
-    // transform
-    transformWithOptions(actionId, partitionValues, dfs, options ++ runtimeOptionsReplaced )
-  }
-  private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[String,String] = {
-    lazy val data = DefaultExpressionData.from(context, partitionValues)
-    runtimeOptions.mapValues {
-      expr => SparkExpressionUtil.evaluateString(actionId, Some(s"transformations.$name.runtimeOptions"), expr, data)
-    }.filter(_._2.isDefined).mapValues(_.get)
-  }
+}

@@ -23,4 +23,5 @@ object smartdatalake {
   type SnowparkDataFrame = com.snowflake.snowpark.DataFrame
   type SparkDataFrame = org.apache.spark.sql.DataFrame
   type SnowparkSession = com.snowflake.snowpark.Session
+  type SnowparkStructType = com.snowflake.snowpark.types.StructType
 }
