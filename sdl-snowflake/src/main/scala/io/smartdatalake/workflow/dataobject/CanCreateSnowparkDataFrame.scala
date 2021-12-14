@@ -18,16 +18,15 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import com.snowflake.snowpark.DataFrame
 import com.snowflake.snowpark.types.{DataType, StructType}
-import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.smartdatalake.SnowparkDataFrame
 import io.smartdatalake.workflow.ActionPipelineContext
 
 private[smartdatalake] trait CanCreateSnowparkDataFrame {
 
-  def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext) : DataFrame
+  def getSnowparkDataFrame()(implicit context: ActionPipelineContext) : SnowparkDataFrame
 
-  def createReadSchema(writeSchema: StructType)(implicit context: ActionPipelineContext): StructType = writeSchema
+  def createSnowparkReadSchema(writeSchema: StructType)(implicit context: ActionPipelineContext): StructType = writeSchema
 
   protected def addFieldIfNotExisting(writeSchema: StructType, colName: String, dataType: DataType): StructType = {
     if (!writeSchema.names.contains(colName)) writeSchema.add(colName, dataType)

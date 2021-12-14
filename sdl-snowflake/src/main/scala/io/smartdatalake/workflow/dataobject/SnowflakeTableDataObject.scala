@@ -19,11 +19,13 @@
 
 package io.smartdatalake.workflow.dataobject
 
+import com.snowflake.snowpark.Session
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
+import io.smartdatalake.smartdatalake.SnowparkDataFrame
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil
@@ -32,6 +34,7 @@ import io.smartdatalake.workflow.connection.SnowflakeTableConnection
 import net.snowflake.spark.snowflake.Utils.SNOWFLAKE_SOURCE_NAME
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+
 
 /**
  * [[DataObject]] of type SnowflakeTableDataObject.
@@ -53,16 +56,30 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     comment: Option[String],
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject {
+  extends TransactionalSparkTableDataObject
+    with CanCreateSnowparkDataFrame
+    with CanWriteSnowparkDataFrame {
 
   /**
    * Connection defines connection string, credentials and database schema/name
    */
   private val connection = getConnection[SnowflakeTableConnection](connectionId)
+  private var _snowparkSession: Option[Session] = None
+
+  val session: Session = {
+    if (_snowparkSession.isEmpty) {
+      _snowparkSession = Some(connection.getSnowparkSession(table.db.get))
+    }
+    _snowparkSession.get
+  }
 
   // prepare table
   if (table.db.isEmpty) {
     throw ConfigurationException(s"($id) A SnowFlake schema name must be added as the 'db' parameter of a SnowflakeTableDataObject.")
+  }
+
+  override def getSnowparkDataFrame()(implicit context: ActionPipelineContext): SnowparkDataFrame = {
+    session.table(table.name)
   }
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {

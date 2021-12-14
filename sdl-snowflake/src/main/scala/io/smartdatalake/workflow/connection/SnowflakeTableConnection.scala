@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.connection
 
 import java.sql.ResultSet
 
+import com.snowflake.snowpark.Session
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
@@ -54,6 +55,23 @@ case class SnowflakeTableConnection(override val id: ConnectionId,
   def execSnowflakeStatement(sql: String, logging: Boolean = true): ResultSet = {
     if (logging) logger.info(s"($id) execSnowflakeStatement: $sql")
     Utils.runQuery(getSnowflakeOptions(""), sql)
+  }
+
+  def getSnowparkSession(schema: String): Session = {
+    if (authMode.isDefined) authMode.get match {
+      case m: BasicAuthMode =>
+        val builder = Session.builder.configs(Map(
+          "URL" -> url,
+          "USER" -> m.user,
+          "PASSWORD" -> m.password,
+          "ROLE" -> role,
+          "WAREHOUSE" -> warehouse,
+          "DB" -> database,
+          "SCHEMA" -> schema
+        ))
+        builder.create
+      case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Snowflake connection.")
+    } else throw new IllegalArgumentException(s"($id) No authMode given for Snowflake connection.")
   }
 
   def getSnowflakeOptions(schema: String): Map[String, String] = {
