@@ -18,9 +18,8 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.app.GlobalConfig
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeMergeOptions}
+import io.smartdatalake.definitions.{SDLSaveMode, SaveModeMergeOptions}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.custom.TestCustomDfCreator
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -35,24 +34,23 @@ import java.nio.file.Files
 
 class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
 
-  // we need a session with additional properties...
+  // set additional spark options for delta lake
   protected implicit val session : SparkSession = new DeltaLakeModulePlugin().additionalSparkProperties()
     .foldLeft(TestUtil.sparkSessionBuilder(withHive = true)) {
       case (builder, config) => builder.config(config._1, config._2)
     }.getOrCreate()
   import session.implicits._
 
-  // initialize empty Global Config in Environment
-  if (Environment._globalConfig == null) Environment._globalConfig = GlobalConfig()
-
   val tempDir = Files.createTempDirectory("tempHadoopDO")
   val tempPath: String = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-  val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
+  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  val contextExec: ActionPipelineContext = context.copy(phase = ExecutionPhase.Exec)
 
-  before { instanceRegistry.clear() }
+  before {
+    instanceRegistry.clear()
+  }
 
   test("CustomDf2DeltaTable") {
 

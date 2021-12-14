@@ -301,7 +301,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // parse config objects
     Environment._globalConfig = GlobalConfig.from(config)
     Environment._instanceRegistry = ConfigParser.parse(config, instanceRegistry) // share instance registry for custom code
-    val stateListeners = Environment._globalConfig.stateListeners.map(_.listener) ++ Environment._additionalStateListeners
+    val stateListeners = Environment.globalConfig.stateListeners.map(_.listener) ++ Environment._additionalStateListeners
 
     exec(appConfig, executionId, runStartTime, attemptStartTime, actionsToSkip, initialSubFeeds, dataObjectsState, stateStore, stateListeners, simulation)(Environment._instanceRegistry)
   }
@@ -329,7 +329,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     // create and execute DAG
     logger.info(s"starting application ${appConfig.appName} runId=${executionId.runId} attemptId=${executionId.attemptId}")
-    val serializableHadoopConf = new SerializableHadoopConfiguration(Environment._globalConfig.getHadoopConfiguration)
+    val serializableHadoopConf = new SerializableHadoopConfiguration(Environment.globalConfig.getHadoopConfiguration)
     val context = ActionPipelineContext(appConfig.feedSel, appConfig.appName, executionId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig, runStartTime, attemptStartTime, simulation, actionsSelected = actionIdsSelected, actionsSkipped = actionIdsSkipped, serializableHadoopConf = serializableHadoopConf)
     val actionDAGRun = ActionDAGRun(actionsToExec, actionsToSkip, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(context)
     val finalSubFeeds = try {
