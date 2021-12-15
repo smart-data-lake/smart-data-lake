@@ -44,7 +44,7 @@ import scala.util.{Failure, Success}
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
  * @param url            Url to download notebook in IPYNB-format, which defines transformation.
- * @param functionName   The notebook needs to contain a Scala-function with these name which type is [[fnTransformType]].
+ * @param functionName   The notebook needs to contain a Scala-function with this name and type [[fnTransformType]].
  * @param authMode       optional authentication information for webservice, e.g. BasicAuthMode for user/pw authentication
  * @param options        Options to pass to the transformation
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
