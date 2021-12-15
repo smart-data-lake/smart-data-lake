@@ -78,8 +78,8 @@ private[smartdatalake] object ScalaJWebserviceClient extends SmartDataLakeLogger
       // Request was sent, but the response contains an error
       case errorResponse if errorResponse.isError =>
         logger.error(s"Error when calling ${request.url}: Http status code: ${errorResponse.code}, response body: ${new String(errorResponse.body).take(200)}...")
-        Failure(new WebserviceException(s"Webservice Request failed with error <${errorResponse.code}>"))
-      // Request was successfull and response can be processed further
+        Failure(new WebserviceException(s"Webservice Request failed with error <${errorResponse.code}>", Some(errorResponse.code), Some(new String(errorResponse.body))))
+      // Request was successful and response can be processed further
       case normalResponse if normalResponse.isSuccess => Success(normalResponse.body)
     }
   }
