@@ -18,13 +18,13 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import io.github.embeddedkafka.EmbeddedKafka
+
 import java.nio.file.Files
 import java.time.temporal.ChronoUnit
-
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.KafkaConnection
-import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.common.serialization.StringSerializer
 import org.apache.spark.sql.streaming.Trigger
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
@@ -41,7 +41,7 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
   import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
   import session.implicits._
 
-  private val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6000")
+  private val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6001")
 
   private lazy val kafka = EmbeddedKafka.start()
   override def beforeAll() {
@@ -92,7 +92,6 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
 
     // check
     val df2 = dataObject2.getDataFrame().cache
-    df2.show
     assert(df2.symmetricDifference(df1).isEmpty)
   }
 
