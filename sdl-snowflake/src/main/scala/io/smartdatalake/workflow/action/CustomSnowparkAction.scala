@@ -18,30 +18,17 @@
  */
 package io.smartdatalake.workflow.action
 
+import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, SdlConfigObject}
-import io.smartdatalake.definitions.{Condition, ExecutionMode, SparkStreamingMode}
-import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.customlogic.{CustomDfsTransformerConfig, CustomSnowparkDfsTransformerConfig}
-import io.smartdatalake.workflow.action.snowparktransformer.ParsableSnowparkDfsTransformer
-import io.smartdatalake.workflow.action.sparktransformer.{ParsableDfsTransformer, SQLDfsTransformer}
-import io.smartdatalake.workflow.{ActionPipelineContext, SnowparkSubFeed, SparkSubFeed}
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanCreateSnowparkDataFrame, CanWriteDataFrame, CanWriteSnowparkDataFrame, DataObject}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.workflow.dataobject.{CanCreateSnowparkDataFrame, CanWriteSnowparkDataFrame, DataObject}
+import io.smartdatalake.workflow.{ActionPipelineContext, SnowparkSubFeed}
 
-class CustomSnowparkAction(override val id: ActionId,
-                           inputIds: Seq[DataObjectId],
-                           outputIds: Seq[DataObjectId],
-                           transformer: Option[CustomSnowparkDfsTransformerConfig] = None,
-                           transformers: Seq[ParsableSnowparkDfsTransformer] = Seq(),
-                           override val mainInputId: Option[DataObjectId] = None,
-                           override val mainOutputId: Option[DataObjectId] = None,
-                           override val executionMode: Option[ExecutionMode] = None,
-                           override val executionCondition: Option[Condition] = None,
-                           override val metricsFailCondition: Option[String] = None,
-                           override val metadata: Option[ActionMetadata] = None,
-                           recursiveInputIds: Seq[DataObjectId] = Seq(),
-                           override val inputIdsToIgnoreFilter: Seq[DataObjectId] = Seq()
-                          )(implicit instanceRegistry: InstanceRegistry) extends SnowparkActionImpl {
+case class CustomSnowparkAction(override val id: ActionId,
+                                inputIds: Seq[DataObjectId],
+                                outputIds: Seq[DataObjectId] = Seq(),
+                                metadata: Option[ActionMetadata] = None
+)(implicit instanceRegistry: InstanceRegistry) extends SnowparkActionImpl {
 
   override val recursiveInputs: Seq[DataObject with CanCreateSnowparkDataFrame] =
     recursiveInputIds.map(getInputDataObject[DataObject with CanCreateSnowparkDataFrame])
@@ -61,4 +48,10 @@ class CustomSnowparkAction(override val id: ActionId,
 
   override def factory: FromConfigFactory[Action] = CustomSparkAction
 
+}
+
+object CustomSnowparkAction extends FromConfigFactory[Action] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CustomSnowparkAction = {
+    extract[CustomSnowparkAction](config)
+  }
 }

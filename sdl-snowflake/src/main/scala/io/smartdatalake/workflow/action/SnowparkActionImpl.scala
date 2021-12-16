@@ -20,15 +20,30 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.definitions.{Condition, ExecutionMode}
 import io.smartdatalake.smartdatalake.SnowparkDataFrame
-import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
-import io.smartdatalake.workflow.action.snowparktransformer.{SnowparkDfTransformer, SnowparkDfsTransformer}
-import io.smartdatalake.workflow.action.sparktransformer.DfsTransformer
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SnowparkSubFeed, SparkSubFeed}
+import io.smartdatalake.workflow.action.customlogic.CustomSnowparkDfsTransformerConfig
+import io.smartdatalake.workflow.action.snowparktransformer.{ParsableSnowparkDfsTransformer, SnowparkDfsTransformer}
 import io.smartdatalake.workflow.dataobject.{CanCreateSnowparkDataFrame, CanWriteSnowparkDataFrame, DataObject}
+import io.smartdatalake.workflow.{ActionPipelineContext, SnowparkSubFeed}
 
 private[smartdatalake] abstract class SnowparkActionImpl extends ActionSubFeedsImpl[SnowparkSubFeed] {
+
+  var executionMode: Option[ExecutionMode] = None
+  var executionCondition: Option[Condition] = None
+  var transformer: Option[CustomSnowparkDfsTransformerConfig] = None
+  var transformers: Seq[ParsableSnowparkDfsTransformer] = Seq()
+  var recursiveInputIds: Seq[DataObjectId] = Seq()
+
+  override def mainInputId: Option[DataObjectId] = None
+
+  override def mainOutputId: Option[DataObjectId] = None
+
+  override def metricsFailCondition: Option[String] = None
+
+  override def inputIdsToIgnoreFilter: Seq[DataObjectId] = Seq()
 
   override def inputs: Seq[DataObject with CanCreateSnowparkDataFrame]
 
@@ -57,7 +72,7 @@ private[smartdatalake] abstract class SnowparkActionImpl extends ActionSubFeedsI
     executionMode match {
       // TODO: Implement more execution modes
       case None =>
-        output.writeDataFrame(subFeed.dataFrame.get, subFeed.partitionValues, isRecursiveInput, None)
+        output.writeSnowparkDataFrame(subFeed.dataFrame.get, isRecursiveInput, None)
         None
       case x => throw new IllegalStateException(s"($id) ExecutionMode $x is not supported")
     }
