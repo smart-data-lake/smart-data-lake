@@ -61,15 +61,15 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     with CanCreateSnowparkDataFrame
     with CanWriteSnowparkDataFrame {
 
+  private val connection = getConnection[SnowflakeTableConnection](connectionId)
+  private var _snowparkSession: Option[Session] = None
+
   def session: Session = {
     if (_snowparkSession.isEmpty) {
       _snowparkSession = Some(connection.getSnowparkSession(table.db.get))
     }
     _snowparkSession.get
   }
-
-  private val connection = getConnection[SnowflakeTableConnection](connectionId)
-  private var _snowparkSession: Option[Session] = None
 
   if (table.db.isEmpty) {
     throw ConfigurationException(s"($id) A SnowFlake schema name must be added as the 'db' parameter of a SnowflakeTableDataObject.")
@@ -134,13 +134,13 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 
   override def factory: FromConfigFactory[DataObject] = SnowflakeTableDataObject
 
-  def writeSnowparkDataFrame(df: SnowparkDataFrame, isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
-    // TODO: Write DataFrame to Snowpark
+  def writeSnowparkDataFrame(df: SnowparkDataFrame, isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
+                            (implicit context: ActionPipelineContext): Unit = {
+    df.write.saveAsTable(table.fullName)
   }
 
   override def getSnowparkDataFrame()(implicit context: ActionPipelineContext): SnowparkDataFrame = {
-    //TODO get snowpark dataframe
-    connection.getSnowparkSession("test").createDataFrame(Seq())
+    connection.getSnowparkSession(table.db.get).table(table.fullName)
   }
 }
 
