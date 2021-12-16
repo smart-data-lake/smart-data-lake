@@ -25,19 +25,12 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeOptions}
-import io.smartdatalake.smartdatalake.{SnowparkDataFrame, SparkDataFrame}
+import io.smartdatalake.smartdatalake.{SnowparkDataFrame, SnowparkStructType, SparkDataFrame, SparkStructType}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.connection.SnowflakeTableConnection
+import io.smartdatalake.workflow.connection.SnowflakeConnection
 import net.snowflake.spark.snowflake.Utils.SNOWFLAKE_SOURCE_NAME
-import org.apache.spark.sql.types.StructType
-
-// If this class is not here to give a default value to schemaMin, the deriving class SnowflakeTableDataObject
-// has an Option[StructType] in its parameter list, which prevents it being perceived as being of type ConfigReader
-abstract class SnowflakeTableDataObjectProxy(override val schemaMin: Option[StructType] = None)
-  extends TransactionalSparkTableDataObject
 
 /**
  * [[DataObject]] of type SnowflakeTableDataObject.
@@ -54,16 +47,17 @@ abstract class SnowflakeTableDataObjectProxy(override val schemaMin: Option[Stru
  */
 case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     override var table: Table,
+                                    override val schemaMin: Option[SparkStructType] = None,
                                     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     connectionId: ConnectionId,
                                     comment: Option[String],
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends SnowflakeTableDataObjectProxy
+  extends TransactionalSparkTableDataObject
     with CanCreateSnowparkDataFrame
     with CanWriteSnowparkDataFrame {
 
-  private val connection = getConnection[SnowflakeTableConnection](connectionId)
+  private val connection = getConnection[SnowflakeConnection](connectionId)
   private var _snowparkSession: Option[Session] = None
 
   def session: Session = {
@@ -77,6 +71,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     throw ConfigurationException(s"($id) A SnowFlake schema name must be added as the 'db' parameter of a SnowflakeTableDataObject.")
   }
 
+  // Get a Spark DataFrame with the table contents for Spark transformations
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): SparkDataFrame = {
     val queryOrTable = Map(table.query.map(q => ("query", q)).getOrElse("dbtable" -> (connection.database + "." + table.fullName)))
     val df = context.sparkSession
@@ -88,27 +83,13 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     df.colNamesLowercase
   }
 
+  // Write a Spark DataFrame to the Snowflake table
   override def writeDataFrame(df: SparkDataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])
                              (implicit context: ActionPipelineContext): Unit = {
-    validateSchemaMin(df, "write")
-    writeDataFrame(df, createTableOnly = false, saveModeOptions = None)
-  }
+    validateSchemaMin(df, role = "write")
+    val finalSaveMode: SDLSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 
-
-  /**
-   * Writes DataFrame to Snowflake
-   * Snowflake does not support explicit partitions, so any passed partition values are ignored
-   */
-  def writeDataFrame(df: SparkDataFrame, createTableOnly: Boolean, saveModeOptions: Option[SaveModeOptions])
-                    (implicit context: ActionPipelineContext): Unit = {
-    val dfPrepared = if (createTableOnly) {
-      DataFrameUtil.getEmptyDataFrame(df.schema)(context.sparkSession)
-    } else {
-      df
-    }
-
-    val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
-    dfPrepared.write
+    df.write
       .format(SNOWFLAKE_SOURCE_NAME)
       .options(connection.getSnowflakeOptions(table.db.get))
       .options(Map("dbtable" -> (connection.database + "." + table.fullName)))
@@ -116,7 +97,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
       .save()
 
     if (comment != null && comment.isDefined) {
-      val sql = s"comment on table ${connection.database}.${table.fullName} is '${comment}';"
+      val sql = s"comment on table ${connection.database}.${table.fullName} is '$comment';"
       connection.execSnowflakeStatement(sql)
     }
   }
@@ -125,7 +106,6 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     val sql = s"SHOW DATABASES LIKE '${connection.database}'"
     connection.execSnowflakeStatement(sql).next()
   }
-
 
   override def isTableExisting(implicit context: ActionPipelineContext): Boolean = {
     val sql = s"SHOW TABLES LIKE '${table.name}' IN SCHEMA ${connection.database}.${table.db.get}"
@@ -136,13 +116,15 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 
   override def factory: FromConfigFactory[DataObject] = SnowflakeTableDataObject
 
+  // Read the contents of a table as a Snowpark DataFrame
+  override def getSnowparkDataFrame()(implicit context: ActionPipelineContext): SnowparkDataFrame = {
+    connection.getSnowparkSession(table.db.get).table(table.fullName)
+  }
+
+  // Write a Snowpark DataFrame to Snowflake, used in Snowpark actions
   def writeSnowparkDataFrame(df: SnowparkDataFrame, isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                             (implicit context: ActionPipelineContext): Unit = {
     df.write.saveAsTable(table.fullName)
-  }
-
-  override def getSnowparkDataFrame()(implicit context: ActionPipelineContext): SnowparkDataFrame = {
-    connection.getSnowparkSession(table.db.get).table(table.fullName)
   }
 }
 
@@ -152,3 +134,16 @@ object SnowflakeTableDataObject extends FromConfigFactory[DataObject] {
   }
 }
 
+private[smartdatalake] trait CanCreateSnowparkDataFrame {
+
+  def getSnowparkDataFrame()(implicit context: ActionPipelineContext): SnowparkDataFrame
+
+  def createSnowparkReadSchema(writeSchema: SnowparkStructType)(implicit context: ActionPipelineContext): SnowparkStructType = writeSchema
+}
+
+private[smartdatalake] trait CanWriteSnowparkDataFrame {
+
+  def initSnowpark(df: SnowparkDataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = Unit
+
+  def writeSnowparkDataFrame(df: SnowparkDataFrame, isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit
+}

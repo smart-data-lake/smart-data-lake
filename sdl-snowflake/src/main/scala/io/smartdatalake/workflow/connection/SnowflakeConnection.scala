@@ -29,8 +29,9 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import net.snowflake.spark.snowflake.Utils
 
 /**
- * Connection information for Snowflake tables.
- * If authentication is needed, user and password must be provided.
+ * Connection information for Snowflake databases.
+ * The connection can be used for SnowflakeTableDataObjects
+ * If multiple SnowflakeTableDataObjects share a connection, they share the same Snowpark session
  *
  * @param id        unique id of this connection
  * @param url       snowflake connection url
@@ -40,14 +41,14 @@ import net.snowflake.spark.snowflake.Utils
  * @param authMode  optional authentication information: for now BasicAuthMode is supported.
  * @param metadata  Connection metadata
  */
-case class SnowflakeTableConnection(override val id: ConnectionId,
-                                    url: String,
-                                    warehouse: String,
-                                    database: String,
-                                    role: String,
-                                    authMode: AuthMode,
-                                    override val metadata: Option[ConnectionMetadata] = None
-                                   ) extends Connection with SmartDataLakeLogger {
+case class SnowflakeConnection(override val id: ConnectionId,
+                               url: String,
+                               warehouse: String,
+                               database: String,
+                               role: String,
+                               authMode: AuthMode,
+                               override val metadata: Option[ConnectionMetadata] = None
+                              ) extends Connection with SmartDataLakeLogger {
 
   private val supportedAuths = Seq(classOf[BasicAuthMode])
   require(supportedAuths.contains(authMode.getClass), s"($id) ${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
@@ -55,6 +56,22 @@ case class SnowflakeTableConnection(override val id: ConnectionId,
   def execSnowflakeStatement(sql: String, logging: Boolean = true): ResultSet = {
     if (logging) logger.info(s"($id) execSnowflakeStatement: $sql")
     Utils.runQuery(getSnowflakeOptions(""), sql)
+  }
+
+  def getSnowflakeOptions(schema: String): Map[String, String] = {
+    authMode match {
+      case m: BasicAuthMode =>
+        Map(
+          "sfURL" -> url,
+          "sfUser" -> m.user,
+          "sfPassword" -> m.password,
+          "sfDatabase" -> database,
+          "sfRole" -> role,
+          "sfSchema" -> schema,
+          "sfWarehouse" -> warehouse
+        )
+      case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Snowflake connection.")
+    }
   }
 
   def getSnowparkSession(schema: String): Session = {
@@ -74,27 +91,11 @@ case class SnowflakeTableConnection(override val id: ConnectionId,
     }
   }
 
-  def getSnowflakeOptions(schema: String): Map[String, String] = {
-    authMode match {
-      case m: BasicAuthMode =>
-        Map(
-          "sfURL" -> url,
-          "sfUser" -> m.user,
-          "sfPassword" -> m.password,
-          "sfDatabase" -> database,
-          "sfRole" -> role,
-          "sfSchema" -> schema,
-          "sfWarehouse" -> warehouse
-        )
-      case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Snowflake connection.")
-    }
-  }
-
-  override def factory: FromConfigFactory[Connection] = SnowflakeTableConnection
+  override def factory: FromConfigFactory[Connection] = SnowflakeConnection
 }
 
-object SnowflakeTableConnection extends FromConfigFactory[Connection] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SnowflakeTableConnection = {
-    extract[SnowflakeTableConnection](config)
+object SnowflakeConnection extends FromConfigFactory[Connection] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SnowflakeConnection = {
+    extract[SnowflakeConnection](config)
   }
 }

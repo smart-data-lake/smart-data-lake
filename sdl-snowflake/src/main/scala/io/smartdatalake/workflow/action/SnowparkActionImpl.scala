@@ -21,22 +21,13 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.{Condition, ExecutionMode}
 import io.smartdatalake.smartdatalake.SnowparkDataFrame
-import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.customlogic.SnowparkDfsTransformer
 import io.smartdatalake.workflow.dataobject.{CanCreateSnowparkDataFrame, CanWriteSnowparkDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SnowparkSubFeed}
 
 private[smartdatalake] abstract class SnowparkActionImpl extends ActionSubFeedsImpl[SnowparkSubFeed] {
 
-  var executionMode: Option[ExecutionMode] = None
-  var executionCondition: Option[Condition] = None
-  var recursiveInputIds: Seq[DataObjectId] = Seq()
-
-  override def mainInputId: Option[DataObjectId] = None
-
-  override def mainOutputId: Option[DataObjectId] = None
 
   override def metricsFailCondition: Option[String] = None
 
@@ -46,18 +37,16 @@ private[smartdatalake] abstract class SnowparkActionImpl extends ActionSubFeedsI
 
   override def outputs: Seq[DataObject with CanWriteSnowparkDataFrame]
 
-  override protected def preprocessInputSubFeedCustomized
-  (subFeed: SnowparkSubFeed, ignoreFilters: Boolean, isRecursive: Boolean)
-  (implicit context: ActionPipelineContext): SnowparkSubFeed = {
-    val inputMap = (inputs ++ recursiveInputs).map(i => i.id -> i).toMap
-    val input = inputMap(subFeed.dataObjectId)
-    enrichSubFeedDataFrame(input, subFeed, context.phase, isRecursive)
-  }
+  // Create a DataFrame (if not existing) for an input SubFeed
+  override protected def preprocessInputSubFeedCustomized(subFeed: SnowparkSubFeed,
+                                                          ignoreFilters: Boolean,
+                                                          isRecursive: Boolean)
+                                                         (implicit context: ActionPipelineContext): SnowparkSubFeed = {
+    val inputMap: Map[DataObjectId, DataObject with CanCreateSnowparkDataFrame] =
+      (inputs ++ recursiveInputs).map(input => input.id -> input).toMap
 
-  override def recursiveInputs: Seq[DataObject with CanCreateSnowparkDataFrame] = Seq()
+    val input: DataObject with CanCreateSnowparkDataFrame = inputMap(subFeed.dataObjectId)
 
-  def enrichSubFeedDataFrame(input: DataObject with CanCreateSnowparkDataFrame, subFeed: SnowparkSubFeed, phase: ExecutionPhase, isRecursive: Boolean = false)
-                            (implicit context: ActionPipelineContext): SnowparkSubFeed = {
     if (subFeed.dataFrame.isEmpty) {
       subFeed.copy(dataFrame = Some(input.getSnowparkDataFrame()))
     } else {
@@ -65,34 +54,30 @@ private[smartdatalake] abstract class SnowparkActionImpl extends ActionSubFeedsI
     }
   }
 
+  override def recursiveInputs: Seq[DataObject with CanCreateSnowparkDataFrame] = Seq()
+
+  // Persist the result SubFeed
   override protected def writeSubFeed(subFeed: SnowparkSubFeed, isRecursive: Boolean)
                                      (implicit context: ActionPipelineContext): WriteSubFeedResult = {
     val output: DataObject with CanWriteSnowparkDataFrame = outputs.find(_.id == subFeed.dataObjectId)
       .getOrElse(throw new IllegalStateException(s"($id) output for subFeed ${subFeed.dataObjectId} not found"))
-    val noData = writeSubFeed(subFeed, output, isRecursive)
-    WriteSubFeedResult(noData)
+
+    output.writeSnowparkDataFrame(subFeed.dataFrame.get, isRecursive, None)
+    WriteSubFeedResult(None)
   }
 
-  def writeSubFeed(subFeed: SnowparkSubFeed, output: DataObject with CanWriteSnowparkDataFrame, isRecursiveInput: Boolean = false)
-                  (implicit context: ActionPipelineContext): Option[Boolean] = {
-    executionMode match {
-      case None =>
-        output.writeSnowparkDataFrame(subFeed.dataFrame.get, isRecursiveInput, None)
-        None
-      case x => throw new IllegalStateException(s"($id) ExecutionMode $x is not supported")
-    }
-  }
-
-  protected def applyTransformers(transformer: SnowparkDfsTransformer,
-                                  inputSubFeeds: Seq[SnowparkSubFeed],
-                                  outputSubFeeds: Seq[SnowparkSubFeed])
-                                 (implicit context: ActionPipelineContext): Seq[SnowparkSubFeed] = {
+  // Apply the transformer defined in the action to the input DataFrames
+  protected def applyTransformer(transformer: SnowparkDfsTransformer,
+                                 inputSubFeeds: Seq[SnowparkSubFeed],
+                                 outputSubFeeds: Seq[SnowparkSubFeed])
+                                (implicit context: ActionPipelineContext): Seq[SnowparkSubFeed] = {
 
     val inputDfsMap: Map[String, SnowparkDataFrame] = inputSubFeeds
       .map(subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap
 
-    val outputDfsMap = transformer.transform(inputDfsMap)
+    val outputDfsMap: Map[String, SnowparkDataFrame] = transformer.transform(inputDfsMap)
 
+    // Check that all output IDs have an associated DataFrame and copy the output SubFeeds
     outputDfsMap.map {
       case (dataObjectId, dataFrame) =>
         val outputSubFeed = outputSubFeeds.find(_.dataObjectId.id == dataObjectId)

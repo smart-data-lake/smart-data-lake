@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.action
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.{Condition, ExecutionMode}
 import io.smartdatalake.workflow.action.customlogic.SnowparkDfsTransformer
 import io.smartdatalake.workflow.dataobject.{CanCreateSnowparkDataFrame, CanWriteSnowparkDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SnowparkSubFeed}
@@ -30,7 +31,12 @@ import io.smartdatalake.workflow.{ActionPipelineContext, SnowparkSubFeed}
 case class CustomSnowparkAction(override val id: ActionId,
                                 inputIds: Seq[DataObjectId],
                                 outputIds: Seq[DataObjectId],
-                                metadata: Option[ActionMetadata] = None,
+                                recursiveInputIds: Seq[DataObjectId] = Seq(),
+                                override val mainInputId: Option[DataObjectId] = None,
+                                override val mainOutputId: Option[DataObjectId] = None,
+                                override val executionCondition: Option[Condition] = None,
+                                override val executionMode: Option[ExecutionMode] = None,
+                                override val metadata: Option[ActionMetadata] = None,
                                 transformer: SnowparkDfsTransformer)
                                (implicit instanceRegistry: InstanceRegistry) extends SnowparkActionImpl {
 
@@ -47,7 +53,7 @@ case class CustomSnowparkAction(override val id: ActionId,
 
   override def transform(inputSubFeeds: Seq[SnowparkSubFeed], outputSubFeeds: Seq[SnowparkSubFeed])
                         (implicit context: ActionPipelineContext): Seq[SnowparkSubFeed] = {
-    applyTransformers(transformer, inputSubFeeds, outputSubFeeds)
+    applyTransformer(transformer, inputSubFeeds, outputSubFeeds)
   }
 
   override def factory: FromConfigFactory[Action] = CustomSparkAction

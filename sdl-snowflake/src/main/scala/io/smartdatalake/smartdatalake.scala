@@ -19,9 +19,13 @@
 
 package io.smartdatalake
 
+import org.apache.spark.sql.types.StructType
+
+// Define some helper types to easily differentiate between Spark and Snowpark classes in sdl-snowflake
 object smartdatalake {
   type SnowparkDataFrame = com.snowflake.snowpark.DataFrame
   type SparkDataFrame = org.apache.spark.sql.DataFrame
   type SnowparkSession = com.snowflake.snowpark.Session
   type SnowparkStructType = com.snowflake.snowpark.types.StructType
+  type SparkStructType = StructType
 }
