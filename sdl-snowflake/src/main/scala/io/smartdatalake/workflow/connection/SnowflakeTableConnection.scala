@@ -45,12 +45,12 @@ case class SnowflakeTableConnection(override val id: ConnectionId,
                                     warehouse: String,
                                     database: String,
                                     role: String,
-                                    authMode: Option[AuthMode] = None,
+                                    authMode: AuthMode,
                                     override val metadata: Option[ConnectionMetadata] = None
                                    ) extends Connection with SmartDataLakeLogger {
 
   private val supportedAuths = Seq(classOf[BasicAuthMode])
-  require(authMode.isEmpty || supportedAuths.contains(authMode.get.getClass), s"($id) ${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
+  require(supportedAuths.contains(authMode.getClass), s"($id) ${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
 
   def execSnowflakeStatement(sql: String, logging: Boolean = true): ResultSet = {
     if (logging) logger.info(s"($id) execSnowflakeStatement: $sql")
@@ -58,7 +58,7 @@ case class SnowflakeTableConnection(override val id: ConnectionId,
   }
 
   def getSnowparkSession(schema: String): Session = {
-    if (authMode.isDefined) authMode.get match {
+    authMode match {
       case m: BasicAuthMode =>
         val builder = Session.builder.configs(Map(
           "URL" -> url,
@@ -71,11 +71,11 @@ case class SnowflakeTableConnection(override val id: ConnectionId,
         ))
         builder.create
       case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Snowflake connection.")
-    } else throw new IllegalArgumentException(s"($id) No authMode given for Snowflake connection.")
+    }
   }
 
   def getSnowflakeOptions(schema: String): Map[String, String] = {
-    if (authMode.isDefined) authMode.get match {
+    authMode match {
       case m: BasicAuthMode =>
         Map(
           "sfURL" -> url,
@@ -87,7 +87,7 @@ case class SnowflakeTableConnection(override val id: ConnectionId,
           "sfWarehouse" -> warehouse
         )
       case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Snowflake connection.")
-    } else throw new IllegalArgumentException(s"($id) No authMode given for Snowflake connection.")
+    }
   }
 
   override def factory: FromConfigFactory[Connection] = SnowflakeTableConnection

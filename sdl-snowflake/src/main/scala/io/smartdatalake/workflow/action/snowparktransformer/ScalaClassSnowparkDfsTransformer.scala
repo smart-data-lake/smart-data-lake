@@ -43,9 +43,9 @@ case class ScalaClassSnowparkDfsTransformer(override val name: String = "snowpar
 }
 
 
-//object ScalaClassSnowparkDfsTransformer extends FromConfigFactory[ParsableSnowparkDfsTransformer] {
-//  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry):
-//  ScalaClassSnowparkDfsTransformer = {
-//    extract[ScalaClassSnowparkDfsTransformer](config)
-//  }
-//}
+object ScalaClassSnowparkDfsTransformer extends FromConfigFactory[ParsableSnowparkDfsTransformer] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry):
+  ScalaClassSnowparkDfsTransformer = {
+    extract[ScalaClassSnowparkDfsTransformer](config)
+  }
+}

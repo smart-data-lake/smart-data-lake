@@ -25,15 +25,13 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
-import io.smartdatalake.smartdatalake.SnowparkDataFrame
+import io.smartdatalake.smartdatalake.{SnowparkDataFrame, SnowparkSession, SnowparkStructType}
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.DataFrameUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.SnowflakeTableConnection
 import net.snowflake.spark.snowflake.Utils.SNOWFLAKE_SOURCE_NAME
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
 
 /**
@@ -49,14 +47,14 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
  * @param metadata     meta data
  */
 case class SnowflakeTableDataObject(override val id: DataObjectId,
-                                    override val schemaMin: Option[StructType] = None,
+                                    override val schemaMin: Option[SnowparkStructType] = None,
                                     override var table: Table,
                                     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     connectionId: ConnectionId,
-                                    comment: Option[String],
+                                    comment: String,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject
+  extends TransactionalSnowparkTableDataObject
     with CanCreateSnowparkDataFrame
     with CanWriteSnowparkDataFrame {
 
@@ -82,7 +80,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     session.table(table.name)
   }
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): SnowparkDataFrame = {
     val queryOrTable = Map(table.query.map(q => ("query", q)).getOrElse("dbtable" -> (connection.database + "." + table.fullName)))
     val df = context.sparkSession
       .read
@@ -94,7 +92,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     df.colNamesLowercase
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
+  override def writeDataFrame(df: SnowparkDataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit context: ActionPipelineContext): Unit = {
     validateSchemaMin(df, "write")
     writeDataFrame(df, createTableOnly = false, partitionValues, saveModeOptions)
@@ -104,9 +102,9 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
    * Writes DataFrame to Snowflake
    * Snowflake does not support explicit partitions, so any passed partition values are ignored
    */
-  def writeDataFrame(df: DataFrame, createTableOnly: Boolean, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions])
+  def writeDataFrame(df: SnowparkDataFrame, createTableOnly: Boolean, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions])
                     (implicit context: ActionPipelineContext): Unit = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SnowparkSession = context.sparkSession
     val dfPrepared = if (createTableOnly) {
       DataFrameUtil.getEmptyDataFrame(df.schema)
     } else {
@@ -121,8 +119,8 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
       .mode(finalSaveMode.asSparkSaveMode)
       .save()
 
-    if (comment.isDefined) {
-      val sql = s"comment on table ${connection.database}.${table.fullName} is '${comment.get}';"
+    if (comment != null && !comment.isEmpty) {
+      val sql = s"comment on table ${connection.database}.${table.fullName} is '${comment}';"
       connection.execSnowflakeStatement(sql)
     }
   }
@@ -141,6 +139,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   override def dropTable(implicit context: ActionPipelineContext): Unit = throw new NotImplementedError()
 
   override def factory: FromConfigFactory[DataObject] = SnowflakeTableDataObject
+
 }
 
 object SnowflakeTableDataObject extends FromConfigFactory[DataObject] {
