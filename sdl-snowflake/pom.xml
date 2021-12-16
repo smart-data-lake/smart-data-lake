@@ -44,7 +44,6 @@
 
 	<properties>
 		<sdl-core.scope>compile</sdl-core.scope>
-		<snowflake-jdbc.version>3.13.11</snowflake-jdbc.version>
 	</properties>
 
 	<dependencies>

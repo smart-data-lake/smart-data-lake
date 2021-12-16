@@ -26,12 +26,12 @@
 
 	<modules>
 		<module>sdl-core</module>
-<!--		<module>sdl-kafka</module>-->
-<!--		<module>sdl-splunk</module>-->
-<!--		<module>sdl-jms</module>-->
-<!--		<module>sdl-deltalake</module>-->
+		<module>sdl-kafka</module>
+		<module>sdl-splunk</module>
+		<module>sdl-jms</module>
+		<module>sdl-deltalake</module>
 		<module>sdl-snowflake</module>
-<!--		<module>sdl-azure</module>-->
+		<module>sdl-azure</module>
 	</modules>
 
 	<licenses>
@@ -330,7 +330,8 @@
 		<splunk.version>1.6.5.0</splunk.version>
 		<sshj.version>0.21.1</sshj.version>
 		<kafka.version>2.4.1</kafka.version>
-		<snowflake.version>2.8.4</snowflake.version>
+		<snowflake-spark.version>2.9.2</snowflake-spark.version>
+		<snowflake-jdbc.version>3.13.11</snowflake-jdbc.version>
 		<keycloak.version>4.5.0.Final</keycloak.version>
 		<delta.version>1.0.0</delta.version>
 		<poi.version>4.1.2</poi.version>
