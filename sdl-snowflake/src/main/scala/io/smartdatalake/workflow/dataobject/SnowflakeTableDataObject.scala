@@ -67,20 +67,13 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     }
     _snowparkSession.get
   }
-  /**
-   * Connection defines connection string, credentials and database schema/name
-   */
+
   private val connection = getConnection[SnowflakeTableConnection](connectionId)
   private var _snowparkSession: Option[Session] = None
 
-  // prepare table
   if (table.db.isEmpty) {
     throw ConfigurationException(s"($id) A SnowFlake schema name must be added as the 'db' parameter of a SnowflakeTableDataObject.")
   }
-
-  //  override def getSnowparkDataFrame()(implicit context: ActionPipelineContext): SnowparkDataFrame = {
-  //    session.table(table.name)
-  //  }
 
   override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): SparkDataFrame = {
     val queryOrTable = Map(table.query.map(q => ("query", q)).getOrElse("dbtable" -> (connection.database + "." + table.fullName)))
@@ -90,7 +83,6 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
       .options(connection.getSnowflakeOptions(table.db.get))
       .options(queryOrTable)
       .load()
-    //    validateSchemaMin(df, "read")
     df.colNamesLowercase
   }
 
@@ -121,7 +113,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
       .mode(finalSaveMode.asSparkSaveMode)
       .save()
 
-    if (comment != null && !comment.isEmpty) {
+    if (comment != null && comment.isDefined) {
       val sql = s"comment on table ${connection.database}.${table.fullName} is '${comment}';"
       connection.execSnowflakeStatement(sql)
     }

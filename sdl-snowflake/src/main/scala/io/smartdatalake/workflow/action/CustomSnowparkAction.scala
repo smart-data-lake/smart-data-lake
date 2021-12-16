@@ -21,13 +21,15 @@ package io.smartdatalake.workflow.action
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.workflow.action.customlogic.CustomSnowparkDfsTransformerConfig
 import io.smartdatalake.workflow.dataobject.{CanCreateSnowparkDataFrame, CanWriteSnowparkDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SnowparkSubFeed}
 
 case class CustomSnowparkAction(override val id: ActionId,
                                 inputIds: Seq[DataObjectId],
                                 outputIds: Seq[DataObjectId] = Seq(),
-                                metadata: Option[ActionMetadata] = None
+                                metadata: Option[ActionMetadata] = None,
+                                transformer: CustomSnowparkDfsTransformerConfig
 )(implicit instanceRegistry: InstanceRegistry) extends SnowparkActionImpl {
 
   override val recursiveInputs: Seq[DataObject with CanCreateSnowparkDataFrame] =
@@ -43,7 +45,7 @@ case class CustomSnowparkAction(override val id: ActionId,
 
   override def transform(inputSubFeeds: Seq[SnowparkSubFeed], outputSubFeeds: Seq[SnowparkSubFeed])
                         (implicit context: ActionPipelineContext): Seq[SnowparkSubFeed] = {
-    applyTransformers(transformers ++ transformer.map(_.impl), inputSubFeeds, outputSubFeeds)
+    applyTransformers(transformer.impl, inputSubFeeds, outputSubFeeds)
   }
 
   override def factory: FromConfigFactory[Action] = CustomSparkAction

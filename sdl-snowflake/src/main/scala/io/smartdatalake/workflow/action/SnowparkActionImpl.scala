@@ -33,8 +33,6 @@ private[smartdatalake] abstract class SnowparkActionImpl extends ActionSubFeedsI
 
   var executionMode: Option[ExecutionMode] = None
   var executionCondition: Option[Condition] = None
-  var transformer: Option[CustomSnowparkDfsTransformerConfig] = None
-  var transformers: Seq[ParsableSnowparkDfsTransformer] = Seq()
   var recursiveInputIds: Seq[DataObjectId] = Seq()
 
   override def mainInputId: Option[DataObjectId] = None
@@ -78,13 +76,14 @@ private[smartdatalake] abstract class SnowparkActionImpl extends ActionSubFeedsI
     }
   }
 
-  protected def applyTransformers(transformers: Seq[SnowparkDfsTransformer],
+  protected def applyTransformers(transformer: SnowparkDfsTransformer,
                                   inputSubFeeds: Seq[SnowparkSubFeed], outputSubFeeds: Seq[SnowparkSubFeed])
                                  (implicit context: ActionPipelineContext): Seq[SnowparkSubFeed] = {
-    val inputDfsMap: Map[String, SnowparkDataFrame] = inputSubFeeds.map(subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap
-    val outputDfsMap: Map[String, SnowparkDataFrame] = transformers.foldLeft(inputDfsMap) {
-      case (dfsMap, transformer) => transformer.applyTransformation(id, dfsMap)
-    }
+
+    val inputDfsMap: Map[String, SnowparkDataFrame] = inputSubFeeds
+      .map(subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap
+
+    val outputDfsMap = transformer.applyTransformation(id, inputDfsMap)
 
     outputDfsMap.map {
       case (dataObjectId, dataFrame) =>
