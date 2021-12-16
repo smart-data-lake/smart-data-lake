@@ -19,30 +19,26 @@
 
 package io.smartdatalake.workflow.action.customlogic
 
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.smartdatalake.{SnowparkDataFrame, SnowparkSession}
-import io.smartdatalake.workflow.action.snowparktransformer.SnowparkDfsTransformer
-import io.smartdatalake.workflow.action.sparktransformer.{DfsTransformer, SQLDfsTransformer, ScalaClassDfsTransformer, ScalaCodeDfsTransformer}
+import io.smartdatalake.smartdatalake.SnowparkDataFrame
+import io.smartdatalake.workflow.action.snowparktransformer.{ScalaClassSnowparkDfsTransformer, SnowparkDfsTransformer}
 
 trait CustomSnowparkDfsTransformer extends Serializable {
 
   def transform(options: Map[String, String], dfs: Map[String, SnowparkDataFrame])
   : Map[String, SnowparkDataFrame]
+}
 
-  case class CustomDfsTransformerConfig(className: Option[String] = None,
-                                        options: Option[Map[String,String]] = None,
-                                        runtimeOptions: Option[Map[String,String]] = None) {
-    require(className.isDefined)
+case class CustomSnowparkDfsTransformerConfig(className: Option[String] = None,
+                                              options: Option[Map[String,String]] = None,
+                                              runtimeOptions: Option[Map[String,String]] = None) {
+  require(className.isDefined)
 
-    // Load Transformer code from appropriate location
-    val impl: SnowparkDfsTransformer =
-      className.map(clazz => ScalaClassDfsTransformer(className = clazz, options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map()))) }
+  // Load Transformer code from appropriate location
+  val impl: SnowparkDfsTransformer =
+    className.map(clazz => ScalaClassSnowparkDfsTransformer(className = clazz, options = options.getOrElse(Map()),
+      runtimeOptions = runtimeOptions.getOrElse(Map()))).get
 
-    override def toString: String = {
-      if(className.isDefined)       "className: "+className.get
-      else if(scalaFile.isDefined)  "scalaFile: "+scalaFile.get
-      else if(scalaCode.isDefined)  "scalaCode: "+scalaCode.get
-      else                          "sqlCode: "+sqlCode.get
-    }
+  override def toString: String = {
+    s"className: ${className.get}"
   }
 }

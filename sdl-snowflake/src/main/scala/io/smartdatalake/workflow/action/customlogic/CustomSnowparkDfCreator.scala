@@ -30,7 +30,7 @@ case class CustomSnowparkDfCreatorConfig(className: Option[String] = None,
   }
 
   override def toString: String = {
-    "className: "+className.get
+    s"className: ${className.get}"
   }
 }
 

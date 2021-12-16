@@ -22,7 +22,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, SdlConfigObject}
 import io.smartdatalake.definitions.{Condition, ExecutionMode, SparkStreamingMode}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig
+import io.smartdatalake.workflow.action.customlogic.{CustomDfsTransformerConfig, CustomSnowparkDfsTransformerConfig}
 import io.smartdatalake.workflow.action.snowparktransformer.ParsableSnowparkDfsTransformer
 import io.smartdatalake.workflow.action.sparktransformer.{ParsableDfsTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.{ActionPipelineContext, SnowparkSubFeed, SparkSubFeed}
