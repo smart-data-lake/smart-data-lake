@@ -24,7 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.{Condition, ExecutionMode}
 import io.smartdatalake.smartdatalake.SnowparkDataFrame
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
-import io.smartdatalake.workflow.action.snowparktransformer.SnowparkDfsTransformer
+import io.smartdatalake.workflow.action.customlogic.SnowparkDfsTransformer
 import io.smartdatalake.workflow.dataobject.{CanCreateSnowparkDataFrame, CanWriteSnowparkDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SnowparkSubFeed}
 
@@ -84,13 +84,14 @@ private[smartdatalake] abstract class SnowparkActionImpl extends ActionSubFeedsI
   }
 
   protected def applyTransformers(transformer: SnowparkDfsTransformer,
-                                  inputSubFeeds: Seq[SnowparkSubFeed], outputSubFeeds: Seq[SnowparkSubFeed])
+                                  inputSubFeeds: Seq[SnowparkSubFeed],
+                                  outputSubFeeds: Seq[SnowparkSubFeed])
                                  (implicit context: ActionPipelineContext): Seq[SnowparkSubFeed] = {
 
     val inputDfsMap: Map[String, SnowparkDataFrame] = inputSubFeeds
       .map(subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap
 
-    val outputDfsMap = transformer.applyTransformation(id, inputDfsMap)
+    val outputDfsMap = transformer.transform(inputDfsMap)
 
     outputDfsMap.map {
       case (dataObjectId, dataFrame) =>

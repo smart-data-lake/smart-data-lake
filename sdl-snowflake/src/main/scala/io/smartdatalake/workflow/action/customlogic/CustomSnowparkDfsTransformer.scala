@@ -19,17 +19,39 @@
 
 package io.smartdatalake.workflow.action.customlogic
 
+import com.typesafe.config.Config
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, ParsableFromConfig}
 import io.smartdatalake.smartdatalake.SnowparkDataFrame
-import io.smartdatalake.workflow.action.snowparktransformer.ScalaClassSnowparkDfsTransformer
+import io.smartdatalake.util.misc.CustomCodeUtil
+import io.smartdatalake.workflow.ActionPipelineContext
 
+// Project-specific custom Snowpark transformers should extend this trait
 trait CustomSnowparkDfsTransformer extends Serializable {
   def transform(options: Map[String, String], dfs: Map[String, SnowparkDataFrame]): Map[String, SnowparkDataFrame]
 }
 
-case class CustomSnowparkDfsTransformerConfig(className: String, options: Option[Map[String, String]] = None) {
+// Transformers defined in CustomSnowparkActions in the configuration files are parsed into this case class
+case class SnowparkDfsTransformer(val name: String = "snowparkScalaTransform",
+                                  val description: Option[String] = None,
+                                  className: String,
+                                  options: Map[String, String] = Map())
+  extends ParsableFromConfig[SnowparkDfsTransformer] {
 
-  val impl: ScalaClassSnowparkDfsTransformer =
-    ScalaClassSnowparkDfsTransformer(className = className, options = options.getOrElse(Map()))
+  private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomSnowparkDfsTransformer](className)
+
+  def transform(dfs: Map[String, SnowparkDataFrame])(implicit context: ActionPipelineContext): Map[String, SnowparkDataFrame] = {
+    customTransformer.transform(options, dfs)
+  }
+
+  override def factory: FromConfigFactory[SnowparkDfsTransformer] = SnowparkDfsTransformer
 
   override def toString: String = s"className: $className"
+}
+
+// This companion object ensures that SnowparkDfsTransformer can be parsed from the configuration
+object SnowparkDfsTransformer extends FromConfigFactory[SnowparkDfsTransformer] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry):
+  SnowparkDfsTransformer = {
+    extract[SnowparkDfsTransformer](config)
+  }
 }
