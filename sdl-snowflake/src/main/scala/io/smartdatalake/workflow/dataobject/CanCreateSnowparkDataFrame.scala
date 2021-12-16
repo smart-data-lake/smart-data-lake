@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2021 Schweizerische Bundesbahnen SBB (<https://www.sbb.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,9 +27,4 @@ private[smartdatalake] trait CanCreateSnowparkDataFrame {
   def getSnowparkDataFrame()(implicit context: ActionPipelineContext) : SnowparkDataFrame
 
   def createSnowparkReadSchema(writeSchema: StructType)(implicit context: ActionPipelineContext): StructType = writeSchema
-
-  protected def addFieldIfNotExisting(writeSchema: StructType, colName: String, dataType: DataType): StructType = {
-    if (!writeSchema.names.contains(colName)) writeSchema.add(colName, dataType)
-    else writeSchema
-  }
 }

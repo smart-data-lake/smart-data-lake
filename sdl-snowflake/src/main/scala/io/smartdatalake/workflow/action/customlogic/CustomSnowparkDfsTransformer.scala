@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2021 Schweizerische Bundesbahnen SBB (<https://www.sbb.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,25 +20,16 @@
 package io.smartdatalake.workflow.action.customlogic
 
 import io.smartdatalake.smartdatalake.SnowparkDataFrame
-import io.smartdatalake.workflow.action.snowparktransformer.{ScalaClassSnowparkDfsTransformer, SnowparkDfsTransformer}
+import io.smartdatalake.workflow.action.snowparktransformer.ScalaClassSnowparkDfsTransformer
 
 trait CustomSnowparkDfsTransformer extends Serializable {
-
-  def transform(options: Map[String, String], dfs: Map[String, SnowparkDataFrame])
-  : Map[String, SnowparkDataFrame]
+  def transform(options: Map[String, String], dfs: Map[String, SnowparkDataFrame]): Map[String, SnowparkDataFrame]
 }
 
-case class CustomSnowparkDfsTransformerConfig(className: Option[String] = None,
-                                              options: Option[Map[String,String]] = None,
-                                              runtimeOptions: Option[Map[String,String]] = None) {
-  require(className.isDefined)
+case class CustomSnowparkDfsTransformerConfig(className: String, options: Option[Map[String, String]] = None) {
 
-  // Load Transformer code from appropriate location
-  val impl: SnowparkDfsTransformer =
-    className.map(clazz => ScalaClassSnowparkDfsTransformer(className = clazz, options = options.getOrElse(Map()),
-      runtimeOptions = runtimeOptions.getOrElse(Map()))).get
+  val impl: ScalaClassSnowparkDfsTransformer =
+    ScalaClassSnowparkDfsTransformer(className = className, options = options.getOrElse(Map()))
 
-  override def toString: String = {
-    s"className: ${className.get}"
-  }
+  override def toString: String = s"className: $className"
 }

@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2021 Schweizerische Bundesbahnen SBB (<https://www.sbb.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,16 +25,7 @@ import io.smartdatalake.workflow.ActionPipelineContext
 
 private[smartdatalake] trait CanWriteSnowparkDataFrame {
 
-  /**
-   * Called during init phase for checks and initialization.
-   * If possible dont change the system until execution phase.
-   */
   def initSnowpark(df: SnowparkDataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = Unit
 
-  /**
-   * Write DataFrame to DataObject
-   * @param df the DataFrame to write
-   * @param isRecursiveInput if DataFrame needs this DataObject as input - special treatment might be needed in this case.
-   */
   def writeSnowparkDataFrame(df: SnowparkDataFrame, isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit
 }

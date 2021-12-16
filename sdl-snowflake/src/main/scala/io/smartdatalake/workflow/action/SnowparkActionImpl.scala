@@ -24,10 +24,9 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.{Condition, ExecutionMode}
 import io.smartdatalake.smartdatalake.SnowparkDataFrame
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
-import io.smartdatalake.workflow.action.customlogic.CustomSnowparkDfsTransformerConfig
-import io.smartdatalake.workflow.action.snowparktransformer.{ParsableSnowparkDfsTransformer, SnowparkDfsTransformer}
+import io.smartdatalake.workflow.action.snowparktransformer.SnowparkDfsTransformer
 import io.smartdatalake.workflow.dataobject.{CanCreateSnowparkDataFrame, CanWriteSnowparkDataFrame, DataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, SnowparkSubFeed, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, SnowparkSubFeed}
 
 private[smartdatalake] abstract class SnowparkActionImpl extends ActionSubFeedsImpl[SnowparkSubFeed] {
 
@@ -47,6 +46,14 @@ private[smartdatalake] abstract class SnowparkActionImpl extends ActionSubFeedsI
 
   override def outputs: Seq[DataObject with CanWriteSnowparkDataFrame]
 
+  override protected def preprocessInputSubFeedCustomized
+  (subFeed: SnowparkSubFeed, ignoreFilters: Boolean, isRecursive: Boolean)
+  (implicit context: ActionPipelineContext): SnowparkSubFeed = {
+    val inputMap = (inputs ++ recursiveInputs).map(i => i.id -> i).toMap
+    val input = inputMap(subFeed.dataObjectId)
+    enrichSubFeedDataFrame(input, subFeed, context.phase, isRecursive)
+  }
+
   override def recursiveInputs: Seq[DataObject with CanCreateSnowparkDataFrame] = Seq()
 
   def enrichSubFeedDataFrame(input: DataObject with CanCreateSnowparkDataFrame, subFeed: SnowparkSubFeed, phase: ExecutionPhase, isRecursive: Boolean = false)
@@ -56,14 +63,6 @@ private[smartdatalake] abstract class SnowparkActionImpl extends ActionSubFeedsI
     } else {
       subFeed
     }
-  }
-
-  override protected def preprocessInputSubFeedCustomized
-  (subFeed: SnowparkSubFeed, ignoreFilters: Boolean, isRecursive: Boolean)
-                                                         (implicit context: ActionPipelineContext): SnowparkSubFeed = {
-    val inputMap = (inputs ++ recursiveInputs).map(i => i.id -> i).toMap
-    val input = inputMap(subFeed.dataObjectId)
-    enrichSubFeedDataFrame(input, subFeed, context.phase, isRecursive)
   }
 
   override protected def writeSubFeed(subFeed: SnowparkSubFeed, isRecursive: Boolean)
@@ -77,7 +76,6 @@ private[smartdatalake] abstract class SnowparkActionImpl extends ActionSubFeedsI
   def writeSubFeed(subFeed: SnowparkSubFeed, output: DataObject with CanWriteSnowparkDataFrame, isRecursiveInput: Boolean = false)
                   (implicit context: ActionPipelineContext): Option[Boolean] = {
     executionMode match {
-      // TODO: Implement more execution modes
       case None =>
         output.writeSnowparkDataFrame(subFeed.dataFrame.get, isRecursiveInput, None)
         None

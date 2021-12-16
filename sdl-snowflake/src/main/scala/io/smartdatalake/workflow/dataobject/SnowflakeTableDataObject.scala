@@ -42,6 +42,8 @@ abstract class SnowflakeTableDataObjectProxy(override val schemaMin: Option[Stru
 /**
  * [[DataObject]] of type SnowflakeTableDataObject.
  * Provides details to access Snowflake tables via an action
+ * Can be used both for interacting with Snowflake through Spark with JDBC,
+ * as well as for actions written in the Snowpark API that run directly on Snowflake
  *
  * @param id           unique name of this data object
  * @param table        Snowflake table to be written by this output
