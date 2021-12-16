@@ -129,21 +129,19 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 }
 
 object SnowflakeTableDataObject extends FromConfigFactory[DataObject] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SnowflakeTableDataObject = {
+  override def fromConfig(config: Config)
+                         (implicit instanceRegistry: InstanceRegistry): SnowflakeTableDataObject = {
     extract[SnowflakeTableDataObject](config)
   }
 }
 
 private[smartdatalake] trait CanCreateSnowparkDataFrame {
-
   def getSnowparkDataFrame()(implicit context: ActionPipelineContext): SnowparkDataFrame
-
-  def createSnowparkReadSchema(writeSchema: SnowparkStructType)(implicit context: ActionPipelineContext): SnowparkStructType = writeSchema
 }
 
 private[smartdatalake] trait CanWriteSnowparkDataFrame {
-
-  def initSnowpark(df: SnowparkDataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = Unit
-
-  def writeSnowparkDataFrame(df: SnowparkDataFrame, isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit
+  def writeSnowparkDataFrame(df: SnowparkDataFrame,
+                             isRecursiveInput: Boolean = false,
+                             saveModeOptions: Option[SaveModeOptions] = None)
+                            (implicit context: ActionPipelineContext): Unit
 }
