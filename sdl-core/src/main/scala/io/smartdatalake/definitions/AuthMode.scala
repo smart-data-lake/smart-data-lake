@@ -154,6 +154,22 @@ case class SSLCertsAuthMode (
 }
 
 /**
+ * Validate by SASL_SSL Authentication : user / password and truststore
+ */
+case class SASLSCRAMAuthMode (
+                                 username: String,
+                                 passwordVariable: String,
+                                 sslMechanism: String,
+                                 truststorePath: String,
+                                 truststoreType: Option[String],
+                                 truststorePassVariable: String
+                               ) extends AuthMode {
+  private[smartdatalake] val password: String = SecretsUtil.getSecret(passwordVariable)
+  private[smartdatalake] val truststorePass: String = SecretsUtil.getSecret(truststorePassVariable)
+}
+
+
+/**
  * Interface to generalize authentication for HTTP requests
  */
 private[smartdatalake] trait HttpHeaderAuth {
