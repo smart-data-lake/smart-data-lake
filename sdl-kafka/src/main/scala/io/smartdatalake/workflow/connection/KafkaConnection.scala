@@ -26,6 +26,7 @@ import io.smartdatalake.definitions.{AuthMode, SASLSCRAMAuthMode, SSLCertsAuthMo
 import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig}
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.config.SslConfigs
+import org.apache.spark.sql.avro.confluent.ConfluentClient
 
 import java.util.Properties
 import scala.collection.JavaConverters._
