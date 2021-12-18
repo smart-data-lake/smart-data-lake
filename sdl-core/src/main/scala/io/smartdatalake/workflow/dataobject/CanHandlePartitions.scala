@@ -100,7 +100,7 @@ trait CanHandlePartitions { this: DataObject =>
       partitionValues.filter( pv => expectedHashCodes.contains(pv.hashCode))
     }.getOrElse(partitionValues)
   }
-  private case class PartitionValueFilterExpressionData(elements: Map[String, String], _hashCode: Int)
+  private[smartdatalake] case class PartitionValueFilterExpressionData(elements: Map[String, String], _hashCode: Int)
 
   /**
    * Validate the schema of a given Spark Data Frame `df` that it contains the specified partition columns
