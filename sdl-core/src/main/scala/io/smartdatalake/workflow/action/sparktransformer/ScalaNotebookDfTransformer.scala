@@ -53,7 +53,7 @@ import scala.util.{Failure, Success}
 case class ScalaNotebookDfTransformer(override val name: String = "scalaTransform", override val description: Option[String] = None, url: String, functionName: String, authMode: Option[AuthMode] = None, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsDfTransformer {
   import ScalaNotebookDfTransformer._
   private var _fnTransform: Option[fnTransformType] = None
-  override def prepare(actionId: ActionId)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = {
     try {
       val notebookCode = prepareFunction(parseNotebook(downloadNotebook(url, authMode)), functionName)
       _fnTransform = Some(compileCode(notebookCode))
@@ -61,9 +61,9 @@ case class ScalaNotebookDfTransformer(override val name: String = "scalaTransfor
       case ex: Exception => throw new ConfigurationException(s"($actionId) " + ex.getMessage, None, ex)
     }
   }
-  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit session: SparkSession): DataFrame = {
+  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit context: ActionPipelineContext): DataFrame = {
     assert(_fnTransform.isDefined, s"($actionId) prepare() must be called before transformWithOptions()")
-    _fnTransform.map(_(session, options, df, dataObjectId.id)).get
+    _fnTransform.map(_(context.sparkSession, options, df, dataObjectId.id)).get
   }
   override def factory: FromConfigFactory[ParsableDfTransformer] = ScalaNotebookDfTransformer
 }
