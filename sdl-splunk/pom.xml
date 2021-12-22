@@ -89,11 +89,6 @@
 			<artifactId>splunk</artifactId>
 			<version>${splunk.version}</version>
 		</dependency>
-		<dependency>
-			<groupId>com.jsuereth</groupId>
-			<artifactId>scala-arm_${scala.minor.version}</artifactId>
-			<version>${scala-arm.version}</version>
-		</dependency>
 
 		<dependency>
 			<groupId>com.typesafe</groupId>

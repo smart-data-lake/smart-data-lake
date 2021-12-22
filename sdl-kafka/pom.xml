@@ -95,7 +95,8 @@
 		<dependency>
 			<groupId>io.confluent</groupId>
 			<artifactId>kafka-schema-registry-client</artifactId>
-			<version>5.4.1</version>
+			<version>6.2.1</version>
+			<scope>runtime</scope>
 		</dependency>
 
 		<dependency>

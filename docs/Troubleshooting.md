@@ -4,10 +4,11 @@
 Error: `java.io.IOException: Could not locate executable null\bin\winutils.exe in the Hadoop binaries`
 
 Cause: The `winutils.exe` executable can not be found.   
-Download hadoop winutils binaries (e.g https://github.com/steveloughran/winutils/archive/tag_2017-08=29-hadoop-2.8.1-native.zip)  
-Extract binaries for desired hadoop version into folder (e.g. hadoop-2.8.1\bin)  
-set HADOOP_HOME evironment variable (e.g. HADOOP_HOME=...\hadoop-2.8.1).  
-Note that the binary files need to be located at %HADOOP_HOME%\bin!
+- Download hadoop winutils binaries (e.g https://github.com/cdarlint/winutils/archive/refs/heads/master.zip)  
+- Extract binaries for desired hadoop version into folder (e.g. hadoop-3.2.2\bin)  
+- Set HADOOP_HOME evironment variable (e.g. HADOOP_HOME=...\hadoop-3.2.2).
+  Note that the binary files need to be located at %HADOOP_HOME%\bin!
+- Add %HADOOP_HOME%\bin to PATH variable.
 
 ## Windows: `/tmp/hive` is not writable / RuntimeException: Error while running command to get file permissions
 Solution: Change to `%HADOOP_HOME%\bin` and execute `winutils chmod 777 /tmp/hive`.
