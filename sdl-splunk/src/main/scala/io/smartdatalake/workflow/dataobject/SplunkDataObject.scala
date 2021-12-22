@@ -35,8 +35,7 @@ import io.smartdatalake.workflow.connection.SplunkConnection
 import io.smartdatalake.workflow.dataobject.SplunkFormatter.{fromSplunkStringFormat, toSplunkStringFormat}
 import org.apache.spark.sql._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
-import resource._
-
+import scala.util.Using
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 
@@ -201,7 +200,7 @@ private[smartdatalake] trait SplunkService extends SmartDataLakeLogger {
 
   def readFromSplunk(query: String, searchArgs: JobExportArgs, splunk: Service): Seq[Map[String, String]] = {
     val startTime = System.currentTimeMillis()
-    val searchResults = managed(splunk.export(query, searchArgs)) acquireAndGet { export =>
+    val searchResults = Using.resource(splunk.export(query, searchArgs)) { export =>
       val reader = new MultiResultsReaderJson(export)
       val results = reader.iterator.asScala.flatMap(_.iterator().asScala.map(_.asScala.toMap)).toArray // toArray copies the result to an array before closing
       reader.close()

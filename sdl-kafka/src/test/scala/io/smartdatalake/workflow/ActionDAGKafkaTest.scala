@@ -18,19 +18,19 @@
  */
 package io.smartdatalake.workflow
 
-import java.nio.file.Files
-import java.time.LocalDateTime
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
+import io.github.embeddedkafka.EmbeddedKafka
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.workflow.action.{CopyAction, SDLExecutionId}
+import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataobject._
-import net.manub.embeddedkafka.EmbeddedKafka
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{StructField, StructType, TimestampType}
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
+
+import java.nio.file.Files
+import java.time.LocalDateTime
 
 /**
  * Note about EmbeddedKafka compatibility:
@@ -69,7 +69,7 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
 
     // setup DataObjects
     val feed = "actionpipeline"
-    val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6000")
+    val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6001")
     instanceRegistry.register(kafkaConnection)
     val srcTable = Table(Some("default"), "ap_input")
     val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)

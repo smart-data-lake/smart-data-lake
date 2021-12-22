@@ -30,13 +30,13 @@ import scala.util.{Failure, Success, Try}
 private[smartdatalake] case class ScalaJWebserviceClient(request: HttpRequest) extends WebserviceClient {
   private val contentTypeHeader = "content-type"
   override def get(): Try[Array[Byte]] = {
-    exec(request)
+    exec(request.option(HttpOptions.followRedirects(true)))
   }
   override def post(body: Array[Byte], mimeType: String): Try[Array[Byte]] = {
-    exec(request.header(contentTypeHeader, mimeType).postData(body))
+    exec(request.option(HttpOptions.followRedirects(true)).header(contentTypeHeader, mimeType).postData(body))
   }
   override def put(body: Array[Byte], mimeType: String): Try[Array[Byte]] = {
-    exec(request.header(contentTypeHeader, mimeType).put(body))
+    exec(request.option(HttpOptions.followRedirects(true)).header(contentTypeHeader, mimeType).put(body))
   }
   private def exec(request: HttpRequest): Try[Array[Byte]] = {
     Try(request.asBytes) match {
@@ -55,13 +55,7 @@ private[smartdatalake] object ScalaJWebserviceClient extends SmartDataLakeLogger
     val request = Http(url.getOrElse(config.url))
       .headers(config.additionalHeaders)
       .optionally(config.timeouts, (v:HttpTimeoutConfig, request:HttpRequest) => request.timeout(v.connectionTimeoutMs, v.readTimeoutMs))
-      .optionally(config.authMode, (v:AuthMode, request:HttpRequest) => {
-        v match {
-          case headerAuth: HttpHeaderAuth => request.headers(headerAuth.getHeaders)
-          case basicAuth: BasicAuthMode => request.auth(basicAuth.user, basicAuth.password)
-          case x => throw ConfigurationException(s"($config.id) authentication mode $x is not supported by ScalaJWebserviceClient")
-        }
-      })
+      .applyAuthMode(config.authMode)
       .optionally(config.proxy, (v:HttpProxyConfig, request:HttpRequest) => request.proxy(v.host, v.port))
       .option(HttpOptions.followRedirects(config.followRedirects))
     new ScalaJWebserviceClient(request)
@@ -84,8 +78,8 @@ private[smartdatalake] object ScalaJWebserviceClient extends SmartDataLakeLogger
       // Request was sent, but the response contains an error
       case errorResponse if errorResponse.isError =>
         logger.error(s"Error when calling ${request.url}: Http status code: ${errorResponse.code}, response body: ${new String(errorResponse.body).take(200)}...")
-        Failure(new WebserviceException(s"Webservice Request failed with error <${errorResponse.code}>"))
-      // Request was successfull and response can be processed further
+        Failure(new WebserviceException(s"Webservice Request failed with error <${errorResponse.code}>", Some(errorResponse.code), Some(new String(errorResponse.body))))
+      // Request was successful and response can be processed further
       case normalResponse if normalResponse.isSuccess => Success(normalResponse.body)
     }
   }
@@ -93,9 +87,18 @@ private[smartdatalake] object ScalaJWebserviceClient extends SmartDataLakeLogger
   /**
    * Pimp my libary to apply optional configurations to HttpRequest
    */
-  private implicit class HttpRequestExtension(request: HttpRequest) {
+  implicit class HttpRequestExtension(request: HttpRequest) {
     def optionally[T](config: Option[T], func: (T,HttpRequest) => HttpRequest): HttpRequest = {
       if (config.isDefined) func(config.get, request) else request
+    }
+    def applyAuthMode(authMode: Option[AuthMode]): HttpRequest = {
+      request.optionally(authMode, (v:AuthMode, request:HttpRequest) => {
+        v match {
+          case headerAuth: HttpHeaderAuth => request.headers(headerAuth.getHeaders)
+          case basicAuth: BasicAuthMode => request.auth(basicAuth.user, basicAuth.password)
+          case x => throw ConfigurationException(s"authentication mode $x is not supported by ScalaJWebserviceClient")
+        }
+      })
     }
   }
 }

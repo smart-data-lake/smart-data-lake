@@ -19,6 +19,7 @@
 package io.smartdatalake.util.evolution
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import org.apache.spark.sql.custom.UnsafeUnaryUdf
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, Row}
 
