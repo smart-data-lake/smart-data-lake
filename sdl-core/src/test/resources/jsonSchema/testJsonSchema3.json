@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "object": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "item1": {
+          "type": "string"
+        },
+        "item2": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "item1",
+        "item2"
+      ]
+    },
+    "array": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "itemProperty1": {
+            "type": "string"
+          },
+          "itemProperty2": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "structure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "nestedArray": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "type": "string",
+                "enum": [
+                  "KEY1",
+                  "KEY2"
+                ]
+              },
+              "value": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      }
+    },
+    "integer": {
+      "type": "integer"
+    },
+    "string": {
+      "type": "string"
+    },
+    "number": {
+      "type": "number"
+    },
+    "float": {
+      "type": "float"
+    },
+    "nullable": {
+      "type": ["number", "null"]
+    },
+    "boolean": {
+      "type": "boolean"
+    },
+    "additionalProperty": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "object",
+    "array",
+    "structure",
+    "typeless",
+    "integer",
+    "string",
+    "number",
+    "nullable",
+    "boolean"
+  ]
+}

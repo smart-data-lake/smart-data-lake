@@ -57,7 +57,7 @@ case class CustomScriptAction(override val id: ActionId,
     val mainPartitionValues = getMainPartitionValues(inputSubFeeds)
     val outputParameters = scripts.foldLeft(inputParameters) {
       case (p, script) =>
-        val stdOut = script.execStdOut(id, mainPartitionValues, p)
+        val stdOut = script.execStdOutString(id, mainPartitionValues, p)
         parseLastLine(stdOut)
     }
     outputSubFeeds.map(_.copy(parameters = Some(outputParameters)))
