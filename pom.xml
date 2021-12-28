@@ -332,6 +332,7 @@
 		<kafka.version>2.4.1</kafka.version>
 		<snowflake-spark.version>2.9.2</snowflake-spark.version>
 		<snowflake-jdbc.version>3.13.11</snowflake-jdbc.version>
+		<snowflake-snowpark.version>0.11.0</snowflake-snowpark.version>
 		<keycloak.version>4.5.0.Final</keycloak.version>
 		<delta.version>1.0.0</delta.version>
 		<poi.version>4.1.2</poi.version>
