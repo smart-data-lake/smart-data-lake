@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+    <component name="Encoding">
+        <file url="file://$PROJECT_DIR$" charset="UTF-8" />
+        <file url="file://$PROJECT_DIR$/sdl-azure/src/main/java" charset="UTF-8" />
+        <file url="file://$PROJECT_DIR$/sdl-azure/src/main/scala" charset="UTF-8" />
+        <file url="file://$PROJECT_DIR$/sdl-core" charset="UTF-8" />
+        <file url="file://$PROJECT_DIR$/sdl-core/src/main/resources" charset="UTF-8" />
+        <file url="file://$PROJECT_DIR$/sdl-core/src/main/scala" charset="UTF-8" />
+        <file url="file://$PROJECT_DIR$/sdl-deltalake/src/main/scala" charset="UTF-8" />
+        <file url="file://$PROJECT_DIR$/sdl-jms/src/main/scala" charset="UTF-8" />
+        <file url="file://$PROJECT_DIR$/sdl-kafka/src/main/scala" charset="UTF-8" />
+        <file url="file://$PROJECT_DIR$/sdl-snowflake/src/main/scala" charset="UTF-8" />
+        <file url="file://$PROJECT_DIR$/sdl-splunk/src/main/scala" charset="UTF-8" />
+    </component>
+</project>
