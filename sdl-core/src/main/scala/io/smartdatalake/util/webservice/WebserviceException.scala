@@ -20,7 +20,5 @@ package io.smartdatalake.util.webservice
 
 /**
   * Exception thrown when calling a webservice
-  *
-  * @param message error message
   */
-class WebserviceException(message: String) extends RuntimeException(message) {}
+class WebserviceException(message: String, responseCode: Option[Int] = None, responseBody: Option[String] = None) extends RuntimeException(message) {}
