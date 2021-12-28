@@ -18,7 +18,6 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
@@ -33,6 +32,7 @@ import java.time.LocalDateTime
 
 class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
 
+  // set additional spark options for delta lake
   protected implicit val session : SparkSession = new DeltaLakeModulePlugin().additionalSparkProperties()
     .foldLeft(TestUtil.sparkSessionBuilder(withHive = true)) {
       case (builder, config) => builder.config(config._1, config._2)
@@ -43,7 +43,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
   private val tempPath = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val context = TestUtil.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
   before {
     instanceRegistry.clear()
@@ -64,7 +64,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
 
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
-    val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
+    val context1 = context.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, mergeModeEnable = true)
     val l1 = Seq(("doe","john",5),("pan","peter",5),("hans","muster",5)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())(context1)
@@ -83,7 +83,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
 
     // prepare & start 2nd load
     val refTimestamp2 = LocalDateTime.now()
-    val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
+    val context2 = context.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
     val l2 = Seq(("doe","john",10),("pan","peter",5)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l2, Seq())(context1)
     action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(context2)
@@ -114,7 +114,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
 
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
-    val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
+    val context1 = context.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, mergeModeEnable = true, updateCapturedColumnOnlyWhenChanged = true)
     val l1 = Seq(("doe","john",5),("pan","peter",5),("hans","muster",5)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())(context1)
@@ -133,7 +133,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
 
     // prepare & start 2nd load
     val refTimestamp2 = LocalDateTime.now()
-    val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
+    val context2 = context.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
     val l2 = Seq(("doe","john",10),("pan","peter",5)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l2, Seq())(context1)
     action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(context2)

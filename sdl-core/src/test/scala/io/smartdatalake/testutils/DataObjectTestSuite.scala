@@ -31,7 +31,6 @@ trait DataObjectTestSuite extends FunSuite with Matchers with BeforeAndAfter {
 
   protected implicit lazy val session: SparkSession = TestUtil.sessionHiveCatalog
 
-
   protected val escapedFilePath: String => String = (path: String) => path.replaceAll("\\\\", "\\\\\\\\")
   protected val convertFilePath: String => String = (path: String) => path.replaceAll("\\\\", "/")
 

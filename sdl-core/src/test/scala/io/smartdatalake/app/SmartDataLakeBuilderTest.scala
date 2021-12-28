@@ -441,7 +441,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == Seq(PartitionValues(Map("dt"->"20190101"))))
       if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty) // doesnt work on windows
-      val stateListener = Environment._globalConfig.stateListeners.head.listener.asInstanceOf[TestStateListener]
+      val stateListener = Environment.globalConfig.stateListeners.head.listener.asInstanceOf[TestStateListener]
       assert(stateListener.firstState.isDefined && !stateListener.firstState.get.isFinal)
       assert(stateListener.finalState.isDefined && stateListener.finalState.get.isFinal)
     }

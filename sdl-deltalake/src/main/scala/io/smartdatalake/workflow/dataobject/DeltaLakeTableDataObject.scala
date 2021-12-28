@@ -122,7 +122,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   private def getAbsolutePath(implicit context: ActionPipelineContext) = {
     val prefixedPath = HdfsUtil.prefixHadoopPath(path.get, connection.map(_.pathPrefix))
-    HdfsUtil.makeAbsolutePath(prefixedPath)(filesystem)
+    HdfsUtil.makeAbsolutePath(prefixedPath)(getFilesystem(prefixedPath, context.serializableHadoopConf)) // dont use "filesystem" to avoid loop
   }
 
   table = table.overrideDb(connection.map(_.db))
@@ -234,7 +234,8 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     if (isTableExisting) {
       if (!allowSchemaEvolution) validateSchema(saveModeTargetDf, session.table(table.fullName).schema, "write")
       if (finalSaveMode == SDLSaveMode.Merge) {
-        mergeDataFrameByPrimaryKey(saveModeTargetDf, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
+        // merge operations still need all columns for potential insert/updateConditions. Therefore dfPrepared instead of saveModeTargetDf is passed on.
+        mergeDataFrameByPrimaryKey(dfPrepared, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
       } else {
         if (partitions.isEmpty) {
           dfWriter
@@ -293,14 +294,14 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       var mergeStmt = deltaTable.merge(df.as("new"), joinCondition and saveModeOptions.additionalMergePredicateExpr.getOrElse(lit(true)))
       // add delete clause if configured
       saveModeOptions.deleteConditionExpr.foreach(c => mergeStmt = mergeStmt.whenMatched(c).delete())
-      // add update clause - insertExpr does not support referring new columns in existing table on schema evolution, thats why we use it only when needed, and insertAll otherwise
+      // add update clause - updateExpr does not support referring new columns in existing table on schema evolution, that's why we use it only when needed, and updateAll otherwise
       mergeStmt = if (saveModeOptions.updateColumnsOpt.isDefined) {
         val updateCols = saveModeOptions.updateColumnsOpt.getOrElse(df.columns.toSeq.diff(table.primaryKey.get))
         mergeStmt.whenMatched(saveModeOptions.updateConditionExpr.getOrElse(lit(true))).updateExpr(updateCols.map(c => c -> s"new.$c").toMap)
       } else {
         mergeStmt.whenMatched(saveModeOptions.updateConditionExpr.getOrElse(lit(true))).updateAll()
       }
-      // add insert clause - insertExpr does not support referring new columns in existing table on schema evolution, thats why we use it only when needed, and insertAll otherwise
+      // add insert clause - insertExpr does not support referring new columns in existing table on schema evolution, that's why we use it only when needed, and insertAll otherwise
       mergeStmt = if (saveModeOptions.insertColumnsToIgnore.nonEmpty) {
         val insertCols = df.columns.diff(saveModeOptions.insertColumnsToIgnore)
         mergeStmt.whenNotMatched(saveModeOptions.insertConditionExpr.getOrElse(lit(true))).insertExpr(insertCols.map(c => c -> s"new.$c").toMap)

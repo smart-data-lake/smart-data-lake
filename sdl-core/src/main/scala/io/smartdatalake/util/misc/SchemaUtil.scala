@@ -42,10 +42,11 @@ object SchemaUtil {
     }
   }
 
-  def prepareSchemaForDiff(schemaIn: StructType, ignoreNullable: Boolean, caseSensitive: Boolean): Seq[StructField] = {
+  def prepareSchemaForDiff(schemaIn: StructType, ignoreNullable: Boolean, caseSensitive: Boolean, ignoreMetadata: Boolean = true): Seq[StructField] = {
     var schema = schemaIn.fields.toSeq
     if (ignoreNullable) schema = nullableFields(schema)
     if (!caseSensitive) schema = lowerCaseFields(schema)
+    if (ignoreMetadata) schema = removeMetadataFields(schema)
     schema
   }
 
@@ -111,6 +112,12 @@ object SchemaUtil {
     ))
   }
 
+  private def removeMetadataFields(fields: Seq[StructField]): Seq[StructField] = {
+    fields.map(field => field.copy(
+      dataType = removeMetadataDataType(field.dataType),
+      metadata = Metadata.empty
+    ))
+  }
   private def lowerCaseFields(fields: Seq[StructField]): Seq[StructField] = {
     fields.map(field => field.copy(name = field.name.toLowerCase))
   }
@@ -128,6 +135,24 @@ object SchemaUtil {
         nullableDataType(keyType),
         nullableDataType(valueType),
         valueContainsNull = true
+      )
+      case _ => dataType
+    }
+  }
+
+  private def removeMetadataDataType(dataType: DataType): DataType = {
+    dataType match {
+      case struct: StructType => StructType(
+        fields = removeMetadataFields(struct)
+      )
+      case ArrayType(elementType, containsNull) => ArrayType(
+        removeMetadataDataType(elementType),
+        containsNull = containsNull
+      )
+      case MapType(keyType, valueType, valueContainsNull) => MapType(
+        removeMetadataDataType(keyType),
+        removeMetadataDataType(valueType),
+        valueContainsNull = valueContainsNull
       )
       case _ => dataType
     }
