@@ -20,6 +20,7 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
 import io.smartdatalake.config.SdlConfigObject.ActionId
 

@@ -28,9 +28,10 @@ import io.smartdatalake.util.dag.DAGHelper._
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action._
-import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject}
+import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject, TransactionalSparkTableDataObject}
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
+import org.apache.spark.sql.SparkSession
 import org.slf4j.event.Level
 
 import scala.concurrent.Await
