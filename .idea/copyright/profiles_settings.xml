@@ -1,7 +1,7 @@
 <component name="CopyrightManager">
-    <settings default="GPLv3">
-        <module2copyright>
-            <element module="All" copyright="GPLv3" />
-        </module2copyright>
-    </settings>
+  <settings default="GPLv3">
+    <module2copyright>
+      <element module="All" copyright="GPLv3" />
+    </module2copyright>
+  </settings>
 </component>
