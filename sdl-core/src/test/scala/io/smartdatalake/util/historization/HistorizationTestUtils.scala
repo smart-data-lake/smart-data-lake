@@ -19,11 +19,12 @@
 
 package io.smartdatalake.util.historization
 
+import java.sql.Timestamp
+
 import io.smartdatalake.definitions.{HiveConventions, TechnicalTableColumn}
 import io.smartdatalake.util.historization.Historization.{localDateTimeToCol, localDateTimeToTstmp}
 import org.apache.spark.sql.{DataFrame, Encoder, SparkSession}
 import org.apache.spark.sql.functions.lit
-
 import java.time.LocalDateTime
 
 object HistorizationTestUtils {
@@ -71,8 +72,8 @@ object HistorizationTestUtils {
       case HistorizationPhase.UpdatedNew =>
         operation = Some(HistorizationRecordOperations.insertNew)
         toDataDf(records, colNames)
-          .withColumn(s"${TechnicalTableColumn.captured}", localDateTimeToCol(referenceTimestampNew))
-          .withColumn(s"${TechnicalTableColumn.delimited}", localDateTimeToCol(doomsday))
+          .withColumn(s"${TechnicalTableColumn.captured}", lit(Timestamp.valueOf(referenceTimestampNew)))
+          .withColumn(s"${TechnicalTableColumn.delimited}", lit(Timestamp.valueOf(doomsday)))
       case HistorizationPhase.NewlyAdded =>
         operation = Some(HistorizationRecordOperations.insertNew)
         toDataDf(records, colNames)
