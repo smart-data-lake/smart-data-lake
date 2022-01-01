@@ -78,7 +78,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
 
   override def expectedPartitionsCondition: Option[String] = None // all partitions are expected to exist
 
-  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def prepare(implicit context: ActionPipelineContext): Unit = {
     // prepare auth mode if defined
     authMode.foreach(_.prepare())
   }
@@ -139,18 +139,18 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
    *
    * @param query it should be possible to define the partition to read as query string, but this is not yet implemented
    */
-  override def createInputStream(query: String)(implicit session: SparkSession): InputStream = {
+  override def createInputStream(query: String)(implicit context: ActionPipelineContext): InputStream = {
     new ByteArrayInputStream(getResponse(Some(query)))
   }
 
-  override def startWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
+  override def startWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = Unit
 
   /**
    * @param path      is ignored for webservices
    * @param overwrite is ignored for webservices
    * @return outputstream that writes to WebService once it's closed
    */
-  override def createOutputStream(path: String, overwrite: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): OutputStream = {
+  override def createOutputStream(path: String, overwrite: Boolean)(implicit context: ActionPipelineContext): OutputStream = {
     new ByteArrayOutputStream() {
       override def close(): Unit = Try {
         super.close()
@@ -163,9 +163,9 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
     }
   }
 
-  override def endWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = Unit
+  override def endWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = Unit
 
-  override def postWrite(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)
     authMode.foreach(_.close())
   }
@@ -173,7 +173,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
   /**
    * For WebserviceFileDataObject, every partition is mapped to one FileRef
    */
-  override def getFileRefs(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[FileRef] = {
+  override def getFileRefs(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[FileRef] = {
     val partitionValuesToProcess = if (partitions.nonEmpty) {
       // as partitionValues don't need to define a value for every partition, we need to create all partition values and filter them
       val allPartitionValues = createAllPartitionValues
@@ -187,7 +187,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
   /**
    * create a FileRef for one given partitionValues
    */
-  private def createFileRef(partitionValues: PartitionValues)(implicit session: SparkSession): FileRef = {
+  private def createFileRef(partitionValues: PartitionValues)(implicit context: ActionPipelineContext): FileRef = {
     val queryString = getPartitionString(partitionValues)
 
     // translate urls special characters into a regular filename
@@ -220,14 +220,14 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
    * List partition values defined for this web service.
    * Note that this is a fixed list.
    */
-  override def listPartitions(implicit session: SparkSession, context: ActionPipelineContext): Seq[PartitionValues] = createAllPartitionValues
+  override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = createAllPartitionValues
 
   /**
    * No root path needed for Webservice. It can be included in webserviceOptions.url.
    */
   override def path: String = ""
 
-  override def relativizePath(filePath: String)(implicit session: SparkSession): String = filePath
+  override def relativizePath(filePath: String)(implicit context: ActionPipelineContext): String = filePath
 
   override def factory: FromConfigFactory[DataObject] = WebserviceFileDataObject
 }

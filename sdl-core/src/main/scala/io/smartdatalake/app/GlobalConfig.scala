@@ -25,9 +25,12 @@ import configs.syntax._
 import io.smartdatalake.config.ConfigImplicits
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.misc.{MemoryUtils, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SmartDataLakeLogger}
 import io.smartdatalake.util.secrets.{SecretProviderConfig, SecretsUtil}
 import io.smartdatalake.workflow.action.customlogic.{PythonUDFCreatorConfig, SparkUDFCreatorConfig}
+import org.apache.hadoop.conf.Configuration
+import org.apache.spark.custom.PrivateAccessor
+import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.custom.ExpressionEvaluator
 
@@ -86,6 +89,14 @@ extends SmartDataLakeLogger {
   }
 
   /**
+   * Get Hadoop configuration as Spark would see it.
+   * This is using potential hadoop properties defined in sparkOptions.
+   */
+  def getHadoopConfiguration: Configuration = {
+    PrivateAccessor.getHadoopConfiguration(sparkOptions.getOrElse(Map()))
+  }
+
+  /**
    * Create a spark session using settings from this global config
    */
   def createSparkSession(appName: String, master: Option[String], deployMode: Option[String] = None): SparkSession = {
@@ -112,6 +123,8 @@ extends SmartDataLakeLogger {
       // register in SDL spark session
       config.registerUDF(name, Environment._sparkSession)
     }
+    // adjust log level
+    LogUtil.setLogLevel(Environment._sparkSession.sparkContext)
     // return
     Environment._sparkSession
   }

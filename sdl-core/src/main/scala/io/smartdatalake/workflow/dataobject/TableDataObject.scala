@@ -30,27 +30,27 @@ private[smartdatalake] trait TableDataObject extends DataObject with CanCreateDa
 
   var tableSchema: StructType = null
 
-  def isDbExisting(implicit session: SparkSession): Boolean
+  def isDbExisting(implicit context: ActionPipelineContext): Boolean
 
-  def isTableExisting(implicit session: SparkSession): Boolean
+  def isTableExisting(implicit context: ActionPipelineContext): Boolean
 
-  def dropTable(implicit session: SparkSession): Unit
+  def dropTable(implicit context: ActionPipelineContext): Unit
 
-  def getPKduplicates(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = if (table.primaryKey.isEmpty) {
+  def getPKduplicates(implicit context: ActionPipelineContext): DataFrame = if (table.primaryKey.isEmpty) {
     getDataFrame().where(lit(false))
   } else {
     getDataFrame().getNonuniqueRows(table.primaryKey.get.toArray)
   }
 
-  def getPKnulls(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  def getPKnulls(implicit context: ActionPipelineContext): DataFrame = {
     getDataFrame().getNulls(table.primaryKey.get.toArray)
   }
 
-  def getPKviolators(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  def getPKviolators(implicit context: ActionPipelineContext): DataFrame = {
     getPKduplicates.union(getPKnulls)
   }
 
-  def isPKcandidateKey(implicit session: SparkSession, context: ActionPipelineContext): Boolean =  {
+  def isPKcandidateKey(implicit context: ActionPipelineContext): Boolean =  {
     table.primaryKey.isEmpty || getDataFrame().isCandidateKey(table.primaryKey.get.toArray)
   }
 

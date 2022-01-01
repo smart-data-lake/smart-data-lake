@@ -42,16 +42,16 @@ abstract class ScriptActionImpl extends ActionSubFeedsImpl[ScriptSubFeed] {
   /**
    * To be implemented by sub-classes
    */
-  protected def execScript(inputSubFeeds: Seq[ScriptSubFeed], outputSubFeeds: Seq[ScriptSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[ScriptSubFeed]
+  protected def execScript(inputSubFeeds: Seq[ScriptSubFeed], outputSubFeeds: Seq[ScriptSubFeed])(implicit context: ActionPipelineContext): Seq[ScriptSubFeed]
 
-  override protected def transform(inputSubFeeds: Seq[ScriptSubFeed], outputSubFeeds: Seq[ScriptSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[ScriptSubFeed] = {
+  override protected def transform(inputSubFeeds: Seq[ScriptSubFeed], outputSubFeeds: Seq[ScriptSubFeed])(implicit context: ActionPipelineContext): Seq[ScriptSubFeed] = {
     // execute scripts in exec phase
     if (context.phase == ExecutionPhase.Exec) {
       execScript(inputSubFeeds, outputSubFeeds)
     } else outputSubFeeds
   }
 
-  override def writeSubFeed(subFeed: ScriptSubFeed, isRecursive: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): WriteSubFeedResult = {
+  override def writeSubFeed(subFeed: ScriptSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult = {
     val output = outputs.find(_.id == subFeed.dataObjectId).getOrElse(throw new IllegalStateException(s"($id) output for subFeed ${subFeed.dataObjectId} not found"))
     output.scriptNotification(subFeed.parameters.getOrElse(Map()))
     WriteSubFeedResult(noData = None) // unknown if there is data

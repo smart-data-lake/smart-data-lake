@@ -90,19 +90,19 @@ case class CopyAction(override val id: ActionId,
 
   validateConfig()
 
-  private def getTransformers(implicit session: SparkSession, context: ActionPipelineContext): Seq[DfTransformer] = {
+  private def getTransformers(implicit context: ActionPipelineContext): Seq[DfTransformer] = {
     getTransformers(transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, transformers, filterClauseExpr)
   }
 
-  override def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  override def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit context: ActionPipelineContext): SparkSubFeed = {
     applyTransformers(getTransformers, inputSubFeed, outputSubFeed)
   }
 
-  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
     applyTransformers(getTransformers, partitionValues)
   }
 
-  override def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = {
     if (deleteDataAfterRead) input match {
       // delete input partitions if applicable
       case (partitionInput: CanHandlePartitions) if partitionInput.partitions.nonEmpty && inputSubFeed.partitionValues.nonEmpty =>

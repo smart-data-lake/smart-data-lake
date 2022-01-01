@@ -32,7 +32,7 @@ private[smartdatalake] trait CanCreateIncrementalOutput {
    * Note that this method is called on initializiation of the SmartDataLakeBuilder job (init Phase) and for streaming execution after every execution of an Action involving this DataObject (postExec).
    * @param state Internal state of last increment. If None then the first increment (may be a full increment) is delivered.
    */
-  def setState(state: Option[String])(implicit session: SparkSession, context: ActionPipelineContext) : Unit
+  def setState(state: Option[String])(implicit context: ActionPipelineContext) : Unit
 
   /**
    * Return the state of the last increment or empty if no increment was processed.

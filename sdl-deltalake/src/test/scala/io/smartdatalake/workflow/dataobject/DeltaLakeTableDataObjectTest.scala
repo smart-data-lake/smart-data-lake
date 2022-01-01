@@ -34,7 +34,7 @@ import java.nio.file.Files
 
 class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
 
-  // we need a session with additional properties...
+  // set additional spark options for delta lake
   protected implicit val session : SparkSession = new DeltaLakeModulePlugin().additionalSparkProperties()
     .foldLeft(TestUtil.sparkSessionBuilder(withHive = true)) {
       case (builder, config) => builder.config(config._1, config._2)
@@ -45,10 +45,12 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
   val tempPath: String = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-  val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
+  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  val contextExec: ActionPipelineContext = context.copy(phase = ExecutionPhase.Exec)
 
-  before { instanceRegistry.clear() }
+  before {
+    instanceRegistry.clear()
+  }
 
   test("CustomDf2DeltaTable") {
 
@@ -64,7 +66,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     // prepare & start load
     val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id)
     val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
-    testAction.exec(Seq(srcSubFeed))(session, contextExec)
+    testAction.exec(Seq(srcSubFeed))(contextExec)
 
     val expected = sourceDO.getDataFrame()
     val actual = targetDO.getDataFrame()
@@ -87,7 +89,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     // prepare & start load
     val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id)
     val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
-    testAction.exec(Seq(srcSubFeed))(session, contextExec)
+    testAction.exec(Seq(srcSubFeed))(contextExec)
 
     val expected = sourceDO.getDataFrame()
     val actual = targetDO.getDataFrame()

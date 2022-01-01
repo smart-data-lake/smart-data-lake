@@ -60,13 +60,13 @@ case class PKViolatorsDataObject(id: DataObjectId,
                                 (@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with ParsableFromConfig[PKViolatorsDataObject] {
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
 
     import PKViolatorsDataObject.{colListType, columnNameName, columnValueName}
     // Get all DataObjects from registry
     val dataObjects: Seq[DataObject with Product] = config match {
       case Some(configLocation) =>
-        val config = ConfigLoader.loadConfigFromFilesystem(configLocation.split(',').toSeq)
+        val config = ConfigLoader.loadConfigFromFilesystem(configLocation.split(',').toSeq, context.hadoopConf)
         ConfigParser.parse(config).getDataObjects.map(_.asInstanceOf[DataObject with Product])
       case None => instanceRegistry.getDataObjects.map(_.asInstanceOf[DataObject with Product])
     }

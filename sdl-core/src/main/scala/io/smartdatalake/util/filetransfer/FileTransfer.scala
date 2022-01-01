@@ -32,7 +32,7 @@ private[smartdatalake] trait FileTransfer {
    * @param fileRefs files to be transferred
    * @return target files which will be created when file transfer is executed
    */
-  def getFileRefMapping(fileRefs: Seq[FileRef])(implicit session: SparkSession, context: ActionPipelineContext): Seq[FileRefMapping] = {
+  def getFileRefMapping(fileRefs: Seq[FileRef])(implicit context: ActionPipelineContext): Seq[FileRefMapping] = {
     tgtDO.translateFileRefs(fileRefs)
   }
 
@@ -40,7 +40,7 @@ private[smartdatalake] trait FileTransfer {
    * Executes the file transfer
    * @param fileRefPairs: mapping from input to output file references.
    */
-  def exec(fileRefPairs: Seq[FileRefMapping])(implicit session: SparkSession, context: ActionPipelineContext): Unit
+  def exec(fileRefPairs: Seq[FileRefMapping])(implicit context: ActionPipelineContext): Unit
 
 }
 

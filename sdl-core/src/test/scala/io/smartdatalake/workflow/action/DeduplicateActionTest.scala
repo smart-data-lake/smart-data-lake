@@ -64,12 +64,12 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
-    val context1 = ActionPipelineContext(feed, "test", SDLExecutionId.executionId1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
+    val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id)
     val l1 = Seq(("doe","john",5),("pan","peter",5),("hans","muster",5)).toDF("lastname", "firstname", "rating")
-    srcDO.writeDataFrame(l1, Seq())(session, context1)
+    srcDO.writeDataFrame(l1, Seq())(context1)
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(session, context1).head
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(context1).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
 
     {
@@ -83,10 +83,10 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start 2nd load
     val refTimestamp2 = LocalDateTime.now()
-    val context2 = ActionPipelineContext(feed, "test", SDLExecutionId.executionId1, instanceRegistry, Some(refTimestamp2), SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
+    val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
     val l2 = Seq(("doe","john",10),("pan","peter",5)).toDF("lastname", "firstname", "rating")
-    srcDO.writeDataFrame(l2, Seq())(session, context1)
-    action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(session, context2)
+    srcDO.writeDataFrame(l2, Seq())(context1)
+    action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(context2)
 
     {
       // note that we expect pan/peter/5 with updated refTimestamp even though all attributes stay the same
@@ -128,12 +128,12 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     // prepare & start 1st load
-    val context1 = ActionPipelineContext(feed, "test", SDLExecutionId.executionId1, instanceRegistry, Some(LocalDateTime.now), SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
+    val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(LocalDateTime.now), phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, filterClause = Some("lastname='jonson'"))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
-    srcDO.writeDataFrame(l1, Seq())(session, context1)
+    srcDO.writeDataFrame(l1, Seq())(context1)
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(session, context1).head
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(context1).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
 
     val r1 = tgtDO.getDataFrame()

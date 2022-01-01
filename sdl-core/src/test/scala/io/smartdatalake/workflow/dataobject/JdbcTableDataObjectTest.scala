@@ -89,7 +89,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     val srcSubFeed = SparkSubFeed(None, srcDO.id, Seq())
     action1.init(Seq(srcSubFeed))
     action1.preExec(Seq(srcSubFeed))
-    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(session,contextExec).head
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
     action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed))
 
     val dfSrcExpected = Seq(("ext", "doe", "john", 5)

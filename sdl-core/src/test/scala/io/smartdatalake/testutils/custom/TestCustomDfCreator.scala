@@ -31,10 +31,7 @@ class TestCustomDfCreator extends CustomDfCreator {
    */
   override def exec(session: SparkSession, config: Map[String, String]): DataFrame = {
       import session.implicits._
-      val rows: Seq[(Some[Int], String)] = Seq((Some(0),"Foo!"),(Some(1),"Bar!"))
-      val myDf: DataFrame = rows.toDF("num","text")
-      myDf.show(false)
-      myDf
+      Seq((Some(0),"Foo!"),(Some(1),"Bar!")).toDF("num","text")
   }
 
   override def equals(obj: Any): Boolean = getClass.equals(obj.getClass)

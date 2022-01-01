@@ -33,7 +33,7 @@ import scala.util.{Failure, Success, Try}
 private[smartdatalake] class StreamFileTransfer(override val srcDO: FileRefDataObject with CanCreateInputStream, override val tgtDO: FileRefDataObject with CanCreateOutputStream, overwrite: Boolean = true)
   extends FileTransfer with SmartDataLakeLogger {
 
-  override def exec(fileRefPairs: Seq[FileRefMapping])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def exec(fileRefPairs: Seq[FileRefMapping])(implicit context: ActionPipelineContext): Unit = {
     assert(fileRefPairs != null, "fileRefPairs is null - FileTransfer must be initialized first")
     fileRefPairs.foreach { m =>
       logger.info(s"Copy ${srcDO.id}:${m.src.toStringShort} -> ${tgtDO.id}:${m.tgt.toStringShort}")

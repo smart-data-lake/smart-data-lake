@@ -70,16 +70,16 @@ abstract class FileOneToOneActionImpl extends ActionSubFeedsImpl[FileSubFeed] {
    * @param outputSubFeed [[SparkSubFeed]] to be enriched with transformed result
    * @return transformed output [[SparkSubFeed]]
    */
-  def transform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed
+  def transform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed
 
-  override protected def transform(inputSubFeeds: Seq[FileSubFeed], outputSubFeeds: Seq[FileSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[FileSubFeed] = {
+  override protected def transform(inputSubFeeds: Seq[FileSubFeed], outputSubFeeds: Seq[FileSubFeed])(implicit context: ActionPipelineContext): Seq[FileSubFeed] = {
     assert(inputSubFeeds.size == 1, s"($id) Only one inputSubFeed allowed")
     assert(outputSubFeeds.size == 1, s"($id) Only one outputSubFeed allowed")
     val transformedSubFeed = transform(inputSubFeeds.head, outputSubFeeds.head)
     Seq(transformedSubFeed)
   }
 
-  override def preprocessInputSubFeedCustomized(subFeed: FileSubFeed, ignoreFilter: Boolean, isRecursive: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
+  override def preprocessInputSubFeedCustomized(subFeed: FileSubFeed, ignoreFilter: Boolean, isRecursive: Boolean)(implicit context: ActionPipelineContext): FileSubFeed = {
     validatePartitionValuesExisting(input, subFeed)
     // get input files
     if (subFeed.fileRefs.isEmpty || breakFileRefLineage) {
