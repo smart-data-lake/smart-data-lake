@@ -32,6 +32,7 @@
 		<module>sdl-deltalake</module>
 		<module>sdl-snowflake</module>
 		<module>sdl-azure</module>
+		<module>sdl-lang</module>
 	</modules>
 
 	<licenses>
