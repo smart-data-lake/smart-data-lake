@@ -22,12 +22,15 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.json.JsonUtils
+import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.script.CmdScript
 import org.apache.spark.sql.types.DataType
 import org.json4s.JsonAST.JArray
 import org.json4s.{Formats, JObject, JString}
 
+import java.nio.file.Files
+import java.nio.file.attribute.BasicFileAttributes
 import scala.collection.mutable
 
 class AirbyteDataObjectTest extends DataObjectTestSuite {
@@ -44,10 +47,15 @@ class AirbyteDataObjectTest extends DataObjectTestSuite {
       my-config = "test"
     """
     val config = ConfigFactory.parseString(configStr)
-    val script = "./sdl-core/src/test/resources/airbyteConnectorMock.sh"
+    // read script from resources and write to temp file
+    val scriptString = CustomCodeUtil.readResourceFile("airbyteConnectorMock.sh")
+    val scriptFile = Files.createTempFile("script", ".sh")
+    Files.write(scriptFile, scriptString.replace("\r\n", "\n").getBytes) // remove windows line endings for wsl!
+    scriptFile.toFile.setExecutable(true)
+    val script = scriptFile.toString
     val dataObject = AirbyteDataObject("test", config, "mystream", cmd = CmdScript(
-      winCmd = Some("wsl sed -i 's/\\r$//' " + s" $script; $script"), // replace windows line endings to unix before start
-      linuxCmd = Some(script)) // replace windows line endings to unix before start
+      winCmd = Some(s"wsl $script"), // replace windows line endings to unix before start
+      linuxCmd = Some(script))
     )
     dataObject.prepare
     val actual = dataObject.getDataFrame()(contextExec)

@@ -60,9 +60,9 @@ case class DockerRunScript(override val name: String = "docker-run", override va
     val dockerParameters = parameters.filterKeys(_.startsWith("dockerParam")).toSeq.sortBy(_._1).map(_._2) ++ localDataDirToMountParameters
     val runParameters = parameters.filterKeys(_.startsWith("runParam")).toSeq.sortBy(_._1).map(_._2)
     // cmd must be split for windows but not for linux
-    val cmd = if (EnvironmentUtil.isWindowsOS) Seq("cmd", "/C") ++ CmdScript.splitCmdParameters(winDockerCmd) ++ dockerParameters ++ Seq(image) ++ runParameters
-    else Seq("sh", "-c", linuxDockerCmd, (Seq(linuxDockerCmd) ++ dockerParameters :+ Seq(image) ++ runParameters).mkString(" "))
-    cmd
+    val cmd = if (EnvironmentUtil.isWindowsOS) Seq("cmd", "/C") ++ CmdScript.splitCmdParameters(winDockerCmd)
+    else CmdScript.splitCmdParameters(linuxDockerCmd)
+    cmd ++ dockerParameters ++ Seq(image) ++ runParameters
   }
 
   override def factory: FromConfigFactory[ParsableScriptDef] = DockerRunScript
