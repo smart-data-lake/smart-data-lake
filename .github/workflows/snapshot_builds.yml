@@ -7,7 +7,7 @@ on:
   pull_request:
     branches:
       - 'develop-spark*'
-    types: [opened, synchronize, closed]
+    types: [opened, synchronize]
 
 jobs:
   build:
@@ -37,7 +37,7 @@ jobs:
 
   deploy:
     needs: build
-    if: github.event.pull_request.merged == true
+    if: github.event_name == 'push'
 
     runs-on: ubuntu-latest
 
