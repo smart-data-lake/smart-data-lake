@@ -1,54 +1,63 @@
 package io.smartdatalake.dataframe
 
-import io.smartdatalake.dataframe.DomainSpecificLanguage.Language
+import com.snowflake.snowpark.types.{ArrayType, DataType, StructField, StructType}
+import com.snowflake.snowpark.{Column, DataFrame}
 
 object SnowparkLanguageImplementation {
 
+  type SnowparkCaseExpression = com.snowflake.snowpark.CaseExpr
+  type SnowparkDataFrame = DataFrame
+  type SnowparkColumn = Column
+  type SnowparkStructType = StructType
+  type SnowparkArrayType = ArrayType
+  type SnowparkStructField = StructField
+  type SnowparkDataType = DataType
+  type SnowparkLanguageType = Language[DataFrame, Column, StructType, DataType]
 
-  val snowparkDataFrameInterpreter: Language[SnowparkDataFrame, SnowparkColumn, SnowparkStructType, SnowparkDataType] =
-    new Language[SnowparkDataFrame, SnowparkColumn, SnowparkStructType, SnowparkDataType] {
-      override def col(colName: String): SnowparkColumn = {
+  val snowparkDataFrameInterpreter: SnowparkLanguageType = new SnowparkLanguageType {
+
+      override def col(colName: String): Column = {
         com.snowflake.snowpark.functions.col(colName)
       }
 
-      override def join(left: SnowparkDataFrame,
-                        right: SnowparkDataFrame,
-                        joinCols: Seq[String]): SnowparkDataFrame = {
+      override def join(left: DataFrame,
+                        right: DataFrame,
+                        joinCols: Seq[String]): DataFrame = {
         left.join(right, joinCols)
       }
 
-      override def select(dataFrame: SnowparkDataFrame,
-                          column: SnowparkColumn): SnowparkDataFrame = {
+      override def select(dataFrame: DataFrame,
+                          column: Column): DataFrame = {
         dataFrame.select(column)
       }
 
-      override def filter(dataFrame: SnowparkDataFrame,
-                          column: SnowparkColumn): SnowparkDataFrame = {
+      override def filter(dataFrame: DataFrame,
+                          column: Column): DataFrame = {
         dataFrame.filter(column)
       }
 
-      override def and(left: SnowparkColumn,
-                       right: SnowparkColumn): SnowparkColumn = {
+      override def and(left: Column,
+                       right: Column): Column = {
         left.and(right)
       }
 
-      override def ===(left: SnowparkColumn, right: SnowparkColumn): SnowparkColumn = {
+      override def ===(left: Column, right: Column): Column = {
         left === right
       }
 
-      override def =!=(left: SnowparkColumn, right: SnowparkColumn): SnowparkColumn = {
+      override def =!=(left: Column, right: Column): Column = {
         left =!= right
       }
 
-      override def lit(value: Any): SnowparkColumn = {
+      override def lit(value: Any): Column = {
         com.snowflake.snowpark.functions.lit(value)
       }
 
-      override def schema(dataFrame: SnowparkDataFrame): SnowparkStructType = {
+      override def schema(dataFrame: DataFrame): StructType = {
         dataFrame.schema
       }
 
-      override def columns(dataFrame: SnowparkDataFrame): Seq[String] = {
+      override def columns(dataFrame: DataFrame): Seq[String] = {
         dataFrame.schema.map(column => column.name)
       }
     }

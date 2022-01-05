@@ -19,62 +19,75 @@
 
 package io.smartdatalake.dataframe
 
+trait Language[DataFrame, Column, Schema, DataType] {
+
+  // Functions
+  def col(colName: String): Column
+
+  def lit(value: Any): Column
+
+  // operators
+  def ===(left: Column, right: Column): Column
+
+  def =!=(left: Column, right: Column): Column
+
+  def and(left: Column, right: Column): Column
+
+  // DataFrame operations
+  def join(left: DataFrame, right: DataFrame, joinCols: Seq[String]): DataFrame
+
+  def select(dataFrame: DataFrame, column: Column): DataFrame
+
+  def filter(dataFrame: DataFrame, expression: Column): DataFrame
+
+  def schema(dataFrame: DataFrame): Schema
+
+  def columns(dataFrame: DataFrame): Seq[String]
+
+  val implicits: DomainSpecificLanguage.type = DomainSpecificLanguage
+}
+
 object DomainSpecificLanguage {
 
-  trait Language[DataFrame, Column, Schema, DataType] {
-    def col(colName: String): Column
+  def col[DataFrame, Column, Schema, DataType](colName: String)
+                                              (implicit L: Language[DataFrame, Column, Schema, DataType]): Column = {
+    L.col(colName)
+  }
 
-    def lit(value: Any): Column
+  def lit[DataFrame, Column, Schema, DataType](value: Any)
+                                              (implicit L: Language[DataFrame, Column, Schema, DataType]): Column = {
+    L.lit(value)
+  }
 
-    def ===(left: Column, right: Column): Column
-
-    def =!=(left: Column, right: Column): Column
-
-    def join(left: DataFrame, right: DataFrame, joinCols: Seq[String]): DataFrame
-
-    def select(dataFrame: DataFrame, column: Column): DataFrame
-
-    def filter(dataFrame: DataFrame, expression: Column): DataFrame
-
-    def and(left: Column, right: Column): Column
-
-    def schema(dataFrame: DataFrame): Schema
-
-    def columns(dataFrame: DataFrame): Seq[String]
-
-
-    implicit class RichDataFrame[RichDataFrame, RichColumn, RichSchema, RichDataType](dataFrame: RichDataFrame)
-                                                           (implicit L: Language[RichDataFrame, RichColumn, RichSchema, RichDataType]) {
-      def join(other: RichDataFrame, joinCols: Seq[String]): RichDataFrame = {
-        L.join(dataFrame, other, joinCols)
-      }
-
-      def select(column: RichColumn): RichDataFrame = {
-        L.select(dataFrame, column)
-      }
-
-      def filter(column: RichColumn): RichDataFrame = {
-        L.filter(dataFrame, column)
-      }
-
-      def schema: RichSchema = {
-        L.schema(dataFrame)
-      }
-
-      def columns: Seq[String] = {
-        L.columns(dataFrame)
-      }
-
+  implicit class RichDataFrame[DataFrame, Column, Schema, DataType](dataFrame: DataFrame)
+                                                                   (implicit L: Language[DataFrame, Column, Schema, DataType]) {
+    def join(other: DataFrame, joinCols: Seq[String]): DataFrame = {
+      L.join(dataFrame, other, joinCols)
     }
 
-    implicit class RichColumn[RichDataFrame, RichColumn, RichSchema, RichDataType](column: RichColumn)
-                                                        (implicit L: Language[RichDataFrame, RichColumn, RichSchema, RichDataType]) {
-      def ===(other: RichColumn): RichColumn = {
-        L.===(column, other)
-      }
+    def select(column: Column): DataFrame = {
+      L.select(dataFrame, column)
+    }
+
+    def filter(column: Column): DataFrame = {
+      L.filter(dataFrame, column)
+    }
+
+    def schema: Schema = {
+      L.schema(dataFrame)
+    }
+
+    def columns: Seq[String] = {
+      L.columns(dataFrame)
     }
 
   }
 
+  implicit class RichColumn[DataFrame, Column, Schema, DataType](column: Column)
+                                                                (implicit L: Language[DataFrame, Column, Schema, DataType]) {
+    def ===(other: Column): Column = {
+      L.===(column, other)
+    }
+  }
 }
 

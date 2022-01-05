@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,56 +19,65 @@
 
 package io.smartdatalake.dataframe
 
-import io.smartdatalake.dataframe.DomainSpecificLanguage.Language
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.{Column, DataFrame}
 
 object SparkLanguageImplementation {
 
-  private[smartdatalake] val language: Language[SparkDataFrame, SparkColumn, SparkStructType, SparkDataType] =
-    new Language[SparkDataFrame, SparkColumn, SparkStructType, SparkDataType] {
+  type SparkDataFrame = DataFrame
+  type SparkColumn = Column
+  type SparkStructType = StructType
+  type SparkArrayType = ArrayType
+  type SparkMapType = MapType
+  type SparkStructField = StructField
+  type SparkDataType = DataType
+  type SparkLanguageType = Language[DataFrame, Column, StructType, DataType]
 
-      override def join(left: SparkDataFrame,
-                        right: SparkDataFrame,
-                        joinCols: Seq[String]): SparkDataFrame = {
-        left.join(right, joinCols)
-      }
+  val language: SparkLanguageType = new SparkLanguageType {
 
-      override def col(colName: String): SparkColumn = {
-        org.apache.spark.sql.functions.column(colName)
-      }
-
-      override def lit(value: Any): SparkColumn = {
-        org.apache.spark.sql.functions.lit(value)
-      }
-
-      override def select(dataFrame: SparkDataFrame,
-                          column: SparkColumn): SparkDataFrame = {
-        dataFrame.select(column)
-      }
-
-      override def filter(dataFrame: SparkDataFrame,
-                          column: SparkColumn): SparkDataFrame = {
-        dataFrame.filter(column)
-      }
-
-      override def and(left: SparkColumn,
-                       right: SparkColumn): SparkColumn = {
-        left.and(right)
-      }
-
-      override def ===(left: SparkColumn, right: SparkColumn): SparkColumn = {
-        left === right
-      }
-
-      override def =!=(left: SparkColumn, right: SparkColumn): SparkColumn = {
-        left =!= right
-      }
-
-      override def schema(dataFrame: SparkDataFrame): SparkStructType = {
-        dataFrame.schema
-      }
-
-      override def columns(dataFrame: SparkDataFrame): Seq[String] = {
-        dataFrame.columns
-      }
+    override def join(left: DataFrame,
+                      right: DataFrame,
+                      joinCols: Seq[String]): DataFrame = {
+      left.join(right, joinCols)
     }
+
+    override def col(colName: String): Column = {
+      org.apache.spark.sql.functions.column(colName)
+    }
+
+    override def lit(value: Any): Column = {
+      org.apache.spark.sql.functions.lit(value)
+    }
+
+    override def select(dataFrame: DataFrame,
+                        column: Column): DataFrame = {
+      dataFrame.select(column)
+    }
+
+    override def filter(dataFrame: DataFrame,
+                        column: Column): DataFrame = {
+      dataFrame.filter(column)
+    }
+
+    override def and(left: Column,
+                     right: Column): Column = {
+      left.and(right)
+    }
+
+    override def ===(left: Column, right: Column): Column = {
+      left === right
+    }
+
+    override def =!=(left: Column, right: Column): Column = {
+      left =!= right
+    }
+
+    override def schema(dataFrame: DataFrame): StructType = {
+      dataFrame.schema
+    }
+
+    override def columns(dataFrame: DataFrame): Seq[String] = {
+      dataFrame.columns
+    }
+  }
 }

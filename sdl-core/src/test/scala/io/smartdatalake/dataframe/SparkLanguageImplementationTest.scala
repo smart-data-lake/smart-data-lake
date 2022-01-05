@@ -19,7 +19,7 @@
 
 package io.smartdatalake.dataframe
 
-import io.smartdatalake.dataframe.DomainSpecificLanguage.Language
+import SparkLanguageImplementation.SparkLanguageType
 import io.smartdatalake.testutils.DataFrameTestHelper
 import io.smartdatalake.testutils.TestUtil.sparkSessionBuilder
 import org.apache.spark.sql.SparkSession
@@ -28,11 +28,11 @@ import org.scalatest.{FlatSpec, Matchers}
 class SparkLanguageImplementationTest extends FlatSpec with Matchers {
 
   implicit val session: SparkSession = sparkSessionBuilder().getOrCreate
-  implicit val language: Language[SparkDataFrame, SparkColumn, SparkStructType, SparkDataType] = SparkLanguageImplementation.language
+  implicit val language: SparkLanguageType = SparkLanguageImplementation.language
 
   "SparkLanguageImplementation" must "return the correct schema" in {
     // Arrange
-    val dfNameAndAge: SparkDataFrame = DataFrameTestHelper.createDf(Map(
+    val dfNameAndAge = DataFrameTestHelper.createDf(Map(
       "Name" -> "Hans",
       "Age" -> 3
     ), Map(
@@ -49,7 +49,7 @@ class SparkLanguageImplementationTest extends FlatSpec with Matchers {
 
   "SparkLanguageImplementation" must "be able to wrap DataFrames, perform DSL operations on them, and unwrap them" in {
     // Arrange
-    val dfNameAndAge: SparkDataFrame = DataFrameTestHelper.createDf(Map(
+    val dfNameAndAge = DataFrameTestHelper.createDf(Map(
       "Name" -> "Hans",
       "Age" -> 3
     ), Map(
@@ -57,7 +57,7 @@ class SparkLanguageImplementationTest extends FlatSpec with Matchers {
       "Age" -> 5
     ))
 
-    val dfNameAndFavoriteColor: SparkDataFrame = DataFrameTestHelper.createDf(Map(
+    val dfNameAndFavoriteColor = DataFrameTestHelper.createDf(Map(
       "Name" -> "Hans",
       "FavoriteColor" -> "Blue"
     ), Map(
@@ -65,16 +65,16 @@ class SparkLanguageImplementationTest extends FlatSpec with Matchers {
       "FavoriteColor" -> "Red"
     ))
 
-    val dfExpected: SparkDataFrame = DataFrameTestHelper.createDf(Map(
+    val dfExpected = DataFrameTestHelper.createDf(Map(
       "FavoriteColor" -> "Blue"
     ))
 
     // This transformation works purely in domain-specific language
     // It does not know which execution engine (e.g. Spark) it will run on
     def businessLogic[DataFrame, Column, Schema, DataType](df1: DataFrame,
-                                                 df2: DataFrame)
-                                                (implicit language: Language[DataFrame, Column, Schema, DataType]): DataFrame = {
-      import language._
+                                                           df2: DataFrame)
+                                                          (implicit language: Language[DataFrame, Column, Schema, DataType]): DataFrame = {
+      import language.implicits._
       val dfJoined = df1.join(df2, Seq("Name"))
       val dfSelected = dfJoined.select(col("FavoriteColor"))
       val dfFiltered = dfSelected.filter(language.===(col("Name"), lit("Hans")))
