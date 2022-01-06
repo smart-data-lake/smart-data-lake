@@ -38,7 +38,7 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
    * Finds all relevant types according to the config and generates GenericTypeDefs for them.
    * A final GenericTypeDef is marked with isFinal=true and represents an SDL case class used in configuration.
    * The final types include all attributes. Inherited attributes are marked with isOverride=true.
-   * GenericTypeDefs include hte hierarchy of interfaces implemented by a type. They are listed in superTypes.
+   * GenericTypeDefs include the hierarchy of interfaces implemented by a type. They are listed in superTypes.
    * SuperTypes only include attributes which are defined by the type itself.
    * @return list of generic type definitions
    */
