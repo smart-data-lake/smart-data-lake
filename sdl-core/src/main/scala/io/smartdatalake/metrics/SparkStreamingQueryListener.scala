@@ -36,10 +36,10 @@ import java.util.concurrent.Semaphore
  * Collect metrics for Spark streaming queries
  * This listener registers and unregisters itself in the spark session.
  */
-class SparkStreamingQueryListener(action: SparkActionImpl, dataObjectId: DataObjectId, queryName: String, firstProgressWaitLock: Option[Semaphore] = None)(implicit session: SparkSession, context: ActionPipelineContext) extends StreamingQueryListener with SmartDataLakeLogger {
+class SparkStreamingQueryListener(action: SparkActionImpl, dataObjectId: DataObjectId, queryName: String, firstProgressWaitLock: Option[Semaphore] = None)(implicit context: ActionPipelineContext) extends StreamingQueryListener with SmartDataLakeLogger {
   private var id: UUID = _
   private var isFirstProgress = true
-  session.streams.addListener(this) // self-register
+  context.sparkSession.streams.addListener(this) // self-register
   override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = {
     if (queryName == event.name) {
       logger.info(s"(${event.name}) streaming query started")
@@ -68,7 +68,7 @@ class SparkStreamingQueryListener(action: SparkActionImpl, dataObjectId: DataObj
   override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = {
     if (event.id == id) {
       logger.info(s"($queryName) streaming query terminated ${event.exception.map(e => s" exception=$e").getOrElse(" normally")}")
-      session.streams.removeListener(this) // self-unregister
+      context.sparkSession.streams.removeListener(this) // self-unregister
       action.notifyStreamingQueryTerminated
       releaseFirstProgressWaitLock()
     }

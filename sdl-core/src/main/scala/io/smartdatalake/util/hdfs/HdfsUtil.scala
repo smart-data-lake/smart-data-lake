@@ -39,7 +39,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    * @param path Path to files in HDFS
    * @return Amount of files, total size of files in Bytes, average size of files in bytes
    */
-  def sizeInfo(path: Path, fs: FileSystem): (Long, Long, Long) = {
+  def sizeInfo(path: Path)(implicit fs: FileSystem): (Long, Long, Long) = {
     try {
       val recursive = false
       val ri = fs.listFiles(path, recursive)
@@ -77,8 +77,8 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    * @param session
    * @return
    */
-  def desiredFileSize(implicit session:SparkSession): Long = {
-    session.sparkContext.hadoopConfiguration.getLong("dfs.blocksize", DefaultBlocksize)
+  def desiredFileSize(implicit hadoopConf: Configuration): Long = {
+    hadoopConf.getLong("dfs.blocksize", DefaultBlocksize)
   }
 
   /**
@@ -99,13 +99,13 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    *                         small and Spark can't use up the configured boundaries.
    * @return repartitioned [[DataFrame]] (or Input [[DataFrame]] if partitioning is untouched)
    */
-  def repartitionForHdfsFileSize(df: DataFrame, existingFilePath: Path, reducePartitions: Boolean = false)(implicit session:SparkSession): DataFrame = {
+  def repartitionForHdfsFileSize(df: DataFrame, existingFilePath: Path, reducePartitions: Boolean = false): DataFrame = {
 
     // Use the HDFS blocksize as target size or use the default if it can't be evaluated
-    val desiredSize = desiredFileSize(df.sparkSession)
+    val desiredSize = desiredFileSize(df.sparkSession.sparkContext.hadoopConfiguration)
 
-    val fs = getHadoopFsFromSpark(existingFilePath)
-    val (numFiles, sumSize, avgSize) = HdfsUtil.sizeInfo(existingFilePath, fs)
+    implicit val fs: FileSystem = getHadoopFsFromSpark(existingFilePath)(df.sparkSession)
+    val (numFiles, sumSize, avgSize) = HdfsUtil.sizeInfo(existingFilePath)
     val reduceBy = if(reducePartitions) 2 else 1
     val numPartitionsRequired = Math.max(1,Math.ceil(sumSize.toDouble / desiredSize / reduceBy).toInt)
     val currentPartitionNum = df.rdd.getNumPartitions
@@ -127,7 +127,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
     dfRepartitioned
   }
 
-  def deletePath( path: Path, fs:FileSystem, doWarn:Boolean ) : Unit = {
+  def deletePath( path: Path, doWarn:Boolean )(implicit fs: FileSystem) : Unit = {
     try {
       fs.delete(path, true) // recursive=true
       logger.info(s"Hadoop path ${path} deleted.")
@@ -139,11 +139,11 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   /**
    * In contrast to deletePath this supports "globs"
    */
-  def deleteFiles( path: Path, fs:FileSystem, doWarn:Boolean ) : Unit = {
+  def deleteFiles(path: Path, doWarn:Boolean)(implicit fs: FileSystem) : Unit = {
     try {
       val pathsToDelete = fs.globStatus(path).map(_.getPath)
       pathsToDelete.foreach{ path => fs.delete(path, true) }
-      logger.info(s"${pathsToDelete.size} files deleted for hadoop path $path.")
+      logger.info(s"${pathsToDelete.length} files deleted for hadoop path $path.")
     } catch {
       case e: Exception => if (doWarn) logger.warn(s"Hadoop path $path couldn't be deleted: (${e.getMessage})")
     }
@@ -152,7 +152,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   /**
    * Rename single path as one hadoop operation (note it depends on the implementation if this is atomic).
    */
-  def renamePath(path: Path, newPath: Path, fs:FileSystem ): Unit = {
+  def renamePath(path: Path, newPath: Path)(implicit fs: FileSystem ): Unit = {
     if (fs.rename(path, newPath)) {
       logger.info(s"Path $path renamed to $newPath")
     } else {
@@ -164,7 +164,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    * Move/rename path supporting "globs".
    * New path must be a directory. If not existing it will be created (also if there are no files to move).
    */
-  def moveFiles(path: Path, newPath: Path, fs:FileSystem, failOnError: Boolean = true, customFilter: (FileStatus => Boolean) = _ => true, addPrefixIfExisting: Boolean = false ): Unit = {
+  def moveFiles(path: Path, newPath: Path, failOnError: Boolean = true, customFilter: (FileStatus => Boolean) = _ => true, addPrefixIfExisting: Boolean = false )(implicit fs: FileSystem): Unit = {
     try {
       if (!fs.exists(newPath)) fs.mkdirs(newPath)
       else if (!fs.isDirectory(newPath))
@@ -190,7 +190,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   /**
    * Create default Hadoop Filesystem Authority
    */
-  def getHadoopDefaultSchemeAuthority(): URI = {
+  def getHadoopDefaultSchemeAuthority: URI = {
     Environment.hadoopDefaultSchemeAuthority.getOrElse( FileSystem.get(new Configuration()).getUri)
   }
 
@@ -230,33 +230,28 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    * If path is not absolute, prefix with working dir
    * @return Absolute hadoop path
    */
-  def makeAbsolutePath(path: Path)(filesystem: FileSystem) =
+  def makeAbsolutePath(path: Path)(implicit filesystem: FileSystem): Path = {
     if (path.isAbsolute) path
     else new Path(filesystem.getWorkingDirectory, path)
+  }
 
   /**
-   * Get Hadoop Filesystem from specified Path.
+   * Get Hadoop Filesystem from specified Path with default Hadoop configuration.
    * Note that use of this is not optimal as there might be additional configurations missing, which are defined in the SparkSession.
    * Use getHadoopFsFromSpark if there is already a SparkSession.
-   *
-   * @param path
-   * @return
    */
-  def getHadoopFs(path: Path): FileSystem = {
+  def getHadoopFsWithDefaultConf(path: Path): FileSystem = {
     path.getFileSystem(new Configuration())
   }
 
   /**
    * Get Hadoop Filesystem from specified Path with additional Configuration from the SparkSession
-   *
-   * @param path
-   * @return
    */
   def getHadoopFsFromSpark(path: Path)(implicit session: SparkSession): FileSystem = {
     path.getFileSystem(session.sparkContext.hadoopConfiguration)
   }
 
-  def getHadoopFsWithConf(path: Path, hadoopConf: Configuration)(implicit session: SparkSession): FileSystem = {
+  def getHadoopFsWithConf(path: Path)(implicit hadoopConf: Configuration): FileSystem = {
     path.getFileSystem(hadoopConf)
   }
 
@@ -268,23 +263,23 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
     partitionCols.map(col => s"$col=%$col%${Path.SEPARATOR_CHAR}").mkString
   }
 
-  def readHadoopFile( file: String ): String = {
+  def readHadoopFile(file: String)(implicit hadoopConf: Configuration): String = {
     val path = addHadoopDefaultSchemaAuthority(new Path(file))
-    val fileSystem: FileSystem = getHadoopFs(path)
+    val fileSystem = getHadoopFsWithConf(path)
     val is = fileSystem.open(path)
     Source.fromInputStream(is).getLines.mkString(sys.props("line.separator"))
   }
 
-  def movePartition(basePath: Path, existingPartition: PartitionValues, newPartition: PartitionValues, filenameWithGlobs: String, filesystem: FileSystem)(implicit session: SparkSession): Unit = {
+  def movePartition(basePath: Path, existingPartition: PartitionValues, newPartition: PartitionValues, filenameWithGlobs: String)(implicit filesystem: FileSystem): Unit = {
     val partitionLayout = getHadoopPartitionLayout(existingPartition.keys.toSeq)
     val existingPartitionPath = new Path(basePath, existingPartition.getPartitionString(partitionLayout))
     val existingPartitionPathWithFilenameGlobs = new Path(existingPartitionPath, filenameWithGlobs)
     val newPartitionPath = new Path(basePath, newPartition.getPartitionString(partitionLayout))
-    moveFiles( existingPartitionPathWithFilenameGlobs, newPartitionPath, filesystem, addPrefixIfExisting = true)
-    deletePath(existingPartitionPath, filesystem, doWarn = true)
+    moveFiles( existingPartitionPathWithFilenameGlobs, newPartitionPath, addPrefixIfExisting = true)
+    deletePath(existingPartitionPath, doWarn = true)
   }
 
-  def touchFile(path: Path, filesystem: FileSystem): Unit = {
+  def touchFile(path: Path)(implicit filesystem: FileSystem): Unit = {
     val os = filesystem.create(path, /*overwrite*/ true)
     os.close()
   }

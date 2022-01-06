@@ -34,7 +34,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param columnBlacklist List of columns to exclude from DataFrame
  */
 case class BlacklistTransformer(override val name: String = "blacklist", override val description: Option[String] = None, columnBlacklist: Seq[String]) extends ParsableDfTransformer {
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
     ActionHelper.filterBlacklist(columnBlacklist)(df)
   }
   override def factory: FromConfigFactory[ParsableDfTransformer] = BlacklistTransformer

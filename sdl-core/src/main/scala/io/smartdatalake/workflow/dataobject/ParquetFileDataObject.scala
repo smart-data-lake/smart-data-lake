@@ -26,6 +26,7 @@ import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
@@ -92,7 +93,7 @@ case class ParquetFileDataObject( override val id: DataObjectId,
   // when writing parquet files, schema column names are forced to lower,
   // because they can also be accessed by Hive which is case insensitive.
   // See: https://medium.com/@an_chee/why-using-mixed-case-field-names-in-hive-spark-sql-is-a-bad-idea-95da8b6ec1e0
-  override def beforeWrite(df: DataFrame)(implicit session: SparkSession): DataFrame =
+  override def beforeWrite(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame =
     super.beforeWrite(df).colNamesLowercase
 
   override def factory: FromConfigFactory[DataObject] = ParquetFileDataObject

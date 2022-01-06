@@ -20,9 +20,10 @@
 package io.smartdatalake.workflow.action.customlogic
 
 import java.io.{ByteArrayInputStream, InputStream}
-
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.CustomCodeUtil
+import io.smartdatalake.workflow.ActionPipelineContext
+import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.SparkSession
 
 trait CustomFileCreator extends Serializable {
@@ -50,6 +51,7 @@ case class CustomFileCreatorConfig(className: Option[String] = None,
   }.orElse {
     scalaFile.map {
       file =>
+        implicit val defaultHadoopConf: Configuration = new Configuration()
         val fnTransform = CustomCodeUtil.compileCode[(SparkSession, Map[String, String])
           => ByteArrayInputStream](HdfsUtil.readHadoopFile(file))
         new CustomFileCreatorWrapper(fnTransform)
@@ -62,8 +64,8 @@ case class CustomFileCreatorConfig(className: Option[String] = None,
     }
   }.get
 
-  def exec(implicit session: SparkSession): InputStream = {
-    impl.exec(session, options.getOrElse(Map()))
+  def exec(implicit context: ActionPipelineContext): InputStream = {
+    impl.exec(context.sparkSession, options.getOrElse(Map()))
   }
 
   override def toString: String = {

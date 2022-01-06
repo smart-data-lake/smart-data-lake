@@ -32,6 +32,7 @@ import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformerConfig, 
 import io.smartdatalake.workflow.action.sparktransformer.{SQLDfTransformer, ScalaClassDfsTransformer}
 import io.smartdatalake.workflow.action.{CopyAction, _}
 import io.smartdatalake.workflow.dataobject._
+import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
@@ -44,6 +45,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString
+  private val defaultHadoopConf: Configuration = new Configuration()
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit var contextInit: ActionPipelineContext = _
@@ -78,14 +80,14 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val action1 = DeduplicateAction("a", srcDO.id, tgt1DO.id, metricsFailCondition = Some(s"dataObjectId = '${tgt1DO.id.id}' and key = 'records_written' and value = 0"))
     val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id)
     val actions: Seq[SparkOneToOneActionImpl] = Seq(action1, action2)
-    val stateStore = HadoopFileActionDAGRunStateStore(statePath, contextInit.application)
+    val stateStore = HadoopFileActionDAGRunStateStore(statePath, contextInit.application, defaultHadoopConf)
     val dag: ActionDAGRun = ActionDAGRun(actions, stateStore = Some(stateStore))
 
     // exec dag
     dag.prepare
     dag.init
     assert(contextInit.dataFrameReuseStatistics((tgt1DO.id,Seq())).size == 1)
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
     assert(contextExec.dataFrameReuseStatistics.forall(_._2.isEmpty))
 
     // check result
@@ -142,7 +144,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.prepare
     dag.init
     assert(!contextInit.dataFrameReuseStatistics.contains((tgt1DO.id, Seq()))) // no reuse because of breakDataframeLineage
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
     assert(!contextExec.dataFrameReuseStatistics.contains((tgt1DO.id, Seq())))
 
     // check result
@@ -186,7 +188,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.prepare
     dag.init
     assert(!contextInit.dataFrameReuseStatistics.contains((tgt1DO.id, Seq()))) // no reuse because of different schema
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
     assert(!contextInit.dataFrameReuseStatistics.contains((tgt1DO.id, Seq())))
 
     // check result
@@ -299,7 +301,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // exec dag
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // as filters are ignored, we expect both records from src3, but only one record from src2
     val r1 = tgtDO.getDataFrame(Seq())
@@ -357,7 +359,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(contextInit.dataFrameReuseStatistics((tgtADO.id, Seq())).size == 2)
     assert(contextInit.dataFrameReuseStatistics((tgtBDO.id, Seq())).size == 1)
     assert(contextInit.dataFrameReuseStatistics((tgtCDO.id, Seq())).size == 1)
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
     assert(contextExec.dataFrameReuseStatistics.forall(_._2.isEmpty))
 
     val r1 = session.table(s"${tgtBTable.fullName}")
@@ -415,7 +417,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // exec dag
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     val r1 = tgtCDO.getDataFrame()
       .select($"rating")
@@ -460,7 +462,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // exec dag
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     val r1 = session.table(s"${tgt2Table.fullName}")
       .select($"rating")
@@ -511,7 +513,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // run dag
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // read src/tgt and count
     val dfSrc = srcDO.getDataFrame()
@@ -560,7 +562,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // run dag
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // read src/tgt and count
     val dfSrc = srcDO.getDataFrame()
@@ -613,7 +615,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // first dag run: partition lastname=einstein
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // check
     val r1 = tgt2DO.getDataFrame()
@@ -625,7 +627,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // second dag run: partition lastname=doe
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // check
     val r2 = tgt2DO.getDataFrame()
@@ -670,7 +672,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // doesnt fail for not existing unexpected partition xyz
     val dag2 = ActionDAGRun(actions, partitionValues = Seq(PartitionValues(Map("lastname" -> "xyz"))))
     dag2.prepare
-    dag2.exec(session,contextExec)
+    dag2.exec(contextExec)
   }
 
   test("action dag with 2 actions in sequence and executionMode=PartitionDiffMode alternativeOutputId") {
@@ -704,7 +706,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // first dag run
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // check
     assert(tgt1DO.getDataFrame().count == 0) // this should be empty because of tgt2DO.deleteDataAfterRead = true
@@ -744,7 +746,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // first dag run, first file processed
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // check
     val r1 = tgt2DO.getDataFrame()
@@ -771,7 +773,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.reset
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // check
     val r3 = tgt2DO.getDataFrame()
@@ -807,7 +809,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // first dag run, first file processed
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // check
     val r1 = tgt2DO.getDataFrame()
@@ -819,7 +821,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.reset
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // check
     val r2 = tgt2DO.getDataFrame()
@@ -833,7 +835,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.reset
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // check
     val r3 = tgt2DO.getDataFrame()
@@ -873,7 +875,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // first dag run, first file processed
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // check
     val r1 = tgt1DO.getDataFrame().select($"lastname",$"firstname",$"rating".cast("int")).as[(String,String,Int)].collect().toSet
@@ -883,7 +885,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.reset
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // check
     val r2 = tgt1DO.getDataFrame().select($"lastname",$"firstname",$"rating".cast("int")).as[(String,String,Int)].collect().toSet
@@ -895,7 +897,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.reset
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // check
     val r3 = tgt1DO.getDataFrame().select($"lastname",$"firstname",$"rating".cast("int")).as[(String,String,Int)].collect().toSet
@@ -929,7 +931,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // first dag run, first file processed
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // check
     val r1 = tgt2DO.getDataFrame()
@@ -955,7 +957,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.reset
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // check
     val r3 = tgt2DO.getDataFrame()
@@ -999,7 +1001,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // first dag run, first file processed
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // check
     val r1 = tgt2DO.getDataFrame()
@@ -1014,7 +1016,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.reset
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // check
     val r2 = tgt2DO.getDataFrame()
@@ -1057,7 +1059,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // first dag run, first file processed
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // check
     val r1 = tgt2DO.getDataFrame()
@@ -1072,7 +1074,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.reset
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // check
     assert(tgt2DO.getDataFrame().isEmpty)
@@ -1112,7 +1114,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // first dag run, first file processed
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // check
     val r1 = tgt2DO.getDataFrame()
@@ -1127,7 +1129,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.reset
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // check
     val r2 = tgt2DO.getDataFrame()
@@ -1228,7 +1230,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // first dag run
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
   }
 
   test("action dag with 2 actions in sequence and executionMode=PartitionDiffMode, second action can not handle partitions") {
@@ -1258,7 +1260,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // first dag run
     dag.prepare
     dag.init
-    dag.exec(session,contextExec)
+    dag.exec(contextExec)
 
     // second dag run - skip action execution because there are no new partitions to process
     dag.prepare

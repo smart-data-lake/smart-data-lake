@@ -30,8 +30,8 @@ import org.apache.spark.sql.SparkSession
 import java.sql.Timestamp
 
 sealed trait HousekeepingMode {
-  private[smartdatalake] def prepare(dataObject: DataObject)(implicit session: SparkSession, context: ActionPipelineContext): Unit
-  private[smartdatalake] def postWrite(dataObject: DataObject)(implicit session: SparkSession, context: ActionPipelineContext): Unit
+  private[smartdatalake] def prepare(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit
+  private[smartdatalake] def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit
 }
 
 /**
@@ -47,11 +47,11 @@ sealed trait HousekeepingMode {
  *                           working with the attributes of [[PartitionExpressionData]] returning a boolean with value true if the partition should be kept.
  */
 case class PartitionRetentionMode(retentionCondition: String, description: Option[String] = None) extends HousekeepingMode with SmartDataLakeLogger {
-  override private[smartdatalake] def prepare(dataObject: DataObject)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override private[smartdatalake] def prepare(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
     assert(dataObject.isInstanceOf[CanHandlePartitions], s"(${dataObject.id}) PartitionRetentionMode only supports DataObject that can handle partitions")
     SparkExpressionUtil.syntaxCheck[PartitionExpressionData,Boolean](dataObject.id, Some("houskeepingMode.retentionCondition"), retentionCondition)
   }
-  override private[smartdatalake] def postWrite(dataObject: DataObject)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override private[smartdatalake] def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
     dataObject match {
       case partitionedDataObject: DataObject with CanHandlePartitions if partitionedDataObject.partitions.isEmpty =>
         throw ConfigurationException(s"(${dataObject.id}) PartitionRetentionMode not supported for DataObject without partition columns defined")
@@ -93,12 +93,12 @@ case class PartitionRetentionMode(retentionCondition: String, description: Optio
  *                                   It is therefore ok to return true for all partitions which should be compacted, regardless if they have been compacted already.
  */
 case class PartitionArchiveCompactionMode(archivePartitionExpression: Option[String] = None, compactPartitionExpression: Option[String] = None, description: Option[String] = None) extends HousekeepingMode with SmartDataLakeLogger {
-  override private[smartdatalake] def prepare(dataObject: DataObject)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override private[smartdatalake] def prepare(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
     assert(dataObject.isInstanceOf[CanHandlePartitions], s"(${dataObject.id}) PartitionRetentionMode only supports DataObject that can handle partitions")
     archivePartitionExpression.foreach(expression => SparkExpressionUtil.syntaxCheck[PartitionExpressionData, Map[String,String]](dataObject.id, Some("housekeepingMode.archivePartitionExpression"), expression))
     compactPartitionExpression.foreach(expression => SparkExpressionUtil.syntaxCheck[PartitionExpressionData, Boolean](dataObject.id, Some("housekeepingMode.compactPartitionExpression"), expression))
   }
-  override private[smartdatalake] def postWrite(dataObject: DataObject)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override private[smartdatalake] def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
     dataObject match {
       case partitionedDataObject: DataObject with CanHandlePartitions if partitionedDataObject.partitions.isEmpty =>
         throw ConfigurationException(s"(${dataObject.id}) PartitionArchiveCompactionMode not supported for DataObject without partition columns defined")

@@ -20,8 +20,10 @@ package io.smartdatalake.workflow.action.customlogic
 
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.CustomCodeUtil
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig.{fnExecType, fnSchemaType}
 import io.smartdatalake.workflow.dataobject.CustomDfDataObject
+import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -77,6 +79,7 @@ case class CustomDfCreatorConfig(className: Option[String] = None,
   }.orElse{
     scalaFile.map {
       file =>
+        implicit val defaultHadoopConf: Configuration = new Configuration()
         val fnExec = CustomCodeUtil.compileCode[fnExecType](HdfsUtil.readHadoopFile(file))
         new CustomDfCreatorWrapper(fnExec, fnEmptySchema)
     }
@@ -88,12 +91,12 @@ case class CustomDfCreatorConfig(className: Option[String] = None,
     }
   }.get
 
-  def exec(implicit session: SparkSession): DataFrame = {
-    impl.exec(session, options.getOrElse(Map()))
+  def exec(implicit context: ActionPipelineContext): DataFrame = {
+    impl.exec(context.sparkSession, options.getOrElse(Map()))
   }
 
-  def schema(implicit session: SparkSession): Option[StructType] = {
-    impl.schema(session, options.getOrElse(Map()))
+  def schema(implicit context: ActionPipelineContext): Option[StructType] = {
+    impl.schema(context.sparkSession, options.getOrElse(Map()))
   }
 
   override def toString: String = {

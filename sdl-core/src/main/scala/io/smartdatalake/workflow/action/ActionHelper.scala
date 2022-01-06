@@ -114,7 +114,7 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
     else None
   }
 
-  def getOptionalDataFrame(sparkInput: CanCreateDataFrame, partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext) : Option[DataFrame] = try {
+  def getOptionalDataFrame(sparkInput: CanCreateDataFrame, partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext) : Option[DataFrame] = try {
     Some(sparkInput.getDataFrame(partitionValues))
   } catch {
     case e: IllegalArgumentException if e.getMessage.contains("DataObject schema is undefined") => None

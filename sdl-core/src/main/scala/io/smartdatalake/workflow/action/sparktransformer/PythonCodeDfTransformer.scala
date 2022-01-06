@@ -24,7 +24,9 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.{DefaultExpressionData, PythonSparkEntryPoint, PythonUtil}
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionHelper
+import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -46,14 +48,17 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
 case class PythonCodeDfTransformer(override val name: String = "pythonTransform", override val description: Option[String] = None, code: Option[String] = None, file: Option[String] = None, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsDfTransformer {
-  private val pythonCode = file.map(file => HdfsUtil.readHadoopFile(file))
-    .orElse(code)
-    .getOrElse(throw ConfigurationException(s"Either file or code must be defined for PythonCodeTransformer"))
-  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit session: SparkSession): DataFrame = {
+  private val pythonCode = {
+    implicit val defaultHadoopConf: Configuration = new Configuration()
+    file.map(file => HdfsUtil.readHadoopFile(file))
+      .orElse(code)
+      .getOrElse(throw ConfigurationException(s"Either file or code must be defined for PythonCodeTransformer"))
+  }
+  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit context: ActionPipelineContext): DataFrame = {
     // python transformation is executed by passing options and input/output DataFrame through entry point
     val objectId = ActionHelper.replaceSpecialCharactersWithUnderscore(dataObjectId.id)
     try {
-      val entryPoint = new DfTransformerPythonSparkEntryPoint(session, options, df, objectId)
+      val entryPoint = new DfTransformerPythonSparkEntryPoint(context.sparkSession, options, df, objectId)
       val additionalInitCode =
         """
           |# prepare input parameters
