@@ -242,6 +242,20 @@
 			<scope>compile</scope>
 		</dependency>
 
+		<!-- needed to find ModulePlugins -->
+		<dependency>
+			<groupId>org.reflections</groupId>
+			<artifactId>reflections</artifactId>
+			<version>0.9.12</version>
+		</dependency>
+
+		<!-- this dependency defines scaladoc annotation used by compiler plugin for scala-maven-plugin -->
+		<dependency>
+			<groupId>com.github.takezoe</groupId>
+			<artifactId>runtime-scaladoc-reader_${scala.minor.version}</artifactId>
+			<version>${scaladoc.reader.version}</version>
+		</dependency>
+
 		<!-- needed for AirbyteDataObject Json handling -->
 		<dependency>
 			<groupId>org.json4s</groupId>
@@ -318,12 +332,6 @@
 			<artifactId>circe-generic_${scala.minor.version}</artifactId>
 			<version>0.12.0-M3</version>
 			<scope>test</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>org.reflections</groupId>
-			<artifactId>reflections</artifactId>
-			<version>0.9.12</version>
 		</dependency>
 
 	</dependencies>

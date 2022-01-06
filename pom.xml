@@ -32,6 +32,7 @@
 		<module>sdl-deltalake</module>
 		<module>sdl-snowflake</module>
 		<module>sdl-azure</module>
+		<module>sdl-lang</module>
 	</modules>
 
 	<licenses>
@@ -363,6 +364,8 @@
 
 		<json4s.version>3.7.0-M11</json4s.version>
 
+		<scaladoc.reader.version>1.0.2</scaladoc.reader.version>
+
 		<scalatest.test.version>3.0.8</scalatest.test.version>
 		<sshd.test.version>2.3.0</sshd.test.version>
 
@@ -438,7 +441,7 @@
 				<plugin>
 					<groupId>net.alchim31.maven</groupId>
 					<artifactId>scala-maven-plugin</artifactId>
-					<version>4.5.4</version>
+					<version>4.5.6</version>
 					<executions>
 						<execution>
 							<goals>
@@ -463,6 +466,15 @@
 							<jvmArg>-Xms64m</jvmArg>
 							<jvmArg>-Xmx1024m</jvmArg>
 						</jvmArgs>
+						<compilerPlugins>
+							<!-- embedded scaladoc as annotations -->
+							<!-- an alternative library would be com.github.andyglow:scaladoc-compiler-plugin, but there are plugin initialization problems with path on windows. -->
+							<compilerPlugin>
+								<groupId>com.github.takezoe</groupId>
+								<artifactId>runtime-scaladoc-reader_${scala.minor.version}</artifactId>
+								<version>${scaladoc.reader.version}</version>
+							</compilerPlugin>
+						</compilerPlugins>
 					</configuration>
 				</plugin>
 
