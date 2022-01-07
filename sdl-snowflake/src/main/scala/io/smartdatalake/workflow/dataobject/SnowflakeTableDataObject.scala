@@ -58,13 +58,9 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     with CanWriteSnowparkDataFrame {
 
   private val connection = getConnection[SnowflakeConnection](connectionId)
-  private var _snowparkSession: Option[Session] = None
 
   def session: Session = {
-    if (_snowparkSession.isEmpty) {
-      _snowparkSession = Some(connection.getSnowparkSession(table.db.get))
-    }
-    _snowparkSession.get
+    connection.getSnowparkSession(table.db.get)
   }
 
   if (table.db.isEmpty) {

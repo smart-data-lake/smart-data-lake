@@ -18,8 +18,6 @@
  */
 package io.smartdatalake.workflow.connection
 
-import java.sql.ResultSet
-
 import com.snowflake.snowpark.Session
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
@@ -27,6 +25,8 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{AuthMode, BasicAuthMode}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import net.snowflake.spark.snowflake.Utils
+
+import java.sql.ResultSet
 
 /**
  * Connection information for Snowflake databases.
@@ -51,6 +51,7 @@ case class SnowflakeConnection(override val id: ConnectionId,
                               ) extends Connection with SmartDataLakeLogger {
 
   private val supportedAuths = Seq(classOf[BasicAuthMode])
+  private var _snowparkSession: Option[Session] = None
   require(supportedAuths.contains(authMode.getClass), s"($id) ${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
 
   def execSnowflakeStatement(sql: String, logging: Boolean = true): ResultSet = {
@@ -75,6 +76,15 @@ case class SnowflakeConnection(override val id: ConnectionId,
   }
 
   def getSnowparkSession(schema: String): Session = {
+    _snowparkSession.synchronized {
+      if (_snowparkSession.isEmpty) {
+        _snowparkSession = Some(createSnowparkSession(schema))
+      }
+    }
+    _snowparkSession.get
+  }
+
+  private def createSnowparkSession(schema: String): Session = {
     authMode match {
       case m: BasicAuthMode =>
         val builder = Session.builder.configs(Map(
