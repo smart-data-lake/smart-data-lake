@@ -18,9 +18,10 @@
  */
 package io.smartdatalake.workflow
 
+import io.smartdatalake.config.ParsableFromConfig
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.ExecutionModeResult
-import io.smartdatalake.util.dag.{DAG, DAGResult}
+import io.smartdatalake.util.dag.DAGResult
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.ScalaUtil.optionalizeMap
@@ -28,14 +29,16 @@ import io.smartdatalake.util.misc.{DataFrameUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.streaming.DummyStreamProvider
 import io.smartdatalake.workflow.dataobject.FileRef
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{Column, DataFrame, SparkSession, functions}
+import org.apache.spark.sql.{Column, DataFrame, functions}
 import sun.reflect.generics.reflectiveObjects.NotImplementedException
 
 /**
  * A SubFeed transports references to data between Actions.
  * Data can be represented by different technologies like Files or DataFrame.
+ *
+ * Note: SubFeed is implementing ParsableFromConfig to persist to
  */
-sealed trait SubFeed extends DAGResult with SmartDataLakeLogger {
+trait SubFeed extends DAGResult with SmartDataLakeLogger {
   def dataObjectId: DataObjectId
   def partitionValues: Seq[PartitionValues]
   def isDAGStart: Boolean

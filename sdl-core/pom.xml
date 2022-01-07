@@ -334,6 +334,12 @@
 			<scope>test</scope>
 		</dependency>
 
+		<dependency>
+			<groupId>org.json4s</groupId>
+			<artifactId>json4s-ext_${scala.minor.version}</artifactId>
+			<version>${json4s.version}</version>
+		</dependency>
+
 	</dependencies>
 
 	<build>
