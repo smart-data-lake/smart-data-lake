@@ -118,7 +118,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 
   // Read the contents of a table as a Snowpark DataFrame
   override def getSnowparkDataFrame()(implicit context: ActionPipelineContext): SnowparkDataFrame = {
-    connection.getSnowparkSession(table.db.get).table(table.fullName)
+    this.session.table(table.fullName)
   }
 
   // Write a Snowpark DataFrame to Snowflake, used in Snowpark actions
