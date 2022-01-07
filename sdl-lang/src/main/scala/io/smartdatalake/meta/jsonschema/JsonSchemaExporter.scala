@@ -26,7 +26,7 @@ object JsonSchemaExporter extends SmartDataLakeLogger {
   /**
    * The Parser defines how to extract the options from the command line args.
    */
-  private val parser: OptionParser[JsonSchemaExporterConfig] = new OptionParser[JsonSchemaExporterConfig]("atlasCleaner") {
+  private val parser: OptionParser[JsonSchemaExporterConfig] = new OptionParser[JsonSchemaExporterConfig]("JsonSchemaExporter") {
     override def showUsageOnError: Option[Boolean] = Some(true)
     opt[String]('f', "filename")
       .required()
