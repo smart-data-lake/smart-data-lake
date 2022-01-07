@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2022 Schweizerische Bundesbahnen SBB (<https://www.sbb.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,13 +19,11 @@
 
 package io.smartdatalake
 
-import org.apache.spark.sql.types.StructType
-
 // Define some helper types to easily differentiate between Spark and Snowpark classes in sdl-snowflake
 object smartdatalake {
   type SnowparkDataFrame = com.snowflake.snowpark.DataFrame
   type SparkDataFrame = org.apache.spark.sql.DataFrame
   type SnowparkSession = com.snowflake.snowpark.Session
   type SnowparkStructType = com.snowflake.snowpark.types.StructType
-  type SparkStructType = StructType
+  type SparkStructType = org.apache.spark.sql.types.StructType.StructType
 }
