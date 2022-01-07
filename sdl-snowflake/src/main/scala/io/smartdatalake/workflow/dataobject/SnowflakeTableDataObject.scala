@@ -50,7 +50,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     override val schemaMin: Option[SparkStructType] = None,
                                     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     connectionId: ConnectionId,
-                                    comment: Option[String],
+                                    comment: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalSparkTableDataObject
@@ -92,7 +92,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
       .mode(finalSaveMode.asSparkSaveMode)
       .save()
 
-    if (comment != null && comment.isDefined) {
+    if (comment.isDefined) {
       val sql = s"comment on table ${connection.database}.${table.fullName} is '$comment';"
       connection.execSnowflakeStatement(sql)
     }
