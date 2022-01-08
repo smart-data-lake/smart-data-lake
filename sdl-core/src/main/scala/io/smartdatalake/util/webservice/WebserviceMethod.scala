@@ -19,8 +19,11 @@
 
 package io.smartdatalake.util.webservice
 
-object WebserviceWriteMethod extends Enumeration {
-  type WebserviceWriteMethod = Value
-  val Post = Value("post")
-  val Put = Value("put")
+object WebserviceMethod extends Enumeration {
+  type WebserviceMethod = Value
+
+  val Get = Value("GET")
+  val Post = Value("POST")
+  val Put = Value("PUT")
+  val Delete = Value("DELETE")
 }

@@ -18,23 +18,20 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
-
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.AuthMode
-import io.smartdatalake.definitions.SDLSaveMode
+import io.smartdatalake.definitions.{AuthMode, SDLSaveMode}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.webservice.WebserviceWriteMethod.WebserviceWriteMethod
+import io.smartdatalake.util.webservice.WebserviceMethod.WebserviceMethod
 import io.smartdatalake.util.webservice._
 import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.tika.Tika
 
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
 import scala.util.{Failure, Success, Try}
 
 case class WebservicePartitionDefinition(name: String, values: Seq[String])
@@ -59,7 +56,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
                                     readTimeoutMs: Option[Int] = None,
                                     authMode: Option[AuthMode] = None,
                                     mimeType: Option[String] = None,
-                                    writeMethod: WebserviceWriteMethod = WebserviceWriteMethod.Post,
+                                    writeMethod: WebserviceMethod = WebserviceMethod.Post,
                                     proxy: Option[HttpProxyConfig] = None,
                                     followRedirects: Boolean = false,
                                     partitionDefs: Seq[WebservicePartitionDefinition] = Seq(),
@@ -124,8 +121,8 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
       }
     }
     val response = writeMethod match {
-      case WebserviceWriteMethod.Post => webserviceClient.post(body, mimetype)
-      case WebserviceWriteMethod.Put => webserviceClient.put(body, mimetype)
+      case WebserviceMethod.Post => webserviceClient.post(body, mimetype)
+      case WebserviceMethod.Put => webserviceClient.put(body, mimetype)
     }
     response match {
       case Success(c) => c
