@@ -114,7 +114,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         val definedPathNormalized = HiveUtil.normalizePath(getAbsolutePath.toString)
 
         if (definedPathNormalized != hadoopPathNormalized)
-          logger.warn(s"($id) Table ${table.fullName} exists already with different path. The table will be written with new path definition ${hadoopPathHolder}!")
+          logger.warn(s"($id) Table ${table.fullName} exists already with different path. The table will use the existing path definition ${hadoopPathHolder}!")
       }
     }
     hadoopPathHolder
@@ -242,7 +242,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
             .option("overwriteSchema", allowSchemaEvolution) // allow overwriting schema when overwriting whole table
             .option("mergeSchema", allowSchemaEvolution)
             .mode(finalSaveMode.asSparkSaveMode)
-            .saveAsTable(table.fullName)
+            .save() // SaveMode append has strange errors with Table API in delta version 1.1.9
         } else {
           // insert
           if (finalSaveMode == SDLSaveMode.Overwrite) {
@@ -256,7 +256,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
             dfWriter
               .mode(finalSaveMode.asSparkSaveMode)
               .option("mergeSchema", allowSchemaEvolution)
-              .saveAsTable(table.fullName)
+              .save() // it seems generally more stable to work without Table API
           }
         }
       }
