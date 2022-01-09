@@ -111,8 +111,8 @@ case class HistorizeAction(
   }
   if (!mergeModeEnable && mergeModeAdditionalJoinPredicateExpr.nonEmpty) logger.warn(s"($id) Configuration of mergeModeAdditionalJoinPredicate has no effect if mergeModeEnable = false")
 
-  // force SDLSaveMode.Merge if mergeModeEnable = true
   override def saveModeOptions: Option[SaveModeOptions] = if (mergeModeEnable) {
+    // force SDLSaveMode.Merge if mergeModeEnable = true
     assert(output.isInstanceOf[CanMergeDataFrame], s"($id) output DataObject must support SaveMode.Merge (implement CanMergeDataFrame) if mergeModeEnable = true")
     // customize update condition
     val updateCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.updateClose}'")
@@ -121,7 +121,11 @@ case class HistorizeAction(
     val insertColsToIgnore = Seq(Historization.historizeOperationColName)
     val additionalMergePredicate = Some((s"new.${TechnicalTableColumn.captured} = existing.${TechnicalTableColumn.captured}" +: mergeModeAdditionalJoinPredicate.toSeq).reduce(_ + " and " + _))
     Some(SaveModeMergeOptions(updateCondition = updateCondition, updateColumns = updateCols, insertCondition = insertCondition, insertColumnsToIgnore = insertColsToIgnore, additionalMergePredicate = additionalMergePredicate))
-  } else None
+  } else {
+    // force SDLSaveMode.Overwrite otherwise
+    Some(SaveModeGenericOptions(SDLSaveMode.Overwrite))
+  }
+
 
   // Output is used as recursive input in DeduplicateAction to get existing data. This override is needed to force tick-tock write operation.
   override val recursiveInputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
