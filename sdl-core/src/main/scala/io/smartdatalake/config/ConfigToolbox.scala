@@ -52,7 +52,7 @@ object ConfigToolbox {
   }
 
   /**
-   * Create an action pipeline context uased by many DataObject and Action methods.
+   * Create an action pipeline context used by many DataObject and Action methods.
    */
   def getDefaultActionPipelineContext(implicit sparkSession : org.apache.spark.sql.SparkSession, instanceRegistry : io.smartdatalake.config.InstanceRegistry) : ActionPipelineContext = {
     val defaultHadoopConf = new SerializableHadoopConfiguration(new Configuration())
