@@ -77,9 +77,9 @@ case class KafkaConnection(override val id: ConnectionId,
       }
       case Some(m: SASLSCRAMAuthMode) => {
         props.put(AdminClientConfig.SECURITY_PROTOCOL_CONFIG, KafkaSASLSSLSecurityProtocol)
-        props.put("ssl.mechanism", m.sslMechanism)
-        props.put("sasl.jaas.config", "org.apache.kafka.common.security.scram.ScramLoginModule required username\""
-          + m.username + "\" password=\"" + m.password + "\"")
+        props.put("sasl.mechanism", m.sslMechanism)
+        props.put("sasl.jaas.config", "org.apache.kafka.common.security.scram.ScramLoginModule required username=\""
+          + m.username + "\" password=\"" + m.password + "\";")
         props.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, m.truststorePath)
         props.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, m.truststorePass)
         props.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, m.truststoreType.getOrElse(SslConfigs.DEFAULT_SSL_TRUSTSTORE_TYPE))
