@@ -109,14 +109,17 @@ case class DeduplicateAction(override val id: ActionId,
   }
   if (!mergeModeEnable && mergeModeAdditionalJoinPredicateExpr.nonEmpty) logger.warn(s"($id) Configuration of mergeModeAdditionalJoinPredicate as no effect if mergeModeEnable = false")
 
-  // force SDLSaveMode.Merge if mergeModeEnable = true
   override def saveModeOptions: Option[SaveModeOptions] = if (mergeModeEnable) {
+    // force SDLSaveMode.Merge if mergeModeEnable = true
     assert(output.isInstanceOf[CanMergeDataFrame], s"($id) output DataObject must support SaveMode.Merge (implement CanMergeDataFrame) if mergeModeEnable = true")
     // customize update condition
     val updateCondition = if (updateCapturedColumnOnlyWhenChanged) Some(checkRecordChangedColumns.map(c => s"existing.$c != new.$c").mkString(" or "))
     else None
     Some(SaveModeMergeOptions(updateCondition = updateCondition, additionalMergePredicate = mergeModeAdditionalJoinPredicate))
-  } else None
+  } else {
+    // force SDLSaveMode.Overwrite otherwise
+    Some(SaveModeGenericOptions(SDLSaveMode.Overwrite))
+  }
   // DataFrame columns are needed in order to generate update condition for SaveModeMergeOptions. Unfortunately they are not available here. A variable is needed which gets updated in transform(...).
   private var checkRecordChangedColumns: Seq[String] = Seq()
 

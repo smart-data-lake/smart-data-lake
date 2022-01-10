@@ -100,7 +100,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
     val configuredType = config.get[String]("type")
       .mapError(error => throw ConfigurationException(s"Required configuration setting 'type' is missing.", None, error.configException))
       .value
-    val clazz = Class.forName(className(configuredType))
+    val clazz = Environment.classLoader.loadClass(className(configuredType))
     val mirror = runtimeMirror(clazz.getClassLoader)
     val classSymbol = mirror.classSymbol(clazz)
     require(classSymbol.companion.isModule, s"Can not instantiate ${classOf[DataObject].getSimpleName} of class '${clazz.getTypeName}'. It does not have a companion object.")

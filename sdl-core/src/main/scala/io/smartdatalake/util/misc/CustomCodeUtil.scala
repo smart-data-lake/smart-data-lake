@@ -18,13 +18,10 @@
  */
 package io.smartdatalake.util.misc
 
-import java.io.{FileNotFoundException, InputStream}
-
-import io.smartdatalake.config.ConfigLoader.logger
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.util.hdfs.HdfsUtil
-import org.apache.hadoop.fs.{FileSystem, Path}
+import io.smartdatalake.definitions.Environment
 
+import java.io.{FileNotFoundException, InputStream}
 import scala.tools.reflect.ToolBox
 import scala.util.{Failure, Success, Try}
 
@@ -59,7 +56,7 @@ private[smartdatalake] object CustomCodeUtil {
   }
 
   def getClassInstanceByName[T](classname:String): T = {
-    val clazz = Class.forName(classname)
+    val clazz = Environment.classLoader.loadClass(classname)
     clazz.getDeclaredConstructor().newInstance().asInstanceOf[T]
   }
 

@@ -160,8 +160,12 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
     val unrelatedStateDataObjectIds = dataObjectsState.map(_.dataObjectId).diff(inputs.map(_.id))
     assert(unrelatedStateDataObjectIds.isEmpty, s"($id) Got state for unrelated DataObjects ${unrelatedStateDataObjectIds.mkString(", ")}")
     if (executionMode.exists(_.isInstanceOf[DataObjectStateIncrementalMode])) {
+      // assert SDL is started with state
+      assert(context.appConfig.statePath.isDefined, s"($id) SmartDataLakeBuilder must be started with state path set. Please specify location of state with parameter '--state-path'.")
+      // set DataObjects state
       inputs.foreach {
         case input: CanCreateIncrementalOutput => input.setState(dataObjectsState.find(_.dataObjectId == input.id).map(_.state))
+        case input => throw new ConfigurationException(s"($id) DataObjectStateIncrementalMode needs input data objects that implement CanCreateIncrementalOutput, but ${input.id} does not.")
       }
     } else {
       assert(dataObjectsState.isEmpty, s"($id) Got dataObjectsState but executionMode not ${classOf[DataObjectStateIncrementalMode].getSimpleName}")
