@@ -36,7 +36,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  *                          The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
 case class AdditionalColumnsTransformer(override val name: String = "additionalColumns", override val description: Option[String] = None, additionalColumns: Map[String,String]) extends ParsableDfTransformer {
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
     val data = DefaultExpressionData.from(context, partitionValues)
     additionalColumns.foldLeft(df){
       case (df, (colName, expr)) =>

@@ -80,9 +80,12 @@ object ConfigLoader extends SmartDataLakeLogger {
    *
    * @see [[com.typesafe.config.ConfigSyntax]]
    * @param configLocations     configuration files or directories containing configuration files.
+   * @param hadoopConf          Hadoop configuration to initialize filesystem.
+   *                            Note that maybe additional hadoop/spark configurations could not yet been loaded from the configuration files.
+   *                            In that case the default configuration is used.
    * @return                    a resolved [[Config]] merged from all found configuration files.
    */
-  def loadConfigFromFilesystem(configLocations: Seq[String]): Config = try {
+  def loadConfigFromFilesystem(configLocations: Seq[String], hadoopConf: Configuration): Config = try {
     val hadoopPaths = configLocations.map( l => HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(l)))
     logger.info(s"Loading configuration from filesystem locations: ${hadoopPaths.map(_.toUri).mkString(", ")}.")
     val hadoopConf: Configuration = new Configuration() // note that we could not yet load additional hadoop/spark configurations set in the configuration files

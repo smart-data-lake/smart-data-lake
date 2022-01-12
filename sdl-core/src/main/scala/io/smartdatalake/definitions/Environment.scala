@@ -193,6 +193,8 @@ object Environment {
   private [smartdatalake] var _instanceRegistry: InstanceRegistry = _
   def globalConfig: GlobalConfig = _globalConfig
   private [smartdatalake] var _globalConfig: GlobalConfig = _
+  def classLoader: ClassLoader = _classLoader
+  private [smartdatalake] var _classLoader: ClassLoader = this.getClass.getClassLoader // initialize with default classloader
 
   // flag to gracefully stop repeated execution of DAG in streaming mode
   var stopStreamingGracefully: Boolean = false

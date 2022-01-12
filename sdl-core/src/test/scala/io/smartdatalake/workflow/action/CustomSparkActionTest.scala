@@ -83,7 +83,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     srcDO1.writeDataFrame(l1, Seq())
     srcDO2.writeDataFrame(l1, Seq())
 
-    val tgtSubFeeds = action1.exec(Seq(SparkSubFeed(None, "src1", Seq()), SparkSubFeed(None, "src2", Seq())))(session,contextExec)
+    val tgtSubFeeds = action1.exec(Seq(SparkSubFeed(None, "src1", Seq()), SparkSubFeed(None, "src2", Seq())))(contextExec)
     assert(tgtSubFeeds.size == 2)
     assert(tgtSubFeeds.map(_.dataObjectId) == Seq(tgtDO1.id, tgtDO2.id))
 
@@ -123,7 +123,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
     srcDO1.writeDataFrame(l1, Seq())
 
-    val tgtSubFeedsNonRecursive = action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(session, contextExec)
+    val tgtSubFeedsNonRecursive = action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(contextExec)
     assert(tgtSubFeedsNonRecursive.size == 1)
     assert(tgtSubFeedsNonRecursive.map(_.dataObjectId) == Seq(tgtDO1.id))
 
@@ -136,7 +136,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     // second action to test recursive inputs
     val action2 = CustomSparkAction("action1", List(srcDO1.id), List(tgtDO1.id), transformers = Seq(customTransformerConfig), recursiveInputIds = List(tgtDO1.id))
 
-    val tgtSubFeedsRecursive = action2.exec(Seq(SparkSubFeed(None, "src1", Seq()), SparkSubFeed(None, "tgt1", Seq())))(session, contextExec)
+    val tgtSubFeedsRecursive = action2.exec(Seq(SparkSubFeed(None, "src1", Seq()), SparkSubFeed(None, "tgt1", Seq())))(contextExec)
     assert(tgtSubFeedsRecursive.size == 1) // still 1 as recursive inputs are handled separately
 
     val r2 = session.table(s"${tgtTable1.fullName}")
@@ -166,13 +166,13 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     srcDO1.writeDataFrame(l1, Seq())
 
     // nothing processed if input is skipped and filters not ignored
-    val tgtSubFeeds = action1.exec(Seq(SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe"))), isSkipped = true)))(session, contextExec)
+    val tgtSubFeeds = action1.exec(Seq(SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe"))), isSkipped = true)))(contextExec)
     assert(tgtSubFeeds.map(_.dataObjectId) == Seq(tgtDO1.id))
     session.table(s"${tgtTable1.fullName}")
       .isEmpty
 
     // input is processed if filters are ignored, even if input subfeed is skipped
-    val tgtSubFeedsIgnoreFilter = action1IgnoreFilter.exec(Seq(SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "test"))), isSkipped = true)))(session, contextExec)
+    val tgtSubFeedsIgnoreFilter = action1IgnoreFilter.exec(Seq(SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "test"))), isSkipped = true)))(contextExec)
     assert(tgtSubFeedsIgnoreFilter.map(_.dataObjectId) == Seq(tgtDO1.id))
     val r2 = session.table(s"${tgtTable1.fullName}")
       .select($"rating")
@@ -202,7 +202,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val l1PartitionValues = Seq(PartitionValues(Map("type"->"A")))
     srcDO.writeDataFrame(l1, l1PartitionValues) // prepare testdata
     action.init(Seq(srcSubFeed))
-    val tgtSubFeed1 = action.exec(Seq(srcSubFeed))(session,contextExec).head
+    val tgtSubFeed1 = action.exec(Seq(srcSubFeed))(contextExec).head
 
     // check first load
     assert(tgtSubFeed1.dataObjectId == tgtDO.id)
@@ -217,7 +217,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     srcDO.writeDataFrame(l2, l2PartitionValues) // prepare testdata
     assert(srcDO.getDataFrame().count == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
     action.init(Seq(srcSubFeed))
-    val tgtSubFeed2 = action.exec(Seq(srcSubFeed))(session,contextExec).head
+    val tgtSubFeed2 = action.exec(Seq(srcSubFeed))(contextExec).head
 
     // check 2nd load
     assert(tgtSubFeed2.dataObjectId == tgtDO.id)
@@ -272,7 +272,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     srcDO2.writeDataFrame(l2, l2PartitionValues)
     srcDO3.writeDataFrame(l2, Seq()) // src3 is not partitioned
     action.init(Seq(srcSubFeed1, srcSubFeed2, srcSubFeed3))
-    val tgtSubFeed1 = action.exec(Seq(srcSubFeed1, srcSubFeed2, srcSubFeed3))(session, contextExec).head
+    val tgtSubFeed1 = action.exec(Seq(srcSubFeed1, srcSubFeed2, srcSubFeed3))(contextExec).head
 
     // check load
     assert(tgtSubFeed1.dataObjectId == tgtDO.id)
@@ -309,7 +309,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(session, contextExec).head
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
 
     val r1 = session.table(s"${tgtTable1.fullName}")
       .select($"lastname")
@@ -392,7 +392,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val srcPartitionValues = Seq(PartitionValues(Map("dt" -> "20100101")), PartitionValues(Map("dt" -> "20100103")))
     srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", srcPartitionValues)
-    val tgtSubFeed = action1.init(Seq(srcSubFeed))(session,contextExec).head.asInstanceOf[SparkSubFeed]
+    val tgtSubFeed = action1.init(Seq(srcSubFeed))(contextExec).head.asInstanceOf[SparkSubFeed]
 
     val expectedPartitionValues = Seq(PartitionValues(Map("mt" -> "201001")))
     assert(tgtSubFeed.partitionValues == expectedPartitionValues)

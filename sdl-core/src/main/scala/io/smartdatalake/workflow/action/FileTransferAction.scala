@@ -59,13 +59,13 @@ case class FileTransferAction(override val id: ActionId,
   // initialize FileTransfer
   private val fileTransfer = FileTransfer(input, output, overwrite)
 
-  override def transform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
+  override def transform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {
     assert(inputSubFeed.fileRefs.nonEmpty, "inputSubFeed.fileRefs must be defined for FileTransferAction.doTransform")
     val inputFileRefs = inputSubFeed.fileRefs.get
     outputSubFeed.copy(fileRefMapping = Some(fileTransfer.getFileRefMapping(inputFileRefs)))
   }
 
-  override def writeSubFeed(subFeed: FileSubFeed, isRecursive: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): WriteSubFeedResult = {
+  override def writeSubFeed(subFeed: FileSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult = {
     val fileRefMapping = subFeed.fileRefMapping.getOrElse(throw new IllegalStateException(s"($id) file mapping is not defined"))
     output.startWritingOutputStreams(subFeed.partitionValues)
     if (fileRefMapping.nonEmpty) fileTransfer.exec(fileRefMapping)

@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="JsonSchemaExporter" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="io.smartdatalake.meta.jsonschema.JsonSchemaExporter" />
+    <module name="sdl-lang" />
+    <option name="PROGRAM_PARAMETERS" value="--filename sdl-lang\target\sdl-schema.json" />
+    <shortenClasspath name="MANIFEST" />
+    <option name="WORKING_DIRECTORY" value="$ProjectFileDir$" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

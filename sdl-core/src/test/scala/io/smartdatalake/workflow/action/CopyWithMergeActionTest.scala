@@ -69,7 +69,7 @@ class CopyWithMergeActionTest extends FunSuite with BeforeAndAfter {
     srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     action1.init(Seq(srcSubFeed))
-    action1.exec(Seq(srcSubFeed))(session, contextExec)
+    action1.exec(Seq(srcSubFeed))(contextExec)
 
     {
       val expected = Seq(("doe", "john", 5), ("pan", "peter", 5), ("hans", "muster", 5))
@@ -84,7 +84,7 @@ class CopyWithMergeActionTest extends FunSuite with BeforeAndAfter {
     val l2 = Seq(("doe","john",10),("pan","peter",5),("pan","peter2",5)).toDF("lastname", "firstname", "rating2")
     srcDO.writeDataFrame(l2, Seq())
     action1.init(Seq(srcSubFeed))
-    action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(session, contextExec)
+    action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(contextExec)
 
     {
       val expected = Seq(("doe", "john", Some(5), Some(10)), ("pan", "peter", Some(5), Some(5)), ("pan", "peter2", None, Some(5)), ("hans", "muster", Some(5), None))

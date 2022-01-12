@@ -23,6 +23,7 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
 import io.smartdatalake.config.SdlConfigObject.ActionId
+import io.smartdatalake.definitions.Environment
 
 /**
  * Configuration to notify interested parties about action results & metric
@@ -33,7 +34,7 @@ import io.smartdatalake.config.SdlConfigObject.ActionId
 case class StateListenerConfig(className: String, options: Option[Map[String,String]] = None) {
   // instantiate listener
   private[smartdatalake] val listener: StateListener = try {
-    val clazz = Class.forName(className)
+    val clazz = Environment.classLoader.loadClass(className)
     val constructor = clazz.getConstructor(classOf[Map[String,String]])
     constructor.newInstance(options.getOrElse(Map())).asInstanceOf[StateListener]
   } catch {

@@ -242,6 +242,37 @@
 			<scope>compile</scope>
 		</dependency>
 
+		<!-- needed to find ModulePlugins -->
+		<dependency>
+			<groupId>org.reflections</groupId>
+			<artifactId>reflections</artifactId>
+			<version>0.9.12</version>
+		</dependency>
+
+		<!-- this dependency defines scaladoc annotation used by compiler plugin for scala-maven-plugin -->
+		<dependency>
+			<groupId>com.github.takezoe</groupId>
+			<artifactId>runtime-scaladoc-reader_${scala.minor.version}</artifactId>
+			<version>${scaladoc.reader.version}</version>
+		</dependency>
+
+		<!-- needed for AirbyteDataObject Json handling -->
+		<dependency>
+			<groupId>org.json4s</groupId>
+			<artifactId>json4s-ext_2.11</artifactId>
+			<version>${json4s.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.networknt</groupId>
+			<artifactId>json-schema-validator</artifactId>
+			<version>1.0.42</version>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.datatype</groupId>
+			<artifactId>jackson-datatype-jsr310</artifactId>
+			<version>${fasterxml.jackson.version}</version>
+		</dependency>
+
 		<!-- TEST dependencies -->
 		<dependency>
 			<groupId>org.scalatest</groupId>
@@ -304,9 +335,9 @@
 		</dependency>
 
 		<dependency>
-			<groupId>org.reflections</groupId>
-			<artifactId>reflections</artifactId>
-			<version>0.9.12</version>
+			<groupId>org.json4s</groupId>
+			<artifactId>json4s-ext_${scala.minor.version}</artifactId>
+			<version>${json4s.version}</version>
 		</dependency>
 
 	</dependencies>

@@ -27,6 +27,7 @@ import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode}
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.types.{DateType, StringType, StructType}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -110,7 +111,7 @@ case class CsvFileDataObject( override val id: DataObjectId,
   /**
    * Formats date type column values according to the specified `dateColumnType` before writing to CSV file.
    */
-  override def beforeWrite(df: DataFrame)(implicit session: SparkSession): DataFrame = {
+  override def beforeWrite(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
     val dfSuper = super.beforeWrite(df)
     // standardize date column types
     dateColumnType match {

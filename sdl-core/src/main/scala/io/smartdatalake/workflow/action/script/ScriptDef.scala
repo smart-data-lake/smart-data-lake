@@ -19,12 +19,13 @@
 
 package io.smartdatalake.workflow.action.script
 
-import com.typesafe.config.Config
+import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, ParsableFromConfig}
-import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.SparkSession
+
+import scala.collection.mutable
 
 /**
  * Interface to implement script execution
@@ -34,13 +35,24 @@ trait ScriptDef {
   def description: Option[String]
 
   /**
-   * Function to be implemented to execute command
-   * @param actionId id of the action which executes this transformation. This is mainly used to prefix error messages.
+   * Function to be implemented to execute command and return stdout as String.
+   * @param configObjectId id of the action or dataobject which executes this transformation. This is mainly used to prefix error messages.
    * @param partitionValues partition values to transform
    * @param parameters key-value parameters
-   * @return standard output of script
+   * @param errors an optional Buffer to collect stdErr messages
+   * @return standard output of script as String
    */
-  def execStdOut(actionId: ActionId, partitionValues: Seq[PartitionValues], parameters: Map[String,String])(implicit session: SparkSession, context: ActionPipelineContext): String
+  def execStdOutString(configObjectId: ConfigObjectId, partitionValues: Seq[PartitionValues], parameters: Map[String,String], errors: mutable.Buffer[String] = mutable.Buffer())(implicit context: ActionPipelineContext): String
+
+  /**
+   * Function to be implemented to execute command and return stdout as Stream of lines.
+   * @param configObjectId id of the action which executes this transformation. This is mainly used to prefix error messages.
+   * @param partitionValues partition values to transform
+   * @param parameters key-value parameters
+   * @param errors an optional Buffer to collect stdErr messages
+   * @return standard output of script as Stream of lines
+   */
+  def execStdOutStream(configObjectId: ConfigObjectId, partitionValues: Seq[PartitionValues], parameters: Map[String,String], errors: mutable.Buffer[String] = mutable.Buffer())(implicit context: ActionPipelineContext): Stream[String]
 }
 
 trait ParsableScriptDef extends ScriptDef with ParsableFromConfig[ParsableScriptDef]

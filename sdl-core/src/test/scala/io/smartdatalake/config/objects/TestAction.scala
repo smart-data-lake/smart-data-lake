@@ -46,8 +46,8 @@ case class TestAction(override val id: ActionId,
                      )(implicit instanceRegistry: InstanceRegistry)
   extends Action {
 
-  override def init(subFeed: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = { /*NOP*/ Seq() }
-  override def exec(subFeed: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SubFeed] = { /*NOP*/ Seq() }
+  override def init(subFeed: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = { /*NOP*/ Seq() }
+  override def exec(subFeed: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = { /*NOP*/ Seq() }
 
   private[config] val input = instanceRegistry.get[DataObject with CanCreateDataFrame](inputId)
   private[config] val output = instanceRegistry.get[TransactionalSparkTableDataObject](outputId)

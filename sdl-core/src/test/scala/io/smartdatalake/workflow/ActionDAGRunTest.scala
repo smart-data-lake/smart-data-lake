@@ -35,9 +35,10 @@ class ActionDAGRunTest extends FunSuite {
 
   test("convert ActionDAGRunState to json and back") {
     val df = Seq(("a",1)).toDF("txt", "value")
-    val infoA = RuntimeInfo(SDLExecutionId.executionId1, RuntimeEventState.SUCCEEDED, startTstmp = Some(LocalDateTime.now()), duration = Some(Duration.ofMinutes(5)), msg = Some("test"), results = Seq(ResultRuntimeInfo(SparkSubFeed(Some(df), "do1", partitionValues = Seq(PartitionValues(Map("test"->1)))),Map("test"->1, "test2"->"abc"))))
+    val infoA = RuntimeInfo(SDLExecutionId.executionId1, RuntimeEventState.SUCCEEDED, startTstmp = Some(LocalDateTime.now()), duration = Some(Duration.ofMinutes(5)), msg = Some("test"), results = Seq(ResultRuntimeInfo(SparkSubFeed(Some(df), "do1", partitionValues = Seq(PartitionValues(Map("test"->1)))),Map("test"->1, "test2"->"abc"))), dataObjectsState = Seq(DataObjectState(DataObjectId("do1"), "test")))
     val state = ActionDAGRunState(SmartDataLakeBuilderConfig(), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = false)
     val json = state.toJson
+    println(json)
     // remove DataFrame from SparkSubFeed, it should not be serialized
     val expectedState = state.copy(actionsState = state.actionsState
       .mapValues(actionState => actionState

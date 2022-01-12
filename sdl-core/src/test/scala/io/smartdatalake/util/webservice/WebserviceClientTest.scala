@@ -22,6 +22,7 @@ import com.github.tomakehurst.wiremock.WireMockServer
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
 import io.smartdatalake.definitions.{AuthHeaderMode, BasicAuthMode, CustomHttpAuthMode, CustomHttpAuthModeLogic}
 import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataobject.WebserviceFileDataObject
 import org.scalatest.{BeforeAndAfterEach, FunSuite}
 import scalaj.http.{Http, HttpRequest, HttpResponse}
@@ -35,6 +36,7 @@ class WebserviceClientTest extends FunSuite with BeforeAndAfterEach  {
 
   // provide an empty instance registry
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+  implicit val context : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
   override protected def beforeEach(): Unit = {
     wireMockServer = TestUtil.setupWebservice(host, port, httpsPort)
@@ -97,7 +99,7 @@ class WebserviceClientTest extends FunSuite with BeforeAndAfterEach  {
 
   test("CustomAuthMode") {
     val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/post/no_auth", authMode = Some(CustomHttpAuthMode(className = classOf[MyCustomHttpAuthMode].getName, options = Map("test"-> "ok"))))
-    webserviceDO.prepare(null, null)
+    webserviceDO.prepare
     val webserviceClient = ScalaJWebserviceClient(webserviceDO)
     assert(webserviceClient.request.headers.toMap.apply("test") == "ok")
   }

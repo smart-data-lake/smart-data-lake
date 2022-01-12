@@ -49,15 +49,27 @@ private[smartdatalake] case class ScalaJWebserviceClient(request: HttpRequest) e
 private[smartdatalake] object ScalaJWebserviceClient extends SmartDataLakeLogger {
 
   /**
-   * Creates a [[WebserviceClient]] using scalaj.http library
+   * Creates a [[WebserviceClient]] using WebserviceFileDataObject configuration
    */
   def apply(config: WebserviceFileDataObject, url: Option[String] = None): ScalaJWebserviceClient = {
-    val request = Http(url.getOrElse(config.url))
-      .headers(config.additionalHeaders)
-      .optionally(config.timeouts, (v:HttpTimeoutConfig, request:HttpRequest) => request.timeout(v.connectionTimeoutMs, v.readTimeoutMs))
-      .applyAuthMode(config.authMode)
-      .optionally(config.proxy, (v:HttpProxyConfig, request:HttpRequest) => request.proxy(v.host, v.port))
-      .option(HttpOptions.followRedirects(config.followRedirects))
+    apply(url.getOrElse(config.url), config.additionalHeaders, config.timeouts, config.authMode, config.proxy, config.followRedirects)
+  }
+
+  /**
+   * Creates a [[WebserviceClient]]
+   */
+  def apply(url: String, additionalHeaders: Map[String,String],
+            timeouts: Option[HttpTimeoutConfig],
+            authMode: Option[AuthMode],
+            proxy: Option[HttpProxyConfig],
+            followRedirects: Boolean
+           ): ScalaJWebserviceClient = {
+    val request = Http(url)
+      .headers(additionalHeaders)
+      .optionally(timeouts, (v:HttpTimeoutConfig, request:HttpRequest) => request.timeout(v.connectionTimeoutMs, v.readTimeoutMs))
+      .applyAuthMode(authMode)
+      .optionally(proxy, (v:HttpProxyConfig, request:HttpRequest) => request.proxy(v.host, v.port))
+      .option(HttpOptions.followRedirects(followRedirects))
     new ScalaJWebserviceClient(request)
   }
 

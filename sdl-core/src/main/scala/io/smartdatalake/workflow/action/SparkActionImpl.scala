@@ -81,28 +81,28 @@ private[smartdatalake] abstract class SparkActionImpl extends ActionSubFeedsImpl
 
   // stage metrics listener to collect metrics
   private var _stageMetricsListener: Option[SparkStageMetricsListener] = None
-  private def registerStageMetricsListener(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  private def registerStageMetricsListener(implicit context: ActionPipelineContext): Unit = {
     if (_stageMetricsListener.isEmpty) {
       _stageMetricsListener = Some(new SparkStageMetricsListener(this))
-      session.sparkContext.addSparkListener(_stageMetricsListener.get)
+      context.sparkSession.sparkContext.addSparkListener(_stageMetricsListener.get)
     }
   }
-  private def unregisterStageMetricsListener(implicit session: SparkSession): Unit = {
+  private def unregisterStageMetricsListener(implicit context: ActionPipelineContext): Unit = {
     if (_stageMetricsListener.isDefined) {
-      session.sparkContext.removeSparkListener(_stageMetricsListener.get)
+      context.sparkSession.sparkContext.removeSparkListener(_stageMetricsListener.get)
       _stageMetricsListener = None
     }
   }
 
   // remember streaming query
   private var streamingQuery: Option[StreamingQuery] = None
-  private[smartdatalake] def notifyStreamingQueryTerminated(implicit session: SparkSession): Unit = {
+  private[smartdatalake] def notifyStreamingQueryTerminated(implicit context: ActionPipelineContext): Unit = {
     streamingQuery = None
     unregisterStageMetricsListener
   }
 
   // reset streaming query
-  override private[smartdatalake] def reset(implicit session: SparkSession): Unit = {
+  override private[smartdatalake] def reset(implicit context: ActionPipelineContext): Unit = {
     super.reset
     streamingQuery = None
     unregisterStageMetricsListener
@@ -116,7 +116,8 @@ private[smartdatalake] abstract class SparkActionImpl extends ActionSubFeedsImpl
    * @param phase current execution phase
    * @param isRecursive true if this input is a recursive input
    */
-  def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, phase: ExecutionPhase, isRecursive: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, phase: ExecutionPhase, isRecursive: Boolean = false)(implicit context: ActionPipelineContext): SparkSubFeed = {
+    implicit val session: SparkSession = context.sparkSession
     assert(input.id == subFeed.dataObjectId, s"($id) DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
     assert(phase!=ExecutionPhase.Prepare, "Strangely enrichSubFeedDataFrame got called in phase prepare. It should only be called in Init and Exec.")
     executionMode match {
@@ -182,7 +183,8 @@ private[smartdatalake] abstract class SparkActionImpl extends ActionSubFeedsImpl
     }
   }
 
-  def createEmptyDataFrame(dataObject: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  def createEmptyDataFrame(dataObject: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed)(implicit context: ActionPipelineContext): DataFrame = {
+    implicit val session: SparkSession = context.sparkSession
     val schema = dataObject match {
       case input: SparkFileDataObject if input.getSchema(false).isDefined =>
         input.getSchema(false).map(dataObject.createReadSchema)
@@ -197,7 +199,7 @@ private[smartdatalake] abstract class SparkActionImpl extends ActionSubFeedsImpl
       .colNamesLowercase // convert to lower case by default
   }
 
-  override protected def preprocessInputSubFeedCustomized(subFeed: SparkSubFeed, ignoreFilters: Boolean, isRecursive: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  override protected def preprocessInputSubFeedCustomized(subFeed: SparkSubFeed, ignoreFilters: Boolean, isRecursive: Boolean)(implicit context: ActionPipelineContext): SparkSubFeed = {
     val inputMap = (inputs ++ recursiveInputs).map(i => i.id -> i).toMap
     val input = inputMap(subFeed.dataObjectId)
     // persist if requested
@@ -218,7 +220,7 @@ private[smartdatalake] abstract class SparkActionImpl extends ActionSubFeedsImpl
     preparedSubFeed
   }
 
-  override def postprocessOutputSubFeedCustomized(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  override def postprocessOutputSubFeedCustomized(subFeed: SparkSubFeed)(implicit context: ActionPipelineContext): SparkSubFeed = {
     if (context.phase == ExecutionPhase.Init) {
       outputs.find(_.id == subFeed.dataObjectId).foreach { output =>
         output.init(subFeed.dataFrame.get, subFeed.partitionValues, saveModeOptions)
@@ -227,7 +229,7 @@ private[smartdatalake] abstract class SparkActionImpl extends ActionSubFeedsImpl
     subFeed
   }
 
-  override protected def writeSubFeed(subFeed: SparkSubFeed, isRecursive: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): WriteSubFeedResult = {
+  override protected def writeSubFeed(subFeed: SparkSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult = {
     setSparkJobMetadata(Some(s"writing to ${subFeed.dataObjectId}"))
     val output = outputs.find(_.id == subFeed.dataObjectId).getOrElse(throw new IllegalStateException(s"($id) output for subFeed ${subFeed.dataObjectId} not found"))
     val noData = writeSubFeed(subFeed, output, isRecursive)
@@ -239,7 +241,7 @@ private[smartdatalake] abstract class SparkActionImpl extends ActionSubFeedsImpl
    * writes subfeed to output respecting given execution mode
    * @return true if no data was transferred, otherwise false. None if unknown.
    */
-  def writeSubFeed(subFeed: SparkSubFeed, output: DataObject with CanWriteDataFrame, isRecursiveInput: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Option[Boolean] = {
+  def writeSubFeed(subFeed: SparkSubFeed, output: DataObject with CanWriteDataFrame, isRecursiveInput: Boolean = false)(implicit context: ActionPipelineContext): Option[Boolean] = {
     assert(!subFeed.isDummy, s"($id) Can not write dummy DataFrame to ${output.id}")
     // write
     executionMode match {
@@ -307,7 +309,7 @@ private[smartdatalake] abstract class SparkActionImpl extends ActionSubFeedsImpl
   /**
    * apply transformer to SubFeeds
    */
-  protected def applyTransformers(transformers: Seq[DfsTransformer], inputPartitionValues: Seq[PartitionValues], inputSubFeeds: Seq[SparkSubFeed], outputSubFeeds: Seq[SparkSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[SparkSubFeed] = {
+  protected def applyTransformers(transformers: Seq[DfsTransformer], inputPartitionValues: Seq[PartitionValues], inputSubFeeds: Seq[SparkSubFeed], outputSubFeeds: Seq[SparkSubFeed])(implicit context: ActionPipelineContext): Seq[SparkSubFeed] = {
     val inputDfsMap = inputSubFeeds.map(subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap
     val (outputDfsMap, _) = transformers.foldLeft((inputDfsMap,inputPartitionValues)){
       case ((dfsMap, partitionValues), transformer) => transformer.applyTransformation(id, partitionValues, dfsMap)
@@ -325,7 +327,7 @@ private[smartdatalake] abstract class SparkActionImpl extends ActionSubFeedsImpl
   /**
    * apply transformer to partition values
    */
-  protected def applyTransformers(transformers: Seq[PartitionValueTransformer], partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+  protected def applyTransformers(transformers: Seq[PartitionValueTransformer], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
     transformers.foldLeft(PartitionValues.oneToOneMapping(partitionValues)){
       case (partitionValuesMap, transformer) => transformer.applyTransformation(id, partitionValuesMap)
     }
@@ -338,7 +340,7 @@ private[smartdatalake] abstract class SparkActionImpl extends ActionSubFeedsImpl
    * @param subFeed SubFeed with transformed DataFrame
    * @return validated and updated SubFeed
    */
-   def validateAndUpdateSubFeedCustomized(output: DataObject, subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+   def validateAndUpdateSubFeedCustomized(output: DataObject, subFeed: SparkSubFeed)(implicit context: ActionPipelineContext): SparkSubFeed = {
     output match {
       case partitionedDO: CanHandlePartitions =>
         // validate output partition columns exist in DataFrame
@@ -392,7 +394,7 @@ private[smartdatalake] abstract class SparkActionImpl extends ActionSubFeedsImpl
   /**
    * Applies changes to a SubFeed from a previous action in order to be used as input for this actions transformation.
    */
-  def prepareInputSubFeed(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, ignoreFilters: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  def prepareInputSubFeed(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, ignoreFilters: Boolean = false)(implicit context: ActionPipelineContext): SparkSubFeed = {
     // persist if requested
     var preparedSubFeed = if (persist) subFeed.persist else subFeed
     // create dummy DataFrame if read schema is different from write schema on this DataObject
@@ -409,12 +411,12 @@ private[smartdatalake] abstract class SparkActionImpl extends ActionSubFeedsImpl
     preparedSubFeed
   }
 
-  override def preExec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def preExec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
     registerStageMetricsListener
     super.preExec(subFeeds)
   }
 
-  override def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
     super.postExec(inputSubFeeds, outputSubFeeds)
     // auto-unpersist DataFrames no longer needed
     inputSubFeeds
@@ -428,7 +430,7 @@ private[smartdatalake] abstract class SparkActionImpl extends ActionSubFeedsImpl
     if (!isAsynchronous) unregisterStageMetricsListener
   }
 
-  override def postExecFailed(implicit session: SparkSession): Unit = {
+  override def postExecFailed(implicit context: ActionPipelineContext): Unit = {
     super.postExecFailed
     unregisterStageMetricsListener
   }

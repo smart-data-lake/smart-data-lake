@@ -52,12 +52,12 @@ case class CustomScriptAction(override val id: ActionId,
 
   validateConfig()
 
-  override protected def execScript(inputSubFeeds: Seq[ScriptSubFeed], outputSubFeeds: Seq[ScriptSubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Seq[ScriptSubFeed] = {
+  override protected def execScript(inputSubFeeds: Seq[ScriptSubFeed], outputSubFeeds: Seq[ScriptSubFeed])(implicit context: ActionPipelineContext): Seq[ScriptSubFeed] = {
     val inputParameters = inputSubFeeds.flatMap(_.parameters).reduceLeftOption(_ ++ _).getOrElse(Map())
     val mainPartitionValues = getMainPartitionValues(inputSubFeeds)
     val outputParameters = scripts.foldLeft(inputParameters) {
       case (p, script) =>
-        val stdOut = script.execStdOut(id, mainPartitionValues, p)
+        val stdOut = script.execStdOutString(id, mainPartitionValues, p)
         parseLastLine(stdOut)
     }
     outputSubFeeds.map(_.copy(parameters = Some(outputParameters)))

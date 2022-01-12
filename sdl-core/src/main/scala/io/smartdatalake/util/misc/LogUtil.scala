@@ -26,14 +26,10 @@ import org.apache.spark.SparkContext
 private[smartdatalake] object LogUtil {
 
   /**
-   * Sets the util log level.
-   *
-   * Uses the system property "loglevel" if it is set.
-   * If not, the default level "INFO" is being used.
-   *
+   * Overrides the Spark log level with system property "loglevel" if it is set.
    * @param sparkContext [[SparkContext]] on which the loglevel should bet set
    */
-  def setLogLevel(sparkContext: SparkContext) = {
+  def setLogLevel(sparkContext: SparkContext): Unit = {
     if (System.getProperty("logLevel") != null) {
       sparkContext.setLogLevel(System.getProperty("logLevel"))
     }
