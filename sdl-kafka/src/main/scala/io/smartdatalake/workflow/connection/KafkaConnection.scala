@@ -75,11 +75,11 @@ case class KafkaConnection(override val id: ConnectionId,
         props.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, m.truststorePass)
         props.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, m.truststoreType.getOrElse(SslConfigs.DEFAULT_SSL_TRUSTSTORE_TYPE))
       }
-      case Some(m: SASLSCRAMAuthMode) => {
+     case Some(m: SASLSCRAMAuthMode) => {
         props.put(AdminClientConfig.SECURITY_PROTOCOL_CONFIG, KafkaSASLSSLSecurityProtocol)
-        props.put("ssl.mechanism", m.sslMechanism)
-        props.put("sasl.jaas.config", "org.apache.kafka.common.security.scram.ScramLoginModule required username\""
-          + m.username + "\" password=\"" + m.password + "\"")
+        props.put("sasl.mechanism", m.sslMechanism)
+        props.put("sasl.jaas.config", "org.apache.kafka.common.security.scram.ScramLoginModule required username=\""
+          + m.username + "\" password=\"" + m.password + "\";")
         props.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, m.truststorePath)
         props.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, m.truststorePass)
         props.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, m.truststoreType.getOrElse(SslConfigs.DEFAULT_SSL_TRUSTSTORE_TYPE))
@@ -102,7 +102,7 @@ case class KafkaConnection(override val id: ConnectionId,
     try {
       confluentHelper.foreach(_.test())
     } catch {
-      case e: Exception => throw ConfigurationException(s"($id) Can not connect to schema registry (${schemaRegistry.get})", None, e)
+      case e:Exception => throw ConfigurationException(s"($id) Can not connect to schema registry (${schemaRegistry.get})", None, e)
     }
   }
 
