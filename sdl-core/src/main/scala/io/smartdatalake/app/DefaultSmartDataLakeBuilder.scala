@@ -19,7 +19,6 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.jetty.JettyServer
 
 /**
  * Default Smart Data Lake Command Line Application.
@@ -30,7 +29,6 @@ class DefaultSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
   def parseAndRun(args: Array[String], ignoreOverrideJars: Boolean = false): Unit = {
     logger.info(s"Starting Program $appType v$appVersion")
-    JettyServer.start()
     parseCommandLineArguments(args, initConfigFromEnvironment) match {
       case Some(config) =>
         assert(config.overrideJars.isEmpty || ignoreOverrideJars, "Option override-jars is not supported by DefaultSmartDataLakeBuilder. Use DatabricksSmartDataLakeBuilder for this option.")

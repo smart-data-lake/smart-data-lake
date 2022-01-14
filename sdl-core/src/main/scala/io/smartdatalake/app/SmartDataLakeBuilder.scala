@@ -22,6 +22,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.jetty.{CustomListener, JettyServer}
 import io.smartdatalake.util.dag.{DAGException, ExceptionSeverity}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SerializableHadoopConfiguration, SmartDataLakeLogger}
@@ -208,6 +209,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   def run(appConfig: SmartDataLakeBuilderConfig): Map[RuntimeEventState,Int] = try {
     // invoke SDLPlugin if configured
     Environment.sdlPlugin.foreach(_.startup())
+    val stateListener = new CustomListener()
+    JettyServer.start(stateListener)
+    Environment._additionalStateListeners = Seq(stateListener)
     // create default hadoop configuration, as we did not yet load custom spark/hadoop properties
     implicit val defaultHadoopConf: Configuration = new Configuration()
     // handle state if defined

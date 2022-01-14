@@ -3,10 +3,11 @@
     <option name="ALTERNATIVE_JRE_PATH" value="11.0.4" />
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
     <option name="INCLUDE_PROVIDED_SCOPE" value="true" />
-    <option name="MAIN_CLASS_NAME" value="io.smartdatalake.app.DefaultSmartDataLakeBuilder" />
+    <option name="MAIN_CLASS_NAME" value="io.smartdatalake.app.LocalSmartDataLakeBuilder" />
     <module name="sdl-core" />
+    <option name="PROGRAM_PARAMETERS" value="--feed-sel .*" />
     <shortenClasspath name="ARGS_FILE" />
-    <option name="WORKING_DIRECTORY" value="$ProjectFileDir$" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/sdl-core/src/main/resources" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>
