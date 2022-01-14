@@ -139,7 +139,8 @@ private[smartdatalake] case class JsonRefDef(
  * Definition of a json union: this allows one of the defined types.
  */
 private[smartdatalake] case class JsonOneOfDef(
-                         oneOf: Seq[JsonTypeDef]
+                         oneOf: Seq[JsonTypeDef],
+                         description: Option[String] = None
                        ) extends JsonTypeDef
 
 /**
@@ -177,7 +178,7 @@ private[smartdatalake] trait SchemaRootDef extends JsonExtractor
  */
 private[smartdatalake] case class SchemaRootObjectDef(
                                 `$schema`: String,
-                                definitions: Map[String,JsonTypeDef],
+                                definitions: Map[String, ListMap[String,JsonTypeDef]],
                                 properties: ListMap[String,JsonTypeDef],
                                 required: Seq[String],
                                 additionalProperties: Boolean,
