@@ -14,8 +14,8 @@ jobs:
         with:
           node-version: 14.x
           cache: yarn
+          cache-dependency-path: '**/yarn.lock'
       - name: Build website
-        working-directory: ./
         run: |
           yarn install --frozen-lockfile
           yarn build
