@@ -53,7 +53,7 @@ import scala.collection.mutable
  * @param actionsSkipped actions selected but skipped in current attempt because they already succeeded in a previous attempt.
  */
 @DeveloperApi
-case class ActionPipelineContext (
+case class ActionPipelineContext ( //application=appId wird auf für state verwendet muss unique sein
                                   feed: String, application: String, executionId: SDLExecutionId,
                                   instanceRegistry: InstanceRegistry,
                                   referenceTimestamp: Option[LocalDateTime] = None,

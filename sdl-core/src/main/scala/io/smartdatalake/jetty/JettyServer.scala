@@ -13,6 +13,7 @@ object JettyServer {
     val pool = new QueuedThreadPool(200)
     val server = new Server(pool)
     val connector = new ServerConnector(server)
+    //TODO find first avaialbe port like spark UI
     connector.setPort(8090)
     server.setConnectors(Array(connector))
     server.setHandler(context);

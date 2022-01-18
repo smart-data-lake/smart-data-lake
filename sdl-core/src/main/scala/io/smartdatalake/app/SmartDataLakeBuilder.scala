@@ -242,6 +242,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     MemoryUtils.stopMemoryLogger()
     // invoke SDLPlugin if configured
     Environment.sdlPlugin.foreach(_.shutdown())
+
+    //TODO jetty shutdown
   }
 
   /**
