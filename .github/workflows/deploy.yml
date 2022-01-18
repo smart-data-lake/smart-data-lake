@@ -13,11 +13,17 @@ jobs:
       - uses: actions/setup-node@v2
         with:
           node-version: 14.x
-          cache: yarn
+          cache: npm
       - name: Build website
         run: |
+          if [ -e yarn.lock ]; then
           yarn install --frozen-lockfile
-          yarn build
+          elif [ -e package-lock.json ]; then
+          npm ci
+          else
+          npm i
+          fi
+          npm run build
 
       # Popular action to deploy to GitHub Pages:
       # Docs: https://github.com/peaceiris/actions-gh-pages#%EF%B8%8F-docusaurus
