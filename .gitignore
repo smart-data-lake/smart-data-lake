@@ -8,7 +8,6 @@
 .docusaurus
 .cache-loader
 /yarn*
-!yarn.lock
 
 # Misc
 .DS_Store
