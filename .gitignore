@@ -1,37 +1,27 @@
-*.tmp
-*.log
-target
+# Dependencies
+/node_modules
 
-# User-specific stuff
-.idea/**/workspace.xml
-.idea/**/tasks.xml
-.idea/**/usage.statistics.xml
-.idea/**/dictionaries
-.idea/**/shelf
-.idea/misc.xml
-.idea/scala_compiler.xml
+# Production
+/build
 
 # Generated files
-.idea/**/contentModel.xml
+.docusaurus
+.cache-loader
+/yarn*
 
-# Sensitive or high-churn files
-.idea/**/dataSources/
-.idea/**/dataSources.ids
-.idea/**/dataSources.local.xml
-.idea/**/sqlDataSources.xml
-.idea/**/dynamic.xml
-.idea/**/uiDesigner.xml
-.idea/**/dbnavigator.xml
+# Misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Gradle and Maven with auto-import
-# When using Gradle or Maven with auto-import, you should exclude module files,
-# since they will be recreated, and may cause churn.  Uncomment if using
-# auto-import.
-.idea/artifacts
-.idea/compiler.xml
-.idea/jarRepositories.xml
-.idea/modules.xml
-.idea/*.iml
-.idea/modules
-.idea/libraries
-.idea/sonarlint
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+.idea*
+
+id_ed25519*
+
+
