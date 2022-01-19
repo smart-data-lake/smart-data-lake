@@ -343,31 +343,41 @@
 		<dependency>
 			<groupId>org.eclipse.jetty</groupId>
 			<artifactId>jetty-util</artifactId>
-			<version>11.0.7</version>
+			<version>9.4.43.v20210629</version>
 		</dependency>
 		<dependency>
 			<groupId>org.eclipse.jetty</groupId>
 			<artifactId>jetty-io</artifactId>
-			<version>11.0.7</version>
+			<version>9.4.43.v20210629</version>
 		</dependency>
 
 		<dependency>
 			<groupId>org.eclipse.jetty</groupId>
 			<artifactId>jetty-server</artifactId>
-			<version>11.0.7</version>
+			<version>9.4.43.v20210629</version>
 		</dependency>
 
 		<dependency>
 			<groupId>org.eclipse.jetty</groupId>
 			<artifactId>jetty-servlet</artifactId>
-			<version>11.0.7</version>
+			<version>9.4.43.v20210629</version>
 		</dependency>
 
 		<dependency>
 			<groupId>org.eclipse.jetty</groupId>
 			<artifactId>jetty-http</artifactId>
-			<version>11.0.7</version>
+			<version>9.4.43.v20210629</version>
 		</dependency>
+
+
+<!-- Needed to serialize Requests for the REST-API-->
+		<dependency>
+			<groupId>org.glassfish.jersey.media</groupId>
+			<artifactId>jersey-media-json-jackson</artifactId>
+			<version>2.34</version>
+		</dependency>
+
+
 
 	</dependencies>
 

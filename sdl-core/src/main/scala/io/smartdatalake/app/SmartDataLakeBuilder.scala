@@ -210,6 +210,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // invoke SDLPlugin if configured
     Environment.sdlPlugin.foreach(_.startup())
     val stateListener = new CustomListener()
+    //TODO use globalconfig?
     JettyServer.start(stateListener)
     Environment._additionalStateListeners = Seq(stateListener)
     // create default hadoop configuration, as we did not yet load custom spark/hadoop properties

@@ -34,11 +34,6 @@ import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.custom.ExpressionEvaluator
 
-//port von wo er startet mit suchen
-case class RestApi(port: Int = 4140, maxPortRetries: Int = 10, stopOnEnd: Boolean = true){
-  //TODO move start from JettyServer, case class in seperate file
-}
-
 /**
  * Global configuration options
  *
