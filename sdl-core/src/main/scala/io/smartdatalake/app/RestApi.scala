@@ -1,12 +1,5 @@
 package io.smartdatalake.app
 
-import io.smartdatalake.jetty.{APIRoot, ApiRequestServletContext, CustomListener}
-import org.eclipse.jetty.server.{Server, ServerConnector}
-import org.eclipse.jetty.servlet.{ServletContextHandler, ServletHolder}
-import org.eclipse.jetty.util.thread.QueuedThreadPool
-import org.glassfish.jersey.server.ServerProperties
-import org.glassfish.jersey.servlet.ServletContainer
-
 /**
  *
  * @param port: port with which the first connection attempt is made
