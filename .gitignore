@@ -1,6 +1,7 @@
 metastore_db
 data/output
 .cache-*
+.mvnrepo
 target
 venv
 /.externalToolBuilders/

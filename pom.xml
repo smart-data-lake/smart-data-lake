@@ -31,14 +31,13 @@
 		  Set the smartdatalake version to use here.
 		  If version cannot be resolved, make sure maven central repository is defined in settings.xml and the corresponding profile activated.
 		-->
-		<version>2.1.0</version>
+		<version>2.2.0-SNAPSHOT</version>
 	</parent>
 
-	<groupId>io.smartdatalake</groupId>
 	<artifactId>getting-started</artifactId>
 	<version>1.0</version>
 
-	<name>Getting Started Tutorial</name>
+	<name>SDL Getting Started</name>
 
 	<properties>
 		<!-- default scala version - use predefined maven profiles to override -->
@@ -46,9 +45,45 @@
 		<scala.version>${scala.minor.version}.12</scala.version>
 	</properties>
 
+	<profiles>
+		<profile>
+			<id>copy-libs</id>
+			<build>
+				<plugins>
+					<!-- copy dependencies to target/lib folder -->
+					<plugin>
+						<artifactId>maven-dependency-plugin</artifactId>
+						<executions>
+							<execution>
+								<phase>package</phase>
+								<goals>
+									<goal>copy-dependencies</goal>
+								</goals>
+								<configuration>
+									<outputDirectory>${project.build.directory}/lib</outputDirectory>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+
+	<repositories>
+		<!-- smartdatalake snapshots -->
+		<repository>
+			<id>ossrh</id>
+			<name>ossrh snapshots</name>
+			<url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+			<releases><enabled>false</enabled></releases>
+			<snapshots><enabled>true</enabled></snapshots>
+		</repository>
+	</repositories>
+
 	<build>
 		<sourceDirectory>src/main/scala</sourceDirectory>
-		<outputDirectory>target</outputDirectory>
+		<outputDirectory>target/classes</outputDirectory>
 		<plugins>
 			<!-- Compiles Scala sources. -->
 			<plugin>
@@ -66,29 +101,30 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-jar-plugin</artifactId>
-			</plugin>
-
-			<!-- Checks for declared but unused and undeclared but used dependencies in the verify stage -->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-dependency-plugin</artifactId>
+				<version>3.1.2</version>
+				<configuration>
+					<archive>
+						<manifest>
+							<addClasspath>true</addClasspath>
+							<classpathPrefix>lib/</classpathPrefix>
+							<mainClass>io.smartdatalake.app.LocalSmartDataLakeBuilder</mainClass>
+						</manifest>
+						<manifestEntries>
+							<Implementation-Version>${project.version}</Implementation-Version>
+						</manifestEntries>
+					</archive>
+					<excludes>
+						<exclude>log4j.properties</exclude> <!-- Logging configuration should be left to user. -->
+						<exclude>${project.artifactId}*.jar</exclude> <!-- avoid "Error assembling JAR" because of already existing artifact jar -->
+						<exclude>*.conf</exclude> <!-- no SDL configuration files - they must be provided by the user separately -->
+					</excludes>
+				</configuration>
 			</plugin>
 
 			<!-- check for dependency version conflicts -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-enforcer-plugin</artifactId>
-			</plugin>
-
-			<!-- disable sign artifacts with gpg -->
-			<!-- TODO: move to profile in sdl-parent pom -->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-gpg-plugin</artifactId>
-				<version>1.6</version>
-				<configuration>
-					<skip>true</skip>
-				</configuration>
 			</plugin>
 
 		</plugins>
@@ -100,6 +136,19 @@
 			<groupId>io.smartdatalake</groupId>
 			<artifactId>sdl-core_${scala.minor.version}</artifactId>
 			<version>${project.parent.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>io.smartdatalake</groupId>
+			<artifactId>sdl-deltalake_${scala.minor.version}</artifactId>
+			<version>${project.parent.version}</version>
+			<exclusions>
+				<!-- TODO: this can probably be removed from sdl-deltalake! -->
+				<exclusion>
+					<groupId>org.apache.spark</groupId>
+					<artifactId>spark-sql-kafka-0-10_2.12</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 
 		<!-- override scope for spark dependencies to include/exclude them correctly for the fat-jar -->
@@ -132,6 +181,20 @@
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-avro_${scala.minor.version}</artifactId>
 			<version>${spark.version}</version>
+			<scope>${spark.deps.scope}</scope>
+		</dependency>
+
+		<!-- needed for derby metastore -->
+		<dependency>
+			<groupId>org.datanucleus</groupId>
+			<artifactId>datanucleus-api-jdo</artifactId>
+			<version>4.1.4</version>
+			<scope>${spark.deps.scope}</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.derby</groupId>
+			<artifactId>derbyclient</artifactId>
+			<version>${derby.version}</version>
 			<scope>${spark.deps.scope}</scope>
 		</dependency>
 
