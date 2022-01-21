@@ -23,7 +23,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.util.misc.{DefaultExpressionData, PythonSparkEntryPoint, PythonUtil}
+import io.smartdatalake.util.spark.{DefaultExpressionData, PythonSparkEntryPoint, PythonUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionHelper
 import org.apache.hadoop.conf.Configuration
@@ -47,7 +47,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
-case class PythonCodeDfTransformer(override val name: String = "pythonTransform", override val description: Option[String] = None, code: Option[String] = None, file: Option[String] = None, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsDfTransformer {
+case class PythonCodeDfTransformer(override val name: String = "pythonTransform", override val description: Option[String] = None, code: Option[String] = None, file: Option[String] = None, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfTransformer {
   private val pythonCode = {
     implicit val defaultHadoopConf: Configuration = new Configuration()
     file.map(file => HdfsUtil.readHadoopFile(file))
@@ -74,10 +74,10 @@ case class PythonCodeDfTransformer(override val name: String = "pythonTransform"
       case e: Throwable => throw new PythonTransformationException(s"($actionId.transformers.$name) Could not execute Python code. Error: ${e.getMessage}", e)
     }
   }
-  override def factory: FromConfigFactory[ParsableDfTransformer] = PythonCodeDfTransformer
+  override def factory: FromConfigFactory[GenericDfTransformer] = PythonCodeDfTransformer
 }
 
-object PythonCodeDfTransformer extends FromConfigFactory[ParsableDfTransformer] {
+object PythonCodeDfTransformer extends FromConfigFactory[GenericDfTransformer] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): PythonCodeDfTransformer = {
     extract[PythonCodeDfTransformer](config)
   }

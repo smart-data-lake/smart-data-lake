@@ -18,13 +18,15 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
-import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
+
+import scala.reflect.runtime.universe.Type
 
 private[smartdatalake] trait CanWriteDataFrame {
 
@@ -35,22 +37,30 @@ private[smartdatalake] trait CanWriteDataFrame {
    * Called during init phase for checks and initialization.
    * If possible dont change the system until execution phase.
    */
-  def init(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = Unit
+  def init(df: GenericDataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = Unit
 
   /**
-   * Write DataFrame to DataObject
-   * @param df the DataFrame to write
-   * @param partitionValues partition values included in DataFrames data
-   * @param isRecursiveInput if DataFrame needs this DataObject as input - special treatment might be needed in this case.
+   * Write a DataFrame to the DataObject
    */
-  def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit
+  def writeDataFrame(df: GenericDataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit
+
+  /**
+   * Write a GenericDataFrameSubFeed to the DataObject.
+   * See writeSubFeedSupportedTypes for supported languages of the GenericDataFrameSubFeed.
+   */
+  private[smartdatalake] def writeSubFeed(subFeed: DataFrameSubFeed, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit
+
+  /**
+   * Declare supported Language for writing DataFrame.
+   */
+  private[smartdatalake] def writeSubFeedSupportedTypes: Seq[Type]
 
   /**
    * Write DataFrame to specific Path with properties of this DataObject.
    * This is needed for compacting partitions by housekeeping.
    * Note: this is optional to implement.
    */
-  private[smartdatalake] def writeDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = throw new RuntimeException("writeDataFrameToPath not implemented")
+  private[smartdatalake] def writeDataFrameToPath(df: GenericDataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = throw new RuntimeException("writeDataFrameToPath not implemented")
 
   /**
    * Write Spark structured streaming DataFrame
@@ -61,22 +71,8 @@ private[smartdatalake] trait CanWriteDataFrame {
    * @param trigger Trigger frequency for stream
    * @param checkpointLocation location for checkpoints of streaming query
    */
-  def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String,String], checkpointLocation: String, queryName: String, outputMode: OutputMode = OutputMode.Append, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): StreamingQuery = {
-
-    // lambda function is ambiguous with foreachBatch in scala 2.12... we need to create a real function...
-    // Note: no partition values supported when writing streaming target
-    def microBatchWriter(dfMicrobatch: Dataset[Row], batchid: Long): Unit = writeDataFrame(dfMicrobatch, Seq(), saveModeOptions = saveModeOptions)
-
-    df
-      .writeStream
-      .trigger(trigger)
-      .queryName(queryName)
-      .outputMode(outputMode)
-      .option("checkpointLocation", checkpointLocation)
-      .options(streamingOptions ++ options) // options override streamingOptions
-      .foreachBatch(microBatchWriter _)
-      .start()
-  }
+  // TODO: this interface is still very spark specific!
+  def writeStreamingDataFrame(df: GenericDataFrame, trigger: Trigger, options: Map[String,String], checkpointLocation: String, queryName: String, outputMode: OutputMode = OutputMode.Append, saveModeOptions: Option[SaveModeOptions] = None)
+                             (implicit context: ActionPipelineContext): StreamingQuery = throw new RuntimeException("writeDataFrameToPath not implemented")
 
 }

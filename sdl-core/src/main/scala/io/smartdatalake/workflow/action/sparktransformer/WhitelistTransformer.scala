@@ -22,10 +22,10 @@ package io.smartdatalake.workflow.action.sparktransformer
 import com.typesafe.config.Config
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import io.smartdatalake.workflow.action.ActionHelper
-import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
  * Apply a column whitelist to a DataFrame.
@@ -34,14 +34,17 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param columnWhitelist List of columns to keep from DataFrame
  */
 
-case class WhitelistTransformer(override val name: String = "whitelist", override val description: Option[String] = None, columnWhitelist: Seq[String]) extends ParsableDfTransformer {
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
-    ActionHelper.filterWhitelist(columnWhitelist)(df)
+case class WhitelistTransformer(override val name: String = "whitelist", override val description: Option[String] = None, columnWhitelist: Seq[String]) extends GenericDfTransformer {
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
+    val helper = DataFrameSubFeed.getHelper(df.subFeedType)
+    import helper._
+    val colsToSelect = df.schema.columns.filter(colName => columnWhitelist.contains(colName.toLowerCase))
+    df.select(colsToSelect.map(col))
   }
-  override def factory: FromConfigFactory[ParsableDfTransformer] = WhitelistTransformer
+  override def factory: FromConfigFactory[GenericDfTransformer] = WhitelistTransformer
 }
 
-object WhitelistTransformer extends FromConfigFactory[ParsableDfTransformer] {
+object WhitelistTransformer extends FromConfigFactory[GenericDfTransformer] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): WhitelistTransformer = {
     extract[WhitelistTransformer](config)
   }

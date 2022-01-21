@@ -20,7 +20,8 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.workflow.{ExecutionPhase, GenericMetrics, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.{ExecutionPhase, GenericMetrics}
 import org.scalatest.FunSuite
 
 import java.time.LocalDateTime

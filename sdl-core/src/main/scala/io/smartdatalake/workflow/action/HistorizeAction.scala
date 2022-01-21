@@ -26,13 +26,15 @@ import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.historization.{Historization, HistorizationRecordOperations}
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.action.sparktransformer.{DfTransformer, DfTransformerFunctionWrapper, ParsableDfTransformer}
+import io.smartdatalake.workflow.action.sparktransformer.{GenericDfTransformer, GenericDfTransformerDef, SparkDfTransformerFunctionWrapper}
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanMergeDataFrame, DataObject, TransactionalSparkTableDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
 import java.time.LocalDateTime
+import scala.reflect.runtime.universe.Type
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -53,10 +55,6 @@ import scala.util.{Failure, Success, Try}
  * @param transformer optional custom transformation to apply
  * @param transformers optional list of transformations to apply before historization. See [[sparktransformer]] for a list of included Transformers.
  *                     The transformations are applied according to the lists ordering.
- * @param columnBlacklist Remove all columns on blacklist from dataframe
- * @param columnWhitelist Keep only columns on whitelist in dataframe
- * @param additionalColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
- *                          The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  * @param mergeModeEnable Set to true to use saveMode.Merge for much better performance. Output DataObject must implement [[CanMergeDataFrame]] if enabled (default = false).
  * @param mergeModeAdditionalJoinPredicate To optimize performance it might be interesting to limit the records read from the existing table data, e.g. it might be sufficient to use only the last 7 days.
  *                                Specify a condition to select existing data to be used in transformation as Spark SQL expression.
@@ -72,20 +70,9 @@ case class HistorizeAction(
                             outputId: DataObjectId,
                             @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                             transformer: Option[CustomDfTransformerConfig] = None,
-                            transformers: Seq[ParsableDfTransformer] = Seq(),
-                            @Deprecated @deprecated("Use transformers instead.", "2.0.5")
-                            columnBlacklist: Option[Seq[String]] = None,
-                            @Deprecated @deprecated("Use transformers instead.", "2.0.5")
-                            columnWhitelist: Option[Seq[String]] = None,
-                            @Deprecated @deprecated("Use transformers instead.", "2.0.5")
-                            additionalColumns: Option[Map[String,String]] = None,
-                            @Deprecated @deprecated("Use transformers instead.", "2.0.5")
-                            standardizeDatatypes: Boolean = false,
-                            @Deprecated @deprecated("Use transformers instead.", "2.0.5")
+                            transformers: Seq[GenericDfTransformer] = Seq(),
                             filterClause: Option[String] = None,
-                            @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                             historizeBlacklist: Option[Seq[String]] = None,
-                            @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                             historizeWhitelist: Option[Seq[String]] = None,
                             ignoreOldDeletedColumns: Boolean = false,
                             ignoreOldDeletedNestedColumns: Boolean = true,
@@ -97,7 +84,7 @@ case class HistorizeAction(
                             override val executionCondition: Option[Condition] = None,
                             override val metricsFailCondition: Option[String] = None,
                             override val metadata: Option[ActionMetadata] = None
-                          )(implicit instanceRegistry: InstanceRegistry) extends SparkOneToOneActionImpl {
+                          )(implicit instanceRegistry: InstanceRegistry) extends DataFrameOneToOneActionImpl {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
   override val output: TransactionalSparkTableDataObject = getOutputDataObject[TransactionalSparkTableDataObject](outputId)
@@ -126,7 +113,6 @@ case class HistorizeAction(
     Some(SaveModeGenericOptions(SDLSaveMode.Overwrite))
   }
 
-
   // Output is used as recursive input in DeduplicateAction to get existing data. This override is needed to force tick-tock write operation.
   override val recursiveInputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
 
@@ -137,34 +123,34 @@ case class HistorizeAction(
   // primary key
   require(output.table.primaryKey.isDefined, s"(${id}) Primary key must be defined for output DataObject")
 
-  // parse filter clause
-  private val filterClauseExpr = Try(filterClause.map(expr)) match {
-    case Success(result) => result
-    case Failure(e) => throw new ConfigurationException(s"(${id}) Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
-  }
+  private val transformerDefs: Seq[GenericDfTransformerDef] = transformer.map(t => t.impl).toSeq ++ transformers
+
+  override val transformerSubFeedSupportedTypes: Seq[Type] = transformerDefs.map(_.getSubFeedSupportedType) // historize transformer can be ignored as it is generic
 
   validateConfig()
 
-  private def getTransformers(implicit context: ActionPipelineContext): Seq[DfTransformer] = {
+  private def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
     val capturedTs = context.referenceTimestamp.getOrElse(LocalDateTime.now)
     val pks = output.table.primaryKey.get // existance is validated earlier
 
     // get existing data
     // Note that HistorizeAction with mergeModeEnabled=false needs to read/write all existing data for tick-tock operation, even if only specific partitions have changed
-    val existingDf = if (output.isTableExisting) Some(output.getDataFrame()) else None
+    val existingDf = if (output.isTableExisting) Some(output.getDataFrame(Seq(), subFeedType)) else None
 
     // historize
     val historizeTransformer = if (mergeModeEnable) {
-      val historizeFunction = incrementalHistorizeDataFrame(existingDf, pks, capturedTs) _
-      DfTransformerFunctionWrapper("incrementalHistorize", historizeFunction)
+      // TODO: make generic
+      val historizeFunction = incrementalHistorizeDataFrame(existingDf.map(_.asInstanceOf[SparkDataFrame].inner), pks, capturedTs) _
+      SparkDfTransformerFunctionWrapper("incrementalHistorize", historizeFunction)
     } else {
-      val historizeFunction = fullHistorizeDataFrame(existingDf, pks, capturedTs) _
-      DfTransformerFunctionWrapper("fullHistorize", historizeFunction)
+      // TODO: make generic
+      val historizeFunction = fullHistorizeDataFrame(existingDf.map(_.asInstanceOf[SparkDataFrame].inner), pks, capturedTs) _
+      SparkDfTransformerFunctionWrapper("fullHistorize", historizeFunction)
     }
-    getTransformers(transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, transformers :+ historizeTransformer)
+    transformerDefs :+ historizeTransformer
   }
 
-  override def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit context: ActionPipelineContext): SparkSubFeed = {
+  override def transform(inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     applyTransformers(getTransformers, inputSubFeed, outputSubFeed)
   }
 
@@ -172,8 +158,15 @@ case class HistorizeAction(
     applyTransformers(getTransformers, partitionValues)
   }
 
+  // TODO: make generic
   protected def fullHistorizeDataFrame(existingDf: Option[DataFrame], pks: Seq[String], refTimestamp: LocalDateTime)(newDf: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
     implicit val session: SparkSession = context.sparkSession
+
+    // parse filter clause
+    val filterClauseExpr = Try(filterClause.map(expr)) match {
+      case Success(result) => result
+      case Failure(e) => throw new ConfigurationException(s"(${id}) Error parsing filterClause parameter as expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
+    }
 
     val newFeedDf = newDf.dropDuplicates(pks)
 
@@ -197,6 +190,7 @@ case class HistorizeAction(
     } else Historization.getFullInitialHistory(newFeedDf, refTimestamp)
   }
 
+  // TODO: make generic
   protected def incrementalHistorizeDataFrame(existingDf: Option[DataFrame], pks: Seq[String], refTimestamp: LocalDateTime)(newDf: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
     implicit val session: SparkSession = context.sparkSession
 
@@ -204,7 +198,7 @@ case class HistorizeAction(
 
     // if output exists we have to do historization, otherwise we just transform the new data into historized form
     if (existingDf.isDefined) {
-      ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get.where(filterClauseExpr.getOrElse(lit(true))), TechnicalTableColumn.captured)
+      ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get, TechnicalTableColumn.captured)
       // historize
       // note that schema evolution is done by output DataObject
       Historization.incrementalHistorize(existingDf.get, newDf, pks, refTimestamp, historizeWhitelist, historizeBlacklist)

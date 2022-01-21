@@ -19,7 +19,7 @@
 package io.smartdatalake.util.misc
 
 import io.smartdatalake.testutils.TestUtil._
-import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types._

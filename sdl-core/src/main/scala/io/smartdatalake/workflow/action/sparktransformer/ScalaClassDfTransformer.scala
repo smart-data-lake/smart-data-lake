@@ -23,7 +23,8 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData}
+import io.smartdatalake.util.misc.CustomCodeUtil
+import io.smartdatalake.util.spark.DefaultExpressionData
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformer
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -40,7 +41,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
-case class ScalaClassDfTransformer(override val name: String = "scalaTransform", override val description: Option[String] = None, className: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsDfTransformer {
+case class ScalaClassDfTransformer(override val name: String = "scalaTransform", override val description: Option[String] = None, className: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfTransformer {
   private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDfTransformer](className)
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit context: ActionPipelineContext): DataFrame = {
     customTransformer.transform(context.sparkSession, options, df, dataObjectId.id)
@@ -48,10 +49,10 @@ case class ScalaClassDfTransformer(override val name: String = "scalaTransform",
   override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = {
    customTransformer.transformPartitionValues(options, partitionValues)
   }
-  override def factory: FromConfigFactory[ParsableDfTransformer] = ScalaClassDfTransformer
+  override def factory: FromConfigFactory[GenericDfTransformer] = ScalaClassDfTransformer
 }
 
-object ScalaClassDfTransformer extends FromConfigFactory[ParsableDfTransformer] {
+object ScalaClassDfTransformer extends FromConfigFactory[GenericDfTransformer] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ScalaClassDfTransformer = {
     extract[ScalaClassDfTransformer](config)
   }

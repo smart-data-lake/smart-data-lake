@@ -21,17 +21,18 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.json.DefaultFlatteningParser
-import io.smartdatalake.util.misc.DataFrameUtil.DataFrameReaderUtils
-import io.smartdatalake.util.misc.{AclDef, DataFrameUtil}
+import io.smartdatalake.util.spark.DataFrameUtil.DataFrameReaderUtils
+import io.smartdatalake.util.misc.AclDef
+import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.{input_file_name, lit}
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, DataFrameReader, SparkSession}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
  * A [[io.smartdatalake.workflow.dataobject.DataObject]] backed by an XML data source.
@@ -61,8 +62,8 @@ case class XmlFileDataObject(override val id: DataObjectId,
                              rowTag: Option[String] = None, // this is for backward compatibility, it can also be given in xmlOptions
                              xmlOptions: Option[Map[String,String]] = None,
                              override val partitions: Seq[String] = Seq(),
-                             override val schema: Option[StructType] = None,
-                             override val schemaMin: Option[StructType] = None,
+                             override val schema: Option[GenericSchema] = None,
+                             override val schemaMin: Option[GenericSchema] = None,
                              override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                              override val sparkRepartition: Option[SparkRepartitionDef] = None,
                              flatten: Boolean = false,
@@ -73,7 +74,7 @@ case class XmlFileDataObject(override val id: DataObjectId,
                              override val housekeepingMode: Option[HousekeepingMode] = None,
                              override val metadata: Option[DataObjectMetadata] = None)
                             (@transient implicit override val instanceRegistry: InstanceRegistry)
-  extends SparkFileDataObject with CanCreateDataFrame with CanWriteDataFrame {
+  extends SparkFileDataObject {
 
   override val format = "com.databricks.spark.xml"
 
@@ -96,9 +97,9 @@ case class XmlFileDataObject(override val id: DataObjectId,
    *   .load("partitionedDataObjectPath")
    *   .show
    */
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     implicit val session: SparkSession = context.sparkSession
-    import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+    import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 
     val wrongPartitionValues = PartitionValues.checkWrongPartitionValues(partitionValues, partitions)
     assert(wrongPartitionValues.isEmpty, s"getDataFrame got request with PartitionValues keys ${wrongPartitionValues.mkString(",")} not included in $id partition columns ${partitions.mkString(", ")}")
@@ -114,7 +115,7 @@ case class XmlFileDataObject(override val id: DataObjectId,
       filesystem.mkdirs(hadoopPath)
     }
 
-    val schemaOpt = getSchema(filesExists)
+    val schemaOpt = getSchema(filesExists).map(_.inner)
     val dfContent = if (partitions.isEmpty) {
       session.read
         .format(format)
@@ -157,7 +158,7 @@ case class XmlFileDataObject(override val id: DataObjectId,
     } else dfSuper
   }
 
-  override def writeDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
+  override def writeDataFrameToPath(df: GenericDataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
     assert(partitions.isEmpty, "writing XML-Files with partitions is not supported by spark-xml")
     super.writeDataFrameToPath(df, path, finalSaveMode)
   }

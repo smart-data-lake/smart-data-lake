@@ -21,12 +21,11 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.AclDef
-import org.apache.spark.sql.SaveMode
-import org.apache.spark.sql.types.StructType
 
 /**
  * A [[io.smartdatalake.workflow.dataobject.DataObject]] backed by an Avro data source.
@@ -57,8 +56,8 @@ case class AvroFileDataObject( override val id: DataObjectId,
                                override val path: String,
                                override val partitions: Seq[String] = Seq(),
                                avroOptions: Option[Map[String,String]] = None,
-                               override val schema: Option[StructType] = None,
-                               override val schemaMin: Option[StructType] = None,
+                               override val schema: Option[GenericSchema] = None,
+                               override val schemaMin: Option[GenericSchema] = None,
                                override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                override val sparkRepartition: Option[SparkRepartitionDef] = None,
                                override val acl: Option[AclDef] = None,
@@ -68,7 +67,7 @@ case class AvroFileDataObject( override val id: DataObjectId,
                                override val housekeepingMode: Option[HousekeepingMode] = None,
                                override val metadata: Option[DataObjectMetadata] = None
                              )(@transient implicit override val instanceRegistry: InstanceRegistry)
-  extends SparkFileDataObjectWithEmbeddedSchema with CanCreateDataFrame with CanWriteDataFrame {
+  extends SparkFileDataObject {
 
   override val format = "com.databricks.spark.avro"
 

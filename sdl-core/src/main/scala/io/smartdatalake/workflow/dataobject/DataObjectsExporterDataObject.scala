@@ -53,14 +53,14 @@ case class DataObjectsExporterDataObject(id: DataObjectId,
                                          config: Option[String] = None,
                                          override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateDataFrame with ParsableFromConfig[DataObjectsExporterDataObject] {
+  extends DataObject with CanCreateDataFrame with CanCreateSparkDataFrame with ParsableFromConfig[DataObjectsExporterDataObject] {
 
   /**
    *
    * @param session SparkSession to use
    * @return DataFrame including all Dataobjects in the instanceRegistry, used for exporting the metadata
    */
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     val session: SparkSession = context.sparkSession
     import session.implicits._
 

@@ -22,10 +22,9 @@ package io.smartdatalake.workflow.action.sparktransformer
 import com.typesafe.config.Config
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.ActionHelper
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 /**
  * Apply a column blacklist to a DataFrame.
@@ -33,14 +32,17 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param description  Optional description of the transformer
  * @param columnBlacklist List of columns to exclude from DataFrame
  */
-case class BlacklistTransformer(override val name: String = "blacklist", override val description: Option[String] = None, columnBlacklist: Seq[String]) extends ParsableDfTransformer {
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
-    ActionHelper.filterBlacklist(columnBlacklist)(df)
+case class BlacklistTransformer(override val name: String = "blacklist", override val description: Option[String] = None, columnBlacklist: Seq[String]) extends GenericDfTransformer {
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
+    val helper = DataFrameSubFeed.getHelper(df.subFeedType)
+    import helper._
+    val colsToSelect = df.schema.columns.filter(colName => !columnBlacklist.contains(colName.toLowerCase))
+    df.select(colsToSelect.map(col))
   }
-  override def factory: FromConfigFactory[ParsableDfTransformer] = BlacklistTransformer
+  override def factory: FromConfigFactory[GenericDfTransformer] = BlacklistTransformer
 }
 
-object BlacklistTransformer extends FromConfigFactory[ParsableDfTransformer] {
+object BlacklistTransformer extends FromConfigFactory[GenericDfTransformer] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): BlacklistTransformer = {
     extract[BlacklistTransformer](config)
   }

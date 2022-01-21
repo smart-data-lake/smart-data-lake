@@ -22,11 +22,11 @@ package io.smartdatalake.workflow.action.sparktransformer
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{DefaultExpressionData, SparkExpressionUtil}
-import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.functions.lit
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import io.smartdatalake.util.misc.ScalaUtil
+import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
 
 /**
  * Add additional columns to the DataFrame by extracting information from the context.
@@ -35,8 +35,10 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param additionalColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
  *                          The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
-case class AdditionalColumnsTransformer(override val name: String = "additionalColumns", override val description: Option[String] = None, additionalColumns: Map[String,String]) extends ParsableDfTransformer {
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
+case class AdditionalColumnsTransformer(override val name: String = "additionalColumns", override val description: Option[String] = None, additionalColumns: Map[String,String]) extends GenericDfTransformer {
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
+    val helper = DataFrameSubFeed.getHelper(df.subFeedType)
+    import helper._
     val data = DefaultExpressionData.from(context, partitionValues)
     additionalColumns.foldLeft(df){
       case (df, (colName, expr)) =>
@@ -44,10 +46,10 @@ case class AdditionalColumnsTransformer(override val name: String = "additionalC
         df.withColumn(colName, lit(value.orNull))
     }
   }
-  override def factory: FromConfigFactory[ParsableDfTransformer] = AdditionalColumnsTransformer
+  override def factory: FromConfigFactory[GenericDfTransformer] = AdditionalColumnsTransformer
 }
 
-object AdditionalColumnsTransformer extends FromConfigFactory[ParsableDfTransformer] {
+object AdditionalColumnsTransformer extends FromConfigFactory[GenericDfTransformer] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): AdditionalColumnsTransformer = {
     extract[AdditionalColumnsTransformer](config)
   }

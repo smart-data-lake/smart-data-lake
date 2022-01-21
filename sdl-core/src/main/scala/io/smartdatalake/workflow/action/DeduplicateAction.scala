@@ -25,15 +25,16 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.action.sparktransformer.{DfTransformer, DfTransformerFunctionWrapper, ParsableDfTransformer}
+import io.smartdatalake.workflow.action.sparktransformer.{GenericDfTransformer, GenericDfTransformerDef, SparkDfTransformerFunctionWrapper}
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanMergeDataFrame, DataObject, TransactionalSparkTableDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame}
 
 import java.time.LocalDateTime
-import scala.util.{Failure, Success, Try}
+import scala.reflect.runtime.universe.Type
 
 /**
  * [[Action]] to deduplicate a subfeed.
@@ -49,10 +50,6 @@ import scala.util.{Failure, Success, Try}
  * @param transformer optional custom transformation to apply
  * @param transformers optional list of transformations to apply before deduplication. See [[sparktransformer]] for a list of included Transformers.
  *                     The transformations are applied according to the lists ordering.
- * @param columnBlacklist Remove all columns on blacklist from dataframe
- * @param columnWhitelist Keep only columns on whitelist in dataframe
- * @param additionalColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
- *                          The spark sql expressions are evaluated against an instance of [[io.smartdatalake.util.misc.DefaultExpressionData]].
  * @param ignoreOldDeletedColumns if true, remove no longer existing columns in Schema Evolution
  * @param ignoreOldDeletedNestedColumns if true, remove no longer existing columns from nested data types in Schema Evolution.
  *                                      Keeping deleted columns in complex data types has performance impact as all new data
@@ -73,17 +70,7 @@ case class DeduplicateAction(override val id: ActionId,
                              outputId: DataObjectId,
                              @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                              transformer: Option[CustomDfTransformerConfig] = None,
-                             transformers: Seq[ParsableDfTransformer] = Seq(),
-                             @Deprecated @deprecated("Use transformers instead.", "2.0.5")
-                             columnBlacklist: Option[Seq[String]] = None,
-                             @Deprecated @deprecated("Use transformers instead.", "2.0.5")
-                             columnWhitelist: Option[Seq[String]] = None,
-                             @Deprecated @deprecated("Use transformers instead.", "2.0.5")
-                             additionalColumns: Option[Map[String,String]] = None,
-                             @Deprecated @deprecated("Use transformers instead.", "2.0.5")
-                             filterClause: Option[String] = None,
-                             @Deprecated @deprecated("Use transformers instead.", "2.0.5")
-                             standardizeDatatypes: Boolean = false,
+                             transformers: Seq[GenericDfTransformer] = Seq(),
                              ignoreOldDeletedColumns: Boolean = false,
                              ignoreOldDeletedNestedColumns: Boolean = true,
                              updateCapturedColumnOnlyWhenChanged: Boolean = false,
@@ -95,7 +82,7 @@ case class DeduplicateAction(override val id: ActionId,
                              override val executionCondition: Option[Condition] = None,
                              override val metricsFailCondition: Option[String] = None,
                              override val metadata: Option[ActionMetadata] = None
-)(implicit instanceRegistry: InstanceRegistry) extends SparkOneToOneActionImpl {
+)(implicit instanceRegistry: InstanceRegistry) extends DataFrameOneToOneActionImpl {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
   override val output: TransactionalSparkTableDataObject = getOutputDataObject[TransactionalSparkTableDataObject](outputId)
@@ -132,37 +119,35 @@ case class DeduplicateAction(override val id: ActionId,
   require(output.table.primaryKey.isDefined, s"($id) Primary key must be defined for output DataObject")
   require(mergeModeEnable || !updateCapturedColumnOnlyWhenChanged, s"($id) updateCapturedColumnOnlyWhenChanged = true is not yet implemented for mergeModeEnable = false")
 
-  // parse filter clause
-  private val filterClauseExpr = Try(filterClause.map(expr)) match {
-    case Success(result) => result
-    case Failure(e) => throw new ConfigurationException(s"($id) Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
-  }
+  private val transformerDefs: Seq[GenericDfTransformerDef] = transformer.map(t => t.impl).toSeq ++ transformers
+
+  override val transformerSubFeedSupportedTypes: Seq[Type] = transformerDefs.map(_.getSubFeedSupportedType) // deduplicate transformer can be ignored as it is generic
 
   validateConfig()
 
-  private def getTransformers(implicit context: ActionPipelineContext): Seq[DfTransformer] = {
+  private def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
     val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
 
     val deduplicateTransformer = if (mergeModeEnable) {
       // deduplication & schema evolution is done by merge stmt, only captured column needs to added before
       val enhanceFunction = DeduplicateAction.enhanceDataFrame(timestamp) _
-      DfTransformerFunctionWrapper("enhanceForMergeDeduplicate", enhanceFunction)
+      SparkDfTransformerFunctionWrapper("enhanceForMergeDeduplicate", enhanceFunction)
     } else {
       // get existing data
       // Note that DeduplicateAction needs to read/write all existing data for tick-tock operation, even if only specific partitions have changed
-      val existingDf = if (output.isTableExisting) Some(output.getDataFrame())
+      val existingDf = if (output.isTableExisting) Some(output.getDataFrame(Seq(), subFeedType))
       else None
       val pks = output.table.primaryKey.get // existance is validated earlier
-      val deduplicateFunction = DeduplicateAction.deduplicateDataFrame(existingDf, pks, timestamp, ignoreOldDeletedColumns, ignoreOldDeletedNestedColumns) _
-      DfTransformerFunctionWrapper("deduplicate", deduplicateFunction)
+      //TODO: make generic
+      val deduplicateFunction = DeduplicateAction.deduplicateDataFrame(existingDf.map(_.asInstanceOf[SparkDataFrame].inner), pks, timestamp, ignoreOldDeletedColumns, ignoreOldDeletedNestedColumns) _
+      SparkDfTransformerFunctionWrapper("deduplicate", deduplicateFunction)
     }
 
-    getTransformers(transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, transformers :+ deduplicateTransformer, filterClauseExpr)
-
+    transformerDefs :+ deduplicateTransformer
   }
 
-  override def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit context: ActionPipelineContext): SparkSubFeed = {
-    checkRecordChangedColumns = inputSubFeed.dataFrame.map(_.columns.toSeq).getOrElse(Seq())
+  override def transform(inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    checkRecordChangedColumns = inputSubFeed.dataFrame.map(_.schema.columns.toSeq).getOrElse(Seq())
     applyTransformers(getTransformers, inputSubFeed, outputSubFeed)
   }
 

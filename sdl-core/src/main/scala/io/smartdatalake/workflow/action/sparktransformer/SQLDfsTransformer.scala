@@ -22,14 +22,14 @@ package io.smartdatalake.workflow.action.sparktransformer
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{DefaultExpressionData, SparkExpressionUtil}
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.action.ActionHelper
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 /**
- * Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m) as SQL code.
+ * Configuration of a custom GenericDataFrame transformation between many inputs and many outputs (n:m) as SQL code.
  * The input data is available as temporary views in SQL. As name for the temporary views the input DataObjectId is used
  * (special characters are replaces by underscores).
  *
@@ -43,8 +43,9 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
-case class SQLDfsTransformer(override val name: String = "sqlTransform", override val description: Option[String] = None, code: Map[DataObjectId,String], options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsDfsTransformer {
-  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String,DataFrame] = {
+case class SQLDfsTransformer(override val name: String = "sqlTransform", override val description: Option[String] = None, code: Map[DataObjectId,String], options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsGenericDfsTransformer {
+  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String,GenericDataFrame] = {
+    val helper = DataFrameSubFeed.getHelper(dfs.values.head.subFeedType)
     // register all input DataObjects as temporary table
     dfs.foreach {
       case (dataObjectId,df) =>
@@ -57,17 +58,17 @@ case class SQLDfsTransformer(override val name: String = "sqlTransform", overrid
       case (dataObjectId,sql) =>
         val df = try {
           val preparedSql = SparkExpressionUtil.substituteOptions(dataObjectId, Some(s"transformers.$name.code"), sql, options)
-          context.sparkSession.sql(preparedSql)
+          helper.sql(preparedSql,dataObjectId)
         } catch {
           case e: Throwable => throw new SQLTransformationException(s"($actionId.transformers.$name) Could not execute SQL query for $dataObjectId. Check your query and remember remember that special characters are replaced by underscores for temporary view names in the SQL statement. Error: ${e.getMessage}")
         }
         (dataObjectId.id, df)
     }
   }
-  override def factory: FromConfigFactory[ParsableDfsTransformer] = SQLDfsTransformer
+  override def factory: FromConfigFactory[GenericDfsTransformer] = SQLDfsTransformer
 }
 
-object SQLDfsTransformer extends FromConfigFactory[ParsableDfsTransformer] {
+object SQLDfsTransformer extends FromConfigFactory[GenericDfsTransformer] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SQLDfsTransformer = {
     extract[SQLDfsTransformer](config)
   }

@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import org.apache.spark.sql.types.StructType
+import io.smartdatalake.workflow.dataframe.GenericSchema
 
 /**
  * A [[DataObject]] that allows optional user-defined schema definition.
@@ -37,5 +37,5 @@ private[smartdatalake] trait UserDefinedSchema {
    * [[io.smartdatalake.workflow.action.Action]]s that bypass Spark data frames ignore the `schema` attribute
    * if it is defined.
    */
-  def schema: Option[StructType]
+  def schema: Option[GenericSchema]
 }

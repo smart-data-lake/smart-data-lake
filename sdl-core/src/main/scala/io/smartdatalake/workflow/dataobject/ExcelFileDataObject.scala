@@ -21,13 +21,15 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
-import io.smartdatalake.util.misc.{AclDef, DataFrameUtil}
+import io.smartdatalake.util.misc.AclDef
+import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.ActionPipelineContext
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
  * A [[DataObject]] backed by an Microsoft Excel data source.
@@ -63,8 +65,8 @@ case class ExcelFileDataObject(override val id: DataObjectId,
                                override val path: String,
                                excelOptions: ExcelOptions = ExcelOptions(),
                                override val partitions: Seq[String] = Seq(),
-                               override val schema: Option[StructType] = None,
-                               override val schemaMin: Option[StructType] = None,
+                               override val schema: Option[GenericSchema] = None,
+                               override val schemaMin: Option[GenericSchema] = None,
                                override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                override val sparkRepartition: Option[SparkRepartitionDef] = Some(SparkRepartitionDef(numberOfTasksPerPartition = 1)),
                                override val acl: Option[AclDef] = None,
@@ -74,7 +76,7 @@ case class ExcelFileDataObject(override val id: DataObjectId,
                                override val housekeepingMode: Option[HousekeepingMode] = None,
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit override val instanceRegistry: InstanceRegistry)
-  extends SparkFileDataObject with CanCreateDataFrame with CanWriteDataFrame {
+  extends SparkFileDataObject {
 
   override val format = "com.crealytics.spark.excel"
 
@@ -183,7 +185,7 @@ case class ExcelOptions(
     } else None
   }
 
-  def toMap(schema: Option[StructType]): Map[String, Option[Any]] = Map(
+  def toMap(schema: Option[GenericSchema]): Map[String, Option[Any]] = Map(
       "dataAddress" -> getDataAddress,
       "treatEmptyValuesAsNulls" -> treatEmptyValuesAsNulls,
       "header" -> Some(useHeader),

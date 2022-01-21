@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,9 +17,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.util.streaming
-
-import java.util
+package io.smartdatalake.util.spark
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.sql.catalyst.InternalRow
@@ -33,6 +31,7 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
+import java.util
 import scala.collection.JavaConverters._
 
 /**

@@ -21,15 +21,16 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode}
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.AclDef
-import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.types.{DateType, StringType, StructType}
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.types.{DateType, StringType}
 
 /**
  * A [[DataObject]] backed by a comma-separated value (CSV) data source.
@@ -75,8 +76,8 @@ case class CsvFileDataObject( override val id: DataObjectId,
                               override val path: String,
                               csvOptions: Map[String, String] = Map(),
                               override val partitions: Seq[String] = Seq(),
-                              override val schema: Option[StructType] = None,
-                              override val schemaMin: Option[StructType] = None,
+                              override val schema: Option[GenericSchema] = None,
+                              override val schemaMin: Option[GenericSchema] = None,
                               dateColumnType: DateColumnType = DateColumnType.Date,
                               override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                               override val sparkRepartition: Option[SparkRepartitionDef] = None,
@@ -87,7 +88,7 @@ case class CsvFileDataObject( override val id: DataObjectId,
                               override val housekeepingMode: Option[HousekeepingMode] = None,
                               override val metadata: Option[DataObjectMetadata] = None
                             )(@transient implicit override val instanceRegistry: InstanceRegistry)
-  extends SparkFileDataObject with CanCreateDataFrame with CanWriteDataFrame {
+  extends SparkFileDataObject {
 
   override val format = "com.databricks.spark.csv"
 

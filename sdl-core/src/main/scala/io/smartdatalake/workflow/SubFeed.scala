@@ -18,25 +18,22 @@
  */
 package io.smartdatalake.workflow
 
-import io.smartdatalake.config.ParsableFromConfig
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame, GenericDataType, GenericSchema}
 import io.smartdatalake.definitions.ExecutionModeResult
 import io.smartdatalake.util.dag.DAGResult
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.ScalaUtil.optionalizeMap
-import io.smartdatalake.util.misc.{DataFrameUtil, SmartDataLakeLogger}
-import io.smartdatalake.util.streaming.DummyStreamProvider
-import io.smartdatalake.workflow.dataobject.FileRef
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{Column, DataFrame, functions}
+import io.smartdatalake.util.misc.{ScalaUtil, SmartDataLakeLogger}
+import io.smartdatalake.workflow.dataobject._
 import sun.reflect.generics.reflectiveObjects.NotImplementedException
+
+import scala.reflect.runtime.universe
+import scala.reflect.runtime.universe.Type
 
 /**
  * A SubFeed transports references to data between Actions.
  * Data can be represented by different technologies like Files or DataFrame.
- *
- * Note: SubFeed is implementing ParsableFromConfig to persist to
  */
 trait SubFeed extends DAGResult with SmartDataLakeLogger {
   def dataObjectId: DataObjectId
@@ -92,109 +89,100 @@ trait SubFeedConverter[S <: SubFeed] {
 }
 
 /**
- * A SparkSubFeed is used to transport [[DataFrame]]'s between Actions.
- *
- * @param dataFrame Spark [[DataFrame]] to be processed. DataFrame should not be saved to state (@transient).
- * @param dataObjectId id of the DataObject this SubFeed corresponds to
- * @param partitionValues Values of Partitions transported by this SubFeed
- * @param isDAGStart true if this subfeed is a start node of the dag
- * @param isSkipped true if this subfeed is the result of a skipped action
- * @param isDummy true if this subfeed only contains a dummy DataFrame. Dummy DataFrames can be used for validating the lineage in init phase, but not for the exec phase.
- * @param filter a spark sql filter expression. This is used by SparkIncrementalMode.
+ * A SubFeed that holds a DataFrame
  */
-case class SparkSubFeed(@transient dataFrame: Option[DataFrame],
-                        override val dataObjectId: DataObjectId,
-                        override val partitionValues: Seq[PartitionValues],
-                        override val isDAGStart: Boolean = false,
-                        override val isSkipped: Boolean = false,
-                        isDummy: Boolean = false,
-                        filter: Option[String] = None
-                       )
-  extends SubFeed {
-  override def breakLineage(implicit context: ActionPipelineContext): SparkSubFeed = {
-    // in order to keep the schema but truncate spark logical plan, a dummy DataFrame is created.
-    // dummy DataFrames must be exchanged to real DataFrames before reading in exec-phase.
-    if(dataFrame.isDefined && !isDummy && !context.simulation) convertToDummy(dataFrame.get.schema) else this
-  }
-  override def clearPartitionValues(breakLineageOnChange: Boolean = true)(implicit context: ActionPipelineContext): SparkSubFeed = {
-    if (breakLineageOnChange && partitionValues.nonEmpty) {
-      logger.info(s"($dataObjectId) breakLineage called for SubFeed from clearPartitionValues")
-      this.copy(partitionValues = Seq()).breakLineage
-    } else this.copy(partitionValues = Seq())
-  }
-  override def updatePartitionValues(partitions: Seq[String], breakLineageOnChange: Boolean = true, newPartitionValues: Option[Seq[PartitionValues]] = None)(implicit context: ActionPipelineContext): SparkSubFeed = {
-    val updatedPartitionValues = SubFeed.filterPartitionValues(newPartitionValues.getOrElse(partitionValues), partitions)
-    if (breakLineageOnChange && partitionValues != updatedPartitionValues) {
-      logger.info(s"($dataObjectId) breakLineage called for SubFeed from updatePartitionValues")
-      this.copy(partitionValues = updatedPartitionValues).breakLineage
-    } else this.copy(partitionValues = updatedPartitionValues)
-  }
-  def movePartitionColumnsLast(partitions: Seq[String]): SparkSubFeed = {
-    this.copy(dataFrame = this.dataFrame.map( df => HiveUtil.movePartitionColsLast(df, partitions)))
-  }
-  override def clearDAGStart(): SparkSubFeed = {
-    this.copy(isDAGStart = false)
-  }
-  override def clearSkipped(): SparkSubFeed = {
-    this.copy(isSkipped = false)
-  }
-  override def toOutput(dataObjectId: DataObjectId): SparkSubFeed = {
-    this.copy(dataFrame = None, filter=None, isDAGStart = false, isSkipped = false, isDummy = false, dataObjectId = dataObjectId)
-  }
-  override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = other match {
-    case sparkSubFeed: SparkSubFeed if this.hasReusableDataFrame && sparkSubFeed.hasReusableDataFrame =>
-      this.copy(dataFrame = Some(this.dataFrame.get.unionByName(sparkSubFeed.dataFrame.get))
-        , partitionValues = unionPartitionValues(sparkSubFeed.partitionValues)
-        , isDAGStart = this.isDAGStart || sparkSubFeed.isDAGStart)
-    case sparkSubFeed: SparkSubFeed if this.dataFrame.isDefined || sparkSubFeed.dataFrame.isDefined =>
-      this.copy(dataFrame = this.dataFrame.orElse(sparkSubFeed.dataFrame)
-        , partitionValues = unionPartitionValues(sparkSubFeed.partitionValues)
-        , isDAGStart = this.isDAGStart || sparkSubFeed.isDAGStart)
-      .convertToDummy(this.dataFrame.orElse(sparkSubFeed.dataFrame).get.schema)
-    case x => this.copy(dataFrame = None, partitionValues = unionPartitionValues(x.partitionValues), isDAGStart = this.isDAGStart || x.isDAGStart)
-  }
-  def clearFilter(breakLineageOnChange: Boolean = true)(implicit context: ActionPipelineContext): SparkSubFeed = {
-    // if filter is removed, also the DataFrame must be removed so that the next action get's a fresh unfiltered DataFrame with all data of this DataObject
-    if (breakLineageOnChange && filter.isDefined) {
-      logger.info(s"($dataObjectId) breakLineage called for SubFeed from clearFilter")
-      this.copy(filter = None).breakLineage
-    } else this.copy(filter = None)
-  }
-  def persist: SparkSubFeed = {
-    this.copy(dataFrame = this.dataFrame.map(_.persist))
-  }
-  def isStreaming: Option[Boolean] = dataFrame.map(_.isStreaming)
-  def hasReusableDataFrame: Boolean = dataFrame.isDefined && !isDummy && !isStreaming.getOrElse(false)
-  def getFilterCol: Option[Column] = {
-    filter.map(functions.expr)
-  }
-  private[smartdatalake] def convertToDummy(schema: StructType)(implicit context: ActionPipelineContext): SparkSubFeed = {
-    val dummyDf = dataFrame.map{
-      df =>
-        if (df.isStreaming) DummyStreamProvider.getDummyDf(schema)(context.sparkSession)
-        else DataFrameUtil.getEmptyDataFrame(schema)(context.sparkSession)
+trait DataFrameSubFeed extends SubFeed  {
+  def tpe: Type // concrete type of this DataFrameSubFeed
+  implicit lazy val helper: DataFrameSubFeedCompanion = DataFrameSubFeed.getHelper(tpe)
+  def dataFrame: Option[GenericDataFrame]
+  def persist: DataFrameSubFeed
+  def unpersist: DataFrameSubFeed
+  def schema: Option[GenericSchema] = dataFrame.map(_.schema)
+  def hasReusableDataFrame: Boolean
+  def isDummy: Boolean
+  def filter: Option[String]
+  def clearFilter(breakLineageOnChange: Boolean = true)(implicit context: ActionPipelineContext): DataFrameSubFeed
+  override def breakLineage(implicit context: ActionPipelineContext): DataFrameSubFeed
+  override def clearPartitionValues(breakLineageOnChange: Boolean = true)(implicit context: ActionPipelineContext): DataFrameSubFeed
+  override def updatePartitionValues(partitions: Seq[String], breakLineageOnChange: Boolean = true, newPartitionValues: Option[Seq[PartitionValues]] = None)(implicit context: ActionPipelineContext): DataFrameSubFeed
+  override def clearDAGStart(): DataFrameSubFeed
+  override def clearSkipped(): DataFrameSubFeed
+  def isStreaming: Option[Boolean]
+  def withDataFrame(dataFrame: Option[GenericDataFrame]): DataFrameSubFeed
+  def withPartitionValues(partitionValues: Seq[PartitionValues]): DataFrameSubFeed
+  def withFilter(partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed
+  def applyFilter: DataFrameSubFeed = {
+    // apply partition filter
+    val partitionValuesColumn = partitionValues.flatMap(_.keys).distinct
+    val dfPartitionFiltered = if (partitionValues.isEmpty) dataFrame
+    else if (partitionValuesColumn.size == 1) {
+      // filter with Sql "isin" expression if only one column
+      val filterExpr = helper.col(partitionValuesColumn.head).isin(partitionValues.flatMap(_.elements.values):_*)
+      dataFrame.map(_.filter(filterExpr))
+    } else {
+      // filter with and/or expression if multiple partition columns
+      val filterExpr = PartitionValues.createFilterExpr(partitionValues)
+      dataFrame.map(_.filter(filterExpr))
     }
-    this.copy(dataFrame = dummyDf, isDummy = true)
+    // apply generic filter
+    val dfResult = if (filter.isDefined) dfPartitionFiltered.map(_.filter(helper.expr(filter.get)))
+    else dfPartitionFiltered
+    // return updated SubFeed
+    withDataFrame(dfResult)
   }
-  override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): SparkSubFeed = {
-    // apply input filter
-    val inputFilter = if (this.dataObjectId == mainInputId) result.filter else None
-    this.copy(partitionValues = result.inputPartitionValues, filter = inputFilter, isSkipped = false).breakLineage // breaklineage keeps DataFrame schema without content
-  }
-  override def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): SparkSubFeed = {
-    this.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false, dataFrame = None)
-  }
+  def asDummy(): DataFrameSubFeed
+  def transform(transformer: GenericDataFrame => GenericDataFrame): DataFrameSubFeed = withDataFrame(dataFrame.map(transformer))
+  def movePartitionColumnsLast(partitions: Seq[String]): DataFrameSubFeed
 }
-object SparkSubFeed extends SubFeedConverter[SparkSubFeed] {
+trait DataFrameSubFeedCompanion extends SubFeedConverter[DataFrameSubFeed] {
+  protected def subFeedType: universe.Type
   /**
-   * This method is used to pass an output SubFeed as input SparkSubFeed to the next Action. SubFeed type might need conversion.
+   * This method can create the schema for reading DataObjects.
+   * If SubFeed subtypes have DataObjects with other methods to create a schema, they can override this method.
    */
-  override def fromSubFeed( subFeed: SubFeed )(implicit context: ActionPipelineContext): SparkSubFeed = {
-    subFeed match {
-      case sparkSubFeed: SparkSubFeed => sparkSubFeed.clearFilter() // make sure there is no filter, as filter can not be passed between actions.
-      case _ => SparkSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
+  def getDataObjectReadSchema(dataObject: DataObject with CanCreateDataFrame)(implicit context: ActionPipelineContext): Option[GenericSchema] = {
+    dataObject match {
+      case input: UserDefinedSchema if input.schema.isDefined =>
+        input.schema.map(dataObject.createReadSchema)
+      case input: SchemaValidation if input.schemaMin.isDefined =>
+        input.schemaMin.map(dataObject.createReadSchema)
+      case _ => None
     }
   }
+
+  /**
+   * Get an empty DataFrame with a defined schema.
+   * @param dataObjectId Snowpark implementation needs to get the Snowpark-Session from the DataObject. This should not be used otherwise.
+   */
+  def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame
+  def getEmptyStreamingDataFrame(schema: GenericSchema)(implicit context: ActionPipelineContext): GenericDataFrame = throw new NotImplementedError(s"getEmptyStreamingDataFrame is not implemented for ${subFeedType.typeSymbol.name}")
+  def getSubFeed(dataFrame: GenericDataFrame, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrameSubFeed
+  def col(colName: String): GenericColumn
+  def lit(value: Any): GenericColumn
+  def max(column: GenericColumn): GenericColumn
+  def explode(column: GenericColumn): GenericColumn
+  /**
+   * Construct array from given columns and removing null values (Snowpark API)
+   */
+  def array_construct_compact(columns: GenericColumn*): GenericColumn
+  def array(columns: GenericColumn*): GenericColumn
+  def struct(columns: GenericColumn*): GenericColumn
+  def expr(sqlExpr: String): GenericColumn
+  def not(column: GenericColumn): GenericColumn
+  def count(column: GenericColumn): GenericColumn
+  def when(condition: GenericColumn, value: GenericColumn): GenericColumn
+  def stringType: GenericDataType
+  def arrayType(dataType: GenericDataType): GenericDataType
+  def structType(colTypes: Map[String,GenericDataType]): GenericDataType
+  /**
+   * Get a DataFrame with the result of the given sql statement.
+   * @param dataObjectId Snowpark implementation needs to get the Snowpark-Session from the DataObject. This should not be used otherwise.
+   */
+  def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame
+}
+object DataFrameSubFeed {
+  def getHelper(tpe: Type): DataFrameSubFeedCompanion = ScalaUtil.companionOf[DataFrameSubFeedCompanion](tpe)
+  def getHelper(fullTpeName: String): DataFrameSubFeedCompanion = ScalaUtil.companionOf[DataFrameSubFeedCompanion](fullTpeName)
 }
 
 /**
@@ -215,6 +203,7 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
                        fileRefMapping: Option[Seq[FileRefMapping]] = None
                       )
   extends SubFeed {
+
   override def breakLineage(implicit context: ActionPipelineContext): FileSubFeed = {
     this.copy(fileRefs = None, fileRefMapping = None)
   }

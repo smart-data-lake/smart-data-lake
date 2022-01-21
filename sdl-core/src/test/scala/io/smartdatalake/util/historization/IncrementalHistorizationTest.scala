@@ -21,7 +21,7 @@ package io.smartdatalake.util.historization
 import io.smartdatalake.definitions.TechnicalTableColumn
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.historization.HistorizationTestUtils._
-import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.{Row, SparkSession}

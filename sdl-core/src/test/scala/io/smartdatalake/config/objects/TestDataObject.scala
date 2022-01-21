@@ -21,6 +21,7 @@ package io.smartdatalake.config.objects
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -36,7 +37,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param args more dummy arguments
  */
 case class TestDataObject( id: DataObjectId,
-                           override val schemaMin: Option[StructType] = None,
+                           override val schemaMin: Option[GenericSchema] = None,
                            arg1: String,
                            args: Seq[String],
                            connectionId: Option[ConnectionId] = None,
@@ -46,9 +47,9 @@ case class TestDataObject( id: DataObjectId,
 
   private val connection = connectionId.map( c => getConnection[TestConnection](c))
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = null
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = null
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
+  override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit context: ActionPipelineContext): Unit = {}
 
   override var table: Table = Table(db=Some("testdb"), name="testtable")

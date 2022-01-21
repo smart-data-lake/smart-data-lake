@@ -43,8 +43,42 @@ object ScalaUtil {
   }
 
   /**
+   * Get companion object instance for given type
+   *
+   * @tparam CT interface that the companion object implements
+   * @return instance of companion object implementing given interface CT
+   */
+  def companionOf[CT](tpe: Type): CT = {
+    Try {
+      val companionModule = tpe.typeSymbol.asClass.companion.asModule
+      currentMirror.reflectModule(companionModule).instance.asInstanceOf[CT]
+    } match {
+      case Success(c) => c
+      case Failure(ex) => throw new RuntimeException(s"Could not get companion object for type ${tpe.typeSymbol.name}: ${ex.getClass.getSimpleName} ${ex.getMessage}")
+    }
+  }
+
+  /**
+   * Get companion object instance for given class name
+   *
+   * @tparam CT interface that the companion object implements
+   * @return instance of companion object implementing given interface CT
+   */
+  def companionOf[CT](className: String): CT = {
+    Try {
+      val companionModule = currentMirror.staticModule(className)
+      currentMirror.reflectModule(companionModule).instance.asInstanceOf[CT]
+    } match {
+      case Success(c) => c
+      case Failure(ex) => throw new RuntimeException(s"Could not get companion object for type ${className}: ${ex.getClass.getSimpleName} ${ex.getMessage}")
+    }
+  }
+
+  /**
    * Return None if given Map is empty, otherwise Some(map). 
    */
   def optionalizeMap(m: Map[String,String]): Option[Map[String,String]] = if (m.isEmpty) None else Some(m)
-  
+
+  def arrayToSeq[T](arr: Array[T]): Seq[T] = if (arr == null) Seq() else arr.toSeq
+
 }

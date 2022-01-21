@@ -24,7 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.DataFrame
 
 /**
  * Repartition DataFrame
@@ -34,14 +34,14 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param numberOfTasksPerPartition Number of Spark tasks to create per partition value by repartitioning the DataFrame.
  * @param keyCols  Optional key columns to distribute records over Spark tasks inside a partition value.
  */
-case class RepartitionTransformer(override val name: String = "repartition", override val description: Option[String] = None, numberOfTasksPerPartition: Int, keyCols: Seq[String] = Seq()) extends ParsableDfTransformer {
+case class RepartitionTransformer(override val name: String = "repartition", override val description: Option[String] = None, numberOfTasksPerPartition: Int, keyCols: Seq[String] = Seq()) extends SparkDfTransformer {
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
     SparkRepartitionDef.repartitionDataFrame(df, partitionValues, dataObjectId, keyCols, numberOfTasksPerPartition)
   }
-  override def factory: FromConfigFactory[ParsableDfTransformer] = RepartitionTransformer
+  override def factory: FromConfigFactory[GenericDfTransformer] = RepartitionTransformer
 }
 
-object RepartitionTransformer extends FromConfigFactory[ParsableDfTransformer] {
+object RepartitionTransformer extends FromConfigFactory[GenericDfTransformer] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): RepartitionTransformer = {
     extract[RepartitionTransformer](config)
   }

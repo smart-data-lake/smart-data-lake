@@ -41,7 +41,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // run
-    val df = customDfDataObject.getDataFrame(Seq())(context)
+    val df = customDfDataObject.getSparkDataFrame(Seq())(context)
 
     // check
     assert(df.schema.equals(customDfDataObject.creator.schema.get))
@@ -53,7 +53,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     val customDfDataObject = CustomDfDataObject("testId", config)
 
     // run
-    val df = customDfDataObject.getDataFrame(Seq())(context)
+    val df = customDfDataObject.getSparkDataFrame(Seq())(context)
 
     // check
     assert(df.schema.equals(customDfDataObject.creator.exec.schema))
@@ -66,7 +66,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // run
-    val df = customDfDataObject.getDataFrame(Seq())(context)
+    val df = customDfDataObject.getSparkDataFrame(Seq())(context)
 
     // check
     assert(df.count() == 0)
@@ -78,7 +78,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     val customDfDataObject = CustomDfDataObject("testId", config)
 
     // run
-    val df = customDfDataObject.getDataFrame(Seq())(context)
+    val df = customDfDataObject.getSparkDataFrame(Seq())(context)
 
     // check
     assert(df.count() == 2)
@@ -91,7 +91,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // run
-    val df = customDfDataObject.getDataFrame(Seq())(context)
+    val df = customDfDataObject.getSparkDataFrame(Seq())(context)
 
     // check
     assert(df.count() == 2)
@@ -103,7 +103,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     val customDfDataObject = CustomDfDataObject("testId", config)
 
     // run
-    val df = customDfDataObject.getDataFrame(Seq())(context)
+    val df = customDfDataObject.getSparkDataFrame(Seq())(context)
 
     // check
     assert(df.count() == 2)

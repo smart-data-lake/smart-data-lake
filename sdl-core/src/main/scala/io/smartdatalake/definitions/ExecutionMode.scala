@@ -23,18 +23,16 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.dag.{DAGException, ExceptionSeverity}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{CustomCodeUtil, ProductUtil, SmartDataLakeLogger, SparkExpressionUtil}
+import io.smartdatalake.util.misc.{CustomCodeUtil, ProductUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.dag.DAGHelper.NodeId
 import io.smartdatalake.util.dag.ExceptionSeverity.ExceptionSeverity
+import io.smartdatalake.util.spark.SparkExpressionUtil
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.ActionHelper.{getOptionalDataFrame, searchCommonInits}
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject, FileRef, FileRefDataObject}
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.functions.{col, max}
 import org.apache.spark.sql.streaming.{OutputMode, Trigger}
-import org.apache.spark.sql.types._
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -303,6 +301,7 @@ case class SparkStreamingMode(checkpointLocation: String, triggerType: String = 
  * @param applyCondition Condition to decide if execution mode should be applied or not. Define a spark sql expression working with attributes of [[DefaultExecutionModeExpressionData]] returning a boolean.
  *                       Default is to apply the execution mode if given partition values (partition values from command line or passed from previous action) are not empty.
  */
+// TODO: this is not Spark specific and should be renamed to DataFrameIncrementalMode!
 case class SparkIncrementalMode( compareCol: String
                                , override val alternativeOutputId: Option[DataObjectId] = None
                                , applyCondition: Option[Condition] = None
@@ -317,29 +316,30 @@ case class SparkIncrementalMode( compareCol: String
   private[smartdatalake] override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
                                             , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
                                            (implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
+    assert(subFeed.isInstanceOf[DataFrameSubFeed], s"($actionId) SparkIncrementalMode needs DataFrameSubFeed to operate but received ${subFeed.getClass.getSimpleName}")
     val doApply = evaluateApplyConditions(actionId, subFeed)
       .getOrElse(true) // default is to apply SparkIncrementalMode
     if (doApply) {
-      implicit val session: SparkSession = context.sparkSession
-      import session.implicits._
       val input = mainInput
       val output = alternativeOutput.getOrElse(mainOutput)
+      val dfSubFeed = subFeed.asInstanceOf[DataFrameSubFeed]
+      import dfSubFeed.helper._
       (input, output) match {
-        case (sparkInput: CanCreateDataFrame, sparkOutput: CanCreateDataFrame) =>
+        case (doDfInput: CanCreateDataFrame, doDfOutput: CanCreateDataFrame) =>
           // if data object is new, it might not be able to create a DataFrame
-          val dfInputOpt = getOptionalDataFrame(sparkInput)
-          val dfOutputOpt = getOptionalDataFrame(sparkOutput)
+          val dfInputOpt = getOptionalDataFrame(doDfInput, Seq(), dfSubFeed.tpe)
+          val dfOutputOpt = getOptionalDataFrame(doDfOutput, Seq(), dfSubFeed.tpe)
           (dfInputOpt, dfOutputOpt) match {
             // if both DataFrames exist, compare and create filter
             case (Some(dfInput), Some(dfOutput)) =>
-              val inputColType = dfInput.schema(compareCol).dataType
-              require(SparkIncrementalMode.allowedDataTypes.contains(inputColType), s"($actionId) Type of compare column $compareCol must be one of ${SparkIncrementalMode.allowedDataTypes.mkString(", ")} in ${sparkInput.id}")
-              val outputColType = dfOutput.schema(compareCol).dataType
-              require(SparkIncrementalMode.allowedDataTypes.contains(outputColType), s"($actionId) Type of compare column $compareCol must be one of ${SparkIncrementalMode.allowedDataTypes.mkString(", ")} in ${sparkOutput.id}")
-              require(inputColType == outputColType, s"($actionId) Type of compare column $compareCol is different between ${sparkInput.id} ($inputColType) and ${sparkOutput.id} ($outputColType)")
+              val inputColType = dfInput.schema.getDataType(compareCol)
+              require(inputColType.isSortable, s"($actionId) Type of compare column $compareCol must be sortable, but is ${inputColType.typeName} in ${doDfInput.id}")
+              val outputColType = dfOutput.schema.getDataType(compareCol)
+              require(outputColType.isSortable, s"($actionId) Type of compare column $compareCol must be sortable, but is ${inputColType.typeName} in ${doDfInput.id}")
+              require(inputColType == outputColType, s"($actionId) Type of compare column $compareCol is different between ${doDfInput.id} (${inputColType.typeName}) and ${doDfOutput.id} (${outputColType.typeName})")
               // get latest values
-              val inputLatestValue = dfInput.agg(max(col(compareCol)).cast(StringType)).as[String].head
-              val outputLatestValue = dfOutput.agg(max(col(compareCol)).cast(StringType)).as[String].head
+              val inputLatestValue = dfInput.agg(Seq(max(col(compareCol)).cast(stringType))).collect.head.getAs[String](0)
+              val outputLatestValue = dfOutput.agg(Seq(max(col(compareCol)).cast(stringType))).collect.head.getAs[String](0)
               // skip processing if no new data
               val warnMsg = if (inputLatestValue == null) {
                 Some(s"($actionId) No increment to process found for ${output.id}: ${input.id} is empty")
@@ -369,9 +369,6 @@ case class SparkIncrementalMode( compareCol: String
       }
     } else None
   }
-}
-private[smartdatalake] object SparkIncrementalMode {
-  val allowedDataTypes = Seq(StringType, LongType, IntegerType, ShortType, FloatType, DoubleType, TimestampType)
 }
 
 /**

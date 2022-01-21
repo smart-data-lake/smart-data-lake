@@ -21,13 +21,13 @@ package io.smartdatalake.workflow.action.customlogic
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, ParsableFromConfig}
-import io.smartdatalake.smartdatalake.SnowparkDataFrame
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.workflow.ActionPipelineContext
+import org.apache.spark.sql.DataFrame
 
 // Project-specific custom Snowpark transformers should extend this trait
 trait CustomSnowparkDfsTransformer extends Serializable {
-  def transform(options: Map[String, String], dfs: Map[String, SnowparkDataFrame]): Map[String, SnowparkDataFrame]
+  def transform(options: Map[String, String], dfs: Map[String, DataFrame]): Map[String, DataFrame]
 }
 
 // Transformers defined in CustomSnowparkActions in the configuration files are parsed into this case class
@@ -39,7 +39,7 @@ case class SnowparkDfsTransformer(val name: String = "snowparkScalaTransform",
 
   private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomSnowparkDfsTransformer](className)
 
-  def transform(dfs: Map[String, SnowparkDataFrame])(implicit context: ActionPipelineContext): Map[String, SnowparkDataFrame] = {
+  def transform(dfs: Map[String, DataFrame])(implicit context: ActionPipelineContext): Map[String, DataFrame] = {
     customTransformer.transform(options, dfs)
   }
 

@@ -29,7 +29,7 @@ import org.scalatest.{BeforeAndAfter, FunSuite}
 import org.apache.hadoop.fs.{Path => HadoopPath}
 
 import scala.util.Try
-import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 
 /**
  * Unit tests for HiveUtil

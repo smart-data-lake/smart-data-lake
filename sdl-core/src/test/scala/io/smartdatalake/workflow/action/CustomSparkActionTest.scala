@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.action
 import java.nio.file.Files
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.definitions.{Condition, PartitionDiffMode}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskSkippedDontStopWarning
@@ -28,7 +29,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.customlogic.{CustomDfsTransformer, CustomDfsTransformerConfig}
 import io.smartdatalake.workflow.action.sparktransformer.{SQLDfsTransformer, ScalaClassDfsTransformer, ScalaCodeDfsTransformer}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
@@ -80,21 +81,21 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val action1 = CustomSparkAction("action1", List(srcDO1.id, srcDO2.id), List(tgtDO1.id, tgtDO2.id), transformers = Seq(customTransformerConfig))
 
     val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
-    srcDO1.writeDataFrame(l1, Seq())
-    srcDO2.writeDataFrame(l1, Seq())
+    srcDO1.writeSparkDataFrame(l1, Seq())
+    srcDO2.writeSparkDataFrame(l1, Seq())
 
     val tgtSubFeeds = action1.exec(Seq(SparkSubFeed(None, "src1", Seq()), SparkSubFeed(None, "src2", Seq())))(contextExec)
     assert(tgtSubFeeds.size == 2)
     assert(tgtSubFeeds.map(_.dataObjectId) == Seq(tgtDO1.id, tgtDO2.id))
 
-    val r1 = tgtDO1.getDataFrame()
+    val r1 = tgtDO1.getSparkDataFrame()
       .select($"rating")
       .as[Int].collect().toSeq
     assert(r1.size == 1)
     assert(r1.head == 6) // should be increased by 1 through TestDfTransformer
 
     // same for the second dataframe
-    val r2 = tgtDO2.getDataFrame()
+    val r2 = tgtDO2.getSparkDataFrame()
       .select($"rating")
       .as[Int].collect().toSeq
     assert(r2.size == 1)
@@ -121,7 +122,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     // first action to create output table as it does not exist yet
     val action1 = CustomSparkAction("action1", List(srcDO1.id), List(tgtDO1.id), transformers = Seq(customTransformerConfig))
     val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
-    srcDO1.writeDataFrame(l1, Seq())
+    srcDO1.writeSparkDataFrame(l1, Seq())
 
     val tgtSubFeedsNonRecursive = action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(contextExec)
     assert(tgtSubFeedsNonRecursive.size == 1)
@@ -163,7 +164,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val action1 = CustomSparkAction("action1", List(srcDO1.id), List(tgtDO1.id), transformers = Seq(customTransformer))
     val action1IgnoreFilter = CustomSparkAction("action1", List(srcDO1.id), List(tgtDO1.id), inputIdsToIgnoreFilter = Seq(srcDO1.id), transformers = Seq(customTransformer))
     val l1 = Seq(("doe", "john", 5),("be", "bob", 3)).toDF("lastname", "firstname", "rating")
-    srcDO1.writeDataFrame(l1, Seq())
+    srcDO1.writeSparkDataFrame(l1, Seq())
 
     // nothing processed if input is skipped and filters not ignored
     val tgtSubFeeds = action1.exec(Seq(SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe"))), isSkipped = true)))(contextExec)
@@ -200,29 +201,29 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     // prepare & start first load
     val l1 = Seq(("A","doe","john",5)).toDF("type", "lastname", "firstname", "rating")
     val l1PartitionValues = Seq(PartitionValues(Map("type"->"A")))
-    srcDO.writeDataFrame(l1, l1PartitionValues) // prepare testdata
+    srcDO.writeSparkDataFrame(l1, l1PartitionValues) // prepare testdata
     action.init(Seq(srcSubFeed))
     val tgtSubFeed1 = action.exec(Seq(srcSubFeed))(contextExec).head
 
     // check first load
     assert(tgtSubFeed1.dataObjectId == tgtDO.id)
     assert(tgtSubFeed1.partitionValues.toSet == l1PartitionValues.toSet)
-    assert(tgtDO.getDataFrame().count == 1)
+    assert(tgtDO.getSparkDataFrame().count == 1)
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet)
 
     // prepare & start 2nd load
     action.reset
     val l2 = Seq(("B","pan","peter",11)).toDF("type", "lastname", "firstname", "rating")
     val l2PartitionValues = Seq(PartitionValues(Map("type"->"B")))
-    srcDO.writeDataFrame(l2, l2PartitionValues) // prepare testdata
-    assert(srcDO.getDataFrame().count == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
+    srcDO.writeSparkDataFrame(l2, l2PartitionValues) // prepare testdata
+    assert(srcDO.getSparkDataFrame().count == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
     action.init(Seq(srcSubFeed))
     val tgtSubFeed2 = action.exec(Seq(srcSubFeed))(contextExec).head
 
     // check 2nd load
     assert(tgtSubFeed2.dataObjectId == tgtDO.id)
     assert(tgtSubFeed2.partitionValues.toSet == l2PartitionValues.toSet)
-    assert(tgtDO.getDataFrame().count == 2)
+    assert(tgtDO.getSparkDataFrame().count == 2)
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet ++ l2PartitionValues.toSet)
   }
 
@@ -268,20 +269,20 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val l2 = Seq(("A","doe","john",5),("B","doe","john",5)).toDF("type", "lastname", "firstname", "rating")
     val l1PartitionValues = Seq(PartitionValues(Map("type"->"A")))
     val l2PartitionValues = Seq(PartitionValues(Map("type"->"A")),PartitionValues(Map("type"->"B")))
-    srcDO.writeDataFrame(l1, l1PartitionValues)
-    srcDO2.writeDataFrame(l2, l2PartitionValues)
-    srcDO3.writeDataFrame(l2, Seq()) // src3 is not partitioned
+    srcDO.writeSparkDataFrame(l1, l1PartitionValues)
+    srcDO2.writeSparkDataFrame(l2, l2PartitionValues)
+    srcDO3.writeSparkDataFrame(l2, Seq()) // src3 is not partitioned
     action.init(Seq(srcSubFeed1, srcSubFeed2, srcSubFeed3))
     val tgtSubFeed1 = action.exec(Seq(srcSubFeed1, srcSubFeed2, srcSubFeed3))(contextExec).head
 
     // check load
     assert(tgtSubFeed1.dataObjectId == tgtDO.id)
     assert(tgtSubFeed1.partitionValues.toSet == l1PartitionValues.toSet)
-    assert(tgtDO.getDataFrame().count == 1) // partition type=A is missing
+    assert(tgtDO.getSparkDataFrame().count == 1) // partition type=A is missing
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet)
-    assert(tgtDO2.getDataFrame().count == 1) // only partitions according to srcDO1 read
+    assert(tgtDO2.getSparkDataFrame().count == 1) // only partitions according to srcDO1 read
     assert(tgtDO2.listPartitions.toSet == l1PartitionValues.toSet)
-    assert(tgtDO3.getDataFrame().count == 2) // all records read because not partitioned
+    assert(tgtDO3.getSparkDataFrame().count == 2) // all records read because not partitioned
   }
 
   test("copy load with 2 transformations from sql code") {
@@ -307,7 +308,7 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val customTransformerConfig = SQLDfsTransformer(code = Map(DataObjectId("tgt1")->"select * from copy_input where rating = 5", DataObjectId("tgt2")->"select * from copy_input where rating = 3"))
     val action1 = CustomSparkAction("ca", List(srcDO.id), List(tgtDO1.id,tgtDO2.id), transformers = Seq(customTransformerConfig))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
-    srcDO.writeDataFrame(l1, Seq())
+    srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
 
@@ -347,9 +348,9 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     // prepare
     val customTransformerConfig = SQLDfsTransformer(code = Map(DataObjectId("tgt1")->"select * from src1 union all select * from src2"))
     val l1 = Seq(("jonson","rob",5)).toDF("lastname", "firstname", "rating")
-    srcDO1.writeDataFrame(l1, Seq())
+    srcDO1.writeSparkDataFrame(l1, Seq())
     val l2 = Seq(("doe","bob",3)).toDF("lastname", "firstname", "rating")
-    srcDO2.writeDataFrame(l2, Seq())
+    srcDO2.writeSparkDataFrame(l2, Seq())
 
     // condition: skip only if both input subfeeds are skipped
     val executionCondition = Some(Condition("!inputSubFeeds.src1.isSkipped or !inputSubFeeds.src2.isSkipped"))
@@ -390,13 +391,13 @@ class CustomSparkActionTest extends FunSuite with BeforeAndAfter {
     val action1 = CustomSparkAction("ca", List(srcDO.id), List(tgtDO1.id), transformers = Seq(customTransformerConfig))
     val l1 = Seq(("20100101","jonson","rob",5),("20100103","doe","bob",3)).toDF("dt", "lastname", "firstname", "rating")
     val srcPartitionValues = Seq(PartitionValues(Map("dt" -> "20100101")), PartitionValues(Map("dt" -> "20100103")))
-    srcDO.writeDataFrame(l1, Seq())
+    srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", srcPartitionValues)
     val tgtSubFeed = action1.init(Seq(srcSubFeed))(contextExec).head.asInstanceOf[SparkSubFeed]
 
     val expectedPartitionValues = Seq(PartitionValues(Map("mt" -> "201001")))
     assert(tgtSubFeed.partitionValues == expectedPartitionValues)
-    assert(tgtSubFeed.dataFrame.get.columns.contains("mt"))
+    assert(tgtSubFeed.dataFrame.get.schema.columns.contains("mt"))
   }
 }
 

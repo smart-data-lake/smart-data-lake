@@ -19,9 +19,8 @@
 
 package io.smartdatalake.workflow.action.customlogic
 
-import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.hdfs.HdfsUtil
-import io.smartdatalake.util.misc.{PythonSparkEntryPoint, PythonUtil}
+import io.smartdatalake.util.spark.{PythonSparkEntryPoint, PythonUtil}
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.SparkSession
 

@@ -21,11 +21,14 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
-import io.smartdatalake.util.misc.{DefaultExpressionData, SchemaUtil, SmartDataLakeLogger, SparkExpressionUtil}
+import io.smartdatalake.util.misc.SchemaUtil
+import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
+import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.JdbcTableConnection
 import org.apache.spark.annotation.DeveloperApi
@@ -72,7 +75,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                postReadSql: Option[String] = None,
                                preWriteSql: Option[String] = None,
                                postWriteSql: Option[String] = None,
-                               override val schemaMin: Option[StructType] = None,
+                               override val schemaMin: Option[GenericSchema] = None,
                                override var table: Table,
                                jdbcFetchSize: Int = 1000,
                                saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
@@ -91,7 +94,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   @DeveloperApi
   val connection: JdbcTableConnection = getConnection[JdbcTableConnection](connectionId)
 
-  private val options = jdbcOptions ++ Map(
+  override val options = jdbcOptions ++ Map(
     "url" -> connection.url,
     "driver" -> connection.driver,
     "fetchSize" -> jdbcFetchSize.toString
@@ -138,20 +141,20 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     val queryOrTable = Map(table.query.map(q => ("query",q)).getOrElse("dbtable"->table.fullName))
     val df = context.sparkSession.read.format("jdbc")
       .options(options)
       .options(connection.getAuthModeSparkOptions)
       .options(queryOrTable)
       .load()
-    validateSchemaMin(df, "read")
+    validateSchemaMin(SparkSchema(df.schema), "read")
     df.colNamesLowercase
   }
 
-  override def init(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
+  override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
-    validateSchemaMin(df, "write")
+    validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
     validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
     val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(df)).getOrElse(df)
@@ -170,23 +173,23 @@ case class JdbcTableDataObject(override val id: DataObjectId,
    */
   private def evolveTableSchema(newSchemaRaw: StructType)(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
-    val existingSchema = getExistingSchema.get
-    val newSchema = if (SchemaUtil.isSparkCaseSensitive) newSchemaRaw else StructType(SchemaUtil.prepareSchemaForDiff(newSchemaRaw, ignoreNullable = false, caseSensitive = false))
+    val existingSchema = SparkSchema(getExistingSchema.get)
+    val newSchema = if (SchemaUtil.isSparkCaseSensitive) SparkSchema(newSchemaRaw) else SchemaUtil.prepareSchemaForDiff(SparkSchema(newSchemaRaw), ignoreNullable = false, caseSensitive = false).asInstanceOf[SparkSchema]
     // prepare changes
-    val newColumns = newSchema.fieldNames.diff(existingSchema.fieldNames) // add new column
-    val missingNotNullColumns = existingSchema.fieldNames.diff(newSchema.fieldNames) // make missing columns nullable
+    val newColumns = newSchema.columns.diff(existingSchema.columns) // add new column
+    val missingNotNullColumns = existingSchema.columns.diff(newSchema.columns) // make missing columns nullable
       .filter { col =>
         // as Spark doesn't know if a field is nullable in the database, but we can check jdbc metadata
         val jdbcColumn = getJdbcColumn(col)
         !jdbcColumn.flatMap(_.isNullable).getOrElse(false)
       }
-    val newSchemaWithoutNewColumns = StructType(newSchema.filter(f => !newColumns.contains(f.name)))
-    val changedDatatypeColumns = SchemaUtil.schemaDiff(newSchemaWithoutNewColumns, existingSchema, ignoreNullable = true) // change column datatype if supported
+    val newSchemaWithoutNewColumns = newSchema.filter(f => !newColumns.contains(f.name))
+    val changedDatatypeColumns = SchemaUtil.schemaDiff(newSchemaWithoutNewColumns, existingSchema, ignoreNullable = true).map(_.asInstanceOf[SparkField]) // change column datatype if supported
     // apply changes
     if (newColumns.nonEmpty || missingNotNullColumns.nonEmpty || changedDatatypeColumns.nonEmpty)
       logger.info(s"($id) schema evolution needed: newColumns=${newColumns.mkString(",")} missingNotNullColumns=${missingNotNullColumns.mkString(",")} changedDatatypeColumns=${changedDatatypeColumns.map(f => s"${f.name}:${f.dataType.sql}").mkString(",")}")
     newColumns.foreach{ col =>
-      val field = newSchema(col)
+      val field = newSchema.inner(col)
       val sqlType = connection.catalog.getSqlType(field.dataType, isNullable = true) // new columns must be nullable because of existing data
       val sql = connection.catalog.getAddColumnSql(table.fullName, quoteCaseSensitiveColumn(col), sqlType)
       connection.execJdbcStatement(sql)
@@ -200,7 +203,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       }
     }
     changedDatatypeColumns.foreach { field =>
-      val sqlType = connection.catalog.getSqlType(field.dataType, field.nullable || existingSchema(field.name).nullable)
+      val sqlType = connection.catalog.getSqlType(field.inner.dataType, field.nullable || existingSchema.inner(field.name).nullable)
       val sql = connection.catalog.getAlterColumnSql(table.fullName, quoteCaseSensitiveColumn(field.name), sqlType)
       connection.execJdbcStatement(sql)
     }
@@ -211,11 +214,11 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
+  override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     require(table.query.isEmpty, s"($id) Cannot write to jdbc DataObject defined by a query.")
-    validateSchemaMin(df, "write")
+    validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
     validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
     val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(df)).getOrElse(df)
@@ -229,7 +232,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       case SDLSaveMode.Overwrite =>
         // cleanup existing data if saveMode=overwrite
         if (partitionValues.nonEmpty) deletePartitions(partitionValues)
-        else deleteAllData
+        else deleteAllData()
         writeDataFrameInternalWithAppend(df, table.fullName)
 
       case SDLSaveMode.Merge =>
@@ -341,15 +344,15 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   private var cachedExistingSchema: Option[StructType] = None
   private def getExistingSchema(implicit context: ActionPipelineContext): Option[StructType] = {
     if (isTableExisting && cachedExistingSchema.isEmpty) {
-      cachedExistingSchema = Some(getDataFrame().schema)
+      cachedExistingSchema = Some(getSparkDataFrame().schema)
       // convert to lowercase when Spark is in non-casesensitive mode
-      if (!SchemaUtil.isSparkCaseSensitive) cachedExistingSchema = Some(StructType(SchemaUtil.prepareSchemaForDiff(cachedExistingSchema.get, ignoreNullable = false, caseSensitive = true)))
+      if (!SchemaUtil.isSparkCaseSensitive) cachedExistingSchema = Some(SchemaUtil.prepareSchemaForDiff(SparkSchema(cachedExistingSchema.get), ignoreNullable = false, caseSensitive = true).asInstanceOf[SparkSchema].inner)
     }
     cachedExistingSchema
   }
 
   private def validateSchemaOnWrite(df: DataFrame)(implicit context: ActionPipelineContext): Unit = {
-    getExistingSchema.foreach(schema => validateSchema(df, schema, "write"))
+    getExistingSchema.foreach(schema => validateSchema(SparkSchema(df.schema), SparkSchema(schema), "write"))
   }
 
   def deleteAllData(): Unit = {
@@ -367,7 +370,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
    */
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     if (partitions.nonEmpty) {
-      PartitionValues.fromDataFrame(getDataFrame().select(partitions.map(col):_*).distinct)
+      PartitionValues.fromDataFrame(getSparkDataFrame().select(partitions.map(col):_*).distinct)
     } else Seq()
   }
 

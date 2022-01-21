@@ -20,14 +20,17 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.action.sparktransformer._
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
-import org.apache.spark.sql.{Column, SparkSession}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanCreateSparkDataFrame, CanWriteDataFrame, CanWriteSparkDataFrame, DataObject}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SubFeed}
+import org.apache.spark.sql.Column
+
+import scala.reflect.runtime.universe.{Type, typeOf}
 
 /**
  * Implementation of logic needed to use SparkAction with only one input and one output SubFeed.
  */
-abstract class SparkOneToOneActionImpl extends SparkActionImpl {
+abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
 
   /**
    * Input [[DataObject]] which can CanCreateDataFrame
@@ -40,6 +43,20 @@ abstract class SparkOneToOneActionImpl extends SparkActionImpl {
   def output:  DataObject with CanWriteDataFrame
 
   /**
+   * SubFeed types of DataFrame transformers to apply with this action
+   * Override by subclasses if there are transformers.
+   */
+  def transformerSubFeedSupportedTypes: Seq[Type] = Seq()
+
+  override lazy val transformerSubFeedType: Option[Type] = {
+    val transformerTypeStats = transformerSubFeedSupportedTypes
+      .filterNot(_ =:= typeOf[DataFrameSubFeed]) // ignore generic transformers
+      .groupBy(identity).mapValues(_.size).toSeq.sortBy(_._2)
+    assert(transformerTypeStats.size <= 1, s"($id) No common transformer subFeedType type found: ${transformerTypeStats.map{case (tpe,cnt) => s"${tpe.typeSymbol.name}: $cnt"}.mkString(",")}")
+    transformerTypeStats.map(_._1).headOption
+  }
+
+  /**
    * Transform a [[SparkSubFeed]].
    * To be implemented by subclasses.
    *
@@ -47,34 +64,13 @@ abstract class SparkOneToOneActionImpl extends SparkActionImpl {
    * @param outputSubFeed [[SparkSubFeed]] to be enriched with transformed result
    * @return transformed output [[SparkSubFeed]]
    */
-  def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit context: ActionPipelineContext): SparkSubFeed
+  def transform(inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed
 
-  override final def transform(inputSubFeeds: Seq[SparkSubFeed], outputSubFeeds: Seq[SparkSubFeed])(implicit context: ActionPipelineContext): Seq[SparkSubFeed] = {
+  override final def transform(inputSubFeeds: Seq[DataFrameSubFeed], outputSubFeeds: Seq[DataFrameSubFeed])(implicit context: ActionPipelineContext): Seq[DataFrameSubFeed] = {
     assert(inputSubFeeds.size == 1, s"($id) Only one inputSubFeed allowed")
     assert(outputSubFeeds.size == 1, s"($id) Only one outputSubFeed allowed")
     val transformedSubFeed = transform(inputSubFeeds.head, outputSubFeeds.head)
     Seq(transformedSubFeed)
-  }
-
-  /**
-   * Combines all transformations into a list of DfTransformers
-   */
-  def getTransformers(transformation: Option[CustomDfTransformerConfig],
-                      columnBlacklist: Option[Seq[String]],
-                      columnWhitelist: Option[Seq[String]],
-                      additionalColumns: Option[Map[String,String]],
-                      standardizeDatatypes: Boolean,
-                      additionalTransformers: Seq[DfTransformer],
-                      filterClauseExpr: Option[Column] = None)
-                     (implicit context: ActionPipelineContext): Seq[DfTransformer] = {
-    Seq(
-      transformation.map(t => t.impl),
-      columnBlacklist.map(l => BlacklistTransformer(columnBlacklist = l)),
-      columnWhitelist.map(l => WhitelistTransformer(columnWhitelist = l)),
-      additionalColumns.map(cs => AdditionalColumnsTransformer(additionalColumns = cs)),
-      filterClauseExpr.map(f => DfTransformerFunctionWrapper("filter", df => df.where(f))),
-      if (standardizeDatatypes) Some(StandardizeDatatypesTransformer()) else None // currently we cast decimals away only but later we may add further type casts
-    ).flatten ++ additionalTransformers
   }
 
   override final def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
@@ -94,11 +90,11 @@ abstract class SparkOneToOneActionImpl extends SparkActionImpl {
   /**
    * apply transformer to SubFeed
    */
-  protected def applyTransformers(transformers: Seq[DfTransformer], inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit context: ActionPipelineContext): SparkSubFeed = {
+  protected def applyTransformers(transformers: Seq[GenericDfTransformerDef], inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     val transformedSubFeed = transformers.foldLeft(inputSubFeed){
       case (subFeed, transformer) => transformer.applyTransformation(id, subFeed)
     }
     // Note that transformed partition values are set by execution mode.
-    outputSubFeed.copy(dataFrame = transformedSubFeed.dataFrame)
+    outputSubFeed.withDataFrame(transformedSubFeed.dataFrame)
   }
 }

@@ -21,6 +21,7 @@ package io.smartdatalake.app
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{InstanceRegistry, SdlConfigObject}
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.definitions.{Environment, PartitionDiffMode, SparkStreamingMode}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskFailedException
@@ -83,7 +84,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     // fill src table with first partition
     val dfSrc1 = Seq(("20180101", "person", "doe","john",5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
-    srcDO.writeDataFrame(dfSrc1, Seq())
+    srcDO.writeSparkDataFrame(dfSrc1, Seq())
 
     // start streaming dag run
     // use only first partition col (dt) for partition diff mode
@@ -101,7 +102,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
         if (state.isFinal && state.runId==1) {
           // check results
           assert(tgt1DO.listPartitions.map(_.apply("dt")) == Seq("20180101"))
-          assert(tgt1DO.getDataFrame(Seq()).select($"lastname").as[String].collect().toSeq == Seq("doe"))
+          assert(tgt1DO.getSparkDataFrame(Seq()).select($"lastname").as[String].collect().toSeq == Seq("doe"))
         }
         // add additional source partition in runId=2 for runId=3
         if (state.isFinal && state.runId==2 && !dfWritten) {
@@ -110,7 +111,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
           logger.info("adding more data")
           val dfSrc2 = Seq(("20180102", "company", "olmo","-",10)) // second partition 20190101
             .toDF("dt", "type", "lastname", "firstname", "rating")
-          srcDO.writeDataFrame(dfSrc2, Seq())
+          srcDO.writeSparkDataFrame(dfSrc2, Seq())
         }
         // stop after runId=3
         if (state.isFinal && state.runId>=3) {
@@ -128,7 +129,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // check data after streaming is terminated
     assert(tgt1DO.listPartitions.map(_.apply("dt")) == Seq("20180101","20180102"))
-    assert(tgt1DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6,11)) // +1 because of udfAddX
+    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6,11)) // +1 because of udfAddX
 
     // check state after streaming is terminated
     {
@@ -160,17 +161,17 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     // setup DataObjects
     // source has partitions columns dt and type
     val srcDO = CsvFileDataObject( "src1", tempPath+"/src1", partitions = Seq("dt","type")
-                                 , schema = Some(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int")))
+                                 , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(srcDO)
     // first table has partitions columns dt and type (same as source)
     val tgt1DO = CsvFileDataObject( "tgt1", tempPath+"/tgt1", partitions = Seq("dt","type")
-      , schema = Some(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int")))
+      , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt1DO)
 
     // fill src with first files
     val dfSrc1 = Seq(("20180101", "person", "doe","john",5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
-    srcDO.writeDataFrame(dfSrc1, Seq())
+    srcDO.writeSparkDataFrame(dfSrc1, Seq())
 
     // prepare streaming action
     val action1 = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
@@ -193,7 +194,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
                 logger.info("adding more data")
                 val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 10)) // second partition 20190101
                   .toDF("dt", "type", "lastname", "firstname", "rating")
-                srcDO.writeDataFrame(dfSrc2, Seq())
+                srcDO.writeSparkDataFrame(dfSrc2, Seq())
               case 2 =>
                 // stop streaming query
                 logger.info("stopping streaming query")
@@ -215,7 +216,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // check data after streaming is terminated
     assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Seq("20180101","20190101").toSet)
-    assert(tgt1DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6,11)) // +1 because of udfAddX
+    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6,11)) // +1 because of udfAddX
 
     val action1InfoSdl1 = action1.getRuntimeInfo(Some(SDLExecutionId(1))).get
     assert(action1InfoSdl1.state == RuntimeEventState.SUCCEEDED) // State for SDL execution 1 is reported as SUCCEEDED by streaming action
@@ -260,21 +261,21 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     // setup DataObjects
     // source has partition columns dt and type
     val srcDO = CsvFileDataObject( "src1", tempPath+"/src1", partitions = Seq("dt","type")
-      , schema = Some(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int")))
+      , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(srcDO)
     // first table has partitions columns dt and type (same as source)
     val tgt1DO = CsvFileDataObject( "tgt1", tempPath+"/tgt1", partitions = Seq("dt","type")
-      , schema = Some(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int")))
+      , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt1DO)
     // second table has partitions columns dt and type (same as source)
     val tgt2DO = CsvFileDataObject( "tgt2", tempPath+"/tgt2", partitions = Seq("dt","type")
-      , schema = Some(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int")))
+      , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt2DO)
 
     // fill src with first files
     val dfSrc1 = Seq(("20180101", "person", "doe","john",5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
-    srcDO.writeDataFrame(dfSrc1, Seq())
+    srcDO.writeSparkDataFrame(dfSrc1, Seq())
 
     // prepare partition diff action
     val actionA = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
@@ -300,7 +301,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
                 logger.info("adding more data")
                 val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 10)) // second partition 20190101
                   .toDF("dt", "type", "lastname", "firstname", "rating")
-                srcDO.writeDataFrame(dfSrc2, Seq())
+                srcDO.writeSparkDataFrame(dfSrc2, Seq())
               case x if x>0 && event.progress.numInputRows > 0 =>
                 // stop streaming gracefully when second data partition was processed
                 logger.info("stopping streaming gracefully")
@@ -322,7 +323,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // check data after streaming is terminated
     assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101","20190101"))
-    assert(tgt2DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6,11)) // +1 because of udfAddX
+    assert(tgt2DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6,11)) // +1 because of udfAddX
   }
 
   test("sdlb streaming recovery, synchronous action failing before asynchronously streaming action") {
@@ -341,21 +342,21 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     // setup DataObjects
     // source has partition columns dt and type
     val srcDO = CsvFileDataObject( "src1", tempPath+"/src1", partitions = Seq("dt","type")
-      , schema = Some(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int")))
+      , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(srcDO)
     // first table has partitions columns dt and type (same as source)
     val tgt1DO = CsvFileDataObject( "tgt1", tempPath+"/tgt1", partitions = Seq("dt","type")
-      , schema = Some(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int")))
+      , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt1DO)
     // second table has partitions columns dt and type (same as source)
     val tgt2DO = CsvFileDataObject( "tgt2", tempPath+"/tgt2", partitions = Seq("dt","type")
-      , schema = Some(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int")))
+      , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt2DO)
 
     // fill src with first files
     val dfSrc1 = Seq(("20180101", "person", "doe","john",5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
-    srcDO.writeDataFrame(dfSrc1, Seq())
+    srcDO.writeSparkDataFrame(dfSrc1, Seq())
 
     // prepare partition diff action
     val actionAFail = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
@@ -382,7 +383,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
                 logger.info("adding more data")
                 val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 10)) // second partition 20190101
                   .toDF("dt", "type", "lastname", "firstname", "rating")
-                srcDO.writeDataFrame(dfSrc2, Seq())
+                srcDO.writeSparkDataFrame(dfSrc2, Seq())
               case x if x>0 && event.progress.numInputRows > 0 =>
                 // stop streaming gracefully when second data partition was processed
                 logger.info("stopping streaming gracefully")
@@ -415,7 +416,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // check data after streaming is terminated
     assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101","20190101"))
-    assert(tgt2DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6,11)) // +1 because of udfAddX
+    assert(tgt2DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6,11)) // +1 because of udfAddX
   }
 
   test("sdlb spark streaming failure, synchronous action before asynchronously streaming action, asynchronous action failing after first run") {
@@ -434,21 +435,21 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     // setup DataObjects
     // source has partition columns dt and type
     val srcDO = CsvFileDataObject( "src1", tempPath+"/src1", partitions = Seq("dt","type")
-      , schema = Some(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int")))
+      , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(srcDO)
     // first table has partitions columns dt and type (same as source)
     val tgt1DO = CsvFileDataObject( "tgt1", tempPath+"/tgt1", partitions = Seq("dt","type")
-      , schema = Some(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int")))
+      , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt1DO)
     // second table has partitions columns dt and type (same as source)
     val tgt2DO = CsvFileDataObject( "tgt2", tempPath+"/tgt2", partitions = Seq("dt","type")
-      , schema = Some(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int")))
+      , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt2DO)
 
     // fill src with first files
     val dfSrc1 = Seq(("20180101", "person", "doe","john",5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
-    srcDO.writeDataFrame(dfSrc1, Seq())
+    srcDO.writeSparkDataFrame(dfSrc1, Seq())
 
     // prepare partition diff action
     val actionA = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
@@ -473,7 +474,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
                 logger.info("adding more data")
                 val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 999)) // second partition 20190101
                   .toDF("dt", "type", "lastname", "firstname", "rating")
-                srcDO.writeDataFrame(dfSrc2, Seq())
+                srcDO.writeSparkDataFrame(dfSrc2, Seq())
             }
         }
       }
@@ -506,21 +507,21 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     // setup DataObjects
     // source has partition columns dt and type
     val srcDO = CsvFileDataObject( "src1", tempPath+"/src1", partitions = Seq("dt","type")
-      , schema = Some(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int")))
+      , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(srcDO)
     // first table has partitions columns dt and type (same as source)
     val tgt1DO = CsvFileDataObject( "tgt1", tempPath+"/tgt1", partitions = Seq("dt","type")
-      , schema = Some(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int")))
+      , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt1DO)
     // second table has partitions columns dt and type (same as source)
     val tgt2DO = CsvFileDataObject( "tgt2", tempPath+"/tgt2", partitions = Seq("dt","type")
-      , schema = Some(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int")))
+      , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt2DO)
 
     // fill src with first files
     val dfSrc1 = Seq(("20180101", "person", "doe","john",5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
-    srcDO.writeDataFrame(dfSrc1, Seq())
+    srcDO.writeSparkDataFrame(dfSrc1, Seq())
 
     // prepare streaming action
     val actionAFail = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
@@ -551,7 +552,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
           logger.info("adding more data")
           val dfSrc2 = Seq(("20180102", "company", "olmo","-",10)) // second partition 20190101
             .toDF("dt", "type", "lastname", "firstname", "rating")
-          srcDO.writeDataFrame(dfSrc2, Seq())
+          srcDO.writeSparkDataFrame(dfSrc2, Seq())
         }
         // stop after runId=3
         if (state.isFinal && state.runId>=3) {
@@ -575,7 +576,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // check data after streaming is terminated
     assert(tgt2DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101","20180102"))
-    assert(tgt2DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6,11)) // +1 because of udfAddX
+    assert(tgt2DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6,11)) // +1 because of udfAddX
   }
 
   test("sdlb streaming restart, synchronous action skipped before asynchronously streaming action") {
@@ -594,21 +595,21 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     // setup DataObjects
     // source has partition columns dt and type
     val srcDO = CsvFileDataObject( "src1", tempPath+"/src1", partitions = Seq("dt","type")
-      , schema = Some(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int")))
+      , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(srcDO)
     // first table has partitions columns dt and type (same as source)
     val tgt1DO = CsvFileDataObject( "tgt1", tempPath+"/tgt1", partitions = Seq("dt","type")
-      , schema = Some(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int")))
+      , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt1DO)
     // second table has partitions columns dt and type (same as source)
     val tgt2DO = CsvFileDataObject( "tgt2", tempPath+"/tgt2", partitions = Seq("dt","type")
-      , schema = Some(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int")))
+      , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt2DO)
 
     // fill src with first files
     val dfSrc1 = Seq(("20180101", "person", "doe","john",5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
-    srcDO.writeDataFrame(dfSrc1, Seq())
+    srcDO.writeSparkDataFrame(dfSrc1, Seq())
 
     // prepare partition diff action
     val actionA = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
@@ -633,7 +634,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
                 logger.info("adding more data")
                 val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 10)) // second partition 20190101
                   .toDF("dt", "type", "lastname", "firstname", "rating")
-                srcDO.writeDataFrame(dfSrc2, Seq())
+                srcDO.writeSparkDataFrame(dfSrc2, Seq())
               case x if x>0 && event.progress.numInputRows > 0 =>
                 // stop streaming gracefully when second data partition was processed
                 logger.info("stopping streaming gracefully")
@@ -696,7 +697,7 @@ class PartitionStreamingTestStateListener2(runIdToAddData: Int) extends StateLis
       logger.info("adding more data")
       val dfSrc2 = Seq(("20180102", "company", "olmo","-",10)) // second partition 20190101
         .toDF("dt", "type", "lastname", "firstname", "rating")
-      srcDO.writeDataFrame(dfSrc2, Seq())
+      srcDO.writeSparkDataFrame(dfSrc2, Seq())
     }
   }
 }

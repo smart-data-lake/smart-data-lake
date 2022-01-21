@@ -20,9 +20,9 @@ package io.smartdatalake.workflow.action.customlogic
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.DefaultExpressionData
+import io.smartdatalake.util.spark.DefaultExpressionData
 import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig.fnTransformType
-import io.smartdatalake.workflow.action.sparktransformer.{DfsTransformer, SQLDfsTransformer, ScalaClassDfsTransformer, ScalaCodeDfsTransformer}
+import io.smartdatalake.workflow.action.sparktransformer.{GenericDfsTransformerDef, SQLDfsTransformer, ScalaClassDfsTransformer, ScalaCodeDfsTransformer}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -75,7 +75,7 @@ case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFi
   require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || sqlCode.isDefined, "Either className, scalaFile, scalaCode or sqlCode must be defined for CustomDfsTransformer")
 
   // Load Transformer code from appropriate location
-  val impl: DfsTransformer = className.map(clazz => ScalaClassDfsTransformer(className = clazz, options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
+  val impl: GenericDfsTransformerDef = className.map(clazz => ScalaClassDfsTransformer(className = clazz, options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
     .orElse {
       scalaFile.map(file => ScalaCodeDfsTransformer(file = Some(file), options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
     }.orElse{

@@ -18,17 +18,16 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
-import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.functions.lit
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SparkSession}
+
+import scala.reflect.runtime.universe.Type
 
 private[smartdatalake] trait TableDataObject extends DataObject with CanCreateDataFrame with SchemaValidation {
 
   var table: Table
-
-  var tableSchema: StructType = null
 
   def isDbExisting(implicit context: ActionPipelineContext): Boolean
 
@@ -36,22 +35,28 @@ private[smartdatalake] trait TableDataObject extends DataObject with CanCreateDa
 
   def dropTable(implicit context: ActionPipelineContext): Unit
 
-  def getPKduplicates(implicit context: ActionPipelineContext): DataFrame = if (table.primaryKey.isEmpty) {
-    getDataFrame().where(lit(false))
-  } else {
-    getDataFrame().getNonuniqueRows(table.primaryKey.get.toArray)
+  def getPKduplicates(subFeedType: Type)(implicit context: ActionPipelineContext): GenericDataFrame = {
+    val helper = DataFrameSubFeed.getHelper(subFeedType)
+    import helper._
+    if (table.primaryKey.isEmpty) {
+      getDataFrame(Seq(), subFeedType).filter(lit(false)) // get empty dataframe
+    } else {
+      getDataFrame(Seq(), subFeedType).getNonuniqueRows(table.primaryKey.get)
+    }
   }
 
-  def getPKnulls(implicit context: ActionPipelineContext): DataFrame = {
-    getDataFrame().getNulls(table.primaryKey.get.toArray)
+  def getPKnulls(subFeedType: Type)(implicit context: ActionPipelineContext): GenericDataFrame = {
+    val helper = DataFrameSubFeed.getHelper(subFeedType)
+    import helper._
+    if (table.primaryKey.isEmpty) {
+      getDataFrame(Seq(), subFeedType).filter(lit(false)) // get empty dataframe
+    } else {
+      getDataFrame(Seq(), subFeedType).getNulls(table.primaryKey.get)
+    }
   }
 
-  def getPKviolators(implicit context: ActionPipelineContext): DataFrame = {
-    getPKduplicates.union(getPKnulls)
-  }
-
-  def isPKcandidateKey(implicit context: ActionPipelineContext): Boolean =  {
-    table.primaryKey.isEmpty || getDataFrame().isCandidateKey(table.primaryKey.get.toArray)
+  def getPKviolators(subFeedType: Type)(implicit context: ActionPipelineContext): GenericDataFrame = {
+    getPKduplicates(subFeedType).unionByName(getPKnulls(subFeedType))
   }
 
   override def atlasQualifiedName(prefix: String): String = s"${table.db.getOrElse("default")}.${table.name}"

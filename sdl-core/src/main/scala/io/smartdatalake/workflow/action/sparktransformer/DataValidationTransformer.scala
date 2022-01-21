@@ -20,12 +20,14 @@
 package io.smartdatalake.workflow.action.sparktransformer
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.functions.{array, expr, flatten, lit, when}
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
+
+import scala.reflect.runtime.universe.typeOf
 
 /**
  * Apply validation rules to a DataFrame and collect potential violation error messages in a new column.
@@ -33,17 +35,22 @@ import org.apache.spark.sql.{Column, DataFrame, SparkSession}
  * @param description  Optional description of the transformer
  * @param rules        list of validation rules to apply to the DataFrame
  * @param errorsColumn Optional column name for the list of error messages. Default is "errors".
+ * @param subFeedTypeForValidation For validating the rule expression, the runtime subFeedType is not yet known.
+ *                                 By default SparkSubFeed langauge is used, but you can configure a different one if needed.
  */
-case class DataValidationTransformer(override val name: String = "dataValidation", override val description: Option[String] = None, rules: Seq[ValidationRule], errorsColumn: String = "errors") extends ParsableDfTransformer {
+case class DataValidationTransformer(override val name: String = "dataValidation", override val description: Option[String] = None, rules: Seq[ValidationRule], errorsColumn: String = "errors", subFeedTypeForValidation: String = typeOf[SparkSubFeed].typeSymbol.fullName) extends GenericDfTransformer {
+  private val validationHelper: DataFrameSubFeedCompanion = DataFrameSubFeed.getHelper(subFeedTypeForValidation)
   // check that rules are parsable
-  rules.foreach(_.getValidationColumn)
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
-    df.withColumn(errorsColumn, flatten(array(rules.map(rule => array(rule.getValidationColumn)): _*))) // nested array and flatten is used to eliminate null entries
+  rules.foreach(_.getValidationColumn(validationHelper))
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
+    implicit val runtimeHelper: DataFrameSubFeedCompanion = DataFrameSubFeed.getHelper(df.subFeedType)
+    import runtimeHelper._
+    df.withColumn(errorsColumn, array_construct_compact(rules.map(rule => rule.getValidationColumn): _*))
   }
-  override def factory: FromConfigFactory[ParsableDfTransformer] = DataValidationTransformer
+  override def factory: FromConfigFactory[GenericDfTransformer] = DataValidationTransformer
 }
 
-object DataValidationTransformer extends FromConfigFactory[ParsableDfTransformer] {
+object DataValidationTransformer extends FromConfigFactory[GenericDfTransformer] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): DataValidationTransformer = {
     extract[DataValidationTransformer](config)
   }
@@ -51,14 +58,17 @@ object DataValidationTransformer extends FromConfigFactory[ParsableDfTransformer
 
 sealed trait ValidationRule {
   def prepare(implicit context: ActionPipelineContext): Unit = Unit
-  def getValidationColumn: Column
+  def getValidationColumn(implicit helper: DataFrameSubFeedCompanion): GenericColumn
 }
 
 /**
  * Definition for a row level data validation rule.
- * @param condition a Spark SQL expression defining the condition to be tested.
+ * @param condition a Spark SQL expression defining the condition to be tested. The condition should return true if the condition is satisfied.
  * @param errorMsg Optional error msg to be create if the condition fails. Default is to use a text representation of the condition.
  */
 case class RowLevelValidationRule(condition: String, errorMsg: Option[String] = None) extends ValidationRule {
-  override def getValidationColumn: Column = when(!expr(condition), lit(errorMsg.getOrElse(s"""validation rule "$condition" failed!"""")))
+  override def getValidationColumn(implicit helper: DataFrameSubFeedCompanion): GenericColumn = {
+    import helper._
+    when(not(expr(condition)), lit(errorMsg.getOrElse(s"""validation rule "$condition" failed!"""")))
+  }
 }

@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.action.customlogic
 
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc._
+import io.smartdatalake.util.spark.DefaultExpressionData
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig.fnTransformType
 import io.smartdatalake.workflow.action.sparktransformer._
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -81,7 +82,7 @@ trait CustomDfTransformer extends Serializable {
 case class CustomDfTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Option[String] = None, pythonFile: Option[String] = None, pythonCode: Option[String] = None, options: Option[Map[String,String]] = None, runtimeOptions: Option[Map[String,String]] = None) {
   require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || sqlCode.isDefined || pythonFile.isDefined || pythonCode.isDefined, "Either className, scalaFile, scalaCode, sqlCode, pythonFile or code must be defined for CustomDfTransformer")
 
-  val impl: DfTransformer = className.map(clazz => ScalaClassDfTransformer(className = clazz, options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
+  val impl: GenericDfTransformerDef = className.map(clazz => ScalaClassDfTransformer(className = clazz, options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
   .orElse {
     scalaFile.map(file => ScalaCodeDfTransformer(file = Some(file), options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
   }.orElse{

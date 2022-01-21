@@ -18,10 +18,6 @@
  */
 package io.smartdatalake.workflow.action
 
-import java.io.PrintWriter
-import java.nio.file.Files
-
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.PartitionDiffMode
 import io.smartdatalake.testutils.TestUtil
@@ -34,6 +30,8 @@ import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
+import java.io.PrintWriter
+import java.nio.file.Files
 import scala.io.Source
 
 class CustomFileActionTest extends FunSuite with BeforeAndAfter {
@@ -79,12 +77,12 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
     assert(r1.head.fileName == resourceFile)
 
     // read src with util and count
-    val dfSrc = srcDO.getDataFrame()
+    val dfSrc = srcDO.getSparkDataFrame()
     assert(dfSrc.columns.length > 2)
     val srcCount = dfSrc.count
 
     // read tgt with util and count
-    val dfTgt = tgtDO.getDataFrame()
+    val dfTgt = tgtDO.getSparkDataFrame()
     assert(dfTgt.columns.length == 2)
     val tgtCount = dfTgt.count
     assert(srcCount == tgtCount)
@@ -122,8 +120,8 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtDO.getFileRefs(srcPartitionValues).map(_.fileName) == Seq(resourceFile))
 
     // check counts
-    val dfSrc = srcDO.getDataFrame()
-    val dfTgt = tgtDO.getDataFrame()
+    val dfSrc = srcDO.getSparkDataFrame()
+    val dfTgt = tgtDO.getSparkDataFrame()
     assert(dfSrc.count == dfTgt.count)
   }
 

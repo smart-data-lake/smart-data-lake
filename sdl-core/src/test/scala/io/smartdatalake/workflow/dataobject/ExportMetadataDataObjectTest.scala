@@ -35,7 +35,7 @@ class ExportMetadataDataObjectTest extends DataObjectTestSuite {
     val config: Config = ConfigFactory.parseString("id = dataObjects-exporter")
 
     val dataObjectsExporter: DataObjectsExporterDataObject = DataObjectsExporterDataObject.fromConfig(config)
-    val df = dataObjectsExporter.getDataFrame()
+    val df = dataObjectsExporter.getSparkDataFrame()
     df.select("id").head().get(0) should be (testDo.id.id)
     df.select("name").head().get(0) should be (metaData.name.get)
     df.select("description").head().get(0) should be (metaData.description.get)
@@ -50,7 +50,7 @@ class ExportMetadataDataObjectTest extends DataObjectTestSuite {
          """.stripMargin)
 
     val dataObjectsExporter = DataObjectsExporterDataObject.fromConfig(config)
-    val df = dataObjectsExporter.getDataFrame()
+    val df = dataObjectsExporter.getSparkDataFrame()
     df.select("id").head().get(0) should be ("testDataObjectFromConfig")
     df.select("name").head().get(0) should be ("Test DataObject From Config")
     df.select("description").head().get(0) should be ("Loaded from a Test Config")
@@ -71,7 +71,7 @@ class ExportMetadataDataObjectTest extends DataObjectTestSuite {
     val config = ConfigFactory.parseString("id = actions-exporter")
 
     val actionsExporter = ActionsExporterDataObject.fromConfig(config)
-    val df = actionsExporter.getDataFrame()
+    val df = actionsExporter.getSparkDataFrame()
     df.select("id").head().get(0) should be (testAction.id.id)
     df.select("name").head().get(0) should be (metaData.name.get)
     df.select("description").head().get(0) should be (metaData.description.get)
@@ -86,7 +86,7 @@ class ExportMetadataDataObjectTest extends DataObjectTestSuite {
          """.stripMargin).resolve()
 
     val actionsExporter = ActionsExporterDataObject.fromConfig(config)
-    val df = actionsExporter.getDataFrame()
+    val df = actionsExporter.getSparkDataFrame()
     df.select("id").head().get(0) should be ("testActionFromConfig")
     df.select("name").head().get(0) should be ("Test Action From Config")
     df.select("description").head().get(0) should be ("Loaded from a Test Config")
