@@ -1,5 +1,5 @@
 
-# This is the initial application.conf file and is the same as application.conf.part-1-solution
+# This is the application.conf file as it should look after completing part-1
 
 global {
   spark-options {
