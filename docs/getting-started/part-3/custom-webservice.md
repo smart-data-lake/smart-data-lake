@@ -107,7 +107,7 @@ Note that parameter `--feed-sel` only selects `download-departures` as Action fo
 ```
   mkdir .mvnrepo
   docker run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
-  docker run --rm -v ${PWD}/target:/mnt/lib -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config smart-data-lake/gs1:latest --config /mnt/config --feed-sel ids:download-departures
+  docker run --rm -v ${PWD}/target:/mnt/lib -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:download-departures
 ```
 
 Nothing should have changed. You should again receive data as json files in the corresponding `stg-departures` folder. 

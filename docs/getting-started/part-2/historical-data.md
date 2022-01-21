@@ -66,7 +66,7 @@ Then start Action `historize-airports`.
 You may have seen that the `--feed-sel` parameter of SDL command line supports more options to select actions to execute (see command line help). 
 We will now only execute this single action by changing this parameter to `--feed-sel ids:historize-airports`:
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config --network getting-started_default smart-data-lake/gs1:latest -c /mnt/config --feed-sel ids:historize-airports
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest -c /mnt/config --feed-sel ids:historize-airports
 
 After successful execution you can check the schema and data of our table in Polynote. 
 It now has a time dimension through the two new columns `dl_ts_captured` and `dl_ts_delimited`.
@@ -190,7 +190,7 @@ Now, delete the table and data of the DataObject `int-departures` in Polynote, t
 
 Then start Action deduplicate-departures:
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config --network getting-started_default smart-data-lake/gs1:latest -c /mnt/config --feed-sel ids:deduplicate-departures
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest -c /mnt/config --feed-sel ids:deduplicate-departures
 
 After successful execution you can check the schema and data of our table in Polynote. 
 The new column `dl_ts_captured` shows the current time of the data pipeline run when this object first occurred in the input data. 

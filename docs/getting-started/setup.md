@@ -17,7 +17,7 @@ To run this tutorial you just need two things:
 - Then run:
 
 
-    docker build -t smart-data-lake/gs1 .
+    docker build -t sdl-spark .
 
 
 ## Run docker image
@@ -26,7 +26,7 @@ Let's see Smart Data Lake in action!
 Run the following commands in the same terminal:
 
     mkdir -f data
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config smart-data-lake/gs1:latest --config /mnt/config --feed-sel download
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download
 
 This creates a folder in the current directory named *data* and then 
 executes a simple data pipeline that downloads two files from two different websites into that directory.

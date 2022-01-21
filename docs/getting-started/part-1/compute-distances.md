@@ -65,7 +65,7 @@ but this would have resulted in more complex code working with lists of inputs, 
 
 You can execute the usual *docker run* command :
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config demo:latest -c /mnt/config --feed-sel compute
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel compute
 
 Under *data/btl-distances* you can now see the final result. 
 
@@ -114,7 +114,7 @@ Just from the definitions of DataObjects and Actions alone, SDL builds a DAG and
 
 You can also execute the entire data pipeline by selecting all feeds:
         
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config smart-data-lake/gs1:latest --config /mnt/config --feed-sel .*
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel .*
 
 The successful execution DAG looks like this
 

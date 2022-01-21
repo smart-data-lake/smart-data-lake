@@ -65,7 +65,7 @@ Always using one Data Object as output will make your data lineage more detailed
 ## Try it out
 You can run the usual *docker run* command:
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config demo:latest -c /mnt/config --feed-sel compute
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel compute
 
 You should now see the resulting files in *data/btl-connected-airports*.
 Great! Now we have names and coordinates of destination airports.

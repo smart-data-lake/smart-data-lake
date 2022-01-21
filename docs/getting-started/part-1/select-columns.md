@@ -83,7 +83,7 @@ try out our new actions.
 
 To execute the pipeline, use the same command as before, but change the feed to compute:
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config smart-data-lake/gs1:latest --config /mnt/config --feed-sel compute
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel compute
 
 :::caution
 
@@ -108,13 +108,13 @@ We might work on a small data set for now, but keep in mind that this would scal
 SDL gives you precise control on which actions you want to execute. 
 For instance if you only want to execute the action that we just wrote, you can type
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config smart-data-lake/gs1:latest --config /mnt/config --feed-sel ids:select-airport-cols
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:select-airport-cols
 
 Of course, at this stage, the feed *compute* only contains this one action, so the result will be the same.
 
 SDL also allows you to use combinations of expressions to select the actions you want to execute. You can run
 
-    docker run --rm smart-data-lake/gs1:latest --help
+    docker run --rm sdl-spark:latest --help
 
 to see all options that are available. For your convenience, here is the current output of the help command:
 
@@ -161,7 +161,7 @@ to see all options that are available. For your convenience, here is the current
 One popular option is to use regular expressions to execute multiple feeds together.
 In our case, we can run the entire data pipeline with the following command : 
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config smart-data-lake/gs1:latest --config /mnt/config --feed-sel .*
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel .*
 
 
 

@@ -126,7 +126,7 @@ Before, we only mounted the data folder so that you could see the results of the
 The config file that was being used was located inside the docker image.
 This time, we add another volume with your config-file and tell SDL to use it with the *--config* option.
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config smart-data-lake/gs1:latest --config /mnt/config --feed-sel download
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download
 
 After executing it, you will see the file *data/stg_departures/result.json* has been replaced with the output of your pipeline.
 
@@ -143,7 +143,7 @@ you can use this docker command to list the running containers:
     docker ps
 
 While your feed-execution is running, the output of this command will contain
-an execution with the image name *smart-data-lake/gs1:latest*.
+an execution with the image name *sdl-spark:latest*.
 Use the container id to stop the container by typing:
     
     docker containter stop <container id>

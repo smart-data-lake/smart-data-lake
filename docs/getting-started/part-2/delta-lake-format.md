@@ -89,8 +89,8 @@ To run our data pipeline, first delete the data directory - otherwise DeltaLakeT
 Then you can execute the usual *docker run* command for all feeds:
 
     mkdir -f data
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config smart-data-lake/gs1:latest -c /mnt/config --feed-sel 'download*'
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config smart-data-lake/gs1:latest -c /mnt/config --feed-sel '^(?!download).*'
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel 'download*'
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel '^(?!download).*'
 
 :::info
 Why two separate commands?   
@@ -145,11 +145,11 @@ This instructs Spark to use the external metastore you started with docker-compo
 Your Smart Data Lake container doesn't have access to the other containers just yet. 
 So when you run your data pipeline again, you need to add a parameter `--network getting-started_default` to join the virtual network where the metastore is located:
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config --network getting-started_default smart-data-lake/gs1:latest -c /mnt/config --feed-sel '.*'
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest -c /mnt/config --feed-sel '.*'
 
 When using podman you need to join the pod where the metastore is located with `--pod getting-started`:
 
-    podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config --pod getting-started smart-data-lake/gs1:latest -c /mnt/config --feed-sel '.*'
+    podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest -c /mnt/config --feed-sel '.*'
 
 After you run your data pipeline again, you should now be able to see our DataObjects data in Polynote.
 No need to restart Polynote, just open it again and run all cells.
