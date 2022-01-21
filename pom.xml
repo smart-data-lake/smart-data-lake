@@ -34,11 +34,11 @@
 		<version>2.1.0</version>
 	</parent>
 
-	<groupId>com.company.app</groupId>
-	<artifactId>app-template</artifactId>
+	<groupId>io.smartdatalake</groupId>
+	<artifactId>getting-started</artifactId>
 	<version>1.0</version>
 
-	<name>Template Data Lake</name>
+	<name>Getting Started Tutorial</name>
 
 	<properties>
 		<!-- default scala version - use predefined maven profiles to override -->
