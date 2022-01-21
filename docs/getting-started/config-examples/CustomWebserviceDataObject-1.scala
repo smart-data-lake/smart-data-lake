@@ -18,6 +18,9 @@ import scala.annotation.tailrec
 import scala.util.{Failure, Success}
 import java.time.Instant
 
+case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int)
+case class DepartureQueryParameters(airport: String, begin: Long, end: Long)
+
 /**
  * [[DataObject]] to call webservice and return response as a DataFrame
  */

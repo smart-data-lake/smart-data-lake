@@ -15,6 +15,9 @@ Throughout this documentation, we will mostly refer to *SDL* which is just short
 With Smart Data Lake Builder, you describe your data pipelines in a config file using the [HOCON](https://github.com/lightbend/config/blob/master/HOCON.md) format.
 All HOCON features are supported so you could also split your configuration into several files. But for this first part, let's just use one file.
 
+The configuration is located in downloaded code under config/application.conf.
+To walk through part-1 tutorial, please reset the existing application.conf to the config file available [here](../config-examples/application-part1-start.conf)
+
 A data pipeline is composed of at least two entities: *DataObjects* and *Actions*.
 
 An action defines how one (or multiple) DataObject are copied or transformed into another (or multiple) DataObject.
@@ -126,7 +129,7 @@ Before, we only mounted the data folder so that you could see the results of the
 The config file that was being used was located inside the docker image.
 This time, we add another volume with your config-file and tell SDL to use it with the *--config* option.
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download
 
 After executing it, you will see the file *data/stg_departures/result.json* has been replaced with the output of your pipeline.
 

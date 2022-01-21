@@ -5,7 +5,7 @@ title: Joining It Together
 ## Goal
 So now we have data from departures in our stage layer, and we have cleaned data for airports in our integration layer.
 In this step we will finally join both data sources together.
-We will continue based on the config file available [here](../config-examples/application-compute-part1-cols.conf).
+We will continue based on the config file available [here](../config-examples/application-part1-compute-cols.conf).
 At the end of the step, we will have all planes departing from Bern Airport
 in the given timeframe along with their readable destination airport names, as well as geo-coordinates.
 
@@ -65,7 +65,7 @@ Always using one Data Object as output will make your data lineage more detailed
 ## Try it out
 You can run the usual *docker run* command:
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel compute
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel compute
 
 You should now see the resulting files in *data/btl-connected-airports*.
 Great! Now we have names and coordinates of destination airports.

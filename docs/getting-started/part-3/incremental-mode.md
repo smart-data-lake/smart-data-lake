@@ -102,7 +102,7 @@ To have access to the state file, we specify the path to be in an already mounte
 
 ```
   docker run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
-  docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures --state-path /mnt/data/state -n getting-started
+  docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures --state-path /mnt/data/state -n getting-started
 ```
 Use this slightly modified command to run `download-deduplicate-departures` Action. 
 Nothing should have changed so far, since we only read and write an empty state.   
@@ -151,7 +151,14 @@ The scenario will be that the first run fetches the data defined in the configur
 If this time difference is larger than a week, the program only queries the next four days since the last execution.
 If there is no data available in a time window, because only a few seconds have passed since the last execution, the execution will fail with Error **404**.
 
+At the end your config file should look something like [this](../config-examples/application-part3-download-incremental-mode.conf) and the CustomWebserviceDataObject code like [this](../config-examples/CustomWebserviceDataObject-2.scala).
+
 :::info
 Unfortunately, the webservice on opensky-network.org responds with a **404** error code when no data is available, rather than a **200** and an empty response. 
-Therefore, SDL gets a 404 and will fail the execution.
+Therefore, SDLB gets a 404 and will fail the execution. The exception could be catched inside CustomWebserviceDataObject, but what if we have a real 404 error?!
 :::
+
+Congratulation, you just completed implementing a nice incremental loading mechanism!
+
+That's it from getting-started for now. We hope you enjoyed your first steps with SDLB. 
+For further informations check the rest of the documentation and the blog on this page!

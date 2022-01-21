@@ -5,7 +5,7 @@ title: Select Columns
 ## Goal
 
 In this step we write our first Action that modifies data.
-We will continue based upon the config file available [here](../config-examples/application-download-part1.conf).
+We will continue based upon the config file available [here](../config-examples/application-part1-download.conf).
 When you look at the data in the folder *data/stg-airports/result.csv*, you will notice that we
 don't need most of the columns. In this step, we will write a simple *CopyAction* that selects only the columns we
 are interested in.
@@ -83,7 +83,7 @@ try out our new actions.
 
 To execute the pipeline, use the same command as before, but change the feed to compute:
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel compute
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel compute
 
 :::caution
 
@@ -108,7 +108,7 @@ We might work on a small data set for now, but keep in mind that this would scal
 SDL gives you precise control on which actions you want to execute. 
 For instance if you only want to execute the action that we just wrote, you can type
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:select-airport-cols
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:select-airport-cols
 
 Of course, at this stage, the feed *compute* only contains this one action, so the result will be the same.
 
@@ -161,7 +161,7 @@ to see all options that are available. For your convenience, here is the current
 One popular option is to use regular expressions to execute multiple feeds together.
 In our case, we can run the entire data pipeline with the following command : 
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel .*
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel .*
 
 
 
