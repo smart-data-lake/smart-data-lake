@@ -11,7 +11,7 @@ This is the easiest way to run SDL, as it needs no installation except from a do
 
 ### Build Spark docker image
 
-    docker build -t sdl-gs-part-1 .
+    docker build -t sdl-spark .
 
 ### Build getting-started artifact
 
@@ -24,7 +24,7 @@ or you can also use maven directly if you have Java SDK and Maven installed
 
 ### Run SDL with docker image
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network=spark sdl-gs-part-1:latest -c /mnt/config --feed-sel .*
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network=spark sdl-spark:latest -c /mnt/config --feed-sel .*
 
 ## Run SDL with Maven
 
@@ -54,7 +54,7 @@ This needs an Intellij and Java SDK installation.
 
 ## Run Polynote and Metastore with docker-compose (part-2)
 
-In part-2 you learn about Notebooks and Metastore to work with the sample data. 
+In part-2 you learn about Notebooks and Metastore to work with the data of this tutorial. 
 You can start these services in a docker environment with docker-compose.
 To update the project with these services `unzip part-2.additional-files.zip` in the projects root folder.
 
