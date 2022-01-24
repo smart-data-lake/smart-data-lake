@@ -3,6 +3,9 @@ id: setup
 title: Technical Setup
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Requirements
 
 To run this tutorial you just need two things:
@@ -16,8 +19,28 @@ To run this tutorial you just need two things:
 - Open up a terminal and change to the folder with the source, you should see a file called Dockerfile. 
 - Then run (note: this might take some time, but it's only needed once):
 
+<Tabs
+defaultValue="javascript"
+values={[
+{label: 'Docker', value: 'javascript'},
+{label: 'Podman', value: 'other'},
+]}>
+<TabItem value="javascript">
 
-    docker build -t sdl-spark .
+```jsx
+docker build -t sdl-spark .
+```
+
+</TabItem>
+<TabItem value="other">
+
+```jsx
+podman build -t sdl-spark .
+```
+
+</TabItem>
+</Tabs>
+
 
 
 ## Compile Scala Classes
