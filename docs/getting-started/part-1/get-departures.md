@@ -16,7 +16,7 @@ With Smart Data Lake Builder, you describe your data pipelines in a config file 
 All HOCON features are supported so you could also split your configuration into several files. But for this first part, let's just use one file.
 
 The configuration is located in downloaded code under config/application.conf.
-To walk through part-1 tutorial, please reset the existing application.conf to the config file available [here](../config-examples/application-part1-start.conf)
+To walk through part-1 of this tutorial, please reset the existing application.conf to the config file available [here](../config-examples/application-part1-start.conf).
 
 A data pipeline is composed of at least two entities: *DataObjects* and *Actions*.
 
@@ -135,22 +135,10 @@ After executing it, you will see the file *data/stg_departures/result.json* has 
 
 :::caution
 Since both web servers are freely available on the internet, they might be overloaded by traffic.
-If the download fails because of a timeout, either increase *readTimeoutMs* or wait a couple of minutes and try again.
+If the download fails because of a timeout wait a couple of minutes and try again.
 If the download still won't work (or if you just get empty files), you can copy the contents of the folder *data-fallback-download*
 into your data folder. This will allow you to execute all steps starting from [Select Columns](select-columns.md)
 :::
-
-In case you run into issues when executing your pipeline and you want to terminate the process
-you can use this docker command to list the running containers:
-
-    docker ps
-
-While your feed-execution is running, the output of this command will contain
-an execution with the image name *sdl-spark:latest*.
-Use the container id to stop the container by typing:
-    
-    docker containter stop <container id>
-
 
 **Congratulations!** You just wrote your first configuration and executed your feed! Now let's get our second input data source...
 

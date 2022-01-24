@@ -20,16 +20,18 @@ To run this tutorial you just need two things:
     docker build -t sdl-spark .
 
 
-## Run SDL with Spark docker image
+## Compile Java Classes
 
-Let's see Smart Data Lake in action!
-
-First compile included Java classes (note: this might take some time, but it's only needed at the beginning or if Java code has changed)
+Compile included Java classes. Note: this might take some time, but it's only needed at the beginning or if Java code has changed.
 
     mkdir .mvnrepo
     docker run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
 
-Then run
+
+## Run SDL with Spark docker image
+
+
+Now let's see Smart Data Lake in action!
 
     mkdir -f data
     docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download
@@ -39,6 +41,9 @@ executes a simple data pipeline that downloads two files from two different webs
 
 When the execution is complete, you should see the two files in the *data* folder.
 Wonder what happened ? You will create the data pipeline that does just this in the first steps of this guide.
+
+If you wish, you can start right away with [part 1](get-input-data).
+For parts 2 and later, it is recommended to setup a Development Environment.
 
 ## Development Environment
 For some parts of this tutorial it is beneficial to have a working development environment ready. In the following we will mainly explain how one can configure a working evironment for 

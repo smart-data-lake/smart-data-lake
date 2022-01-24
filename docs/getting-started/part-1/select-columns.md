@@ -93,7 +93,7 @@ If you encounter an error that looks like this:
     ma must be defined if there are no existing files.'
     Caused by: java.lang.IllegalArgumentException: requirement failed: (DataObject~stg-airports) DataObject schema is undefined. A schema must be defined if there are no existing files.
 
-Execute the feed download again. After that feed was successfully executed, the execution of the feed .* or compute will work.
+Execute the **`download`**-feed again. After that feed was successfully executed, the execution of the feed `.*` or `compute` will work.
 More one this problem in the List of [Common Problems](../troubleshooting/common-problems.md).
 
 
@@ -118,10 +118,8 @@ SDL also allows you to use combinations of expressions to select the actions you
 
 to see all options that are available. For your convenience, here is the current output of the help command:
 
-    Usage: LocalSmartDataLakeBuilder [options]
-    
-      -f, --feed-sel <value>   Select actions to execute by one or multiple expressions separated by semicolon (;). Results from multiple expressions are combined from left to right.
-                               Expression syntax: "<operation?><prefix:?><regex>"
+      -f, --feed-sel <operation?><prefix:?><regex>[,<operation?><prefix:?><regex>...]
+                               Select actions to execute by one or multiple expressions separated by comma (,). Results from multiple expressions are combined from left to right.
                                Operations:
                                - pipe symbol (|): the two sets are combined by union operation (default)
                                - ampersand symbol (&): the two sets are combined by intersection operation
@@ -136,18 +134,20 @@ to see all options that are available. For your convenience, here is the current
                                - 'startFromDataObjectIds': select actions which have an input DataObject with id is matched by regex pattern and any dependent action (=successors)
                                - 'endWithDataObjectIds': select actions which have an output DataObject with id is matched by regex pattern and their predecessors
                                All matching is done case-insensitive.
-                               Example: to filter action 'A' and its successors but only in layer L1 and L2, use the following pattern: "startFromActionIds:a;&layers:(l1|l2)"
+                               Example: to filter action 'A' and its successors but only in layer L1 and L2, use the following pattern: "startFromActionIds:a,&layers:(l1|l2)"
       -n, --name <value>       Optional name of the application. If not specified feed-sel is used.
-      -c, --config <value>     One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme "cp" which is treated as classpath entr
-    y.
-      --partition-values <value>
-                               Partition values to process in format <partitionColName>=<partitionValue>[,<partitionValue>,...].
-      --multi-partition-values <value>
-                               Multi partition values to process in format <partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>[;(<partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>;...].
-      --parallelism <value>    Parallelism for DAG run.
-      --state-path <value>     Path to save run state files. Must be set to enable recovery in case of failures.
-      --override-jars <value>  Comma separated list of jars for child-first class loader. The jars must be present in classpath.
-      --test <value>           Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage
+      -c, --config <file1>[,<file2>...]
+                               One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme "cp" which is treated as classpath entry.
+      --partition-values <partitionColName>=<partitionValue>[,<partitionValue>,...]
+                               Partition values to process for one single partition column.
+      --multi-partition-values <partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>[;(<partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>;...]
+                               Partition values to process for multiple partitoin columns.
+      -s, --streaming          Enable streaming mode for continuous processing.
+      --parallelism <int>      Parallelism for DAG run.
+      --state-path <path>      Path to save run state files. Must be set to enable recovery in case of failures.
+      --override-jars <jar1>[,<jar2>...]
+                               Comma separated list of jar filenames for child-first class loader. The jars must be present in classpath.
+      --test <config|dry-run>  Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage
       --help                   Display the help text.
       --version                Display version information.
       -m, --master <value>     The Spark master URL passed to SparkContext (default=local[*], yarn, spark://HOST:PORT, mesos://HOST:PORT, k8s://HOST:PORT).
@@ -156,6 +156,8 @@ to see all options that are available. For your convenience, here is the current
       -d, --kerberos-domain <value>
                                Kerberos-Domain for authentication (USERNAME@KERBEROS-DOMAIN) in local mode.
       -u, --username <value>   Kerberos username for authentication (USERNAME@KERBEROS-DOMAIN) in local mode.
+      -k, --keytab-path <value>
+                               Path to the Kerberos keytab file for authentication in local mode.
 
 
 One popular option is to use regular expressions to execute multiple feeds together.
