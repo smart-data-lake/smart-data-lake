@@ -19,20 +19,20 @@ To run this tutorial you just need two things:
 - Open up a terminal and change to the folder with the source, you should see a file called Dockerfile. 
 - Then run (note: this might take some time, but it's only needed once):
 
-<Tabs
-defaultValue="javascript"
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
 values={[
-{label: 'Docker', value: 'javascript'},
-{label: 'Podman', value: 'other'},
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
 ]}>
-<TabItem value="javascript">
+<TabItem value="docker">
 
 ```jsx
 docker build -t sdl-spark .
 ```
 
 </TabItem>
-<TabItem value="other">
+<TabItem value="podman">
 
 ```jsx
 podman build -t sdl-spark .
@@ -41,16 +41,37 @@ podman build -t sdl-spark .
 </TabItem>
 </Tabs>
 
-
-
 ## Run SDL with Spark docker image
 
 Let's see Smart Data Lake in action!
 
 First compile included Java classes (note: this might take some time, but it's only needed at the beginning or if Java code has changed)
 
-    mkdir .mvnrepo
-    docker run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+mkdir .mvnrepo
+docker run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+mkdir .mvnrepo
+podman run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
+```
+
+</TabItem>
+</Tabs>
+
+
 
 Then run
 
