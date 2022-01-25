@@ -71,7 +71,7 @@ Hence, we enforce the rule that if the chosen interval is larger, we query only 
 
 Note that we changed the type to `CustomWebserviceDataObject`.
 This is a custom DataObject type, not included in standard Smart Data Lake Builder. 
-To make it work please go to the projects root directory and **unzip part3.additional-files.zip**.
+To make it work please go to the project's root directory and **unzip part3.additional-files.zip** into the project's root folder.
 It includes the following file for you:
 
   - ./src/scala/io/smartdatalake/workflow/dataobject/CustomWebserviceDataObject.scala
@@ -168,16 +168,16 @@ In this section we will learn how we can avoid sending the request twice to the 
 We will now implement a simple *if ... else* statement that allows us to return an empty data frame with the correct schema in the **Init** phase and to only query the data in the **Exec** phase. 
 This logic is implemented in the next code snipped and should replace the code currently enclosed between the two `// REPLACE BLOCK` comments.
 ```scala
-if(context.phase == ExecutionPhase.Init){
+    if(context.phase == ExecutionPhase.Init){
   // simply return an empty data frame
   Seq[String]().toDF("responseString")
-    .select(from_json($"responseString", DataType.fromDLL(schema)).as("response"))
-    .select(explode($"response").as("record"))
-    .select("record.*")
-    .withColumn("created_at", current_timestamp())
+          .select(from_json($"responseString", DataType.fromDDL(schema)).as("response"))
+          .select(explode($"response").as("record"))
+          .select("record.*")
+          .withColumn("created_at", current_timestamp())
 } else {
   // use the queryParameters from the config
-  val currentQueryParameters = checkQueryParameters(queryParameters.get)
+  val currentQueryParameters = checkQueryParameters(queryParameters)
 
   // given the query parameters, generate all requests
   val departureRequests = currentQueryParameters.map(
@@ -187,20 +187,22 @@ if(context.phase == ExecutionPhase.Init){
   val departuresResponses = departureRequests.map(request(_))
   // create dataframe with the correct schema and add created_at column with the current timestamp
   val departuresDf = departuresResponses.toDF("responseBinary")
-    .withColumn("responseString", byte2String($"responseBinary"))
-    .select(from_json($"responseString", DataType.fromDDL(schema)).as("response"))
-    .select(explode($"response").as("record"))
-    .select("record.*")
-    .withColumn("created_at", current_timestamp())
-  
+          .withColumn("responseString", byte2String($"responseBinary"))
+          .select(from_json($"responseString", DataType.fromDDL(schema)).as("response"))
+          .select(explode($"response").as("record"))
+          .select("record.*")
+          .withColumn("created_at", current_timestamp())
+
   // put simple nextState logic below
-  
+
   // return
-   departuresDf
+  departuresDf
 }
+
 ```
 Don't be confused about some comments in the code. They will be used in the next chapter. 
-If you rebuild the docker image and then restart the program you should see that we do not query the API twice anymore.
+If you re-compile the code of this project and then restart the program with the previous commands
+you should see that we do not query the API twice anymore.
 
 :::tip
 Use the information of the `ExecutionPhase` in your custom implementations whenever you need to have different logic during the different phases.
@@ -223,3 +225,11 @@ Please replace it with the implementation below
 The old Action `download-departures` and the DataObject `stg-departures` can be deleted, as it's not needed anymore.
 
 At the end, your config file should look something like [this](../config-examples/application-part3-download-custom-webservice.conf) and the CustomWebserviceDataObject code like [this](../config-examples/CustomWebserviceDataObject-1.scala).
+Note that since we changed the file format to delta lake, your new `download-deduplicate-departures` feed now needs the metastore that you setup in part 2.
+Therefore, you need to make sure that polynote and the metastore are running as shown in [the first step of part 2](../part-2/delta-lake-format).
+Then, you need to delete the files in the data folder and then run the following command in another terminal: 
+
+    mkdir -f data
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures
+
+

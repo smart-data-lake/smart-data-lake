@@ -113,7 +113,7 @@ But state-of-the-art is to use notebooks like Jupyter for this.
 One of the most advanced notebooks for Scala code we found is Polynote, see [polynote.org](https://polynote.org/).
 
 We will now start Polynote in a docker container, and an external Metastore (Derby database) in another container to share the catalog between our experiments and the notebook.
-To do so you need to add additional files to the project. Change to the projects root directory and **unzip part2.additional-files.zip**, then run the following commands in the projects root directory:
+To do so you need to add additional files to the project. Change to the projects root directory and **unzip part2.additional-files.zip** into the project's root directoy, then run the following commands in the projects root directory:
     
     docker-compose build
     mkdir -p data/_metastore
