@@ -42,10 +42,13 @@ Note: To execute a single example:
 
 ## Run SDL in IntelliJ (on Windows)
 
-This needs an Intellij and Java SDK installation.
+This needs an Intellij and Java SDK installation. Please make sure you have: 
+- Java 8 SDK or Java 11 SDK 
+- Scala Version 12.2. You need to install the Scala-Plugin with this exact version and DO NOT UPGRADE to Scala 3.
 
-1. Ensure, that the directory `src/main/resources` is configured as a resource directory in IntelliJ (File - Project Structure - Modules).
-1. Configure and run the following run configuration in IntelliJ IDEA:
+1. Load the project as a maven project: Right-click on pom.xml file -> add as Maven Project
+2. Ensure all correct dependencies are loaded: Right-click on pom.xml file, Maven -> Reload Project
+4. Configure and run the following run configuration in IntelliJ IDEA:
    - Main class: `io.smartdatalake.app.LocalSmartDataLakeBuilder`
    - Program arguments: `--feed-sel <regex-feedname-selector> --config $ProjectFileDir$/config`
    - Working directory: `/path/to/sdl-examples/target` or just `target`

@@ -1,11 +1,11 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="SDLB" type="Application" factoryName="Application">
-    <option name="ALTERNATIVE_JRE_PATH" value="$PROJECT_DIR$/../../Program Files/AdoptOpenJDK/jdk-15.0.1.9-hotspot" />
+    <option name="ALTERNATIVE_JRE_PATH" value="11.0.4" />
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
     <option name="INCLUDE_PROVIDED_SCOPE" value="true" />
     <option name="MAIN_CLASS_NAME" value="io.smartdatalake.app.LocalSmartDataLakeBuilder" />
     <module name="getting-started" />
-    <option name="PROGRAM_PARAMETERS" value="-c $ProjectFileDir$/config --feed-sel ids:download-deduplicate-departures" />
+    <option name="PROGRAM_PARAMETERS" value="-c $ProjectFileDir$/config --feed-sel download" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/target" />
     <method v="2">
       <option name="Make" enabled="true" />
