@@ -40,8 +40,8 @@ Note: To execute a single example:
 ```
 (requires Maven 3.3.1 or later)
 
-## Run SDL in IntelliJ (on Windows)
-
+## Run SDL in IntelliJ
+We will focus on the community version of Intellij. Please [download](https://www.jetbrains.com/idea/) the version that suits your operating system.
 This needs an Intellij and Java SDK installation. Please make sure you have: 
 - Java 8 SDK or Java 11 SDK 
 - Scala Version 12.2. You need to install the Scala-Plugin with this exact version and DO NOT UPGRADE to Scala 3.
