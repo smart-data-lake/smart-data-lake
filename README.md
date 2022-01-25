@@ -48,7 +48,7 @@ This needs an Intellij and Java SDK installation. Please make sure you have:
 
 1. Load the project as a maven project: Right-click on pom.xml file -> add as Maven Project
 2. Ensure all correct dependencies are loaded: Right-click on pom.xml file, Maven -> Reload Project
-4. Configure and run the following run configuration in IntelliJ IDEA:
+3. Configure and run the following run configuration in IntelliJ IDEA:
    - Main class: `io.smartdatalake.app.LocalSmartDataLakeBuilder`
    - Program arguments: `--feed-sel <regex-feedname-selector> --config $ProjectFileDir$/config`
    - Working directory: `/path/to/sdl-examples/target` or just `target`
