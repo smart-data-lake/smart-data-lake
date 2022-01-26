@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>JSON Schema Viewer 0.3.4</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            html, #jsv-tree {
+                height: 100%;
+            }
+            body {
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                right: 0;
+                left: 0;
+                font-family: sans-serif;
+            }
+            #loading {
+                background-color: #fff;
+                font-weight: 900;
+                height: 100%;
+                left: 0;
+                padding-top: 5em;
+                position: absolute;
+                text-align: center;
+                top: 0;
+                width: 100%;
+                z-index: 1000;
+            }
+            #main-body {
+                margin: 15px;
+                border: 2px #F1C15B solid;
+                border-radius: 14px;
+                height: 90%;
+                position: relative;
+            }
+            a {
+                color: #058ADC;
+                display: block;
+                text-decoration: none;
+                padding: 2px;
+                font-weight: 900;
+                font-size: 16px;
+            }
+            a:hover {
+                color: #DC9705;
+            }
+            a, #legend {
+                font-family: monospace;
+            }
+            #legend-container {
+                background-color: #FFEECB;
+                padding: 3px 0;
+                border-radius: 14px;
+                opacity: 0.9;
+                font-size: 0.9em;
+                position: absolute;
+                right: 20px;
+                top: 15px;
+                width: 200px;
+                text-align: center;
+            }
+            #legend-container hr {
+                border: 0;
+                height: 2px;
+                background-color: #F1C15B;
+            }
+            #legend-container h3 {
+                margin: .5em 0;
+            }
+            #zoom-controls {
+                left: 10px;
+                position: absolute;
+                top: 15px;
+            }
+
+            .node {
+                cursor: pointer;
+            }
+            .overlay {
+                background-color: inherit;
+            }
+            .node circle, #legend circle {
+                fill: #fff;
+                stroke: steelblue;
+                stroke-width: 1.5px;
+            }
+            .node circle.collapsed, #legend circle.collapsed {
+                fill: lightsteelblue;
+            }
+            .node .abstract, #legend .abstract {
+                font-style: italic;
+            }
+            .node.label {
+                cursor: default;
+            }
+            .node.label circle, .node.label circle:hover {
+                stroke: #ccc;
+                stroke-width: 1.5px;
+            }
+            .node text {
+                font-family: sans-serif;
+                font-size: 14px;
+            }
+            .node text:hover {
+                text-decoration: underline;
+            }
+            .node.label text:hover {
+                text-decoration: none;
+            }
+            .node.focus, #legend .focus {
+                font-weight: bold;
+            }
+            .node.focus circle, #legend .focus circle {
+                stroke: #0ecc43;
+                stroke-width: 2px;
+            }
+            .node circle:hover, .focus circle:hover {
+                stroke-width: 3px;
+            }
+            .link {
+                fill: none;
+                stroke: #ccc;
+                stroke-width: 1.5px;
+            }
+            .deprecated {
+                color: orange;
+            }
+            .deprecated text {
+                fill: orange;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="loading">
+            <div id="preload"><img src="images/loader.gif" alt="Loading..."/>
+                <br />
+                Loading...
+            </div>
+        </div>
+        <div id="main-body">
+            <div id="zoom-controls">
+                <a id="zoom_in" href="#"  title="Zoom In">Zoom-in</a>
+                <a id="zoom_out" href="#" title="Zoom Out">Zoom-out</a>
+                <div id="tree-controls">
+                    <a id="reset-tree" href="#" title="Reset">Reset</a>
+                </div>
+            </div>
+            <div id="legend-container">
+                <div id="legend">
+                    <h3 class="ui-mini">Legend</h3>
+                    <hr />
+                    <div id="legend-items">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script type='text/javascript' src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+        <script type='text/javascript' src="json-schema-viewer.min.js"></script>
+        <script type='text/javascript'>
+          (function($) {
+
+            var loc = window.location,
+            //if not already set, set the root schema location
+            //this allows dev ENV to override the schema location
+                schema = JSV.schema ? JSV.schema : loc.origin + loc.pathname.substring(0, loc.pathname.lastIndexOf('/') + 1) + 'schemas/schema/schema.json';
+
+            JSV.init({
+              schema : schema,
+              plain : true, //don't use JQM
+              viewerHeight : $('#main-body').height(), //set initial dimensions of SVG
+              viewerWidth : $('#main-body').width()
+            }, function() {
+              $('#jsv-tree').css('width', '100%');
+              //set diagram width to 100%, this DOES NOT resize the svg container
+              //it will not adjust to window resize, needs a listener to support that
+              JSV.resetViewer();
+              $('#loading').fadeOut('slow');
+            });
+          })(jQuery);
+        </script>
+    </body>
+</html>
