@@ -49,7 +49,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
   /**
    * create generic type definitions and convert to json schema elements.
    */
-  def createSdlSchema(): SchemaRootObjectDef = {
+  def createSdlSchema(version: String): SchemaRootObjectDef = {
 
     val reflections = GenericTypeUtil.getReflections
 
@@ -79,6 +79,8 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
     // create output schema
     val jsonRootDef = SchemaRootObjectDef(
       `$schema` = "http://json-schema.org/draft-07/schema#",
+      version = version,
+      id = "sdl-schema.json#",
       properties = ListMap(
         globalKey -> globalJsonDef,
         connectionsKey -> JsonMapDef(JsonOneOfDef(registry.getJsonRefDefs(typeOf[Connection]), Some("Map Connection name : definition"))),
@@ -103,7 +105,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
       val jsonAttributes = typeProperty ++ typeDef.attributes.map(a => (a.name, convertToJsonType(a)))
       val properties = ListMap(jsonAttributes:_*)
       val required = typeDef.attributes.filter(_.isRequired).map(_.name)
-      jsonschema.JsonObjectDef(properties, required, description = typeDef.description)
+      jsonschema.JsonObjectDef(properties, required = required, title = typeDef.name, description = typeDef.description)
     }
 
     def fromCaseClass(cls: ClassSymbol): JsonObjectDef = {
@@ -116,24 +118,24 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
     private val convertedCaseClasses: mutable.Map[ClassSymbol, JsonObjectDef] = mutable.Map()
 
     def convertToJsonType(attr: GenericAttributeDef): JsonTypeDef = {
-      convertToJsonType(attr.tpe, attr.description)
+      convertToJsonType(attr.tpe, attr.description, if (attr.isDeprecated) Some(true) else None)
     }
 
-    def convertToJsonType(tpe: Type, description: Option[String] = None): JsonTypeDef = {
+    def convertToJsonType(tpe: Type, description: Option[String] = None, isDeprecated: Option[Boolean] = None): JsonTypeDef = {
       tpe match {
-        case t if t =:= typeOf[String] => JsonStringDef(description)
-        case t if t =:= typeOf[Long] => JsonIntegerDef(description)
-        case t if t =:= typeOf[Int] => JsonIntegerDef(description)
-        case t if t =:= typeOf[Float] => JsonNumberDef(description)
-        case t if t =:= typeOf[Double] => JsonNumberDef(description)
-        case t if t =:= typeOf[Boolean] => JsonBooleanDef(description)
-        case t if t.typeSymbol.asType.toType <:< typeOf[ConfigObjectId] => JsonStringDef(description) // map DataObjectId as string
-        case t if t =:= typeOf[StructType] => JsonStringDef(description) // map StructType (Spark schema) as string
-        case t if t =:= typeOf[OutputMode] => JsonStringDef(description, enum = Some(Seq("Append", "Complete", "Update"))) // OutputMode is not an ordinary enum...
+        case t if t =:= typeOf[String] => JsonStringDef(description, deprecated = isDeprecated)
+        case t if t =:= typeOf[Long] => JsonIntegerDef(description, deprecated = isDeprecated)
+        case t if t =:= typeOf[Int] => JsonIntegerDef(description, deprecated = isDeprecated)
+        case t if t =:= typeOf[Float] => JsonNumberDef(description, deprecated = isDeprecated)
+        case t if t =:= typeOf[Double] => JsonNumberDef(description, deprecated = isDeprecated)
+        case t if t =:= typeOf[Boolean] => JsonBooleanDef(description, deprecated = isDeprecated)
+        case t if t.typeSymbol.asType.toType <:< typeOf[ConfigObjectId] => JsonStringDef(description, deprecated = isDeprecated) // map DataObjectId as string
+        case t if t =:= typeOf[StructType] => JsonStringDef(description, deprecated = isDeprecated) // map StructType (Spark schema) as string
+        case t if t =:= typeOf[OutputMode] => JsonStringDef(description, enum = Some(Seq("Append", "Complete", "Update")), deprecated = isDeprecated) // OutputMode is not an ordinary enum...
         // BaseTypes needs to be handled before ParsableFromConfig type
         case t if registry.baseTypeExists(t) => {
           val refDefs = registry.getJsonRefDefs(t)
-          if (refDefs.size > 1) JsonOneOfDef(refDefs, description)
+          if (refDefs.size > 1) JsonOneOfDef(refDefs, description, deprecated = isDeprecated)
           else refDefs.head
         }
         case t if registry.typeExists(t) => registry.getJsonRefDef(t)
@@ -143,31 +145,31 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
           val subTypeClssSym = reflections.getSubTypesOf(baseCls).asScala
             .map(mirror.classSymbol)
           logger.debug(s"ParsableFromConfig ${baseCls.getSimpleName} has sub types ${subTypeClssSym.map(_.name.toString)}")
-          JsonOneOfDef(subTypeClssSym.map(c => addTypeProperty(fromCaseClass(c), c.fullName)).toSeq, description)
+          JsonOneOfDef(subTypeClssSym.map(c => addTypeProperty(fromCaseClass(c), c.fullName)).toSeq, description, deprecated = isDeprecated)
         case t if t.typeSymbol.asClass.isSealed =>
           val subTypeClss = t.typeSymbol.asClass.knownDirectSubclasses
           logger.debug(s"Sealed trait ${t.typeSymbol.fullName} has sub types ${subTypeClss.map(_.name.toString)}")
-          JsonOneOfDef(subTypeClss.map(c => addTypeProperty(fromCaseClass(c.asClass), c.fullName)).toSeq, description)
+          JsonOneOfDef(subTypeClss.map(c => addTypeProperty(fromCaseClass(c.asClass), c.fullName)).toSeq, description, deprecated = isDeprecated)
         case t if t <:< typeOf[Iterable[_]] || t <:< typeOf[Array[_]] =>
           t.typeArgs.size match {
             // simple list
             case 1 =>
               val subTypeCls = t.typeArgs.head.typeSymbol.asClass
-              JsonArrayDef(convertToJsonType(subTypeCls.toType), description)
+              JsonArrayDef(convertToJsonType(subTypeCls.toType), description, deprecated = isDeprecated)
             // map with key=String
             case 2 if t.typeArgs.head.typeSymbol.asType.toType =:= typeOf[String] || t.typeArgs.head.typeSymbol.asType.toType <:< typeOf[ConfigObjectId] =>
               val valueCls = t.typeArgs.last.typeSymbol.asClass
-              JsonMapDef(additionalProperties = convertToJsonType(valueCls.toType), description = description)
+              JsonMapDef(additionalProperties = convertToJsonType(valueCls.toType), description = description, deprecated = isDeprecated)
             case 2 => throw new IllegalStateException(s"Key type for Map must be String, but is ${t.typeArgs.head.typeSymbol.fullName}")
             case _ => throw new IllegalStateException(s"Can not handle List with elements of type ${t.typeArgs.map(_.typeSymbol.fullName).mkString(",")}")
           }
         case t: TypeRef if t.pre <:< typeOf[Enumeration] =>
           val enumValues = t.pre.members.filter(m => !m.isMethod && !m.isType  && m.typeSignature.typeSymbol.name.toString == "Value")
           assert(enumValues.nonEmpty, s"Enumeration values for ${t.typeSymbol.fullName} not found")
-          JsonStringDef(description, enum = Some(enumValues.map(_.name.toString).toSeq))
+          JsonStringDef(description, enum = Some(enumValues.map(_.name.toString).toSeq), deprecated = isDeprecated)
         case t =>
           logger.warn(s"Json schema creator for ${t.typeSymbol.fullName} missing. Creating type as existingJavaType.")
-          JsonStringDef(description, existingJavaType = Some(t.typeSymbol.fullName))
+          JsonStringDef(description, existingJavaType = Some(t.typeSymbol.fullName), deprecated = isDeprecated)
       }
     }
 

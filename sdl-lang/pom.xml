@@ -218,7 +218,10 @@
                         <goals><goal>java</goal></goals>
                         <configuration>
                             <mainClass>io.smartdatalake.meta.jsonschema.JsonSchemaExporter</mainClass>
-                            <arguments><argument>--filename</argument><argument>target\classes\sdl-schema.json</argument></arguments>
+                            <arguments>
+                                <argument>--filename</argument><argument>target\classes\sdl-schema.json</argument>
+                                <argument>--version</argument><argument>${project.parent.version}</argument>
+                            </arguments>
                         </configuration>
                     </execution>
                 </executions>

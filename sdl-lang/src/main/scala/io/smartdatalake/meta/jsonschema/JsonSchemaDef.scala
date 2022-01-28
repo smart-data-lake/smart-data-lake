@@ -53,6 +53,7 @@ private[smartdatalake] sealed trait JsonTypeDef extends JsonExtractor
  */
 private[smartdatalake] case class JsonObjectDef(
                           properties: ListMap[String,JsonTypeDef],
+                          title: String,
                           required: Seq[String] = Seq(),
                           additionalProperties: Boolean = false,
                           description: Option[String] = None
@@ -65,7 +66,8 @@ private[smartdatalake] case class JsonObjectDef(
  */
 private[smartdatalake] case class JsonArrayDef(
                          items: JsonTypeDef,
-                         description: Option[String]
+                         description: Option[String],
+                         deprecated: Option[Boolean] = None
                         ) extends JsonTypeDef {
   override val `type`: Option[JsonTypeEnum] = Some(JsonTypeEnum.Array)
 }
@@ -77,7 +79,8 @@ private[smartdatalake] case class JsonStringDef(
                           description: Option[String] = None,
                           default: Option[String] = None,
                           enum: Option[Seq[String]] = None,
-                          existingJavaType: Option[String] = None
+                          existingJavaType: Option[String] = None,
+                          deprecated: Option[Boolean] = None
                         ) extends JsonTypeDef {
   override val `type`: Option[JsonTypeEnum] = Some(JsonTypeEnum.String)
 }
@@ -88,6 +91,7 @@ private[smartdatalake] case class JsonStringDef(
 private[smartdatalake] case class JsonNumberDef(
                           description: Option[String] = None,
                           default: Option[Int] = None,
+                          deprecated: Option[Boolean] = None
                         ) extends JsonTypeDef {
   override val `type`: Option[JsonTypeEnum] = Some(JsonTypeEnum.Number)
 }
@@ -98,6 +102,7 @@ private[smartdatalake] case class JsonNumberDef(
 private[smartdatalake] case class JsonIntegerDef(
                           description: Option[String] = None,
                           default: Option[Int] = None,
+                          deprecated: Option[Boolean] = None
                         ) extends JsonTypeDef {
   override val `type`: Option[JsonTypeEnum] = Some(JsonTypeEnum.Integer)
 }
@@ -108,6 +113,7 @@ private[smartdatalake] case class JsonIntegerDef(
 private[smartdatalake] case class JsonBooleanDef(
                            description: Option[String] = None,
                            default: Option[Boolean] = None,
+                           deprecated: Option[Boolean] = None
                          ) extends JsonTypeDef {
   override val `type`: Option[JsonTypeEnum] = Some(JsonTypeEnum.String)
 }
@@ -132,7 +138,8 @@ private[smartdatalake] case class JsonConstDef(
  */
 private[smartdatalake] case class JsonRefDef(
                        `$ref`: String,
-                       description: Option[String] = None
+                       description: Option[String] = None,
+                       deprecated: Option[Boolean] = None
                      ) extends JsonTypeDef
 
 /**
@@ -140,7 +147,8 @@ private[smartdatalake] case class JsonRefDef(
  */
 private[smartdatalake] case class JsonOneOfDef(
                          oneOf: Seq[JsonTypeDef],
-                         description: Option[String] = None
+                         description: Option[String] = None,
+                         deprecated: Option[Boolean] = None
                        ) extends JsonTypeDef
 
 /**
@@ -163,7 +171,8 @@ private[smartdatalake] case class JsonAnyOfDef(
  */
 private[smartdatalake] case class JsonMapDef(
                        additionalProperties: JsonTypeDef,
-                       description: Option[String] = None
+                       description: Option[String] = None,
+                       deprecated: Option[Boolean] = None
                      ) extends JsonTypeDef {
   override val `type`: Option[JsonTypeEnum] = Some(JsonTypeEnum.Object)
 }
@@ -178,6 +187,8 @@ private[smartdatalake] trait SchemaRootDef extends JsonExtractor
  */
 private[smartdatalake] case class SchemaRootObjectDef(
                                 `$schema`: String,
+                                version: String,
+                                id: String,
                                 definitions: Map[String, ListMap[String,JsonTypeDef]],
                                 properties: ListMap[String,JsonTypeDef],
                                 required: Seq[String],

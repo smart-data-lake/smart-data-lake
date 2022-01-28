@@ -4,8 +4,8 @@ import com.github.takezoe.scaladoc.{Scaladoc => ScaladocAnnotation}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{AuthMode, ExecutionMode, SaveModeOptions}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.action.script.{ParsableScriptDef, ScriptDef}
-import io.smartdatalake.workflow.action.sparktransformer.{DfTransformer, DfsTransformer, ParsableDfTransformer, ParsableDfsTransformer, ValidationRule}
+import io.smartdatalake.workflow.action.script.ParsableScriptDef
+import io.smartdatalake.workflow.action.sparktransformer.{ParsableDfTransformer, ParsableDfsTransformer, ValidationRule}
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata, HousekeepingMode, Table}
@@ -13,7 +13,7 @@ import org.reflections.Reflections
 import scaladoc.{Markup, Tag}
 
 import scala.collection.JavaConverters._
-import scala.reflect.runtime.universe.{AssignOrNamedArg, ClassSymbol, MethodSymbol, TermSymbol, Type, typeOf}
+import scala.reflect.runtime.universe.{Annotation, AssignOrNamedArg, MethodSymbol, TermSymbol, Type, typeOf}
 
 
 /**
@@ -151,17 +151,25 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     formatScaladocString(markup.trimmed.plainString)
   }
 
+  private def formatScaladoc(doc: scaladoc.Scaladoc, filter: scaladoc.Tag => Boolean = _ => true): String = {
+    val rawText = doc.tags.filter(filter).flatMap(formatScaladocTag).mkString(System.lineSeparator())
+    formatScaladocString(rawText)
+  }
+
+  private def extractScalaDoc(annotations: Seq[Annotation]) = {
+    val rawScaladoc = annotations.find(_.tree.tpe =:= typeOf[ScaladocAnnotation])
+      .flatMap(_.tree.children.collectFirst{ case x: AssignOrNamedArg => x.rhs.toString })
+    rawScaladoc.map(d => scaladoc.Scaladoc.fromString(d).right.get)
+  }
+
   def typeDefForClass(tpe: Type, interestingSuperTypes: Seq[Type] = Seq(), baseType: Option[Type] = None): GenericTypeDef = {
     val parentTypes = if (interestingSuperTypes.nonEmpty)
       tpe.baseClasses.map(_.asType.toType).filter(baseType => interestingSuperTypes.contains(baseType) && baseType != tpe)
     else Seq()
     val name = tpe.typeSymbol.name.toString
-    val rawScaladoc = tpe.typeSymbol.annotations.find(_.tree.tpe =:= typeOf[ScaladocAnnotation])
-      .flatMap(_.tree.children.collectFirst{ case x: AssignOrNamedArg => x.rhs.toString })
-    val parsedScaladoc = rawScaladoc.map(d => scaladoc.Scaladoc.fromString(d).right.get)
-    val rawDescription = parsedScaladoc.map(d => d.tags.filterNot(_.isInstanceOf[Tag.Param]).flatMap(formatScaladocTag).mkString(System.lineSeparator()))
-    val description = rawDescription.map(_.replaceAll(raw"(?m)^\s?\*\s?", "").trim)
-    val attributes = if (tpe.typeSymbol.asClass.isCaseClass) attributesForCaseClass(tpe, parsedScaladoc.map(_.textParams.mapValues(formatScaladocString)).getOrElse(Map())) else Seq()
+    val scaladoc = extractScalaDoc(tpe.typeSymbol.annotations)
+    val description = scaladoc.map(formatScaladoc(_, !_.isInstanceOf[Tag.Param]))
+    val attributes = if (tpe.typeSymbol.asClass.isCaseClass) attributesForCaseClass(tpe, scaladoc.map(_.textParams.mapValues(formatScaladocString)).getOrElse(Map())) else Seq()
     GenericTypeDef(name, baseType, tpe, description, tpe.typeSymbol.asClass.isCaseClass, parentTypes.toSet, attributes)
   }
 
@@ -171,14 +179,22 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
   def attributesForCaseClass(tpe: Type, paramDescriptions: Map[String,String]): Seq[GenericAttributeDef] = {
     // get case class constructor parameters
     val params = tpe.decls.collectFirst {
-        case m: MethodSymbol if m.isPrimaryConstructor =>
-          // only use first parameter list of case class constructor
-          m.paramLists.head
-      }.getOrElse(throw new RuntimeException("no primary constructor found. bug?"))
+      case m: MethodSymbol if m.isPrimaryConstructor =>
+        // only use first parameter list of case class constructor
+        m.paramLists.head
+    }.getOrElse(throw new RuntimeException("no primary constructor found. bug?"))
+    // get SDLB base classes to search for overrides and scaladoc
+    val superTypeMethodsWithoutParameters = tpe.baseClasses
+      .filterNot(_ == tpe.typeSymbol)
+      .filter(_.fullName.startsWith("io.smartdatalake"))
+      .flatMap(_.asType.toType.decls.collect{ case m:MethodSymbol if m.paramLists.isEmpty || m.paramLists.head.isEmpty => m })
     // prepare parameters
     params.map(p => {
-      val isDeprecated = p.annotations.exists(_.tree.tpe =:= typeOf[deprecated])
-      val isOverride = p.overrides.nonEmpty
+      // only java annotations are kept for runtime. SDLB needs to use Java @Deprecated annotation to be able to retrieve this with reflection.
+      val isDeprecated = p.annotations.exists(_.tree.tpe =:= typeOf[Deprecated])
+      val overriddenMethods = superTypeMethodsWithoutParameters
+        .filter(m => p.name == m.name && p.typeSignature.resultType <:< m.typeSignature.resultType)
+      val isOverride = overriddenMethods.nonEmpty
       val isOptional = p.typeSignature <:< typeOf[scala.Option[_]]
       val hasDefaultValue = p match {
         case t: TermSymbol => t.isParamWithDefault
@@ -188,6 +204,7 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
         p.typeSignature.typeArgs.head
       } else p.typeSignature
       val description = paramDescriptions.get(p.name.toString)
+        .orElse(superTypeMethodsWithoutParameters.map(s => extractScalaDoc(s.annotations).map(formatScaladoc(_))).find(_.isDefined).flatten) // use Scaladoc from first overridden method
       GenericAttributeDef(p.name.encodedName.toString, tpe, description, isRequired = !isOptional && !hasDefaultValue, isOverride = isOverride, isDeprecated = isDeprecated)
     })
   }
