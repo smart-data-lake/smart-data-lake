@@ -48,24 +48,24 @@ For parts 2 and later, it is recommended to setup a Development Environment.
 ## Development Environment
 For some parts of this tutorial it is beneficial to have a working development environment ready. In the following we will mainly explain how one can configure a working evironment for 
 Windows or Linux. We will focus on the community version of Intellij. Please [download](https://www.jetbrains.com/idea/) the version that suits your operating system. 
-### Windows
-#### System setup 
+### Hadoop Setup (Needed for Windows only)
+Windows Users need to follow the steps below to have a working Hadoop Installation :
 1. First download the Windows binaries for Hadoop [here](https://github.com/cdarlint/winutils/archive/refs/heads/master.zip)
 2. Extract the wished version to a folder (e.g. &lt prefix &gt\hadoop-&lt version &gt\bin ). For this tutorial we use the version 3.2.2.
 3. Configure the *HADOOP_HOME* environment variable to point to the folder &lt prefix &gt\hadoop-&lt version &gt\
 4. Add the *%HADOOP_HOME%\bin* to the *PATH* environment variable
-   
-#### Intellij
-1. Open the project in Intellj
-2. Load the Maven project
-3. Install the scala plugin
-4. Select one of the preconfigured runConfigurations (part-x)
-5. Run
 
-### Linux
-**TODO**
+### Run SDL in IntelliJ
+We will focus on the community version of Intellij. Please [download](https://www.jetbrains.com/idea/) the version that suits your operating system.
+This needs an Intellij and Java SDK installation. Please make sure you have:
+- Java 8 SDK or Java 11 SDK
+- Scala Version 2.12. You need to install the Scala-Plugin with this exact version and DO NOT UPGRADE to Scala 3. For the complete list of versions at play in SDLB, [you can consult the Reference](../reference/build).
 
-### Dockerized
-**TODO**
+1. Load the project as a maven project: Right-click on pom.xml file -> add as Maven Project
+2. Ensure all correct dependencies are loaded: Right-click on pom.xml file, Maven -> Reload Project
+3. Configure and run the following run configuration in IntelliJ IDEA:
+    - Main class: `io.smartdatalake.app.LocalSmartDataLakeBuilder`
+    - Program arguments: `--feed-sel <regex-feedname-selector> --config $ProjectFileDir$/config`
+    - Working directory: `/path/to/sdl-examples/target` or just `target`
 
 **Congratulations!** You're now all setup! Head over to the next step to analyse these files...
