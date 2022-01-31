@@ -14,9 +14,14 @@ import org.apache.spark.sql.types.DataType
 import org.json4s.jackson.{JsonMethods, Serialization}
 import org.json4s.{DefaultFormats, Formats}
 
+import java.time.Instant
 import scala.annotation.tailrec
 import scala.util.{Failure, Success}
-import java.time.Instant
+
+case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int)
+case class DepartureQueryParameters(airport: String, begin: Long, end: Long)
+
+case class State(airport: String, nextBegin: Long)
 
 /**
  * [[DataObject]] to call webservice and return response as a DataFrame
@@ -32,7 +37,12 @@ case class CustomWebserviceDataObject(override val id: DataObjectId,
                                       override val metadata: Option[DataObjectMetadata] = None
                                      )
                                      (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateDataFrame with SmartDataLakeLogger {
+  extends DataObject with CanCreateDataFrame with CanCreateIncrementalOutput with SmartDataLakeLogger {
+
+  private var previousState : Seq[State] = Seq()
+  private var nextState : Seq[State] = Seq()
+
+  private val now = Instant.now.getEpochSecond
 
   @tailrec
   private def request(url: String, method: WebserviceMethod = WebserviceMethod.Get, body: String = "", retry: Int = nRetry) : Array[Byte] = {
@@ -76,7 +86,6 @@ case class CustomWebserviceDataObject(override val id: DataObjectId,
       }
     }
 
-    // REPLACE BLOCK
     if(context.phase == ExecutionPhase.Init){
       // simply return an empty data frame
       Seq[String]().toDF("responseString")
@@ -85,8 +94,11 @@ case class CustomWebserviceDataObject(override val id: DataObjectId,
         .select("record.*")
         .withColumn("created_at", current_timestamp())
     } else {
-      // use the queryParameters from the config
-      val currentQueryParameters = checkQueryParameters(queryParameters)
+      // place the new implementation of currentQueryParameters below this line
+      // if we have query parameters in the state we will use them from now on
+      val currentQueryParameters = if (previousState.isEmpty) checkQueryParameters(queryParameters) else checkQueryParameters(previousState.map{
+        x => DepartureQueryParameters(x.airport, x.nextBegin, now)
+      })
 
       // given the query parameters, generate all requests
       val departureRequests = currentQueryParameters.map(
@@ -103,11 +115,24 @@ case class CustomWebserviceDataObject(override val id: DataObjectId,
         .withColumn("created_at", current_timestamp())
 
       // put simple nextState logic below
-
+      if(previousState.isEmpty){
+        nextState = currentQueryParameters.map(params => State(params.airport, params.end))
+      } else {
+        nextState = previousState.map(params => State(params.airport, now))
+      }
       // return
       departuresDf
     }
-    // REPLACE BLOCK
+  }
+
+  override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
+    implicit val formats: Formats = DefaultFormats
+    previousState = state.map(s => JsonMethods.parse(s).extract[Seq[State]]).getOrElse(Seq())
+  }
+
+  override def getState: Option[String] = {
+    implicit val formats: Formats = DefaultFormats
+    Some(Serialization.write(nextState))
   }
 
   override def factory: FromConfigFactory[DataObject] = CustomWebserviceDataObject
