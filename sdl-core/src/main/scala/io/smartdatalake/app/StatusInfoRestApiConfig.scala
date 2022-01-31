@@ -8,4 +8,4 @@ package io.smartdatalake.app
  * @param stopOnEnd: Set to false if the RestAPI should remain online even after SDL has finished its execution.
  * In that case, the Application needs to be stopped manually. Useful for debugging.
  */
-case class RestApi(port: Int = 4140, maxPortRetries: Int = 10, stopOnEnd: Boolean = true)
+case class StatusInfoRestApiConfig(port: Int = 4440, maxPortRetries: Int = 10, stopOnEnd: Boolean = false)

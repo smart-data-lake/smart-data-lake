@@ -209,10 +209,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   def run(appConfig: SmartDataLakeBuilderConfig): Map[RuntimeEventState,Int] = try {
     // invoke SDLPlugin if configured
     Environment.sdlPlugin.foreach(_.startup())
-    val stateListener = new CustomListener()
-    //TODO use globalconfig?
-    JettyServer.start(stateListener)
-    Environment._additionalStateListeners = Seq(stateListener)
     // create default hadoop configuration, as we did not yet load custom spark/hadoop properties
     implicit val defaultHadoopConf: Configuration = new Configuration()
     // handle state if defined
@@ -244,7 +240,13 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // invoke SDLPlugin if configured
     Environment.sdlPlugin.foreach(_.shutdown())
 
-    //TODO jetty shutdown
+    val stopStatusInfoRestApiServer = Environment._globalConfig.statusInfoRestApi match {
+      case Some(statusInfoRestApiConfig) => statusInfoRestApiConfig.stopOnEnd
+      case _ => false
+    }
+    if(stopStatusInfoRestApiServer){
+      JettyServer.stop()
+    }
   }
 
   /**
@@ -308,8 +310,14 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // parse config objects
     Environment._globalConfig = GlobalConfig.from(config)
     Environment._instanceRegistry = ConfigParser.parse(config, instanceRegistry) // share instance registry for custom code
-    val stateListeners = Environment.globalConfig.stateListeners.map(_.listener) ++ Environment._additionalStateListeners
 
+    val statusInfoRestApiListeners = if (Environment._globalConfig.statusInfoRestApi.isDefined) Seq(new CustomListener()) else Nil
+    val stateListeners =
+      Environment.globalConfig.stateListeners.map(_.listener) ++ Environment._additionalStateListeners ++ statusInfoRestApiListeners
+
+    if (Environment._globalConfig.statusInfoRestApi.isDefined) {
+      JettyServer.start(statusInfoRestApiListeners.head, Environment._globalConfig.statusInfoRestApi.get)
+    }
     exec(appConfig, executionId, runStartTime, attemptStartTime, actionsToSkip, initialSubFeeds, dataObjectsState, stateStore, stateListeners, simulation)(Environment._instanceRegistry)
   }
 

@@ -57,19 +57,19 @@ import org.apache.spark.sql.custom.ExpressionEvaluator
  *                       The synchronous actions of the DAG will be executed with this interval if possile.
  *                       Note that for asynchronous actions there are separate settings, e.g. SparkStreamingMode.triggerInterval.
  */
-case class GlobalConfig( kryoClasses: Option[Seq[String]] = None
-                       , sparkOptions: Option[Map[String,String]] = None
-                       , restApi: Option[RestApi] = None
-                       , enableHive: Boolean = true
-                       , memoryLogTimer: Option[MemoryLogTimerConfig] = None
-                       , shutdownHookLogger: Boolean = false
-                       , stateListeners: Seq[StateListenerConfig] = Seq()
-                       , sparkUDFs: Option[Map[String,SparkUDFCreatorConfig]] = None
-                       , pythonUDFs: Option[Map[String,PythonUDFCreatorConfig]] = None
-                       , secretProviders: Option[Map[String,SecretProviderConfig]] = None
-                       , allowOverwriteAllPartitionsWithoutPartitionValues: Seq[DataObjectId] = Seq()
-                       , runtimeDataNumberOfExecutionsToKeep: Int = 10
-                       , synchronousStreamingTriggerIntervalSec: Int = 60
+case class GlobalConfig(kryoClasses: Option[Seq[String]] = None
+                        , sparkOptions: Option[Map[String,String]] = None
+                        , statusInfoRestApi: Option[StatusInfoRestApiConfig] = None
+                        , enableHive: Boolean = true
+                        , memoryLogTimer: Option[MemoryLogTimerConfig] = None
+                        , shutdownHookLogger: Boolean = false
+                        , stateListeners: Seq[StateListenerConfig] = Seq()
+                        , sparkUDFs: Option[Map[String,SparkUDFCreatorConfig]] = None
+                        , pythonUDFs: Option[Map[String,PythonUDFCreatorConfig]] = None
+                        , secretProviders: Option[Map[String,SecretProviderConfig]] = None
+                        , allowOverwriteAllPartitionsWithoutPartitionValues: Seq[DataObjectId] = Seq()
+                        , runtimeDataNumberOfExecutionsToKeep: Int = 10
+                        , synchronousStreamingTriggerIntervalSec: Int = 60
                        )
 extends SmartDataLakeLogger {
   assert(runtimeDataNumberOfExecutionsToKeep>1, "GlobalConfig.runtimeDataNumberOfExecutionsToKeep must be bigger than 1.")

@@ -1,5 +1,6 @@
 package io.smartdatalake.jetty
 
+import io.smartdatalake.app.StatusInfoRestApiConfig
 import org.eclipse.jetty.server._
 import org.eclipse.jetty.servlet.{ServletContextHandler, ServletHolder}
 import org.eclipse.jetty.util.thread.QueuedThreadPool
@@ -9,18 +10,26 @@ import org.glassfish.jersey.servlet.ServletContainer
 
 object JettyServer {
 
-  def start(stateListener: CustomListener): Unit = {
+  private val pool = new QueuedThreadPool(200)
+  private val server = new Server(pool)
+
+  def start(stateListener: CustomListener, config: StatusInfoRestApiConfig): Unit = {
 
     val context = getServletHandler(stateListener)
-    val pool = new QueuedThreadPool(200)
-    val server = new Server(pool)
-    val connector = new ServerConnector(server)
-    //TODO find first avaialbe port like spark UI
-    connector.setPort(8090)
-    server.setConnectors(Array(connector))
-    server.setHandler(context);
-    server.start()
 
+    def startService(context: ServletContextHandler)(port: Int): Int = {
+      val connector = new ServerConnector(server)
+      connector.setPort(port)
+      server.setConnectors(Array(connector))
+      server.setHandler(context);
+      server.start()
+      port
+    }
+    PortUtils.startOnPort(startService(context), "Test", config.port, config.maxPortRetries)
+
+  }
+  def stop(): Unit = {
+    server.stop()
   }
 
   def getServletHandler(stateListener: CustomListener): ServletContextHandler = {
