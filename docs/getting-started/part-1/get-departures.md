@@ -15,7 +15,7 @@ Throughout this documentation, we will mostly refer to *SDL* which is just short
 With Smart Data Lake Builder, you describe your data pipelines in a config file using the [HOCON](https://github.com/lightbend/config/blob/master/HOCON.md) format.
 All HOCON features are supported so you could also split your configuration into several files. But for this first part, let's just use one file.
 
-The configuration is located in downloaded code under config/application.conf.
+The configuration is located in the downloaded code under config/application.conf.
 To walk through part-1 of this tutorial, please reset the existing application.conf to the config file available [here](../config-examples/application-part1-start.conf).
 
 A data pipeline is composed of at least two entities: *DataObjects* and *Actions*.
@@ -135,7 +135,7 @@ After executing it, you will see the file *data/stg_departures/result.json* has 
 
 :::caution
 Since both web servers are freely available on the internet, they might be overloaded by traffic.
-If the download fails because of a timeout wait a couple of minutes and try again.
+If the download fails because of a timeout, wait a couple of minutes and try again.
 If the download still won't work (or if you just get empty files), you can copy the contents of the folder *data-fallback-download*
 into your data folder. This will allow you to execute all steps starting from [Select Columns](select-columns.md)
 :::

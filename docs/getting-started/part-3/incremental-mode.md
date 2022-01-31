@@ -161,4 +161,4 @@ Therefore, SDLB gets a 404 and will fail the execution. The exception could be c
 Congratulation, you just completed implementing a nice incremental loading mechanism!
 
 That's it from getting-started for now. We hope you enjoyed your first steps with SDLB. 
-For further informations check the rest of the documentation and the blog on this page!
+For further information, check the rest of the documentation and the blog on this page!

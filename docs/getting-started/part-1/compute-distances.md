@@ -73,7 +73,7 @@ or you can also use maven directly if you have Java SDK and Maven installed
 
     mvn package
 
-This creates a jar-file ./target/getting-started-1.0.jar containing the compiled Java classes.
+This creates a jar-file ./target/getting-started-1.0.jar containing the compiled Scala classes.
 The *docker run* includes a parameter to mount ./target into the docker image, which makes this jar-file accessible to SDL.
 
 Now you can start SDL again:
