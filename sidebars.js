@@ -1,7 +1,7 @@
 module.exports = {
-  docs: {
-    'Smart Data Lake' : ['intro', 'features'],
-    'Getting Started' : [
+  docs: [
+    {'Smart Data Lake' : ['intro', 'features']},
+    {'Getting Started' : [
       'getting-started/setup',
       'getting-started/get-input-data',
       {
@@ -28,8 +28,8 @@ module.exports = {
         ]
       }
 
-    ],
-    'Reference' : [
+    ]},
+    {'Reference' : [
         'reference/build',
         'reference/commandLine',
         //'reference/hoconOverview',
@@ -46,6 +46,11 @@ module.exports = {
         //'reference/testing',
         'reference/troubleshooting',
         //'reference/glossary'
-    ],
-  }
+    ]},
+    {
+      type: 'link',
+      label: 'Json Schema Viewer', // The link label
+      href: '/JsonSchemaViewer', // The internal path
+    },
+  ],
 };
