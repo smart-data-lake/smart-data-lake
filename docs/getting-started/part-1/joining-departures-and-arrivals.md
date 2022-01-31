@@ -4,7 +4,7 @@ title: Get Departure Coordinates
 
 ## Goal
 
-In this step we will extend the [configuration file](../config-examples/application-compute-part1-join.conf) of the previous step
+In this step we will extend the [configuration file](../config-examples/application-part1-compute-join.conf) of the previous step
 so that we get the coordinates and the readable name of Bern Airport in our final data.
 Since we are dealing with just one record, we could manually add it to the data set.
 But what if we wanted to extend our project to other departure airports in the future?
@@ -70,7 +70,7 @@ Another difference is that you cannot run an individual transformation alone, yo
 
 ## Try it out
 
-[This](../config-examples/application-compute-part1-dep-arr.conf) is how your config should look like by now.
+[This](../config-examples/application-part1-compute-dep-arr.conf) is how your config should look like by now.
 
 When running the example, you should see a CSV file with departure and arrival airport names and coordinates.
 

@@ -89,8 +89,8 @@ To run our data pipeline, first delete the data directory - otherwise DeltaLakeT
 Then you can execute the usual *docker run* command for all feeds:
 
     mkdir -f data
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config smart-data-lake/gs1:latest -c /mnt/config --feed-sel 'download*'
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config smart-data-lake/gs1:latest -c /mnt/config --feed-sel '^(?!download).*'
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel 'download*'
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel '^(?!download).*'
 
 :::info
 Why two separate commands?   
@@ -113,7 +113,7 @@ But state-of-the-art is to use notebooks like Jupyter for this.
 One of the most advanced notebooks for Scala code we found is Polynote, see [polynote.org](https://polynote.org/).
 
 We will now start Polynote in a docker container, and an external Metastore (Derby database) in another container to share the catalog between our experiments and the notebook.
-To do so, run the following commands in the projects root directory:
+To do so you need to add additional files to the project. Change to the projects root directory and **unzip part2.additional-files.zip** into the project's root directoy, then run the following commands in the projects root directory:
     
     docker-compose build
     mkdir -p data/_metastore
@@ -145,15 +145,15 @@ This instructs Spark to use the external metastore you started with docker-compo
 Your Smart Data Lake container doesn't have access to the other containers just yet. 
 So when you run your data pipeline again, you need to add a parameter `--network getting-started_default` to join the virtual network where the metastore is located:
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config --network getting-started_default smart-data-lake/gs1:latest -c /mnt/config --feed-sel '.*'
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest -c /mnt/config --feed-sel '.*'
 
 When using podman you need to join the pod where the metastore is located with `--pod getting-started`:
 
-    podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config --pod getting-started smart-data-lake/gs1:latest -c /mnt/config --feed-sel '.*'
+    podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest -c /mnt/config --feed-sel '.*'
 
 After you run your data pipeline again, you should now be able to see our DataObjects data in Polynote.
 No need to restart Polynote, just open it again and run all cells.
-[This](../config-examples/application-deltalake-part2.conf) is how the final configuration file should look like. Feel free to play around.
+[This](../config-examples/application-part2-deltalake.conf) is how the final configuration file should look like. Feel free to play around.
 
 :::tip Delta Lake tuning
 You might have seen that our data pipeline with DeltaTableDataObject runs a Spark stage with 50 tasks several times.

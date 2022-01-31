@@ -61,11 +61,24 @@ but this would have resulted in more complex code working with lists of inputs, 
 
 ## Try it out
 
-[This](../config-examples/application-compute-part1-final.conf) is how the final config-file looks like.
+[This](../config-examples/application-part1-compute-final.conf) is how the final config-file looks like.
 
-You can execute the usual *docker run* command :
+To use the Java Code in our sdl-spark docker image, we have to compile it. 
+You have already done this in the [setup](../setup.md), but lets review this step again. It can be done by using a maven docker image as follows
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config demo:latest -c /mnt/config --feed-sel compute
+    mkdir .mvnrepo
+    docker run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
+
+or you can also use maven directly if you have Java SDK and Maven installed
+
+    mvn package
+
+This creates a jar-file ./target/getting-started-1.0.jar containing the compiled Scala classes.
+The *docker run* includes a parameter to mount ./target into the docker image, which makes this jar-file accessible to SDL.
+
+Now you can start SDL again:
+
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel compute
 
 Under *data/btl-distances* you can now see the final result. 
 
@@ -114,7 +127,7 @@ Just from the definitions of DataObjects and Actions alone, SDL builds a DAG and
 
 You can also execute the entire data pipeline by selecting all feeds:
         
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/config:/mnt/config smart-data-lake/gs1:latest --config /mnt/config --feed-sel .*
+    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel .*
 
 The successful execution DAG looks like this
 
@@ -192,5 +205,3 @@ if your download fails you will have to re-execute the download feed before bein
 
 **Congratulations!**  
 You successfully recreated the configuration file that is contained in the Docker Image you ran in the first step.
-If you look at [the docker command on the first step](../setup.md), you will notice that there was no path specified for the configuration file.
-By default, SDL looks for the config under *src/main/resources*, which is also part of the Docker Image that you created.

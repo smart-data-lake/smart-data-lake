@@ -14,4 +14,4 @@ In Part 2 we will cover the following two points:
 
 Additionally we will use Polynote-Notebook to easily interact with our data.
 
-Part 2 is based on [this](../config-examples/application-compute-part1-final.conf) configuration file, **copy it to config/application.conf** to walk through the tutorial. 
+Part 2 is based on [this](../config-examples/application-part1-compute-final.conf) configuration file, **copy it to config/application.conf** to walk through the tutorial.
