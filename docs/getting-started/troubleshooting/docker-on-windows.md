@@ -18,6 +18,12 @@ Install podman on WSL2 Ubuntu:
     sudo apt-get -y upgrade
     sudo apt-get -y install podman
 
+## Using podman build and podman run
+
+Throughout this tutorial, we often refer to the commands `docker build` and `docker run`.
+Podman has identically named commands, which, for the purpose of this tutorial, do exactly the same thing.
+So with podman you can just type `podman build` and `podman run` instead.
+
 ## Using podman compose
 For [part 2 of this guide](../part-2/delta-lake-format.md), you need docker compose.
 For Windows, you can use the alternative podman compose.

@@ -34,7 +34,7 @@ For each record, it contains the ICAO identifier of the airport where the plane 
 
 :::info
 Notice that the result of this JSON-call is exactly what was downloaded in the previous step into 
-the folder *data/ext_departures/result.json*.
+the folder *data/stg_departures/result.json*.
 :::
 
 ### airports.csv
@@ -44,7 +44,7 @@ It hosts a csv-file called *airports.csv* which contains what you need.
 
 :::info
 Notice that this CSV-File is exactly what was downloaded in the previous step into
-the folder *data/ext_airports/result.csv*.
+the folder *data/stg_airports/result.csv*.
 :::
 
 ## Next step
