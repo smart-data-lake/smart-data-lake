@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.util.filetransfer
 
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, FileRefMapping}
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
 
@@ -28,20 +28,19 @@ private[smartdatalake] trait FileTransfer {
   protected val tgtDO: FileRefDataObject
 
   /**
-   * Initialize the file transfer with the files to copy
-   *
-   * @param fileRefs files to be transfered
+   * Establish mapping from input file references to output file references, translating directory and file name
+   * @param fileRefs files to be transferred
    * @return target files which will be created when file transfer is executed
    */
-  def init(fileRefs: Seq[FileRef])(implicit session: SparkSession, context: ActionPipelineContext): Seq[(FileRef,FileRef)] = {
-    val tgtFileRefs = tgtDO.translateFileRefs(fileRefs)
-    fileRefs.zip(tgtFileRefs)
+  def getFileRefMapping(fileRefs: Seq[FileRef])(implicit context: ActionPipelineContext): Seq[FileRefMapping] = {
+    tgtDO.translateFileRefs(fileRefs)
   }
 
   /**
    * Executes the file transfer
+   * @param fileRefPairs: mapping from input to output file references.
    */
-  def exec(fileRefPairs: Seq[(FileRef,FileRef)])(implicit session: SparkSession, context: ActionPipelineContext): Unit
+  def exec(fileRefPairs: Seq[FileRefMapping])(implicit context: ActionPipelineContext): Unit
 
 }
 
@@ -50,9 +49,9 @@ private[smartdatalake] trait FileTransfer {
  * For now we can do everything with the StreamFileTransfer.
  */
 private[smartdatalake] object FileTransfer {
-  def apply( srcDO: DataObject, tgtDO: DataObject, deleteSource: Boolean, overwrite: Boolean): FileTransfer = {
+  def apply( srcDO: DataObject, tgtDO: DataObject, overwrite: Boolean): FileTransfer = {
     (srcDO, tgtDO) match {
-      case (inputDO: FileRefDataObject with CanCreateInputStream, outputDO: FileRefDataObject with CanCreateOutputStream) => new StreamFileTransfer(inputDO, outputDO, deleteSource, overwrite)
+      case (inputDO: FileRefDataObject with CanCreateInputStream, outputDO: FileRefDataObject with CanCreateOutputStream) => new StreamFileTransfer(inputDO, outputDO, overwrite)
       case x => throw new IllegalStateException(s"Unmatched case $x")
     }
   }

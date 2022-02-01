@@ -21,16 +21,17 @@ package io.smartdatalake.workflow
 
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, FileUtil, Path, PathFilter}
 
 import scala.io.Codec
 
-private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: String, appName: String) extends ActionDAGRunStateStore[HadoopFileStateId] with SmartDataLakeLogger {
+private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: String, appName: String, hadoopConf: Configuration) extends ActionDAGRunStateStore[HadoopFileStateId] with SmartDataLakeLogger {
 
   private val hadoopStatePath = HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(statePath))
   private val currentStatePath = new Path(hadoopStatePath, "current")
   private val succeededStatePath = new Path(hadoopStatePath, "succeeded")
-  implicit private val filesystem: FileSystem = HdfsUtil.getHadoopFs(hadoopStatePath)
+  implicit private val filesystem: FileSystem = HdfsUtil.getHadoopFsWithConf(hadoopStatePath)(hadoopConf)
   if (!filesystem.exists(hadoopStatePath)) filesystem.mkdirs(hadoopStatePath)
   filesystem.setWriteChecksum(false) // disable writing CRC files
 

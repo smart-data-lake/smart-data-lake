@@ -55,18 +55,18 @@ case class CopyAction(override val id: ActionId,
                       inputId: DataObjectId,
                       outputId: DataObjectId,
                       deleteDataAfterRead: Boolean = false,
-                      @deprecated("Use transformers instead.", "2.0.5")
+                      @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                       transformer: Option[CustomDfTransformerConfig] = None,
                       transformers: Seq[ParsableDfTransformer] = Seq(),
-                      @deprecated("Use transformers instead.", "2.0.5")
+                      @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                       columnBlacklist: Option[Seq[String]] = None,
-                      @deprecated("Use transformers instead.", "2.0.5")
+                      @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                       columnWhitelist: Option[Seq[String]] = None,
-                      @deprecated("Use transformers instead.", "2.0.5")
+                      @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                       additionalColumns: Option[Map[String,String]] = None,
-                      @deprecated("Use transformers instead.", "2.0.5")
+                      @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                       filterClause: Option[String] = None,
-                      @deprecated("Use transformers instead.", "2.0.5")
+                      @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                       standardizeDatatypes: Boolean = false,
                       override val breakDataFrameLineage: Boolean = false,
                       override val persist: Boolean = false,
@@ -75,7 +75,7 @@ case class CopyAction(override val id: ActionId,
                       override val metricsFailCondition: Option[String] = None,
                       override val saveModeOptions: Option[SaveModeOptions] = None,
                       override val metadata: Option[ActionMetadata] = None
-                     )(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedAction {
+                     )(implicit instanceRegistry: InstanceRegistry) extends SparkOneToOneActionImpl {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
   override val output: DataObject with CanWriteDataFrame = getOutputDataObject[DataObject with CanWriteDataFrame](outputId)
@@ -88,19 +88,21 @@ case class CopyAction(override val id: ActionId,
     case Failure(e) => throw new ConfigurationException(s"(${id}) Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
   }
 
-  private def getTransformers(implicit session: SparkSession, context: ActionPipelineContext): Seq[DfTransformer] = {
+  validateConfig()
+
+  private def getTransformers(implicit context: ActionPipelineContext): Seq[DfTransformer] = {
     getTransformers(transformer, columnBlacklist, columnWhitelist, additionalColumns, standardizeDatatypes, transformers, filterClauseExpr)
   }
 
-  override def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  override def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit context: ActionPipelineContext): SparkSubFeed = {
     applyTransformers(getTransformers, inputSubFeed, outputSubFeed)
   }
 
-  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
     applyTransformers(getTransformers, partitionValues)
   }
 
-  override def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = {
     if (deleteDataAfterRead) input match {
       // delete input partitions if applicable
       case (partitionInput: CanHandlePartitions) if partitionInput.partitions.nonEmpty && inputSubFeed.partitionValues.nonEmpty =>

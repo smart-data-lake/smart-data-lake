@@ -71,18 +71,18 @@ import scala.util.{Failure, Success, Try}
 case class DeduplicateAction(override val id: ActionId,
                              inputId: DataObjectId,
                              outputId: DataObjectId,
-                             @deprecated("Use transformers instead.", "2.0.5")
+                             @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                              transformer: Option[CustomDfTransformerConfig] = None,
                              transformers: Seq[ParsableDfTransformer] = Seq(),
-                             @deprecated("Use transformers instead.", "2.0.5")
+                             @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                              columnBlacklist: Option[Seq[String]] = None,
-                             @deprecated("Use transformers instead.", "2.0.5")
+                             @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                              columnWhitelist: Option[Seq[String]] = None,
-                             @deprecated("Use transformers instead.", "2.0.5")
+                             @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                              additionalColumns: Option[Map[String,String]] = None,
-                             @deprecated("Use transformers instead.", "2.0.5")
+                             @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                              filterClause: Option[String] = None,
-                             @deprecated("Use transformers instead.", "2.0.5")
+                             @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                              standardizeDatatypes: Boolean = false,
                              ignoreOldDeletedColumns: Boolean = false,
                              ignoreOldDeletedNestedColumns: Boolean = true,
@@ -95,7 +95,7 @@ case class DeduplicateAction(override val id: ActionId,
                              override val executionCondition: Option[Condition] = None,
                              override val metricsFailCondition: Option[String] = None,
                              override val metadata: Option[ActionMetadata] = None
-)(implicit instanceRegistry: InstanceRegistry) extends SparkSubFeedAction {
+)(implicit instanceRegistry: InstanceRegistry) extends SparkOneToOneActionImpl {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
   override val output: TransactionalSparkTableDataObject = getOutputDataObject[TransactionalSparkTableDataObject](outputId)
@@ -109,19 +109,24 @@ case class DeduplicateAction(override val id: ActionId,
   }
   if (!mergeModeEnable && mergeModeAdditionalJoinPredicateExpr.nonEmpty) logger.warn(s"($id) Configuration of mergeModeAdditionalJoinPredicate as no effect if mergeModeEnable = false")
 
-  // force SDLSaveMode.Merge if mergeModeEnable = true
   override def saveModeOptions: Option[SaveModeOptions] = if (mergeModeEnable) {
+    // force SDLSaveMode.Merge if mergeModeEnable = true
     assert(output.isInstanceOf[CanMergeDataFrame], s"($id) output DataObject must support SaveMode.Merge (implement CanMergeDataFrame) if mergeModeEnable = true")
     // customize update condition
     val updateCondition = if (updateCapturedColumnOnlyWhenChanged) Some(checkRecordChangedColumns.map(c => s"existing.$c != new.$c").mkString(" or "))
     else None
     Some(SaveModeMergeOptions(updateCondition = updateCondition, additionalMergePredicate = mergeModeAdditionalJoinPredicate))
-  } else None
+  } else {
+    // force SDLSaveMode.Overwrite otherwise
+    Some(SaveModeGenericOptions(SDLSaveMode.Overwrite))
+  }
   // DataFrame columns are needed in order to generate update condition for SaveModeMergeOptions. Unfortunately they are not available here. A variable is needed which gets updated in transform(...).
   private var checkRecordChangedColumns: Seq[String] = Seq()
 
   // If mergeModeEnabled=false, output is used as recursive input in DeduplicateAction to get existing data. This override is needed to force tick-tock write operation.
   override val recursiveInputs: Seq[TransactionalSparkTableDataObject] = if (!mergeModeEnable) Seq(output) else Seq()
+
+  private[smartdatalake] override val handleRecursiveInputsAsSubFeeds: Boolean = false
 
   // check preconditions
   require(output.table.primaryKey.isDefined, s"($id) Primary key must be defined for output DataObject")
@@ -133,7 +138,9 @@ case class DeduplicateAction(override val id: ActionId,
     case Failure(e) => throw new ConfigurationException(s"($id) Error parsing filterClause parameter as Spark expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
   }
 
-  private def getTransformers(implicit session: SparkSession, context: ActionPipelineContext): Seq[DfTransformer] = {
+  validateConfig()
+
+  private def getTransformers(implicit context: ActionPipelineContext): Seq[DfTransformer] = {
     val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
 
     val deduplicateTransformer = if (mergeModeEnable) {
@@ -154,12 +161,12 @@ case class DeduplicateAction(override val id: ActionId,
 
   }
 
-  override def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  override def transform(inputSubFeed: SparkSubFeed, outputSubFeed: SparkSubFeed)(implicit context: ActionPipelineContext): SparkSubFeed = {
     checkRecordChangedColumns = inputSubFeed.dataFrame.map(_.columns.toSeq).getOrElse(Seq())
     applyTransformers(getTransformers, inputSubFeed, outputSubFeed)
   }
 
-  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
     applyTransformers(getTransformers, partitionValues)
   }
 
@@ -175,7 +182,7 @@ object DeduplicateAction extends FromConfigFactory[Action] {
   /**
    * deduplicates a SubFeed.
    */
-  def deduplicateDataFrame(existingDf: Option[DataFrame], pks: Seq[String], refTimestamp: LocalDateTime, ignoreOldDeletedColumns: Boolean, ignoreOldDeletedNestedColumns: Boolean)(df: DataFrame)(implicit session: SparkSession): DataFrame = {
+  def deduplicateDataFrame(existingDf: Option[DataFrame], pks: Seq[String], refTimestamp: LocalDateTime, ignoreOldDeletedColumns: Boolean, ignoreOldDeletedNestedColumns: Boolean)(df: DataFrame): DataFrame = {
     assert(!df.columns.contains(rnkColName), s"Column $rnkColName not allowed in DataFrame for DeduplicateAction")
 
     // enhance
@@ -196,7 +203,7 @@ object DeduplicateAction extends FromConfigFactory[Action] {
    * @param newDf  new data
    * @return deduplicated data
    */
-  def deduplicate(baseDf: DataFrame, newDf: DataFrame, keyColumns: Seq[String])(implicit session: SparkSession): DataFrame = {
+  def deduplicate(baseDf: DataFrame, newDf: DataFrame, keyColumns: Seq[String]): DataFrame = {
     baseDf.unionByName(newDf)
       .withColumn(rnkColName, row_number().over(Window.partitionBy(keyColumns.map(col): _*).orderBy(col(TechnicalTableColumn.captured).desc)))
       .where(col(rnkColName) === 1)
@@ -206,7 +213,7 @@ object DeduplicateAction extends FromConfigFactory[Action] {
   /**
    * enhance DataFrame with captured column
    */
-  def enhanceDataFrame(refTimestamp: LocalDateTime)(df: DataFrame)(implicit session: SparkSession): DataFrame = {
+  def enhanceDataFrame(refTimestamp: LocalDateTime)(df: DataFrame): DataFrame = {
     df.withColumn(TechnicalTableColumn.captured, ActionHelper.ts1(refTimestamp))
   }
 

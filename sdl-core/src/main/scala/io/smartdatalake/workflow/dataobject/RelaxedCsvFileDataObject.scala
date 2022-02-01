@@ -100,7 +100,7 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
 
   // validate parser options
   private val defaultNameOfCorruptRecord = SQLConf.get.getConf(SQLConf.COLUMN_NAME_OF_CORRUPT_RECORD)
-  private val parserOptions = new CSVOptions(options, columnPruning = true, defaultTimeZoneId = TimeZone.getDefault().getID, defaultColumnNameOfCorruptRecord = defaultNameOfCorruptRecord)
+  private val parserOptions = new CSVOptions(options, columnPruning = true, defaultTimeZoneId = TimeZone.getDefault.getID, defaultColumnNameOfCorruptRecord = defaultNameOfCorruptRecord)
   assert(parserOptions.parseMode == PermissiveMode || parserOptions.parseMode == FailFastMode || parserOptions.parseMode == DropMalformedMode, s"($id) RelaxedCsvFileDataObject doesn't support the ${parserOptions.parseMode.name} mode. Acceptable modes are ${PermissiveMode.name}, ${FailFastMode.name} and ${DropMalformedMode.name}.")
   assert(parserOptions.parseMode == PermissiveMode || !schema.get.exists(_.name == parserOptions.columnNameOfCorruptRecord), s"($id) Schema including columnNameOfCorruptRecord '${parserOptions.columnNameOfCorruptRecord}' makes no sense if options.mode != PermissiveMode. Remove ${parserOptions.columnNameOfCorruptRecord} from schema.")
   ExprUtils.verifyColumnNameOfCorruptRecord(schema.get, parserOptions.columnNameOfCorruptRecord)
@@ -108,7 +108,8 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
   /**
    * This is mostly the same as with SparkFileDataObject
    */
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext) : DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext) : DataFrame = {
+    implicit val session: SparkSession = context.sparkSession
     import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 
     val wrongPartitionValues = PartitionValues.checkWrongPartitionValues(partitionValues, partitions)
@@ -190,14 +191,6 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
     dataIterator.flatMap( line => parser.parse(line.trim)) // remove potential CR from last column value
   }
 
-  private def containsCaseSensitive(entries: Seq[String], entry: String, caseSensitive: Boolean): Boolean = {
-    entries.contains(if (caseSensitive) entry else entry.toLowerCase)
-  }
-
-  private def indexOfCaseSensitive(entries: Seq[String], entry: String, caseSensitive: Boolean): Int = {
-    entries.indexOf(if (caseSensitive) entry else entry.toLowerCase)
-  }
-
   private def getHeaderLine(csvContent: String, parserOptions: CSVOptions): (Option[String], Iterator[String]) = {
     val tokenizer = new StringTokenizer(csvContent, parserOptions.lineSeparator.getOrElse(System.lineSeparator)) // lineSeparator can be only one character long according to assert statement in CSVOptions
     val lineIterator = new Iterator[String] {
@@ -207,14 +200,14 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
     (CSVExprUtils.extractHeader(lineIterator, parserOptions), lineIterator)
   }
 
-  override def getStreamingDataFrame(options: Map[String,String], pipelineSchema: Option[StructType])(implicit session: SparkSession): DataFrame = {
+  override def getStreamingDataFrame(options: Map[String,String], pipelineSchema: Option[StructType])(implicit context: ActionPipelineContext): DataFrame = {
     throw new UnsupportedOperationException(s"($id)getStreamingDataFrame is not yet supported RelaxedCsvFileDataObject")
   }
 
   /**
    * Formats date type column values according to the specified `dateColumnType` before writing to CSV file.
    */
-  override def beforeWrite(df: DataFrame)(implicit session: SparkSession): DataFrame = {
+  override def beforeWrite(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
     val dfSuper = super.beforeWrite(df)
     // standardize date column types
     dateColumnType match {
@@ -222,12 +215,6 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
         dfSuper.castDfColumnTyp(DateType, StringType)
       case DateColumnType.Date => dfSuper.castAllDate2Timestamp
     }
-  }
-
-  private def movePartitionColsLast( schema: StructType, partitions:Seq[String] ): StructType = {
-    val nonPartitionCols = schema.filterNot( c => partitions.contains(c.name))
-    val partitionCols = schema.filter( c => partitions.contains(c.name))
-    StructType(nonPartitionCols ++ partitionCols)
   }
 
   override def factory: FromConfigFactory[DataObject] = CsvFileDataObject

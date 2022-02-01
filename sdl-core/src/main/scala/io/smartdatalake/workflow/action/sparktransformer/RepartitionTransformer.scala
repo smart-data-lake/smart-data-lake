@@ -35,7 +35,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param keyCols  Optional key columns to distribute records over Spark tasks inside a partition value.
  */
 case class RepartitionTransformer(override val name: String = "repartition", override val description: Option[String] = None, numberOfTasksPerPartition: Int, keyCols: Seq[String] = Seq()) extends ParsableDfTransformer {
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
     SparkRepartitionDef.repartitionDataFrame(df, partitionValues, dataObjectId, keyCols, numberOfTasksPerPartition)
   }
   override def factory: FromConfigFactory[ParsableDfTransformer] = RepartitionTransformer

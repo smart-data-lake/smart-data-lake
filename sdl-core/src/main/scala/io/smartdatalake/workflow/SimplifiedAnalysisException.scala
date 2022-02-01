@@ -34,7 +34,7 @@ class SimplifiedAnalysisException (analysisException: AnalysisException)
     analysisException.getSimpleMessage + planAnnotation
   }
   private def limitLines(s: String, lines: Int) = {
-    val lines = s.lines
+    val lines = s.linesIterator
     val limitedLines = lines.take(logicalPlanMaxLines) ++ (if(lines.hasNext) Seq("... logical plan is truncated to 5 lines. See Environment.simplifyFinalExceptionLog to disable this.") else Seq())
     limitedLines.mkString(System.lineSeparator())
   }

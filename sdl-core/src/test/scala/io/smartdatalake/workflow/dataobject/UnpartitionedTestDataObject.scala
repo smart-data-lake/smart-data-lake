@@ -36,13 +36,14 @@ case class UnpartitionedTestDataObject(override val id: DataObjectId,
                                       (@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with CanWriteDataFrame {
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+    val session = context.sparkSession
     import session.implicits._
     Seq(("test",1),("test",2)).toDF("a","b")
   }
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+                             (implicit context: ActionPipelineContext): Unit = {
     df.show
   }
 

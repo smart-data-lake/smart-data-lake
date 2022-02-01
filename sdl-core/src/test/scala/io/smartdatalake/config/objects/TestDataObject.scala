@@ -42,24 +42,27 @@ case class TestDataObject( id: DataObjectId,
                            connectionId: Option[ConnectionId] = None,
                            override val metadata: Option[DataObjectMetadata] = None)
                          ( implicit val instanceRegistry: InstanceRegistry)
-  extends DataObject with TransactionalSparkTableDataObject {
+  extends DataObject with TransactionalSparkTableDataObject with CanReceiveScriptNotification {
 
   private val connection = connectionId.map( c => getConnection[TestConnection](c))
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = null
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = null
 
   override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit session: SparkSession, context: ActionPipelineContext): Unit = {}
+                             (implicit context: ActionPipelineContext): Unit = {}
 
   override var table: Table = Table(db=Some("testdb"), name="testtable")
 
-  override def isDbExisting(implicit session: SparkSession): Boolean = true
+  override def isDbExisting(implicit context: ActionPipelineContext): Boolean = true
 
-  override def isTableExisting(implicit session: SparkSession): Boolean = true
+  override def isTableExisting(implicit context: ActionPipelineContext): Boolean = true
 
-  override def dropTable(implicit session: SparkSession): Unit = throw new NotImplementedError()
+  override def dropTable(implicit context: ActionPipelineContext): Unit = throw new NotImplementedError()
+
+  override def scriptNotification(parameters: Map[String, String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = Unit
 
   override def factory: FromConfigFactory[DataObject] = TestDataObject
+
 }
 
 object TestDataObject extends FromConfigFactory[DataObject] {

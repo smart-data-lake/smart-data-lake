@@ -7,7 +7,7 @@ on:
   pull_request:
     branches:
       - 'develop-spark*'
-    types: [opened, synchronize, closed]
+    types: [opened, synchronize]
 
 jobs:
   build:
@@ -37,7 +37,7 @@ jobs:
 
   deploy:
     needs: build
-    if: github.event.pull_request.merged == true
+    if: github.event_name == 'push'
 
     runs-on: ubuntu-latest
 
@@ -65,6 +65,7 @@ jobs:
           maven_args: -B -DskipTests -f pom.xml
 
       - name: Maven deploy to sonatype for Scala 2.11
+        if: ${{ contains(github.base_ref, 'develop-spark2') || contains(github.ref, 'develop-spark2')}}
         uses: samuelmeuli/action-maven-publish@v1
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}

@@ -65,7 +65,8 @@ case class JmsDataObject(override val id: DataObjectId,
 
   if(schemaMin.isDefined) logger.warn("SchemaMin ignored, for JmsDataObject is always fixed to payload:string")
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+    implicit val session: SparkSession = context.sparkSession
     val consumerFactory = new JmsQueueConsumerFactory(jndiContextFactory, jndiProviderUrl, basicAuthMode.user, basicAuthMode.password, connectionFactory, queue)
     val receiver = new SynchronousJmsReceiver[String](consumerFactory,
       TextMessageHandler.convert2Text, batchSize, Duration(maxWaitSec, TimeUnit.SECONDS),

@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, FileRefMapping}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 
@@ -55,7 +55,7 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
    * This is for instance needed if pathPrefix is defined in a connection.
    * @return
    */
-  def getPath(implicit session: SparkSession): String = path
+  def getPath(implicit context: ActionPipelineContext): String = path
 
   /**
    * List files for given partition values
@@ -63,12 +63,12 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
    * @param partitionValues List of partition values to be filtered. If empty all files in root path of DataObject will be listed.
    * @return List of [[FileRef]]s
    */
-  def getFileRefs(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[FileRef]
+  def getFileRefs(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[FileRef]
 
   /**
-   * Given some [[FileRef]]s for another [[DataObject]], translate the paths to the root path of this [[DataObject]]
+   * Given some [[FileRef]] for another [[DataObject]], translate the paths to the root path of this [[DataObject]]
    */
-  def translateFileRefs(fileRefs: Seq[FileRef])(implicit session: SparkSession, context: ActionPipelineContext): Seq[FileRef] = {
+  def translateFileRefs(fileRefs: Seq[FileRef])(implicit context: ActionPipelineContext): Seq[FileRefMapping] = {
     assert(!partitionLayout().exists(_.contains("*")), s"Cannot translate FileRef if partition layout contains * (${partitionLayout()})")
     fileRefs.map {
       f =>
@@ -79,14 +79,14 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
         val newPath = getPartitionString(f.partitionValues.addKey(Environment.runIdPartitionColumnName, context.executionId.runId.toString))
           .map(partitionString => getPath + separator + partitionString + newFileName)
           .getOrElse(getPath + separator + newFileName)
-        f.copy(fullPath = newPath)
+        FileRefMapping(f, f.copy(fullPath = newPath))
     }
   }
 
   /**
    * get partition values formatted by partition layout
    */
-  def getPartitionString(partitionValues: PartitionValues)(implicit session: SparkSession): Option[String] = {
+  def getPartitionString(partitionValues: PartitionValues)(implicit context: ActionPipelineContext): Option[String] = {
     if (partitionLayout().isDefined) Some(partitionValues.getPartitionString(partitionLayout().get))
     else if (partitions.isEmpty) None
     else throw new RuntimeException("Partition layout needed when working with PartitionValues")
@@ -95,7 +95,7 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
   /**
    * prepare paths to be searched
    */
-  protected def getSearchPaths(partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Seq[(PartitionValues, String)] = {
+  protected def getSearchPaths(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[(PartitionValues, String)] = {
     val partitionValuesWithDefault = if (partitionValues.isEmpty) Seq(PartitionValues(Map())) else partitionValues
     val partitionValuesPaths = partitionValuesWithDefault.map(v => (v, getPartitionString(v)))
     partitionValuesPaths.map {
@@ -108,19 +108,19 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
   /**
    * Extract partition values from a given file path
    */
-  protected def extractPartitionValuesFromPath(filePath: String)(implicit session: SparkSession): PartitionValues = {
+  protected def extractPartitionValuesFromPath(filePath: String)(implicit context: ActionPipelineContext): PartitionValues = {
     PartitionLayout.extractPartitionValues(partitionLayout().get, fileName, relativizePath(filePath))
   }
 
   /**
    * Delete given files. This is used to cleanup files after they are processed.
    */
-  def deleteFileRefs(fileRefs: Seq[FileRef])(implicit session: SparkSession): Unit = throw new RuntimeException(s"($id) deleteFileRefs not implemented")
+  def deleteFileRefs(fileRefs: Seq[FileRef])(implicit context: ActionPipelineContext): Unit = throw new RuntimeException(s"($id) deleteFileRefs not implemented")
 
   /**
    * Delete all data. This is used to implement SaveMode.Overwrite.
    */
-  def deleteAll(implicit session: SparkSession): Unit = throw new RuntimeException(s"($id) deleteAll not implemented")
+  def deleteAll(implicit context: ActionPipelineContext): Unit = throw new RuntimeException(s"($id) deleteAll not implemented")
 
   /**
    * Overwrite or Append new data.

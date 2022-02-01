@@ -19,9 +19,8 @@
 package io.smartdatalake.util.filetransfer
 
 import java.io.{InputStream, OutputStream}
-
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, TryWithRessource}
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, FileRefMapping}
 import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRef, FileRefDataObject}
 import org.apache.spark.sql.SparkSession
 
@@ -31,20 +30,20 @@ import scala.util.{Failure, Success, Try}
 /**
   * Copy data of each file from Input- to OutputStream of DataObject's
   */
-private[smartdatalake] class StreamFileTransfer(override val srcDO: FileRefDataObject with CanCreateInputStream, override val tgtDO: FileRefDataObject with CanCreateOutputStream, deleteSource: Boolean = false, overwrite: Boolean = true)
+private[smartdatalake] class StreamFileTransfer(override val srcDO: FileRefDataObject with CanCreateInputStream, override val tgtDO: FileRefDataObject with CanCreateOutputStream, overwrite: Boolean = true)
   extends FileTransfer with SmartDataLakeLogger {
 
-  override def exec(fileRefPairs: Seq[(FileRef,FileRef)])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def exec(fileRefPairs: Seq[FileRefMapping])(implicit context: ActionPipelineContext): Unit = {
     assert(fileRefPairs != null, "fileRefPairs is null - FileTransfer must be initialized first")
-    fileRefPairs.foreach { case (srcFileRef, tgtFileRef) =>
-      logger.info(s"Copy ${srcDO.id}:${srcFileRef.toStringShort} -> ${tgtDO.id}:${tgtFileRef.toStringShort}")
+    fileRefPairs.foreach { m =>
+      logger.info(s"Copy ${srcDO.id}:${m.src.toStringShort} -> ${tgtDO.id}:${m.tgt.toStringShort}")
       // get streams
-      TryWithRessource.exec(srcDO.createInputStream(srcFileRef.fullPath)) { is =>
-        TryWithRessource.exec( tgtDO.createOutputStream(tgtFileRef.fullPath, overwrite)) { os =>
+      TryWithRessource.exec(srcDO.createInputStream(m.src.fullPath)) { is =>
+        TryWithRessource.exec( tgtDO.createOutputStream(m.tgt.fullPath, overwrite)) { os =>
           // transfer data
           Try(copyStream(is, os)) match {
             case Success(r) => r
-            case Failure(e) => throw new RuntimeException(s"Could not copy ${srcDO.toStringShort}:${srcFileRef.toStringShort} -> ${tgtDO.toStringShort}:${tgtFileRef.toStringShort}: ${e.getClass.getSimpleName} - ${e.getMessage}", e)
+            case Failure(e) => throw new RuntimeException(s"Could not copy ${srcDO.toStringShort}:${m.src.toStringShort} -> ${tgtDO.toStringShort}:${m.tgt.toStringShort}: ${e.getClass.getSimpleName} - ${e.getMessage}", e)
           }
         }
       }
@@ -53,7 +52,7 @@ private[smartdatalake] class StreamFileTransfer(override val srcDO: FileRefDataO
 
   private def copyStream( is: InputStream, os: OutputStream, bufferSize: Int = 4096 ): Unit = {
     val buffer = new Array[Byte](bufferSize)
-    @tailrec def writeStep() {
+    @tailrec def writeStep(): Unit = {
       val cnt = is.read(buffer)
       if (cnt > 0) {
         os.write(buffer, 0, cnt)

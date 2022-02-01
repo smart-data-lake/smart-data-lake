@@ -25,6 +25,7 @@ import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.{AclDef, DataFrameUtil}
+import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -90,7 +91,7 @@ case class ExcelFileDataObject(override val id: DataObjectId,
   /**
    * @inheritdoc
    */
-  override def afterRead(df: DataFrame)(implicit session: SparkSession): DataFrame = {
+  override def afterRead(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
     val dfSuper = super.afterRead(df)
 
     // cleanup header names
@@ -101,7 +102,7 @@ case class ExcelFileDataObject(override val id: DataObjectId,
   /**
    * Checks preconditions before writing.
    */
-  override def beforeWrite(df: DataFrame)(implicit session: SparkSession): DataFrame = {
+  override def beforeWrite(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
     val dfSuper = super.beforeWrite(df)
 
     // check for unsupported write options

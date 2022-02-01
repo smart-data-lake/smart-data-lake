@@ -67,7 +67,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe")),PartitionValues(Map("lastname" -> "jonson"))))
-    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(session,contextExec).head
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
 
     val r1 = session.table(s"${tgtTable.fullName}")
@@ -107,7 +107,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    action1.exec(Seq(srcSubFeed))(session,contextExec)
+    action1.exec(Seq(srcSubFeed))(contextExec)
 
     val r1 = session.table(s"${tgtTable.fullName}")
       .select($"rating")
@@ -135,7 +135,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(session,contextExec).head
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
 
     session.table(s"${tgtTable.fullName}").show
@@ -167,7 +167,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(session,contextExec).head
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
 
     val r1 = session.table(s"${tgtTable.fullName}")
@@ -201,7 +201,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     action.preInit(Seq(srcSubFeed), Seq())
     val initOutputSubFeeds = action.init(Seq(srcSubFeed))
     action.preExec(Seq(srcSubFeed))
-    val tgtSubFeed1 = action.exec(Seq(srcSubFeed))(session,contextExec).head
+    val tgtSubFeed1 = action.exec(Seq(srcSubFeed))(contextExec).head
     action.postExec(Seq(srcSubFeed), Seq(tgtSubFeed1))
 
     // check first load
@@ -218,7 +218,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     srcDO.writeDataFrame(l2, l2PartitionValues) // prepare testdata
     assert(srcDO.getDataFrame().count == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
     action.init(Seq(srcSubFeed))
-    val tgtSubFeed2 = action.exec(Seq(srcSubFeed))(session,contextExec).head
+    val tgtSubFeed2 = action.exec(Seq(srcSubFeed))(contextExec).head
 
     // check 2nd load
     assert(tgtSubFeed2.dataObjectId == tgtDO.id)
@@ -227,7 +227,6 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet ++ l2PartitionValues.toSet)
   }
 
-  // TODO
   test("copy load with spark incremental mode and schema evolution") {
 
     // setup DataObjects
@@ -252,7 +251,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     action.preInit(Seq(srcSubFeed), Seq())
     val initOutputSubFeeds = action.init(Seq(srcSubFeed))
     action.preExec(Seq(srcSubFeed))
-    val tgtSubFeed1 = action.exec(Seq(srcSubFeed))(session,contextExec).head
+    val tgtSubFeed1 = action.exec(Seq(srcSubFeed))(contextExec).head
     action.postExec(Seq(srcSubFeed), Seq(tgtSubFeed1))
 
     // check first load
@@ -269,7 +268,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     srcDO.writeDataFrame(l2, l2PartitionValues) // prepare testdata
     assert(srcDO.getDataFrame().count == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
     action.init(Seq(srcSubFeed))
-    val tgtSubFeed2 = action.exec(Seq(srcSubFeed))(session,contextExec).head
+    val tgtSubFeed2 = action.exec(Seq(srcSubFeed))(contextExec).head
 
     // check 2nd load
     assert(tgtSubFeed2.dataObjectId == tgtDO.id)
@@ -302,7 +301,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(session,contextExec).head
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
 
     val r1 = tgtDO.getDataFrame()
@@ -341,10 +340,10 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtSubFeed.dataFrame.get.columns.contains("mt"))
 
     // run
-    action1.preExec(Seq(srcSubFeed))(session,contextExec)
-    val resultSubFeeds = action1.exec(Seq(srcSubFeed))(session,contextExec)
+    action1.preExec(Seq(srcSubFeed))(contextExec)
+    val resultSubFeeds = action1.exec(Seq(srcSubFeed))(contextExec)
     assert(tgtDO.getDataFrame().count == 2)
-    action1.postExec(Seq(srcSubFeed),resultSubFeeds)(session,contextExec)
+    action1.postExec(Seq(srcSubFeed),resultSubFeeds)(contextExec)
 
     // simulate next run with no data
     action1.reset
@@ -371,7 +370,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe")),PartitionValues(Map("lastname" -> "jonson"))))
-    action1.exec(Seq(srcSubFeed))(session,contextExec).head
+    action1.exec(Seq(srcSubFeed))(contextExec).head
 
     val r1 = tgtDO.getDataFrame()
       .select($"rating")
@@ -379,7 +378,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(r1.toSet == Set(5,3))
 
     // start 2nd load - data should be overwritten
-    action1.exec(Seq(srcSubFeed))(session,contextExec).head
+    action1.exec(Seq(srcSubFeed))(contextExec).head
 
     val r2 = tgtDO.getDataFrame()
       .select($"rating")

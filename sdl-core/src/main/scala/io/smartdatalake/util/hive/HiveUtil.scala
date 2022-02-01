@@ -61,7 +61,8 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     val purgeClause = if (doPurge) " purge" else ""
     val stmt = s"drop table $existsClause${table.fullName}$purgeClause"
     execSqlStmt(stmt)
-    HdfsUtil.deletePath(tablePath, filesystem.getOrElse(HdfsUtil.getHadoopFsFromSpark(tablePath)), false)
+    implicit val fs: FileSystem = filesystem.getOrElse(HdfsUtil.getHadoopFsFromSpark(tablePath))
+    HdfsUtil.deletePath(tablePath, false)
   }
 
   /**
@@ -104,7 +105,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    * @return Desired number of records per file if it can be determined, None otherwise
    */
   def calculateMaxRecordsPerFileFromStatistics(table: Table)(implicit session: SparkSession): Option[BigInt] = {
-    val desiredSizePerFile = HdfsUtil.desiredFileSize(session)
+    val desiredSizePerFile = HdfsUtil.desiredFileSize(session.sparkContext.hadoopConfiguration)
     logger.debug("Desired filesize for session is " +desiredSizePerFile +" bytes.")
 
     session.sharedState.externalCatalog.getTable(table.db.get, table.name).stats.flatMap(s =>
@@ -300,7 +301,8 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       // create and write to table
       if (partitions.nonEmpty) { // with partitions
         logger.info(s"(${table.fullName}) writeDfToHive: creating external partitioned table at location $outputPath")
-        HdfsUtil.deletePath(outputPath, HdfsUtil.getHadoopFsFromSpark(outputPath), doWarn=false) // delete existing data, as all partitions need to be written when table is created.
+        implicit val fs: FileSystem = HdfsUtil.getHadoopFsFromSpark(outputPath)
+        HdfsUtil.deletePath(outputPath, doWarn=false) // delete existing data, as all partitions need to be written when table is created.
         df_partitioned.write
           .partitionBy(partitions:_*)
           .format(OutputType.Parquet.toString)
@@ -332,7 +334,6 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    * @param outputPath Directory to store files for Table
    * @param table Table
    * @param partitions Partitions column name
-   * @param hdfsOutputType tables underlying file format, default = parquet
    * @param forceTickTock set to true if you want to always to tick-tock, and avoid the optimization to cancel tick-tock for partitioned tables
    */
   def writeDfToHiveWithTickTock(df_new: DataFrame, outputPath: Path, table: Table, partitions: Seq[String], saveMode: SaveMode, forceTickTock: Boolean = false)
@@ -407,7 +408,8 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       // create and write to table
       if (partitions.nonEmpty) { // with partitions
         logger.info(s"(${table.fullName}) writeDfToHive: creating external partitioned table $tableName at location $location")
-        HdfsUtil.deletePath(location, HdfsUtil.getHadoopFsFromSpark(location), doWarn=false) // delete existing data, as all partitions need to be written when table is created.
+        implicit val fs: FileSystem = HdfsUtil.getHadoopFsFromSpark(location)
+        HdfsUtil.deletePath(location, doWarn=false) // delete existing data, as all partitions need to be written when table is created.
         df_newColsSorted.write
           .partitionBy(partitions:_*)
           .format(OutputType.Parquet.toString)
@@ -629,7 +631,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     val partitionPath = new Path(tablePath, partition.getPartitionString(partitionLayout))
     val partitionDef = partition.elements.map{ case (k,v) => s"$k='$v'"}.mkString(", ")
     execSqlStmt(s"ALTER TABLE ${table.fullName} DROP IF EXISTS PARTITION ($partitionDef)")
-    HdfsUtil.deletePath(partitionPath, filesystem, false)
+    HdfsUtil.deletePath(partitionPath, false)(filesystem)
   }
 
   def movePartition(table: Table, tablePath: Path, existingPartition: PartitionValues, newPartition: PartitionValues, filenameWithGlobs: String, filesystem: FileSystem)(implicit session: SparkSession): Unit = {
@@ -638,7 +640,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     val existingPartitionPathWithFilenameGlobs = new Path(existingPartitionPath, filenameWithGlobs)
     val newPartitionPath = new Path(tablePath, newPartition.getPartitionString(partitionLayout))
     val newPartitionDef = newPartition.elements.map{ case (k,v) => s"$k='$v'"}.mkString(", ")
-    HdfsUtil.moveFiles( existingPartitionPathWithFilenameGlobs, newPartitionPath, filesystem, addPrefixIfExisting = true)
+    HdfsUtil.moveFiles( existingPartitionPathWithFilenameGlobs, newPartitionPath, addPrefixIfExisting = true)(filesystem)
     dropPartition(table, tablePath, existingPartition, filesystem)
     execSqlStmt(s"ALTER TABLE ${table.fullName} ADD IF NOT EXISTS PARTITION ($newPartitionDef)")
   }

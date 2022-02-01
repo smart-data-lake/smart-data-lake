@@ -19,8 +19,8 @@
 
 package io.smartdatalake.workflow.action
 
+import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions._
 import io.smartdatalake.metrics.{SparkStageMetricsListener, SparkStreamingQueryListener}
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -36,10 +36,17 @@ import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.streaming.{StreamingQuery, Trigger}
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
-import java.time.Duration
 import java.util.concurrent.Semaphore
 
-private[smartdatalake] abstract class SparkAction extends Action {
+/**
+ * Implementation of logic needed for Spark Actions.
+ * This is a generic implementation that supports many input and output SubFeeds.
+ */
+private[smartdatalake] abstract class SparkActionImpl extends ActionSubFeedsImpl[SparkSubFeed] {
+
+  override def inputs: Seq[DataObject with CanCreateDataFrame]
+  override def outputs: Seq[DataObject with CanWriteDataFrame]
+  override def recursiveInputs: Seq[DataObject with CanCreateDataFrame] = Seq()
 
   /**
    * Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject.
@@ -74,36 +81,31 @@ private[smartdatalake] abstract class SparkAction extends Action {
 
   // stage metrics listener to collect metrics
   private var _stageMetricsListener: Option[SparkStageMetricsListener] = None
-  private def registerStageMetricsListener(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  private def registerStageMetricsListener(implicit context: ActionPipelineContext): Unit = {
     if (_stageMetricsListener.isEmpty) {
       _stageMetricsListener = Some(new SparkStageMetricsListener(this))
-      session.sparkContext.addSparkListener(_stageMetricsListener.get)
+      context.sparkSession.sparkContext.addSparkListener(_stageMetricsListener.get)
     }
   }
-  private def unregisterStageMetricsListener(implicit session: SparkSession): Unit = {
+  private def unregisterStageMetricsListener(implicit context: ActionPipelineContext): Unit = {
     if (_stageMetricsListener.isDefined) {
-      session.sparkContext.removeSparkListener(_stageMetricsListener.get)
+      context.sparkSession.sparkContext.removeSparkListener(_stageMetricsListener.get)
       _stageMetricsListener = None
     }
   }
 
   // remember streaming query
   private var streamingQuery: Option[StreamingQuery] = None
-  private[smartdatalake] def notifyStreamingQueryTerminated(implicit session: SparkSession): Unit = {
+  private[smartdatalake] def notifyStreamingQueryTerminated(implicit context: ActionPipelineContext): Unit = {
     streamingQuery = None
     unregisterStageMetricsListener
   }
 
   // reset streaming query
-  override private[smartdatalake] def reset(implicit session: SparkSession): Unit = {
+  override private[smartdatalake] def reset(implicit context: ActionPipelineContext): Unit = {
     super.reset
     streamingQuery = None
     unregisterStageMetricsListener
-  }
-
-  override def prepare(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    super.prepare
-    executionMode.foreach(_.prepare(id))
   }
 
   /**
@@ -114,7 +116,8 @@ private[smartdatalake] abstract class SparkAction extends Action {
    * @param phase current execution phase
    * @param isRecursive true if this input is a recursive input
    */
-  def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, phase: ExecutionPhase, isRecursive: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, phase: ExecutionPhase, isRecursive: Boolean = false)(implicit context: ActionPipelineContext): SparkSubFeed = {
+    implicit val session: SparkSession = context.sparkSession
     assert(input.id == subFeed.dataObjectId, s"($id) DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
     assert(phase!=ExecutionPhase.Prepare, "Strangely enrichSubFeedDataFrame got called in phase prepare. It should only be called in Init and Exec.")
     executionMode match {
@@ -141,11 +144,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
           if (subFeed.dataFrame.isEmpty || subFeed.isDummy || subFeed.isStreaming.contains(true)) {
             // validate partition values existing for input
             input match {
-              case partitionedInput: DataObject with CanHandlePartitions if subFeed.partitionValues.nonEmpty && (context.phase == ExecutionPhase.Exec || subFeed.isDAGStart) =>
-                val completePartitionValues = subFeed.partitionValues.filter(_.keys == partitionedInput.partitions.toSet)
-                val expectedPartitions = partitionedInput.filterExpectedPartitionValues(completePartitionValues)
-                val missingPartitionValues = if (expectedPartitions.nonEmpty) PartitionValues.checkExpectedPartitionValues(partitionedInput.listPartitions, expectedPartitions) else Seq()
-                assert(missingPartitionValues.isEmpty, s"($id) partitions ${missingPartitionValues.mkString(", ")} missing for ${input.id}")
+              case partitionedInput: DataObject with CanHandlePartitions => validatePartitionValuesExisting(partitionedInput, subFeed)
               case _ => Unit
             }
             // check if data is existing, otherwise create empty dataframe for recursive input
@@ -184,7 +183,8 @@ private[smartdatalake] abstract class SparkAction extends Action {
     }
   }
 
-  def createEmptyDataFrame(dataObject: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): DataFrame = {
+  def createEmptyDataFrame(dataObject: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed)(implicit context: ActionPipelineContext): DataFrame = {
+    implicit val session: SparkSession = context.sparkSession
     val schema = dataObject match {
       case input: SparkFileDataObject if input.getSchema(false).isDefined =>
         input.getSchema(false).map(dataObject.createReadSchema)
@@ -199,11 +199,49 @@ private[smartdatalake] abstract class SparkAction extends Action {
       .colNamesLowercase // convert to lower case by default
   }
 
+  override protected def preprocessInputSubFeedCustomized(subFeed: SparkSubFeed, ignoreFilters: Boolean, isRecursive: Boolean)(implicit context: ActionPipelineContext): SparkSubFeed = {
+    val inputMap = (inputs ++ recursiveInputs).map(i => i.id -> i).toMap
+    val input = inputMap(subFeed.dataObjectId)
+    // persist if requested
+    var preparedSubFeed = if (persist) subFeed.persist else subFeed
+    // create dummy DataFrame if read schema is different from write schema on this DataObject
+    val writeSchema = preparedSubFeed.dataFrame.map(_.schema)
+    val readSchema = preparedSubFeed.dataFrame.map(df => input.createReadSchema(df.schema))
+    val schemaChanges = writeSchema != readSchema
+    require(!context.simulation || !schemaChanges, s"($id) write & read schema is not the same for ${input.id}. Need to create a dummy DataFrame, but this is not allowed in simulation!")
+    preparedSubFeed = if (schemaChanges) preparedSubFeed.convertToDummy(readSchema.get) else preparedSubFeed
+    // remove potential filter and partition values added by execution mode
+    if (ignoreFilters) preparedSubFeed = preparedSubFeed.clearFilter().clearPartitionValues().clearSkipped()
+    // break lineage if requested or if it's a streaming DataFrame or if a filter expression is set
+    if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined) preparedSubFeed = preparedSubFeed.breakLineage
+    // enrich with fresh DataFrame if needed
+    preparedSubFeed = enrichSubFeedDataFrame(input, preparedSubFeed, context.phase, isRecursive)
+    // return
+    preparedSubFeed
+  }
+
+  override def postprocessOutputSubFeedCustomized(subFeed: SparkSubFeed)(implicit context: ActionPipelineContext): SparkSubFeed = {
+    if (context.phase == ExecutionPhase.Init) {
+      outputs.find(_.id == subFeed.dataObjectId).foreach { output =>
+        output.init(subFeed.dataFrame.get, subFeed.partitionValues, saveModeOptions)
+      }
+    }
+    subFeed
+  }
+
+  override protected def writeSubFeed(subFeed: SparkSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult = {
+    setSparkJobMetadata(Some(s"writing to ${subFeed.dataObjectId}"))
+    val output = outputs.find(_.id == subFeed.dataObjectId).getOrElse(throw new IllegalStateException(s"($id) output for subFeed ${subFeed.dataObjectId} not found"))
+    val noData = writeSubFeed(subFeed, output, isRecursive)
+    setSparkJobMetadata(None)
+    WriteSubFeedResult(noData)
+  }
+
   /**
    * writes subfeed to output respecting given execution mode
-   * @return true if no data was transfered, otherwise false
+   * @return true if no data was transferred, otherwise false. None if unknown.
    */
-  def writeSubFeed(subFeed: SparkSubFeed, output: DataObject with CanWriteDataFrame, isRecursiveInput: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): Boolean = {
+  def writeSubFeed(subFeed: SparkSubFeed, output: DataObject with CanWriteDataFrame, isRecursiveInput: Boolean = false)(implicit context: ActionPipelineContext): Option[Boolean] = {
     assert(!subFeed.isDummy, s"($id) Can not write dummy DataFrame to ${output.id}")
     // write
     executionMode match {
@@ -228,10 +266,10 @@ private[smartdatalake] abstract class SparkAction extends Action {
           if (noData) logger.info(s"($id) no data to process for ${output.id} in first micro-batch streaming mode")
           streamingQuery = Some(streamingQueryLocalVal) // remember streaming query
           // return
-          noData
+          Some(noData)
         } else {
           logger.debug("($id) streaming query already started")
-          false // noData
+          None // unknown
         }
       case Some(m: SparkStreamingMode) =>
         // Use spark streaming mode synchronously (Trigger.once & awaitTermination)
@@ -246,7 +284,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
         val noData = streamingQuery.lastProgress.numInputRows == 0
         if (noData) logger.info(s"($id) no data to process for ${output.id} in streaming mode")
         // return
-        noData
+        Some(noData)
       case None | Some(_: DataObjectStateIncrementalMode) | Some(_: PartitionDiffMode) | Some(_: SparkIncrementalMode) | Some(_: FailIfNoPartitionValuesMode) | Some(_: CustomPartitionMode) | Some(_: ProcessAllMode) =>
         // Auto persist if dataFrame is reused later
         val preparedSubFeed = if (context.dataFrameReuseStatistics.contains((output.id, subFeed.partitionValues))) {
@@ -259,8 +297,8 @@ private[smartdatalake] abstract class SparkAction extends Action {
         assert(!preparedSubFeed.isDummy, s"($id) Input from ${preparedSubFeed.dataObjectId} is a dummy. Cannot write dummy DataFrame.")
         assert(!preparedSubFeed.isSkipped, s"($id) Input from ${preparedSubFeed.dataObjectId} is a skipped. Cannot write skipped DataFrame.")
         output.writeDataFrame(preparedSubFeed.dataFrame.get, preparedSubFeed.partitionValues, isRecursiveInput, saveModeOptions)
-        // return noData
-        false
+        // return
+        None // unknown
       case x => throw new IllegalStateException( s"($id) ExecutionMode $x is not supported")
     }
   }
@@ -268,35 +306,31 @@ private[smartdatalake] abstract class SparkAction extends Action {
     s"${context.appConfig.appName} $id writing ${dataObjectId}"
   }
 
+  /**
+   * apply transformer to SubFeeds
+   */
+  protected def applyTransformers(transformers: Seq[DfsTransformer], inputPartitionValues: Seq[PartitionValues], inputSubFeeds: Seq[SparkSubFeed], outputSubFeeds: Seq[SparkSubFeed])(implicit context: ActionPipelineContext): Seq[SparkSubFeed] = {
+    val inputDfsMap = inputSubFeeds.map(subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap
+    val (outputDfsMap, _) = transformers.foldLeft((inputDfsMap,inputPartitionValues)){
+      case ((dfsMap, partitionValues), transformer) => transformer.applyTransformation(id, partitionValues, dfsMap)
+    }
+    // create output subfeeds from transformed dataframes
+    outputDfsMap.map {
+      case (dataObjectId, dataFrame) =>
+        val outputSubFeed = outputSubFeeds.find(_.dataObjectId.id == dataObjectId)
+          .getOrElse(throw ConfigurationException(s"($id) No output found for result ${dataObjectId}. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
+        // get partition values from main input
+        outputSubFeed.copy(dataFrame = Some(dataFrame))
+    }.toSeq
+  }
 
   /**
    * apply transformer to partition values
    */
-  protected def applyTransformers(transformers: Seq[PartitionValueTransformer], partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+  protected def applyTransformers(transformers: Seq[PartitionValueTransformer], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
     transformers.foldLeft(PartitionValues.oneToOneMapping(partitionValues)){
       case (partitionValuesMap, transformer) => transformer.applyTransformation(id, partitionValuesMap)
     }
-  }
-
-  /**
-   * applies all the transformations above
-   */
-  def getTransformers(transformation: Option[CustomDfTransformerConfig],
-                      columnBlacklist: Option[Seq[String]],
-                      columnWhitelist: Option[Seq[String]],
-                      additionalColumns: Option[Map[String,String]],
-                      standardizeDatatypes: Boolean,
-                      additionalTransformers: Seq[DfTransformer],
-                      filterClauseExpr: Option[Column] = None)
-                     (implicit session: SparkSession, context: ActionPipelineContext): Seq[DfTransformer] = {
-    Seq(
-      transformation.map(t => t.impl),
-      columnBlacklist.map(l => BlacklistTransformer(columnBlacklist = l)),
-      columnWhitelist.map(l => WhitelistTransformer(columnWhitelist = l)),
-      additionalColumns.map(cs => AdditionalColumnsTransformer(additionalColumns = cs)),
-      filterClauseExpr.map(f => DfTransformerFunctionWrapper("filter", df => df.where(f))),
-      if (standardizeDatatypes) Some(StandardizeDatatypesTransformer()) else None // currently we cast decimals away only but later we may add further type casts
-    ).flatten ++ additionalTransformers
   }
 
   /**
@@ -306,7 +340,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
    * @param subFeed SubFeed with transformed DataFrame
    * @return validated and updated SubFeed
    */
-  def validateAndUpdateSubFeed(output: DataObject, subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+   def validateAndUpdateSubFeedCustomized(output: DataObject, subFeed: SparkSubFeed)(implicit context: ActionPipelineContext): SparkSubFeed = {
     output match {
       case partitionedDO: CanHandlePartitions =>
         // validate output partition columns exist in DataFrame
@@ -360,7 +394,7 @@ private[smartdatalake] abstract class SparkAction extends Action {
   /**
    * Applies changes to a SubFeed from a previous action in order to be used as input for this actions transformation.
    */
-  def prepareInputSubFeed(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, ignoreFilters: Boolean = false)(implicit session: SparkSession, context: ActionPipelineContext): SparkSubFeed = {
+  def prepareInputSubFeed(input: DataObject with CanCreateDataFrame, subFeed: SparkSubFeed, ignoreFilters: Boolean = false)(implicit context: ActionPipelineContext): SparkSubFeed = {
     // persist if requested
     var preparedSubFeed = if (persist) subFeed.persist else subFeed
     // create dummy DataFrame if read schema is different from write schema on this DataObject
@@ -377,12 +411,12 @@ private[smartdatalake] abstract class SparkAction extends Action {
     preparedSubFeed
   }
 
-  override def preExec(subFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def preExec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
     registerStageMetricsListener
     super.preExec(subFeeds)
   }
 
-  override def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+  override def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
     super.postExec(inputSubFeeds, outputSubFeeds)
     // auto-unpersist DataFrames no longer needed
     inputSubFeeds
@@ -396,22 +430,8 @@ private[smartdatalake] abstract class SparkAction extends Action {
     if (!isAsynchronous) unregisterStageMetricsListener
   }
 
-  override def postExecFailed(implicit session: SparkSession): Unit = {
+  override def postExecFailed(implicit context: ActionPipelineContext): Unit = {
     super.postExecFailed
     unregisterStageMetricsListener
   }
-
-  def logWritingStarted(subFeed: SparkSubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    val msg = s"writing to ${subFeed.dataObjectId}" + (if (subFeed.partitionValues.nonEmpty) s", partitionValues ${subFeed.partitionValues.mkString(" ")}" else "")
-    logger.info(s"($id) start " + msg)
-    setSparkJobMetadata(Some(msg))
-  }
-
-  def logWritingFinished(subFeed: SparkSubFeed, noData: Boolean, duration: Duration)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
-    setSparkJobMetadata()
-    val metricsLog = if (noData) ", no data found"
-    else runtimeData.getFinalMetrics(subFeed.dataObjectId).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
-    logger.info(s"($id) finished writing DataFrame to ${subFeed.dataObjectId.id}: jobDuration=$duration" + metricsLog)
-  }
-
 }

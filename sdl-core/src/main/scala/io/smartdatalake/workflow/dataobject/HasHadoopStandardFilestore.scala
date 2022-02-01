@@ -21,29 +21,41 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.SerializableHadoopConfiguration
+import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.spark.sql.SparkSession
 
 trait HasHadoopStandardFilestore extends CanHandlePartitions { this: DataObject =>
 
   /**
-   * Creates a cached hadoop [[FileSystem]] for the provided [[SparkSession]].
+   * Creates a cached hadoop [[FileSystem]] with the Hadoop configuration of the context.
    */
-  private[smartdatalake] def filesystem(implicit session: SparkSession): FileSystem = {
-    if (filesystemHolder == null) filesystemHolder = getFilesystem(hadoopPath)
+  private[smartdatalake] def filesystem(implicit context: ActionPipelineContext): FileSystem = {
+    if (filesystemHolder == null) {
+      serializableHadoopConfHolder = context.serializableHadoopConf
+      filesystemHolder = getFilesystem(hadoopPath)
+    }
     filesystemHolder
   }
+
+  // filesystem holder
   @transient private var filesystemHolder: FileSystem = _
-  private var serializableHadoopConf: SerializableHadoopConfiguration = _ // we must serialize hadoop config for CustomFileAction running transformation on executors
+
+  // hadoop configuration holder
+  private var serializableHadoopConfHolder: SerializableHadoopConfiguration = _ // we must serialize hadoop config for CustomFileAction running transformation on executors
 
   /**
-   * Creates a hadoop [[FileSystem]] for the provided [[SparkSession]] and [[Path]].
+   * Creates a hadoop [[FileSystem]] for [[Path]] with a given serializable hadoop configuration.
    */
-  private[smartdatalake] def getFilesystem(path: Path)(implicit session: SparkSession) = {
-    if (serializableHadoopConf == null) {
-      serializableHadoopConf = new SerializableHadoopConfiguration(session.sparkContext.hadoopConfiguration)
-    }
-    HdfsUtil.getHadoopFsWithConf(path, serializableHadoopConf.get)
+  private[smartdatalake] def getFilesystem(path: Path): FileSystem = {
+    assert(serializableHadoopConfHolder != null, "serializableHadoopConfHolder must be initialized before using getFilesystem")
+    getFilesystem(path, serializableHadoopConfHolder)
+  }
+
+  /**
+   * Creates a hadoop [[FileSystem]] for [[Path]] with a given serializable hadoop configuration.
+   */
+  private[smartdatalake] def getFilesystem(path: Path, hadoopConf: SerializableHadoopConfiguration): FileSystem = {
+    HdfsUtil.getHadoopFsWithConf(path)(hadoopConf.get) // this must use serializable HadoopConfiguration to be distributed.
   }
 
   /**
@@ -55,5 +67,5 @@ trait HasHadoopStandardFilestore extends CanHandlePartitions { this: DataObject 
     else None
   }
 
-  private[smartdatalake] def hadoopPath(implicit session: SparkSession): Path
+  private[smartdatalake] def hadoopPath(implicit context: ActionPipelineContext): Path
 }

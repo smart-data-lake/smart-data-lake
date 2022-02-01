@@ -65,13 +65,13 @@ class DeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
-    val context1 = ActionPipelineContext(feed, "test", SDLExecutionId.executionId1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
+    val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, mergeModeEnable = true)
     val l1 = Seq(("doe","john",5),("pan","peter",5),("hans","muster",5)).toDF("lastname", "firstname", "rating")
-    srcDO.writeDataFrame(l1, Seq())(session, context1)
+    srcDO.writeDataFrame(l1, Seq())(context1)
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    action1.init(Seq(srcSubFeed))(session, context1).head
-    action1.exec(Seq(srcSubFeed))(session, context1).head
+    action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init)).head
+    action1.exec(Seq(srcSubFeed))(context1).head
 
     {
       val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1)), ("pan", "peter", 5, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1)))
@@ -84,10 +84,10 @@ class DeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start 2nd load
     val refTimestamp2 = LocalDateTime.now()
-    val context2 = ActionPipelineContext(feed, "test", SDLExecutionId.executionId1, instanceRegistry, Some(refTimestamp2), SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
+    val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
     val l2 = Seq(("doe","john",10),("pan","peter",5)).toDF("lastname", "firstname", "rating")
-    srcDO.writeDataFrame(l2, Seq())(session, context1)
-    action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(session, context2)
+    srcDO.writeDataFrame(l2, Seq())(context1)
+    action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(context2)
 
     {
       // note that we expect pan/peter/5 with updated refTimestamp even though all attributes stay the same
@@ -117,13 +117,13 @@ class DeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
-    val context1 = ActionPipelineContext(feed, "test", SDLExecutionId.executionId1, instanceRegistry, Some(refTimestamp1), SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
+    val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, mergeModeEnable = true, updateCapturedColumnOnlyWhenChanged = true)
     val l1 = Seq(("doe","john",Some(5)),("pan","peter",Some(5)),("pan","peter2",None),("hans","muster",Some(5))).toDF("lastname", "firstname", "rating")
-    srcDO.writeDataFrame(l1, Seq())(session, context1)
+    srcDO.writeDataFrame(l1, Seq())(context1)
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    action1.init(Seq(srcSubFeed))(session, context1).head
-    action1.exec(Seq(srcSubFeed))(session, context1).head
+    action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init)).head
+    action1.exec(Seq(srcSubFeed))(context1).head
 
     {
       val expected = Seq(("doe", "john", Some(5), Timestamp.valueOf(refTimestamp1)), ("pan", "peter", Some(5), Timestamp.valueOf(refTimestamp1)), ("pan", "peter2", None, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", Some(5), Timestamp.valueOf(refTimestamp1)))
@@ -136,10 +136,10 @@ class DeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start 2nd load
     val refTimestamp2 = LocalDateTime.now()
-    val context2 = ActionPipelineContext(feed, "test", SDLExecutionId.executionId1, instanceRegistry, Some(refTimestamp2), SmartDataLakeBuilderConfig(), phase = ExecutionPhase.Exec)
+    val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
     val l2 = Seq(("doe","john",Some(10)),("pan","peter",Some(5)),("pan","peter2",None)).toDF("lastname", "firstname", "rating")
-    srcDO.writeDataFrame(l2, Seq())(session, context1)
-    action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(session, context2)
+    srcDO.writeDataFrame(l2, Seq())(context1)
+    action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(context2)
 
     {
       // note that we expect pan/peter/5 and pan/peter2/null with old refTimestamp because all attributes stay the same

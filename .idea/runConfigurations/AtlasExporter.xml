@@ -1,0 +1,14 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="AtlasExporter" type="Application" factoryName="Application">
+    <option name="ALTERNATIVE_JRE_PATH" value="15" />
+    <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+    <option name="INCLUDE_PROVIDED_SCOPE" value="true" />
+    <option name="MAIN_CLASS_NAME" value="io.smartdatalake.meta.atlas.AtlasExporter" />
+    <module name="sdl-lang" />
+    <option name="PROGRAM_PARAMETERS" value="-a $MODULE_DIR$/src/main/resources/atlasExporter.local.conf -s $MODULE_DIR$/src/test/resources/application.conf" />
+    <shortenClasspath name="MANIFEST" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

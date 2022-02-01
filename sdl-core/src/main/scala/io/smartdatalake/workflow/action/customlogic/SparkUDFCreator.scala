@@ -20,6 +20,7 @@
 package io.smartdatalake.workflow.action.customlogic
 
 import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.definitions.Environment
 import org.apache.spark.sql.expressions.UserDefinedFunction
 
 
@@ -32,7 +33,7 @@ import org.apache.spark.sql.expressions.UserDefinedFunction
 case class SparkUDFCreatorConfig(className: String, options: Option[Map[String,String]] = None) {
   // instantiate SparkUDFCreator
   private[smartdatalake] val creator: SparkUDFCreator = try {
-    val clazz = Class.forName(className)
+    val clazz = Environment.classLoader.loadClass(className)
     val constructor = clazz.getConstructor()
     constructor.newInstance().asInstanceOf[SparkUDFCreator]
   } catch {

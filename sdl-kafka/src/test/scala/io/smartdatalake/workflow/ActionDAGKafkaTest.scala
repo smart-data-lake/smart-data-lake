@@ -18,19 +18,19 @@
  */
 package io.smartdatalake.workflow
 
-import java.nio.file.Files
-import java.time.LocalDateTime
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
+import io.github.embeddedkafka.EmbeddedKafka
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.workflow.action.{CopyAction, SDLExecutionId}
+import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataobject._
-import net.manub.embeddedkafka.EmbeddedKafka
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{StructField, StructType, TimestampType}
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
+
+import java.nio.file.Files
+import java.time.LocalDateTime
 
 /**
  * Note about EmbeddedKafka compatibility:
@@ -65,10 +65,11 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
   test("action dag with 2 actions in sequence where 2nd action reads different schema than produced by last action") {
     // Note: Some DataObjects remove & add columns on read (e.g. KafkaTopicDataObject, SparkFileDataObject)
     // In this cases we have to break the lineage und create a dummy DataFrame in init phase.
+    implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     val feed = "actionpipeline"
-    val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6000")
+    val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6001")
     instanceRegistry.register(kafkaConnection)
     val srcTable = Table(Some("default"), "ap_input")
     val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
@@ -82,9 +83,6 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
     instanceRegistry.register(tgt2DO)
 
     // prepare DAG
-    val refTimestamp1 = LocalDateTime.now()
-    val appName = "test"
-    implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
     val l1 = Seq(("doe-john", 5)).toDF("key", "value")
     srcDO.writeDataFrame(l1, Seq())
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id)

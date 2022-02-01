@@ -24,7 +24,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{Condition, ExecutionMode}
 import io.smartdatalake.util.filetransfer.FileTransfer
 import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRefDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, GenericMetrics}
 import org.apache.spark.sql.SparkSession
 
 /**
@@ -32,16 +32,16 @@ import org.apache.spark.sql.SparkSession
  *
  * @param inputId inputs DataObject
  * @param outputId output DataObject
- * @param deleteDataAfterRead if the input files should be deleted after processing successfully
  * @param executionMode optional execution mode for this Action
  * @param executionCondition optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
+ * @param breakFileRefLineage If set to true, file references passed on from previous action are ignored by this action.
+ *                            The action will detect on its own what files it is going to process.
  */
 case class FileTransferAction(override val id: ActionId,
                               inputId: DataObjectId,
                               outputId: DataObjectId,
-                              @deprecated("use executionMode = FileIncrementalMoveMode instead", "2.0.3") override val deleteDataAfterRead: Boolean = false,
                               overwrite: Boolean = true,
                               override val breakFileRefLineage: Boolean = false,
                               override val executionMode: Option[ExecutionMode] = None,
@@ -49,7 +49,7 @@ case class FileTransferAction(override val id: ActionId,
                               override val metricsFailCondition: Option[String] = None,
                               override val metadata: Option[ActionMetadata] = None)
                              ( implicit instanceRegistry: InstanceRegistry)
-  extends FileSubFeedAction {
+  extends FileOneToOneActionImpl {
 
   override val input: FileRefDataObject with CanCreateInputStream = getInputDataObject[FileRefDataObject with CanCreateInputStream](inputId)
   override val output: FileRefDataObject with CanCreateOutputStream = getOutputDataObject[FileRefDataObject with CanCreateOutputStream](outputId)
@@ -57,15 +57,22 @@ case class FileTransferAction(override val id: ActionId,
   override val outputs: Seq[FileRefDataObject] = Seq(output)
 
   // initialize FileTransfer
-  private val fileTransfer = FileTransfer(input, output, deleteDataAfterRead, overwrite)
+  private val fileTransfer = FileTransfer(input, output, overwrite)
 
-  override def doTransform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed, doExec: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): FileSubFeed = {
+  override def transform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {
     assert(inputSubFeed.fileRefs.nonEmpty, "inputSubFeed.fileRefs must be defined for FileTransferAction.doTransform")
     val inputFileRefs = inputSubFeed.fileRefs.get
+    outputSubFeed.copy(fileRefMapping = Some(fileTransfer.getFileRefMapping(inputFileRefs)))
+  }
 
-    val fileRefPairs = fileTransfer.init(inputFileRefs)
-    if (doExec) fileTransfer.exec(fileRefPairs)
-    outputSubFeed.copy(fileRefs = Some(fileRefPairs.map(_._2)), processedInputFileRefs = Some(inputFileRefs))
+  override def writeSubFeed(subFeed: FileSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult = {
+    val fileRefMapping = subFeed.fileRefMapping.getOrElse(throw new IllegalStateException(s"($id) file mapping is not defined"))
+    output.startWritingOutputStreams(subFeed.partitionValues)
+    if (fileRefMapping.nonEmpty) fileTransfer.exec(fileRefMapping)
+    output.endWritingOutputStreams(subFeed.partitionValues)
+    // return metric to action
+    val metrics = Map("files_written"->fileRefMapping.size.toLong)
+    WriteSubFeedResult(Some(fileRefMapping.isEmpty), Some(metrics))
   }
 
   override def factory: FromConfigFactory[Action] = FileTransferAction

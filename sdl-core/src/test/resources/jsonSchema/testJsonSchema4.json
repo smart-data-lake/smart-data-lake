@@ -1,0 +1,27 @@
+{
+  "$schema": "smallTestSchema",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "addressA": {
+      "type": "object",
+      "$ref": "/definitions/address"
+    },
+    "addressB": {
+      "type": "object",
+      "$ref": "/definitions/address"
+    }
+  },
+  "definitions": {
+    "address": {
+      "type": "object",
+      "properties": {
+        "zip": {
+          "type": ["string", "null"]
+        }
+      }
+    }
+  }
+}

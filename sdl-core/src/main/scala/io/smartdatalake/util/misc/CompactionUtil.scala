@@ -23,7 +23,8 @@ import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataobject._
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.permission.FsPermission
+import org.apache.hadoop.fs.{FileContext, FileSystem, Path}
 import org.apache.spark.sql.SparkSession
 
 object CompactionUtil extends SmartDataLakeLogger {
@@ -47,7 +48,9 @@ object CompactionUtil extends SmartDataLakeLogger {
    * @param dataObject: DataObject with partition values to compact. The DataObject must be partitioned, able to read & write DataFrames and have a hadoop standard partition layout.
    * @param partitionValues: partition values to compact
    */
-  def compactHadoopStandardPartitions(dataObject: DataObject with CanHandlePartitions with CanCreateDataFrame with CanWriteDataFrame with HasHadoopStandardFilestore, partitionValues: Seq[PartitionValues])(implicit session: SparkSession, actionPipelineContext: ActionPipelineContext): Seq[PartitionValues] = {
+  def compactHadoopStandardPartitions(dataObject: DataObject with CanHandlePartitions with CanCreateDataFrame with CanWriteDataFrame with HasHadoopStandardFilestore, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
+    implicit val session: SparkSession = context.sparkSession
+    implicit val fs: FileSystem = dataObject.filesystem
     assert(dataObject.partitions.nonEmpty, "compactPartitions needs a partitionend DataObject")
     assert(partitionValues.flatMap(_.keys).forall(dataObject.partitions.contains), "keys of partitionValues must exist as DataObject partitions")
     val partitionLayout = dataObject.partitionLayout().getOrElse(s"(${dataObject.id}) partitionLayout must be defined for compactPartitions")
@@ -64,7 +67,7 @@ object CompactionUtil extends SmartDataLakeLogger {
       if (dataObject.filesystem.getFileStatus(compactingFile).getModificationTime > System.currentTimeMillis - 12*60*60*1000) throw new IllegalStateException(s"(${dataObject.id}) Compaction already running! Compacting file younger than 12h found, please make sure there is no compaction running and clenaup file $compactingFile")
       else logger.warn(s"(${dataObject.id}) $compactingFileName older than 12h found - it seems the last compaction crashed")
     }
-    HdfsUtil.touchFile(compactingFile, dataObject.filesystem)
+    HdfsUtil.touchFile(compactingFile)
 
     // 2. fix crashed compaction if needed
     if (dataObject.filesystem.exists(tempPath)) {
@@ -78,13 +81,13 @@ object CompactionUtil extends SmartDataLakeLogger {
         else {
           // some filesystems (S3?) might be renaming/moving files in the directory one-by-one. This implements an incremental process for recovery in case of existing target files...
           // TODO: what if movingFileName was already moved, but others still missing?
-          HdfsUtil.moveFiles(new Path(tempPartitionPath, "*"), targetPartitionPath, dataObject.filesystem, customFilter = !_.getPath.toString.endsWith(movingFileName))
+          HdfsUtil.moveFiles(new Path(tempPartitionPath, "*"), targetPartitionPath, customFilter = !_.getPath.toString.endsWith(movingFileName))
         }
-        HdfsUtil.touchFile(new Path(targetPartitionPath, compactedFileName), dataObject.filesystem)
+        HdfsUtil.touchFile(new Path(targetPartitionPath, compactedFileName))
         dataObject.filesystem.delete(new Path(targetPartitionPath, movingFileName), /*recursive*/ false)
         logger.info(s"(${dataObject.id}) Recovered partition $partitionDir")
       }
-      HdfsUtil.deletePath(tempPath, dataObject.filesystem, doWarn = true)
+      HdfsUtil.deletePath(tempPath, doWarn = true)
     }
 
     // 3. Filter already compacted partitions
@@ -110,21 +113,21 @@ object CompactionUtil extends SmartDataLakeLogger {
       val tempPartitionPath = new Path(tempPath, partitionDir)
       val targetPartitionPath = new Path(dataObject.hadoopPath, partitionDir)
       val trashPartitionPath = new Path(trashPath, partitionDir)
-      HdfsUtil.touchFile(new Path(targetPartitionPath, movingFileName), dataObject.filesystem)
-      dataObject.filesystem.rename(targetPartitionPath, trashPartitionPath)
-      dataObject.filesystem.rename(tempPartitionPath, targetPartitionPath)
-      HdfsUtil.touchFile(new Path(targetPartitionPath, compactedFileName), dataObject.filesystem)
-      dataObject.filesystem.delete(new Path(targetPartitionPath, movingFileName), /*recursive*/ false)
-      dataObject.filesystem.delete(trashPartitionPath, /*recursive*/ true)
+      HdfsUtil.touchFile(new Path(targetPartitionPath, movingFileName))
+      fs.mkdirs(trashPath) // this is needed with Hadoop 2.7.4 on windows
+      fs.mkdirs(tempPath) // this is needed with Hadoop 2.7.4 on windows
+      fs.rename(targetPartitionPath, trashPartitionPath)
+      fs.rename(tempPartitionPath, targetPartitionPath)
+      HdfsUtil.touchFile(new Path(targetPartitionPath, compactedFileName))
+      fs.delete(new Path(targetPartitionPath, movingFileName), /*recursive*/ false)
+      fs.delete(trashPartitionPath, /*recursive*/ true)
     }
-    HdfsUtil.deletePath(tempPath, dataObject.filesystem, doWarn = true)
-    HdfsUtil.deletePath(trashPath, dataObject.filesystem, doWarn = true)
+    HdfsUtil.deletePath(tempPath, doWarn = true)
+    HdfsUtil.deletePath(trashPath, doWarn = true)
 
     // 6. remove compacting file
     dataObject.filesystem.delete(compactingFile, /*recursive*/ false)
     logger.info(s"(${dataObject.id}) finished compaction successfully")
     partitionValuesToCompact
   }
-
-
 }
