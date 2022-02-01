@@ -2,35 +2,46 @@ package io.smartdatalake.meta
 
 import com.github.takezoe.scaladoc.{Scaladoc => ScaladocAnnotation}
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.definitions.{AuthMode, ExecutionMode, SaveModeOptions}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.action.script.ParsableScriptDef
+import io.smartdatalake.workflow.action.sparktransformer.{ParsableDfTransformer, ParsableDfsTransformer, ValidationRule}
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
-import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata, Table}
+import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata, HousekeepingMode, Table}
 import org.reflections.Reflections
 import scaladoc.{Markup, Tag}
 
 import scala.collection.JavaConverters._
-import scala.reflect.runtime.universe.{AssignOrNamedArg, ClassSymbol, MethodSymbol, TermSymbol, Type, typeOf}
+import scala.reflect.runtime.universe.{Annotation, AssignOrNamedArg, MethodSymbol, TermSymbol, Type, typeOf}
 
-/**
- * Base types for which type definitions are extracted.
- * Note that order is important for creation of json schema: Types used by other types should be placed later in the list.
- */
-object BaseType extends Enumeration {
-  type BaseType = Value
-  val Connection = Value(classOf[Connection].getName)
-  val DataObject = Value(classOf[DataObject].getName)
-  val Action = Value(classOf[Action].getName)
-  val Table = Value(classOf[Table].getName)
-  val DataObjectMeta = Value(classOf[DataObjectMetadata].getName)
-  val ActionMeta = Value(classOf[ActionMetadata].getName)
-  val ConnectionMeta = Value(classOf[ConnectionMetadata].getName)
-}
 
 /**
  * Create generic SDL configuration elements by using reflection.
  */
 private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
+
+  /**
+   * Base types for which type definitions are extracted.
+   * Note that order is important for creation of json schema: Types used by other types should be placed later in the list.
+   */
+  def baseTypes: Seq[Type] = Seq(
+    typeOf[Connection],
+    typeOf[DataObject],
+    typeOf[Action],
+    typeOf[Table],
+    typeOf[DataObjectMetadata],
+    typeOf[ActionMetadata],
+    typeOf[ConnectionMetadata],
+    typeOf[ParsableDfTransformer],
+    typeOf[ParsableDfsTransformer],
+    typeOf[ParsableScriptDef],
+    typeOf[ExecutionMode],
+    typeOf[HousekeepingMode],
+    typeOf[AuthMode],
+    typeOf[ValidationRule],
+    typeOf[SaveModeOptions]
+  )
 
   def getReflections = new Reflections("io.smartdatalake")
 
@@ -46,15 +57,14 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
 
     val mirror = scala.reflect.runtime.currentMirror
 
-    val allTypes = BaseType.values.toSeq.flatMap{ baseType =>
-      val baseCls = getClass.getClassLoader.loadClass(baseType.toString)
+    val allTypes = baseTypes.flatMap { baseType =>
+      val baseCls = getClass.getClassLoader.loadClass(baseType.typeSymbol.fullName)
       val subTypeClss = reflections.getSubTypesOf(baseCls).asScala.toSeq
-      val allClss = subTypeClss :+ baseCls
-      allClss.map(cls => (baseType, mirror.classSymbol(cls)))
+      subTypeClss.map(cls => (Some(baseType), mirror.classSymbol(cls).toType)) :+ (None, baseType)
     }
 
-    val typeDefsWithCaseClassAttributes = allTypes.map{ case (baseType, cls) =>
-      typeDefForClass(cls, allTypes.map(_._2), Some(baseType))
+    val typeDefsWithCaseClassAttributes = allTypes.map{ case (baseType, tpe) =>
+      typeDefForClass(tpe, allTypes.map(_._2), baseType)
     }.toSet
 
     // propagate attributes from case classes to super type classes where they are defined.
@@ -64,7 +74,7 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     // mark overridden attributes with isOverride
     val refinedEntities = typeDefsWithPropagatedAttributes.map{typeDef =>
       if (typeDef.superTypes.nonEmpty) {
-        val superTypeDefs = typeDefsWithPropagatedAttributes.filter(superTypeDef => typeDef.superTypes.contains(superTypeDef.cls))
+        val superTypeDefs = typeDefsWithPropagatedAttributes.filter(superTypeDef => typeDef.superTypes.contains(superTypeDef.tpe))
         val overriddenAttributes = superTypeDefs.flatMap(_.attributes)
         val refinedAttributes = typeDef.attributes.map(a => if(overriddenAttributes.contains(a)) a.copy(isOverride = true) else a)
         val indirectSuperTypes = superTypeDefs.flatMap(_.superTypes)
@@ -85,11 +95,11 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
    */
   def propagateAttributes(typeDef: GenericTypeDef, typeDefs: Set[GenericTypeDef]): GenericTypeDef = {
     if (!typeDef.isFinal) {
-      val childTypes = typeDefs.filter(entity => entity.superTypes.contains(typeDef.cls))
+      val childTypes = typeDefs.filter(entity => entity.superTypes.contains(typeDef.tpe))
       val candidateAttributes = childTypes.toSeq.flatMap(_.attributes)
         .groupBy(a => (a.name, a.tpe)).map(_._2.maxBy(_.description.isDefined)) // if an attribute exists multiple times, take the first which has a description.
         .toSet
-      val methodsWithoutParams = typeDef.cls.toType.decls.filter(_.isMethod).map(_.asMethod)
+      val methodsWithoutParams = typeDef.tpe.decls.filter(_.isMethod).map(_.asMethod)
         .filter(m => m.paramLists.isEmpty || m.paramLists.map(_.size) == List(0))
         .map(m => (m.name.toString,extractOptionalType(m.typeSignature.resultType)))
         .toSet
@@ -141,36 +151,50 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     formatScaladocString(markup.trimmed.plainString)
   }
 
-  def typeDefForClass(cls: ClassSymbol, interestingSuperTypes: Seq[ClassSymbol] = Seq(), baseType: Option[BaseType.BaseType] = None): GenericTypeDef = {
-    val superTypeNames = interestingSuperTypes.map(_.name)
-    val parentTypes = if (superTypeNames.nonEmpty)
-      cls.baseClasses.filter(baseCls => superTypeNames.contains(baseCls.name) && baseCls != cls).map(_.asClass)
-    else Seq()
-    val name = cls.fullName.split('.').last
-    val rawScaladoc = cls.annotations.find(_.tree.tpe =:= typeOf[ScaladocAnnotation])
+  private def formatScaladoc(doc: scaladoc.Scaladoc, filter: scaladoc.Tag => Boolean = _ => true): String = {
+    val rawText = doc.tags.filter(filter).flatMap(formatScaladocTag).mkString(System.lineSeparator())
+    formatScaladocString(rawText)
+  }
+
+  private def extractScalaDoc(annotations: Seq[Annotation]) = {
+    val rawScaladoc = annotations.find(_.tree.tpe =:= typeOf[ScaladocAnnotation])
       .flatMap(_.tree.children.collectFirst{ case x: AssignOrNamedArg => x.rhs.toString })
-    val parsedScaladoc = rawScaladoc.map(d => scaladoc.Scaladoc.fromString(d).right.get)
-    val rawDescription = parsedScaladoc.map(d => d.tags.filterNot(_.isInstanceOf[Tag.Param]).flatMap(formatScaladocTag).mkString(System.lineSeparator()))
-    val description = rawDescription.map(_.replaceAll(raw"(?m)^\s?\*\s?", "").trim)
-    val attributes = if (cls.isCaseClass) attributesForCaseClass(cls, parsedScaladoc.map(_.textParams.mapValues(formatScaladocString)).getOrElse(Map())) else Seq()
-    GenericTypeDef(name, baseType, cls, description, cls.isCaseClass, parentTypes.toSet, attributes)
+    rawScaladoc.map(d => scaladoc.Scaladoc.fromString(d).right.get)
+  }
+
+  def typeDefForClass(tpe: Type, interestingSuperTypes: Seq[Type] = Seq(), baseType: Option[Type] = None): GenericTypeDef = {
+    val parentTypes = if (interestingSuperTypes.nonEmpty)
+      tpe.baseClasses.map(_.asType.toType).filter(baseType => interestingSuperTypes.contains(baseType) && baseType != tpe)
+    else Seq()
+    val name = tpe.typeSymbol.name.toString
+    val scaladoc = extractScalaDoc(tpe.typeSymbol.annotations)
+    val description = scaladoc.map(formatScaladoc(_, !_.isInstanceOf[Tag.Param]))
+    val attributes = if (tpe.typeSymbol.asClass.isCaseClass) attributesForCaseClass(tpe, scaladoc.map(_.textParams.mapValues(formatScaladocString)).getOrElse(Map())) else Seq()
+    GenericTypeDef(name, baseType, tpe, description, tpe.typeSymbol.asClass.isCaseClass, parentTypes.toSet, attributes)
   }
 
   /**
    * Find all attributes for a given case class
    */
-  def attributesForCaseClass(cls: ClassSymbol, paramDescriptions: Map[String,String]): Seq[GenericAttributeDef] = {
+  def attributesForCaseClass(tpe: Type, paramDescriptions: Map[String,String]): Seq[GenericAttributeDef] = {
     // get case class constructor parameters
-    val tpe = cls.toType
     val params = tpe.decls.collectFirst {
-        case m: MethodSymbol if m.isPrimaryConstructor =>
-          // only use first parameter list of case class constructor
-          m.paramLists.head
-      }.getOrElse(throw new RuntimeException("no primary constructor found. bug?"))
+      case m: MethodSymbol if m.isPrimaryConstructor =>
+        // only use first parameter list of case class constructor
+        m.paramLists.head
+    }.getOrElse(throw new RuntimeException("no primary constructor found. bug?"))
+    // get SDLB base classes to search for overrides and scaladoc
+    val superTypeMethodsWithoutParameters = tpe.baseClasses
+      .filterNot(_ == tpe.typeSymbol)
+      .filter(_.fullName.startsWith("io.smartdatalake"))
+      .flatMap(_.asType.toType.decls.collect{ case m:MethodSymbol if m.paramLists.isEmpty || m.paramLists.head.isEmpty => m })
     // prepare parameters
     params.map(p => {
-      val isDeprecated = p.annotations.exists(_.tree.tpe =:= typeOf[deprecated])
-      val isOverride = p.overrides.nonEmpty
+      // only java annotations are kept for runtime. SDLB needs to use Java @Deprecated annotation to be able to retrieve this with reflection.
+      val isDeprecated = p.annotations.exists(_.tree.tpe =:= typeOf[Deprecated])
+      val overriddenMethods = superTypeMethodsWithoutParameters
+        .filter(m => p.name == m.name && p.typeSignature.resultType <:< m.typeSignature.resultType)
+      val isOverride = overriddenMethods.nonEmpty
       val isOptional = p.typeSignature <:< typeOf[scala.Option[_]]
       val hasDefaultValue = p match {
         case t: TermSymbol => t.isParamWithDefault
@@ -180,6 +204,7 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
         p.typeSignature.typeArgs.head
       } else p.typeSignature
       val description = paramDescriptions.get(p.name.toString)
+        .orElse(superTypeMethodsWithoutParameters.map(s => extractScalaDoc(s.annotations).map(formatScaladoc(_))).find(_.isDefined).flatten) // use Scaladoc from first overridden method
       GenericAttributeDef(p.name.encodedName.toString, tpe, description, isRequired = !isOptional && !hasDefaultValue, isOverride = isOverride, isDeprecated = isDeprecated)
     })
   }
@@ -188,9 +213,9 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
    * extract case class attributes with values through reflection
    */
   def attributesWithValuesForCaseClass(obj: Any): Seq[(String, Any)] = {
-    val cls = mirror.classSymbol(obj.getClass)
+    val clsSym = mirror.classSymbol(obj.getClass)
     val inst = mirror.reflect(obj)
-    val attributes = cls.toType.members.collect { case m: MethodSymbol if m.isCaseAccessor => m }
+    val attributes = clsSym.toType.members.collect { case m: MethodSymbol if m.isCaseAccessor => m }
     attributes.map { m =>
       val key = m.name.toString
       val value = inst.reflectMethod(m).apply()

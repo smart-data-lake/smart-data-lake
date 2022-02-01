@@ -12,6 +12,7 @@ import java.nio.file.{Files, Paths, StandardOpenOption}
  */
 case class JsonSchemaExporterConfig(
                                      filename: String = null,
+                                     version: Option[String] = None
                                    )
 
 /**
@@ -19,7 +20,7 @@ case class JsonSchemaExporterConfig(
  */
 object JsonSchemaExporter extends SmartDataLakeLogger {
 
-  // read version from package manifest (not defined if project is executed in IntellJ)
+  // read version from package jar-manifest (not defined if project is executed in IntellJ)
   val appVersion: String = Option(getClass.getPackage.getImplementationVersion).getOrElse("develop")
   val appType: String = getClass.getSimpleName.replaceAll("\\$$","") // remove $ from object name and use it as appType
 
@@ -32,6 +33,9 @@ object JsonSchemaExporter extends SmartDataLakeLogger {
       .required()
       .action((v, c) => c.copy(filename = v))
       .text("Filename to write json schema into")
+    opt[String]('v', "version")
+      .action((v, c) => c.copy(version = Some(v)))
+      .text("SDL Version to write to json file")
     help("help").text("Display the help text.")
   }
 
@@ -45,7 +49,7 @@ object JsonSchemaExporter extends SmartDataLakeLogger {
 
       case Some(config) =>
         // create schema
-        val jsonRootDef = JsonSchemaUtil.createSdlSchema()
+        val jsonRootDef = JsonSchemaUtil.createSdlSchema(config.version.getOrElse(appVersion))
         val jsonRoot = jsonRootDef.toJson
         val jsonRootString = pretty(jsonRoot)
         // write file

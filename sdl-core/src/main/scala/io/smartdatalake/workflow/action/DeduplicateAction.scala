@@ -71,18 +71,18 @@ import scala.util.{Failure, Success, Try}
 case class DeduplicateAction(override val id: ActionId,
                              inputId: DataObjectId,
                              outputId: DataObjectId,
-                             @deprecated("Use transformers instead.", "2.0.5")
+                             @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                              transformer: Option[CustomDfTransformerConfig] = None,
                              transformers: Seq[ParsableDfTransformer] = Seq(),
-                             @deprecated("Use transformers instead.", "2.0.5")
+                             @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                              columnBlacklist: Option[Seq[String]] = None,
-                             @deprecated("Use transformers instead.", "2.0.5")
+                             @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                              columnWhitelist: Option[Seq[String]] = None,
-                             @deprecated("Use transformers instead.", "2.0.5")
+                             @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                              additionalColumns: Option[Map[String,String]] = None,
-                             @deprecated("Use transformers instead.", "2.0.5")
+                             @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                              filterClause: Option[String] = None,
-                             @deprecated("Use transformers instead.", "2.0.5")
+                             @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                              standardizeDatatypes: Boolean = false,
                              ignoreOldDeletedColumns: Boolean = false,
                              ignoreOldDeletedNestedColumns: Boolean = true,
