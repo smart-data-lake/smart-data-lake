@@ -1,4 +1,4 @@
-package io.smartdatalake.jetty
+package io.smartdatalake.statusinfo
 
 import io.netty.channel.unix.Errors.NativeIoException
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -33,16 +33,10 @@ object PortUtils extends SmartDataLakeLogger {
                   serviceName: String,
                   startPort: Int, maxRetries: Int): Int = {
 
-    require(startPort == 0 || (1024 <= startPort && startPort < 65536),
-      "startPort should be between 1024 and 65535 (inclusive)")
+    require(1024 <= startPort && startPort < 65536, "startPort should be between 1024 and 65535 (inclusive)")
 
     for (offset <- 0 to maxRetries + 1) {
-      // Do not increment port if startPort is 0, which is treated as a special port
-      val tryPort = if (startPort == 0) {
-        startPort
-      } else {
-        userPort(startPort, offset)
-      }
+      val tryPort = userPort(startPort, offset)
       try {
         val port = startService(tryPort)
         logger.info(s"Successfully started service$serviceName on port $port.")
@@ -61,15 +55,8 @@ object PortUtils extends SmartDataLakeLogger {
             exception.setStackTrace(e.getStackTrace)
             throw exception
           }
-          if (startPort == 0) {
-            // As startPort 0 is for a random free port, it is most possibly binding address is
-            // not correct.
-            logger.warn(s"Service$serviceName could not bind on a random free port. " +
-              "You may check whether configuring an appropriate binding address.")
-          } else {
-            logger.warn(s"Service$serviceName could not bind on port $tryPort. " +
-              s"Attempting port ${tryPort + 1}.")
-          }
+          logger.warn(s"Service$serviceName could not bind on port $tryPort. " +
+            s"Attempting port ${tryPort + 1}.")
       }
     }
     // Should never happen

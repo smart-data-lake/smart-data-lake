@@ -340,33 +340,24 @@
 			<version>${json4s.version}</version>
 		</dependency>
 
-		<dependency>
-			<groupId>org.eclipse.jetty</groupId>
-			<artifactId>jetty-server</artifactId>
-			<version>9.4.43.v20210629</version>
-		</dependency>
-
+		<!-- Dependency for StatusInfoRestApi-->
 		<dependency>
 			<groupId>org.eclipse.jetty</groupId>
 			<artifactId>jetty-servlet</artifactId>
 			<version>9.4.43.v20210629</version>
 		</dependency>
-
+		<!-- Dependency for StatusInfoRestApi-->
 		<dependency>
 			<groupId>org.eclipse.jetty</groupId>
 			<artifactId>jetty-http</artifactId>
 			<version>9.4.43.v20210629</version>
 		</dependency>
-
-
-<!-- Needed to serialize Requests for the REST-API-->
+		<!-- Needed to serialize Requests for StatusInfoRestApi-->
 		<dependency>
 			<groupId>org.glassfish.jersey.media</groupId>
 			<artifactId>jersey-media-json-jackson</artifactId>
 			<version>2.34</version>
 		</dependency>
-
-
 
 	</dependencies>
 
