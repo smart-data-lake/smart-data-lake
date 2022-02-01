@@ -74,6 +74,11 @@
         <!-- all modules needed to create configuration schema -->
         <dependency>
             <groupId>io.smartdatalake</groupId>
+            <artifactId>sdl-core_${scala.minor.version}</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-azure_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
         </dependency>
