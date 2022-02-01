@@ -1,7 +1,7 @@
 {
 	"type" : "object",
 	"version":"1.0.0",
-	"id": "schema.json#",
+	"id": "sdl-schema.json#",
 	"additionalProperties" : true,
 	"required" : [ "dataObjects", "actions" ],
 	"properties" : {
