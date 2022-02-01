@@ -58,15 +58,15 @@ import org.apache.spark.sql.custom.ExpressionEvaluator
  *                       Note that for asynchronous actions there are separate settings, e.g. SparkStreamingMode.triggerInterval.
  */
 case class GlobalConfig(kryoClasses: Option[Seq[String]] = None
-                        , sparkOptions: Option[Map[String,String]] = None
-                        , statusInfoRestApi: Option[StatusInfoRestApiConfig] = None
+                        , sparkOptions: Option[Map[String, String]] = None
+                        , statusInfo: Option[StatusInfoRestApiConfig] = None
                         , enableHive: Boolean = true
                         , memoryLogTimer: Option[MemoryLogTimerConfig] = None
                         , shutdownHookLogger: Boolean = false
                         , stateListeners: Seq[StateListenerConfig] = Seq()
-                        , sparkUDFs: Option[Map[String,SparkUDFCreatorConfig]] = None
-                        , pythonUDFs: Option[Map[String,PythonUDFCreatorConfig]] = None
-                        , secretProviders: Option[Map[String,SecretProviderConfig]] = None
+                        , sparkUDFs: Option[Map[String, SparkUDFCreatorConfig]] = None
+                        , pythonUDFs: Option[Map[String, PythonUDFCreatorConfig]] = None
+                        , secretProviders: Option[Map[String, SecretProviderConfig]] = None
                         , allowOverwriteAllPartitionsWithoutPartitionValues: Seq[DataObjectId] = Seq()
                         , runtimeDataNumberOfExecutionsToKeep: Int = 10
                         , synchronousStreamingTriggerIntervalSec: Int = 60

@@ -241,11 +241,11 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // invoke SDLPlugin if configured
     Environment.sdlPlugin.foreach(_.shutdown())
 
-    val stopStatusInfoRestApiServer = Environment._globalConfig.statusInfoRestApi match {
+    val stopStatusInfoServer = Environment._globalConfig.statusInfo match {
       case Some(statusInfoRestApiConfig) => statusInfoRestApiConfig.stopOnEnd
       case _ => false
     }
-    if(stopStatusInfoRestApiServer){
+    if (stopStatusInfoServer) {
       StatusInfoServer.stop()
     }
   }
@@ -312,12 +312,12 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     Environment._globalConfig = GlobalConfig.from(config)
     Environment._instanceRegistry = ConfigParser.parse(config, instanceRegistry) // share instance registry for custom code
 
-    val statusInfoRestApiListeners = if (Environment._globalConfig.statusInfoRestApi.isDefined) Seq(new StatusInfoListener()) else Nil
+    val statusInfoListeners = if (Environment._globalConfig.statusInfo.isDefined) Seq(new StatusInfoListener()) else Nil
     val stateListeners =
-      Environment.globalConfig.stateListeners.map(_.listener) ++ Environment._additionalStateListeners ++ statusInfoRestApiListeners
+      Environment.globalConfig.stateListeners.map(_.listener) ++ Environment._additionalStateListeners ++ statusInfoListeners
 
-    if (Environment._globalConfig.statusInfoRestApi.isDefined) {
-      StatusInfoServer.start(statusInfoRestApiListeners.head, Environment._globalConfig.statusInfoRestApi.get)
+    if (Environment._globalConfig.statusInfo.isDefined) {
+      StatusInfoServer.start(statusInfoListeners.head, Environment._globalConfig.statusInfo.get)
     }
     exec(appConfig, executionId, runStartTime, attemptStartTime, actionsToSkip, initialSubFeeds, dataObjectsState, stateStore, stateListeners, simulation)(Environment._instanceRegistry)
   }
