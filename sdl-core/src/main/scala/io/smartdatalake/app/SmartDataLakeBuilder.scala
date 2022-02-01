@@ -241,10 +241,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // invoke SDLPlugin if configured
     Environment.sdlPlugin.foreach(_.shutdown())
 
-    val stopStatusInfoServer = Environment._globalConfig.statusInfo match {
-      case Some(statusInfoRestApiConfig) => statusInfoRestApiConfig.stopOnEnd
-      case _ => false
-    }
+    //Environment._globalConfig can be null here if global contains superfluous entries
+    val stopStatusInfoServer: Boolean = Option(Environment._globalConfig).flatMap(_.statusInfo.map(_.stopOnEnd)).getOrElse(false)
+
     if (stopStatusInfoServer) {
       StatusInfoServer.stop()
     }

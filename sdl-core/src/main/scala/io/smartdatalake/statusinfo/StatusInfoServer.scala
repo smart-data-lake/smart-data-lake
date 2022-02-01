@@ -26,7 +26,7 @@ object StatusInfoServer {
     val jerseyContext = new ServletContextHandler(ServletContextHandler.NO_SESSIONS)
     jerseyContext.setContextPath("/api")
     val holder: ServletHolder = new ServletHolder(classOf[ServletContainer])
-    holder.setInitParameter(ServerProperties.PROVIDER_PACKAGES, "io.smartdatalake.jetty")
+    holder.setInitParameter(ServerProperties.PROVIDER_PACKAGES, "io.smartdatalake.statusinfo")
     StatusInfoServletContext.setStatusInfoProvider(jerseyContext, StatusInfoProvider(stateListener))
     jerseyContext.addServlet(holder, "/*")
     jerseyContext
