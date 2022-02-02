@@ -49,7 +49,7 @@ module.exports = {
     ]},
     {
       type: 'link',
-      label: 'Json Schema Viewer', // The link label
+      label: 'Configuration Schema Viewer', // The link label
       href: '/JsonSchemaViewer', // The internal path
     },
   ],

@@ -13,7 +13,7 @@ function JsonSchemaViewer() {
         <iframe
           onLoad={onLoad}
           id="JsonSchemaViewer"
-          src="./json-schema-viewer/index.html"
+          src="/json-schema-viewer/index.html"
           width="100%"
           scrolling="no"
           frameBorder="0"
