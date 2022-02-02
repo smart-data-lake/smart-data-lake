@@ -2,7 +2,7 @@
 <html>
     <head>
         <meta charset="utf-8">
-        <title>JSON Schema Viewer 0.3.4</title>
+        <title>SDLB Configuration Schema Viewer</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-mobile/1.4.5/jquery.mobile.min.css" />
         <link rel="stylesheet" href="styles/json-schema-viewer.min.css" />
@@ -15,18 +15,18 @@
                 Loading...
             </div>
         </div>
-        <div class="ui-responsive-panel" data-role="page" id="viewer-page"  data-title="JSON Schema Viewer">
+        <div class="ui-responsive-panel" data-role="page" id="viewer-page"  data-title="Configuration Schema Viewer">
             <div data-role="header" class="md-navbar">
                 <div data-role="controlgroup" data-type="horizontal" class="ui-btn-left">
                     <a class="ui-btn ui-corner-all ui-icon-bars ui-btn-icon-notext" href="#info-panel" title="Toggle Info">Menu</a>
-                    <a class="ui-btn md-flex-btn ui-corner-all ui-icon-check ui-btn-icon-left" href="#validator-page" title="Go to Validator">Validator</a>
+                    <!--a class="ui-btn md-flex-btn ui-corner-all ui-icon-check ui-btn-icon-left" href="#validator-page" title="Go to Validator">Validator</a-->
                     <!--<a href="#" class="ui-btn ui-btn-icon-right ui-icon-plus ui-btn-icon-notext ui-corner-all">Zoom-in</a>
                     <a href="#" class="ui-btn ui-btn-icon-right ui-icon-minus ui-btn-icon-notext ui-corner-all">Zoom-out</a>-->
 
                 </div>
-                <h1 id="viewer-title">JSON Schema Viewer<span class="schema-version"></span></h1>
+                <h1 id="viewer-title">Configuration Schema Viewer<span class="schema-version"></span></h1>
                 <!-- <a class="ui-btn-right ui-btn ui-icon-info ui-btn-icon-notext ui-corner-all" href="#help-panel"  title="Toggle Help">Help</a> -->
-                <a data-rel="popup" data-role="none" data-position-to="window" class="ui-btn-right main-logo" href="#popup-welcome"  title="Show Info"></a>
+                <a data-rel="popup" data-role="none" data-position-to="window" class="ui-btn-right main-logo" href="https://github.com/jlblcc/json-schema-viewer" title="Github"></a>
             </div><!-- /header -->
             <div  role="main" class="ui-content" id="main-body">
                 <div id="zoom-controls">
@@ -37,7 +37,7 @@
                     </div>
                 </div>
                 <div id="legend-container">
-                    <div id="legend" data-role="collapsible" data-collapsed="false">
+                    <div id="legend" data-role="collapsible" data-collapsed="true">
                         <h3 class="ui-mini">Legend</h3>
                         <div id="legend-items"></div>
                     </div>
@@ -111,7 +111,7 @@
             </div> -->
         </div>
 
-        <div data-role="page" id="validator-page"  data-title="JSON Validator">
+        <div data-role="page" id="validator-page" data-title="JSON Validator">
             <div data-role="header" class="md-navbar">
                 <h1>mdJSON Validator <span class="schema-version"></span></h1>
                 <div data-role="controlgroup" data-type="horizontal" class="ui-btn-left">
@@ -156,83 +156,9 @@
             </p>
         </div>
 
-        <div id="popup-welcome" data-role="popup" data-history="false" data-theme="a" data-overlay-theme="b">
-            <a href="#" data-rel="back" class="ui-btn ui-corner-all ui-shadow ui-btn-b ui-icon-delete ui-btn-icon-notext ui-btn-right">Close</a>
-            <div data-role="header" data-theme="b">
-                <h1>JSON Schema Viewer</h1>
-            </div>
-            <div class="ui-content">
-                <p>
-                    JavaScript tool for visualizing json-schemas.
-                </p>
-                <h3> Built using: </h3>
-                <ul>
-                    <li>
-                        <a href="http://d3js.org/">D3.js</a>
-                    </li>
-                    <li>
-                        <a href="http://jquery.com/">jQuery</a>
-                    </li>
-                    <li>
-                        <a href="http://jquerymobile.com/">jQuery Mobile</a>
-                    </li>
-                    <li>
-                        <a href="http://geraintluff.github.io/tv4/">tv4</a>
-                    </li>
-                    <li>
-                        <a href="http://bgrins.github.io/filereader.js/">FileReader.js</a>
-                    </li>
-                    <li>
-                        <a href="https://highlightjs.org/">highlight.js</a>
-                    </li>
-                    <li>
-                        <a href="https://github.com/alexeykuzmin/jsonpointer.js">jsonpointer.js</a>
-                    </li>
-                    <li>
-                        <a href="https://github.com/mhulse/grunt-html-boiler">Grunt HTML Boiler</a>
-                    </li>
-                    <li>
-                        <a href="https://github.com/medialize/URI.js">URI.js</a>
-                    </li>
-                </ul>
-                <hr />
-                <h3> Features: </h3>
-                <ul>
-                    <li>
-                        <h4>Viewer</h4>
-                        <p>
-                            Interactive documentation tool for <a href="http://json-schema.org/">JSON schemas</a>.
-                            Utilizes the D3.js library to build a collapsible tree from the supplied schema(s).
-                        </p>
-                    </li>
-                    <li>
-                        <h4>JSON Validator</h4>
-                        <p>
-                            A tool to validate a json object using the supplied schema.
-                            Utilizes the tv4 library.
-                        </p>
-                    </li>
-                </ul>
-                <p>There's also a <a rel="external" href="./basic.html">basic example</a> without the jQuery Mobile interface elements.</p>
-                <hr />
-                <div id="welcome-footer">
-                    <a href="https://github.com/jlblcc/json-schema-viewer" class="ui-btn ui-btn-inline ui-icon-github ui-btn-icon-left">This project's on GitHub!</a>
-                </div>
-            </div>
-        </div>
-
         <script type='text/javascript' src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
         <script type="text/javascript" src="lib/preinit.js"></script>
         <script type='text/javascript' src="https://cdnjs.cloudflare.com/ajax/libs/jquery-mobile/1.4.5/jquery.mobile.min.js"></script>
         <script type='text/javascript' src="lib/json-schema-viewer.min.js"></script>
-        <script>
-            // reloads page, such that schema is displayed
-            window.onload = function() {
-                if(!window.location.hash) {
-                    window.location = window.location + '#loaded';
-                    window.location.reload();
-                }
-            }
-        </script>
     </body>
 </html>
