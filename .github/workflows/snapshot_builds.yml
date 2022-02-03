@@ -28,7 +28,7 @@ jobs:
         restore-keys: ${{ runner.os }}-maven-
 
     - name: Build with Maven for Scala 2.12
-      run: mvn -P scala-2.12 -B clean test --file pom.xml
+      run: mvn -P scala-2.12,test-sonar -B clean test scoverage:report --file pom.xml
 
     - name: Build with Maven for Scala 2.11, only if on develop-spark2* branch
       if: ${{ contains(github.base_ref, 'develop-spark2') || contains(github.ref, 'develop-spark2') }}
