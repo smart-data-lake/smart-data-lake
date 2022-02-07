@@ -36,17 +36,18 @@ import org.apache.spark.sql.custom.ExpressionEvaluator
 /**
  * Global configuration options
  *
- * @param kryoClasses    classes to register for spark kryo serialization
- * @param sparkOptions   spark options
- * @param enableHive     enable hive for spark session
- * @param memoryLogTimer enable periodic memory usage logging, see detailed configuration [[MemoryLogTimerConfig]]
- * @param shutdownHookLogger enable shutdown hook logger to trace shutdown cause
- * @param stateListeners Define state listeners to be registered for receiving events of the execution of SmartDataLake job
- * @param sparkUDFs      Define UDFs to be registered in spark session. The registered UDFs are available in Spark SQL transformations
- *                       and expression evaluation, e.g. configuration of ExecutionModes.
- * @param pythonUDFs     Define UDFs in python to be registered in spark session. The registered UDFs are available in Spark SQL transformations
- *                       but not for expression evaluation.
- * @param secretProviders Define SecretProvider's to be registered.
+ * @param kryoClasses                                       classes to register for spark kryo serialization
+ * @param sparkOptions                                      spark options
+ * @param statusInfo                                        enable a REST API providing live status info, see detailed configuration [[StatusInfoRestApiConfig]]
+ * @param enableHive                                        enable hive for spark session
+ * @param memoryLogTimer                                    enable periodic memory usage logging, see detailed configuration [[MemoryLogTimerConfig]]
+ * @param shutdownHookLogger                                enable shutdown hook logger to trace shutdown cause
+ * @param stateListeners                                    Define state listeners to be registered for receiving events of the execution of SmartDataLake job
+ * @param sparkUDFs                                         Define UDFs to be registered in spark session. The registered UDFs are available in Spark SQL transformations
+ *                                                          and expression evaluation, e.g. configuration of ExecutionModes.
+ * @param pythonUDFs                                        Define UDFs in python to be registered in spark session. The registered UDFs are available in Spark SQL transformations
+ *                                                          but not for expression evaluation.
+ * @param secretProviders                                   Define SecretProvider's to be registered.
  * @param allowOverwriteAllPartitionsWithoutPartitionValues Configure a list of exceptions for partitioned DataObject id's,
  *                       which are allowed to overwrite the all partitions of a table if no partition values are set.
  *                       This is used to override/avoid a protective error when using SDLSaveMode.OverwriteOptimized|OverwritePreserveDirectories.

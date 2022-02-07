@@ -344,13 +344,13 @@
 		<dependency>
 			<groupId>org.eclipse.jetty</groupId>
 			<artifactId>jetty-servlet</artifactId>
-			<version>9.4.43.v20210629</version>
+			<version>${jetty.version}</version>
 		</dependency>
 		<!-- Dependency for StatusInfoRestApi-->
 		<dependency>
 			<groupId>org.eclipse.jetty</groupId>
 			<artifactId>jetty-http</artifactId>
-			<version>9.4.43.v20210629</version>
+			<version>${jetty.version}</version>
 		</dependency>
 		<!-- Needed to serialize Requests for StatusInfoRestApi-->
 		<dependency>

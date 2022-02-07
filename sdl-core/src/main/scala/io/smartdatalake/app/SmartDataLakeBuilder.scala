@@ -242,7 +242,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     Environment.sdlPlugin.foreach(_.shutdown())
 
     //Environment._globalConfig can be null here if global contains superfluous entries
-    val stopStatusInfoServer: Boolean = Option(Environment._globalConfig).flatMap(_.statusInfo.map(_.stopOnEnd)).getOrElse(false)
+    val stopStatusInfoServer = Option(Environment._globalConfig).flatMap(_.statusInfo.map(_.stopOnEnd)).getOrElse(false)
 
     if (stopStatusInfoServer) {
       StatusInfoServer.stop()
