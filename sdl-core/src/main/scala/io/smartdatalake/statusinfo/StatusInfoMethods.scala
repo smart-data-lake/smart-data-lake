@@ -35,11 +35,11 @@ class StatusInfoMethods {
 
   @GET
   @Path("state")
-  def state: ActionDAGRunState = statelistener.stateVar
+  def state: Option[ActionDAGRunState] = statelistener.stateVar
 
   @GET
   @Path("context")
-  def context: ActionPipelineContext = statelistener.contextVar
+  def context: Option[ActionPipelineContext] = statelistener.contextVar
 
   @Context
   protected var servletContext: ServletContext = _
