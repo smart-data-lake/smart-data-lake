@@ -75,8 +75,7 @@ private[smartdatalake] object ActionDAGRunState {
   implicit private lazy val workflowReflections = ReflectionUtil.getReflections("io.smartdatalake.workflow")
 
   private lazy val typeHints = ShortTypeHints(ReflectionUtil.getTraitImplClasses[SubFeed].toList ++ ReflectionUtil.getSealedTraitImplClasses[ExecutionId], "type")
-  implicit private val formats: Formats = Serialization.formats(typeHints)
-    .withStrictArrayExtraction.withStrictMapExtraction.withStrictOptionParsing + new EnumNameSerializer(RuntimeEventState) +
+  implicit private val formats: Formats = Json4sCompat.getStrictSerializationFormat(typeHints) + new EnumNameSerializer(RuntimeEventState) +
     actionIdSerializer + dataObjectIdSerializer + durationSerializer + localDateTimeSerializer
 
   // write state to Json
