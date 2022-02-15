@@ -43,7 +43,7 @@ public class EventClient
         {
             client.start();
             // The socket that receives events
-            org.eclipse.jetty.demo.EventSocket socket = new org.eclipse.jetty.demo.EventSocket();
+            EventSocket socket = new EventSocket();
             // Attempt Connect
             Future<Session> fut = client.connect(socket, uri);
             // Wait for Connect

@@ -16,7 +16,8 @@ package io.smartdatalake.statusinfo.websocket;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.websocket.server.config.JettyWebSocketServletContainerInitializer;
+import org.eclipse.jetty.websocket.server.NativeWebSocketServletContainerInitializer;
+
 
 import java.net.URI;
 
@@ -46,10 +47,10 @@ public class EventServer
         server.setHandler(context);
 
         // Configure specific websocket behavior
-        JettyWebSocketServletContainerInitializer.configure(context, (servletContext, wsContainer) ->
+        NativeWebSocketServletContainerInitializer.configure(context, (servletContext, wsContainer) ->
         {
             // Configure default max size
-            wsContainer.setMaxTextMessageSize(65535);
+            //wsContainer.set(65535);
 
             // Add websockets
             wsContainer.addMapping("/events/*", EventSocket.class);
