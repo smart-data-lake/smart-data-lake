@@ -52,7 +52,7 @@ case class DataObjectState(dataObjectId: DataObjectId, state: String) {
 
 private[smartdatalake] object ActionDAGRunState {
 
-  private val durationSerializer = new CustomSerializer[Duration](formats => (
+  private val durationSerializer = Json4sCompat.getCustomSerializer[Duration](formats => (
     {
       case json: JString => Duration.parse(json.s)
       case json: JInt => Duration.ofSeconds(json.num.toLong)
