@@ -24,6 +24,7 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.{ExecutionId, RuntimeEventState, RuntimeInfo, SDLExecutionId}
+import org.apache.spark.util.Json4sCompat
 import org.json4s._
 import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.Serialization
@@ -58,17 +59,17 @@ private[smartdatalake] object ActionDAGRunState {
     },
     {case obj: Duration => JString(obj.toString)}
   ))
-  private val localDateTimeSerializer = new CustomSerializer[LocalDateTime](formats => (
+  private val localDateTimeSerializer = Json4sCompat.getCustomSerializer[LocalDateTime](formats => (
     {case json: JString => LocalDateTime.parse(json.s)},
     {case obj: LocalDateTime => JString(obj.toString)}
   ))
-  private val actionIdSerializer = new CustomKeySerializer[ActionId](formats => (
-    {case json => ActionId(json)},
-    {case obj: ActionId => obj.id}
+  private val actionIdSerializer = Json4sCompat.getCustomSerializer[ActionId](formats => (
+    {case json: JString => ActionId(json.s)},
+    {case obj: ActionId => JString(obj.id)}
   ))
-  private val dataObjectIdSerializer = new CustomKeySerializer[DataObjectId](formats => (
-    {case json => DataObjectId(json)},
-    {case obj: DataObjectId => obj.id}
+  private val dataObjectIdSerializer = Json4sCompat.getCustomSerializer[DataObjectId](formats => (
+    {case json: JString => DataObjectId(json.s)},
+    {case obj: DataObjectId => JString(obj.id)}
   ))
 
   implicit private lazy val workflowReflections = ReflectionUtil.getReflections("io.smartdatalake.workflow")
