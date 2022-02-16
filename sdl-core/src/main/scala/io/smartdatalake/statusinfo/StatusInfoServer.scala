@@ -19,9 +19,12 @@
 package io.smartdatalake.statusinfo
 
 import io.smartdatalake.app.StatusInfoRestApiConfig
+import io.smartdatalake.statusinfo.websocket.EventSocket
 import org.eclipse.jetty.server._
+import org.eclipse.jetty.server.handler.{ContextHandler, ContextHandlerCollection}
 import org.eclipse.jetty.servlet.{ServletContextHandler, ServletHolder}
 import org.eclipse.jetty.util.thread.QueuedThreadPool
+import org.eclipse.jetty.websocket.server.WebSocketHandler
 import org.glassfish.jersey.server.ServerProperties
 import org.glassfish.jersey.servlet.ServletContainer
 
@@ -42,21 +45,37 @@ object StatusInfoServer {
     server.stop()
   }
 
-  private def getServletContextHandler(stateListener: StatusInfoListener): ServletContextHandler = {
+  private def getServletContextHandler(stateListener: StatusInfoListener): ContextHandlerCollection = {
+    val handlers: ContextHandlerCollection = new ContextHandlerCollection();
     val jerseyContext = new ServletContextHandler(ServletContextHandler.NO_SESSIONS)
     jerseyContext.setContextPath("/api")
     val holder: ServletHolder = new ServletHolder(classOf[ServletContainer])
     holder.setInitParameter(ServerProperties.PROVIDER_PACKAGES, "io.smartdatalake.statusinfo")
     StatusInfoServletContext.setStateListener(jerseyContext, stateListener)
     jerseyContext.addServlet(holder, "/*")
-    jerseyContext
+    handlers.addHandler(jerseyContext)
+
+    val wsh = new WebSocketHandler.Simple(classOf[EventSocket])
+    handlers.addHandler(createContextHandler("/ws", wsh));
+
+    handlers
   }
 
-  private def startServer(context: ServletContextHandler)(port: Int): Int = {
+  // Convenience method to create and configure a ContextHandler.
+  private def createContextHandler(contextPath: String, wrappedHandler: Handler): ContextHandler = {
+    val ch = new ContextHandler(contextPath)
+    ch.setHandler(wrappedHandler)
+    ch.clearAliasChecks()
+    ch.setAllowNullPathInfo(true)
+    ch
+  }
+
+  private def startServer(handlers: ContextHandlerCollection)(port: Int): Int = {
+
     val connector = new ServerConnector(server)
     connector.setPort(port)
     server.setConnectors(Array(connector))
-    server.setHandler(context)
+    server.setHandler(handlers)
     server.start()
     port
   }
