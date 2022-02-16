@@ -90,6 +90,41 @@
 			</build>
 		</profile>
 		<profile>
+			<!-- Create a fat-jar adapting non-provided library versions to be compatible with Spark 3.1.
+			     Note that the default for the current SDLB version is Spark 3.2.
+			     This fat-jar is only useful to run SDLB with a Spark 3.1 distribution -->
+			<id>fat-jar-for-spark-3.1</id>
+			<properties>
+				<spark.version>3.1.1</spark.version>
+				<spark-extensions.version>3.1.1-SNAPSHOT</spark-extensions.version>
+				<delta.version>1.0.1</delta.version>
+				<json4s.version>3.7.0-M5</json4s.version>
+
+				<scala.deps.scope>provided</scala.deps.scope>
+				<spark.deps.scope>provided</spark.deps.scope>
+				<hadoop.deps.scope>provided</hadoop.deps.scope>
+				<flume.deps.scope>provided</flume.deps.scope>
+				<hive.deps.scope>provided</hive.deps.scope>
+				<hive.parquet.scope>provided</hive.parquet.scope>
+				<hive.storage.scope>provided</hive.storage.scope>
+				<hive.common.scope>provided</hive.common.scope>
+				<hive.llap.scope>provided</hive.llap.scope>
+				<hive.serde.scope>provided</hive.serde.scope>
+				<hive.shims.scope>provided</hive.shims.scope>
+				<orc.deps.scope>provided</orc.deps.scope>
+				<parquet.deps.scope>provided</parquet.deps.scope>
+			</properties>
+			<build>
+				<plugins>
+					<!-- Builds executable fat-jar that includes all dependencies -->
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-shade-plugin</artifactId>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+		<profile>
 			<id>fat-jar-with-spark</id>
 			<build>
 				<plugins>
