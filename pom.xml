@@ -2657,6 +2657,16 @@
 				<artifactId>spark-extensions_${scala.minor.version}</artifactId>
 				<version>${spark-extensions.version}</version>
 			</dependency>
+			<dependency>
+				<groupId>org.json4s</groupId>
+				<artifactId>json4s-ext_${scala.minor.version}</artifactId>
+				<version>${json4s.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>io.delta</groupId>
+				<artifactId>delta-core_${scala.minor.version}</artifactId>
+				<version>${delta.version}</version>
+			</dependency>
 
 			<!-- TEST dependencies -->
 			<dependency>
