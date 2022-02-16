@@ -19,12 +19,13 @@
 package io.smartdatalake.statusinfo
 
 import io.smartdatalake.app.StatusInfoRestApiConfig
-import io.smartdatalake.statusinfo.websocket.EventSocket
+import io.smartdatalake.statusinfo.websocket.StatusInfoSocket
 import org.eclipse.jetty.server._
 import org.eclipse.jetty.server.handler.{ContextHandler, ContextHandlerCollection}
 import org.eclipse.jetty.servlet.{ServletContextHandler, ServletHolder}
 import org.eclipse.jetty.util.thread.QueuedThreadPool
 import org.eclipse.jetty.websocket.server.WebSocketHandler
+import org.eclipse.jetty.websocket.servlet.{ServletUpgradeRequest, ServletUpgradeResponse, WebSocketCreator, WebSocketServletFactory}
 import org.glassfish.jersey.server.ServerProperties
 import org.glassfish.jersey.servlet.ServletContainer
 
@@ -36,8 +37,8 @@ object StatusInfoServer {
   private val pool = new QueuedThreadPool(200)
   private val server = new Server(pool)
 
-  def start(stateListener: StatusInfoListener, config: StatusInfoRestApiConfig): Unit = {
-    val contextHandler = getServletContextHandler(stateListener)
+  def start(snapshotListener: SnapshotStatusInfoListener, incrementalListener: IncrementalStatusInfoListener, config: StatusInfoRestApiConfig): Unit = {
+    val contextHandler = getServletContextHandler(snapshotListener, incrementalListener)
     PortUtils.startOnPort(startServer(contextHandler), "StatusInfoServer", config.port, config.maxPortRetries)
   }
 
@@ -45,29 +46,35 @@ object StatusInfoServer {
     server.stop()
   }
 
-  private def getServletContextHandler(stateListener: StatusInfoListener): ContextHandlerCollection = {
-    val handlers: ContextHandlerCollection = new ContextHandlerCollection();
+  private def getServletContextHandler(snapshotListener: SnapshotStatusInfoListener, incrementalListener: IncrementalStatusInfoListener): ContextHandlerCollection = {
+    val handlers: ContextHandlerCollection = new ContextHandlerCollection()
     val jerseyContext = new ServletContextHandler(ServletContextHandler.NO_SESSIONS)
     jerseyContext.setContextPath("/api")
     val holder: ServletHolder = new ServletHolder(classOf[ServletContainer])
     holder.setInitParameter(ServerProperties.PROVIDER_PACKAGES, "io.smartdatalake.statusinfo")
-    StatusInfoServletContext.setStateListener(jerseyContext, stateListener)
+    StatusInfoServletContext.setStateListener(jerseyContext, snapshotListener)
     jerseyContext.addServlet(holder, "/*")
     handlers.addHandler(jerseyContext)
 
-    val wsh = new WebSocketHandler.Simple(classOf[EventSocket])
-    handlers.addHandler(createContextHandler("/ws", wsh));
-
+    val socketHandler = createWebsocketHandler(incrementalListener)
+    handlers.addHandler(socketHandler)
     handlers
   }
 
-  // Convenience method to create and configure a ContextHandler.
-  private def createContextHandler(contextPath: String, wrappedHandler: Handler): ContextHandler = {
-    val ch = new ContextHandler(contextPath)
-    ch.setHandler(wrappedHandler)
-    ch.clearAliasChecks()
-    ch.setAllowNullPathInfo(true)
-    ch
+  private def createWebsocketHandler(stateListener: IncrementalStatusInfoListener): ContextHandler = {
+    val contextHandler = new ContextHandler("/ws")
+    // contextHandler.setAllowNullPathInfo(true) // disable redirect from /ws to /ws/
+
+    val webSocketcreator: WebSocketCreator = new WebSocketCreator() {
+      override def createWebSocket(request: ServletUpgradeRequest, response: ServletUpgradeResponse) = new StatusInfoSocket(stateListener)
+    }
+    val webSocketHandler = new WebSocketHandler() {
+      override def configure(factory: WebSocketServletFactory): Unit = {
+        factory.setCreator(webSocketcreator)
+      }
+    }
+    contextHandler.setHandler(webSocketHandler)
+    contextHandler
   }
 
   private def startServer(handlers: ContextHandlerCollection)(port: Int): Int = {

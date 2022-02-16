@@ -31,11 +31,11 @@ object StatusInfoServletContext {
 
   private val attribute = getClass.getCanonicalName
 
-  def setStateListener(contextHandler: ContextHandler, statusInfoListener: StatusInfoListener): Unit = {
+  def setStateListener(contextHandler: ContextHandler, statusInfoListener: SnapshotStatusInfoListener): Unit = {
     contextHandler.setAttribute(attribute, statusInfoListener)
   }
 
-  def getStateListener(context: ServletContext): StatusInfoListener = {
-    context.getAttribute(attribute).asInstanceOf[StatusInfoListener]
+  def getStateListener(context: ServletContext): SnapshotStatusInfoListener = {
+    context.getAttribute(attribute).asInstanceOf[SnapshotStatusInfoListener]
   }
 }

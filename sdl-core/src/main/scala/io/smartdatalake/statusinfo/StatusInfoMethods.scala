@@ -47,5 +47,5 @@ class StatusInfoMethods {
   @Context
   protected var httpRequest: HttpServletRequest = _
 
-  def statelistener: StatusInfoListener = StatusInfoServletContext.getStateListener(servletContext)
+  def statelistener: SnapshotStatusInfoListener = StatusInfoServletContext.getStateListener(servletContext)
 }
