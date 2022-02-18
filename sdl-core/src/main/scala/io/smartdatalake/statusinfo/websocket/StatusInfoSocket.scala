@@ -14,38 +14,40 @@
 package io.smartdatalake.statusinfo.websocket
 
 import io.smartdatalake.statusinfo.IncrementalStatusInfoListener
+import io.smartdatalake.statusinfo.websocket.SDLMessageType.EndConnection
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.eclipse.jetty.websocket.api.{Session, StatusCode, WebSocketAdapter}
 
 import java.util.Locale
 
-class StatusInfoSocket(stateListener: IncrementalStatusInfoListener) extends WebSocketAdapter {
+class StatusInfoSocket(stateListener: IncrementalStatusInfoListener) extends WebSocketAdapter with SmartDataLakeLogger {
 
     override def onWebSocketConnect(sess: Session): Unit = {
         super.onWebSocketConnect(sess)
         stateListener.activeSockets.+=(this)
-        System.out.println("Socket Connected: " + sess)
+        logger.info(s"Socket $this Connected")
         sess.getRemote.sendString("Hello from " + this)
-
     }
 
     override def onWebSocketText(message: String): Unit = {
         super.onWebSocketText(message)
-        System.out.println("Received TEXT message: " + message)
+        logger.info("Received TEXT message: " + message)
 
-        if (message.toLowerCase(Locale.US).contains("bye")) {
-            getSession.close(StatusCode.NORMAL, "Thanks")
+        if (message.toLowerCase(Locale.US).contains(EndConnection)) {
+            getSession.close(StatusCode.NORMAL, "Connection closed by client")
         }
     }
 
     override def onWebSocketClose(statusCode: Int, reason: String): Unit = {
         super.onWebSocketClose(statusCode, reason)
         stateListener.activeSockets -= this
-        System.out.println("Socket Closed: [" + statusCode + "] " + reason)
+        logger.info("Socket Closed: [" + statusCode + "] " + reason)
 
     }
 
     override def onWebSocketError(cause: Throwable): Unit = {
         super.onWebSocketError(cause)
-        cause.printStackTrace(System.err)
+        stateListener.activeSockets -= this
+        logger.error(s"Socket $this was closed with error ${cause.printStackTrace(System.err)}")
     }
 }

@@ -20,6 +20,8 @@
 package io.smartdatalake.statusinfo.websocket
 
 import io.smartdatalake.config.SdlConfigObject.ActionId
+import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.RuntimeInfo
 
-case class ActionStatusUpdate(actionId: ActionId, runtimeInfo: RuntimeInfo, phase: String)
+case class StatusUpdate(actionId: Option[ActionId], runtimeInfo: Option[RuntimeInfo], phase: ExecutionPhase, isFinal: Boolean)
+
