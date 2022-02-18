@@ -4,7 +4,7 @@ title: Common Problems
 ---
 This page lists a couple of common pitfalls that you may encounter in this guide as well as their solutions.
 
-## Missing files
+## Missing files / DataObject schema is undefined
 If you encounter an error that looks like this:
 
     Exception in thread "main" io.smartdatalake.util.dag.TaskFailedException: Task select-airport-cols failed. Root cause is 'IllegalArgumentException: requirement failed: (DataObject~stg-airports) DataObject schema is undefined. A sche
