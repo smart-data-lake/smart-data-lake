@@ -19,7 +19,7 @@ Let's use CsvFileDataObject again because that makes it easy for us to check the
 In more advanced (speak: real-life) scenarios, we would use one of numerous other possibilities, 
 such as HiveTableDataObject, SplunkDataObject...
 See [this list](https://github.com/smart-data-lake/smart-data-lake/blob/develop-spark3/docs/Reference.md#data-objects) for an overview.
-You can also consult the [API docs](https://smartdatalake.ch/docs/site/scaladocs/io/smartdatalake/workflow/dataobject/index.html) to see how to use all those Data Objects.
+You can also consult the [Configuration Schema Browser](https://smartdatalake.ch/json-schema-viewer/index.html#viewer-page?v=2) to get a list of all Data Objects and related properties.
 
 In a first step, we want to make the airport data more understandable by removing any columns we don't need. 
 Since we don't introduce any business logic into the transformation, 
@@ -71,7 +71,7 @@ In this case, it automatically replaced "-" with "_"
 
 :::
 
-There are numerous other options available for the CopyAction, which you can view in the [API Docs](http://smartdatalake.ch/docs/site/scaladocs/io/smartdatalake/workflow/action/CopyAction.html).
+There are numerous other options available for the CopyAction, which you can view in the [Configuration Schema Browser](https://smartdatalake.ch/json-schema-viewer/index.html#viewer-page?v=3-0).
 
 
 
@@ -94,7 +94,7 @@ If you encounter an error that looks like this:
     Caused by: java.lang.IllegalArgumentException: requirement failed: (DataObject~stg-airports) DataObject schema is undefined. A schema must be defined if there are no existing files.
 
 Execute the **`download`**-feed again. After that feed was successfully executed, the execution of the feed `.*` or `compute` will work.
-More one this problem in the List of [Common Problems](../troubleshooting/common-problems.md).
+More on this problem in the list of [Common Problems](../troubleshooting/common-problems.md).
 
 
 :::
@@ -182,7 +182,7 @@ If you know Apache Spark, this column will look very familiar to you.
 After that, the query fails, because it only finds that column with error messages instead of the actual data.
 
 One way to get a better error message is to tell Spark that it should promptly fail when reading a corrupt file.
-You can do that with the option [jsonOptions](https://smartdatalake.ch/docs/site/scaladocs/io/smartdatalake/workflow/dataobject/JsonFileDataObject.html),
+You can do that with the option [jsonOptions](https://smartdatalake.ch/json-schema-viewer/index.html#viewer-page?v=2-13-3),
 which allows you to directly pass on settings to Spark.
 
 In our case, we would end up with a faulty dataObject that looks like this:
