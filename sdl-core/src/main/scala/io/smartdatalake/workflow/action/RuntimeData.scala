@@ -273,7 +273,7 @@ private[smartdatalake] object SparkStreamingExecutionId {
  * Summarized runtime information
  */
 case class RuntimeInfo(
-                       executionId: ExecutionId,
+                       executionId: ExecutionId = SDLExecutionId(-1, -1), // default value is needed for backward compatibility
                        state: RuntimeEventState,
                        startTstmp: Option[LocalDateTime] = None,
                        duration: Option[Duration] = None,
