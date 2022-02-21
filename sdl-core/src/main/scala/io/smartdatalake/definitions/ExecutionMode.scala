@@ -473,7 +473,7 @@ case class FileIncrementalMoveMode() extends ExecutionMode {
   private[smartdatalake] override def postExec(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, mainInputSubFeed: SubFeed, mainOutputSubFeed: SubFeed)(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
     (mainInput, mainOutputSubFeed) match {
       case (fileRefInput: FileRefDataObject, fileSubFeed: FileSubFeed) =>
-        fileSubFeed.processedInputFileRefs.foreach(fileRefs => fileRefInput.deleteFileRefs(fileRefs))
+        fileSubFeed.fileRefMapping.foreach(fileRefs => fileRefInput.deleteFileRefs(fileRefs.map(_.src)))
       case x => throw ConfigurationException(s"($actionId) FileIncrementalMoveMode needs FileRefDataObject and FileSubFeed as input")
     }
   }

@@ -102,7 +102,7 @@ case class KafkaConnection(override val id: ConnectionId,
     try {
       confluentHelper.foreach(_.test())
     } catch {
-      case e: Exception => throw ConfigurationException(s"($id) Can not connect to schema registry (${schemaRegistry.get})")
+      case e: Exception => throw ConfigurationException(s"($id) Can not connect to schema registry (${schemaRegistry.get})", None, e)
     }
   }
 

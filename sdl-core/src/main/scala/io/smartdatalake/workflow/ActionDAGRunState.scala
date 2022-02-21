@@ -39,7 +39,7 @@ import scala.collection.compat.Factory
 /**
  * ActionDAGRunState contains all configuration and state of an ActionDAGRun needed to start a recovery run in case of failure.
  */
-private[smartdatalake] case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime
+case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime
                                                     , actionsState: Map[ActionId, RuntimeInfo], isFinal: Boolean) {
   def toJson: String = ActionDAGRunState.toJson(this)
   def isFailed: Boolean = actionsState.exists(_._2.state==RuntimeEventState.FAILED)
@@ -50,7 +50,7 @@ private[smartdatalake] case class ActionDAGRunState(appConfig: SmartDataLakeBuil
     actionsState.flatMap{ case (actionId, info) => info.dataObjectsState }.toSeq
   }
 }
-private[smartdatalake] case class DataObjectState(dataObjectId: DataObjectId, state: String) {
+case class DataObjectState(dataObjectId: DataObjectId, state: String) {
   def getEntry: (DataObjectId, DataObjectState) = (dataObjectId, this)
 }
 private[smartdatalake] object ActionDAGRunState {

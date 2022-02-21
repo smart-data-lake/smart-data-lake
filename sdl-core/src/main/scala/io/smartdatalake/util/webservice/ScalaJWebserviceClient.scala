@@ -55,13 +55,7 @@ private[smartdatalake] object ScalaJWebserviceClient extends SmartDataLakeLogger
     val request = Http(url.getOrElse(config.url))
       .headers(config.additionalHeaders)
       .optionally(config.timeouts, (v:HttpTimeoutConfig, request:HttpRequest) => request.timeout(v.connectionTimeoutMs, v.readTimeoutMs))
-      .optionally(config.authMode, (v:AuthMode, request:HttpRequest) => {
-        v match {
-          case headerAuth: HttpHeaderAuth => request.headers(headerAuth.getHeaders)
-          case basicAuth: BasicAuthMode => request.auth(basicAuth.user, basicAuth.password)
-          case x => throw ConfigurationException(s"($config.id) authentication mode $x is not supported by ScalaJWebserviceClient")
-        }
-      })
+      .applyAuthMode(config.authMode)
       .optionally(config.proxy, (v:HttpProxyConfig, request:HttpRequest) => request.proxy(v.host, v.port))
       .option(HttpOptions.followRedirects(config.followRedirects))
     new ScalaJWebserviceClient(request)
@@ -93,9 +87,18 @@ private[smartdatalake] object ScalaJWebserviceClient extends SmartDataLakeLogger
   /**
    * Pimp my libary to apply optional configurations to HttpRequest
    */
-  private implicit class HttpRequestExtension(request: HttpRequest) {
+  implicit class HttpRequestExtension(request: HttpRequest) {
     def optionally[T](config: Option[T], func: (T,HttpRequest) => HttpRequest): HttpRequest = {
       if (config.isDefined) func(config.get, request) else request
+    }
+    def applyAuthMode(authMode: Option[AuthMode]): HttpRequest = {
+      request.optionally(authMode, (v:AuthMode, request:HttpRequest) => {
+        v match {
+          case headerAuth: HttpHeaderAuth => request.headers(headerAuth.getHeaders)
+          case basicAuth: BasicAuthMode => request.auth(basicAuth.user, basicAuth.password)
+          case x => throw ConfigurationException(s"authentication mode $x is not supported by ScalaJWebserviceClient")
+        }
+      })
     }
   }
 }

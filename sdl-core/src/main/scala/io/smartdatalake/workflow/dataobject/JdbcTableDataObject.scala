@@ -249,7 +249,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
     // cleanup temp table if existing
     if(connection.catalog.isTableExisting(tmpTable.fullName)) {
-      logger.error(s"(id) Temporary table ${tmpTable.fullName} for merge already exists! There might be a potential conflict with another job. It will be dropped and recreated.")
+      logger.error(s"($id) Temporary table ${tmpTable.fullName} for merge already exists! There might be a potential conflict with another job. It will be dropped and recreated.")
       connection.dropTable(tmpTable.fullName)
     }
     try {
@@ -417,8 +417,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     _cachedJdbcColumnMetadata
   }
   private def getJdbcColumn(sparkColName: String)(implicit session: SparkSession): Option[JdbcColumn] = {
-    if (SchemaUtil.isSparkCaseSensitive) jdbcColumnMetadata.get.find(_.name == sparkColName)
-    else jdbcColumnMetadata.get.find(_.nameEqualsIgnoreCaseSensitive(sparkColName))
+    if (SchemaUtil.isSparkCaseSensitive) jdbcColumnMetadata.flatMap(_.find(_.name == sparkColName))
+    else jdbcColumnMetadata.flatMap(_.find(_.nameEqualsIgnoreCaseSensitive(sparkColName)))
   }
 
   // if we generate sql statements with column names we need to care about quoting them properly
