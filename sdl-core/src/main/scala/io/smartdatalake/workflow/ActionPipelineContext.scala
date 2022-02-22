@@ -66,6 +66,7 @@ case class ActionPipelineContext (
                                    dataFrameReuseStatistics: mutable.Map[(DataObjectId, Seq[PartitionValues]), Seq[ActionId]] = mutable.Map(),
                                    actionsSelected: Seq[ActionId] = Seq(),
                                    actionsSkipped: Seq[ActionId] = Seq(),
+                                   @transient // Prevent polluting output with contents of classLoader field
                                    serializableHadoopConf: SerializableHadoopConfiguration
                                  ) extends SmartDataLakeLogger {
   private[smartdatalake] def getReferenceTimestampOrNow: LocalDateTime = referenceTimestamp.getOrElse(LocalDateTime.now)
