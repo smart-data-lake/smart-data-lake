@@ -18,8 +18,9 @@
  */
 package io.smartdatalake.statusinfo
 
-import io.smartdatalake.app.StatusInfoRestApiConfig
-import io.smartdatalake.statusinfo.websocket.StatusInfoSocket
+import io.smartdatalake.app.StatusInfoConfig
+import io.smartdatalake.statusinfo.api.{SnapshotStatusInfoListener, StatusInfoServletContext}
+import io.smartdatalake.statusinfo.websocket.{IncrementalStatusInfoListener, StatusInfoSocket}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.util.PortUtils
 import org.eclipse.jetty.server._
@@ -39,7 +40,7 @@ object StatusInfoServer extends SmartDataLakeLogger {
   private val pool = new QueuedThreadPool(200)
   private val server = new Server(pool)
 
-  def start(snapshotListener: SnapshotStatusInfoListener, incrementalListener: IncrementalStatusInfoListener, config: StatusInfoRestApiConfig): Unit = {
+  def start(snapshotListener: SnapshotStatusInfoListener, incrementalListener: IncrementalStatusInfoListener, config: StatusInfoConfig): Unit = {
     val contextHandler = getServletContextHandler(snapshotListener, incrementalListener)
     PortUtils.startOnPort(startServer(contextHandler), "StatusInfoServer", config.port, config.maxPortRetries, logger)
   }
