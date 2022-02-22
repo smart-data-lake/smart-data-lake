@@ -66,8 +66,6 @@ object StatusInfoServer extends SmartDataLakeLogger {
 
   private def createWebsocketHandler(stateListener: IncrementalStatusInfoListener): ContextHandler = {
     val contextHandler = new ContextHandler("/ws")
-    // contextHandler.setAllowNullPathInfo(true) // disable redirect from /ws to /ws/
-
     val webSocketcreator: WebSocketCreator = new WebSocketCreator() {
       override def createWebSocket(request: ServletUpgradeRequest, response: ServletUpgradeResponse) = new StatusInfoSocket(stateListener)
     }
