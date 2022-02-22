@@ -17,11 +17,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.statusinfo.websocket
+package io.smartdatalake.meta.dagexporter
 
-import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
-import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
-import io.smartdatalake.workflow.action.RuntimeInfo
+import io.smartdatalake.workflow.action.ActionMetadata
 
-case class StatusUpdate(actionId: Option[String], runtimeInfo: Option[RuntimeInfo], phase: ExecutionPhase, finalState: Option[RuntimeEventState])
-
+case class SimplifiedAction(metadata: Option[ActionMetadata], inputIds: Seq[String], outputIds: Seq[String])

@@ -22,6 +22,7 @@ package io.smartdatalake.workflow
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
+import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{ExecutionId, RuntimeEventState, RuntimeInfo, SDLExecutionId}
 import org.json4s._
 import org.json4s.ext.EnumNameSerializer
@@ -37,13 +38,30 @@ import java.time.{Duration, LocalDateTime}
 private[smartdatalake] case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime
                                                     , actionsState: Map[ActionId, RuntimeInfo], isFinal: Boolean) {
   def toJson: String = ActionDAGRunState.toJson(this)
-  def isFailed: Boolean = actionsState.exists(_._2.state==RuntimeEventState.FAILED)
+
+  def isFailed: Boolean = actionsState.exists(_._2.state == RuntimeEventState.FAILED)
+
   def isSucceeded: Boolean = isFinal && !isFailed
+
   def isSkipped: Boolean = isFinal &&
-    actionsState.filter(_._2.executionId.isInstanceOf[SDLExecutionId]).forall(_._2.state==RuntimeEventState.SKIPPED)
+    actionsState.filter(_._2.executionId.isInstanceOf[SDLExecutionId]).forall(_._2.state == RuntimeEventState.SKIPPED)
+
   def getDataObjectsState: Seq[DataObjectState] = {
-    actionsState.flatMap{ case (actionId, info) => info.dataObjectsState }.toSeq
+    actionsState.flatMap { case (actionId, info) => info.dataObjectsState }.toSeq
   }
+
+  def finalState: Option[RuntimeEventState] =
+    if (!isFinal) {
+      None
+    } else {
+      if (isFailed)
+        Some(RuntimeEventState.FAILED)
+      else if (isSkipped)
+        Some(RuntimeEventState.SKIPPED)
+      else if (isSucceeded)
+        Some(RuntimeEventState.SUCCEEDED)
+      else throw new IllegalStateException("Illegal State")
+    }
 }
 private[smartdatalake] case class DataObjectState(dataObjectId: DataObjectId, state: String) {
   def getEntry: (DataObjectId, DataObjectState) = (dataObjectId, this)

@@ -45,10 +45,10 @@ class IncrementalStatusInfoListener extends StateListener with SmartDataLakeLogg
         }
 
         val changedAction = changedActions.head
-        SDLMessage(SDLMessageType.StatusUpdate, Some(StatusUpdate(Some(changedAction._1), Some(changedAction._2), context.phase, state.isFinal)))
+        SDLMessage(SDLMessageType.StatusUpdate, Some(StatusUpdate(Some(changedAction._1.id), Some(changedAction._2), context.phase, state.finalState)))
       }
       else {
-        SDLMessage(SDLMessageType.StatusUpdate, Some(StatusUpdate(None, None, context.phase, state.isFinal)))
+        SDLMessage(SDLMessageType.EndConnection, Some(StatusUpdate(None, None, context.phase, state.finalState)))
       }
 
     activeSockets.foreach(socket => socket.getRemote.sendString(writePretty(updateJSON)(ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase))))
