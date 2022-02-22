@@ -19,32 +19,31 @@
 
 package io.smartdatalake.workflow.connection
 
-import java.util.Properties
-
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{AuthMode, SSLCertsAuthMode}
+import io.smartdatalake.definitions.{AuthMode, SASLSCRAMAuthMode, SSLCertsAuthMode}
 import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig}
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.config.SslConfigs
 import org.apache.spark.sql.avro.confluent.ConfluentClient
 
+import java.util.Properties
 import scala.collection.JavaConverters._
 
 /**
  * Connection information for kafka
  *
- * @param id unique id of this connection
- * @param brokers comma separated list of kafka bootstrap server incl. port, e.g. "host1:9092,host2:9092:
+ * @param id             unique id of this connection
+ * @param brokers        comma separated list of kafka bootstrap server incl. port, e.g. "host1:9092,host2:9092:
  * @param schemaRegistry url of schema registry service, e.g. "https://host2"
- * @param options Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)
+ * @param options        Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)
  * @param metadata
  */
 case class KafkaConnection(override val id: ConnectionId,
                            brokers: String,
                            schemaRegistry: Option[String] = None,
-                           options: Map[String,String] = Map(),
+                           options: Map[String, String] = Map(),
                            authMode: Option[AuthMode] = None,
                            override val metadata: Option[ConnectionMetadata] = None
                           ) extends Connection {
@@ -52,7 +51,7 @@ case class KafkaConnection(override val id: ConnectionId,
   @transient private lazy val adminClient = {
     val props = new Properties()
     props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, brokers)
-    authProps.asScala.foreach{ case (k,v) => props.put(k,v)}
+    authProps.asScala.foreach { case (k, v) => props.put(k, v) }
     AdminClient.create(props)
   }
 
@@ -60,6 +59,7 @@ case class KafkaConnection(override val id: ConnectionId,
 
   private[smartdatalake] val KafkaConfigOptionPrefix = "kafka."
   private val KafkaSSLSecurityProtocol = "SSL"
+  private val KafkaSASLSSLSecurityProtocol = "SASL_SSL"
 
   // Early validation and partition init use kafka clients directly and need
   // to authenticate to broker
@@ -75,6 +75,15 @@ case class KafkaConnection(override val id: ConnectionId,
         props.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, m.truststorePass)
         props.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, m.truststoreType.getOrElse(SslConfigs.DEFAULT_SSL_TRUSTSTORE_TYPE))
       }
+      case Some(m: SASLSCRAMAuthMode) => {
+        props.put(AdminClientConfig.SECURITY_PROTOCOL_CONFIG, KafkaSASLSSLSecurityProtocol)
+        props.put("sasl.mechanism", m.sslMechanism)
+        props.put("sasl.jaas.config", "org.apache.kafka.common.security.scram.ScramLoginModule required username=\""
+          + m.username + "\" password=\"" + m.password + "\";")
+        props.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, m.truststorePath)
+        props.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, m.truststorePass)
+        props.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, m.truststoreType.getOrElse(SslConfigs.DEFAULT_SSL_TRUSTSTORE_TYPE))
+      }
       case Some(m) => throw ConfigurationException(s"${m.getClass.getSimpleName} is not supported for ${getClass.getSimpleName}")
       case None => Unit
     }
@@ -83,7 +92,7 @@ case class KafkaConnection(override val id: ConnectionId,
 
   // Kafka Configs are prepended with "kafka." in data source option map
   private val authOptions = authProps.asScala.map(c => (s"${KafkaConfigOptionPrefix}${c._1}", c._2))
-  private[workflow] val sparkOptions = authOptions ++ options + (KafkaConfigOptionPrefix+ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> brokers)
+  private[workflow] val sparkOptions = authOptions ++ options + (KafkaConfigOptionPrefix + ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> brokers)
 
   def topicExists(topic: String): Boolean = {
     adminClient.listTopics.names.get.asScala.contains(topic)
@@ -93,7 +102,7 @@ case class KafkaConnection(override val id: ConnectionId,
     try {
       confluentHelper.foreach(_.test())
     } catch {
-      case e:Exception => throw ConfigurationException(s"($id) Can not connect to schema registry (${schemaRegistry.get})")
+      case e: Exception => throw ConfigurationException(s"($id) Can not connect to schema registry (${schemaRegistry.get})", None, e)
     }
   }
 

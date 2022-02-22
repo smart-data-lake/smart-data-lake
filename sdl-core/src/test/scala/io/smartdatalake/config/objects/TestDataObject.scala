@@ -42,7 +42,7 @@ case class TestDataObject( id: DataObjectId,
                            connectionId: Option[ConnectionId] = None,
                            override val metadata: Option[DataObjectMetadata] = None)
                          ( implicit val instanceRegistry: InstanceRegistry)
-  extends DataObject with TransactionalSparkTableDataObject {
+  extends DataObject with TransactionalSparkTableDataObject with CanReceiveScriptNotification {
 
   private val connection = connectionId.map( c => getConnection[TestConnection](c))
 
@@ -59,7 +59,10 @@ case class TestDataObject( id: DataObjectId,
 
   override def dropTable(implicit session: SparkSession): Unit = throw new NotImplementedError()
 
+  override def scriptNotification(parameters: Map[String, String], partitionValues: Seq[PartitionValues])(implicit session: SparkSession): Unit = Unit
+
   override def factory: FromConfigFactory[DataObject] = TestDataObject
+
 }
 
 object TestDataObject extends FromConfigFactory[DataObject] {

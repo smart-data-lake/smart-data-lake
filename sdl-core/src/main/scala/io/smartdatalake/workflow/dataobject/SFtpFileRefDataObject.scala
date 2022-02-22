@@ -107,7 +107,21 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
     }
   }
 
-  override def createOutputStream(path: String, overwrite: Boolean)(implicit session: SparkSession): OutputStream = {
+  override def startWritingOutputStreams(partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    if (saveMode == SDLSaveMode.Overwrite) {
+      if (partitions.nonEmpty)
+        if (partitionValues.nonEmpty) deletePartitions(partitionValues)
+        else logger.warn(s"($id) Cannot delete data from partitioned data object as no partition values are given but saveMode=overwrite")
+      else deleteAll
+    }
+  }
+
+  override def endWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit session: SparkSession, context: ActionPipelineContext): Unit = {
+    // make sure empty partitions are created as well
+    if (partitionValues.nonEmpty) createMissingPartitions(partitionValues)
+  }
+
+  override def createOutputStream(path: String, overwrite: Boolean)(implicit session: SparkSession, context: ActionPipelineContext): OutputStream = {
     Try {
       implicit val sftp = connection.pool.borrowObject
       SshUtil.getOutputStream(path, () => Try(connection.pool.returnObject(sftp)))

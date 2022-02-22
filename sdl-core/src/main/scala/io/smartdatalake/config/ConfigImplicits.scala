@@ -25,6 +25,7 @@ import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.secrets.SecretProviderConfig
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.action.customlogic._
+import io.smartdatalake.workflow.action.script.ParsableScriptDef
 import io.smartdatalake.workflow.action.sparktransformer.{ParsableDfTransformer, ParsableDfsTransformer}
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
@@ -115,5 +116,14 @@ trait ConfigImplicits {
   implicit val dfsTransformerReader: ConfigReader[ParsableDfsTransformer] = ConfigReader.fromTry { (c, p) =>
     implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
     ConfigParser.parseConfigObject[ParsableDfsTransformer](c.getConfig(p))
+  }
+
+  /**
+   * A reader that reads [[ParsableScriptDef]] values.
+   * Note that ParsableScriptDef must be parsed according to it's 'type' attribute by using SDL ConfigParser.
+   */
+  implicit val scriptDefReader: ConfigReader[ParsableScriptDef] = ConfigReader.fromTry { (c, p) =>
+    implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
+    ConfigParser.parseConfigObject[ParsableScriptDef](c.getConfig(p))
   }
 }
