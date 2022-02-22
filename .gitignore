@@ -7,6 +7,7 @@ venv
 *.html
 *.js
 *.log
+/sdl-core/src/main/resources/application.conf
 
 # User-specific stuff
 .idea/**/workspace.xml
@@ -49,3 +50,4 @@ venv
 
 # JIRA plugin
 atlassian-ide-plugin.xml
+
