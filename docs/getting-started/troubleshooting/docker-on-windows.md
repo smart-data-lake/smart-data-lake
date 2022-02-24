@@ -34,6 +34,7 @@ Install podman-compose for podman in WSL2:
 
 :::Info podman version
 Starting with podman-compose major version 1, no pods are created automatically. This results in networking issues between the containers. Therefore, we recommend to use a the latest version of 0.x.x which is here `0.1.11`. The behaviour may change in future versions.
+:::
 
 After starting `podman-compose up` in the getting-started folder you should now be able to open Polynote on port localhost:8192, as WSL2 automatically publishes all ports on Windows.
 If the port is not accessible, you can use `wsl hostname -I` on Windows command line to get the IP adress of WSL, and then access Polynote over {ip-address}:8192.
