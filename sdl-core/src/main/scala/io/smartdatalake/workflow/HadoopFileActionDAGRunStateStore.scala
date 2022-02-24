@@ -93,7 +93,7 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
     val pathFilter = new PathFilter {
       override def accept(path: Path): Boolean = path.getName.startsWith(appName + HadoopFileActionDAGRunStateStore.fileNamePartSeparator)
     }
-    val searchPath = path.getOrElse(hadoopStatePath)
+    val searchPath = path.getOrElse( new Path(hadoopStatePath, "*"))
     logger.debug(s"searching path $searchPath for state")
     filesystem.globStatus(new Path(searchPath, "*.json"), pathFilter )
       .filter( x => x.isFile)
