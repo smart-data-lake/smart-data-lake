@@ -2,9 +2,10 @@ package io.smartdatalake.meta.dagexporter
 
 import io.smartdatalake.config.{ConfigToolbox, ConfigurationException, InstanceRegistry}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.ActionDAGRunState
 import io.smartdatalake.workflow.action.Action
 import org.apache.log4j.varia.NullAppender
+import org.json4s.NoTypeHints
+import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.writePretty
 import scopt.OptionParser
 
@@ -36,15 +37,11 @@ object DagExporter extends SmartDataLakeLogger {
     Logger.getRootLogger.addAppender(new NullAppender())
 
     val config = DagExporterConfig()
-
     // Parse all command line arguments
     parser.parse(args, config) match {
       case Some(config) =>
-
-        val (registry, _) = ConfigToolbox.loadAndParseConfig(config.sdlConfigPaths.split(','))
-        val simplifiedActions: Map[String, SimplifiedAction] = registry.getActions.groupBy(action => action.id.id).mapValues(action => toSimplifiedAction(action.head))
-        println(writePretty(simplifiedActions)(ActionDAGRunState.formats))
-
+        val dagAsJSON = exportConfigDagToJSON(config)
+        print(dagAsJSON)
       case None =>
         logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
     }
@@ -52,5 +49,11 @@ object DagExporter extends SmartDataLakeLogger {
 
   private def toSimplifiedAction(action: Action): SimplifiedAction = {
     SimplifiedAction(action.metadata, action.inputs.map(_.id.id), action.outputs.map(_.id.id))
+  }
+
+  def exportConfigDagToJSON(config: DagExporterConfig): String = {
+    val (registry, _) = ConfigToolbox.loadAndParseConfig(config.sdlConfigPaths.split(','))
+    val simplifiedActions: Map[String, SimplifiedAction] = registry.getActions.groupBy(action => action.id.id).mapValues(action => toSimplifiedAction(action.head))
+    writePretty(simplifiedActions)(Serialization.formats(NoTypeHints))
   }
 }
