@@ -132,7 +132,7 @@ private val now = Instant.now.getEpochSecond
 just below the `nextState` variable. Then modify the `currentQueryParameters` variable according to
 ```scala
 // if we have query parameters in the state we will use them from now on
-val currentQueryParameters = if (previousState.isEmpty) checkQueryParameters(queryParameters.get) else checkQueryParameters(previousState.map{
+val currentQueryParameters = if (previousState.isEmpty) checkQueryParameters(queryParameters) else checkQueryParameters(previousState.map{
   x => DepartureQueryParameters(x.airport, x.nextBegin, now)
 })
 ```
