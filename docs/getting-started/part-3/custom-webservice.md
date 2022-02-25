@@ -86,7 +86,7 @@ download-departures {
   inputId = ext-departures
   outputId = stg-departures
   metadata {
-    feed = compute
+    feed = download
   }
 }
 ```
