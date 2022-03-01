@@ -145,7 +145,7 @@ This instructs Spark to use the external metastore you started with docker-compo
 Your Smart Data Lake container doesn't have access to the other containers just yet. 
 So when you run your data pipeline again, you need to add a parameter `--network getting-started_default` to join the virtual network where the metastore is located:
 
-    docker run --hostmane localhost --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest -c /mnt/config --feed-sel '.*'
+    docker run --hostname localhost --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest -c /mnt/config --feed-sel '.*'
 
 When using podman you need to join the pod where the metastore is located with `--pod getting-started`:
 
