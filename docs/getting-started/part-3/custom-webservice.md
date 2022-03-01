@@ -65,8 +65,8 @@ How many times a failed request will be resend, is controlled by the `nRetry` pa
 :::info
 The *begin* and *end* can now be configured for each airport separatly. 
 The configuration expects unix timestamps, if you don't know what that means, have a look at this [website](https://www.unixtimestamp.com/).
-The webservice will not respond if the interval is larger than a week.
-Hence, we enforce the rule that if the chosen interval is larger, we query only the next four days given the *begin* configuration. T
+The webservice from opensky-network.org will not respond if the interval is larger than a week. 
+Hence, our `CustomWebserviceDataObject` will enforce the rule that if the chosen interval is larger, we query only the next four days given the *begin* configuration.
 :::
 
 Note that we changed the type to `CustomWebserviceDataObject`.
