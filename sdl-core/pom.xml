@@ -258,11 +258,6 @@
 
 		<!-- needed for AirbyteDataObject Json handling -->
 		<dependency>
-			<groupId>org.json4s</groupId>
-			<artifactId>json4s-ext_2.11</artifactId>
-			<version>${json4s.version}</version>
-		</dependency>
-		<dependency>
 			<groupId>com.networknt</groupId>
 			<artifactId>json-schema-validator</artifactId>
 			<version>1.0.42</version>
@@ -337,7 +332,6 @@
 		<dependency>
 			<groupId>org.json4s</groupId>
 			<artifactId>json4s-ext_${scala.minor.version}</artifactId>
-			<version>${json4s.version}</version>
 		</dependency>
 
 		<!-- Dependency for StatusInfoRestApi-->
