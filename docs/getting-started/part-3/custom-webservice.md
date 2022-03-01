@@ -200,6 +200,8 @@ This logic is implemented in the next code snipped and should replace the code c
 }
 
 ```
+Note, in the *Init* phase, the pre-defined **schema** (see the `ext-departures` dataObject definition in the config) is used to create an empty/dummy json string, which then gets converted to the DataFrame.
+
 Don't be confused about some comments in the code. They will be used in the next chapter. 
 If you re-compile the code of this project and then restart the program with the previous commands
 you should see that we do not query the API twice anymore.
