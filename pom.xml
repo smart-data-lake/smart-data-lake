@@ -161,6 +161,23 @@
 			</properties>
 		</profile>
 		<profile>
+			<id>test-sonar</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.scoverage</groupId>
+						<artifactId>scoverage-maven-plugin</artifactId>
+						<version>${scoverage.plugin.version}</version>
+						<configuration>
+							<scalaVersion>${scala.version}</scalaVersion>
+							<aggregate>true</aggregate>
+							<highlighting>true</highlighting>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+		<profile>
 			<id>release-sonatype</id>
 			<distributionManagement>
 				<snapshotRepository>
@@ -406,6 +423,11 @@
 		<scalatest.test.version>3.0.8</scalatest.test.version>
 		<sshd.test.version>2.3.0</sshd.test.version>
 
+		<!-- Sonar related -->
+		<sonar.organization>smart-data-lake</sonar.organization>
+		<sonar.host.url>https://sonarcloud.io</sonar.host.url>
+		<scoverage.plugin.version>1.4.11</scoverage.plugin.version>
+		<scoverage.scalacPluginVersion>1.4.11</scoverage.scalacPluginVersion>
 
 	</properties>
 
@@ -676,7 +698,7 @@
 									<transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer">
 									</transformer>
 								</transformers>
-								<!-- the following archiv tag might show as error in IntelliJ, but it's ok for maven and works! -->
+								<!-- the following archive tag might show as error in IntelliJ, but it's ok for maven and works! -->
 								<archive>
 									<compress>false</compress>
 									<manifest>

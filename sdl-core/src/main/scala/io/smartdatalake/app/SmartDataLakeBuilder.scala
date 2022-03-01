@@ -19,9 +19,11 @@
 package io.smartdatalake.app
 
 import com.typesafe.config.Config
+import io.smartdatalake.app
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.statusinfo.{StatusInfoListener, StatusInfoServer}
 import io.smartdatalake.util.dag.{DAGException, ExceptionSeverity}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SerializableHadoopConfiguration, SmartDataLakeLogger}
@@ -87,14 +89,14 @@ object TestMode extends Enumeration {
    * Test if config is valid.
    * Note that this only parses and validates the configuration. No attempts are made to check the environment (e.g. connection informations...).
    */
-  val Config = Value("config")
+  val Config: app.TestMode.Value = Value("config")
 
   /**
    * Test the environment if connections can be initalized and spark lineage can be created.
    * Note that no changes are made to the environment if possible.
    * The test executes "prepare" and "init" phase, but not the "exec" phase of an SDLB run.
    */
-  val DryRun = Value("dry-run")
+  val DryRun: app.TestMode.Value = Value("dry-run")
 }
 
 /**
@@ -125,7 +127,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * Subclasses SmartDataLakeBuilder can define additional options to be extracted.
    */
   protected val parser: OptionParser[SmartDataLakeBuilderConfig] = new OptionParser[SmartDataLakeBuilderConfig](appType) {
-    override def showUsageOnError = Some(true)
+    override def showUsageOnError: Option[Boolean] = Some(true)
 
     head(appType, appVersion)
     opt[String]('f', "feed-sel")
@@ -238,6 +240,13 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     MemoryUtils.stopMemoryLogger()
     // invoke SDLPlugin if configured
     Environment.sdlPlugin.foreach(_.shutdown())
+
+    //Environment._globalConfig can be null here if global contains superfluous entries
+    val stopStatusInfoServer = Option(Environment._globalConfig).flatMap(_.statusInfo.map(_.stopOnEnd)).getOrElse(false)
+
+    if (stopStatusInfoServer) {
+      StatusInfoServer.stop()
+    }
   }
 
   /**
@@ -301,8 +310,14 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // parse config objects
     Environment._globalConfig = GlobalConfig.from(config)
     Environment._instanceRegistry = ConfigParser.parse(config, instanceRegistry) // share instance registry for custom code
-    val stateListeners = Environment.globalConfig.stateListeners.map(_.listener) ++ Environment._additionalStateListeners
 
+    val statusInfoListeners = if (Environment._globalConfig.statusInfo.isDefined) Seq(new StatusInfoListener()) else Nil
+    val stateListeners =
+      Environment.globalConfig.stateListeners.map(_.listener) ++ Environment._additionalStateListeners ++ statusInfoListeners
+
+    if (Environment._globalConfig.statusInfo.isDefined) {
+      StatusInfoServer.start(statusInfoListeners.head, Environment._globalConfig.statusInfo.get)
+    }
     exec(appConfig, executionId, runStartTime, attemptStartTime, actionsToSkip, initialSubFeeds, dataObjectsState, stateStore, stateListeners, simulation)(Environment._instanceRegistry)
   }
 

@@ -18,7 +18,6 @@
  */
 package io.smartdatalake.workflow
 
-import java.time.LocalDateTime
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
@@ -26,11 +25,12 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
-import io.smartdatalake.workflow.action.{Action, SDLExecutionId}
+import io.smartdatalake.workflow.action.SDLExecutionId
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.SparkSession
 
+import java.time.LocalDateTime
 import scala.collection.mutable
 
 /**
@@ -54,19 +54,21 @@ import scala.collection.mutable
  */
 @DeveloperApi
 case class ActionPipelineContext (
-                                  feed: String, application: String, executionId: SDLExecutionId,
-                                  instanceRegistry: InstanceRegistry,
-                                  referenceTimestamp: Option[LocalDateTime] = None,
-                                  appConfig: SmartDataLakeBuilderConfig, // application config is needed to persist action dag state for recovery
-                                  runStartTime: LocalDateTime = LocalDateTime.now(),
-                                  attemptStartTime: LocalDateTime = LocalDateTime.now(),
-                                  simulation: Boolean = false,
-                                  var phase: ExecutionPhase = ExecutionPhase.Prepare,
-                                  dataFrameReuseStatistics: mutable.Map[(DataObjectId, Seq[PartitionValues]), Seq[ActionId]] = mutable.Map(),
-                                  actionsSelected: Seq[ActionId] = Seq(),
-                                  actionsSkipped: Seq[ActionId] = Seq(),
-                                  serializableHadoopConf: SerializableHadoopConfiguration
-) extends SmartDataLakeLogger {
+                                   feed: String, application: String, executionId: SDLExecutionId,
+                                   @transient
+                                   instanceRegistry: InstanceRegistry,
+                                   referenceTimestamp: Option[LocalDateTime] = None,
+                                   appConfig: SmartDataLakeBuilderConfig, // application config is needed to persist action dag state for recovery
+                                   runStartTime: LocalDateTime = LocalDateTime.now(),
+                                   attemptStartTime: LocalDateTime = LocalDateTime.now(),
+                                   simulation: Boolean = false,
+                                   var phase: ExecutionPhase = ExecutionPhase.Prepare,
+                                   dataFrameReuseStatistics: mutable.Map[(DataObjectId, Seq[PartitionValues]), Seq[ActionId]] = mutable.Map(),
+                                   actionsSelected: Seq[ActionId] = Seq(),
+                                   actionsSkipped: Seq[ActionId] = Seq(),
+                                   @transient // Prevent polluting output with contents of classLoader field
+                                   serializableHadoopConf: SerializableHadoopConfiguration
+                                 ) extends SmartDataLakeLogger {
   private[smartdatalake] def getReferenceTimestampOrNow: LocalDateTime = referenceTimestamp.getOrElse(LocalDateTime.now)
   private[smartdatalake] def rememberDataFrameReuse(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], actionId: ActionId): Int = dataFrameReuseStatistics.synchronized {
     val key = (dataObjectId, partitionValues)
