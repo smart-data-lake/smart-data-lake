@@ -412,9 +412,18 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val srcSubFeedNok = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "joe", "firstname" -> "bob"))))
     intercept[AssertionError](action1.exec(Seq(srcSubFeedNok))(contextExec))
 
-    // dont fail if partition information is incomplete
-    val srcSubFeedPartial = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe")), PartitionValues(Map("lastname" -> "joe"))))
-    action1.exec(Seq(srcSubFeedPartial))(contextExec)
+    // dont fail if partition information is an init of partition columns, and partition does exist
+    val srcSubFeedInitOk = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe"))))
+    action1.exec(Seq(srcSubFeedInitOk))(contextExec)
+
+    // fail if partition information is an init of partition columns, but partition does not exist
+    val srcSubFeedInitNok = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "joe"))))
+    intercept[AssertionError](action1.exec(Seq(srcSubFeedInitNok))(contextExec))
+
+    // dont fail if partition values is not an init of partition columns (lastname is not defined)
+    val srcSubFeedNoInit = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("firstname" -> "bob"))))
+    action1.exec(Seq(srcSubFeedNoInit))(contextExec)
+
   }
 }
 
