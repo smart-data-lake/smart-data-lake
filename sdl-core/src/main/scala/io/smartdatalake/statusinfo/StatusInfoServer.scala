@@ -54,7 +54,7 @@ object StatusInfoServer extends SmartDataLakeLogger {
     val jerseyContext = new ServletContextHandler(ServletContextHandler.NO_SESSIONS)
     jerseyContext.setContextPath("/api")
     val holder: ServletHolder = new ServletHolder(classOf[ServletContainer])
-    holder.setInitParameter(ServerProperties.PROVIDER_PACKAGES, "io.smartdatalake.statusinfo")
+    holder.setInitParameter(ServerProperties.PROVIDER_PACKAGES, "io.smartdatalake.statusinfo.api")
     StatusInfoServletContext.setStateListener(jerseyContext, snapshotListener)
     jerseyContext.addServlet(holder, "/*")
     handlers.addHandler(jerseyContext)

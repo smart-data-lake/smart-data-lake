@@ -28,4 +28,4 @@ package io.smartdatalake.app
  * @param stopOnEnd      : Set to false if the Server should remain online even after SDL has finished its execution.
  *                       In that case, the Application needs to be stopped manually. Useful for debugging.
  */
-case class StatusInfoConfig(port: Int = 4440, maxPortRetries: Int = 10, stopOnEnd: Boolean = false)
+case class StatusInfoConfig(port: Int = 4440, maxPortRetries: Int = 10, stopOnEnd: Boolean = true)
