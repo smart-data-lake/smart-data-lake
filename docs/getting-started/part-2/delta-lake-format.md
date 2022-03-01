@@ -152,7 +152,7 @@ When using podman you need to join the pod where the metastore is located with `
     podman run --hostname localhost --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest -c /mnt/config --feed-sel '.*'
 
 :::info Hostname specification
-Without specifying the hostname the containter name (by default the docker/podman container ID) can not be resolved to localhost. If you need to name your container differently, the following arguments can be used alternitively: `--hostname myhost --add-host myhost:127.0.0.1 -rm ...`
+Without specifying the hostname, the containter name (by default the docker/podman container ID) can not be resolved to localhost. If you need to name your container differently, the following arguments can be used alternatively: `--hostname myhost --add-host myhost:127.0.0.1 -rm ...`
 :::
 
 After you run your data pipeline again, you should now be able to see our DataObjects data in Polynote.
