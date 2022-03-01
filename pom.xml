@@ -264,7 +264,7 @@
 		<scala.version>${scala.minor.version}.15</scala.version>
 
 		<spark.version>3.2.0</spark.version>
-		<spark-extensions.version>3.2.1</spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
+		<spark-extensions.version>3.2.2</spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
 		<spark.minor.version>3.0</spark.minor.version> <!-- this is used in sdl-snowflake which has no version yet for Spark 3.1 -->
 
 		<!-- SPARK-PARENT start: properties copied from spark-parent pom version for spark-parent import in dependencyManagement -->
