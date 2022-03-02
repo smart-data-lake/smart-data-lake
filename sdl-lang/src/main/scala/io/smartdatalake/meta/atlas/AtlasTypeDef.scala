@@ -32,7 +32,7 @@ case class AtlasTypeDef(
                     )
 object AtlasTypeDef {
   def apply(typeDef: GenericTypeDef): AtlasTypeDef = {
-    AtlasTypeDef(typeDef.name, typeDef.description.getOrElse(""), typeDef.superTypes.map(_.name.toString), typeDef.attributes.map(AtlasAttributeDef.apply).toSet)
+    AtlasTypeDef(typeDef.name, typeDef.description.getOrElse(""), typeDef.superTypes.map(_.typeSymbol.name.toString), typeDef.attributes.map(AtlasAttributeDef.apply).toSet)
   }
 }
 

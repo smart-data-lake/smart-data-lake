@@ -24,6 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{ExecutionId, RuntimeEventState, RuntimeInfo, SDLExecutionId}
+import org.apache.spark.util.Json4sCompat
 import org.json4s._
 import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.Serialization
@@ -35,7 +36,7 @@ import java.time.{Duration, LocalDateTime}
 /**
  * ActionDAGRunState contains all configuration and state of an ActionDAGRun needed to start a recovery run in case of failure.
  */
-private[smartdatalake] case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime
+case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime
                                                     , actionsState: Map[ActionId, RuntimeInfo], isFinal: Boolean) {
   def toJson: String = ActionDAGRunState.toJson(this)
 
@@ -63,29 +64,29 @@ private[smartdatalake] case class ActionDAGRunState(appConfig: SmartDataLakeBuil
       else throw new IllegalStateException("Illegal State")
     }
 }
-private[smartdatalake] case class DataObjectState(dataObjectId: DataObjectId, state: String) {
+case class DataObjectState(dataObjectId: DataObjectId, state: String) {
   def getEntry: (DataObjectId, DataObjectState) = (dataObjectId, this)
 }
 
 private[smartdatalake] object ActionDAGRunState {
 
-  private val durationSerializer = new CustomSerializer[Duration](formats => (
+  private val durationSerializer = Json4sCompat.getCustomSerializer[Duration](formats => (
     {
       case json: JString => Duration.parse(json.s)
       case json: JInt => Duration.ofSeconds(json.num.toLong)
     },
     {case obj: Duration => JString(obj.toString)}
   ))
-  private val localDateTimeSerializer = new CustomSerializer[LocalDateTime](formats => (
+  private val localDateTimeSerializer = Json4sCompat.getCustomSerializer[LocalDateTime](formats => (
     {case json: JString => LocalDateTime.parse(json.s)},
     {case obj: LocalDateTime => JString(obj.toString)}
   ))
-  private val actionIdSerializer = new CustomKeySerializer[ActionId](formats => (
-    {case json => ActionId(json)},
+  private val actionIdSerializer = Json4sCompat.getCustomKeySerializer[ActionId](formats => (
+    {case s: String => ActionId(s)},
     {case obj: ActionId => obj.id}
   ))
-  private val dataObjectIdSerializer = new CustomKeySerializer[DataObjectId](formats => (
-    {case json => DataObjectId(json)},
+  private val dataObjectIdSerializer = Json4sCompat.getCustomKeySerializer[DataObjectId](formats => (
+    {case s: String => DataObjectId(s)},
     {case obj: DataObjectId => obj.id}
   ))
 
