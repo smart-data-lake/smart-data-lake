@@ -93,6 +93,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // create state listener to control execution
     val stateListener = new StateListener with SmartDataLakeLogger {
+      private var dfWritten = false
       override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId : Option[ActionId]): Unit = {
         assert(state.runId == context.executionId.runId && state.attemptId == context.executionId.attemptId)
         logger.info(s"Received metrics for runId=${state.runId} attemptId=${state.attemptId} final=${state.isFinal}")
@@ -103,7 +104,10 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
           assert(tgt1DO.getDataFrame(Seq()).select($"lastname").as[String].collect().toSeq == Seq("doe"))
         }
         // add additional source partition in runId=2 for runId=3
-        if (state.isFinal && state.runId==2) {
+        if (state.isFinal && state.runId==2 && !dfWritten) {
+          dfWritten = true
+          // add some more data
+          logger.info("adding more data")
           val dfSrc2 = Seq(("20180102", "company", "olmo","-",10)) // second partition 20190101
             .toDF("dt", "type", "lastname", "firstname", "rating")
           srcDO.writeDataFrame(dfSrc2, Seq())
@@ -175,6 +179,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // streaming event listener will add data and stop streaming after 3 micro-batches
     val testStreamingQueryListener = new StreamingQueryListener {
+      private var dfWritten = false
       private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
       override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = Unit
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
@@ -182,7 +187,8 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
         event.progress.name match {
           case actionRegex(actionId) =>
             event.progress.batchId match {
-              case 0 =>
+              case 0 if !dfWritten =>
+                dfWritten = true
                 // add some more data
                 logger.info("adding more data")
                 val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 10)) // second partition 20190101
@@ -280,6 +286,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // streaming event listener will add data and stop streaming after 3 micro-batches
     val testStreamingQueryListener = new StreamingQueryListener {
+      private var dfWritten = false
       private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
       override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = Unit
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
@@ -287,7 +294,8 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
         event.progress.name match {
           case actionRegex(actionId) =>
             event.progress.batchId match {
-              case 0 =>
+              case 0 if !dfWritten =>
+                dfWritten = true
                 // add some more data
                 logger.info("adding more data")
                 val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 10)) // second partition 20190101
@@ -360,6 +368,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // streaming event listener will add data and stop streaming after 3 micro-batches
     val testStreamingQueryListener = new StreamingQueryListener {
+      private var dfWritten = false
       private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
       override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = Unit
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
@@ -367,7 +376,8 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
         event.progress.name match {
           case actionRegex(actionId) =>
             event.progress.batchId match {
-              case 0 =>
+              case 0 if !dfWritten=>
+                dfWritten = true
                 // add some more data
                 logger.info("adding more data")
                 val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 10)) // second partition 20190101
@@ -449,6 +459,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // streaming event listener will add data and stop streaming after 3 micro-batches
     val testStreamingQueryListener = new StreamingQueryListener {
+      private var dfWritten = false
       private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
       override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = Unit
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
@@ -456,7 +467,8 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
         event.progress.name match {
           case actionRegex(actionId) =>
             event.progress.batchId match {
-              case 0 =>
+              case 0 if !dfWritten =>
+                dfWritten = true
                 // add some more data which will fail streaming query (udfAddX fails if input=999)
                 logger.info("adding more data")
                 val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 999)) // second partition 20190101
@@ -528,12 +540,15 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     Environment.stopStreamingGracefully = false
 
     // create state listener for controlling execution
-    val stateListener = new StateListener with SmartDataLakeLogger {
+    val stateListener: StateListener with SmartDataLakeLogger = new StateListener with SmartDataLakeLogger {
+      var dfSrc2Written = false
       override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId : Option[ActionId]): Unit = {
         assert(state.runId == context.executionId.runId && state.attemptId == context.executionId.attemptId)
         logger.info(s"Received metrics for runId=${state.runId} attemptId=${state.attemptId} final=${state.isFinal}")
         // add additional source partition for runId=2
-        if (state.isFinal && state.runId==2) {
+        if (state.isFinal && state.runId==2 && !dfSrc2Written) {
+          dfSrc2Written = true
+          logger.info("adding more data")
           val dfSrc2 = Seq(("20180102", "company", "olmo","-",10)) // second partition 20190101
             .toDF("dt", "type", "lastname", "firstname", "rating")
           srcDO.writeDataFrame(dfSrc2, Seq())
@@ -603,7 +618,8 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
       , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1")))
 
     // streaming event listener will add data and stop streaming after 3 micro-batches
-    val testStreamingQueryListener = new StreamingQueryListener {
+    val testStreamingQueryListener: StreamingQueryListener = new StreamingQueryListener {
+      var dfSrc2Written = false
       private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
       override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = Unit
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
@@ -611,7 +627,8 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
         event.progress.name match {
           case actionRegex(actionId) =>
             event.progress.batchId match {
-              case 0 =>
+              case 0 if !dfSrc2Written =>
+                dfSrc2Written = true
                 // add some more data
                 logger.info("adding more data")
                 val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 10)) // second partition 20190101
@@ -663,6 +680,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
  */
 class PartitionStreamingTestStateListener2(runIdToAddData: Int) extends StateListener with SmartDataLakeLogger {
   var srcDO: CsvFileDataObject = _
+  private var dfWritten = false
   override def init(): Unit = {
     srcDO = Environment.instanceRegistry.get[CsvFileDataObject](DataObjectId("src1"))
   }
@@ -673,7 +691,9 @@ class PartitionStreamingTestStateListener2(runIdToAddData: Int) extends StateLis
     assert(state.runId == context.executionId.runId && state.attemptId == context.executionId.attemptId)
     logger.info(s"Received metrics for runId=${state.runId} attemptId=${state.attemptId} final=${state.isFinal}")
     // add additional source partition after runIdToAddData
-    if (state.isFinal && state.runId==runIdToAddData) {
+    if (state.isFinal && state.runId==runIdToAddData && !dfWritten) {
+      dfWritten = true
+      logger.info("adding more data")
       val dfSrc2 = Seq(("20180102", "company", "olmo","-",10)) // second partition 20190101
         .toDF("dt", "type", "lastname", "firstname", "rating")
       srcDO.writeDataFrame(dfSrc2, Seq())
