@@ -385,6 +385,46 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
       .as[Int].collect().toSeq
     assert(r2.toSet == Set(5,3))
   }
+
+  test("fail on reading missing partition") {
+
+    // setup DataObjects
+    val feed = "copy"
+    val srcTable = Table(Some("default"), "copy_input")
+    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, partitions = Seq("lastname", "firstname"), numInitialHdfsPartitions = 1)
+    srcDO.dropTable
+    instanceRegistry.register(srcDO)
+    val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("lastname","firstname")))
+    val tgtDO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable, partitions = Seq("lastname", "firstname"), numInitialHdfsPartitions = 1, saveMode = SDLSaveMode.Append)
+    tgtDO.dropTable
+    instanceRegistry.register(tgtDO)
+
+    // prepare
+    val action1 = CopyAction("ca", srcDO.id, tgtDO.id)
+    val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
+    srcDO.writeDataFrame(l1, Seq())
+
+    // dont fail if partition exists
+    val srcSubFeedOk = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe", "firstname" -> "bob"))))
+    action1.exec(Seq(srcSubFeedOk))(contextExec)
+
+    // fail if partition doesnt exist
+    val srcSubFeedNok = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "joe", "firstname" -> "bob"))))
+    intercept[AssertionError](action1.exec(Seq(srcSubFeedNok))(contextExec))
+
+    // dont fail if partition information is an init of partition columns, and partition does exist
+    val srcSubFeedInitOk = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe"))))
+    action1.exec(Seq(srcSubFeedInitOk))(contextExec)
+
+    // fail if partition information is an init of partition columns, but partition does not exist
+    val srcSubFeedInitNok = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "joe"))))
+    intercept[AssertionError](action1.exec(Seq(srcSubFeedInitNok))(contextExec))
+
+    // dont fail if partition values is not an init of partition columns (lastname is not defined)
+    val srcSubFeedNoInit = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("firstname" -> "bob"))))
+    action1.exec(Seq(srcSubFeedNoInit))(contextExec)
+
+  }
 }
 
 class TestDfTransformer extends CustomDfTransformer {

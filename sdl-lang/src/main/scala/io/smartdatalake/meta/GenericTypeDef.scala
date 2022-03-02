@@ -6,13 +6,13 @@ import scala.reflect.runtime.universe.{ClassSymbol, Type}
  * Generic definition of SDL configuration elements
  */
 private[smartdatalake] case class GenericTypeDef(
-                           name: String,
-                           baseType: Option[BaseType.BaseType],
-                           cls: ClassSymbol,
-                           description: Option[String],
-                           isFinal: Boolean,
-                           superTypes: Set[ClassSymbol],
-                           attributes: Seq[GenericAttributeDef]
+                                                  name: String,
+                                                  baseTpe: Option[Type],
+                                                  tpe: Type,
+                                                  description: Option[String],
+                                                  isFinal: Boolean,
+                                                  superTypes: Set[Type],
+                                                  attributes: Seq[GenericAttributeDef]
                          )
 
 /**

@@ -55,18 +55,18 @@ case class CopyAction(override val id: ActionId,
                       inputId: DataObjectId,
                       outputId: DataObjectId,
                       deleteDataAfterRead: Boolean = false,
-                      @deprecated("Use transformers instead.", "2.0.5")
+                      @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                       transformer: Option[CustomDfTransformerConfig] = None,
                       transformers: Seq[ParsableDfTransformer] = Seq(),
-                      @deprecated("Use transformers instead.", "2.0.5")
+                      @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                       columnBlacklist: Option[Seq[String]] = None,
-                      @deprecated("Use transformers instead.", "2.0.5")
+                      @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                       columnWhitelist: Option[Seq[String]] = None,
-                      @deprecated("Use transformers instead.", "2.0.5")
+                      @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                       additionalColumns: Option[Map[String,String]] = None,
-                      @deprecated("Use transformers instead.", "2.0.5")
+                      @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                       filterClause: Option[String] = None,
-                      @deprecated("Use transformers instead.", "2.0.5")
+                      @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                       standardizeDatatypes: Boolean = false,
                       override val breakDataFrameLineage: Boolean = false,
                       override val persist: Boolean = false,

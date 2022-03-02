@@ -224,7 +224,7 @@ private[smartdatalake] case class LateArrivingMetricException(msg: String) exten
 /**
  * A structure to collect runtime event information
  */
-private[smartdatalake] case class RuntimeEvent(tstmp: LocalDateTime, phase: ExecutionPhase, state: RuntimeEventState, msg: Option[String], results: Seq[SubFeed])
+case class RuntimeEvent(tstmp: LocalDateTime, phase: ExecutionPhase, state: RuntimeEventState, msg: Option[String], results: Seq[SubFeed])
 private[smartdatalake] object RuntimeEventState extends Enumeration {
   type RuntimeEventState = Value
   val STARTED, PREPARED, INITIALIZED, SUCCEEDED, FAILED, CANCELLED, SKIPPED, PENDING, STREAMING = Value
@@ -273,7 +273,7 @@ private[smartdatalake] object SparkStreamingExecutionId {
  * Summarized runtime information
  */
 case class RuntimeInfo(
-                       executionId: ExecutionId,
+                       executionId: ExecutionId = SDLExecutionId(-1, -1), // default value is needed for backward compatibility
                        state: RuntimeEventState,
                        startTstmp: Option[LocalDateTime] = None,
                        duration: Option[Duration] = None,
@@ -287,4 +287,4 @@ case class RuntimeInfo(
   def hasCompleted: Boolean = state==RuntimeEventState.SUCCEEDED || state==RuntimeEventState.SKIPPED
   override def toString: String = duration.map(d => s"$state $d").getOrElse(state.toString)
 }
-private[smartdatalake] case class ResultRuntimeInfo(subFeed: SubFeed, mainMetrics: Map[String, Any])
+case class ResultRuntimeInfo(subFeed: SubFeed, mainMetrics: Map[String, Any])

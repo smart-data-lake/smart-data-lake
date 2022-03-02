@@ -20,7 +20,7 @@
 package io.smartdatalake.meta.atlas
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.meta.{BaseType, GenericTypeUtil}
+import io.smartdatalake.meta.GenericTypeUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.webservice.ScalaJWebserviceClient
 import io.smartdatalake.workflow.dataobject.{HttpTimeoutConfig, WebserviceFileDataObject}
@@ -88,7 +88,7 @@ case class AtlasTypeUtil(atlasConfig: AtlasConfig) extends SmartDataLakeLogger {
     ).map(_.typeSymbol.name.toString)
 
     if (simpleTypeNames.contains(typeName)) return typeName.toLowerCase()
-    if (BaseType.values.map(_.toString).contains(typeName)) return typeDefPrefix + typeName.split("\\.").last
+    if (GenericTypeUtil.baseTypes.map(_.typeSymbol.name.toString).contains(typeName)) return typeDefPrefix + typeName.split("\\.").last
     if (sdlBaseTypesWithAtlasSuperTypes.values.toSet.contains(typeName)) return typeName
     if (typeName.startsWith("Seq[")) {
       val typeArgument = exportTypeName(typeName.drop(4).dropRight(1))
