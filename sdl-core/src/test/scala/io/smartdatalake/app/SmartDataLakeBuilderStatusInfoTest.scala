@@ -106,7 +106,20 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
     client.start()
     val socket = new UnitTestSocket
     val fut: Future[Session] = client.connect(socket, uri)
-    fut.get
+
+    var connectionTries = 0
+    var connectionEstablished = false
+    while (!connectionEstablished && connectionTries < 10) {
+      try {
+        fut.get
+        connectionEstablished = true
+      } catch {
+        case e: Exception => {
+          println("Try " + connectionTries + " failed with Exception : " + e)
+          connectionTries += 1
+        }
+      }
+    }
 
     //Verify Rest API is reachable
     val webserviceDOContext = WebserviceFileDataObject("dummy", url = s"http://localhost:4440/api/v1/context/")
