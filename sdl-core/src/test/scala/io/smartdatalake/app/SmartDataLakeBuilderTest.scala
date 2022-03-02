@@ -26,11 +26,10 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
-import io.smartdatalake.util.misc.{EnvironmentUtil, SmartDataLakeLogger}
-import io.smartdatalake.util.webservice.ScalaJWebserviceClient
-import io.smartdatalake.workflow.action._
+import io.smartdatalake.util.misc.EnvironmentUtil
 import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, SparkUDFCreator}
 import io.smartdatalake.workflow.action.sparktransformer.{AdditionalColumnsTransformer, SQLDfTransformer, SQLDfsTransformer, ScalaClassDfTransformer}
+import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore, SparkSubFeed}
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -38,16 +37,9 @@ import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{col, udf}
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.sql.{DataFrame, SparkSession, functions}
-import org.eclipse.jetty.websocket.api.{Session, WebSocketAdapter}
-import org.eclipse.jetty.websocket.client.WebSocketClient
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
-import java.net.URI
-import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.util.concurrent.Future
-import scala.collection.mutable.ListBuffer
-import scala.util.{Failure, Success}
 
 /**
  * This tests use configuration test/resources/application.conf
@@ -55,7 +47,6 @@ import scala.util.{Failure, Success}
 class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
-
   import session.implicits._
 
   private val tempDir = Files.createTempDirectory("test")
@@ -407,7 +398,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // check results
     assert(tgt1DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6)) // +1 because of udfAddX
 
-
     // check latest state
     {
       val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName, session.sparkContext.hadoopConfiguration)
@@ -454,79 +444,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       assert(stateListener.firstState.isDefined && !stateListener.firstState.get.isFinal)
       assert(stateListener.finalState.isDefined && stateListener.finalState.get.isFinal)
     }
-  }
-
-  test("sdlb run with statusinfoserver: Test connectivity of REST API and Websocket") {
-
-    // init sdlb
-    val appName = "sdlb-runId"
-    val feedName = "test"
-
-    HdfsUtil.deleteFiles(new Path(statePath), false)
-    val sdlb = new DefaultSmartDataLakeBuilder()
-    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-
-    // setup DataObjects
-    val srcTable = Table(Some("default"), "ap_input")
-    // source table has partitions columns dt and type
-    val srcDO = HiveTableDataObject("src1", Some(tempPath + s"/${srcTable.fullName}"), partitions = Seq("dt", "type"), table = srcTable, numInitialHdfsPartitions = 1)
-    srcDO.dropTable
-    instanceRegistry.register(srcDO)
-    val tgt1Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname", "firstname")))
-    // first table has partitions columns dt and type (same as source)
-    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tempPath + s"/${tgt1Table.fullName}"), partitions = Seq("dt", "type"), table = tgt1Table, numInitialHdfsPartitions = 1)
-    tgt1DO.dropTable
-    instanceRegistry.register(tgt1DO)
-
-    // fill src table with first partition
-    val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5)) // first partition 20180101
-      .toDF("dt", "type", "lastname", "firstname", "rating")
-    srcDO.writeDataFrame(dfSrc1, Seq())
-
-    // start first dag run
-    // use only first partition col (dt) for partition diff mode
-    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, udfAddX(rating) rating from src1")))
-    instanceRegistry.register(action1.copy())
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
-    Environment._globalConfig = GlobalConfig(statusInfo = Some(StatusInfoConfig(4440, stopOnEnd = false)))
-
-    sdlb.run(sdlConfig)
-
-    //Create Client Websocket that tries to establish connection with SDLB Job
-    val receivedMessages: ListBuffer[String] = ListBuffer()
-    // The socket that receives events
-    class UnitTestSocket() extends WebSocketAdapter with SmartDataLakeLogger {
-      override def onWebSocketConnect(sess: Session): Unit = {}
-
-      override def onWebSocketText(message: String): Unit = {
-        receivedMessages += message
-      }
-
-      override def onWebSocketClose(statusCode: Int, reason: String): Unit = {}
-
-      override def onWebSocketError(cause: Throwable): Unit = {}
-    }
-    val client = new WebSocketClient
-    val uri = URI.create("ws://localhost:4440/ws/")
-    client.start()
-    val socket = new UnitTestSocket
-    val fut: Future[Session] = client.connect(socket, uri)
-    fut.get
-
-    //Verify Rest API is reachable
-    val webserviceDOContext = WebserviceFileDataObject("dummy", url = s"http://localhost:4440/api/v1/context/")
-    val webserviceClientContext = ScalaJWebserviceClient(webserviceDOContext)
-    webserviceClientContext.get() match {
-      case Failure(exception) =>
-        throw exception
-      case Success(value) =>
-        val str = new String(value, StandardCharsets.UTF_8)
-        assert(str.contains("\"feedSel\":\"test\""))
-    }
-    //Verify a client websocket can connect
-    assert(receivedMessages.head.contains("Hello from io.smartdatalake.statusinfo.websocket.StatusInfoSocket"))
   }
 
   test("sdlb run with executionMode=DataObjectStateIncrementalMode") {
@@ -629,8 +546,7 @@ class FailTransformer extends CustomDfTransformer {
     // DataFrame needs at least one string column in schema
     val firstStringColumn = df.schema.fields.find(_.dataType == StringType).map(_.name).get
     val udfFail = udf((s: String) => {
-      throw new IllegalStateException("aborted by FailTransformer");
-      s
+      throw new IllegalStateException("aborted by FailTransformer"); s
     })
     // fail at spark runtime
     df.withColumn(firstStringColumn, udfFail(col(firstStringColumn)))
@@ -673,7 +589,6 @@ class TestSDLPlugin extends SDLPlugin {
     TestSDLPlugin.shutdownCalled = true
   }
 }
-
 object TestSDLPlugin {
   var startupCalled = false
   var shutdownCalled = false
