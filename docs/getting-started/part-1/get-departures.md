@@ -2,6 +2,9 @@
 title: Get Departures
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Goal
 
 In this step, we will download plane departure data from the REST-Interface described in the previous step using Smart Data Lake Builder.
@@ -129,7 +132,27 @@ Before, we only mounted the data folder so that you could see the results of the
 The config file that was being used was located inside the docker image.
 This time, we add another volume with your config-file and tell SDL to use it with the *--config* option.
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download
+```
+
+</TabItem>
+</Tabs>
 
 After executing it, you will see the file *data/stg_departures/result.json* has been replaced with the output of your pipeline.
 

@@ -2,6 +2,9 @@
 title: Select Columns
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Goal
 
 In this step we write our first Action that modifies data.
@@ -56,7 +59,7 @@ with some optional transformations of the data along the way.
 - To define the transformations of an action, you define a list of HOCON Objects.
 HOCON-Objects are just like JSON-Objects (with a few added features, but more on that later).
 - Instead of allowing for just one transformer, we could potentially have multiple transformers within the same action that
-  get executed one after the other. That's why we have the bracket followed by the curly brace "[{" :
+  get executed one after the other. That's why we have the bracket followed by the curly brace `[{` :
   the CustomSparkAction expects it's field *transformers* to be a list of HOCON Objects.
 - There's different kinds of transformers, in this case we defined a *SQLDfTransformer* and provided it with a custom SQL-Code.
 There are other transformer types such as *ScalaCodeDfTransformer*, *PythonCodeDfTransformer*... More on that later.
@@ -67,7 +70,7 @@ Notice that we call our input DataObject stg-airports with a hyphen "-", but in 
 This is due to the SQL standard not allowing "-" in unquoted identifiers (e.g. table names). 
 Under the hood, Apache Spark SQL is used to execute the query, which implements SQL standard.
 SDL works around this by replacing special chars in DataObject names used in SQL statements for you. 
-In this case, it automatically replaced "-" with "_"
+In this case, it automatically replaced "-" with `_`
 
 :::
 
@@ -83,15 +86,37 @@ try out our new actions.
 
 To execute the pipeline, use the same command as before, but change the feed to compute:
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel compute
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel compute
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel compute
+```
+
+</TabItem>
+</Tabs>
 
 :::caution
 
 If you encounter an error that looks like this:
 
-    Exception in thread "main" io.smartdatalake.util.dag.TaskFailedException: Task select-airport-cols failed. Root cause is 'IllegalArgumentException: requirement failed: (DataObject~stg-airports) DataObject schema is undefined. A sche
-    ma must be defined if there are no existing files.'
-    Caused by: java.lang.IllegalArgumentException: requirement failed: (DataObject~stg-airports) DataObject schema is undefined. A schema must be defined if there are no existing files.
+    Exception in thread "main" io.smartdatalake.util.dag.TaskFailedException: Task select-airport-cols failed. 
+			Root cause is 'IllegalArgumentException: requirement failed: (DataObject~stg-airports) DataObject schema 
+			is undefined. A schema must be defined if there are no existing files.'
+    Caused by: java.lang.IllegalArgumentException: requirement failed: (DataObject~stg-airports) DataObject 
+			schema is undefined. A schema must be defined if there are no existing files.
 
 Execute the **`download`**-feed again. After that feed was successfully executed, the execution of the feed `.*` or `compute` will work.
 More on this problem in the list of [Common Problems](../troubleshooting/common-problems.md).
@@ -108,13 +133,53 @@ We might work on a small data set for now, but keep in mind that this would scal
 SDL gives you precise control on which actions you want to execute. 
 For instance if you only want to execute the action that we just wrote, you can type
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:select-airport-cols
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:select-airport-cols
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:select-airport-cols
+```
+
+</TabItem>
+</Tabs>
 
 Of course, at this stage, the feed *compute* only contains this one action, so the result will be the same.
 
 SDL also allows you to use combinations of expressions to select the actions you want to execute. You can run
 
-    docker run --rm sdl-spark:latest --help
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+docker run --rm sdl-spark:latest --help
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+podman run --rm sdl-spark:latest --help
+```
+
+</TabItem>
+</Tabs>
 
 to see all options that are available. For your convenience, here is the current output of the help command:
 
@@ -163,7 +228,27 @@ to see all options that are available. For your convenience, here is the current
 One popular option is to use regular expressions to execute multiple feeds together.
 In our case, we can run the entire data pipeline with the following command : 
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel .*
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel .*
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel .*
+```
+
+</TabItem>
+</Tabs>
 
 
 

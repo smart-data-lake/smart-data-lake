@@ -2,6 +2,9 @@
 title: Joining It Together
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Goal
 So now we have data from departures in our stage layer, and we have cleaned data for airports in our integration layer.
 In this step we will finally join both data sources together.
@@ -65,7 +68,27 @@ Always using one Data Object as output will make your data lineage more detailed
 ## Try it out
 You can run the usual *docker run* command:
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel compute
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel compute
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel compute
+```
+
+</TabItem>
+</Tabs>
 
 You should now see the resulting files in *data/btl-connected-airports*.
 Great! Now we have names and coordinates of destination airports.

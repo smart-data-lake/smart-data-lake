@@ -2,6 +2,9 @@
 title: Keeping historical data
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Goal
 
 Data generally can be split into two groups:
@@ -66,7 +69,27 @@ Then start Action `historize-airports`.
 You may have seen that the `--feed-sel` parameter of SDL command line supports more options to select actions to execute (see command line help). 
 We will now only execute this single action by changing this parameter to `--feed-sel ids:historize-airports`:
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest -c /mnt/config --feed-sel ids:historize-airports
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest -c /mnt/config --feed-sel ids:historize-airports
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest -c /mnt/config --feed-sel ids:historize-airports
+```
+
+</TabItem>
+</Tabs>
 
 After successful execution you can check the schema and data of our table in Polynote. 
 It now has a time dimension through the two new columns `dl_ts_captured` and `dl_ts_delimited`.
@@ -190,7 +213,27 @@ Now, delete the table and data of the DataObject `int-departures` in Polynote, t
 
 Then start Action deduplicate-departures:
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest -c /mnt/config --feed-sel ids:deduplicate-departures
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest -c /mnt/config --feed-sel ids:deduplicate-departures
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest -c /mnt/config --feed-sel ids:deduplicate-departures
+```
+
+</TabItem>
+</Tabs>
 
 After successful execution you can check the schema and data of our table in Polynote. 
 The new column `dl_ts_captured` shows the current time of the data pipeline run when this object first occurred in the input data. 
