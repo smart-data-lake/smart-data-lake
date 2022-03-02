@@ -3,7 +3,6 @@ package io.smartdatalake.meta.dagexporter
 import io.smartdatalake.config.{ConfigToolbox, ConfigurationException, InstanceRegistry}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.Action
-import org.apache.log4j.varia.NullAppender
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.writePretty
@@ -31,17 +30,15 @@ object DagExporter extends SmartDataLakeLogger {
    * Takes as input a SDL Config and prints it's containing Actions to STDOUT, in a simplified JSON-Format.
    */
   def main(args: Array[String]): Unit = {
-    //Silence the loggers so that stdout only contains the output
-    import org.apache.log4j.Logger
-    Logger.getRootLogger.removeAllAppenders()
-    Logger.getRootLogger.addAppender(new NullAppender())
 
     val config = DagExporterConfig()
     // Parse all command line arguments
     parser.parse(args, config) match {
       case Some(config) =>
         val dagAsJSON = exportConfigDagToJSON(config)
+        println("BEGIN DAG")
         print(dagAsJSON)
+        println("END DAG")
       case None =>
         logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
     }
