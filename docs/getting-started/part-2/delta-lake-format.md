@@ -190,7 +190,7 @@ You probably don't have a global section in your application.conf yet, so here i
 
 This instructs Spark to use the external metastore you started with docker-compose. 
 Your Smart Data Lake container doesn't have access to the other containers just yet. 
-So when you run your data pipeline again, you need to add a parameter `--network getting-started_default` to join the virtual network where the metastore is located:
+So when you run your data pipeline again, you need to add a parameter `--network`/`--pod` to join the virtual network where the metastore is located:
 
 <Tabs groupId = "docker-podman-switch"
 defaultValue="docker"
