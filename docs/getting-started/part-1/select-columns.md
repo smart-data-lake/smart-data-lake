@@ -113,10 +113,10 @@ podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/con
 If you encounter an error that looks like this:
 
     Exception in thread "main" io.smartdatalake.util.dag.TaskFailedException: Task select-airport-cols failed. 
-			Root cause is 'IllegalArgumentException: requirement failed: (DataObject~stg-airports) DataObject schema 
-			is undefined. A schema must be defined if there are no existing files.'
+	Root cause is 'IllegalArgumentException: requirement failed: (DataObject~stg-airports) DataObject schema 
+	is undefined. A schema must be defined if there are no existing files.'
     Caused by: java.lang.IllegalArgumentException: requirement failed: (DataObject~stg-airports) DataObject 
-			schema is undefined. A schema must be defined if there are no existing files.
+	schema is undefined. A schema must be defined if there are no existing files.
 
 Execute the **`download`**-feed again. After that feed was successfully executed, the execution of the feed `.*` or `compute` will work.
 More on this problem in the list of [Common Problems](../troubleshooting/common-problems.md).
