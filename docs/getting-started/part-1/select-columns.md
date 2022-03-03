@@ -70,7 +70,7 @@ Notice that we call our input DataObject stg-airports with a hyphen "-", but in 
 This is due to the SQL standard not allowing "-" in unquoted identifiers (e.g. table names). 
 Under the hood, Apache Spark SQL is used to execute the query, which implements SQL standard.
 SDL works around this by replacing special chars in DataObject names used in SQL statements for you. 
-In this case, it automatically replaced "-" with `_`
+In this case, it automatically replaced `-` with `_`
 
 :::
 
