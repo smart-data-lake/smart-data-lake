@@ -103,6 +103,10 @@ case class ActionPipelineContext (
     if (_sparkSession.isEmpty) {
       if (Environment.sparkSession != null) { // take spark session from environment if initialized
         _sparkSession = Some(Environment.sparkSession)
+        if (Environment.globalConfig != null) { // update spark options and udfs in existing session (needed for unit tests)
+          Environment.globalConfig.setSparkOptions(_sparkSession.get)
+          Environment.globalConfig.registerUdf(_sparkSession.get)
+        }
       } else {
         assert(Environment.globalConfig != null, "Cannot create SparkSession because Environment.globalConfig is not initialized.")
         _sparkSession = Some(Environment.globalConfig.createSparkSession(appConfig.appName, appConfig.master, appConfig.deployMode))

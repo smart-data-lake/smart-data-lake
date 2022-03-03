@@ -101,18 +101,35 @@ extends SmartDataLakeLogger {
    * Create a spark session using settings from this global config
    */
   def createSparkSession(appName: String, master: Option[String], deployMode: Option[String] = None): SparkSession = {
-    if (Environment._sparkSession != null) logger.warn("Your SparkSession was already set, that should not happen. We will re-initialize it anyway now.")
-    // prepare additional spark options
-    // enable MemoryLoggerExecutorPlugin if memoryLogTimer is enabled
-    val executorPlugins = sparkOptions.flatMap(_.get("spark.plugins")).toSeq ++ (if (memoryLogTimer.isDefined) Seq(classOf[MemoryLoggerExecutorPlugin].getName) else Seq())
-    val executorPluginOptions = if (executorPlugins.nonEmpty) Map("spark.executor.plugins" -> executorPlugins.mkString(",")) else Map[String,String]()
-    // config for MemoryLoggerExecutorPlugin can only be transferred to Executor by spark-options
-    val memoryLogOptions = memoryLogTimer.map(_.getAsMap).getOrElse(Map())
-    // get additional options from modules
-    val moduleOptions = ModulePlugin.modules.map(_.additionalSparkProperties()).reduceOption(mergeSparkOptions).getOrElse(Map())
-    // combine all options: custom options will override framework options
-    val sparkOptionsExtended = Seq(moduleOptions, memoryLogOptions, executorPluginOptions).reduceOption(mergeSparkOptions).getOrElse(Map()) ++  sparkOptions.getOrElse(Map())
-    Environment._sparkSession = AppUtil.createSparkSession(appName, master, deployMode, kryoClasses, sparkOptionsExtended, enableHive)
+    if (Environment._sparkSession != null) {
+      logger.warn("Your SparkSession was already set, that should not happen. We will re-register UDFs and set spark options.")
+      setSparkOptions(Environment._sparkSession)
+      registerUdf(Environment._sparkSession)
+    } else {
+      // prepare additional spark options
+      // enable MemoryLoggerExecutorPlugin if memoryLogTimer is enabled
+      val executorPlugins = sparkOptions.flatMap(_.get("spark.plugins")).toSeq ++ (if (memoryLogTimer.isDefined) Seq(classOf[MemoryLoggerExecutorPlugin].getName) else Seq())
+      val executorPluginOptions = if (executorPlugins.nonEmpty) Map("spark.executor.plugins" -> executorPlugins.mkString(",")) else Map[String, String]()
+      // config for MemoryLoggerExecutorPlugin can only be transferred to Executor by spark-options
+      val memoryLogOptions = memoryLogTimer.map(_.getAsMap).getOrElse(Map())
+      // get additional options from modules
+      val moduleOptions = ModulePlugin.modules.map(_.additionalSparkProperties()).reduceOption(mergeSparkOptions).getOrElse(Map())
+      // combine all options: custom options will override framework options
+      val sparkOptionsExtended = Seq(moduleOptions, memoryLogOptions, executorPluginOptions).reduceOption(mergeSparkOptions).getOrElse(Map()) ++ sparkOptions.getOrElse(Map())
+      Environment._sparkSession = AppUtil.createSparkSession(appName, master, deployMode, kryoClasses, sparkOptionsExtended, enableHive)
+      registerUdf(Environment._sparkSession)
+      // adjust log level
+      LogUtil.setLogLevel(Environment._sparkSession.sparkContext)
+    }
+    // return
+    Environment._sparkSession
+  }
+
+  private[smartdatalake] def setSparkOptions(session:SparkSession): Unit = {
+    sparkOptions.getOrElse(Map()).foreach{ case (k,v) => Environment._sparkSession.conf.set(k,v)}
+  }
+
+  private[smartdatalake] def registerUdf(session: SparkSession): Unit = {
     sparkUDFs.getOrElse(Map()).foreach { case (name,config) =>
       val udf = config.getUDF
       // register in SDL spark session
@@ -124,10 +141,6 @@ extends SmartDataLakeLogger {
       // register in SDL spark session
       config.registerUDF(name, Environment._sparkSession)
     }
-    // adjust log level
-    LogUtil.setLogLevel(Environment._sparkSession.sparkContext)
-    // return
-    Environment._sparkSession
   }
 
   /**
