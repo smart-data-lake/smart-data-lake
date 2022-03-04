@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.statusinfo
+package io.smartdatalake.statusinfo.api
 
 import io.smartdatalake.app.StateListener
 import io.smartdatalake.config.SdlConfigObject.ActionId
@@ -24,15 +24,13 @@ import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
 
 
 /*
- * Listens to the current contents of ActionDAGRunState and ActionPipelineContext and stores them so that
- * the status info server has access to them.
+ * Provides a Snapshot of the current contents of ActionDAGRunState and ActionPipelineContext.
  */
-class StatusInfoListener extends StateListener {
+class SnapshotStatusInfoListener extends StateListener {
 
   var stateVar: Option[ActionDAGRunState] = None
   var contextVar: Option[ActionPipelineContext] = None
 
-  //TODO When implementing websocket: if changedAction!=None then look for action with changedActionId  in actionsState and push it into socket
   override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId: Option[ActionId]): Unit = {
     stateVar = Some(state)
     contextVar = Some(context)

@@ -1,0 +1,98 @@
+/*
+ * Smart Data Lake - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package io.smartdatalake.app
+
+import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.webservice.ScalaJWebserviceClient
+import io.smartdatalake.workflow.dataobject._
+import org.apache.spark.sql.SparkSession
+import org.eclipse.jetty.websocket.api.{Session, WebSocketAdapter}
+import org.eclipse.jetty.websocket.client.WebSocketClient
+import org.scalatest.{BeforeAndAfter, FunSuite}
+
+import java.net.URI
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.Future
+import scala.collection.mutable.ListBuffer
+import scala.util.{Failure, Success}
+
+/**
+ * This tests use configuration test/resources/application.conf
+ */
+class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
+
+  protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+
+  import session.implicits._
+
+  test("sdlb run with statusinfoserver: Test connectivity of REST API and Websocket") {
+
+    val feedName = "test"
+    val sdlb = new DefaultSmartDataLakeBuilder()
+    // setup input DataObject
+    val srcDO = CsvFileDataObject("src1", "target/src1")(sdlb.instanceRegistry)
+    val dfSrc1 = Seq("testData").toDF("testColumn")
+    srcDO.writeDataFrame(dfSrc1, Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
+      getClass.getResource("/configstatusinfo/application.conf").getPath))
+    )
+    //Run SDLB
+    sdlb.run(sdlConfig)
+
+    //Create Client Websocket that tries to establish connection with SDLB Job
+    val receivedMessages: ListBuffer[String] = ListBuffer()
+    // The socket that receives events
+    class UnitTestSocket() extends WebSocketAdapter with SmartDataLakeLogger {
+      override def onWebSocketConnect(sess: Session): Unit = {}
+
+      override def onWebSocketText(message: String): Unit = {
+        receivedMessages += message
+      }
+
+      override def onWebSocketClose(statusCode: Int, reason: String): Unit = {}
+
+      override def onWebSocketError(cause: Throwable): Unit = {}
+    }
+    val client = new WebSocketClient
+    val uri = URI.create("ws://localhost:4440/ws/")
+    client.start()
+    val socket = new UnitTestSocket
+    val fut: Future[Session] = client.connect(socket, uri)
+    fut.get
+
+    //Verify Rest API is reachable
+    val webserviceDOContext = WebserviceFileDataObject("dummy", url = s"http://localhost:4440/api/v1/context/")(sdlb.instanceRegistry)
+    val webserviceClientContext = ScalaJWebserviceClient(webserviceDOContext)
+    webserviceClientContext.get() match {
+      case Failure(exception) =>
+        throw exception
+      case Success(value) =>
+        val str = new String(value, StandardCharsets.UTF_8)
+        assert(str.contains("\"feedSel\":\"test\""))
+    }
+    //Verify a client websocket can connect
+    assert(receivedMessages.head.contains("Hello from io.smartdatalake.statusinfo.websocket.StatusInfoSocket"))
+  }
+}
+
+
+
