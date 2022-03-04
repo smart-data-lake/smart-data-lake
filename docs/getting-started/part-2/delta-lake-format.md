@@ -2,6 +2,9 @@
 title: Delta Lake - a better data format
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Goal
 
 Up to now we have used CSV with CsvFileDataObject as file format. We will switch to a more modern data format in this step which supports a catalog, compression and even transactions.
@@ -88,9 +91,31 @@ Finally, adapt the action definition for `join-departures-airports`:
 To run our data pipeline, first delete the data directory - otherwise DeltaLakeTableDataObject will fail because of existing files in different format.
 Then you can execute the usual *docker run* command for all feeds:
 
-    mkdir -f data
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel 'download*'
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel '^(?!download).*'
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+mkdir -f data
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel 'download*'
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel '^(?!download).*'
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+mkdir -f data
+podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel 'download*'
+podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel '^(?!download).*'
+```
+
+</TabItem>
+</Tabs>
 
 :::info
 Why two separate commands?   
@@ -114,10 +139,32 @@ One of the most advanced notebooks for Scala code we found is Polynote, see [pol
 
 We will now start Polynote in a docker container, and an external Metastore (Derby database) in another container to share the catalog between our experiments and the notebook.
 To do so you need to add additional files to the project. Change to the projects root directory and **unzip part2.additional-files.zip** into the project's root directoy, then run the following commands in the projects root directory:
-    
-    docker-compose build
-    mkdir -p data/_metastore
-    docker-compose up
+
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+docker-compose build
+mkdir -p data/_metastore
+docker-compose up
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+podman-compose build
+mkdir -p data/_metastore
+podman-compose up
+```
+
+</TabItem>
+</Tabs>
 
 This might take multiple minutes.
 You should now be able to access Polynote at `localhost:8192`. 
@@ -143,13 +190,29 @@ You probably don't have a global section in your application.conf yet, so here i
 
 This instructs Spark to use the external metastore you started with docker-compose. 
 Your Smart Data Lake container doesn't have access to the other containers just yet. 
-So when you run your data pipeline again, you need to add a parameter `--network getting-started_default` to join the virtual network where the metastore is located:
+So when you run your data pipeline again, you need to add a parameter `--network`/`--pod` to join the virtual network where the metastore is located:
 
-    docker run --hostname localhost --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest -c /mnt/config --feed-sel '.*'
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
 
-When using podman you need to join the pod where the metastore is located with `--pod getting-started`:
+```jsx
+docker run --hostname localhost --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest -c /mnt/config --feed-sel '.*'
+```
 
-    podman run --hostname localhost --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest -c /mnt/config --feed-sel '.*'
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+podman run --hostname localhost --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest -c /mnt/config --feed-sel '.*'
+```
+
+</TabItem>
+</Tabs>
 
 :::info Hostname specification
 Without specifying the hostname, the containter name (by default the docker/podman container ID) can not be resolved to localhost. If you need to name your container differently, the following arguments can be used alternatively: `--hostname myhost --add-host myhost:127.0.0.1 -rm ...`

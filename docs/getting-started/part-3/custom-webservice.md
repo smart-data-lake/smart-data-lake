@@ -3,6 +3,9 @@ id: custom-webservice
 title: Custom Webservice
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Goal
   In the previous examples we worked mainly with data that was available as a file or could be fetched with the built-in `WebserviceFileDataObject`.
   To fetch data from a webservice, the `WebserviceFileDataObject` is sometimes not enough and has to be customized. 
@@ -102,18 +105,40 @@ They work by using Spark Data Frames under the hood.
 ## Try it out
 Compile and execute the code of this project with the following commands.
 Note that parameter `--feed-sel` only selects `download-departures` as Action for execution. 
+
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+mkdir .mvnrepo
+docker run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:download-departures
 ```
-  mkdir .mvnrepo
-  docker run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
-  docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:download-departures
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+mkdir .mvnrepo
+podman run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
+podmanrun --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:download-departures
 ```
+
+</TabItem>
+</Tabs>
 
 Nothing should have changed. You should again receive data as json files in the corresponding `stg-departures` folder. 
 But except of receiving the departures for only one airport, the DataObject returns the departures for all configured airports. 
 In this specific case this would be *LSZB* and *EDDF* within the corresponding time window.
 
 Having a look at the log, something similar should appear on your screen. 
-```
+
+```Bash
 2021-11-10 14:00:32 INFO  ActionDAGRun$ActionEventListener:228 - Action~download-departures[CopyAction]: Prepare started
 2021-11-10 14:00:32 INFO  ActionDAGRun$ActionEventListener:237 - Action~download-departures[CopyAction]: Prepare succeeded
 2021-11-10 14:00:32 INFO  ActionDAGRun$ActionEventListener:228 - Action~download-departures[CopyAction]: Init started
@@ -125,11 +150,13 @@ Having a look at the log, something similar should appear on your screen.
 2021-11-10 14:00:36 INFO  CustomWebserviceDataObject:69 - Success for request https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1630200800&end=1630310979
 2021-11-10 14:00:37 INFO  CustomWebserviceDataObject:69 - Success for request https://opensky-network.org/api/flights/departure?airport=EDDF&begin=1630200800&end=1630310979
 ```
+
 It is important to notice that the two requests for each airport to the API were not send only once, but twice. 
 This stems from the fact that the method `getDataFrame` of the Data Object is called twice in the DAG execution of the Smart Data Lake Builder: 
 Once during the Init Phase and once again during the Exec Phase. See [this page](/docs/reference/executionPhases) for more information on that. 
 Before we address and mitigate this behaviour in the next section, let's have a look at the `getDataFrame` method and the currently implemented logic:
-```scala
+
+```Scala
 // use the queryParameters from the config
 val currentQueryParameters = checkQueryParameters(queryParameters)
 
@@ -149,6 +176,7 @@ val departuresDf = departuresResponses.toDF("responseBinary")
 // return
 departuresDf
 ```
+
 Given the configured query parameters, the requests are first prepared using the request method. 
 If you have a look at the implementation of the `request` method, you notice that we provide some ScalaJCustomWebserviceClient that is based on the *ScalaJ* library. 
 Also in the `request` method you can find the configuration for the number of retries.
@@ -167,7 +195,7 @@ This function is a nice example of how to write your own *UDF*.
 In this section we will learn how we can avoid sending the request twice to the API using the execution phase information provided by the Smart Data Lake Builder. 
 We will now implement a simple *if ... else* statement that allows us to return an empty data frame with the correct schema in the **Init** phase and to only query the data in the **Exec** phase. 
 This logic is implemented in the next code snipped and should replace the code currently enclosed between the two `// REPLACE BLOCK` comments.
-```scala
+```Scala
     if(context.phase == ExecutionPhase.Init){
   // simply return an empty data frame
   Seq[String]().toDF("responseString")
@@ -231,7 +259,28 @@ Note that since we changed the file format to delta lake, your new `download-ded
 Therefore, you need to make sure that polynote and the metastore are running as shown in [the first step of part 2](../part-2/delta-lake-format).
 Then, you need to delete the files in the data folder and then run the following command in another terminal: 
 
-    mkdir -f data
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+mkdir -f data
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+mkdir -f data
+podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures
+```
+
+</TabItem>
+</Tabs>
 
 

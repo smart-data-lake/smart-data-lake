@@ -3,6 +3,9 @@ id: incremental-mode
 title: Incremental Mode
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Goal
 The goal of this part is to use the DataObject's state, such that it can be used in subsequent requests. 
 This allows for more dynamic querying of the API. 
@@ -100,10 +103,30 @@ To work with a state, we need to introduce two new command line parameters: `--s
 This allows us to define the folder and name of the state file. 
 To have access to the state file, we specify the path to be in an already mounted folder.
 
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+docker run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures --state-path /mnt/data/state -n getting-started
 ```
-  docker run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
-  docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures --state-path /mnt/data/state -n getting-started
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+podman run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
+podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures --state-path /mnt/data/state -n getting-started
 ```
+
+</TabItem>
+</Tabs>
+
 Use this slightly modified command to run `download-deduplicate-departures` Action. 
 Nothing should have changed so far, since we only read and write an empty state.   
 You can verify this by opening the file `getting-started.<runId>.<attemptId>.json` and having a look at the field `dataObjectsState`. The stored state is currently empty. 

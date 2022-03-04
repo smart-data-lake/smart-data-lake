@@ -3,11 +3,14 @@ id: setup
 title: Technical Setup
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Requirements
 
 To run this tutorial you just need two things:
 
-- [Docker](https://www.docker.com/get-started), including docker-compose. If you use Windows, please read our note on [Docker for Windows](troubleshooting/docker-on-windows.md),
+- [Docker](https://www.docker.com/get-started), including docker-compose. If you use Windows, you might want to use [podman as an alternative to docker](troubleshooting/docker-on-windows.md).
 - The [source code of the example](https://github.com/smart-data-lake/getting-started).
 
 ## Build Spark docker image
@@ -16,16 +19,59 @@ To run this tutorial you just need two things:
 - Open up a terminal and change to the folder with the source, you should see a file called Dockerfile. 
 - Then run (note: this might take some time, but it's only needed once):
 
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
 
-    docker build -t sdl-spark .
+```jsx
+docker build -t sdl-spark .
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+podman build -t sdl-spark .
+```
+
+</TabItem>
+</Tabs>
+
 
 
 ## Compile Scala Classes
 
 Compile included Scala classes. Note: this might take some time, but it's only needed at the beginning or if Scala code has changed.
 
-    mkdir .mvnrepo
-    docker run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
+First compile included Java classes (note: this might take some time, but it's only needed at the beginning or if Java code has changed)
+
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+mkdir .mvnrepo
+docker run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+mkdir .mvnrepo
+podman run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
+```
+
+</TabItem>
+</Tabs>
 
 
 ## Run SDL with Spark docker image

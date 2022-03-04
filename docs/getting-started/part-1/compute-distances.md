@@ -2,6 +2,9 @@
 title: Compute Distances
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Goal
 
 In this part, we will compute the distances between departure and arrival airports
@@ -66,8 +69,29 @@ but this would have resulted in more complex code working with lists of inputs, 
 To use the Java Code in our sdl-spark docker image, we have to compile it. 
 You have already done this in the [setup](../setup.md), but lets review this step again. It can be done by using a maven docker image as follows
 
-    mkdir .mvnrepo
-    docker run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+mkdir .mvnrepo
+docker run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+mkdir .mvnrepo
+podman run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
+```
+
+</TabItem>
+</Tabs>
 
 or you can also use maven directly if you have Java SDK and Maven installed
 
@@ -78,7 +102,27 @@ The *docker run* includes a parameter to mount ./target into the docker image, w
 
 Now you can start SDL again:
 
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel compute
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel compute
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel compute
+```
+
+</TabItem>
+</Tabs>
 
 Under *data/btl-distances* you can now see the final result. 
 
@@ -126,8 +170,28 @@ Just from the definitions of DataObjects and Actions alone, SDL builds a DAG and
 ### The Execution DAG of the .* feed
 
 You can also execute the entire data pipeline by selecting all feeds:
-        
-    docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel .*
+
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel .*
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel .*
+```
+
+</TabItem>
+</Tabs>        
 
 The successful execution DAG looks like this
 
