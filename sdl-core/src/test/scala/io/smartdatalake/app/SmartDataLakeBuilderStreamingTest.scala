@@ -686,7 +686,7 @@ class PartitionStreamingTestStateListener2(runIdToAddData: Int) extends StateLis
   }
   override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId : Option[ActionId]): Unit = {
     implicit val _context = context
-    implicit val _sparkSession = Environment.sparkSession
+    implicit val _sparkSession = context.sparkSession
     import _sparkSession.implicits._
     assert(state.runId == context.executionId.runId && state.attemptId == context.executionId.attemptId)
     logger.info(s"Received metrics for runId=${state.runId} attemptId=${state.attemptId} final=${state.isFinal}")
