@@ -90,7 +90,7 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
         assert(str.contains("\"feedSel\":\"test\""))
     }
     //Verify a client websocket can connect
-    assert(receivedMessages.head.contains("Hello from io.smartdatalake.statusinfo.websocket.StatusInfoSocket"))
+    assert(receivedMessages.head.contains("Hello from io.smartdatalake.communication.statusinfo.websocket.StatusInfoSocket"))
   }
 }
 

@@ -20,12 +20,12 @@ package io.smartdatalake.app
 
 import com.typesafe.config.Config
 import io.smartdatalake.app
+import io.smartdatalake.communication.statusinfo.StatusInfoServer
+import io.smartdatalake.communication.statusinfo.api.SnapshotStatusInfoListener
+import io.smartdatalake.communication.statusinfo.websocket.IncrementalStatusInfoListener
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.statusinfo.StatusInfoServer
-import io.smartdatalake.statusinfo.api.SnapshotStatusInfoListener
-import io.smartdatalake.statusinfo.websocket.IncrementalStatusInfoListener
 import io.smartdatalake.util.dag.{DAGException, ExceptionSeverity}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SerializableHadoopConfiguration, SmartDataLakeLogger}

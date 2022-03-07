@@ -17,9 +17,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.statusinfo.websocket
+package io.smartdatalake.communication.statusinfo.websocket
 
-import io.smartdatalake.statusinfo.websocket.SDLMessageType.SDLMessageType
+import io.smartdatalake.config.SdlConfigObject.ActionId
 
-case class SDLMessage(msgType: SDLMessageType, statusUpdate: Option[StatusUpdate] = None, log: Option[ActionLog] = None)
+import java.time.LocalDateTime
 
+case class ActionLog(actionId: Option[ActionId], level: String, timestamp: LocalDateTime, message: String)

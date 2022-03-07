@@ -17,11 +17,13 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.statusinfo.websocket
+package io.smartdatalake.communication.statusinfo.websocket
 
-import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
-import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
-import io.smartdatalake.workflow.action.RuntimeInfo
+object SDLMessageType extends Enumeration {
+  type SDLMessageType = Value
 
-case class StatusUpdate(actionId: Option[String], runtimeInfo: Option[RuntimeInfo], phase: ExecutionPhase, finalState: Option[RuntimeEventState])
+  val Log: Value = Value("Log")
+  val StatusUpdate: Value = Value("StatusUpdate")
+  val EndConnection: Value = Value("EndConnection")
 
+}

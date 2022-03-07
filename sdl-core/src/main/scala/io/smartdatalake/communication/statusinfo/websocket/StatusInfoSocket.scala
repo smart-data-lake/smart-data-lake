@@ -11,9 +11,9 @@
 // ========================================================================
 //
 
-package io.smartdatalake.statusinfo.websocket
+package io.smartdatalake.communication.statusinfo.websocket
 
-import io.smartdatalake.statusinfo.websocket.SDLMessageType.EndConnection
+import io.smartdatalake.communication.statusinfo.websocket.SDLMessageType.EndConnection
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.eclipse.jetty.websocket.api.{Session, StatusCode, WebSocketAdapter}
 

@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.statusinfo.websocket
+package io.smartdatalake.communication.statusinfo.websocket
 
 import io.smartdatalake.app.StateListener
 import io.smartdatalake.config.SdlConfigObject.ActionId

@@ -16,23 +16,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.statusinfo.api
 
-import io.smartdatalake.app.StateListener
-import io.smartdatalake.config.SdlConfigObject.ActionId
-import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
+package io.smartdatalake.communication.statusinfo.websocket
 
+import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
+import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
+import io.smartdatalake.workflow.action.RuntimeInfo
 
-/*
- * Provides a Snapshot of the current contents of ActionDAGRunState and ActionPipelineContext.
- */
-class SnapshotStatusInfoListener extends StateListener {
+case class StatusUpdate(actionId: Option[String], runtimeInfo: Option[RuntimeInfo], phase: ExecutionPhase, finalState: Option[RuntimeEventState])
 
-  var stateVar: Option[ActionDAGRunState] = None
-  var contextVar: Option[ActionPipelineContext] = None
-
-  override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId: Option[ActionId]): Unit = {
-    stateVar = Some(state)
-    contextVar = Some(context)
-  }
-}
