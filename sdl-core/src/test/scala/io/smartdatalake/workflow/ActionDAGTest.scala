@@ -21,7 +21,7 @@ package io.smartdatalake.workflow
 import java.nio.file.Files
 import java.sql.Timestamp
 import java.time.{Instant, LocalDateTime}
-import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
+import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.definitions._
@@ -245,7 +245,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // exec dag
     val sdlb = new DefaultSmartDataLakeBuilder
     val appConfig = SmartDataLakeBuilderConfig(feedSel=feed)
-    sdlb.exec(appConfig, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), Seq(), None, Seq(), simulation = false)
+    sdlb.exec(appConfig, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), Seq(), None, Seq(), simulation = false, globalConfig = GlobalConfig())
 
     val r1 = tgtBDO.getDataFrame()
       .select($"rating")

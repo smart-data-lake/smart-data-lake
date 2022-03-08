@@ -57,8 +57,9 @@ object ConfigToolbox {
   def getDefaultActionPipelineContext(implicit sparkSession : org.apache.spark.sql.SparkSession, instanceRegistry : io.smartdatalake.config.InstanceRegistry) : ActionPipelineContext = {
     val defaultHadoopConf = new SerializableHadoopConfiguration(new Configuration())
     val name = "interactive"
-    val context = ActionPipelineContext(name, name, SDLExecutionId.executionId1, instanceRegistry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig(name, Some(name)), phase = ExecutionPhase.Exec, serializableHadoopConf = defaultHadoopConf)
-    context._sparkSession = Some(sparkSession)
+    val globalConfig = GlobalConfig()
+    val context = ActionPipelineContext(name, name, SDLExecutionId.executionId1, instanceRegistry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig(name, Some(name)), phase = ExecutionPhase.Exec, serializableHadoopConf = defaultHadoopConf, globalConfig = globalConfig)
+    globalConfig._sparkSession = Some(sparkSession)
     context
   }
 
