@@ -17,15 +17,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.communication.statusinfo.websocket
+package io.smartdatalake.communication.agent
 
-object SDLMessageType extends Enumeration {
-  type SDLMessageType = Value
+import io.smartdatalake.communication.agent.AgentStateEnum.{AgentStateEnum, IDLE}
+import io.smartdatalake.config.InstanceRegistry
 
-  val Log: Value = Value("Log")
-  val StatusUpdate: Value = Value("StatusUpdate")
-  val EndConnection: Value = Value("EndConnection")
-  val UpdateInstanceRegistry: Value = Value("UpdateInstanceRegistry")
-  val StartAgent: Value = Value("StartAgent")
-
+object AgentController {
+  var instanceRegistry: InstanceRegistry = _
+  var state: AgentStateEnum = IDLE
 }

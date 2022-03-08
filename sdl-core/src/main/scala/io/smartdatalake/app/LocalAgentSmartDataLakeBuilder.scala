@@ -18,11 +18,13 @@
  */
 package io.smartdatalake.app
 
-import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.util.misc.EnvironmentUtil
+import io.smartdatalake.communication.agent.AgentStateEnum.{IDLE, READY}
+import io.smartdatalake.communication.agent.{AgentController, AgentServer, AgentServerConfig}
+import io.smartdatalake.workflow.action.SDLExecutionId
 import org.apache.hadoop.conf.Configuration
 
 import java.io.File
+import java.time.LocalDateTime
 
 /**
  * Smart Data Lake Builder application for agent mode.
@@ -71,39 +73,35 @@ object LocalAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
       statePath = sys.env.get("SDL_STATE_PATH")
     )
 
-    // Parse all command line arguments
-    parseCommandLineArguments(args, config) match {
-      case Some(config) =>
+    val agentController: AgentController.type = AgentController
+    AgentServer.start(AgentServerConfig(4441), agentController)
 
-        // checking environment variables for local mode
-        require(!EnvironmentUtil.isWindowsOS || System.getenv("HADOOP_HOME") != null, "Env variable HADOOP_HOME needs to be set in local mode in Windows!")
-        require(!config.master.contains("yarn") || System.getenv("SPARK_HOME") != null, "Env variable SPARK_HOME needs to be set in local mode with master=yarn!")
+    while (true) {
 
-        // authenticate with kerberos if configured
-        if (config.kerberosDomain.isDefined) {
-          require(config.username.isDefined, "Parameter 'username' must be set for kerberos authentication!")
-          val kp = config.keytabPath.map(_.getPath).orElse(Some(ClassLoader.getSystemClassLoader.getResource(s"${config.username.get}.keytab")).map(_.getPath))
-            .getOrElse(throw new IllegalArgumentException(s"Couldn't find keytab file for kerberos authentication. Set parameter 'keytab-path' or make sure resource '${config.username.get}.keytab' exists!"))
-          val principal = s"${config.username.get}@${config.kerberosDomain.get}"
-          AppUtil.authenticate(kp, principal)
-        }
+      if (agentController.state == READY) {
+        println(agentController.instanceRegistry.getActions.toSet)
+        val result = exec(config, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), Seq(), None, Seq(), simulation = false)(agentController.instanceRegistry)
 
-        // start
-        //1. Start Websocket
-        //2. Start some sleep-loop waiting for instructions
-        //When receving info from websocket write special hocon conf file to execute
-        implicit val defaultHadoopConf: Configuration = new Configuration()
-        //TODO manipulate config with input from websocket eg change file path
-        val configToRun = config.copy(configuration = Some(Seq("theConfigPathSavedByWebsocket")))
+        println(result)
+        agentController.state = IDLE
+      }
 
-      //Create dataobjects and action, add to instanceRegistry like in
-      // test("action dag with 2 dependent actions from same predecessor, PartitionDiffMode and another action with no data to process") {
-      //
-
-
-      case None =>
-        logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
+      Thread.sleep(1000)
     }
+
+    // start
+    //1. Start Websocket
+    //2. Start some sleep-loop waiting for instructions
+    //When receving info from websocket write special hocon conf file to execute
+    implicit val defaultHadoopConf: Configuration = new Configuration()
+    //TODO manipulate config with input from websocket eg change file path
+    //    val configToRun = config.copy(configuration = Some(Seq("theConfigPathSavedByWebsocket")))
+
+    //Create dataobjects and action, add to instanceRegistry like in
+    // test("action dag with 2 dependent actions from same predecessor, PartitionDiffMode and another action with no data to process") {
+    //
+
+
   }
 
 

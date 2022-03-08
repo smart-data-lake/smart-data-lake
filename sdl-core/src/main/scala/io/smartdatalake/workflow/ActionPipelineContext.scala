@@ -55,7 +55,7 @@ import scala.collection.mutable
 @DeveloperApi
 case class ActionPipelineContext (
                                    feed: String, application: String, executionId: SDLExecutionId,
-                                   @transient
+                                   // @transient
                                    instanceRegistry: InstanceRegistry,
                                    referenceTimestamp: Option[LocalDateTime] = None,
                                    appConfig: SmartDataLakeBuilderConfig, // application config is needed to persist action dag state for recovery
