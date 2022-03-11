@@ -90,7 +90,7 @@ case class AirbyteDataObject(override val id: DataObjectId,
     configuredStream = Some(
       ConfiguredAirbyteStream(stream.get, SyncModeEnum.full_refresh, if (incrementalCursorFields.nonEmpty) Some(incrementalCursorFields) else None, DestinationSyncModeEnum.append, primary_key = None)
     )
-    schema = Some(SchemaConverter.convert(jsonToString(configuredStream.get.stream.json_schema \ "properties")))
+    schema = Some(SchemaConverter.convert(jsonToString(configuredStream.get.stream.json_schema)))
     logger.info(s"($id) got schema: ${schema.get.simpleString}")
   }
 

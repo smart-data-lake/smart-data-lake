@@ -75,7 +75,7 @@ private[smartdatalake] abstract class SparkActionImpl extends ActionSubFeedsImpl
 
   override def getRuntimeDataImpl: RuntimeData = {
     // override runtime data implementation for SparkStreamingMode
-    if (executionMode.exists(_.isInstanceOf[SparkStreamingMode])) AsynchronousRuntimeData(Option(Environment.globalConfig).map(_.runtimeDataNumberOfExecutionsToKeep).getOrElse(10))
+    if (executionMode.exists(_.isInstanceOf[SparkStreamingMode])) AsynchronousRuntimeData(Environment.runtimeDataNumberOfExecutionsToKeep)
     else super.getRuntimeDataImpl
   }
 
