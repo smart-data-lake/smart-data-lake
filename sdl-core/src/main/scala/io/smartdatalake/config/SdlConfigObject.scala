@@ -25,7 +25,7 @@ import scala.language.implicitConversions
 /**
  * A first class object from which SDL [[ActionDAG]]s are built.
  */
-private[smartdatalake] trait SdlConfigObject {
+private[smartdatalake] trait SdlConfigObject extends ConfigHolder {
 
   /**
    * A unique identifier for this instance.
@@ -33,6 +33,7 @@ private[smartdatalake] trait SdlConfigObject {
   def id: ConfigObjectId
 
   validateId(id.id)
+
 }
 
 object SdlConfigObject {

@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.action.customlogic
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, ParsableFromConfig}
+import io.smartdatalake.config.{ConfigHolder, FromConfigFactory, InstanceRegistry, ParsableFromConfig}
 import io.smartdatalake.smartdatalake.SnowparkDataFrame
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -35,7 +35,7 @@ case class SnowparkDfsTransformer(val name: String = "snowparkScalaTransform",
                                   val description: Option[String] = None,
                                   className: String,
                                   options: Map[String, String] = Map())
-  extends ParsableFromConfig[SnowparkDfsTransformer] {
+  extends ParsableFromConfig[SnowparkDfsTransformer] with ConfigHolder {
 
   private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomSnowparkDfsTransformer](className)
 

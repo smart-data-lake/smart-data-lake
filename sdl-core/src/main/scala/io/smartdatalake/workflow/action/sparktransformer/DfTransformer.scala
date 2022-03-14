@@ -19,24 +19,24 @@
 
 package io.smartdatalake.workflow.action.sparktransformer
 
-import io.smartdatalake.config.{ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.{ConfigHolder, ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed}
-import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.DataFrame
 
-trait PartitionValueTransformer {
+trait PartitionValueTransformer extends ConfigHolder {
   /**
    * Optional function to define the transformation of input to output partition values.
    * For example this enables to implement aggregations where multiple input partitions are combined into one output partition.
    * Note that the default value is input = output partition values, which should be correct for most use cases.
-   * @param actionId id of the action which executes this transformation. This is mainly used to prefix error messages.
+   *
+   * @param actionId        id of the action which executes this transformation. This is mainly used to prefix error messages.
    * @param partitionValues partition values to transform
    * @return Map of input to output partition values. This allows to map partition values forward and backward, which is needed in execution modes. Return None if mapping is 1:1.
    */
-  def transformPartitionValues(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = None
+  def transformPartitionValues(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = None
 
   private[smartdatalake] def applyTransformation(actionId: ActionId, partitionValuesMap: Map[PartitionValues,PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
     val thisPartitionValuesMap = transformPartitionValues(actionId, partitionValuesMap.values.toStream.distinct) // note that stream is lazy -> distinct is only calculated if transformPartitionValues creates a mapping.
