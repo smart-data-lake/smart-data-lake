@@ -27,7 +27,6 @@ import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.action.sparktransformer.{DfTransformer, ParsableDfTransformer}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, SparkSubFeed, SubFeed}
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.expr
 
 import scala.util.{Failure, Success, Try}
@@ -35,21 +34,21 @@ import scala.util.{Failure, Success, Try}
 /**
  * [[Action]] to copy files (i.e. from stage to integration)
  *
- * @param inputId inputs DataObject
- * @param outputId output DataObject
- * @param deleteDataAfterRead a flag to enable deletion of input partitions after copying.
- * @param transformer optional custom transformation to apply.
- * @param transformers optional list of transformations to apply. See [[sparktransformer]] for a list of included Transformers.
- *                     The transformations are applied according to the lists ordering.
- * @param columnBlacklist Remove all columns on blacklist from dataframe
- * @param columnWhitelist Keep only columns on whitelist in dataframe
- * @param additionalColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
- *                          The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
- * @param executionMode optional execution mode for this Action
- * @param executionCondition     optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
+ * @param inputId              inputs DataObject
+ * @param outputId             output DataObject
+ * @param deleteDataAfterRead  a flag to enable deletion of input partitions after copying.
+ * @param transformer          optional custom transformation to apply.
+ * @param transformers         optional list of transformations to apply. See [[sparktransformer]] for a list of included Transformers.
+ *                             The transformations are applied according to the lists ordering.
+ * @param columnBlacklist      Remove all columns on blacklist from dataframe
+ * @param columnWhitelist      Keep only columns on whitelist in dataframe
+ * @param additionalColumns    optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
+ *                             The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
+ * @param executionMode        optional execution mode for this Action
+ * @param executionCondition   optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
  *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
- * @param saveModeOptions override and parametrize saveMode set in output DataObject configurations when writing to DataObjects.
+ * @param saveModeOptions      override and parametrize saveMode set in output DataObject configurations when writing to DataObjects.
  */
 case class CopyAction(override val id: ActionId,
                       inputId: DataObjectId,
@@ -63,7 +62,7 @@ case class CopyAction(override val id: ActionId,
                       @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                       columnWhitelist: Option[Seq[String]] = None,
                       @Deprecated @deprecated("Use transformers instead.", "2.0.5")
-                      additionalColumns: Option[Map[String,String]] = None,
+                      additionalColumns: Option[Map[String, String]] = None,
                       @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                       filterClause: Option[String] = None,
                       @Deprecated @deprecated("Use transformers instead.", "2.0.5")
@@ -74,7 +73,8 @@ case class CopyAction(override val id: ActionId,
                       override val executionCondition: Option[Condition] = None,
                       override val metricsFailCondition: Option[String] = None,
                       override val saveModeOptions: Option[SaveModeOptions] = None,
-                      override val metadata: Option[ActionMetadata] = None
+                      override val metadata: Option[ActionMetadata] = None,
+                      override val remoteActionConfig: Option[RemoteActionConfig] = None
                      )(implicit instanceRegistry: InstanceRegistry) extends SparkOneToOneActionImpl {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
@@ -98,7 +98,7 @@ case class CopyAction(override val id: ActionId,
     applyTransformers(getTransformers, inputSubFeed, outputSubFeed)
   }
 
-  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues, PartitionValues] = {
     applyTransformers(getTransformers, partitionValues)
   }
 
@@ -115,6 +115,7 @@ case class CopyAction(override val id: ActionId,
   }
 
   override def factory: FromConfigFactory[Action] = CopyAction
+
 }
 
 object CopyAction extends FromConfigFactory[Action] {

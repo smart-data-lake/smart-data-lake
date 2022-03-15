@@ -25,10 +25,9 @@ import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path, RemoteIterator}
+import org.apache.hadoop.fs.{FileSystem, Path}
 
 import java.io.InputStreamReader
-import scala.collection.AbstractIterator
 import scala.util.{Failure, Success, Try}
 
 object ConfigLoader extends SmartDataLakeLogger {
@@ -141,9 +140,9 @@ object ConfigLoader extends SmartDataLakeLogger {
    * Merge configurations such that configurations earlier in the list overwrite configurations at the end of the list.
    *
    * @param configs a list of [[Config]]s sorted according to their priority
-   * @return        a merged [[Config]].
+   * @return a merged [[Config]].
    */
-  private def mergeConfigs(configs: Seq[Config]): Config = {
+  def mergeConfigs(configs: Seq[Config]): Config = {
     configs.reduceLeft((c1, c2) => c1.withFallback(c2))
   }
 

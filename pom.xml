@@ -142,7 +142,7 @@
 			<activation><activeByDefault>true</activeByDefault></activation>
 			<properties>
 				<scala.minor.version>2.12</scala.minor.version>
-				<scala.version>${scala.minor.version}.15</scala.version>
+				<scala.version>${scala.minor.version}.12</scala.version>
 			</properties>
 		</profile>
 		<!-- default is hadoop 3.2 in spark 3.2 -->

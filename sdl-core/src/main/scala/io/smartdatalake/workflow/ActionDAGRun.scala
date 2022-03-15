@@ -19,6 +19,7 @@
 package io.smartdatalake.workflow
 
 import io.smartdatalake.app.StateListener
+import io.smartdatalake.communication.agent.AgentClient
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.DAGHelper._
@@ -164,6 +165,10 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
           val deduplicatedSubFeeds = unionDuplicateSubFeeds(subFeeds ++ getRecursiveSubFeeds(node), node.id)
           val previousThreadName = setThreadName(getActionThreadName(node.id))
           val resultSubFeeds = try {
+            if (node.remoteActionConfig.isDefined) {
+              val agentClient = AgentClient(node.remoteActionConfig.get)
+              agentClient.sendAction(node)
+            }
             node.preExec(deduplicatedSubFeeds)
             val resultSubFeeds = node.exec(deduplicatedSubFeeds)
             node.postExec(deduplicatedSubFeeds, resultSubFeeds)

@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.config
 
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigValueFactory}
 import configs.ConfigReader
 
 /**
@@ -45,7 +45,7 @@ private[smartdatalake] trait FromConfigFactory[+CO <: ParsableFromConfig[CO]] ex
   protected def extract[T <: ConfigHolder : ConfigReader](config: Config): T = {
     import configs.syntax.RichConfig
     val obj = config.extract[T].value
-    obj._config = Some(config)
+    obj._config = Some(config.withValue("type", ConfigValueFactory.fromAnyRef(this.getClass.getName.filterNot(_ == '$'))))
     obj
   }
 

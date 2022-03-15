@@ -18,8 +18,8 @@
  */
 package io.smartdatalake.app
 
-import io.smartdatalake.communication.agent.AgentStateEnum.{IDLE, READY}
 import io.smartdatalake.communication.agent.{AgentController, AgentServer, AgentServerConfig}
+import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.workflow.action.SDLExecutionId
 import org.apache.hadoop.conf.Configuration
 
@@ -62,7 +62,7 @@ object LocalAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
     logger.info(s"Starting Program $appType v$appVersion")
 
     // Set defaults from environment variables
-    val config = initConfigFromEnvironment.copy(
+    val envconfig = initConfigFromEnvironment.copy(
       master = sys.env.get("SDL_SPARK_MASTER_URL").orElse(Some("local[*]")),
       deployMode = sys.env.get("SDL_SPARK_DEPLOY_MODE").orElse(Some("client")),
       username = sys.env.get("SDL_KERBEROS_USER"),
@@ -73,21 +73,11 @@ object LocalAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
       statePath = sys.env.get("SDL_STATE_PATH")
     )
 
-    val agentController: AgentController.type = AgentController
-    AgentServer.start(AgentServerConfig(4441), agentController)
+    val agentController: AgentController = AgentController(new InstanceRegistry, this)
+    AgentServer.start(AgentServerConfig(sdlConfig = envconfig), agentController)
 
-    while (true) {
+    val result = exec(envconfig, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), Seq(), None, Seq(), simulation = false)(agentController.instanceRegistry)
 
-      if (agentController.state == READY) {
-        println(agentController.instanceRegistry.getActions.toSet)
-        val result = exec(config, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), Seq(), None, Seq(), simulation = false)(agentController.instanceRegistry)
-
-        println(result)
-        agentController.state = IDLE
-      }
-
-      Thread.sleep(1000)
-    }
 
     // start
     //1. Start Websocket

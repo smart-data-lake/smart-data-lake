@@ -16,16 +16,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.communication.agent
+package io.smartdatalake.workflow.action
 
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
 
-/**
- * Configuration for the Server that provides live status info of the current DAG Execution
- *
- * @param port           : port with which the first connection attempt is made
- * @param maxPortRetries : If port is already in use, we will increment port by one and try with that new port.
- *                       maxPortRetries describes how many times this should be attempted. If set to 0 it will not be attempted.
- *                       Values below 0 are not allowed.
- */
-case class AgentServerConfig(port: Int = 4441, maxPortRetries: Int = 10, sdlConfig: SmartDataLakeBuilderConfig)
+case class RemoteActionConfig(remoteAgentURL: String)
+
+
+

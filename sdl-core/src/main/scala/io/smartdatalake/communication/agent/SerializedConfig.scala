@@ -18,14 +18,21 @@
  */
 package io.smartdatalake.communication.agent
 
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
+import com.typesafe.config.{Config, ConfigRenderOptions}
 
-/**
- * Configuration for the Server that provides live status info of the current DAG Execution
- *
- * @param port           : port with which the first connection attempt is made
- * @param maxPortRetries : If port is already in use, we will increment port by one and try with that new port.
- *                       maxPortRetries describes how many times this should be attempted. If set to 0 it will not be attempted.
- *                       Values below 0 are not allowed.
- */
-case class AgentServerConfig(port: Int = 4441, maxPortRetries: Int = 10, sdlConfig: SmartDataLakeBuilderConfig)
+case class SerializedConfig(inputDataObjects: Seq[Config], outputDataObjects: Seq[Config], action: Config) {
+
+  def renderObject(obj: Config): String = obj.root().render(ConfigRenderOptions.concise().setJson(false))
+
+  def asHoconString: String = {
+    "dataObjects { \n" +
+      inputDataObjects.map(obj => obj.getValue("id").render() + " { \n" +
+        renderObject(obj)).mkString(" } ") + " } \n" +
+      outputDataObjects.map(obj => obj.getValue("id").render() + " { \n" +
+        renderObject(obj)).mkString("} ") + "} }\n" +
+      "actions { " + action.getValue("id").render() + " { \n" +
+      renderObject(action) + "} }"
+
+
+  }
+}

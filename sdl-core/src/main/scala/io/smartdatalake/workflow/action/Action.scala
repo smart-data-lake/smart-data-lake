@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
-import io.smartdatalake.definitions.{Condition, DataObjectStateIncrementalMode, Environment, ExecutionMode, ExecutionModeResult}
+import io.smartdatalake.definitions._
 import io.smartdatalake.util.dag.{DAGNode, TaskSkippedDontStopWarning}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, SparkExpressionUtil}
@@ -28,7 +28,6 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.dataobject.{CanCreateIncrementalOutput, DataObject, TransactionalSparkTableDataObject}
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions.expr
 
@@ -109,6 +108,9 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
 
   private[smartdatalake] def isAsynchronousProcessStarted: Boolean = false
 
+  def remoteActionConfig: Option[RemoteActionConfig] = None
+
+
   /**
    * Validate configuration.
    * Put validation logic here which will run on class instantiation. It has to be put into a separate method because like that
@@ -117,7 +119,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * This must be called by every Action in initialization code of the case class.
    */
   def validateConfig(): Unit = {
-    recursiveInputs.foreach{ input =>
+    recursiveInputs.foreach { input =>
       assert(outputs.exists(_.id == input.id), s"($id) Recursive input ${input.id} is not listed in outputIds of the same action.")
       assert(input.isInstanceOf[TransactionalSparkTableDataObject], s"($id) Recursive input ${input.id} is not a TransactionalSparkTableDataObjects.")
     }

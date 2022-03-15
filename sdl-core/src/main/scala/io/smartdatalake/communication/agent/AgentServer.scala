@@ -34,27 +34,27 @@ object AgentServer extends SmartDataLakeLogger {
   private val pool = new QueuedThreadPool(200)
   private val server = new Server(pool)
 
-  def start(config: AgentServerConfig, state: AgentController.type): Unit = {
-    val contextHandler = getServletContextHandler(state)
-    PortUtils.startOnPort(startServer(contextHandler), "StatusInfoServer", config.port, config.maxPortRetries, logger)
+  def start(config: AgentServerConfig, state: AgentController): Unit = {
+    val contextHandler = getServletContextHandler(config, state)
+    PortUtils.startOnPort(startServer(contextHandler), "AgentServer", config.port, config.maxPortRetries, logger)
   }
 
   def stop(): Unit = {
     server.stop()
   }
 
-  private def getServletContextHandler(state: AgentController.type): ContextHandlerCollection = {
+  private def getServletContextHandler(config: AgentServerConfig, state: AgentController): ContextHandlerCollection = {
     val handlers: ContextHandlerCollection = new ContextHandlerCollection()
 
-    val socketHandler = createWebsocketHandler(state)
+    val socketHandler = createWebsocketHandler(config, state)
     handlers.addHandler(socketHandler)
     handlers
   }
 
-  private def createWebsocketHandler(state: AgentController.type): ContextHandler = {
+  private def createWebsocketHandler(config: AgentServerConfig, state: AgentController): ContextHandler = {
     val contextHandler = new ContextHandler("/ws")
     val webSocketcreator: WebSocketCreator = new WebSocketCreator() {
-      override def createWebSocket(request: ServletUpgradeRequest, response: ServletUpgradeResponse) = new AgentSocket(state)
+      override def createWebSocket(request: ServletUpgradeRequest, response: ServletUpgradeResponse) = new AgentServerSocket(config, state)
     }
     val webSocketHandler = new WebSocketHandler() {
       override def configure(factory: WebSocketServletFactory): Unit = {

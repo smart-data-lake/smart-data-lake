@@ -19,10 +19,10 @@
 
 package io.smartdatalake.communication.agent
 
-import io.smartdatalake.communication.agent.AgentStateEnum.{AgentStateEnum, IDLE}
+import io.smartdatalake.app.SmartDataLakeBuilder
 import io.smartdatalake.config.InstanceRegistry
 
-object AgentController {
-  var instanceRegistry: InstanceRegistry = _
-  var state: AgentStateEnum = IDLE
-}
+case class AgentController(
+                            instanceRegistry: InstanceRegistry,
+                            sdlb: SmartDataLakeBuilder
+                          )

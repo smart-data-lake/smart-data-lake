@@ -182,10 +182,10 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
    * inferred from the short name (xxxAction or yyyDataObject).
    *
    * @param configuredType type attribute from configuration.
-   * @tparam A            the abstract type of this object, i.e.: [[Action]] or [[DataObject]]
-   * @return              the fully qualified class name of this class.
+   * @tparam A the abstract type of this object, i.e.: [[Action]] or [[DataObject]]
+   * @return the fully qualified class name of this class.
    */
-  private def className[A <: ParsableFromConfig[_] : TypeTag](configuredType: String): String = {
+  def className[A <: ParsableFromConfig[_] : TypeTag](configuredType: String): String = {
     // if no package name is given, prefix with package name of abstract type
     if (!configuredType.contains('.')) {
       val abstractSymbol = symbolOf[A]
