@@ -163,3 +163,7 @@ The output presents the successful run of the workflow:
 
 Launching Polynote `localhost:8192` in the browser, we can inspect data and develop further workflows. Here an example, where the commits are listed, which were committed in the name of someone else, excluding the web-flow. See [Polynote Notebook](SelectingData.ipynb)
 ![polynote example](polynote_commits.png)
+
+## Summary
+
+The Airbyte connectors provide an easy access to a variety of data sources. The connectors can be utilized in SDLB with a few settings. Thus this maybe a handy solution for access even complex interfaces.  
