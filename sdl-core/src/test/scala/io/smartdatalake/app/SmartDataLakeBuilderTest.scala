@@ -369,28 +369,29 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     HdfsUtil.deleteFiles(new Path(statePath), false)
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     val srcTable = Table(Some("default"), "ap_input")
     // source table has partitions columns dt and type
-    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), partitions = Seq("dt","type"), table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject("src1", Some(tempPath + s"/${srcTable.fullName}"), partitions = Seq("dt", "type"), table = srcTable, numInitialHdfsPartitions = 1)
     srcDO.dropTable
     instanceRegistry.register(srcDO)
-    val tgt1Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
+    val tgt1Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname", "firstname")))
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = TickTockHiveTableDataObject( "tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), partitions = Seq("dt","type"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tempPath + s"/${tgt1Table.fullName}"), partitions = Seq("dt", "type"), table = tgt1Table, numInitialHdfsPartitions = 1)
     tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
 
     // fill src table with first partition
-    val dfSrc1 = Seq(("20180101", "person", "doe","john",5)) // first partition 20180101
+    val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
     srcDO.writeDataFrame(dfSrc1, Seq())
 
     // start first dag run
     // use only first partition col (dt) for partition diff mode
-    val action1 = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
+
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
       , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, udfAddX(rating) rating from src1")))
     instanceRegistry.register(action1.copy())
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
@@ -407,13 +408,13 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
       val resultActionsState = runState.actionsState.mapValues(_.state)
-      val expectedActionsState = Map((action1.id , RuntimeEventState.SUCCEEDED))
+      val expectedActionsState = Map((action1.id, RuntimeEventState.SUCCEEDED))
       assert(resultActionsState == expectedActionsState)
-      assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == Seq(PartitionValues(Map("dt"->"20180101"))))
+      assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == Seq(PartitionValues(Map("dt" -> "20180101"))))
     }
 
     // now fill src table with second partitions
-    val dfSrc2 = Seq(("20190101", "company", "olmo","-",10)) // second partition 20190101
+    val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 10)) // second partition 20190101
       .toDF("dt", "type", "lastname", "firstname", "rating")
     srcDO.writeDataFrame(dfSrc2, Seq())
 
@@ -427,7 +428,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     sdlb.run(sdlConfig)
 
     // check results
-    assert(tgt1DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6,11)) // +1 because of udfAddX
+    assert(tgt1DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6, 11)) // +1 because of udfAddX
 
     // check latest state
     {
@@ -437,11 +438,16 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       assert(runState.runId == 2)
       assert(runState.attemptId == 1)
       val resultActionsState = runState.actionsState.mapValues(_.state)
-      val expectedActionsState = Map((action1.id , RuntimeEventState.SUCCEEDED))
+      val expectedActionsState = Map((action1.id, RuntimeEventState.SUCCEEDED))
       assert(resultActionsState == expectedActionsState)
-      assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == Seq(PartitionValues(Map("dt"->"20190101"))))
+      assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == Seq(PartitionValues(Map("dt" -> "20190101"))))
       if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty) // doesnt work on windows
-      val stateListener = Environment.globalConfig.stateListeners.head.listener.asInstanceOf[TestStateListener]
+    }
+
+    // check state listener
+    {
+      assert(TestStateListener.context.isDefined)
+      val stateListener = TestStateListener.context.get.globalConfig.stateListeners.head.listener.asInstanceOf[TestStateListener]
       assert(stateListener.firstState.isDefined && !stateListener.firstState.get.isFinal)
       assert(stateListener.finalState.isDefined && stateListener.finalState.get.isFinal)
     }
@@ -563,10 +569,13 @@ class TestStateListener(options: Map[String,String]) extends StateListener {
   var firstState: Option[ActionDAGRunState] = None
   var finalState: Option[ActionDAGRunState] = None
   override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId : Option[ActionId]): Unit = {
+    if (TestStateListener.context.isEmpty) TestStateListener.context = Some(context)
     if (firstState.isEmpty) firstState = Some(state)
     finalState = Some(state)
   }
-
+}
+object TestStateListener {
+  var context: Option[ActionPipelineContext] = None
 }
 
 class TestUDFAddXCreator() extends SparkUDFCreator {

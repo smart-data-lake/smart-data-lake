@@ -36,6 +36,9 @@ import org.apache.spark.util.PrivateAccessor
 /**
  * Global configuration options
  *
+ * Note that global configuration is responsible to hold SparkSession, so that its created once and only once per SDLB job.
+ * This is especially important if JVM is shared between different SDL jobs (e.g. Databricks cluster), because sharing SparkSession in object Environment survives the current SDLB job.
+ *
  * @param kryoClasses                                       classes to register for spark kryo serialization
  * @param sparkOptions                                      spark options
  * @param statusInfo                                        enable a REST API providing live status info, see detailed configuration [[StatusInfoConfig]]
@@ -52,8 +55,6 @@ import org.apache.spark.util.PrivateAccessor
  *                       which are allowed to overwrite the all partitions of a table if no partition values are set.
  *                       This is used to override/avoid a protective error when using SDLSaveMode.OverwriteOptimized|OverwritePreserveDirectories.
  *                       Define it as a list of DataObject id's.
- * @param runtimeDataNumberOfExecutionsToKeep Number of Executions to keep runtime data for in streaming mode (default = 10).
- *                       Must be bigger than 1.
  * @param synchronousStreamingTriggerIntervalSec Trigger interval for synchronous actions in streaming mode in seconds (default = 60 seconds)
  *                       The synchronous actions of the DAG will be executed with this interval if possile.
  *                       Note that for asynchronous actions there are separate settings, e.g. SparkStreamingMode.triggerInterval.
@@ -69,11 +70,9 @@ case class GlobalConfig(kryoClasses: Option[Seq[String]] = None
                         , pythonUDFs: Option[Map[String, PythonUDFCreatorConfig]] = None
                         , secretProviders: Option[Map[String, SecretProviderConfig]] = None
                         , allowOverwriteAllPartitionsWithoutPartitionValues: Seq[DataObjectId] = Seq()
-                        , runtimeDataNumberOfExecutionsToKeep: Int = 10
                         , synchronousStreamingTriggerIntervalSec: Int = 60
                        )
 extends SmartDataLakeLogger {
-  assert(runtimeDataNumberOfExecutionsToKeep>1, "GlobalConfig.runtimeDataNumberOfExecutionsToKeep must be bigger than 1.")
 
   // start memory logger, else log memory once
   if (memoryLogTimer.isDefined) {
@@ -100,34 +99,64 @@ extends SmartDataLakeLogger {
   /**
    * Create a spark session using settings from this global config
    */
-  def createSparkSession(appName: String, master: Option[String], deployMode: Option[String] = None): SparkSession = {
-    if (Environment._sparkSession != null) logger.warn("Your SparkSession was already set, that should not happen. We will re-initialize it anyway now.")
+  private def createSparkSession(appName: String, master: Option[String], deployMode: Option[String] = None): SparkSession = {
     // prepare additional spark options
     // enable MemoryLoggerExecutorPlugin if memoryLogTimer is enabled
     val executorPlugins = sparkOptions.flatMap(_.get("spark.plugins")).toSeq ++ (if (memoryLogTimer.isDefined) Seq(classOf[MemoryLoggerExecutorPlugin].getName) else Seq())
-    val executorPluginOptions = if (executorPlugins.nonEmpty) Map("spark.executor.plugins" -> executorPlugins.mkString(",")) else Map[String,String]()
+    val executorPluginOptions = if (executorPlugins.nonEmpty) Map("spark.executor.plugins" -> executorPlugins.mkString(",")) else Map[String, String]()
     // config for MemoryLoggerExecutorPlugin can only be transferred to Executor by spark-options
     val memoryLogOptions = memoryLogTimer.map(_.getAsMap).getOrElse(Map())
     // get additional options from modules
     val moduleOptions = ModulePlugin.modules.map(_.additionalSparkProperties()).reduceOption(mergeSparkOptions).getOrElse(Map())
     // combine all options: custom options will override framework options
-    val sparkOptionsExtended = Seq(moduleOptions, memoryLogOptions, executorPluginOptions).reduceOption(mergeSparkOptions).getOrElse(Map()) ++  sparkOptions.getOrElse(Map())
-    Environment._sparkSession = AppUtil.createSparkSession(appName, master, deployMode, kryoClasses, sparkOptionsExtended, enableHive)
+    val sparkOptionsExtended = Seq(moduleOptions, memoryLogOptions, executorPluginOptions).reduceOption(mergeSparkOptions).getOrElse(Map()) ++ sparkOptions.getOrElse(Map())
+    val sparkSession = AppUtil.createSparkSession(appName, master, deployMode, kryoClasses, sparkOptionsExtended, enableHive)
+    registerUdf(sparkSession)
+    // adjust log level
+    LogUtil.setLogLevel(sparkSession.sparkContext)
+    // set sparkSession in environment
+    // Attention: if JVM is shared between different SDL jobs (e.g. Databricks cluster), this overrides values from earlier jobs!
+    // Environment._sparkSession is a workaround for accessing it in custom code. It should not be used inside SDLB code.
+    Environment._sparkSession = sparkSession
+    // return
+    sparkSession
+  }
+
+  // private holder for spark session
+  private[smartdatalake] var _sparkSession: Option[SparkSession] = None
+
+  /**
+   * Return SparkSession
+   * Create SparkSession if not yet done, but only if it is used.
+   */
+  def sparkSession(appName: String, master: Option[String], deployMode: Option[String] = None): SparkSession = {
+    if (_sparkSession.isEmpty) {
+      _sparkSession = Some(createSparkSession(appName, master, deployMode))
+    }
+    _sparkSession.get
+  }
+
+  /**
+   * True if a SparkSession has been created in this job
+   */
+  def hasSparkSession: Boolean = _sparkSession.isDefined
+
+  private[smartdatalake] def setSparkOptions(session:SparkSession): Unit = {
+    sparkOptions.getOrElse(Map()).foreach{ case (k,v) => session.conf.set(k,v)}
+  }
+
+  private[smartdatalake] def registerUdf(session: SparkSession): Unit = {
     sparkUDFs.getOrElse(Map()).foreach { case (name,config) =>
       val udf = config.getUDF
       // register in SDL spark session
-      Environment._sparkSession.udf.register(name, udf)
+      session.udf.register(name, udf)
       // register for use in expression evaluation
       ExpressionEvaluator.registerUdf(name, udf)
     }
     pythonUDFs.getOrElse(Map()).foreach { case (name,config) =>
       // register in SDL spark session
-      config.registerUDF(name, Environment._sparkSession)
+      config.registerUDF(name, session)
     }
-    // adjust log level
-    LogUtil.setLogLevel(Environment._sparkSession.sparkContext)
-    // return
-    Environment._sparkSession
   }
 
   /**

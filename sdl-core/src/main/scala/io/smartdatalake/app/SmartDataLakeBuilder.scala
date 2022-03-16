@@ -283,7 +283,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    */
   def startSimulation(appConfig: SmartDataLakeBuilderConfig, initialSubFeeds: Seq[SparkSubFeed], dataObjectsState: Seq[DataObjectState] = Seq())(implicit instanceRegistry: InstanceRegistry, session: SparkSession): (Seq[SparkSubFeed], Map[RuntimeEventState,Int]) = {
     implicit val hadoopConf: Configuration = session.sparkContext.hadoopConfiguration
-    val (subFeeds, stats) = exec(appConfig, SDLExecutionId.executionId1, runStartTime = LocalDateTime.now, attemptStartTime = LocalDateTime.now, actionsToSkip = Map(), initialSubFeeds = initialSubFeeds, dataObjectsState = dataObjectsState, stateStore = None, stateListeners = Seq(), simulation = true)
+    val (subFeeds, stats) = exec(appConfig, SDLExecutionId.executionId1, runStartTime = LocalDateTime.now, attemptStartTime = LocalDateTime.now, actionsToSkip = Map(), initialSubFeeds = initialSubFeeds, dataObjectsState = dataObjectsState, stateStore = None, stateListeners = Seq(), simulation = true, globalConfig = GlobalConfig())
     (subFeeds.map(_.asInstanceOf[SparkSubFeed]), stats)
   }
 
@@ -310,8 +310,13 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     require(config.hasPath("dataObjects"), s"No configuration parsed or it does not have a section called dataObjects")
 
     // parse config objects
-    Environment._globalConfig = GlobalConfig.from(config)
-    Environment._instanceRegistry = ConfigParser.parse(config, instanceRegistry) // share instance registry for custom code
+    val globalConfig = GlobalConfig.from(config)
+    ConfigParser.parse(config, instanceRegistry) // share instance registry for custom code
+
+    // set environment
+    // Attention: if JVM is shared between different SDL jobs (e.g. Databricks cluster), this overrides values from earlier jobs!
+    Environment._globalConfig = globalConfig
+    Environment._instanceRegistry = instanceRegistry
 
     val snapshotListener = new SnapshotStatusInfoListener()
     val incrementalListener = new IncrementalStatusInfoListener()
@@ -321,15 +326,15 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       else Nil
 
     val stateListeners =
-      Environment.globalConfig.stateListeners.map(_.listener) ++ Environment._additionalStateListeners ++ statusInfoListeners
+      globalConfig.stateListeners.map(_.listener) ++ Environment._additionalStateListeners ++ statusInfoListeners
 
     if (Environment._globalConfig.statusInfo.isDefined) {
       StatusInfoServer.start(snapshotListener, incrementalListener, Environment._globalConfig.statusInfo.get)
     }
-    exec(appConfig, executionId, runStartTime, attemptStartTime, actionsToSkip, initialSubFeeds, dataObjectsState, stateStore, stateListeners, simulation)(Environment._instanceRegistry)
+    exec(appConfig, executionId, runStartTime, attemptStartTime, actionsToSkip, initialSubFeeds, dataObjectsState, stateStore, stateListeners, simulation, globalConfig)(instanceRegistry)
   }
 
-  private[smartdatalake] def exec(appConfig: SmartDataLakeBuilderConfig, executionId: SDLExecutionId, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime, actionsToSkip: Map[ActionId, RuntimeInfo], initialSubFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener], simulation: Boolean)(implicit instanceRegistry: InstanceRegistry) : (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
+  private[smartdatalake] def exec(appConfig: SmartDataLakeBuilderConfig, executionId: SDLExecutionId, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime, actionsToSkip: Map[ActionId, RuntimeInfo], initialSubFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener], simulation: Boolean, globalConfig: GlobalConfig)(implicit instanceRegistry: InstanceRegistry) : (Seq[SubFeed], Map[RuntimeEventState,Int]) = {
 
     // select actions by feedSel
     val actionsSelected = AppUtil.filterActionList(appConfig.feedSel, instanceRegistry.getActions.toSet).toSeq
@@ -352,8 +357,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     // create and execute DAG
     logger.info(s"starting application ${appConfig.appName} runId=${executionId.runId} attemptId=${executionId.attemptId}")
-    val serializableHadoopConf = new SerializableHadoopConfiguration(Environment.globalConfig.getHadoopConfiguration)
-    val context = ActionPipelineContext(appConfig.feedSel, appConfig.appName, executionId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig, runStartTime, attemptStartTime, simulation, actionsSelected = actionIdsSelected, actionsSkipped = actionIdsSkipped, serializableHadoopConf = serializableHadoopConf)
+    val serializableHadoopConf = new SerializableHadoopConfiguration(globalConfig.getHadoopConfiguration)
+    val context = ActionPipelineContext(appConfig.feedSel, appConfig.appName, executionId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig, runStartTime, attemptStartTime, simulation, actionsSelected = actionIdsSelected, actionsSkipped = actionIdsSkipped, serializableHadoopConf = serializableHadoopConf, globalConfig = globalConfig)
     val actionDAGRun = ActionDAGRun(actionsToExec, actionsToSkip, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(context)
     val finalSubFeeds = try {
       if (simulation) {
@@ -399,7 +404,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
       // wait for trigger interval
       lastStartTime.foreach { t =>
-        val nextStartTime = t.plusSeconds(Environment.globalConfig.synchronousStreamingTriggerIntervalSec)
+        val nextStartTime = t.plusSeconds(context.globalConfig.synchronousStreamingTriggerIntervalSec)
         val waitTimeSec = Duration.between(LocalDateTime.now, nextStartTime).getSeconds
         if (waitTimeSec > 0) {
           logger.info(s"sleeping $waitTimeSec seconds for synchronous streaming trigger interval")
