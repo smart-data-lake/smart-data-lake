@@ -23,7 +23,9 @@ import io.smartdatalake.app
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.statusinfo.{StatusInfoListener, StatusInfoServer}
+import io.smartdatalake.statusinfo.StatusInfoServer
+import io.smartdatalake.statusinfo.api.SnapshotStatusInfoListener
+import io.smartdatalake.statusinfo.websocket.IncrementalStatusInfoListener
 import io.smartdatalake.util.dag.{DAGException, ExceptionSeverity}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SerializableHadoopConfiguration, SmartDataLakeLogger}
@@ -316,12 +318,18 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     Environment._globalConfig = globalConfig
     Environment._instanceRegistry = instanceRegistry
 
-    val statusInfoListeners = if (Environment._globalConfig.statusInfo.isDefined) Seq(new StatusInfoListener()) else Nil
+    val snapshotListener = new SnapshotStatusInfoListener()
+    val incrementalListener = new IncrementalStatusInfoListener()
+    val statusInfoListeners =
+      if (Environment._globalConfig.statusInfo.isDefined)
+        Seq(snapshotListener, incrementalListener)
+      else Nil
+
     val stateListeners =
       globalConfig.stateListeners.map(_.listener) ++ Environment._additionalStateListeners ++ statusInfoListeners
 
     if (Environment._globalConfig.statusInfo.isDefined) {
-      StatusInfoServer.start(statusInfoListeners.head, Environment._globalConfig.statusInfo.get)
+      StatusInfoServer.start(snapshotListener, incrementalListener, Environment._globalConfig.statusInfo.get)
     }
     exec(appConfig, executionId, runStartTime, attemptStartTime, actionsToSkip, initialSubFeeds, dataObjectsState, stateStore, stateListeners, simulation, globalConfig)(instanceRegistry)
   }
