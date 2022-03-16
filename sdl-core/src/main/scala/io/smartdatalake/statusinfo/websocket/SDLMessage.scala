@@ -21,5 +21,12 @@ package io.smartdatalake.statusinfo.websocket
 
 import io.smartdatalake.statusinfo.websocket.SDLMessageType.SDLMessageType
 
+/**
+ * Represents a message that can be sent between a DAG Execution of SmartDataLakeBuilder and a web frontend, such as Airflow
+ * @param msgType The type of the message. For message type Log, log must be filled.
+ *                For message type StatusUpdate, statusUpdate must be filled.
+ * @param statusUpdate Status update sent to the web frontend
+ * @param log Log message sent to the web frontend
+ */
 case class SDLMessage(msgType: SDLMessageType, statusUpdate: Option[StatusUpdate] = None, log: Option[ActionLog] = None)
 

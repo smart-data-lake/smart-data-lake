@@ -22,6 +22,7 @@ import io.smartdatalake.app.StateListener
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, ExecutionPhase}
+import org.json4s.Formats
 import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.Serialization.writePretty
 
@@ -33,6 +34,7 @@ import scala.collection.mutable.ListBuffer
 class IncrementalStatusInfoListener extends StateListener with SmartDataLakeLogger {
 
   val activeSockets: ListBuffer[StatusInfoSocket] = ListBuffer()
+  implicit val jsonFormat: Formats = ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)
 
   override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId: Option[ActionId]): Unit = {
 
@@ -51,6 +53,6 @@ class IncrementalStatusInfoListener extends StateListener with SmartDataLakeLogg
         SDLMessage(SDLMessageType.EndConnection, Some(StatusUpdate(None, None, context.phase, state.finalState)))
       }
 
-    activeSockets.foreach(socket => socket.getRemote.sendString(writePretty(updateJSON)(ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase))))
+    activeSockets.foreach(socket => socket.getRemote.sendString(writePretty(updateJSON)))
   }
 }
