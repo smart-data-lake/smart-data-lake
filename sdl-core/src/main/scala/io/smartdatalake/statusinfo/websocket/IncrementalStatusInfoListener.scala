@@ -42,9 +42,7 @@ class IncrementalStatusInfoListener extends StateListener with SmartDataLakeLogg
       if (changedActionId.isDefined) {
         val changedActions = state.actionsState.filter(_._1 == changedActionId.get)
 
-        if (changedActions.size != 1) {
-          logger.warn(s"Not exactly one changedAction! Got: $changedActions")
-        }
+        require(changedActions.size != 1, s"Not exactly one changedAction! Got: $changedActions")
 
         val changedAction = changedActions.head
         SDLMessage(SDLMessageType.StatusUpdate, Some(StatusUpdate(Some(changedAction._1.id), Some(changedAction._2), context.phase, state.finalState)))
