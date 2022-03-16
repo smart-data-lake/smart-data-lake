@@ -88,7 +88,7 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
   }
 
   // convert schema to spark schema
-  private val sparkParserSchema = parserSchema.convertIfNeeded(typeOf[SparkSubFeed]).asInstanceOf[SparkSchema].inner
+  private val sparkParserSchema = parserSchema.convert(typeOf[SparkSubFeed]).asInstanceOf[SparkSchema].inner
 
   override val format = "csv" // this is overriden with "text" for reading
 

@@ -97,6 +97,7 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
       // if transformerSubFeedType is None or generic, take the one that occurs first in the inputs list
       commonTypes.map(t => (t, inputs.map(_.getSubFeedSupportedTypes.indexOf(t)).max)).minBy(_._2)._1
     }
+    logger.info(s"($id) selected subFeedType ${commonType.typeSymbol.name}")
     commonType
   }
   private[smartdatalake] implicit lazy val subFeedHelper: DataFrameSubFeedCompanion = {
@@ -224,10 +225,10 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
       case _ => None
     }
     val readSchema = schema.map(dataObject.createReadSchema)
-    // TODO - how to create an empty Snowflake DataFrame?!
-    readSchema.map(s => subFeedHelper.getEmptyDataFrame(s, dataObject.id))
-      .getOrElse(dataObject.getDataFrame(Seq(), subFeedType).filter(subFeedHelper.lit(false)))
-      .colNamesLowercase // convert to lower case by default
+    readSchema
+      .map(_.toLowerCase) // convert to lower case by default
+      .map(s => subFeedHelper.getEmptyDataFrame(s, dataObject.id))
+      .getOrElse(dataObject.getDataFrame(Seq(), subFeedType).filter(subFeedHelper.lit(false)).colNamesLowercase)
   }
 
   override protected def preprocessInputSubFeedCustomized(subFeed: DataFrameSubFeed, ignoreFilters: Boolean, isRecursive: Boolean)(implicit context: ActionPipelineContext): DataFrameSubFeed = {

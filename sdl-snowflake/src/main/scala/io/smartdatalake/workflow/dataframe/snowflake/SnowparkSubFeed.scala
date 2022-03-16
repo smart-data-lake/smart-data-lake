@@ -19,13 +19,13 @@
 
 package io.smartdatalake.workflow.dataframe.snowflake
 
-import com.snowflake.snowpark.functions
+import com.snowflake.snowpark.{Column, functions}
 import com.snowflake.snowpark.types.{ArrayType, StringType, StructField, StructType}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.ExecutionModeResult
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.dataframe.spark.SparkDataType
-import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame, GenericDataType, GenericSchema}
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataType, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame, GenericDataType, GenericField, GenericSchema}
 import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion, SubFeed}
 
@@ -130,33 +130,36 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion {
   override def fromSubFeed(subFeed: SubFeed)(implicit context: ActionPipelineContext): SnowparkSubFeed = {
     subFeed match {
       case snowparkSubFeed: SnowparkSubFeed => snowparkSubFeed
+      case dataFrameSubFeed: DataFrameSubFeed =>
+        val convertedSchema = dataFrameSubFeed.schema.map(_.convert(subFeedType))
+        SnowparkSubFeed(convertedSchema.map(s => getEmptyDataFrame(s, subFeed.dataObjectId)), subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped, isDummy = convertedSchema.isDefined)
       case _ => SnowparkSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
     }
   }
   override def subFeedType: universe.Type = typeOf[SnowparkSubFeed]
-  override def col(colName: String): GenericColumn = {
+  override def col(colName: String): SnowparkColumn = {
     SnowparkColumn(functions.col(colName))
   }
-  override def lit(value: Any): GenericColumn = {
+  override def lit(value: Any): SnowparkColumn = {
     SnowparkColumn(functions.lit(value))
   }
-  override def max(column: GenericColumn): GenericColumn = {
+  override def max(column: GenericColumn): SnowparkColumn = {
     column match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.max(snowparkColumn.inner))
       case _ => throw new IllegalStateException(s"Unsupported subFeedType ${column.subFeedType.typeSymbol.name} in method max")
     }
   }
-  override def count(column: GenericColumn): GenericColumn = {
+  override def count(column: GenericColumn): SnowparkColumn = {
     column match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.count(snowparkColumn.inner))
       case _ => throw new IllegalStateException(s"Unsupported subFeedType ${column.subFeedType.typeSymbol.name} in method count")
     }
   }
-  override def explode(column: GenericColumn): GenericColumn = {
+  override def explode(column: GenericColumn): SnowparkColumn = {
     // TODO: check if this can be done by a udf?
     throw new NotImplementedError("explode array is not implemented in Snowpark")
   }
-  override def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
+  override def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): SnowparkDataFrame = {
     schema match {
       case snowparkSchema: SnowparkSchema =>
         val dataObject = context.instanceRegistry.get[SnowflakeTableDataObject](dataObjectId)
@@ -164,20 +167,20 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion {
       case _ => throw new IllegalStateException(s"Can not create SnowparkDataFrame for ${schema.subFeedType.typeSymbol.name}")
     }
   }
-  override def getSubFeed(df: GenericDataFrame, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+  override def getSubFeed(df: GenericDataFrame, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): SnowparkSubFeed = {
     df match {
       case snowparkDf: SnowparkDataFrame => SnowparkSubFeed(Some(snowparkDf), dataObjectId, partitionValues)
       case _ => throw new IllegalStateException(s"Can not create SnowparkSubFeed for ${df.subFeedType.typeSymbol.name}")
     }
   }
-  override def stringType: GenericDataType = SnowparkDataType(StringType)
-  override def arrayType(dataType: GenericDataType): GenericDataType = {
+  override def stringType: SnowparkDataType = SnowparkDataType(StringType)
+  override def arrayType(dataType: GenericDataType): SnowparkDataType = {
     dataType match {
       case snowparkDataType: SnowparkDataType => SnowparkDataType(ArrayType(snowparkDataType.inner))
       case _ => throw new IllegalStateException(s"Can not create SnowparkDataType for ${dataType.subFeedType.typeSymbol.name}")
     }
   }
-  override def structType(fields: Map[String,GenericDataType]): GenericDataType = {
+  override def structType(fields: Map[String,GenericDataType]): SnowparkDataType = {
     assert(fields.values.forall(_.isInstanceOf[SnowparkDataType]), s"Unsupported subFeedType(s) ${fields.values.filterNot(_.isInstanceOf[SparkDataType]).map(_.subFeedType.typeSymbol.name).toSeq.distinct.mkString(", ")} in method structType")
     val sparkFields = fields.map{ case (name,dataType) => StructField(name, dataType.asInstanceOf[SnowparkDataType].inner)}.toSeq
     SnowparkDataType(StructType(sparkFields))
@@ -185,33 +188,37 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion {
   /**
    * Construct array from given columns removing null values (Snowpark API)
    */
-  override def array_construct_compact(columns: GenericColumn*): GenericColumn = {
+  override def array_construct_compact(columns: GenericColumn*): SnowparkColumn = {
     assert(columns.forall(_.isInstanceOf[SnowparkColumn]), s"Unsupported subFeedType(s) ${columns.filterNot(_.isInstanceOf).map(_.subFeedType.typeSymbol.name).distinct.mkString(", ")} in method array_construct_compact")
     SnowparkColumn(functions.array_construct_compact(columns.map(_.asInstanceOf[SnowparkColumn].inner):_*))
   }
-  override def array(columns: GenericColumn*): GenericColumn = {
+  override def array(columns: GenericColumn*): SnowparkColumn = {
     assert(columns.forall(_.isInstanceOf[SnowparkColumn]), s"Unsupported subFeedType(s) ${columns.filterNot(_.isInstanceOf).map(_.subFeedType.typeSymbol.name).distinct.mkString(", ")} in method array")
     SnowparkColumn(functions.array_construct(columns.map(_.asInstanceOf[SnowparkColumn].inner):_*))
   }
-  override def struct(columns: GenericColumn*): GenericColumn = {
+  override def struct(columns: GenericColumn*): SnowparkColumn = {
     assert(columns.forall(_.isInstanceOf[SnowparkColumn]), s"Unsupported subFeedType(s) ${columns.filterNot(_.isInstanceOf).map(_.subFeedType.typeSymbol.name).distinct.mkString(", ")} in method struct")
     SnowparkColumn(functions.object_construct(columns.map(_.asInstanceOf[SnowparkColumn].inner):_*))
   }
-  override def expr(sqlExpr: String): GenericColumn = SnowparkColumn(functions.sqlExpr(sqlExpr))
+  override def expr(sqlExpr: String): SnowparkColumn = SnowparkColumn(functions.sqlExpr(sqlExpr))
   override def when(condition: GenericColumn, value: GenericColumn): GenericColumn = {
     (condition, value) match {
-      case (snowparkCondition: SnowparkColumn, sparkValue: SnowparkColumn) => SnowparkColumn(functions.when(snowparkCondition.inner, sparkValue.inner))
+      case (snowparkCondition: SnowparkColumn, sparkValue: SnowparkColumn) => SnowparkColumn(functions.when(snowparkCondition.inner, sparkValue.inner).asInstanceOf[Column])
       case _ => throw new IllegalStateException(s"Unsupported subFeedType ${condition.subFeedType.typeSymbol.name}, ${value.subFeedType.typeSymbol.name} in method when")
     }
   }
-  override def not(column: GenericColumn): GenericColumn = {
+  override def not(column: GenericColumn): SnowparkColumn = {
     column match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.not(snowparkColumn.inner))
       case _ => throw new IllegalStateException(s"Unsupported subFeedType ${column.subFeedType.typeSymbol.name} in method not")
     }
   }
-  override def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
+  override def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): SnowparkDataFrame = {
     val dataObject = context.instanceRegistry.get[SnowflakeTableDataObject](dataObjectId)
     SnowparkDataFrame(dataObject.snowparkSession.sql(query))
+  }
+  override def createSchema(fields: Seq[GenericField]): GenericSchema = {
+    assert(fields.forall(_.isInstanceOf[SnowparkField]), s"Unsupported subFeedType(s) ${fields.filterNot(_.isInstanceOf[SnowparkField]).map(_.subFeedType.typeSymbol.name).distinct.mkString(", ")} in method createSchema")
+    SnowparkSchema(StructType(fields.map(_.asInstanceOf[SnowparkField].inner)))
   }
 }

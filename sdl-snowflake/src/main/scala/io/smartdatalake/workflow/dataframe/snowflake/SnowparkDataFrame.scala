@@ -103,7 +103,7 @@ case class SnowparkGroupedDataFrame(inner: RelationalGroupedDataFrame) extends G
 case class SnowparkSchema(inner: StructType) extends GenericSchema {
   override def subFeedType: Type = typeOf[SnowparkSubFeed]
   override def diffSchema(schema: GenericSchema): Option[GenericSchema] = {
-    val snowparkSchema = schema.convertIfNeeded(subFeedType).asInstanceOf[SnowparkSchema]
+    val snowparkSchema = schema.convert(subFeedType).asInstanceOf[SnowparkSchema]
     val missingCols = SchemaUtil.schemaDiff(this, snowparkSchema,
       ignoreNullable = Environment.schemaValidationIgnoresNullability,
       deep = Environment.schemaValidationDeepComarison
@@ -113,9 +113,9 @@ case class SnowparkSchema(inner: StructType) extends GenericSchema {
   }
   override def columns: Seq[String] = inner.names
   override def fields: Seq[SnowparkField] = inner.fields.map(SnowparkField)
-  override def sql: String = inner.toString // TODO: not sure if this is valid sql...
+  override def sql: String = throw new NotImplementedError(s"Converting schema back to sql ddl is not supported by Snowpark")
   override def add(colName: String, dataType: GenericDataType): SnowparkSchema = {
-    val snowparkDataType = dataType.convertIfNeeded(subFeedType).asInstanceOf[SnowparkDataType]
+    val snowparkDataType = SchemaConverter.convertDatatype(dataType, subFeedType).asInstanceOf[SnowparkDataType]
     SnowparkSchema(inner.add(StructField(colName, snowparkDataType.inner)))
   }
   override def add(field: GenericField): SnowparkSchema = {
@@ -184,7 +184,7 @@ case class SnowparkColumn(inner: Column) extends GenericColumn {
       case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method or")
     }
   }
-  override def exprSql: String = inner.toString() // TODO: not sure if this is valid sql...
+  override def exprSql: String = throw new NotImplementedError(s"Converting column back to sql expression is not supported by Snowpark")
 }
 
 case class SnowparkField(inner: StructField) extends GenericField {
@@ -202,7 +202,7 @@ trait SnowparkDataType extends GenericDataType {
   override def subFeedType: universe.Type = typeOf[SnowparkSubFeed]
   override def isSortable: Boolean = Seq(StringType, LongType, IntegerType, ShortType, FloatType, DoubleType, DecimalType, TimestampType, TimeType, DateType).contains(inner)
   override def typeName: String = inner.typeName
-  override def sql: String = inner.typeName //TODO: not sure if this is sql compatible
+  override def sql: String = convertToSFType(inner)
   override def makeNullable: SnowparkDataType
   override def toLowerCase: SnowparkDataType
   override def removeMetadata: SnowparkDataType = this // metadata is not existing in Snowpark
@@ -220,6 +220,7 @@ case class SnowparkStructDataType(override val inner: StructType) extends Snowpa
       case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method withOtherFields")
     }
   }
+  override def fields: Seq[SnowparkField] = inner.fields.map(SnowparkField)
 }
 case class SnowparkArrayDataType(inner: ArrayType) extends SnowparkDataType with GenericArrayDataType {
   override def makeNullable: SnowparkDataType = SnowparkArrayDataType(ArrayType(SnowparkArrayDataType(inner).makeNullable.inner))
@@ -231,6 +232,7 @@ case class SnowparkArrayDataType(inner: ArrayType) extends SnowparkDataType with
     }
   }
   override def containsNull: Boolean = true // not existing in Snowpark
+  override def elementDataType: SnowparkDataType = SnowparkDataType(inner.elementType)
 }
 case class SnowparkMapDataType(inner: MapType) extends SnowparkDataType with GenericMapDataType {
   override def makeNullable: SnowparkDataType = SnowparkMapDataType(MapType(SnowparkDataType(inner.keyType).makeNullable.inner,SnowparkDataType(inner.valueType).makeNullable.inner))
@@ -248,6 +250,8 @@ case class SnowparkMapDataType(inner: MapType) extends SnowparkDataType with Gen
     }
   }
   override def valueContainsNull: Boolean = true // not existing in Snowpark
+  override def keyDataType: SnowparkDataType = SnowparkDataType(inner.keyType)
+  override def valueDataType: SnowparkDataType = SnowparkDataType(inner.valueType)
 }
 object SnowparkDataType {
   def apply(inner: DataType): SnowparkDataType = inner match {

@@ -104,7 +104,7 @@ case class SparkGroupedDataFrame(inner: RelationalGroupedDataset) extends Generi
 case class SparkSchema(inner: StructType) extends GenericSchema {
   override def subFeedType: universe.Type = typeOf[SparkSubFeed]
   override def diffSchema(schema: GenericSchema): Option[GenericSchema] = {
-    val sparkSchema = schema.convertIfNeeded(subFeedType).asInstanceOf[SparkSchema]
+    val sparkSchema = schema.convert(subFeedType).asInstanceOf[SparkSchema]
     val caseSensitive = SQLConf.get.getConf(SQLConf.CASE_SENSITIVE)
     val missingCols = SchemaUtil.schemaDiff(this, sparkSchema,
       ignoreNullable = Environment.schemaValidationIgnoresNullability,
@@ -118,7 +118,7 @@ case class SparkSchema(inner: StructType) extends GenericSchema {
   override def fields: Seq[SparkField] = inner.fields.map(SparkField)
   override def sql: String = inner.toDDL
   override def add(colName: String, dataType: GenericDataType): SparkSchema = {
-    val sparkDataType = dataType.convertIfNeeded(subFeedType).asInstanceOf[SparkDataType]
+    val sparkDataType = SchemaConverter.convertDatatype(dataType, subFeedType).asInstanceOf[SparkDataType]
     SparkSchema(inner.add(StructField(colName, sparkDataType.inner)))
   }
   override def add(field: GenericField): SparkSchema = {
@@ -222,6 +222,7 @@ case class SparkStructDataType(override val inner: StructType) extends SparkData
       case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method withOtherFields")
     }
   }
+  override def fields: Seq[SparkField] = inner.fields.map(SparkField)
 }
 case class SparkArrayDataType(inner: ArrayType) extends SparkDataType with GenericArrayDataType {
   override def makeNullable: SparkDataType = SparkArrayDataType(ArrayType(SparkDataType(inner.elementType).makeNullable.inner, containsNull = true))
@@ -234,6 +235,7 @@ case class SparkArrayDataType(inner: ArrayType) extends SparkDataType with Gener
     }
   }
   override def containsNull: Boolean = inner.containsNull
+  override def elementDataType: SparkDataType = SparkDataType(inner.elementType)
 }
 case class SparkMapDataType(inner: MapType) extends SparkDataType with GenericMapDataType {
   override def makeNullable: SparkDataType = SparkMapDataType(MapType(SparkDataType(inner.keyType).makeNullable.inner,SparkDataType(inner.valueType).makeNullable.inner, valueContainsNull = true))
@@ -252,6 +254,8 @@ case class SparkMapDataType(inner: MapType) extends SparkDataType with GenericMa
     }
   }
   override def valueContainsNull: Boolean = inner.valueContainsNull
+  override def keyDataType: SparkDataType = SparkDataType(inner.keyType)
+  override def valueDataType: SparkDataType = SparkDataType(inner.valueType)
 }
 object SparkDataType {
   def apply(inner: DataType): SparkDataType = inner match {

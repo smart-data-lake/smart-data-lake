@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.dataframe.spark
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame, GenericDataType, GenericSchema}
+import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame, GenericDataType, GenericField, GenericSchema}
 import io.smartdatalake.definitions.ExecutionModeResult
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.{DataFrameUtil, DummyStreamProvider}
@@ -209,15 +209,15 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
    * Construct array from given columns removing null values (Snowpark API)
    */
   override def array_construct_compact(columns: GenericColumn*): GenericColumn = {
-    assert(columns.forall(_.isInstanceOf[SparkColumn]), s"Unsupported subFeedType(s) ${columns.filterNot(_.isInstanceOf).map(_.subFeedType.typeSymbol.name).distinct.mkString(", ")} in method array_construct_compact")
+    assert(columns.forall(_.isInstanceOf[SparkColumn]), s"Unsupported subFeedType(s) ${columns.filterNot(_.isInstanceOf[SparkColumn]).map(_.subFeedType.typeSymbol.name).distinct.mkString(", ")} in method array_construct_compact")
     SparkColumn(functions.flatten(functions.array(functions.array(columns.map(_.asInstanceOf[SparkColumn].inner):_*))))
   }
   override def array(columns: GenericColumn*): GenericColumn = {
-    assert(columns.forall(_.isInstanceOf[SparkColumn]), s"Unsupported subFeedType(s) ${columns.filterNot(_.isInstanceOf).map(_.subFeedType.typeSymbol.name).distinct.mkString(", ")} in method array")
+    assert(columns.forall(_.isInstanceOf[SparkColumn]), s"Unsupported subFeedType(s) ${columns.filterNot(_.isInstanceOf[SparkColumn]).map(_.subFeedType.typeSymbol.name).distinct.mkString(", ")} in method array")
     SparkColumn(functions.array(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
   }
   override def struct(columns: GenericColumn*): GenericColumn = {
-    assert(columns.forall(_.isInstanceOf[SparkColumn]), s"Unsupported subFeedType(s) ${columns.filterNot(_.isInstanceOf).map(_.subFeedType.typeSymbol.name).distinct.mkString(", ")} in method struct")
+    assert(columns.forall(_.isInstanceOf[SparkColumn]), s"Unsupported subFeedType(s) ${columns.filterNot(_.isInstanceOf[SparkColumn]).map(_.subFeedType.typeSymbol.name).distinct.mkString(", ")} in method struct")
     SparkColumn(functions.struct(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
   }
   override def expr(sqlExpr: String): GenericColumn = SparkColumn(functions.expr(sqlExpr))
@@ -235,5 +235,9 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   }
   override def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
     SparkDataFrame(context.sparkSession.sql(query))
+  }
+  override def createSchema(fields: Seq[GenericField]): GenericSchema = {
+    assert(fields.forall(_.isInstanceOf[SparkField]), s"Unsupported subFeedType(s) ${fields.filterNot(_.isInstanceOf[SparkField]).map(_.subFeedType.typeSymbol.name).distinct.mkString(", ")} in method createSchema")
+    SparkSchema(StructType(fields.map(_.asInstanceOf[SparkField].inner)))
   }
 }

@@ -29,6 +29,7 @@ import org.json4s._
 import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.{read, writePretty}
+import org.reflections.Reflections
 
 import java.time.{Duration, LocalDateTime}
 
@@ -72,7 +73,7 @@ private[smartdatalake] object ActionDAGRunState {
     {case obj: DataObjectId => obj.id}
   ))
 
-  implicit private lazy val workflowReflections = ReflectionUtil.getReflections("io.smartdatalake.workflow")
+  implicit private lazy val workflowReflections: Reflections = ReflectionUtil.getReflections("io.smartdatalake.workflow")
 
   private lazy val typeHints = ShortTypeHints(ReflectionUtil.getTraitImplClasses[SubFeed].toList ++ ReflectionUtil.getSealedTraitImplClasses[ExecutionId], "type")
   implicit private val formats: Formats = Json4sCompat.getStrictSerializationFormat(typeHints) + new EnumNameSerializer(RuntimeEventState) +

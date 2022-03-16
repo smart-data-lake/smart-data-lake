@@ -23,12 +23,12 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
-import org.apache.spark.sql.DataFrame
 
-import scala.collection.mutable
 import scala.reflect.runtime.universe.Type
 
-
+/**
+ * Interface for a generic data frame.
+ */
 trait GenericDataFrame {
   def subFeedType: Type
 
@@ -123,8 +123,6 @@ trait GenericDataFrame {
 
   /**
    * symmetric difference of two data frames: (df∪df2)∖(df∩df2) = (df∖df2)∪(df2∖df)
-   *
-   * @param other         : data frame to compare with
    * @param diffColName : name of boolean column which indicates whether the row belongs to df
    * @return data frame
    */
@@ -139,8 +137,6 @@ trait GenericDataFrame {
 
   /**
    * compares df with df2
-   *
-   * @param other : data frame to comapre with
    * @return true if both data frames have the same cardinality, schema and an empty symmetric difference
    */
   def isEqual(other: GenericDataFrame): Boolean = {
@@ -151,21 +147,39 @@ trait GenericDataFrame {
     isSchemaEqualIgnoreNullabilty(other) && symmetricDifference(other).isEmpty && other.count == other.count
   }
 
+  /**
+   * compares df with df2 ignoring schema nullability
+   * @return true if both data frames have the same cardinality, schema (ignoring nullability) and an empty symmetric difference
+   */
   def isSchemaEqualIgnoreNullabilty(other: GenericDataFrame): Boolean = {
     SchemaUtil.schemaDiff(this.schema, other.schema, ignoreNullable = true).isEmpty && SchemaUtil.schemaDiff(other.schema, this.schema, ignoreNullable = true).isEmpty
   }
 
+  /**
+   * Create an empty SubFeed for this subFeedType.
+   */
   def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed
 
 }
+
+/**
+ * Interface for the result of a df.groupBy on a GenericDataFrame
+ */
 trait GenericGroupedDataFrame {
   def subFeedType: Type
   def agg(columns: Seq[GenericColumn]): GenericDataFrame
 }
 
+/**
+ * Interface for the schema of a GenericDataFrame
+ */
 trait GenericSchema {
   def subFeedType: Type
-  def convertIfNeeded(toSubFeedType: Type): GenericSchema = {
+
+  /**
+   * Convert schema to another SubFeedType.
+   */
+  def convert(toSubFeedType: Type): GenericSchema = {
     if (this.subFeedType != toSubFeedType) SchemaConverter.convert(this, toSubFeedType)
     else this
   }
@@ -183,6 +197,10 @@ trait GenericSchema {
   def toLowerCase: GenericSchema
   def removeMetadata: GenericSchema
 }
+
+/**
+ * Interface for the columns of a GenericDataFrame
+ */
 trait GenericColumn {
   def subFeedType: Type
   def ===(other: GenericColumn): GenericColumn
@@ -200,6 +218,10 @@ trait GenericColumn {
    */
   def exprSql: String
 }
+
+/**
+ * Interface for the fields of a GenericSchema or struct type
+ */
 trait GenericField {
   def subFeedType: Type
   def name: String
@@ -209,12 +231,12 @@ trait GenericField {
   def toLowerCase: GenericField
   def removeMetadata: GenericField
 }
+
+/**
+ * Interface for the data type of a GenericField
+ */
 trait GenericDataType {
   def subFeedType: Type
-  def convertIfNeeded(toSubFeedType: Type): GenericDataType = {
-    if (this.subFeedType != toSubFeedType) SchemaConverter.convertDataType(this, toSubFeedType)
-    else this
-  }
   def isSortable: Boolean
   def typeName: String
   def sql: String
@@ -222,69 +244,40 @@ trait GenericDataType {
   def toLowerCase: GenericDataType
   def removeMetadata: GenericDataType
 }
+
+/**
+ * Mixin trait for a StructDataType in addition to interface GenericDataType.
+ */
 trait GenericStructDataType { this: GenericDataType =>
+  def fields: Seq[GenericField]
   def withOtherFields[T](other: GenericStructDataType, func: (Seq[GenericField],Seq[GenericField]) => T): T
 }
+
+/**
+ * Mixin trait for a ArrayDataType in addition to interface GenericDataType.
+ */
 trait GenericArrayDataType { this: GenericDataType =>
+  def elementDataType: GenericDataType
   def withOtherElementType[T](other: GenericArrayDataType, func: (GenericDataType,GenericDataType) => T): T
   def containsNull: Boolean // Indicates array might contain null entries
 }
+
+/**
+ * Mixin trait for a MapDataType in addition to interface GenericDataType.
+ */
 trait GenericMapDataType { this: GenericDataType =>
+  def keyDataType: GenericDataType
+  def valueDataType: GenericDataType
   def withOtherKeyType[T](other: GenericMapDataType, func: (GenericDataType,GenericDataType) => T): T
   def withOtherValueType[T](other: GenericMapDataType, func: (GenericDataType,GenericDataType) => T): T
   def valueContainsNull: Boolean // Indicates if map values might be set to null
 }
+
+/**
+ * Interface for the rows of a GenericDataFrame.
+ */
 trait GenericRow {
   def subFeedType: Type
   def get(index: Int): Any
   def getAs[T](index: Int): T
-}
-
-// TODO
-/*
-object DataFrameSubFeedHelper {
-  // search all classes implementing DataFrameSubFeedHelper
-  private lazy val helpersCache = mutable.Map[Type, DataFrameSubFeedHelper]()
-
-  /**
-   * Get the DataFrameSubFeedHelper for a given SubFeed type
-   */
-  def apply(subFeedType: Type): DataFrameSubFeedHelper = {
-    helpersCache.getOrElseUpdate(subFeedType, {
-      val mirror = scala.reflect.runtime.currentMirror
-      try {
-        val module = mirror.staticModule(subFeedType.typeSymbol.name.toString)
-        mirror.reflectModule(module).instance.asInstanceOf[DataFrameSubFeedHelper]
-      } catch {
-        case e: Exception => throw new IllegalStateException(s"No DataFrameSubFeedHelper implementation found for SubFeed type ${subFeedType.typeSymbol.name}", e)
-      }
-    })
-  }
-}
-*/
-
-trait SchemaConverter {
-  def fromSubFeedType: Type
-  def toSubFeedType: Type
-  def convert(schema: GenericSchema): GenericSchema
-  def convertDataType(dataType: GenericDataType): GenericDataType
-}
-object SchemaConverter {
-  private val converters: mutable.Map[(Type,Type), SchemaConverter] = mutable.Map()
-  def registerConverter(converter: SchemaConverter): Unit = {
-    converters.put(
-      (converter.fromSubFeedType,converter.toSubFeedType),
-      converter
-    )
-  }
-  def convert(schema: GenericSchema, toSubFeedType: Type): GenericSchema = {
-    val converter = converters.get(schema.subFeedType, toSubFeedType)
-      .getOrElse(throw new IllegalStateException(s"No schema converter found from ${schema.subFeedType.typeSymbol.name} to ${toSubFeedType.typeSymbol.name}"))
-    converter.convert(schema)
-  }
-  def convertDataType(dataType: GenericDataType, toSubFeedType: Type): GenericDataType = {
-    val converter = converters.get(dataType.subFeedType, toSubFeedType)
-      .getOrElse(throw new IllegalStateException(s"No SchemaConverter found from ${dataType.subFeedType.typeSymbol.name} to ${toSubFeedType.typeSymbol.name}"))
-    converter.convertDataType(dataType)
-  }
 }

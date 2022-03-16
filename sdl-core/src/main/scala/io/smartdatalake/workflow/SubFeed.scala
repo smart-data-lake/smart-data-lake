@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame, GenericDataType, GenericSchema}
+import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame, GenericDataType, GenericField, GenericSchema}
 import io.smartdatalake.definitions.ExecutionModeResult
 import io.smartdatalake.util.dag.DAGResult
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -157,6 +157,7 @@ trait DataFrameSubFeedCompanion extends SubFeedConverter[DataFrameSubFeed] {
   def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame
   def getEmptyStreamingDataFrame(schema: GenericSchema)(implicit context: ActionPipelineContext): GenericDataFrame = throw new NotImplementedError(s"getEmptyStreamingDataFrame is not implemented for ${subFeedType.typeSymbol.name}")
   def getSubFeed(dataFrame: GenericDataFrame, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrameSubFeed
+  def createSchema(fields: Seq[GenericField]): GenericSchema
   def col(colName: String): GenericColumn
   def lit(value: Any): GenericColumn
   def max(column: GenericColumn): GenericColumn

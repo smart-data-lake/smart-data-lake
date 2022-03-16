@@ -29,7 +29,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.connection.SnowflakeConnection
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import net.snowflake.spark.snowflake.Utils.SNOWFLAKE_SOURCE_NAME
 import org.apache.spark.{sql => spark}
 import com.snowflake.snowpark
@@ -120,12 +120,26 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     }
   }
 
+  override def init(df: GenericDataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
+    df match {
+      // TODO: initSparkDataFrame has empty implementation
+      case sparkDf: SparkDataFrame => initSparkDataFrame(sparkDf.inner, partitionValues, saveModeOptions)
+      case sparkDf: SnowparkDataFrame => Unit
+      case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method init")
+    }
+  }
+
   override private[smartdatalake] def getSubFeed(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     if (subFeedType =:= typeOf[SparkSubFeed]) SparkSubFeed(Some(SparkDataFrame(getSparkDataFrame(partitionValues))), id, partitionValues)
-    else if (subFeedType =:= typeOf[SparkSubFeed]) SnowparkSubFeed(Some(SnowparkDataFrame(getSnowparkDataFrame(partitionValues))), id, partitionValues)
+    else if (subFeedType =:= typeOf[SnowparkSubFeed]) SnowparkSubFeed(Some(SnowparkDataFrame(getSnowparkDataFrame(partitionValues))), id, partitionValues)
     else throw new IllegalStateException(s"($id) Unknown subFeedType ${subFeedType.typeSymbol.name}")
   }
-  private[smartdatalake] override def getSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SparkSubFeed], typeOf[SnowparkSubFeed])
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type)(implicit context: ActionPipelineContext) : GenericDataFrame = {
+    if (subFeedType =:= typeOf[SparkSubFeed]) SparkDataFrame(getSparkDataFrame(partitionValues))
+    else if (subFeedType =:= typeOf[SnowparkSubFeed]) SnowparkDataFrame(getSnowparkDataFrame(partitionValues))
+    else throw new IllegalStateException(s"($id) Unknown subFeedType ${subFeedType.typeSymbol.name}")
+  }
+  private[smartdatalake] override def getSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SnowparkSubFeed], typeOf[SparkSubFeed]) // order matters... if possible Snowpark is preferred to Spark
 
   private[smartdatalake] override def writeSubFeed(subFeed: DataFrameSubFeed, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): Unit = {
     writeDataFrame(subFeed.dataFrame.get, partitionValues, isRecursiveInput, saveModeOptions)
@@ -137,7 +151,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
       case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method writeDataFrame")
     }
   }
-  private[smartdatalake] override def writeSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SparkSubFeed], typeOf[SnowparkSubFeed])
+  private[smartdatalake] override def writeSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SnowparkSubFeed], typeOf[SparkSubFeed]) // order matters... if possible Snowpark is preferred to Spark
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
     val sql = s"SHOW DATABASES LIKE '${connection.database}'"
@@ -149,7 +163,10 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     connection.execSnowflakeStatement(sql).next()
   }
 
-  override def dropTable(implicit context: ActionPipelineContext): Unit = throw new NotImplementedError()
+  override def dropTable(implicit context: ActionPipelineContext): Unit = {
+    val sql = s"DROP TABLE IF EXISTS $fullyQualifiedTableName"
+    connection.execSnowflakeStatement(sql).next()
+  }
 
   override def factory: FromConfigFactory[DataObject] = SnowflakeTableDataObject
 
@@ -157,8 +174,8 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
    * Read the contents of a table as a Snowpark DataFrame
    */
   def getSnowparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): snowpark.DataFrame = {
-    implicit val helper: DataFrameSubFeedCompanion = SnowparkSubFeed
-    this.snowparkSession.table(table.fullName)
+    //val helper: DataFrameSubFeedCompanion = SnowparkSubFeed
+    this.snowparkSession.table(fullyQualifiedTableName)
   }
 
   /**

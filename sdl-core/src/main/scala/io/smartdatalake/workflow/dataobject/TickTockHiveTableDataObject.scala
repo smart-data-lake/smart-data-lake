@@ -122,7 +122,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     implicit val session: SparkSession = context.sparkSession
     val df = if(!isTableExisting && schemaMin.isDefined) {
       logger.info(s"Table ${table.fullName} does not exist but schemaMin was provided. Creating empty DataFrame.")
-      DataFrameUtil.getEmptyDataFrame(schemaMin.map(_.convertIfNeeded(typeOf[SparkSubFeed]).asInstanceOf[SparkSchema].inner).get)
+      DataFrameUtil.getEmptyDataFrame(schemaMin.map(_.convert(typeOf[SparkSubFeed]).asInstanceOf[SparkSchema].inner).get)
     } else {
       session.table(s"${table.fullName}")
     }

@@ -95,7 +95,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
    * @param sourceExists Whether the source file/table exists already. Existing sources may have a source schema.
    * @return The schema to use for the data frame reader when reading from the source.
    */
-  def getSchema(sourceExists: Boolean): Option[SparkSchema] = schema.map(_.convertIfNeeded(typeOf[SparkSubFeed]).asInstanceOf[SparkSchema])
+  def getSchema(sourceExists: Boolean): Option[SparkSchema] = schema.map(_.convert(typeOf[SparkSubFeed]).asInstanceOf[SparkSchema])
 
   override def options: Map[String, String] = Map() // override options because of conflicting definitions in CanCreateSparkDataFrame and CanWriteSparkDataFrame
 
