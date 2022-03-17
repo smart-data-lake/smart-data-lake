@@ -11,7 +11,7 @@ image: airbyte.png
 hide_table_of_contents: false
 ---
 
-This article presents the deployment of an [Airbyte Connector](airbyte.com) with Smart Data Lake Builder (SDLB). 
+This article presents the deployment of an [Airbyte Connector](https://airbyte.com) with Smart Data Lake Builder (SDLB). 
 In particular the [github connector](https://docs.airbyte.com/integrations/sources/github) is implemented using the python sources.
 
 <!--truncate-->
@@ -27,7 +27,7 @@ The general [Airbyte connector handling](https://docs.airbyte.com/understanding-
 
 The actual connector is not provided in the SDL repository and need to be obtained from the [Airbyte repository](https://github.com/airbytehq/airbyte). Beside the [list of existing connectors](https://docs.airbyte.com/integrations), custom connectors could be implemented in Python or Javascript. 
 
-The following description builds on top of the example setup from the [getting-started](../../docs/getting-started/setup) guide, using [Podman](docs.podman.io) as container engine within a [WSL](https://docs.microsoft.com/en-us/windows/wsl/install) Ubuntu image. 
+The following description builds on top of the example setup from the [getting-started](../../docs/getting-started/setup) guide, using [Podman](https://docs.podman.io) as container engine within a [WSL](https://docs.microsoft.com/en-us/windows/wsl/install) Ubuntu image. 
 
 The [github connector](https://docs.airbyte.com/integrations/sources/github) is utilized to gather data about a specific repository.
 
