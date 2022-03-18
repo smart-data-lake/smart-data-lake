@@ -18,26 +18,27 @@
  */
 package io.smartdatalake.workflow
 
-import java.nio.file.Files
-import java.sql.Timestamp
-import java.time.{Instant, LocalDateTime}
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformerConfig, CustomDfsTransformer, CustomDfsTransformerConfig}
-import io.smartdatalake.workflow.action.sparktransformer.{SQLDfTransformer, ScalaClassDfsTransformer}
-import io.smartdatalake.workflow.action.{CopyAction, _}
+import io.smartdatalake.workflow.action.customlogic.{CustomDfsTransformer, CustomDfsTransformerConfig}
+import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassDfsTransformer
+import io.smartdatalake.workflow.action._
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject._
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{DataType, StructType}
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
+
+import java.nio.file.Files
+import java.sql.Timestamp
+import java.time.{Instant, LocalDateTime}
 
 class ActionDAGTest extends FunSuite with BeforeAndAfter {
 

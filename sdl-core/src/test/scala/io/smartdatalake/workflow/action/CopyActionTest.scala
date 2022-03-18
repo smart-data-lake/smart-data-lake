@@ -24,7 +24,8 @@ import io.smartdatalake.definitions.{PartitionDiffMode, SDLSaveMode, SaveModeGen
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.customlogic.CustomDfTransformer
-import io.smartdatalake.workflow.action.sparktransformer._
+import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer}
+import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassDfTransformer, ScalaCodeDfTransformer}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.spark.sql.functions.{lit, substring}

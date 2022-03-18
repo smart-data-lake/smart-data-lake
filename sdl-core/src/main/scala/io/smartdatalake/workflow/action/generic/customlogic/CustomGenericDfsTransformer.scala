@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,12 +16,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow.action.customlogic
 
-import io.smartdatalake.workflow.dataframe.GenericDataFrame
+package io.smartdatalake.workflow.action.generic.customlogic
+
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.DataFrameSubFeedCompanion
-import org.apache.spark.sql.SparkSession
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
 
 /**
  * Interface to define a custom Spark-DataFrame transformation (n:m)
@@ -32,12 +32,12 @@ trait CustomGenericDfsTransformer extends Serializable {
   /**
    * Function to define the transformation between several input and output GenericDataFrames (n:m)
    *
-   * @param helper Functions to work with type of the GenericDataFrames given.
+   * @param helper  Functions to work with type of the GenericDataFrames given.
    * @param options Options specified in the configuration for this transformation
-   * @param dfs GenericDataFrames to be transformed
+   * @param dfs     GenericDataFrames to be transformed
    * @return Transformed GenericDataFrame
    */
-  def transform(helper: DataFrameSubFeedCompanion, options: Map[String,String], dfs: Map[String,GenericDataFrame]) : Map[String,GenericDataFrame]
+  def transform(helper: DataFrameSubFeedCompanion, options: Map[String, String], dfs: Map[String, GenericDataFrame]): Map[String, GenericDataFrame]
 
   /**
    * Optional function to define the transformation of input to output partition values.
@@ -47,9 +47,9 @@ trait CustomGenericDfsTransformer extends Serializable {
    * Note that the default value is input = output partition values, which should be correct for most use cases.
    *
    * @param partitionValues partition values to be transformed
-   * @param options Options specified in the configuration for this transformation
+   * @param options         Options specified in the configuration for this transformation
    * @return a map of input partition values to output partition values
    */
-  def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Option[Map[PartitionValues,PartitionValues]] = None
+  def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Option[Map[PartitionValues, PartitionValues]] = None
 
 }

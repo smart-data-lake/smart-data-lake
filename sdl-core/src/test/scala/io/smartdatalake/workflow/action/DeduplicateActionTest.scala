@@ -25,7 +25,7 @@ import io.smartdatalake.definitions.TechnicalTableColumn
 import io.smartdatalake.testutils.DataFrameTestHelper._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
-import io.smartdatalake.workflow.action.sparktransformer.FilterTransformer
+import io.smartdatalake.workflow.action.generic.transformer.FilterTransformer
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession

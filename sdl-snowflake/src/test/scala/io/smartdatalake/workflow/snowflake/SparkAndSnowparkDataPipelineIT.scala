@@ -19,13 +19,14 @@
 
 package io.smartdatalake.workflow.snowflake
 
+import com.snowflake.snowpark.{DataFrame, Session}
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
-import io.smartdatalake.definitions.BasicAuthMode
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.action.CopyAction
-import io.smartdatalake.workflow.action.sparktransformer.{AdditionalColumnsTransformer, FilterTransformer}
-import io.smartdatalake.workflow.connection.SnowflakeConnection
+import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer}
+import io.smartdatalake.workflow.action.snowflake.customlogic.CustomSnowparkDfTransformer
+import io.smartdatalake.workflow.action.snowflake.transformer.ScalaClassSnowparkDfTransformer
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, SnowflakeTableDataObject, Table}
 
 import java.nio.file.Files
@@ -71,7 +72,7 @@ object SparkAndSnowparkDataPipelineIT extends App {
   instanceRegistry.register(action1)
   val action2 = CopyAction("copySnowpark", tgt1DO.id, tgt2DO.id,
     transformers = Seq(
-      //ScalaClassDfTransformer(className = classOf[TestOptionsDfTransformer].getName, options = Map("test" -> "test"), runtimeOptions = Map("appName" -> "application")),
+      ScalaClassSnowparkDfTransformer(className = classOf[TestOptionsSnowparkDfTransformer].getName, options = Map("test" -> "test"), runtimeOptions = Map("appName" -> "application")),
       FilterTransformer(filterClause = "lastname='jonson'"),
       AdditionalColumnsTransformer(additionalColumns = Map("run_id" -> "runId"))
     )
@@ -87,4 +88,13 @@ object SparkAndSnowparkDataPipelineIT extends App {
   val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "ids:copy.*", applicationName = Some(feed))
   sdlb.run(sdlConfig)
 
+}
+
+class TestOptionsSnowparkDfTransformer extends CustomSnowparkDfTransformer {
+  def transform(session: Session, options: Map[String,String], df: DataFrame, dataObjectId: String) : DataFrame = {
+    import com.snowflake.snowpark.functions._
+    import session.implicits._
+    df.withColumn("rating", $"rating" + 1)
+      .withColumn("test", lit(options("test")+"-"+options("appName")))
+  }
 }

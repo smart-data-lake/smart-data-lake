@@ -22,7 +22,7 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.action.CustomSparkAction
 import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer
-import io.smartdatalake.workflow.action.sparktransformer.ScalaClassDfsTransformer
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassDfsTransformer
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}

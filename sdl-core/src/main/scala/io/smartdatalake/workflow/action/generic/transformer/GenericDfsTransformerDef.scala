@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,15 +17,15 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.workflow.action.sparktransformer
+package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.ParsableFromConfig
 import io.smartdatalake.config.SdlConfigObject.ActionId
-import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql.DataFrame
 
 import scala.reflect.runtime.universe
@@ -134,8 +134,8 @@ trait OptionsGenericDfsTransformer extends GenericDfsTransformer {
 }
 
 /**
- * Interface to implement Spark-DataFrame transformers working with one input and one output (1:1) and options.
- * This trait extends OptionsGenericDfTransformer and passes a map of options as parameter to the transform function.
+ * Interface to implement Spark-DataFrame transformers working with multiple inputs and outputs (n:m) and options.
+ * This trait extends OptionsGenericDfsTransformer and passes a map of options as parameter to the transform function.
  * This is mainly used by custom transformers.
  */
 trait OptionsSparkDfsTransformer extends OptionsGenericDfsTransformer {

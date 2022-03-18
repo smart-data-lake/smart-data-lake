@@ -23,8 +23,9 @@ import io.smartdatalake.config.SdlConfigObject._
 import io.smartdatalake.workflow.action
 import io.smartdatalake.workflow.action.TestDfTransformer
 import io.smartdatalake.workflow.action.customlogic.CustomFileTransformerConfig
+import io.smartdatalake.workflow.action.generic.transformer.{DataValidationTransformer, DfTransformerWrapperDfsTransformer, FilterTransformer, RowLevelValidationRule, SQLDfsTransformer, WhitelistTransformer}
 import io.smartdatalake.workflow.action.script.CmdScript
-import io.smartdatalake.workflow.action.sparktransformer._
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassDfTransformer
 import org.scalatest.{FlatSpec, Matchers}
 
 

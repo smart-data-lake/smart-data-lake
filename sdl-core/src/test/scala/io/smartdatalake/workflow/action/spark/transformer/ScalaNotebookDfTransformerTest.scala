@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,10 +17,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.workflow.action.sparktransformer
+package io.smartdatalake.workflow.action.spark.transformer
 
 import com.fasterxml.jackson.core.JsonParseException
-import io.smartdatalake.workflow.action.sparktransformer.ScalaNotebookDfTransformer.{compileCode, downloadNotebook, parseNotebook, prepareFunction}
+import ScalaNotebookDfTransformer.{compileCode, downloadNotebook, parseNotebook, prepareFunction}
 import org.scalatest.FunSuite
 import scalaj.http.Http
 

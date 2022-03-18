@@ -27,7 +27,8 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskSkippedDontStopWarning
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.customlogic.{CustomDfsTransformer, CustomDfsTransformerConfig}
-import io.smartdatalake.workflow.action.sparktransformer.{SQLDfsTransformer, ScalaClassDfsTransformer, ScalaCodeDfsTransformer}
+import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassDfsTransformer
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.spark.sql.{DataFrame, SparkSession}

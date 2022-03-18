@@ -27,8 +27,9 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.action.sparktransformer.{SQLDfTransformer, ScalaClassDfTransformer}
 import io.smartdatalake.workflow.action._
+import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassDfTransformer
 import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore}
 import org.apache.hadoop.fs.{FileSystem, Path}

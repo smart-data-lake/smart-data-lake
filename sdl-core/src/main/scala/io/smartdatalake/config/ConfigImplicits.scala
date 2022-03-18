@@ -26,8 +26,8 @@ import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.secrets.SecretProviderConfig
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.action.customlogic._
+import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
-import io.smartdatalake.workflow.action.sparktransformer.{GenericDfTransformer, GenericDfsTransformer}
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
@@ -113,7 +113,7 @@ trait ConfigImplicits {
 
   /**
    * A reader that reads [[GenericDfTransformer]] values.
-   * Note that DfSparkTransformer must be parsed according to it's 'type' attribute by using SDL ConfigParser.
+   * Note that GenericDfTransformer must be parsed according to it's 'type' attribute by using SDL ConfigParser.
    */
   implicit val dfTransformerReader: ConfigReader[GenericDfTransformer] = ConfigReader.fromTry { (c, p) =>
     implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
@@ -122,7 +122,7 @@ trait ConfigImplicits {
 
   /**
    * A reader that reads [[GenericDfsTransformer]] values.
-   * Note that DfSparkTransformer must be parsed according to it's 'type' attribute by using SDL ConfigParser.
+   * Note that GenericDfsTransformer must be parsed according to it's 'type' attribute by using SDL ConfigParser.
    */
   implicit val dfsTransformerReader: ConfigReader[GenericDfsTransformer] = ConfigReader.fromTry { (c, p) =>
     implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
