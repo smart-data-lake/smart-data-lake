@@ -41,7 +41,7 @@ import org.apache.spark.util.PrivateAccessor
  *
  * @param kryoClasses                                       classes to register for spark kryo serialization
  * @param sparkOptions                                      spark options
- * @param statusInfo                                        enable a REST API providing live status info, see detailed configuration [[StatusInfoRestApiConfig]]
+ * @param statusInfo                                        enable a REST API providing live status info, see detailed configuration [[StatusInfoConfig]]
  * @param enableHive                                        enable hive for spark session
  * @param memoryLogTimer                                    enable periodic memory usage logging, see detailed configuration [[MemoryLogTimerConfig]]
  * @param shutdownHookLogger                                enable shutdown hook logger to trace shutdown cause
@@ -61,7 +61,7 @@ import org.apache.spark.util.PrivateAccessor
  */
 case class GlobalConfig(kryoClasses: Option[Seq[String]] = None
                         , sparkOptions: Option[Map[String, String]] = None
-                        , statusInfo: Option[StatusInfoRestApiConfig] = None
+                        , statusInfo: Option[StatusInfoConfig] = None
                         , enableHive: Boolean = true
                         , memoryLogTimer: Option[MemoryLogTimerConfig] = None
                         , shutdownHookLogger: Boolean = false
