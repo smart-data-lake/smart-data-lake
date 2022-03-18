@@ -16,7 +16,7 @@ In particular the [github connector](https://docs.airbyte.com/integrations/sourc
 
 <!--truncate-->
 
-Airbyte is a framework to sync data from a variety of sources (APIs and databases) into warehouses and lakes. 
+Airbyte is a framework to sync data from a variety of sources (APIs and databases) into data warehouses and data lakes. 
 In this example an Airbyte connector is utilized to stream data into Smart Data Lake (SDL). 
 Therefore, the [Airbyte dataObject](http://smartdatalake.ch/json-schema-viewer/index.html#viewer-page?v=2-2) is used and will be configured. 
 The general [Airbyte connector handling](https://docs.airbyte.com/understanding-airbyte/airbyte-specification#source) is implemented in SDL, which includes the 4 main steps:
