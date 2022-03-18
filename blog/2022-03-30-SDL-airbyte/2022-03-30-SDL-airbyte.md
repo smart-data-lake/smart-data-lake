@@ -6,7 +6,7 @@ authors:
   - name: Mandes Schönherr
     title: Dr.sc.nat.
     url: https://github.com/mand35
-tags: [SDL, Airbyte, Connector]
+tags: [Airbyte, Connector]
 image: airbyte.png
 hide_table_of_contents: false
 ---
