@@ -25,7 +25,7 @@ The general [Airbyte connector handling](https://docs.airbyte.com/understanding-
 * `discover`: gather a catalog of available streams and its schemas
 * `read`: collect the actual data
 
-The actual connector is not provided in the SDL repository and need to be obtained from the [Airbyte repository](https://github.com/airbytehq/airbyte). Beside the [list of existing connectors](https://docs.airbyte.com/integrations), custom connectors could be implemented in Python or Javascript. 
+The actual connector is not provided in the SDL repository and needs to be obtained from the [Airbyte repository](https://github.com/airbytehq/airbyte). Besides the [list of existing connectors](https://docs.airbyte.com/integrations), custom connectors could be implemented in Python or Javascript. 
 
 The following description builds on top of the example setup from the [getting-started](../../docs/getting-started/setup) guide, using [Podman](https://docs.podman.io) as container engine within a [WSL](https://docs.microsoft.com/en-us/windows/wsl/install) Ubuntu image. 
 
