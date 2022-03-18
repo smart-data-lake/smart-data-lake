@@ -96,7 +96,7 @@ To launch Smart Data Lake Builder (SDLB) with the Airbyte connector the followin
       }
     }
   ```
-  The `ext-commits` defined connector settings. 
+  Note the options set for `ext-commits` which define the Airbyte connector settings. 
   While the `config` varies from connector to connector, the remaining fields are SDL specific. 
   The `streamName` selects the stream, exactly one. 
   If multiple streams should be collected, multiple dataObjects need to be defined. 
