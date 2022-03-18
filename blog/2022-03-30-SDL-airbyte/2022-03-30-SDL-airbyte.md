@@ -59,7 +59,7 @@ The first connector command `spec` provides the connector specification. This is
   cd SDL_airbyte
   python source_github/main.py spec | python -m json.tool
   ```
-  This provides a [JSON string](github_spec_out.json) with the connector specification. The fields listed under `properties` are relevant for the configuration (compare with the configuration later used). 
+  This provides a [JSON string](github_spec_out.json) with the connector specification. The fields listed under `properties` are relevant for the configuration (compare with the configuration  used later). 
 
 ## Configuration
 To launch Smart Data Lake Builder (SDLB) with the Airbyte connector the following needs to be modified:
