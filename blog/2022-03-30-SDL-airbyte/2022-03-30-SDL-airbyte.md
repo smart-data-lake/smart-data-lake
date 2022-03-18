@@ -132,7 +132,7 @@ To launch Smart Data Lake Builder (SDLB) with the Airbyte connector the followin
 Now we are ready to go. My full [SDLB config file](application.conf) additionally includes the pull-request stream.
 
 ## Run and inspect results
-Since the data will be streamed into a `DeltaLakeTableDataObject` the metastore container is necessary. Further we aim to inspect the data using the Polynote notebook. Thus, first these containers are launched using (in the SDL example base directory):
+Since the data will be streamed into a `DeltaLakeTableDataObject`, the metastore container is necessary. Further, we aim to inspect the data using the Polynote notebook. Thus, first these containers are launched using (in the SDL example base directory):
 ```Bash
 podman-compose up
 podman pod ls
