@@ -166,4 +166,4 @@ Launching Polynote `localhost:8192` in the browser, we can inspect data and deve
 
 ## Summary
 
-The Airbyte connectors provide an easy access to a variety of data sources. The connectors can be utilized in SDLB with a few settings. Thus this maybe a handy solution for access even complex interfaces.  
+The Airbyte connectors provide easy access to a variety of data sources. The connectors can be utilized in SDLB with just a few settings. This also works great for more complex interfaces.
