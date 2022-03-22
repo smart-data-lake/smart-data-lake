@@ -74,7 +74,7 @@ trait GenericDataFrame {
   }
 
   /**
-   * Count nlets of this data frame with respect to specified columns.
+   * Count n-lets of this data frame with respect to specified columns.
    * The result data frame possesses the columns cols and an additional count column countColname.
    */
   def getNonuniqueStats(cols: Seq[String] = schema.columns, countColname: String = "_cnt_"): GenericDataFrame = {
@@ -90,7 +90,7 @@ trait GenericDataFrame {
    * The result data frame possesses an additional count column countColname.
    *
    * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
-   * @return subdataframe of nlets
+   * @return subdataframe of n-lets
    */
   def getNonuniqueRows(cols: Seq[String] = schema.columns): GenericDataFrame = {
     import helper._
@@ -206,6 +206,10 @@ trait GenericColumn {
   def ===(other: GenericColumn): GenericColumn
   def >(other: GenericColumn): GenericColumn
   def <(other: GenericColumn): GenericColumn
+  def +(other: GenericColumn): GenericColumn
+  def -(other: GenericColumn): GenericColumn
+  def /(other: GenericColumn): GenericColumn
+  def *(other: GenericColumn): GenericColumn
   def and(other: GenericColumn): GenericColumn
   def or(other: GenericColumn): GenericColumn
   @scala.annotation.varargs

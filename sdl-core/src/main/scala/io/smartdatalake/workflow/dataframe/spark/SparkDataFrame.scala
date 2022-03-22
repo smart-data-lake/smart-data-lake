@@ -162,6 +162,30 @@ case class SparkColumn(inner: Column) extends GenericColumn {
       case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method <")
     }
   }
+  override def +(other: GenericColumn): GenericColumn = {
+    other match {
+      case sparkColumn: SparkColumn => SparkColumn(inner + sparkColumn.inner)
+      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method +")
+    }
+  }
+  override def -(other: GenericColumn): GenericColumn = {
+    other match {
+      case sparkColumn: SparkColumn => SparkColumn(inner - sparkColumn.inner)
+      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method -")
+    }
+  }
+  override def /(other: GenericColumn): GenericColumn = {
+    other match {
+      case sparkColumn: SparkColumn => SparkColumn(inner / sparkColumn.inner)
+      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method /")
+    }
+  }
+  override def *(other: GenericColumn): GenericColumn = {
+    other match {
+      case sparkColumn: SparkColumn => SparkColumn(inner * sparkColumn.inner)
+      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method *")
+    }
+  }
   override def and(other: GenericColumn): GenericColumn = {
     other match {
       case sparkColumn: SparkColumn => SparkColumn(inner and sparkColumn.inner)
