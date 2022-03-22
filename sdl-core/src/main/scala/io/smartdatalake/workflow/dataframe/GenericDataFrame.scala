@@ -144,7 +144,7 @@ trait GenericDataFrame {
     // Thus we need also to compare the cardinalities and the schemata of the two data frames.
     // For the schema, the order of columns doesn't need to match.
     // Note that we ignore the nullability of the columns to compare schemata.
-    isSchemaEqualIgnoreNullabilty(other) && symmetricDifference(other).isEmpty && other.count == other.count
+    isSchemaEqualIgnoreNullabilty(other) && symmetricDifference(other).isEmpty && this.count == other.count
   }
 
   /**
