@@ -180,8 +180,7 @@ trait GenericSchema {
    * Convert schema to another SubFeedType.
    */
   def convert(toSubFeedType: Type): GenericSchema = {
-    if (this.subFeedType != toSubFeedType) SchemaConverter.convert(this, toSubFeedType)
-    else this
+    SchemaConverter.convert(this, toSubFeedType)
   }
   def diffSchema(schema: GenericSchema): Option[GenericSchema]
   def columns: Seq[String]

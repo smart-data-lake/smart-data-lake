@@ -62,13 +62,15 @@ private[smartdatalake] object SchemaConverter {
    * Convert a given schema with SubFeedType A to SubFeedType B.
    */
   def convert(schema: GenericSchema, toSubFeedType: Type): GenericSchema = {
-    getConverter(schema.subFeedType, toSubFeedType).convert(schema)
+    if (schema.subFeedType != toSubFeedType) getConverter(schema.subFeedType, toSubFeedType).convert(schema)
+    else schema
   }
 
   /**
    * Convert a given data type with SubFeedType A to SubFeedType B.
    */
   def convertDatatype(dataType: GenericDataType, toSubFeedType: Type): GenericDataType = {
-    getConverter(dataType.subFeedType, toSubFeedType).convertDataType(dataType)
+    if (dataType.subFeedType != toSubFeedType) getConverter(dataType.subFeedType, toSubFeedType).convertDataType(dataType)
+    else dataType
   }
 }
