@@ -19,13 +19,13 @@
 
 package io.smartdatalake.workflow.dataframe.snowflake
 
-import com.snowflake.snowpark.{Column, functions}
 import com.snowflake.snowpark.types.{ArrayType, StringType, StructField, StructType}
+import com.snowflake.snowpark.{Column, functions}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.ExecutionModeResult
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataType, SparkSubFeed}
-import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame, GenericDataType, GenericField, GenericSchema}
+import io.smartdatalake.workflow.dataframe.spark.SparkDataType
+import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion, SubFeed}
 
@@ -41,6 +41,7 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
                            override val filter: Option[String] = None
                           )
   extends DataFrameSubFeed {
+  @transient
   override val tpe: Type = typeOf[SnowparkSubFeed]
 
   override def clearPartitionValues(breakLineageOnChange: Boolean = true)(implicit context: ActionPipelineContext): SnowparkSubFeed = {

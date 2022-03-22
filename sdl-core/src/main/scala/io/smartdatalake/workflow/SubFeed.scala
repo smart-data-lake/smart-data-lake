@@ -19,12 +19,12 @@
 package io.smartdatalake.workflow
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame, GenericDataType, GenericField, GenericSchema}
 import io.smartdatalake.definitions.ExecutionModeResult
 import io.smartdatalake.util.dag.DAGResult
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ScalaUtil.optionalizeMap
 import io.smartdatalake.util.misc.{ScalaUtil, SmartDataLakeLogger}
+import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject._
 import sun.reflect.generics.reflectiveObjects.NotImplementedException
 
@@ -92,6 +92,7 @@ trait SubFeedConverter[S <: SubFeed] {
  * A SubFeed that holds a DataFrame
  */
 trait DataFrameSubFeed extends SubFeed  {
+  @transient
   def tpe: Type // concrete type of this DataFrameSubFeed
   implicit lazy val helper: DataFrameSubFeedCompanion = DataFrameSubFeed.getHelper(tpe)
   def dataFrame: Option[GenericDataFrame]

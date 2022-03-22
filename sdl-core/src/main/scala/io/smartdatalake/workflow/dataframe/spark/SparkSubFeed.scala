@@ -20,11 +20,11 @@
 package io.smartdatalake.workflow.dataframe.spark
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame, GenericDataType, GenericField, GenericSchema}
 import io.smartdatalake.definitions.ExecutionModeResult
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.{DataFrameUtil, DummyStreamProvider}
 import io.smartdatalake.workflow._
+import io.smartdatalake.workflow.dataframe._
 import org.apache.spark.sql.types.{ArrayType, StringType, StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame, functions}
 
@@ -51,6 +51,7 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
                         override val filter: Option[String] = None
                        )
   extends DataFrameSubFeed {
+  @transient
   override val tpe: Type = typeOf[SparkSubFeed]
   override def breakLineage(implicit context: ActionPipelineContext): SparkSubFeed = {
     // in order to keep the schema but truncate spark logical plan, a dummy DataFrame is created.
