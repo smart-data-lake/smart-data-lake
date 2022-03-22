@@ -23,10 +23,13 @@ import com.snowflake.snowpark.{DataFrame, Session}
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
 import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.workflow.{DataFrameSubFeed, DataFrameSubFeedCompanion}
 import io.smartdatalake.workflow.action.CopyAction
-import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer}
+import io.smartdatalake.workflow.action.generic.customlogic.CustomGenericDfTransformer
+import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, ScalaClassGenericDfTransformer}
 import io.smartdatalake.workflow.action.snowflake.customlogic.CustomSnowparkDfTransformer
 import io.smartdatalake.workflow.action.snowflake.transformer.ScalaClassSnowparkDfTransformer
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, SnowflakeTableDataObject, Table}
 
 import java.nio.file.Files
@@ -70,11 +73,16 @@ object SparkAndSnowparkDataPipelineIT extends App {
   // first action copy with Spark from Hive to Snowflake
   val action1 = CopyAction("copySpark", srcDO.id, tgt1DO.id)
   instanceRegistry.register(action1)
+  // second action copy with Snowpark from Snowflake to Snowflake
   val action2 = CopyAction("copySnowpark", tgt1DO.id, tgt2DO.id,
     transformers = Seq(
+      // a custom transformer written in Snowpark
       ScalaClassSnowparkDfTransformer(className = classOf[TestOptionsSnowparkDfTransformer].getName, options = Map("test" -> "test"), runtimeOptions = Map("appName" -> "application")),
+      // generic predefined transformers
       FilterTransformer(filterClause = "lastname='jonson'"),
-      AdditionalColumnsTransformer(additionalColumns = Map("run_id" -> "runId"))
+      AdditionalColumnsTransformer(additionalColumns = Map("run_id" -> "runId")),
+      // a custom generic transformer
+      ScalaClassGenericDfTransformer(className = classOf[TestAdd1GenericDfTransformer].getName, options = Map("column" -> "rating"))
     )
   )
   instanceRegistry.register(action2)
@@ -94,7 +102,15 @@ class TestOptionsSnowparkDfTransformer extends CustomSnowparkDfTransformer {
   def transform(session: Session, options: Map[String,String], df: DataFrame, dataObjectId: String) : DataFrame = {
     import com.snowflake.snowpark.functions._
     import session.implicits._
-    df.withColumn("rating", $"rating" + 1)
-      .withColumn("test", lit(options("test")+"-"+options("appName")))
+    df.withColumn("test", lit(options("test")+"-"+options("appName")))
+  }
+}
+
+class TestAdd1GenericDfTransformer extends CustomGenericDfTransformer {
+  override def transform(helper: DataFrameSubFeedCompanion, options: Map[String, String], df: GenericDataFrame, dataObjectId: String): GenericDataFrame = {
+    val helper = DataFrameSubFeed.getHelper(df.subFeedType)
+    import helper._
+    val columnToAdd1 = options("column")
+    df.withColumn(columnToAdd1, col(columnToAdd1) + lit(1))
   }
 }
