@@ -80,7 +80,7 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
     val fut: Future[Session] = client.connect(socket, uri)
     fut.get
 
-    //Verify Rest API context endpoint is reachable and plausible correct results
+    //Verify Rest API context endpoint is reachable and returns correct results
     val webserviceDOContext = WebserviceFileDataObject("dummy", url = s"http://localhost:4440/api/v1/context/")(sdlb.instanceRegistry)
     val webserviceClientContext = ScalaJWebserviceClient(webserviceDOContext)
     webserviceClientContext.get() match {
@@ -91,7 +91,7 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
         assert(str.contains("\"feedSel\":\"test\""))
     }
 
-    //Verify Rest API state endpoint is reachable and plausible correct results
+    //Verify Rest API state endpoint is reachable and returns correct results
     //Known Issue: if you run this test with Java 11.0.4, you may see a Stackoverflow error.
     //The problem arises after the second call to the webservice (no matter what the call is)
     // If you encounter it, either: Comment out one of the Calls to the webservice, or use a different JDK version to run the test.
