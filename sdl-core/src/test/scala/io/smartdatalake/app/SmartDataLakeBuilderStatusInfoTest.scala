@@ -22,6 +22,7 @@ package io.smartdatalake.app
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.webservice.ScalaJWebserviceClient
+import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
 import org.eclipse.jetty.websocket.api.{Session, WebSocketAdapter}
@@ -50,7 +51,7 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
     // setup input DataObject
     val srcDO = CsvFileDataObject("src1", "target/src1")(sdlb.instanceRegistry)
     val dfSrc1 = Seq("testData").toDF("testColumn")
-    srcDO.writeDataFrame(dfSrc1, Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
       getClass.getResource("/configstatusinfo/application.conf").getPath))
