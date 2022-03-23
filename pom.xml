@@ -397,7 +397,7 @@
 		<!-- other dependency versions -->
 		<scopt.version>4.0.1</scopt.version>
 		<databricks.spark-xml.version>0.14.0</databricks.spark-xml.version>
-		<spark.excel.version>0.14.0</spark.excel.version>
+		<spark.excel.version>${spark.version}_0.16.4</spark.excel.version>
 		<ucanaccess.version>5.0.1</ucanaccess.version>
 		<hsqldb.version>2.5.2</hsqldb.version>
 		<!-- when changing config version, remember to update it in DatabricksSmartDataLakeBuilder main method -->
@@ -412,7 +412,7 @@
 		<snowflake-snowpark.version>0.11.0</snowflake-snowpark.version>
 		<keycloak.version>15.0.2</keycloak.version>
 		<delta.version>1.1.0</delta.version>
-		<poi.version>4.1.2</poi.version>
+		<poi.version>5.2.2</poi.version>
 
 		<json4s.version>3.7.0-M11</json4s.version>
 
