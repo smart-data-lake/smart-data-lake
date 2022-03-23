@@ -15,7 +15,7 @@ Find below an overview of requirements, versions and supported configurations.
 - Uses Maven 3+ as build system
 
 ## Versions and supported configuration
-Smart Data Lake Builder currently maintains the following two major version, which are published as maven artifacts on maven central:
+Smart Data Lake Builder currently maintains the following two major versions, which are published as Maven artifacts on maven central:
 
 |SDL Version|Java/Scala/Hadoop Version|File Engine|Spark Engine|Snowflake/Snowpark Engine|Comments|
 | --------- | ----------------------- | --------- | ---------- | ----------------------- | ------ |
@@ -26,10 +26,10 @@ Configurations using alternative versions mentioned in parentheses can be build 
 
 It's possible to customize dependencies and make Smart Data Lake Builder work with other version combinations, but this needs manual tuning of dependencies in your own maven project.
 
-In general Java library versions are hold as close as possible to the ones used in the corresponding Spark version.
+In general, Java library versions are held as close as possible to the ones used in the corresponding Spark version.
 
 ## Logging
-Smart Data Lake Builder by default uses the logging libraries included in the corresponding Spark version. This is Log4j 1.2.x for Spark 2.4.x up to Spark 3.2.x.
+By default, Smart Data Lake Builder uses the logging libraries included in the corresponding Spark version. This is Log4j 1.2.x for Spark 2.4.x up to Spark 3.2.x.
 Starting from Spark 3.3.x it will use Log4j 2.x, see [SPARK-6305](https://issues.apache.org/jira/browse/SPARK-6305).
 
 You can customize logging dependencies manually by creating your own maven project.
