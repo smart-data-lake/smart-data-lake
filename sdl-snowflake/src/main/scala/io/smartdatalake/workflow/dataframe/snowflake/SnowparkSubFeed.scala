@@ -24,8 +24,8 @@ import com.snowflake.snowpark.{Column, functions}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.ExecutionModeResult
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.dataframe.spark.SparkDataType
 import io.smartdatalake.workflow.dataframe._
+import io.smartdatalake.workflow.dataframe.spark.SparkDataType
 import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion, SubFeed}
 
@@ -183,8 +183,8 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion {
   }
   override def structType(fields: Map[String,GenericDataType]): SnowparkDataType = {
     assert(fields.values.forall(_.isInstanceOf[SnowparkDataType]), s"Unsupported subFeedType(s) ${fields.values.filterNot(_.isInstanceOf[SparkDataType]).map(_.subFeedType.typeSymbol.name).toSeq.distinct.mkString(", ")} in method structType")
-    val sparkFields = fields.map{ case (name,dataType) => StructField(name, dataType.asInstanceOf[SnowparkDataType].inner)}.toSeq
-    SnowparkDataType(StructType(sparkFields))
+    val snowparkFields = fields.map { case (name, dataType) => StructField(name, dataType.asInstanceOf[SnowparkDataType].inner) }.toSeq
+    SnowparkDataType(StructType(snowparkFields))
   }
   /**
    * Construct array from given columns removing null values (Snowpark API)
@@ -204,7 +204,7 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion {
   override def expr(sqlExpr: String): SnowparkColumn = SnowparkColumn(functions.sqlExpr(sqlExpr))
   override def when(condition: GenericColumn, value: GenericColumn): GenericColumn = {
     (condition, value) match {
-      case (snowparkCondition: SnowparkColumn, sparkValue: SnowparkColumn) => SnowparkColumn(functions.when(snowparkCondition.inner, sparkValue.inner).asInstanceOf[Column])
+      case (snowparkCondition: SnowparkColumn, snowparkValue: SnowparkColumn) => SnowparkColumn(functions.when(snowparkCondition.inner, snowparkValue.inner).asInstanceOf[Column])
       case _ => throw new IllegalStateException(s"Unsupported subFeedType ${condition.subFeedType.typeSymbol.name}, ${value.subFeedType.typeSymbol.name} in method when")
     }
   }
