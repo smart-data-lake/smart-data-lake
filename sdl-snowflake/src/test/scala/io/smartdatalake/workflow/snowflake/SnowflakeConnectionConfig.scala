@@ -28,10 +28,10 @@ import io.smartdatalake.workflow.connection.SnowflakeConnection
 object SnowflakeConnectionConfig {
   val sfConnection: SnowflakeConnection = SnowflakeConnection(
     id = "sfCon",
-    url = "https://nlzwyzv-hf72796.snowflakecomputing.com",
+    url = "<accountUrl>",
     warehouse = "COMPUTE_WH",
     database = "testdb",
     role = "ACCOUNTADMIN",
-    authMode = BasicAuthMode("CLEAR#zachkull", "CLEAR#Sagjdgn5KencCX3")
+    authMode = BasicAuthMode("CLEAR#<user>", "CLEAR#<pwd>")
   )
 }
