@@ -49,7 +49,7 @@ which CopyAction does not.
 Similarly, our transformer is now of type SQLDf**s**Transformer.
 Again, the **s** is important, since it shows that multiple inputs/output Data Objects are possible, which is what we need in this step.
 In the previous step, we defined a SQLDfTransformer because we only needed one input.
-- Finally, the *SQLDfsTransformer* expects it's code as a HOCON object rather than as a string. 
+- Finally, the *SQLDfsTransformer* expects its code as a HOCON object rather than as a string. 
 This is due to the fact that you could have multiple
 outputs, in which case you would need to name them in order to distinguish them.
 In our case, there is only one output DataObject: *btl-connected-airports*.
