@@ -23,10 +23,10 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{PerformanceUtils, ScalaUtil}
-import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject}
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow._
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject}
 
 import java.time.Duration
 import scala.reflect.runtime.universe._
@@ -34,6 +34,7 @@ import scala.reflect.runtime.universe._
 /**
  * Implementation of SubFeed handling.
  * This is a generic implementation that supports many input and output SubFeeds.
+ *
  * @tparam S SubFeed type this Action is designed for.
  */
 abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
@@ -73,7 +74,8 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   // helper data structures
   private lazy val inputMap = (inputs ++ recursiveInputs).map(i => i.id -> i).toMap
   private lazy val outputMap = outputs.map(i => i.id -> i).toMap
-  private[smartdatalake] def subFeedConverter(): SubFeedConverter[S]
+
+  private[smartdatalake] def subFeedConverter: SubFeedConverter[S]
 
   def prepareInputSubFeeds(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): (Seq[S],Seq[S]) = {
     val mainInput = getMainInput(subFeeds)
