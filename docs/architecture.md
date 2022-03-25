@@ -3,7 +3,7 @@ id: architecture
 title: Architecture
 ---
 
-Smart Data Lake Builder is basically a Java application which is started on the [command line](reference/commandLine.md).
+Smart Data Lake Builder (SDLB) is basically a Java application which is started on the [command line](reference/commandLine.md).
 It can run in many environments and platforms like a Databricks cluster, Azure Synapse, Google Dataproc, and also on your local machine, see [Getting Started](getting-started/setup).
 
 Find below an overview of requirements, versions and supported configurations.
@@ -15,7 +15,7 @@ Find below an overview of requirements, versions and supported configurations.
 - Uses Maven 3+ as build system
 
 ## Versions and supported configuration
-Smart Data Lake Builder currently maintains the following two major versions, which are published as Maven artifacts on maven central:
+SDLB currently maintains the following two major versions, which are published as Maven artifacts on maven central:
 
 |SDL Version|Java/Scala/Hadoop Version|File Engine|Spark Engine|Snowflake/Snowpark Engine|Comments|
 | --------- | ----------------------- | --------- | ---------- | ----------------------- | ------ |
@@ -28,8 +28,12 @@ It's possible to customize dependencies and make Smart Data Lake Builder work wi
 
 In general, Java library versions are held as close as possible to the ones used in the corresponding Spark version.
 
+## Release Notes
+
+See SDBL Release Notes including breaking changes on [Github](https://github.com/smart-data-lake/smart-data-lake/releases)
+
 ## Logging
-By default, Smart Data Lake Builder uses the logging libraries included in the corresponding Spark version. This is Log4j 1.2.x for Spark 2.4.x up to Spark 3.2.x.
+By default, SDLB uses the logging libraries included in the corresponding Spark version. This is Log4j 1.2.x for Spark 2.4.x up to Spark 3.2.x.
 Starting from Spark 3.3.x it will use Log4j 2.x, see [SPARK-6305](https://issues.apache.org/jira/browse/SPARK-6305).
 
 You can customize logging dependencies manually by creating your own maven project.
