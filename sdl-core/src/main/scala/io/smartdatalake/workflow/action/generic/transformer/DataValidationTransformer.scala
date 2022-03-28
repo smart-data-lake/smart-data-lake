@@ -63,8 +63,9 @@ sealed trait ValidationRule {
 
 /**
  * Definition for a row level data validation rule.
- * @param condition a Spark SQL expression defining the condition to be tested. The condition should return true if the condition is satisfied.
- * @param errorMsg Optional error msg to be create if the condition fails. Default is to use a text representation of the condition.
+ *
+ * @param condition an SQL expression defining the condition to be tested. The condition should return true if the condition is satisfied.
+ * @param errorMsg  Optional error msg to be create if the condition fails. Default is to use a text representation of the condition.
  */
 case class RowLevelValidationRule(condition: String, errorMsg: Option[String] = None) extends ValidationRule {
   override def getValidationColumn(implicit functions: DataFrameFunctions): GenericColumn = {
