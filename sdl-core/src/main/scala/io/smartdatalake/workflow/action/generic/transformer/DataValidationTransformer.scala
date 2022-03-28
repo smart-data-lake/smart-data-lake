@@ -24,7 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}
+import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn, GenericDataFrame}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
 
 import scala.reflect.runtime.universe.typeOf
@@ -39,12 +39,12 @@ import scala.reflect.runtime.universe.typeOf
  *                                 By default SparkSubFeed langauge is used, but you can configure a different one if needed.
  */
 case class DataValidationTransformer(override val name: String = "dataValidation", override val description: Option[String] = None, rules: Seq[ValidationRule], errorsColumn: String = "errors", subFeedTypeForValidation: String = typeOf[SparkSubFeed].typeSymbol.fullName) extends GenericDfTransformer {
-  private val validationHelper: DataFrameSubFeedCompanion = DataFrameSubFeed.getHelper(subFeedTypeForValidation)
+  private val validationHelper: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(subFeedTypeForValidation)
   // check that rules are parsable
   rules.foreach(_.getValidationColumn(validationHelper))
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
-    implicit val runtimeHelper: DataFrameSubFeedCompanion = DataFrameSubFeed.getHelper(df.subFeedType)
-    import runtimeHelper._
+    implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
+    import functions._
     df.withColumn(errorsColumn, array_construct_compact(rules.map(rule => rule.getValidationColumn): _*))
   }
   override def factory: FromConfigFactory[GenericDfTransformer] = DataValidationTransformer
@@ -58,7 +58,7 @@ object DataValidationTransformer extends FromConfigFactory[GenericDfTransformer]
 
 sealed trait ValidationRule {
   def prepare(implicit context: ActionPipelineContext): Unit = Unit
-  def getValidationColumn(implicit helper: DataFrameSubFeedCompanion): GenericColumn
+  def getValidationColumn(implicit helper: DataFrameFunctions): GenericColumn
 }
 
 /**
@@ -67,8 +67,8 @@ sealed trait ValidationRule {
  * @param errorMsg Optional error msg to be create if the condition fails. Default is to use a text representation of the condition.
  */
 case class RowLevelValidationRule(condition: String, errorMsg: Option[String] = None) extends ValidationRule {
-  override def getValidationColumn(implicit helper: DataFrameSubFeedCompanion): GenericColumn = {
-    import helper._
+  override def getValidationColumn(implicit functions: DataFrameFunctions): GenericColumn = {
+    import functions._
     when(not(expr(condition)), lit(errorMsg.getOrElse(s"""validation rule "$condition" failed!"""")))
   }
 }

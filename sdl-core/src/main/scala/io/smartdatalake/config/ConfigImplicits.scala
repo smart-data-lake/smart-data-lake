@@ -25,9 +25,9 @@ import io.smartdatalake.definitions.{AuthMode, Condition, Environment, Execution
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.secrets.SecretProviderConfig
 import io.smartdatalake.workflow.action.Action
-import io.smartdatalake.workflow.action.customlogic._
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
+import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfCreatorConfig, CustomDfTransformerConfig, CustomDfsTransformerConfig, CustomFileTransformerConfig, SparkUDFCreatorConfig}
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType

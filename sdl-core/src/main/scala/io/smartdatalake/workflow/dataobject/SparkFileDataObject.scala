@@ -168,9 +168,9 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
   }
 
   override def createReadSchema(writeSchema: GenericSchema)(implicit context: ActionPipelineContext): GenericSchema = {
-    val helper = DataFrameSubFeed.getHelper(writeSchema.subFeedType)
+    val functions = DataFrameSubFeed.getFunctions(writeSchema.subFeedType)
     // add additional columns created by SparkFileDataObject
-    filenameColumn.map(colName => addFieldIfNotExisting(writeSchema, colName, helper.stringType))
+    filenameColumn.map(colName => addFieldIfNotExisting(writeSchema, colName, functions.stringType))
       .getOrElse(writeSchema)
   }
 

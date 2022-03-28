@@ -26,8 +26,8 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.util.spark.DefaultExpressionData
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, OptionsSparkDfsTransformer}
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import org.apache.spark.sql.DataFrame
 
 /**

@@ -23,7 +23,7 @@ import io.smartdatalake.config.{ConfigLoader, ConfigParser, FromConfigFactory, I
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ProductUtil._
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**

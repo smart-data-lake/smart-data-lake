@@ -23,8 +23,8 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{Condition, ExecutionMode, SparkStreamingMode}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, GenericDfsTransformerDef, SQLDfsTransformer}
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
@@ -47,22 +47,21 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param recursiveInputIds      output of action that are used as input in the same action
  * @param inputIdsToIgnoreFilter optional list of input ids to ignore filter (partition values & filter clause)
  */
-// TODO: should be renamed to CustomDataFrameAction
-case class CustomSparkAction (override val id: ActionId,
-                              inputIds: Seq[DataObjectId],
-                              outputIds: Seq[DataObjectId],
-                              transformer: Option[CustomDfsTransformerConfig] = None,
-                              transformers: Seq[GenericDfsTransformer] = Seq(),
-                              override val breakDataFrameLineage: Boolean = false,
-                              override val persist: Boolean = false,
-                              override val mainInputId: Option[DataObjectId] = None,
-                              override val mainOutputId: Option[DataObjectId] = None,
-                              override val executionMode: Option[ExecutionMode] = None,
-                              override val executionCondition: Option[Condition] = None,
-                              override val metricsFailCondition: Option[String] = None,
-                              override val metadata: Option[ActionMetadata] = None,
-                              recursiveInputIds: Seq[DataObjectId] = Seq(),
-                              override val inputIdsToIgnoreFilter: Seq[DataObjectId] = Seq()
+case class CustomDataFrameAction(override val id: ActionId,
+                                 inputIds: Seq[DataObjectId],
+                                 outputIds: Seq[DataObjectId],
+                                 transformer: Option[CustomDfsTransformerConfig] = None,
+                                 transformers: Seq[GenericDfsTransformer] = Seq(),
+                                 override val breakDataFrameLineage: Boolean = false,
+                                 override val persist: Boolean = false,
+                                 override val mainInputId: Option[DataObjectId] = None,
+                                 override val mainOutputId: Option[DataObjectId] = None,
+                                 override val executionMode: Option[ExecutionMode] = None,
+                                 override val executionCondition: Option[Condition] = None,
+                                 override val metricsFailCondition: Option[String] = None,
+                                 override val metadata: Option[ActionMetadata] = None,
+                                 recursiveInputIds: Seq[DataObjectId] = Seq(),
+                                 override val inputIdsToIgnoreFilter: Seq[DataObjectId] = Seq()
                              )(implicit instanceRegistry: InstanceRegistry) extends DataFrameActionImpl {
 
   override val recursiveInputs: Seq[DataObject with CanCreateDataFrame] = recursiveInputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
@@ -93,13 +92,13 @@ case class CustomSparkAction (override val id: ActionId,
     transformerTypeStats.map(_._1).headOption
   }
 
-  override def factory: FromConfigFactory[Action] = CustomSparkAction
+  override def factory: FromConfigFactory[Action] = CustomDataFrameAction
 
 }
 
 
-object CustomSparkAction extends FromConfigFactory[Action] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CustomSparkAction = {
-    extract[CustomSparkAction](config)
+object CustomDataFrameAction extends FromConfigFactory[Action] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CustomDataFrameAction = {
+    extract[CustomDataFrameAction](config)
   }
 }

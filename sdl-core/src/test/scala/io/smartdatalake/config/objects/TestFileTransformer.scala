@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.config.objects
 
-import io.smartdatalake.workflow.action.customlogic.CustomFileTransformer
+import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformer
 import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
 
 class TestFileTransformer extends CustomFileTransformer {

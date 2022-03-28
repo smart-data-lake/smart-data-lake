@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,12 +16,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow.action.customlogic
+package io.smartdatalake.workflow.action.spark.customlogic
 
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig.{fnExecType, fnSchemaType}
+import CustomDfCreatorConfig.{fnExecType, fnSchemaType}
 import io.smartdatalake.workflow.dataobject.CustomDfDataObject
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.types.StructType

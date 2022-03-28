@@ -40,7 +40,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param isDAGStart true if this subfeed is a start node of the dag
  * @param isSkipped true if this subfeed is the result of a skipped action
  * @param isDummy true if this subfeed only contains a dummy DataFrame. Dummy DataFrames can be used for validating the lineage in init phase, but not for the exec phase.
- * @param filter a spark sql filter expression. This is used by SparkIncrementalMode.
+ * @param filter a spark sql filter expression. This is used by DataFrameIncrementalMode.
  */
 case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame],
                         override val dataObjectId: DataObjectId,

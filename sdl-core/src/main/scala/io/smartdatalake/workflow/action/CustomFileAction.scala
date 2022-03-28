@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{Condition, ExecutionMode}
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, TryWithRessource}
-import io.smartdatalake.workflow.action.customlogic.CustomFileTransformerConfig
+import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig
 import io.smartdatalake.workflow.dataobject.HadoopFileDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed}
 import org.apache.hadoop.fs.Path

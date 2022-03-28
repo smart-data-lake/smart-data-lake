@@ -46,12 +46,12 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  */
 case class SQLDfTransformer(override val name: String = "sqlTransform", override val description: Option[String] = None, code: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsGenericDfTransformer {
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit context: ActionPipelineContext): GenericDataFrame = {
-    val helper = DataFrameSubFeed.getHelper(df.subFeedType)
+    val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
     val inputViewName = ActionHelper.replaceSpecialCharactersWithUnderscore(dataObjectId.id)
     val preparedSql = SparkExpressionUtil.substituteOptions(actionId, Some(s"transformers.$name.sqlCode"), code, options + ("inputViewName" -> inputViewName))
     try {
       df.createOrReplaceTempView(s"$inputViewName")
-      helper.sql(preparedSql,dataObjectId)
+      functions.sql(preparedSql,dataObjectId)
     } catch {
       case e: Throwable => throw new SQLTransformationException(s"($actionId.transformers.$name) Could not execute SQL query. Check your query and make sure to use '$inputViewName' or token '%{inputViewName}' as temporary view in the SQL statement (special characters are replaces by underscores). Error: ${e.getMessage}")
     }

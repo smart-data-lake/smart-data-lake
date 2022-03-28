@@ -34,7 +34,7 @@ private[smartdatalake] trait SchemaConverter {
   def fromSubFeedType: Type
   def toSubFeedType: Type
   final def convert(schema: GenericSchema): GenericSchema = {
-    val helper = DataFrameSubFeed.getHelper(toSubFeedType)
+    val helper = DataFrameSubFeed.getCompanion(toSubFeedType)
     helper.createSchema(schema.fields.map(convertField))
   }
   def convertField(field: GenericField): GenericField

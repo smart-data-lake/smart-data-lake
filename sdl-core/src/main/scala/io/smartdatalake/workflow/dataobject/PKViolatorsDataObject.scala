@@ -61,8 +61,8 @@ case class PKViolatorsDataObject(id: DataObjectId,
   extends DataObject with CanCreateDataFrame with ParsableFromConfig[PKViolatorsDataObject] {
 
   override def getDataFrame(partitionValues: Seq[PartitionValues], subFeedType: Type)(implicit context: ActionPipelineContext): GenericDataFrame = {
-    val helper = DataFrameSubFeed.getHelper(subFeedType)
-    import helper._
+    val functions = DataFrameSubFeed.getFunctions(subFeedType)
+    import functions._
 
     import PKViolatorsDataObject.{columnNameName, columnValueName}
     // Get all DataObjects from registry
@@ -78,7 +78,7 @@ case class PKViolatorsDataObject(id: DataObjectId,
     logger.info(s"Prepare DataFrame with primary key violations for ${dataObjectsWithPk.map(_.id).mkString(", ")}")
 
     def colName2colRepresentation(colName: String) = struct(lit(colName).as(columnNameName),col(colName).cast(stringType).as(columnValueName))
-    def optionalCastColToString(doCast: Boolean)(col: GenericColumn) = if (doCast) col.cast(helper.stringType) else col
+    def optionalCastColToString(doCast: Boolean)(col: GenericColumn) = if (doCast) col.cast(functions.stringType) else col
 
     def getPKviolatorDf(dataObject: TableDataObject) = {
       val pkColNames = dataObject.table.primaryKey.get.toArray
@@ -117,7 +117,7 @@ case class PKViolatorsDataObject(id: DataObjectId,
   }
 
   override private[smartdatalake] def getSubFeed(partitionValues: Seq[PartitionValues], subFeedType: universe.Type)(implicit context: ActionPipelineContext) = {
-    val helper = DataFrameSubFeed.getHelper(subFeedType)
+    val helper = DataFrameSubFeed.getCompanion(subFeedType)
     val df = getDataFrame(partitionValues, subFeedType)
     helper.getSubFeed(df, id, partitionValues)
   }

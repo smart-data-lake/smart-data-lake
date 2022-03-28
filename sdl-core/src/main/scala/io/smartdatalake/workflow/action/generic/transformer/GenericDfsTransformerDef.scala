@@ -70,7 +70,7 @@ trait GenericDfsTransformerDef extends PartitionValueTransformer {
 }
 
 /**
- * Interface to implement Spark-DataFrame transformers working with many inputs and many outputs (n:m)
+ * Interface to implement GenericDataFrame transformers working with many inputs and many outputs (n:m)
  */
 trait GenericDfsTransformer extends GenericDfsTransformerDef with ParsableFromConfig[GenericDfsTransformer]
 
@@ -87,8 +87,8 @@ trait SparkDfsTransformer extends GenericDfsTransformer {
 }
 
 /**
- * Interface to implement Spark-DataFrame transformers working with many inputs and many outputs (n:m)
- * This trait extends DfSparkTransformer to pass a map of options as parameter to the transform function. This is mainly
+ * Interface to implement GenericDataFrame transformers working with many inputs and many outputs (n:m)
+ * This trait extends GenericDfsTransformer to pass a map of options as parameter to the transform function. This is mainly
  * used by custom transformers.
  */
 trait OptionsGenericDfsTransformer extends GenericDfsTransformer {

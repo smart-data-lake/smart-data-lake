@@ -19,7 +19,7 @@
 package io.smartdatalake.testutils.custom
 
 import io.smartdatalake.testutils.TestUtil.dfNonUniqueWithNull
-import io.smartdatalake.workflow.action.customlogic.CustomDfCreator
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreator
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 

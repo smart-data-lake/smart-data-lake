@@ -20,8 +20,8 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.workflow.action.CustomSparkAction
-import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformer
+import io.smartdatalake.workflow.action.CustomDataFrameAction
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassDfsTransformer
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.types._
@@ -63,7 +63,7 @@ class TickTockHiveTableDataObjectTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     val customTransformerConfig = ScalaClassDfsTransformer(className = classOf[TestDfsTransformerEmptyDf].getName)
-    val action = CustomSparkAction("action", List(srcDO.id), List(tgtDO.id), transformers = Seq(customTransformerConfig), recursiveInputIds = List(tgtDO.id))
+    val action = CustomDataFrameAction("action", List(srcDO.id), List(tgtDO.id), transformers = Seq(customTransformerConfig), recursiveInputIds = List(tgtDO.id))
 
     // write test files
     val l1 = Seq((1, "john", 5)).toDF("id", "name", "rating")

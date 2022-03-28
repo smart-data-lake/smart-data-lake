@@ -36,8 +36,8 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  */
 case class AdditionalColumnsTransformer(override val name: String = "additionalColumns", override val description: Option[String] = None, additionalColumns: Map[String,String]) extends GenericDfTransformer {
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
-    val helper = DataFrameSubFeed.getHelper(df.subFeedType)
-    import helper._
+    val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
+    import functions._
     val data = DefaultExpressionData.from(context, partitionValues)
     additionalColumns.foldLeft(df){
       case (df, (colName, expr)) =>

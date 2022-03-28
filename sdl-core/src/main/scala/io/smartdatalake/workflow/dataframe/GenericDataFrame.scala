@@ -63,13 +63,13 @@ trait GenericDataFrame {
   def count: Long
 
   // instantiate subfeed helper
-  private lazy val helper = DataFrameSubFeed.getHelper(subFeedType)
+  private lazy val functions = DataFrameSubFeed.getFunctions(subFeedType)
 
   /**
    * returns data frame which consists of those rows which contain at least a null in the specified columns
    */
   def getNulls(cols: Seq[String]): GenericDataFrame = {
-    import helper._
+    import functions._
     filter(cols.map(col(_).isNull).reduce(_ or _))
   }
 
@@ -78,11 +78,11 @@ trait GenericDataFrame {
    * The result data frame possesses the columns cols and an additional count column countColname.
    */
   def getNonuniqueStats(cols: Seq[String] = schema.columns, countColname: String = "_cnt_"): GenericDataFrame = {
-    import helper._
+    import functions._
     // for better usability we define empty Array of cols to mean all columns of df
     val colsInDf = if (cols.isEmpty) schema.columns else schema.columns.intersect(cols)
     groupBy(colsInDf.map(col))
-      .agg(Seq(helper.count(col("*")).as(countColname)))
+      .agg(Seq(functions.count(col("*")).as(countColname)))
       .filter(col(countColname) > lit(1))
   }
   /**
@@ -93,7 +93,7 @@ trait GenericDataFrame {
    * @return subdataframe of n-lets
    */
   def getNonuniqueRows(cols: Seq[String] = schema.columns): GenericDataFrame = {
-    import helper._
+    import functions._
     val dfNonUnique = getNonuniqueStats(cols, "_duplicationCount_").drop("_duplicationCount_")
     join(dfNonUnique, cols).select(schema.columns.map(col))
   }
@@ -129,10 +129,10 @@ trait GenericDataFrame {
   def symmetricDifference(other: GenericDataFrame, diffColName: String = "_in_first_df"): GenericDataFrame = {
     require(schema.columns.map(_.toLowerCase).toSet == other.schema.columns.map(_.toLowerCase).toSet, "DataFrames must have the same columns for symmetricDifference calculation")
     // reorder columns according to the original df for calculating symmetricDifference
-    val colOrder = schema.columns.map(helper.col)
+    val colOrder = schema.columns.map(functions.col)
     val dfOtherPrep = other.select(colOrder)
-    this.except(dfOtherPrep).withColumn(diffColName, helper.lit(true))
-      .unionByName(dfOtherPrep.except(this).withColumn(diffColName, helper.lit(false)))
+    this.except(dfOtherPrep).withColumn(diffColName, functions.lit(true))
+      .unionByName(dfOtherPrep.except(this).withColumn(diffColName, functions.lit(false)))
   }
 
   /**

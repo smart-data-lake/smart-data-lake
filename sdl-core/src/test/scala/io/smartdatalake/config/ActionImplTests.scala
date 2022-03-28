@@ -22,9 +22,9 @@ import com.typesafe.config.{Config, ConfigException, ConfigFactory}
 import io.smartdatalake.config.SdlConfigObject._
 import io.smartdatalake.workflow.action
 import io.smartdatalake.workflow.action.TestDfTransformer
-import io.smartdatalake.workflow.action.customlogic.CustomFileTransformerConfig
 import io.smartdatalake.workflow.action.generic.transformer.{DataValidationTransformer, DfTransformerWrapperDfsTransformer, FilterTransformer, RowLevelValidationRule, SQLDfsTransformer, WhitelistTransformer}
 import io.smartdatalake.workflow.action.script.CmdScript
+import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassDfTransformer
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -99,13 +99,13 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
     )
   }
 
-  "CustomSparkAction" should "be parsable" in {
+  "CustomDataFrameAction" should "be parsable" in {
 
     val config = ConfigFactory.parseString(
       """
         |actions = {
         | 123 = {
-        |   type = CustomSparkAction
+        |   type = CustomDataFrameAction
         |   inputIds = [tdo1]
         |   outputIds = [tdo2]
         |   transformers = [{
@@ -124,7 +124,7 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
         |""".stripMargin).withFallback(dataObjectConfig).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
-    registry.getActions.head shouldBe action.CustomSparkAction(
+    registry.getActions.head shouldBe action.CustomDataFrameAction(
       id = "123",
       inputIds = Seq("tdo1"),
       outputIds = Seq("tdo2"),

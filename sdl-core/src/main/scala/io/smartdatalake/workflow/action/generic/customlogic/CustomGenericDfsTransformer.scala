@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action.generic.customlogic
 
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.DataFrameSubFeedCompanion
-import io.smartdatalake.workflow.dataframe.GenericDataFrame
+import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
 
 /**
  * Interface to define a custom Spark-DataFrame transformation (n:m)
@@ -37,7 +37,7 @@ trait CustomGenericDfsTransformer extends Serializable {
    * @param dfs     GenericDataFrames to be transformed
    * @return Transformed GenericDataFrame
    */
-  def transform(helper: DataFrameSubFeedCompanion, options: Map[String, String], dfs: Map[String, GenericDataFrame]): Map[String, GenericDataFrame]
+  def transform(helper: DataFrameFunctions, options: Map[String, String], dfs: Map[String, GenericDataFrame]): Map[String, GenericDataFrame]
 
   /**
    * Optional function to define the transformation of input to output partition values.

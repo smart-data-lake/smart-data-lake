@@ -19,14 +19,13 @@
 
 package io.smartdatalake.workflow.action
 
-import java.nio.file.Files
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ActionId
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.customlogic.{SparkUDFCreator, SparkUDFCreatorConfig}
+import io.smartdatalake.workflow.action.spark.customlogic.{SparkUDFCreator, SparkUDFCreatorConfig}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed}
 import org.apache.spark.sql.SparkSession
@@ -34,6 +33,8 @@ import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.udf
 import org.scalatest.{BeforeAndAfter, FunSuite}
+
+import java.nio.file.Files
 
 class ExecutionModeTest extends FunSuite with BeforeAndAfter {
 
@@ -154,31 +155,31 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
     intercept[NoDataToProcessWarning](executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping))
   }
 
-  test("SparkIncrementalMode empty source") {
-    val executionMode = SparkIncrementalMode(compareCol = "rating")
+  test("DataFrameIncrementalMode empty source") {
+    val executionMode = DataFrameIncrementalMode(compareCol = "rating")
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, tgt1DO.id, partitionValues = Seq())
     intercept[NoDataToProcessWarning](executionMode.apply(ActionId("test"), tgt1DO, tgt2DO, subFeed, PartitionValues.oneToOneMapping))
   }
 
-  test("SparkIncrementalMode empty target") {
-    val executionMode = SparkIncrementalMode(compareCol = "rating")
+  test("DataFrameIncrementalMode empty target") {
+    val executionMode = DataFrameIncrementalMode(compareCol = "rating")
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
     val result = executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping).get
     assert(result.filter.isEmpty) // no filter if target is empty as everything needs to be copied
   }
 
-  test("SparkIncrementalMode partially filled target") {
-    val executionMode = SparkIncrementalMode(compareCol = "rating")
+  test("DataFrameIncrementalMode partially filled target") {
+    val executionMode = DataFrameIncrementalMode(compareCol = "rating")
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
     val result = executionMode.apply(ActionId("test"), srcDO, tgt2DO, subFeed, PartitionValues.oneToOneMapping).get
     assert(result.filter.nonEmpty)
   }
 
-  test("SparkIncrementalMode no data to process") {
-    val executionMode = SparkIncrementalMode(compareCol = "rating")
+  test("DataFrameIncrementalMode no data to process") {
+    val executionMode = DataFrameIncrementalMode(compareCol = "rating")
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, tgt2DO.id, partitionValues = Seq())
     intercept[NoDataToProcessWarning](executionMode.apply(ActionId("test"), tgt2DO, tgt2DO, subFeed, PartitionValues.oneToOneMapping))

@@ -24,10 +24,10 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.customlogic.{CustomDfsTransformer, CustomDfsTransformerConfig}
-import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
-import io.smartdatalake.workflow.action.spark.transformer.ScalaClassDfsTransformer
 import io.smartdatalake.workflow.action._
+import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
+import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, CustomDfsTransformerConfig}
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassDfsTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject._
 import org.apache.hadoop.conf.Configuration
@@ -294,7 +294,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     srcDO1.writeSparkDataFrame(l1, Seq())
     srcDO2.writeSparkDataFrame(l2.union(l1), Seq())
     srcDO3.writeSparkDataFrame(l2.union(l1), Seq())
-    val action1 = CustomSparkAction( "a", inputIds = Seq(srcDO1.id, srcDO2.id, srcDO3.id), inputIdsToIgnoreFilter = Seq(srcDO3.id), outputIds = Seq(tgtDO.id)
+    val action1 = CustomDataFrameAction( "a", inputIds = Seq(srcDO1.id, srcDO2.id, srcDO3.id), inputIdsToIgnoreFilter = Seq(srcDO3.id), outputIds = Seq(tgtDO.id)
                                     , transformers = Seq(ScalaClassDfsTransformer(className=classOf[TestDfsUnionOfThree].getName)))
     // filter partition values lastname=xyz: src1 is not partitioned, src2 & src3 have 1 record with partition lastname=doe and 1 record with partition lastname=xyz
     val partitionValuesFilter = Seq(PartitionValues(Map("lastname" -> "doe")))
@@ -314,7 +314,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
   test("action dag with four dependencies") {
     // Action B and C depend on Action A
-    // Action D depends on Action B and C (uses CustomSparkAction with multiple inputs)
+    // Action D depends on Action B and C (uses CustomDataFrameAction with multiple inputs)
 
     // setup DataObjects
     val feed = "actionpipeline"
@@ -351,7 +351,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
       DeduplicateAction("A", srcDO.id, tgtADO.id),
       CopyAction("B", tgtADO.id, tgtBDO.id),
       CopyAction("C", tgtADO.id, tgtCDO.id),
-      CustomSparkAction("D", List(tgtBDO.id,tgtCDO.id), List(tgtDDO.id), transformers = Seq(customTransfomer))
+      CustomDataFrameAction("D", List(tgtBDO.id,tgtCDO.id), List(tgtDDO.id), transformers = Seq(customTransfomer))
     )
     val dag = ActionDAGRun(actions)
 
@@ -868,7 +868,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     src1DO.writeSparkDataFrame(data1src1.toDF("lastname", "firstname", "rating"), Seq())
     src2DO.writeSparkDataFrame(data1src2.toDF("lastname", "firstname", "rating"), Seq())
 
-    val action1 = CustomSparkAction( "a", Seq(src1DO.id,src2DO.id), Seq(tgt1DO.id)
+    val action1 = CustomDataFrameAction( "a", Seq(src1DO.id,src2DO.id), Seq(tgt1DO.id)
                                    , executionMode = Some(SparkStreamingMode(checkpointLocation = tempDir.resolve("stateA").toUri.toString))
                                    , transformers = Seq(ScalaClassDfsTransformer(className = classOf[TestStreamingTransformer].getName))
                                    )
@@ -910,7 +910,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(action1MainMetrics("records_written")==1)
   }
 
-  test("action dag with 2 actions in sequence, first is executionMode=SparkIncrementalMode, second is normal") {
+  test("action dag with 2 actions in sequence, first is executionMode=DataFrameIncrementalMode, second is normal") {
     // setup DataObjects
     val feed = "actionpipeline"
     val tempDir = Files.createTempDirectory(feed)
@@ -926,7 +926,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val df1 = Seq(("doe","john",5, Timestamp.from(Instant.now))).toDF("lastname", "firstname", "rating", "tstmp")
     srcDO.writeSparkDataFrame(df1, Seq())
 
-    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkIncrementalMode(compareCol = "tstmp")))
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(DataFrameIncrementalMode(compareCol = "tstmp")))
     val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id)
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1,action2))
 
@@ -972,7 +972,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(action2MainMetrics("records_written")==2) // without execution mode always the whole table is processed
   }
 
-  test("action dag with 2 actions in sequence, first is executionMode=SparkIncrementalMode, second with executionCondition=true und executionMode=ProcessAllMode") {
+  test("action dag with 2 actions in sequence, first is executionMode=DataFrameIncrementalMode, second with executionCondition=true und executionMode=ProcessAllMode") {
     // setup DataObjects
     val feed = "actionpipeline"
     val tempDir = Files.createTempDirectory(feed)
@@ -994,8 +994,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     src2DO.writeSparkDataFrame(df2, Seq())
 
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id
-      , executionMode = Some(SparkIncrementalMode(compareCol = "tstmp")))
-    val action2 = CustomSparkAction("b", Seq(tgt1DO.id,src2DO.id), Seq(tgt2DO.id)
+      , executionMode = Some(DataFrameIncrementalMode(compareCol = "tstmp")))
+    val action2 = CustomDataFrameAction("b", Seq(tgt1DO.id,src2DO.id), Seq(tgt2DO.id)
       , executionCondition = Some(Condition("true")), executionMode = Some(ProcessAllMode()) // process everything, also if predecessor skipped
       , transformer = Some(CustomDfsTransformerConfig.apply(sqlCode = Some(Map(tgt2DO.id -> "select * from src2 join tgt1 using (lastname, firstname)")))))
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1,action2))
@@ -1031,7 +1031,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(action2MainMetrics("records_written")==1)
   }
 
-  test("action dag with 2 actions in sequence, first is executionMode=SparkIncrementalMode, second with executionCondition=true") {
+  test("action dag with 2 actions in sequence, first is executionMode=DataFrameIncrementalMode, second with executionCondition=true") {
     // setup DataObjects
     val feed = "actionpipeline"
     val tempDir = Files.createTempDirectory(feed)
@@ -1054,8 +1054,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     src2DO.writeSparkDataFrame(df2, Seq())
 
     val transformation = CustomDfsTransformerConfig.apply(sqlCode = Some(Map(tgt2DO.id -> "select * from src2 join tgt1 using (lastname, firstname)")))
-    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkIncrementalMode(compareCol = "tstmp")))
-    val action2 = CustomSparkAction("b", Seq(tgt1DO.id,src2DO.id), Seq(tgt2DO.id), Some(transformation), executionCondition = Some(Condition("true")))
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(DataFrameIncrementalMode(compareCol = "tstmp")))
+    val action2 = CustomDataFrameAction("b", Seq(tgt1DO.id,src2DO.id), Seq(tgt2DO.id), Some(transformation), executionCondition = Some(Condition("true")))
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1,action2))
 
     // first dag run, first file processed
@@ -1086,7 +1086,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(action2MainMetrics("records_written")==0)
   }
 
-  test("action dag with 2 actions in sequence, first is executionMode=SparkIncrementalMode, second with executionCondition=true and ProcessAll mode") {
+  test("action dag with 2 actions in sequence, first is executionMode=DataFrameIncrementalMode, second with executionCondition=true and ProcessAll mode") {
     // setup DataObjects
     val feed = "actionpipeline"
     val tempDir = Files.createTempDirectory(feed)
@@ -1109,8 +1109,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     src2DO.writeSparkDataFrame(df2, Seq())
 
     val transformation = CustomDfsTransformerConfig.apply(sqlCode = Some(Map(tgt2DO.id -> "select * from src2 join tgt1 using (lastname, firstname)")))
-    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkIncrementalMode(compareCol = "tstmp")))
-    val action2 = CustomSparkAction("b", Seq(tgt1DO.id,src2DO.id), Seq(tgt2DO.id), Some(transformation), executionCondition = Some(Condition("true")), executionMode = Some(ProcessAllMode()))
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(DataFrameIncrementalMode(compareCol = "tstmp")))
+    val action2 = CustomDataFrameAction("b", Seq(tgt1DO.id,src2DO.id), Seq(tgt2DO.id), Some(transformation), executionCondition = Some(Condition("true")), executionMode = Some(ProcessAllMode()))
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1,action2))
 
     // first dag run, first file processed

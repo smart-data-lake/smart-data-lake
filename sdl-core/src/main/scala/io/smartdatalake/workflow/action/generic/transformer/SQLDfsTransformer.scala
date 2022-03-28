@@ -45,7 +45,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  */
 case class SQLDfsTransformer(override val name: String = "sqlTransform", override val description: Option[String] = None, code: Map[DataObjectId,String], options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsGenericDfsTransformer {
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String,GenericDataFrame] = {
-    val helper = DataFrameSubFeed.getHelper(dfs.values.head.subFeedType)
+    val functions = DataFrameSubFeed.getFunctions(dfs.values.head.subFeedType)
     // register all input DataObjects as temporary table
     dfs.foreach {
       case (dataObjectId,df) =>
@@ -58,7 +58,7 @@ case class SQLDfsTransformer(override val name: String = "sqlTransform", overrid
       case (dataObjectId,sql) =>
         val df = try {
           val preparedSql = SparkExpressionUtil.substituteOptions(dataObjectId, Some(s"transformers.$name.code"), sql, options)
-          helper.sql(preparedSql,dataObjectId)
+          functions.sql(preparedSql,dataObjectId)
         } catch {
           case e: Throwable => throw new SQLTransformationException(s"($actionId.transformers.$name) Could not execute SQL query for $dataObjectId. Check your query and remember remember that special characters are replaced by underscores for temporary view names in the SQL statement. Error: ${e.getMessage}")
         }

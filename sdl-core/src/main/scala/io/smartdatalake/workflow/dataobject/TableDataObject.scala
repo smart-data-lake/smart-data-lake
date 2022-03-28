@@ -36,8 +36,8 @@ private[smartdatalake] trait TableDataObject extends DataObject with CanCreateDa
   def dropTable(implicit context: ActionPipelineContext): Unit
 
   def getPKduplicates(subFeedType: Type)(implicit context: ActionPipelineContext): GenericDataFrame = {
-    val helper = DataFrameSubFeed.getHelper(subFeedType)
-    import helper._
+    val functions = DataFrameSubFeed.getFunctions(subFeedType)
+    import functions._
     if (table.primaryKey.isEmpty) {
       getDataFrame(Seq(), subFeedType).filter(lit(false)) // get empty dataframe
     } else {
@@ -46,8 +46,8 @@ private[smartdatalake] trait TableDataObject extends DataObject with CanCreateDa
   }
 
   def getPKnulls(subFeedType: Type)(implicit context: ActionPipelineContext): GenericDataFrame = {
-    val helper = DataFrameSubFeed.getHelper(subFeedType)
-    import helper._
+    val functions = DataFrameSubFeed.getFunctions(subFeedType)
+    import functions._
     if (table.primaryKey.isEmpty) {
       getDataFrame(Seq(), subFeedType).filter(lit(false)) // get empty dataframe
     } else {

@@ -40,15 +40,15 @@ import scala.util.{Failure, Success, Try}
  *                                 By default SparkSubFeed langauge is used, but you can configure a different one if needed.
  */
 case class FilterTransformer(override val name: String = "filter", override val description: Option[String] = None, filterClause: String, subFeedTypeForValidation: String = typeOf[SparkSubFeed].typeSymbol.fullName) extends GenericDfTransformer {
-  private val validationHelper: DataFrameSubFeedCompanion = DataFrameSubFeed.getHelper(subFeedTypeForValidation)
+  private val validationHelper: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(subFeedTypeForValidation)
   import validationHelper._
   private val filterClauseExpr = Try(expr(filterClause)) match {
     case Success(result) => result
     case Failure(e) => throw new ConfigurationException(s"Error parsing filterClause parameter as expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
   }
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
-    val runtimeHelper = DataFrameSubFeed.getHelper(df.subFeedType)
-    import runtimeHelper._
+    val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
+    import functions._
     df.filter(expr(filterClause))
   }
   override def factory: FromConfigFactory[GenericDfTransformer] = FilterTransformer

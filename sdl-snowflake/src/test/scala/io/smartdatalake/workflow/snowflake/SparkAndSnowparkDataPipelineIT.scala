@@ -29,7 +29,7 @@ import io.smartdatalake.workflow.action.generic.customlogic.CustomGenericDfTrans
 import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, ScalaClassGenericDfTransformer}
 import io.smartdatalake.workflow.action.snowflake.customlogic.CustomSnowparkDfTransformer
 import io.smartdatalake.workflow.action.snowflake.transformer.ScalaClassSnowparkDfTransformer
-import io.smartdatalake.workflow.dataframe.GenericDataFrame
+import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, SnowflakeTableDataObject, Table}
 
 import java.nio.file.Files
@@ -107,9 +107,9 @@ class TestOptionsSnowparkDfTransformer extends CustomSnowparkDfTransformer {
 }
 
 class TestAdd1GenericDfTransformer extends CustomGenericDfTransformer {
-  override def transform(helper: DataFrameSubFeedCompanion, options: Map[String, String], df: GenericDataFrame, dataObjectId: String): GenericDataFrame = {
-    val helper = DataFrameSubFeed.getHelper(df.subFeedType)
-    import helper._
+  override def transform(helper: DataFrameFunctions, options: Map[String, String], df: GenericDataFrame, dataObjectId: String): GenericDataFrame = {
+    val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
+    import functions._
     val columnToAdd1 = options("column")
     df.withColumn(columnToAdd1, col(columnToAdd1) + lit(1))
   }

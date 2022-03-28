@@ -23,7 +23,7 @@ import io.smartdatalake.definitions.PartitionDiffMode
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.TryWithRessource
-import io.smartdatalake.workflow.action.customlogic.{CustomFileTransformer, CustomFileTransformerConfig}
+import io.smartdatalake.workflow.action.spark.customlogic.{CustomFileTransformer, CustomFileTransformerConfig}
 import io.smartdatalake.workflow.dataobject.CsvFileDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, InitSubFeed}
 import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}

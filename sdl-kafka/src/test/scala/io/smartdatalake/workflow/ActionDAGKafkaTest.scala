@@ -22,7 +22,7 @@ import io.github.embeddedkafka.EmbeddedKafka
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.action.CopyAction
-import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject._

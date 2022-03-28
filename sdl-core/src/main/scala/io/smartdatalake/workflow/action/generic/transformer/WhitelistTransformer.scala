@@ -35,8 +35,8 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 case class WhitelistTransformer(override val name: String = "whitelist", override val description: Option[String] = None, columnWhitelist: Seq[String]) extends GenericDfTransformer {
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
-    val helper = DataFrameSubFeed.getHelper(df.subFeedType)
-    import helper._
+    val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
+    import functions._
     val colsToSelect = df.schema.columns.filter(colName => columnWhitelist.contains(colName.toLowerCase))
     df.select(colsToSelect.map(col))
   }

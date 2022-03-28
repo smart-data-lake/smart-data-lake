@@ -48,7 +48,7 @@ case class ExecutionModeResult( inputPartitionValues: Seq[PartitionValues] = Seq
  *
  * {{{
  * executionMode = {
- *   type = SparkIncrementalMode
+ *   type = DataFrameIncrementalMode
  *   compareCol = "id"
  * }
  * }}}
@@ -301,10 +301,9 @@ case class SparkStreamingMode(checkpointLocation: String, triggerType: String = 
  * @param applyCondition Condition to decide if execution mode should be applied or not. Define a spark sql expression working with attributes of [[DefaultExecutionModeExpressionData]] returning a boolean.
  *                       Default is to apply the execution mode if given partition values (partition values from command line or passed from previous action) are not empty.
  */
-// TODO: this is not Spark specific and should be renamed to DataFrameIncrementalMode!
-case class SparkIncrementalMode( compareCol: String
-                               , override val alternativeOutputId: Option[DataObjectId] = None
-                               , applyCondition: Option[Condition] = None
+case class DataFrameIncrementalMode(compareCol: String
+                                    , override val alternativeOutputId: Option[DataObjectId] = None
+                                    , applyCondition: Option[Condition] = None
                                ) extends ExecutionMode with ExecutionModeWithMainInputOutput {
   private[smartdatalake] override val applyConditionsDef = applyCondition.toSeq
   private[smartdatalake] override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
@@ -316,14 +315,14 @@ case class SparkIncrementalMode( compareCol: String
   private[smartdatalake] override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
                                             , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
                                            (implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
-    assert(subFeed.isInstanceOf[DataFrameSubFeed], s"($actionId) SparkIncrementalMode needs DataFrameSubFeed to operate but received ${subFeed.getClass.getSimpleName}")
+    assert(subFeed.isInstanceOf[DataFrameSubFeed], s"($actionId) DataFrameIncrementalMode needs DataFrameSubFeed to operate but received ${subFeed.getClass.getSimpleName}")
     val doApply = evaluateApplyConditions(actionId, subFeed)
-      .getOrElse(true) // default is to apply SparkIncrementalMode
+      .getOrElse(true) // default is to apply DataFrameIncrementalMode
     if (doApply) {
       val input = mainInput
       val output = alternativeOutput.getOrElse(mainOutput)
       val dfSubFeed = subFeed.asInstanceOf[DataFrameSubFeed]
-      import dfSubFeed.helper._
+      import dfSubFeed.companion._
       (input, output) match {
         case (doDfInput: CanCreateDataFrame, doDfOutput: CanCreateDataFrame) =>
           // if data object is new, it might not be able to create a DataFrame
@@ -349,23 +348,23 @@ case class SparkIncrementalMode( compareCol: String
               warnMsg.foreach(msg => throw NoDataToProcessWarning(actionId.id, msg))
               // prepare filter
               val dataFilter = if (outputLatestValue != null) {
-                logger.info(s"($actionId) SparkIncrementalMode selected increment for writing to ${output.id}: column $compareCol} from $outputLatestValue to $inputLatestValue to process")
+                logger.info(s"($actionId) DataFrameIncrementalMode selected increment for writing to ${output.id}: column $compareCol} from $outputLatestValue to $inputLatestValue to process")
                 Some(s"$compareCol > cast('$outputLatestValue' as ${inputColType.sql})")
               } else {
-                logger.info(s"($actionId) SparkIncrementalMode selected all data for writing to ${output.id}: output table is currently empty")
+                logger.info(s"($actionId) DataFrameIncrementalMode selected all data for writing to ${output.id}: output table is currently empty")
                 None
               }
               Some(ExecutionModeResult(filter = dataFilter))
             // select all if output is empty
             case (Some(_),None) =>
-              logger.info(s"($actionId) SparkIncrementalMode selected all records for writing to ${output.id}, because output DataObject is still empty.")
+              logger.info(s"($actionId) DataFrameIncrementalMode selected all records for writing to ${output.id}, because output DataObject is still empty.")
               Some(ExecutionModeResult())
             // otherwise no data to process
             case _ =>
               val warnMsg = s"($actionId) No increment to process found for ${output.id}, because ${input.id} is still empty."
               throw NoDataToProcessWarning(actionId.id, warnMsg)
           }
-        case _ => throw ConfigurationException(s"$actionId has set executionMode = $SparkIncrementalMode but $input or $output does not support creating Spark DataFrames!")
+        case _ => throw ConfigurationException(s"$actionId has set executionMode = $DataFrameIncrementalMode but $input or $output does not support creating Spark DataFrames!")
       }
     } else None
   }

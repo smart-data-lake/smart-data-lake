@@ -45,8 +45,8 @@ case class ScalaClassGenericDfsTransformer(override val name: String = "scalaTra
   private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomGenericDfsTransformer](className)
 
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, GenericDataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
-    val helper = DataFrameSubFeed.getHelper(dfs.values.head.subFeedType)
-    customTransformer.transform(helper, options, dfs)
+    val functions = DataFrameSubFeed.getFunctions(dfs.values.head.subFeedType)
+    customTransformer.transform(functions, options, dfs)
   }
 
   override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {
