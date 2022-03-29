@@ -161,48 +161,48 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   override def max(column: GenericColumn): GenericColumn = {
     column match {
       case sparkColumn: SparkColumn => SparkColumn(functions.max(sparkColumn.inner))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${column.subFeedType.typeSymbol.name} in method max")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
   override def count(column: GenericColumn): GenericColumn = {
     column match {
       case sparkColumn: SparkColumn => SparkColumn(functions.count(sparkColumn.inner))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${column.subFeedType.typeSymbol.name} in method count")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
   override def explode(column: GenericColumn): GenericColumn = {
     column match {
       case sparkColumn: SparkColumn => SparkColumn(functions.explode(sparkColumn.inner))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${column.subFeedType.typeSymbol.name} in method explode")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
   override def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
     schema match {
       case sparkSchema: SparkSchema => SparkDataFrame(DataFrameUtil.getEmptyDataFrame(sparkSchema.inner)(context.sparkSession))
-      case _ => throw new IllegalStateException(s"Can not create SparkDataFrame for ${schema.subFeedType.typeSymbol.name}")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(schema)
     }
   }
   override def getEmptyStreamingDataFrame(schema: GenericSchema)(implicit context: ActionPipelineContext): GenericDataFrame = {
     schema match {
       case sparkSchema: SparkSchema => SparkDataFrame(DummyStreamProvider.getDummyDf(sparkSchema.inner)(context.sparkSession))
-      case _ => throw new IllegalStateException(s"Can not create SparkDataFrame for ${schema.subFeedType.typeSymbol.name}")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(schema)
     }
   }
   override def getSubFeed(df: GenericDataFrame, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     df match {
       case sparkDf: SparkDataFrame => SparkSubFeed(Some(sparkDf), dataObjectId, partitionValues)
-      case _ => throw new IllegalStateException(s"Can not create SparkSubFeed for ${df.subFeedType.typeSymbol.name}")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(df)
     }
   }
   override def stringType: GenericDataType = SparkDataType(StringType)
   override def arrayType(dataType: GenericDataType): GenericDataType = {
     dataType match {
       case sparkDataType: SparkDataType => SparkDataType(ArrayType(sparkDataType.inner))
-      case _ => throw new IllegalStateException(s"Can not create SparkDataType for ${dataType.subFeedType.typeSymbol.name}")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(dataType)
     }
   }
   override def structType(fields: Map[String,GenericDataType]): GenericDataType = {
-    assert(fields.values.forall(_.isInstanceOf[SparkDataType]), s"Unsupported subFeedType(s) ${fields.values.filterNot(_.isInstanceOf[SparkDataType]).map(_.subFeedType.typeSymbol.name).toSeq.distinct.mkString(", ")} in method structType")
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, fields.values.toSeq)
     val sparkFields = fields.map{ case (name,dataType) => StructField(name, dataType.asInstanceOf[SparkDataType].inner)}.toSeq
     SparkDataType(StructType(sparkFields))
   }
@@ -210,15 +210,15 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
    * Construct array from given columns removing null values (Snowpark API)
    */
   override def array_construct_compact(columns: GenericColumn*): GenericColumn = {
-    assert(columns.forall(_.isInstanceOf[SparkColumn]), s"Unsupported subFeedType(s) ${columns.filterNot(_.isInstanceOf[SparkColumn]).map(_.subFeedType.typeSymbol.name).distinct.mkString(", ")} in method array_construct_compact")
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
     SparkColumn(functions.flatten(functions.array(functions.array(columns.map(_.asInstanceOf[SparkColumn].inner):_*))))
   }
   override def array(columns: GenericColumn*): GenericColumn = {
-    assert(columns.forall(_.isInstanceOf[SparkColumn]), s"Unsupported subFeedType(s) ${columns.filterNot(_.isInstanceOf[SparkColumn]).map(_.subFeedType.typeSymbol.name).distinct.mkString(", ")} in method array")
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
     SparkColumn(functions.array(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
   }
   override def struct(columns: GenericColumn*): GenericColumn = {
-    assert(columns.forall(_.isInstanceOf[SparkColumn]), s"Unsupported subFeedType(s) ${columns.filterNot(_.isInstanceOf[SparkColumn]).map(_.subFeedType.typeSymbol.name).distinct.mkString(", ")} in method struct")
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
     SparkColumn(functions.struct(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
   }
   override def expr(sqlExpr: String): GenericColumn = SparkColumn(functions.expr(sqlExpr))
@@ -231,14 +231,14 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   override def not(column: GenericColumn): GenericColumn = {
     column match {
       case sparkColumn: SparkColumn => SparkColumn(functions.not(sparkColumn.inner))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${column.subFeedType.typeSymbol.name} in method not")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
   override def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
     SparkDataFrame(context.sparkSession.sql(query))
   }
   override def createSchema(fields: Seq[GenericField]): GenericSchema = {
-    assert(fields.forall(_.isInstanceOf[SparkField]), s"Unsupported subFeedType(s) ${fields.filterNot(_.isInstanceOf[SparkField]).map(_.subFeedType.typeSymbol.name).distinct.mkString(", ")} in method createSchema")
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, fields)
     SparkSchema(StructType(fields.map(_.asInstanceOf[SparkField].inner)))
   }
 }

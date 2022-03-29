@@ -27,10 +27,16 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataF
 import scala.reflect.runtime.universe.Type
 
 /**
+ * Interface for all Generic objects defining it's subfeed type
+ */
+trait GenericTypedObject {
+  def subFeedType: Type
+}
+
+/**
  * Interface for a generic data frame.
  */
-trait GenericDataFrame {
-  def subFeedType: Type
+trait GenericDataFrame extends GenericTypedObject {
 
   def schema: GenericSchema
 
@@ -165,16 +171,14 @@ trait GenericDataFrame {
 /**
  * Interface for the result of a df.groupBy on a GenericDataFrame
  */
-trait GenericGroupedDataFrame {
-  def subFeedType: Type
+trait GenericGroupedDataFrame extends GenericTypedObject {
   def agg(columns: Seq[GenericColumn]): GenericDataFrame
 }
 
 /**
  * Interface for the schema of a GenericDataFrame
  */
-trait GenericSchema {
-  def subFeedType: Type
+trait GenericSchema extends GenericTypedObject {
 
   /**
    * Convert schema to another SubFeedType.
@@ -200,8 +204,7 @@ trait GenericSchema {
 /**
  * Interface for the columns of a GenericDataFrame
  */
-trait GenericColumn {
-  def subFeedType: Type
+trait GenericColumn extends GenericTypedObject {
   def ===(other: GenericColumn): GenericColumn
   def >(other: GenericColumn): GenericColumn
   def <(other: GenericColumn): GenericColumn
@@ -225,8 +228,7 @@ trait GenericColumn {
 /**
  * Interface for the fields of a GenericSchema or struct type
  */
-trait GenericField {
-  def subFeedType: Type
+trait GenericField extends GenericTypedObject {
   def name: String
   def dataType: GenericDataType
   def nullable: Boolean
@@ -238,8 +240,7 @@ trait GenericField {
 /**
  * Interface for the data type of a GenericField
  */
-trait GenericDataType {
-  def subFeedType: Type
+trait GenericDataType extends GenericTypedObject {
   def isSortable: Boolean
   def typeName: String
   def sql: String
@@ -253,7 +254,7 @@ trait GenericDataType {
  */
 trait GenericStructDataType { this: GenericDataType =>
   def fields: Seq[GenericField]
-  def withOtherFields[T](other: GenericStructDataType, func: (Seq[GenericField],Seq[GenericField]) => T): T
+  def withOtherFields[T](other: GenericStructDataType with GenericDataType, func: (Seq[GenericField],Seq[GenericField]) => T): T
 }
 
 /**
@@ -261,7 +262,7 @@ trait GenericStructDataType { this: GenericDataType =>
  */
 trait GenericArrayDataType { this: GenericDataType =>
   def elementDataType: GenericDataType
-  def withOtherElementType[T](other: GenericArrayDataType, func: (GenericDataType,GenericDataType) => T): T
+  def withOtherElementType[T](other: GenericArrayDataType with GenericDataType, func: (GenericDataType,GenericDataType) => T): T
   def containsNull: Boolean // Indicates array might contain null entries
 }
 
@@ -271,16 +272,15 @@ trait GenericArrayDataType { this: GenericDataType =>
 trait GenericMapDataType { this: GenericDataType =>
   def keyDataType: GenericDataType
   def valueDataType: GenericDataType
-  def withOtherKeyType[T](other: GenericMapDataType, func: (GenericDataType,GenericDataType) => T): T
-  def withOtherValueType[T](other: GenericMapDataType, func: (GenericDataType,GenericDataType) => T): T
+  def withOtherKeyType[T](other: GenericMapDataType with GenericDataType, func: (GenericDataType,GenericDataType) => T): T
+  def withOtherValueType[T](other: GenericMapDataType with GenericDataType, func: (GenericDataType,GenericDataType) => T): T
   def valueContainsNull: Boolean // Indicates if map values might be set to null
 }
 
 /**
  * Interface for the rows of a GenericDataFrame.
  */
-trait GenericRow {
-  def subFeedType: Type
+trait GenericRow extends GenericTypedObject {
   def get(index: Int): Any
   def getAs[T](index: Int): T
 }

@@ -38,39 +38,39 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   override def join(other: GenericDataFrame, joinCols: Seq[String]): SnowparkDataFrame = {
     other match {
       case snowparkOther: SnowparkDataFrame => SnowparkDataFrame(inner.join(snowparkOther.inner, joinCols))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${other.subFeedType.typeSymbol.name} in method join")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def select(columns: Seq[GenericColumn]): SnowparkDataFrame = {
-    assert(columns.forall(_.subFeedType =:= subFeedType), s"Unsupported subFeedType(s) ${columns.filter(c => !(c.subFeedType =:= subFeedType)).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method select")
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     SnowparkDataFrame(inner.select(columns.map(_.asInstanceOf[SnowparkColumn].inner)))
   }
   override def groupBy(columns: Seq[GenericColumn]): SnowparkGroupedDataFrame = {
-    assert(columns.forall(_.subFeedType =:= subFeedType), s"Unsupported subFeedType(s) ${columns.filter(c => !(c.subFeedType =:= subFeedType)).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method select")
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     val snowparkCols = columns.map(_.asInstanceOf[SnowparkColumn].inner)
     SnowparkGroupedDataFrame(inner.groupBy(snowparkCols))
   }
   override def agg(columns: Seq[GenericColumn]): SnowparkDataFrame = {
-    assert(columns.forall(_.subFeedType =:= subFeedType), s"Unsupported subFeedType(s) ${columns.filter(c => !(c.subFeedType =:= subFeedType)).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method select")
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     val snowparkCols = columns.map(_.asInstanceOf[SnowparkColumn].inner)
     SnowparkDataFrame(inner.agg(snowparkCols.head, snowparkCols.tail:_*))
   }
   override def unionByName(other: GenericDataFrame): SnowparkDataFrame= {
     other match {
       case snowparkOther: SnowparkDataFrame => SnowparkDataFrame(inner.unionByName(snowparkOther.inner))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${other.subFeedType.typeSymbol.name} in method unionByName")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def except(other: GenericDataFrame): SnowparkDataFrame= {
     other match {
       case snowparkOther: SnowparkDataFrame => SnowparkDataFrame(inner.except(snowparkOther.inner))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${other.subFeedType.typeSymbol.name} in method except")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def filter(expression: GenericColumn): SnowparkDataFrame = {
     expression match {
       case snowparkExpr: SnowparkColumn => SnowparkDataFrame(inner.filter(snowparkExpr.inner))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${expression.subFeedType.typeSymbol.name} in method filter")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(expression)
     }
   }
   override def collect: Seq[GenericRow] = inner.collect.map(SnowparkRow)
@@ -80,7 +80,7 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   override def withColumn(colName: String, expression: GenericColumn): GenericDataFrame = {
     expression match {
       case snowparkExpression: SnowparkColumn => SnowparkDataFrame(inner.withColumn(colName,snowparkExpression.inner))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${expression.subFeedType.typeSymbol.name} in method withColumn")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(expression)
     }
   }
   override def drop(colName: String): GenericDataFrame = SnowparkDataFrame(inner.drop(colName))
@@ -94,7 +94,7 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame {
 case class SnowparkGroupedDataFrame(inner: RelationalGroupedDataFrame) extends GenericGroupedDataFrame {
   override def subFeedType: Type = typeOf[SnowparkSubFeed]
   override def agg(columns: Seq[GenericColumn]): SnowparkDataFrame = {
-    assert(columns.forall(_.subFeedType =:= subFeedType), s"Unsupported subFeedType(s) ${columns.filter(c => !(c.subFeedType =:= subFeedType)).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method agg")
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     val snowparkCols = columns.map(_.asInstanceOf[SnowparkColumn].inner)
     SnowparkDataFrame(inner.agg(snowparkCols.head, snowparkCols.tail:_*))
   }
@@ -121,7 +121,7 @@ case class SnowparkSchema(inner: StructType) extends GenericSchema {
   override def add(field: GenericField): SnowparkSchema = {
     field match {
       case snowparkField: SnowparkField => SnowparkSchema(inner.add(snowparkField.inner))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method add")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(field)
     }
   }
   override def remove(colName: String): SnowparkSchema = {
@@ -145,55 +145,55 @@ case class SnowparkColumn(inner: Column) extends GenericColumn {
   override def ===(other: GenericColumn): SnowparkColumn = {
     other match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(inner === snowparkColumn.inner)
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method ===")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def >(other: GenericColumn): SnowparkColumn = {
     other match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(inner > snowparkColumn.inner)
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method >")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def <(other: GenericColumn): SnowparkColumn = {
     other match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(inner < snowparkColumn.inner)
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method <")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def +(other: GenericColumn): SnowparkColumn = {
     other match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(inner + snowparkColumn.inner)
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method +")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def -(other: GenericColumn): SnowparkColumn = {
     other match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(inner - snowparkColumn.inner)
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method -")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def /(other: GenericColumn): SnowparkColumn = {
     other match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(inner / snowparkColumn.inner)
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method /")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def *(other: GenericColumn): SnowparkColumn = {
     other match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(inner * snowparkColumn.inner)
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method *")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def and(other: GenericColumn): SnowparkColumn = {
     other match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(inner and snowparkColumn.inner)
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method and")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def or(other: GenericColumn): SnowparkColumn = {
     other match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(inner or snowparkColumn.inner)
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method or")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def isin(list: Any*): SnowparkColumn = {
@@ -205,7 +205,7 @@ case class SnowparkColumn(inner: Column) extends GenericColumn {
   override def cast(dataType: GenericDataType): SnowparkColumn = {
     dataType match {
       case snowparkDataType: SnowparkDataType => SnowparkColumn(inner.cast(snowparkDataType.inner))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method or")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(dataType)
     }
   }
   override def exprSql: String = throw new NotImplementedError(s"Converting column back to sql expression is not supported by Snowpark")
@@ -238,10 +238,10 @@ case class SnowparkSimpleDataType(inner: DataType) extends SnowparkDataType {
 case class SnowparkStructDataType(override val inner: StructType) extends SnowparkDataType with GenericStructDataType {
   override def makeNullable: SnowparkDataType = SnowparkStructDataType(SnowparkSchema(inner).makeNullable.inner)
   override def toLowerCase: SnowparkDataType = SnowparkStructDataType(SnowparkSchema(inner).toLowerCase.inner)
-  override def withOtherFields[T](other: GenericStructDataType, func: (Seq[GenericField], Seq[GenericField]) => T): T = {
+  override def withOtherFields[T](other: GenericStructDataType with GenericDataType, func: (Seq[GenericField], Seq[GenericField]) => T): T = {
     other match {
       case snowparkOther: SnowparkStructDataType => func(inner.fields.map(SnowparkField), snowparkOther.inner.fields.map(SnowparkField))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method withOtherFields")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def fields: Seq[SnowparkField] = inner.fields.map(SnowparkField)
@@ -249,10 +249,10 @@ case class SnowparkStructDataType(override val inner: StructType) extends Snowpa
 case class SnowparkArrayDataType(inner: ArrayType) extends SnowparkDataType with GenericArrayDataType {
   override def makeNullable: SnowparkDataType = SnowparkArrayDataType(ArrayType(SnowparkArrayDataType(inner).makeNullable.inner))
   override def toLowerCase: SnowparkDataType = SnowparkArrayDataType(ArrayType(SnowparkArrayDataType(inner).toLowerCase.inner))
-  override def withOtherElementType[T](other: GenericArrayDataType, func: (GenericDataType, GenericDataType) => T): T = {
+  override def withOtherElementType[T](other: GenericArrayDataType with GenericDataType, func: (GenericDataType, GenericDataType) => T): T = {
     other match {
       case snowparkOther: SnowparkArrayDataType => func(SnowparkDataType(inner.elementType), SnowparkDataType(snowparkOther.inner.elementType))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method withOtherElementType")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def containsNull: Boolean = true // not existing in Snowpark
@@ -261,16 +261,16 @@ case class SnowparkArrayDataType(inner: ArrayType) extends SnowparkDataType with
 case class SnowparkMapDataType(inner: MapType) extends SnowparkDataType with GenericMapDataType {
   override def makeNullable: SnowparkDataType = SnowparkMapDataType(MapType(SnowparkDataType(inner.keyType).makeNullable.inner,SnowparkDataType(inner.valueType).makeNullable.inner))
   override def toLowerCase: SnowparkDataType = SnowparkMapDataType(MapType(SnowparkDataType(inner.keyType).toLowerCase.inner,SnowparkDataType(inner.valueType).toLowerCase.inner))
-  override def withOtherKeyType[T](other: GenericMapDataType, func: (GenericDataType, GenericDataType) => T): T = {
+  override def withOtherKeyType[T](other: GenericMapDataType with GenericDataType, func: (GenericDataType, GenericDataType) => T): T = {
     other match {
       case snowparkOther: SnowparkMapDataType => func(SnowparkDataType(inner.keyType), SnowparkDataType(snowparkOther.inner.keyType))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method withOtherKeyType")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
-  override def withOtherValueType[T](other: GenericMapDataType, func: (GenericDataType, GenericDataType) => T): T = {
+  override def withOtherValueType[T](other: GenericMapDataType with GenericDataType, func: (GenericDataType, GenericDataType) => T): T = {
     other match {
       case snowparkOther: SnowparkMapDataType => func(SnowparkDataType(inner.valueType), SnowparkDataType(snowparkOther.inner.valueType))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method withOtherValueType")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def valueContainsNull: Boolean = true // not existing in Snowpark

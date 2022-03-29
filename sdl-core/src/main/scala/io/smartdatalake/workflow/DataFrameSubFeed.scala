@@ -22,7 +22,7 @@ package io.smartdatalake.workflow
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ScalaUtil
-import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame, GenericField, GenericSchema}
+import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame, GenericField, GenericSchema, GenericTypedObject}
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, SchemaValidation, UserDefinedSchema}
 
 import scala.reflect.runtime.universe
@@ -110,4 +110,20 @@ object DataFrameSubFeed {
    * Get implementation of generic DataFrameFunctions.
    */
   def getFunctions(tpe: Type): DataFrameFunctions = getCompanion(tpe) // down cast to reduce interface
+
+  /**
+   * Helper method to throw exception for wrong subfeed type including method name of caller
+   */
+  private[smartdatalake] def throwIllegalSubFeedTypeException(obj: GenericTypedObject): Nothing = {
+    val parentMethod = Thread.currentThread().getStackTrace.drop(2).find(_.getClassName.startsWith("io.smartdatalake")).map(_.getMethodName).getOrElse("<unknown>")
+    throw new IllegalStateException(s"Unsupported subFeedType ${obj.subFeedType.typeSymbol.name} in method $parentMethod")
+  }
+
+  /**
+   * Helper method to assert subfeed type for a list of generic objects, throwing exception including method name of caller
+   */
+  private[smartdatalake] def assertCorrectSubFeedType(expectedTpe: Type, elements: Seq[GenericTypedObject]): Unit = {
+    val parentMethod = Thread.currentThread().getStackTrace.drop(2).find(_.getClassName.startsWith("io.smartdatalake")).map(_.getMethodName).getOrElse("<unknown>")
+    assert(elements.forall(_.subFeedType =:= expectedTpe), s"Unsupported subFeedType(s) ${elements.filter(c => !(c.subFeedType =:= expectedTpe)).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method $parentMethod")
+  }
 }

@@ -24,7 +24,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.spark.DataFrameUtil
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import io.smartdatalake.workflow.dataframe._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
@@ -39,39 +39,39 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   override def join(other: GenericDataFrame, joinCols: Seq[String]): SparkDataFrame = {
     other match {
       case sparkOther: SparkDataFrame => SparkDataFrame(inner.join(sparkOther.inner, joinCols))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${other.subFeedType.typeSymbol.name} in method join")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def select(columns: Seq[GenericColumn]): SparkDataFrame = {
-    assert(columns.forall(_.subFeedType =:= subFeedType), s"Unsupported subFeedType(s) ${columns.filter(c => !(c.subFeedType =:= subFeedType)).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method select")
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     SparkDataFrame(inner.select(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
   }
   override def groupBy(columns: Seq[GenericColumn]): SparkGroupedDataFrame = {
-    assert(columns.forall(_.subFeedType =:= subFeedType), s"Unsupported subFeedType(s) ${columns.filter(c => !(c.subFeedType =:= subFeedType)).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method select")
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     val sparkCols = columns.map(_.asInstanceOf[SparkColumn].inner)
     SparkGroupedDataFrame(inner.groupBy(sparkCols:_*))
   }
   override def agg(columns: Seq[GenericColumn]): SparkDataFrame = {
-    assert(columns.forall(_.subFeedType =:= subFeedType), s"Unsupported subFeedType(s) ${columns.filter(c => !(c.subFeedType =:= subFeedType)).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method select")
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     val sparkCols = columns.map(_.asInstanceOf[SparkColumn].inner)
     SparkDataFrame(inner.agg(sparkCols.head, sparkCols.tail:_*))
   }
   override def unionByName(other: GenericDataFrame): SparkDataFrame= {
     other match {
       case sparkOther: SparkDataFrame => SparkDataFrame(inner.unionByName(sparkOther.inner))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${other.subFeedType.typeSymbol.name} in method join")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def except(other: GenericDataFrame): SparkDataFrame= {
     other match {
       case sparkOther: SparkDataFrame => SparkDataFrame(inner.except(sparkOther.inner))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${other.subFeedType.typeSymbol.name} in method except")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def filter(expression: GenericColumn): SparkDataFrame = {
     expression match {
       case sparkExpr: SparkColumn => SparkDataFrame(inner.filter(sparkExpr.inner))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${expression.subFeedType.typeSymbol.name} in method filter")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(expression)
     }
   }
   override def collect: Seq[GenericRow] = inner.collect.map(SparkRow)
@@ -81,7 +81,7 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   override def withColumn(colName: String, expression: GenericColumn): SparkDataFrame = {
     expression match {
       case sparkExpression: SparkColumn => SparkDataFrame(inner.withColumn(colName,sparkExpression.inner))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${expression.subFeedType.typeSymbol.name} in method withColumn")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(expression)
     }
   }
   override def drop(colName: String): SparkDataFrame = SparkDataFrame(inner.drop(colName))
@@ -95,7 +95,7 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
 case class SparkGroupedDataFrame(inner: RelationalGroupedDataset) extends GenericGroupedDataFrame {
   override def subFeedType: universe.Type = typeOf[SparkSubFeed]
   override def agg(columns: Seq[GenericColumn]): SparkDataFrame = {
-    assert(columns.forall(_.subFeedType =:= subFeedType), s"Unsupported subFeedType(s) ${columns.filter(c => !(c.subFeedType =:= subFeedType)).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method agg")
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     val sparkCols = columns.map(_.asInstanceOf[SparkColumn].inner)
     SparkDataFrame(inner.agg(sparkCols.head, sparkCols.tail:_*))
   }
@@ -124,7 +124,7 @@ case class SparkSchema(inner: StructType) extends GenericSchema {
   override def add(field: GenericField): SparkSchema = {
     field match {
       case sparkField: SparkField => SparkSchema(inner.add(sparkField.inner))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method add")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(field)
     }
   }
   override def remove(colName: String): SparkSchema = {
@@ -147,55 +147,55 @@ case class SparkColumn(inner: Column) extends GenericColumn {
   override def ===(other: GenericColumn): GenericColumn = {
     other match {
       case sparkColumn: SparkColumn => SparkColumn(inner === sparkColumn.inner)
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method ===")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def >(other: GenericColumn): GenericColumn = {
     other match {
       case sparkColumn: SparkColumn => SparkColumn(inner > sparkColumn.inner)
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method >")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def <(other: GenericColumn): GenericColumn = {
     other match {
       case sparkColumn: SparkColumn => SparkColumn(inner < sparkColumn.inner)
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method <")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def +(other: GenericColumn): GenericColumn = {
     other match {
       case sparkColumn: SparkColumn => SparkColumn(inner + sparkColumn.inner)
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method +")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def -(other: GenericColumn): GenericColumn = {
     other match {
       case sparkColumn: SparkColumn => SparkColumn(inner - sparkColumn.inner)
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method -")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def /(other: GenericColumn): GenericColumn = {
     other match {
       case sparkColumn: SparkColumn => SparkColumn(inner / sparkColumn.inner)
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method /")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def *(other: GenericColumn): GenericColumn = {
     other match {
       case sparkColumn: SparkColumn => SparkColumn(inner * sparkColumn.inner)
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method *")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def and(other: GenericColumn): GenericColumn = {
     other match {
       case sparkColumn: SparkColumn => SparkColumn(inner and sparkColumn.inner)
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method and")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def or(other: GenericColumn): GenericColumn = {
     other match {
       case sparkColumn: SparkColumn => SparkColumn(inner or sparkColumn.inner)
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method or")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def isin(list: Any*): GenericColumn = SparkColumn(inner.isin(list:_*))
@@ -204,7 +204,7 @@ case class SparkColumn(inner: Column) extends GenericColumn {
   override def cast(dataType: GenericDataType): GenericColumn = {
     dataType match {
       case sparkDataType: SparkDataType => SparkColumn(inner.cast(sparkDataType.inner))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method or")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(dataType)
     }
   }
   override def exprSql: String = inner.expr.sql
@@ -240,10 +240,10 @@ case class SparkStructDataType(override val inner: StructType) extends SparkData
   override def makeNullable: SparkDataType = SparkStructDataType(SparkSchema(inner).makeNullable.inner)
   override def toLowerCase: SparkDataType = SparkStructDataType(SparkSchema(inner).toLowerCase.inner)
   override def removeMetadata: SparkDataType = SparkStructDataType(SparkSchema(inner).removeMetadata.inner)
-  override def withOtherFields[T](other: GenericStructDataType, func: (Seq[GenericField], Seq[GenericField]) => T): T = {
+  override def withOtherFields[T](other: GenericStructDataType with GenericDataType, func: (Seq[GenericField], Seq[GenericField]) => T): T = {
     other match {
       case sparkOther: SparkStructDataType => func(inner.fields.map(SparkField), sparkOther.inner.fields.map(SparkField))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method withOtherFields")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def fields: Seq[SparkField] = inner.fields.map(SparkField)
@@ -252,10 +252,10 @@ case class SparkArrayDataType(inner: ArrayType) extends SparkDataType with Gener
   override def makeNullable: SparkDataType = SparkArrayDataType(ArrayType(SparkDataType(inner.elementType).makeNullable.inner, containsNull = true))
   override def toLowerCase: SparkDataType = SparkArrayDataType(ArrayType(SparkDataType(inner.elementType).toLowerCase.inner, containsNull = inner.containsNull))
   override def removeMetadata: SparkDataType = SparkArrayDataType(ArrayType(SparkDataType(inner.elementType).removeMetadata.inner, containsNull = inner.containsNull))
-  override def withOtherElementType[T](other: GenericArrayDataType, func: (GenericDataType, GenericDataType) => T): T = {
+  override def withOtherElementType[T](other: GenericArrayDataType with GenericDataType, func: (GenericDataType, GenericDataType) => T): T = {
     other match {
       case sparkOther: SparkArrayDataType => func(SparkDataType(inner.elementType), SparkDataType(sparkOther.inner.elementType))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method withOtherElementType")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def containsNull: Boolean = inner.containsNull
@@ -265,16 +265,16 @@ case class SparkMapDataType(inner: MapType) extends SparkDataType with GenericMa
   override def makeNullable: SparkDataType = SparkMapDataType(MapType(SparkDataType(inner.keyType).makeNullable.inner,SparkDataType(inner.valueType).makeNullable.inner, valueContainsNull = true))
   override def toLowerCase: SparkDataType = SparkMapDataType(MapType(SparkDataType(inner.keyType).toLowerCase.inner,SparkDataType(inner.valueType).toLowerCase.inner, valueContainsNull = inner.valueContainsNull))
   override def removeMetadata: SparkDataType = SparkMapDataType(MapType(SparkDataType(inner.keyType).removeMetadata.inner,SparkDataType(inner.valueType).removeMetadata.inner, valueContainsNull = inner.valueContainsNull))
-  override def withOtherKeyType[T](other: GenericMapDataType, func: (GenericDataType, GenericDataType) => T): T = {
+  override def withOtherKeyType[T](other: GenericMapDataType with GenericDataType, func: (GenericDataType, GenericDataType) => T): T = {
     other match {
       case sparkOther: SparkMapDataType => func(SparkDataType(inner.keyType), SparkDataType(sparkOther.inner.keyType))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method withOtherKeyType")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
-  override def withOtherValueType[T](other: GenericMapDataType, func: (GenericDataType, GenericDataType) => T): T = {
+  override def withOtherValueType[T](other: GenericMapDataType with GenericDataType, func: (GenericDataType, GenericDataType) => T): T = {
     other match {
       case sparkOther: SparkMapDataType => func(SparkDataType(inner.valueType), SparkDataType(sparkOther.inner.valueType))
-      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${subFeedType.typeSymbol.name} in method withOtherValueType")
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
   override def valueContainsNull: Boolean = inner.valueContainsNull
