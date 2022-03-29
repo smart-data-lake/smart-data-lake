@@ -35,16 +35,16 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
  */
-case class StandardizeDatatypesTransformer(override val name: String = "standardizeDatatypes", override val description: Option[String] = None) extends SparkDfTransformer {
+case class StandardizeSparkDatatypesTransformer(override val name: String = "standardizeSparkDatatypes", override val description: Option[String] = None) extends SparkDfTransformer {
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
     df.castAllDecimal2IntegralFloat
   }
-  override def factory: FromConfigFactory[GenericDfTransformer] = StandardizeDatatypesTransformer
+  override def factory: FromConfigFactory[GenericDfTransformer] = StandardizeSparkDatatypesTransformer
 }
 
-object StandardizeDatatypesTransformer extends FromConfigFactory[GenericDfTransformer] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): StandardizeDatatypesTransformer = {
-    extract[StandardizeDatatypesTransformer](config)
+object StandardizeSparkDatatypesTransformer extends FromConfigFactory[GenericDfTransformer] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): StandardizeSparkDatatypesTransformer = {
+    extract[StandardizeSparkDatatypesTransformer](config)
   }
 }
 

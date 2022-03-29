@@ -281,7 +281,7 @@ To implement custom transformation logic, define the **transformers** attribute 
 where output SubFeeds from one transformation are use as input for the next.  
 Note that the definition of the transformations looks different for:
 * **1-to-1** transformations (\*DfTransformer): One input DataFrame is transformed into one output DataFrame. This is the case for CopyAction, DeduplicateAction and HistorizeAction. 
-* **many-to-many** transformations (\*DfsTransformer): Many input DataFrames can be transformed into many output DataFrames. This is the case for CustomSparkAction.
+* **many-to-many** transformations (\*DfsTransformer): Many input DataFrames can be transformed into many output DataFrames. This is the case for CustomDataFrameAction.
 
 The configuration allows you to use predefined standard transformations or to define custom transformation in various languages.
 
@@ -293,7 +293,7 @@ Predefined transformations implement generic logic to be reused in different act
 * BlacklistTransformer (1-to-1): Apply a column blacklist to a DataFrame
 * WhitelistTransformer (1-to-1): Apply a column whitelist to a DataFrame
 * AdditionalColumnsTransformer (1-to-1): Add additional columns to the DataFrame by extracting information from the context
-* StandardizeDatatypesTransformer (1-to-1): Standardize datatypes of a DataFrame
+* StandardizeSparkDatatypesTransformer (1-to-1): Standardize datatypes of a Spark-DataFrame
 * DfTransformerWrapperDfsTransformer (many-to-many): use 1-to-1 transformer as many-to-many transformer by specifying the SubFeeds it should be applied to
 
 ### Custom Transformations
@@ -305,11 +305,11 @@ Specifying options allows to reuse a transformation in different settings.
 #### Java/Scala
 You can use Spark Dataset API in Java/Scala to define custom transformations. 
 If you have a Java project, create a class that extends CustomDfTransformer or CustomDfsTransformer and implement `transform` method.
-Then use **type = ScalaClassDfTransformer** or **type = ScalaClassDfsTransformer** and configure **className** attribute.
+Then use **type = ScalaClassSparkDfTransformer** or **type = ScalaClassSparkDfsTransformer** and configure **className** attribute.
 
 If you work without Java project, it's still possible to define your transformation in Java/Scala and compile it at runtime.
-For a 1-to-1 transformation use **type = ScalaCodeDfTransformer** and configure **code** or **file** as a function that takes `session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectName: String` as parameters and returns a `DataFrame`.
-For many-to-many transformations use **type = ScalaCodeDfsTransformer** and configure **code** or **file** as a function that takes `session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]` with DataFrames per input DataObject as parameter, and returns a `Map[String,DataFrame]` with the DataFrame per output DataObject.
+For a 1-to-1 transformation use **type = ScalaCodeSparkDfTransformer** and configure **code** or **file** as a function that takes `session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectName: String` as parameters and returns a `DataFrame`.
+For many-to-many transformations use **type = ScalaCodeSparkDfsTransformer** and configure **code** or **file** as a function that takes `session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]` with DataFrames per input DataObject as parameter, and returns a `Map[String,DataFrame]` with the DataFrame per output DataObject.
 
 See [sdl-examples](https://github.com/smart-data-lake/sdl-examples) for details.
 

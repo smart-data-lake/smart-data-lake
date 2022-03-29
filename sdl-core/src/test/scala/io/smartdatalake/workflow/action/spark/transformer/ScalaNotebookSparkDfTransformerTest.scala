@@ -20,14 +20,14 @@
 package io.smartdatalake.workflow.action.spark.transformer
 
 import com.fasterxml.jackson.core.JsonParseException
-import ScalaNotebookDfTransformer.{compileCode, downloadNotebook, parseNotebook, prepareFunction}
+import ScalaNotebookSparkDfTransformer.{compileCode, downloadNotebook, parseNotebook, prepareFunction}
 import org.scalatest.FunSuite
 import scalaj.http.Http
 
 import java.net.URLConnection
 import scala.io.Source
 
-class ScalaNotebookDfTransformerTest extends FunSuite {
+class ScalaNotebookSparkDfTransformerTest extends FunSuite {
 
   val testNotebookContent = """
     {
@@ -120,7 +120,7 @@ class ScalaNotebookDfTransformerTest extends FunSuite {
     """
 
   test("parse notebook") {
-    val notebookCode = ScalaNotebookDfTransformer.parseNotebook(testNotebookContent)
+    val notebookCode = ScalaNotebookSparkDfTransformer.parseNotebook(testNotebookContent)
     val expectedNotebookCode = """
         |val t1 = "test"
         |val t3 = "test3"
@@ -129,11 +129,11 @@ class ScalaNotebookDfTransformerTest extends FunSuite {
   }
 
   test("parse notebook fails if not json") {
-    intercept[JsonParseException](ScalaNotebookDfTransformer.parseNotebook("<html></html>"))
+    intercept[JsonParseException](ScalaNotebookSparkDfTransformer.parseNotebook("<html></html>"))
   }
 
   test("prepare function fails if function name is not found in content") {
-    intercept[IllegalArgumentException](ScalaNotebookDfTransformer.prepareFunction(ScalaNotebookDfTransformer.parseNotebook(testNotebookContent), "abc"))
+    intercept[IllegalArgumentException](ScalaNotebookSparkDfTransformer.prepareFunction(ScalaNotebookSparkDfTransformer.parseNotebook(testNotebookContent), "abc"))
   }
 
   test("compile transform function") {
@@ -144,6 +144,6 @@ class ScalaNotebookDfTransformerTest extends FunSuite {
   ignore("load notebook") {
     // test loading from Polynote installation
     // note that java has some problems to connect to Polynote running in WSL2 over localhost/127.0.0.1
-    ScalaNotebookDfTransformer(url = "http://172.17.125.205:8192/notebook/Test.ipynb?download=true", functionName = "testTransform")
+    ScalaNotebookSparkDfTransformer(url = "http://172.17.125.205:8192/notebook/Test.ipynb?download=true", functionName = "testTransform")
   }
 }

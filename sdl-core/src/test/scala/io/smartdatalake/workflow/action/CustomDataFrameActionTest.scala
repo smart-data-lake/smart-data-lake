@@ -26,7 +26,7 @@ import io.smartdatalake.util.dag.TaskSkippedDontStopWarning
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
-import io.smartdatalake.workflow.action.spark.transformer.ScalaClassDfsTransformer
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
@@ -75,7 +75,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO2)
 
     // prepare & start load
-    val customTransformerConfig = ScalaClassDfsTransformer(
+    val customTransformerConfig = ScalaClassSparkDfsTransformer(
       className = classOf[TestDfsTransformerIncrement].getName,
       options = Map("increment1" -> "1"), runtimeOptions = Map("increment2" -> "runId")
     )
@@ -119,7 +119,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO1)
 
     // prepare & start load
-    val customTransformerConfig = ScalaClassDfsTransformer(className = classOf[TestDfsTransformerRecursive].getName)
+    val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerRecursive].getName)
 
     // first action to create output table as it does not exist yet
     val action1 = CustomDataFrameAction("action1", List(srcDO1.id), List(tgtDO1.id), transformers = Seq(customTransformerConfig))
@@ -196,7 +196,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     // prepare action
-    val customTransformerConfig = ScalaClassDfsTransformer(className = classOf[TestDfsTransformerDummy].getName)
+    val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerDummy].getName)
     val action = CustomDataFrameAction("a1", Seq(srcDO.id), Seq(tgtDO.id), transformers = Seq(customTransformerConfig), executionMode = Some(PartitionDiffMode()))
     val srcSubFeed = InitSubFeed("src1", Seq())
 
@@ -259,7 +259,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO3)
 
     // prepare action
-    val customTransformerConfig = ScalaClassDfsTransformer(className = classOf[TestDfsTransformerDummy].getName)
+    val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerDummy].getName)
     val action = CustomDataFrameAction("a1", Seq(srcDO.id, srcDO2.id, srcDO3.id), Seq(tgtDO.id, tgtDO2.id, tgtDO3.id), transformers = Seq(customTransformerConfig)
       , mainInputId = Some("src1"), mainOutputId = Some("tgt1"), executionMode = Some(PartitionDiffMode()))
     val srcSubFeed1 = InitSubFeed("src1", Seq())
@@ -389,7 +389,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO1)
 
     // prepare & simulate load (init only)
-    val customTransformerConfig = ScalaClassDfsTransformer(className = classOf[TestDfsTransformerPartitionValues].getName)
+    val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerPartitionValues].getName)
     val action1 = CustomDataFrameAction("ca", List(srcDO.id), List(tgtDO1.id), transformers = Seq(customTransformerConfig))
     val l1 = Seq(("20100101","jonson","rob",5),("20100103","doe","bob",3)).toDF("dt", "lastname", "firstname", "rating")
     val srcPartitionValues = Seq(PartitionValues(Map("dt" -> "20100101")), PartitionValues(Map("dt" -> "20100103")))

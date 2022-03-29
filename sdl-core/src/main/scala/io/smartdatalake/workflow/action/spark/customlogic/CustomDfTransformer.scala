@@ -23,7 +23,7 @@ import io.smartdatalake.util.misc._
 import io.smartdatalake.util.spark.DefaultExpressionData
 import CustomDfTransformerConfig.fnTransformType
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformerDef, SQLDfTransformer}
-import io.smartdatalake.workflow.action.spark.transformer.{PythonCodeDfTransformer, ScalaClassDfTransformer, ScalaCodeDfTransformer}
+import io.smartdatalake.workflow.action.spark.transformer.{PythonCodeDfTransformer, ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -80,14 +80,15 @@ trait CustomDfTransformer extends Serializable {
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
+@deprecated("use transformers instead")
 case class CustomDfTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Option[String] = None, pythonFile: Option[String] = None, pythonCode: Option[String] = None, options: Option[Map[String,String]] = None, runtimeOptions: Option[Map[String,String]] = None) {
   require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || sqlCode.isDefined || pythonFile.isDefined || pythonCode.isDefined, "Either className, scalaFile, scalaCode, sqlCode, pythonFile or code must be defined for CustomDfTransformer")
 
-  val impl: GenericDfTransformerDef = className.map(clazz => ScalaClassDfTransformer(className = clazz, options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
+  val impl: GenericDfTransformerDef = className.map(clazz => ScalaClassSparkDfTransformer(className = clazz, options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
   .orElse {
-    scalaFile.map(file => ScalaCodeDfTransformer(file = Some(file), options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
+    scalaFile.map(file => ScalaCodeSparkDfTransformer(file = Some(file), options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
   }.orElse{
-    scalaCode.map(code => ScalaCodeDfTransformer(code = Some(code), options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
+    scalaCode.map(code => ScalaCodeSparkDfTransformer(code = Some(code), options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
   }.orElse {
     sqlCode.map(code => SQLDfTransformer(code = code, options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
   }.orElse {

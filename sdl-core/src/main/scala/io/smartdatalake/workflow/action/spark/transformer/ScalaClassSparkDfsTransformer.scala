@@ -42,7 +42,7 @@ import org.apache.spark.sql.DataFrame
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
-case class ScalaClassDfsTransformer(override val name: String = "scalaSparkTransform", override val description: Option[String] = None, className: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfsTransformer {
+case class ScalaClassSparkDfsTransformer(override val name: String = "scalaSparkTransform", override val description: Option[String] = None, className: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfsTransformer {
   private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDfsTransformer](className)
   override def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String,DataFrame] = {
     customTransformer.transform(context.sparkSession, options, dfs)
@@ -50,12 +50,12 @@ case class ScalaClassDfsTransformer(override val name: String = "scalaSparkTrans
   override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = {
    customTransformer.transformPartitionValues(options, partitionValues)
   }
-  override def factory: FromConfigFactory[GenericDfsTransformer] = ScalaClassDfsTransformer
+  override def factory: FromConfigFactory[GenericDfsTransformer] = ScalaClassSparkDfsTransformer
 }
 
 
-object ScalaClassDfsTransformer extends FromConfigFactory[GenericDfsTransformer] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ScalaClassDfsTransformer = {
-    extract[ScalaClassDfsTransformer](config)
+object ScalaClassSparkDfsTransformer extends FromConfigFactory[GenericDfsTransformer] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ScalaClassSparkDfsTransformer = {
+    extract[ScalaClassSparkDfsTransformer](config)
   }
 }

@@ -25,7 +25,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.util.spark.DefaultExpressionData
 import io.smartdatalake.workflow.action.generic.customlogic.CustomGenericDfsTransformer
-import io.smartdatalake.workflow.action.spark.transformer.ScalaClassDfsTransformer
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
@@ -53,5 +53,5 @@ case class ScalaClassGenericDfsTransformer(override val name: String = "scalaTra
     customTransformer.transformPartitionValues(options, partitionValues)
   }
 
-  override def factory: FromConfigFactory[GenericDfsTransformer] = ScalaClassDfsTransformer
+  override def factory: FromConfigFactory[GenericDfsTransformer] = ScalaClassSparkDfsTransformer
 }

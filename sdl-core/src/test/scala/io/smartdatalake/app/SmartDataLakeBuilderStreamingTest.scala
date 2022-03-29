@@ -29,7 +29,7 @@ import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
-import io.smartdatalake.workflow.action.spark.transformer.ScalaClassDfTransformer
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
 import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore}
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -361,7 +361,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // prepare partition diff action
     val actionAFail = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(ScalaClassDfTransformer(className = classOf[FailTransformer].getName)))
+      , transformers = Seq(ScalaClassSparkDfTransformer(className = classOf[FailTransformer].getName)))
     val actionA = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
       , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, rating from src1")))
     // prepare streaming action
@@ -526,7 +526,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // prepare streaming action
     val actionAFail = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(ScalaClassDfTransformer(className = classOf[FailTransformer].getName)))
+      , transformers = Seq(ScalaClassSparkDfTransformer(className = classOf[FailTransformer].getName)))
     val actionA = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
       , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, rating from src1")))
     // prepare partition diff action

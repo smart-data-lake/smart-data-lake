@@ -48,7 +48,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
-case class PythonCodeDfTransformer(override val name: String = "pythonTransform", override val description: Option[String] = None, code: Option[String] = None, file: Option[String] = None, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfTransformer {
+case class PythonCodeDfTransformer(override val name: String = "pythonSparkTransform", override val description: Option[String] = None, code: Option[String] = None, file: Option[String] = None, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfTransformer {
   private val pythonCode = {
     implicit val defaultHadoopConf: Configuration = new Configuration()
     file.map(file => HdfsUtil.readHadoopFile(file))

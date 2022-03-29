@@ -25,7 +25,7 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
-import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassDfTransformer, ScalaCodeDfTransformer}
+import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.spark.sql.functions.{lit, substring}
@@ -64,7 +64,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    val customTransformerConfig = ScalaClassDfTransformer(className = classOf[TestDfTransformer].getName)
+    val customTransformerConfig = ScalaClassSparkDfTransformer(className = classOf[TestDfTransformer].getName)
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
@@ -91,7 +91,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
       // return as function
       transform _
     """
-    val customTransformerConfig = ScalaCodeDfTransformer(code = Some(codeStr))
+    val customTransformerConfig = ScalaCodeSparkDfTransformer(code = Some(codeStr))
 
     // setup DataObjects
     val feed = "copy"
@@ -295,7 +295,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // prepare & start load
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id,
       transformers = Seq(
-        ScalaClassDfTransformer(className = classOf[TestOptionsDfTransformer].getName, options = Map("test" -> "test"), runtimeOptions = Map("appName" -> "application")),
+        ScalaClassSparkDfTransformer(className = classOf[TestOptionsDfTransformer].getName, options = Map("test" -> "test"), runtimeOptions = Map("appName" -> "application")),
         FilterTransformer(filterClause = "lastname='jonson'"),
         AdditionalColumnsTransformer(additionalColumns = Map("run_id" -> "runId"))
       )
@@ -327,7 +327,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare, simulate
     val contextExec = contextInit.copy(phase = ExecutionPhase.Exec)
-    val customTransformerConfig = ScalaClassDfTransformer(className = classOf[TestAggDfTransformer].getName)
+    val customTransformerConfig = ScalaClassSparkDfTransformer(className = classOf[TestAggDfTransformer].getName)
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig), executionMode = Some(PartitionDiffMode(applyPartitionValuesTransform=true)))
     val l1 = Seq(("20100101","jonson","rob",5),("20100103","doe","bob",3)).toDF("dt", "lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())

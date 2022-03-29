@@ -35,16 +35,16 @@ import org.apache.spark.sql.DataFrame
  * @param numberOfTasksPerPartition Number of Spark tasks to create per partition value by repartitioning the DataFrame.
  * @param keyCols  Optional key columns to distribute records over Spark tasks inside a partition value.
  */
-case class RepartitionTransformer(override val name: String = "repartition", override val description: Option[String] = None, numberOfTasksPerPartition: Int, keyCols: Seq[String] = Seq()) extends SparkDfTransformer {
+case class SparkRepartitionTransformer(override val name: String = "sparkRepartition", override val description: Option[String] = None, numberOfTasksPerPartition: Int, keyCols: Seq[String] = Seq()) extends SparkDfTransformer {
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
     SparkRepartitionDef.repartitionDataFrame(df, partitionValues, dataObjectId, keyCols, numberOfTasksPerPartition)
   }
-  override def factory: FromConfigFactory[GenericDfTransformer] = RepartitionTransformer
+  override def factory: FromConfigFactory[GenericDfTransformer] = SparkRepartitionTransformer
 }
 
-object RepartitionTransformer extends FromConfigFactory[GenericDfTransformer] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): RepartitionTransformer = {
-    extract[RepartitionTransformer](config)
+object SparkRepartitionTransformer extends FromConfigFactory[GenericDfTransformer] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SparkRepartitionTransformer = {
+    extract[SparkRepartitionTransformer](config)
   }
 }
 

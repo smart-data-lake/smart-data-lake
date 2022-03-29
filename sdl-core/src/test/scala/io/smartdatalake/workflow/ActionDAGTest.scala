@@ -27,7 +27,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, CustomDfsTransformerConfig}
-import io.smartdatalake.workflow.action.spark.transformer.ScalaClassDfsTransformer
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject._
 import org.apache.hadoop.conf.Configuration
@@ -295,7 +295,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     srcDO2.writeSparkDataFrame(l2.union(l1), Seq())
     srcDO3.writeSparkDataFrame(l2.union(l1), Seq())
     val action1 = CustomDataFrameAction( "a", inputIds = Seq(srcDO1.id, srcDO2.id, srcDO3.id), inputIdsToIgnoreFilter = Seq(srcDO3.id), outputIds = Seq(tgtDO.id)
-                                    , transformers = Seq(ScalaClassDfsTransformer(className=classOf[TestDfsUnionOfThree].getName)))
+                                    , transformers = Seq(ScalaClassSparkDfsTransformer(className=classOf[TestDfsUnionOfThree].getName)))
     // filter partition values lastname=xyz: src1 is not partitioned, src2 & src3 have 1 record with partition lastname=doe and 1 record with partition lastname=xyz
     val partitionValuesFilter = Seq(PartitionValues(Map("lastname" -> "doe")))
     val dag = ActionDAGRun(Seq(action1), partitionValues = partitionValuesFilter)
@@ -344,7 +344,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDDO)
 
     // prepare DAG
-    val customTransfomer = ScalaClassDfsTransformer(className = classOf[TestActionDagTransformer].getName)
+    val customTransfomer = ScalaClassSparkDfsTransformer(className = classOf[TestActionDagTransformer].getName)
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
     val actions = Seq(
@@ -870,7 +870,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     val action1 = CustomDataFrameAction( "a", Seq(src1DO.id,src2DO.id), Seq(tgt1DO.id)
                                    , executionMode = Some(SparkStreamingMode(checkpointLocation = tempDir.resolve("stateA").toUri.toString))
-                                   , transformers = Seq(ScalaClassDfsTransformer(className = classOf[TestStreamingTransformer].getName))
+                                   , transformers = Seq(ScalaClassSparkDfsTransformer(className = classOf[TestStreamingTransformer].getName))
                                    )
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1))
 

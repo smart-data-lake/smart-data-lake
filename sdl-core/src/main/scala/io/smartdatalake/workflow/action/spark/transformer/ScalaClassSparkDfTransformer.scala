@@ -20,45 +20,41 @@
 package io.smartdatalake.workflow.action.spark.transformer
 
 import com.typesafe.config.Config
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.util.spark.DefaultExpressionData
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig.fnTransformType
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, OptionsSparkDfTransformer}
-import org.apache.hadoop.conf.Configuration
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
- * Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Scala code which is compiled at runtime.
+ * Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Java/Scala Class.
  * Define a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a
- * DataFrame. The scala code has to implement a function of type [[fnTransformType]].
+ * DataFrame. The Java/Scala class has to implement interface [[CustomDfTransformer]].
  *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
- * @param file           File where scala code for transformation is loaded from. The scala code in the file needs to be a function of type [[fnTransformType]].
- * @param code           Scala code for transformation. The scala code needs to be a function of type [[fnTransformType]].
+ * @param className      class name implementing trait [[CustomDfTransformer]]
  * @param options        Options to pass to the transformation
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
-case class ScalaCodeDfTransformer(override val name: String = "scalaTransform", override val description: Option[String] = None, code: Option[String] = None, file: Option[String] = None, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfTransformer {
-  private val fnTransform = {
-    implicit val defaultHadoopConf: Configuration = new Configuration()
-    file.map(file => CustomCodeUtil.compileCode[fnTransformType](HdfsUtil.readHadoopFile(file)))
-      .orElse(code.map(code => CustomCodeUtil.compileCode[fnTransformType](code)))
-      .getOrElse(throw ConfigurationException(s"Either file or code must be defined for ScalaCodeTransformer"))
-  }
+case class ScalaClassSparkDfTransformer(override val name: String = "scalaSparkTransform", override val description: Option[String] = None, className: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfTransformer {
+  private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDfTransformer](className)
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit context: ActionPipelineContext): DataFrame = {
-    fnTransform(context.sparkSession, options, df, dataObjectId.id)
+    customTransformer.transform(context.sparkSession, options, df, dataObjectId.id)
   }
-  override def factory: FromConfigFactory[GenericDfTransformer] = ScalaCodeDfTransformer
+  override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = {
+   customTransformer.transformPartitionValues(options, partitionValues)
+  }
+  override def factory: FromConfigFactory[GenericDfTransformer] = ScalaClassSparkDfTransformer
 }
 
-object ScalaCodeDfTransformer extends FromConfigFactory[GenericDfTransformer] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ScalaCodeDfTransformer = {
-    extract[ScalaCodeDfTransformer](config)
+object ScalaClassSparkDfTransformer extends FromConfigFactory[GenericDfTransformer] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ScalaClassSparkDfTransformer = {
+    extract[ScalaClassSparkDfTransformer](config)
   }
 }

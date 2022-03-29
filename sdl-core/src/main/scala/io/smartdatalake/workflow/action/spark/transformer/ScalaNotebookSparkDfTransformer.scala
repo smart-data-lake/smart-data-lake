@@ -52,8 +52,8 @@ import scala.util.{Failure, Success}
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
-case class ScalaNotebookDfTransformer(override val name: String = "scalaTransform", override val description: Option[String] = None, url: String, functionName: String, authMode: Option[AuthMode] = None, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfTransformer {
-  import ScalaNotebookDfTransformer._
+case class ScalaNotebookSparkDfTransformer(override val name: String = "scalaSparkTransform", override val description: Option[String] = None, url: String, functionName: String, authMode: Option[AuthMode] = None, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfTransformer {
+  import ScalaNotebookSparkDfTransformer._
   private var _fnTransform: Option[fnTransformType] = None
   override def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = {
     try {
@@ -67,14 +67,14 @@ case class ScalaNotebookDfTransformer(override val name: String = "scalaTransfor
     assert(_fnTransform.isDefined, s"($actionId) prepare() must be called before transformWithOptions()")
     _fnTransform.map(_(context.sparkSession, options, df, dataObjectId.id)).get
   }
-  override def factory: FromConfigFactory[GenericDfTransformer] = ScalaNotebookDfTransformer
+  override def factory: FromConfigFactory[GenericDfTransformer] = ScalaNotebookSparkDfTransformer
 }
 
 
-object ScalaNotebookDfTransformer extends FromConfigFactory[GenericDfTransformer] {
+object ScalaNotebookSparkDfTransformer extends FromConfigFactory[GenericDfTransformer] {
 
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ScalaNotebookDfTransformer = {
-    extract[ScalaNotebookDfTransformer](config)
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ScalaNotebookSparkDfTransformer = {
+    extract[ScalaNotebookSparkDfTransformer](config)
   }
 
   /**
