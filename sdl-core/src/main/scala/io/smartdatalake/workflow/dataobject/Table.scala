@@ -21,10 +21,10 @@ package io.smartdatalake.workflow.dataobject
 /**
  * Table attributes
  *
- * @param db optional override of db defined by connection
- * @param name table name
- * @param query optional select query
- * @param primaryKey optional sequence of primary key columns
+ * @param db          optional override of database-schema defined by connection. Called db for backwards-compatibility.
+ * @param name        table name
+ * @param query       optional select query
+ * @param primaryKey  optional sequence of primary key columns
  * @param foreignKeys optional sequence of foreign key definitions.
  *                    This is used as metadata for a data catalog.
  * @param options

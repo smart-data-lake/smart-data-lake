@@ -36,7 +36,7 @@ import scala.collection.mutable.ListBuffer
 import scala.util.{Failure, Success}
 
 /**
- * This tests use configuration test/resources/application.conf
+ * This tests use configuration test/resources/configstatusinfo/application.conf
  */
 class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
 
