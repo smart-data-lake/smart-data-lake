@@ -34,7 +34,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 case class UnpartitionedTestDataObject(override val id: DataObjectId,
                                        override val metadata: Option[DataObjectMetadata] = None)
                                       (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateDataFrame with CanCreateSparkDataFrame with CanWriteDataFrame with CanWriteSparkDataFrame {
+  extends DataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame {
 
   override def options: Map[String, String] = Map() // override options because of conflicting definitions in CanCreateSparkDataFrame and CanWriteSparkDataFrame
 

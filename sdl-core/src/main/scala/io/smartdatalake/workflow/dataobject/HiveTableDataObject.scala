@@ -76,7 +76,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
                                override val housekeepingMode: Option[HousekeepingMode] = None,
                                override val metadata: Option[DataObjectMetadata] = None)
                               (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TableDataObject with CanCreateSparkDataFrame with CanWriteDataFrame with CanWriteSparkDataFrame with CanHandlePartitions with HasHadoopStandardFilestore with SmartDataLakeLogger {
+  extends TableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame with CanHandlePartitions with HasHadoopStandardFilestore with SmartDataLakeLogger {
 
   // Hive tables are always written in parquet format
   private val fileName = "*.parquet"

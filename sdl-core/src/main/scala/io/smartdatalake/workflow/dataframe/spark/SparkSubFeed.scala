@@ -112,10 +112,6 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
   }
   override def isStreaming: Option[Boolean] = dataFrame.map(_.inner.isStreaming)
   override def hasReusableDataFrame: Boolean = dataFrame.isDefined && !isDummy && !isStreaming.getOrElse(false)
-  // TODO: still needed?
-  def getFilterCol: Option[Column] = {
-    filter.map(functions.expr)
-  }
   private[smartdatalake] def convertToDummy(schema: SparkSchema)(implicit context: ActionPipelineContext): SparkSubFeed = {
     val dummyDf = dataFrame.map{
       dataFrame =>

@@ -54,7 +54,7 @@ case class ActionsExporterDataObject(id: DataObjectId,
                                      config: Option[String] = None,
                                      override val metadata: Option[DataObjectMetadata] = None)
                                (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateDataFrame with CanCreateSparkDataFrame with ParsableFromConfig[ActionsExporterDataObject] {
+  extends DataObject with CanCreateSparkDataFrame with ParsableFromConfig[ActionsExporterDataObject] {
 
   /**
    *

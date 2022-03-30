@@ -41,8 +41,8 @@ import scala.reflect.runtime.universe.typeOf
  * Delegates read and write operations to Apache Spark [[DataFrameReader]] and [[DataFrameWriter]] respectively.
  */
 private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
-  with CanCreateDataFrame with CanCreateSparkDataFrame with CanCreateStreamingDataFrame
-  with CanWriteDataFrame with CanWriteSparkDataFrame
+  with CanCreateSparkDataFrame with CanCreateStreamingDataFrame
+  with CanWriteSparkDataFrame
   with UserDefinedSchema with SchemaValidation {
 
   /**

@@ -349,7 +349,6 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
    */
   protected def applyTransformers(transformers: Seq[GenericDfsTransformerDef], inputPartitionValues: Seq[PartitionValues], inputSubFeeds: Seq[DataFrameSubFeed], outputSubFeeds: Seq[DataFrameSubFeed])(implicit context: ActionPipelineContext): Seq[DataFrameSubFeed] = {
     val inputDfsMap = inputSubFeeds.map(subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap
-    // TODO !!!
     val (outputDfsMap, _) = transformers.foldLeft((inputDfsMap,inputPartitionValues)){
       case ((dfsMap, partitionValues), transformer) => transformer.applyTransformation(id, partitionValues, dfsMap)
     }
@@ -358,7 +357,6 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
       case (dataObjectId, dataFrame) =>
         val outputSubFeed = outputSubFeeds.find(_.dataObjectId.id == dataObjectId)
           .getOrElse(throw ConfigurationException(s"($id) No output found for result ${dataObjectId}. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
-        // get partition values from main input
         outputSubFeed.withDataFrame(Some(dataFrame))
     }.toSeq
   }

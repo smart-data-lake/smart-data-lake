@@ -123,7 +123,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
     }
   }
 
-  def validateSchemaMinOnWrite(createDataObject: (String, Option[StructType], Option[StructType]) => DataObject with CanWriteDataFrame with CanWriteSparkDataFrame,
+  def validateSchemaMinOnWrite(createDataObject: (String, Option[StructType], Option[StructType]) => DataObject with CanWriteSparkDataFrame,
                                fileExtension: String = null)
                               (implicit context: ActionPipelineContext) : Unit = {
 

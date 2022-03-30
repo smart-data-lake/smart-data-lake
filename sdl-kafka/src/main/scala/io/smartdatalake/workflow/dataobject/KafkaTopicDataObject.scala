@@ -120,7 +120,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                                 override val options: Map[String, String] = Map(),
                                 override val metadata: Option[DataObjectMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateDataFrame with CanCreateSparkDataFrame with CanCreateStreamingDataFrame with CanWriteDataFrame with CanWriteSparkDataFrame with CanHandlePartitions with SchemaValidation {
+  extends DataObject with CanCreateSparkDataFrame with CanCreateStreamingDataFrame with CanWriteSparkDataFrame with CanHandlePartitions with SchemaValidation {
 
   override val partitions: Seq[String] = datePartitionCol.map(_.colName).toSeq
   override val expectedPartitionsCondition: Option[String] = None // expect all partitions to exist

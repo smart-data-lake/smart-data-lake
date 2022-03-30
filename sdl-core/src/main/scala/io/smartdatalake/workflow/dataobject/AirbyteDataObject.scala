@@ -62,7 +62,7 @@ case class AirbyteDataObject(override val id: DataObjectId,
                              incrementalCursorFields: Seq[String] = Seq(),
                              override val schemaMin: Option[GenericSchema] = None,
                              override val metadata: Option[DataObjectMetadata] = None)
-  extends DataObject with CanCreateDataFrame with CanCreateSparkDataFrame with CanCreateIncrementalOutput with SchemaValidation with SmartDataLakeLogger {
+  extends DataObject with CanCreateSparkDataFrame with CanCreateIncrementalOutput with SchemaValidation with SmartDataLakeLogger {
 
   // these variables will be initialized in prepare phase
   private var spec: Option[AirbyteConnectorSpecification] = None

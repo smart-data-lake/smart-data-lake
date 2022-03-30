@@ -23,7 +23,7 @@ package io.smartdatalake.workflow.dataobject
  * and [[io.smartdatalake.workflow.action.DeduplicateAction]] which need any kind
  * of transactional util table
  */
-private[smartdatalake] trait TransactionalSparkTableDataObject extends TableDataObject with CanCreateSparkDataFrame with CanWriteDataFrame with CanWriteSparkDataFrame {
+private[smartdatalake] trait TransactionalSparkTableDataObject extends TableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame {
 
   override def options: Map[String, String] = Map() // override options because of conflicting definitions in CanCreateSparkDataFrame and CanWriteSparkDataFrame
 

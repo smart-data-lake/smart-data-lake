@@ -601,7 +601,7 @@ object TestSDLPlugin {
  * This test DataObject delivers the 10 next numbers on every increment.
  */
 case class TestIncrementalDataObject(override val id: DataObjectId, override val metadata: Option[DataObjectMetadata] = None)
-  extends DataObject with CanCreateDataFrame with CanCreateSparkDataFrame with CanCreateIncrementalOutput {
+  extends DataObject with CanCreateSparkDataFrame with CanCreateIncrementalOutput {
 
   // State is the start number of the last delivered increment
   var previousState: Int = 1

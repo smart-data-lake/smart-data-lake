@@ -38,7 +38,7 @@ case class CustomDfDataObject(override val id: DataObjectId,
                               override val schemaMin: Option[GenericSchema] = None,
                               override val metadata: Option[DataObjectMetadata] = None
                              )(@transient implicit val instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateDataFrame with CanCreateSparkDataFrame with SchemaValidation {
+  extends DataObject with CanCreateSparkDataFrame with SchemaValidation {
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     implicit val session = context.sparkSession

@@ -49,7 +49,7 @@ case class SplunkDataObject(override val id: DataObjectId,
                              connectionId: ConnectionId,
                              override val metadata: Option[DataObjectMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateDataFrame with CanCreateSparkDataFrame with SplunkService {
+  extends DataObject with CanCreateSparkDataFrame with SplunkService {
 
   /**
    * Connection defines host, port and credentials in central location

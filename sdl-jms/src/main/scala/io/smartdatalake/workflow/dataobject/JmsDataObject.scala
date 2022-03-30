@@ -57,7 +57,7 @@ case class JmsDataObject(override val id: DataObjectId,
                          queue: String,
                          override val metadata: Option[DataObjectMetadata] = None)
                         (implicit instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateDataFrame with CanCreateSparkDataFrame with SchemaValidation {
+  extends DataObject with CanCreateSparkDataFrame with SchemaValidation {
 
   // Allow only supported authentication modes
   private val supportedAuths = Seq(classOf[BasicAuthMode])
