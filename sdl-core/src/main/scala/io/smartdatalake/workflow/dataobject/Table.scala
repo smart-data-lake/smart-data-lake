@@ -21,7 +21,9 @@ package io.smartdatalake.workflow.dataobject
 /**
  * Table attributes
  *
- * @param db          optional override of database-schema defined by connection. Called db for backwards-compatibility.
+ * @param db          database-schema to be used for this table. If there exists a connection for the DataObject,
+ *                    the contents of this field will be overwritten.
+ *                    Called db for backwards-compatibility because for hive tables, db and connection mean the same thing.
  * @param name        table name
  * @param query       optional select query
  * @param primaryKey  optional sequence of primary key columns
