@@ -45,9 +45,7 @@ podman build -t sdl-spark .
 
 ## Compile Scala Classes
 
-Compile included Scala classes. Note: this might take some time, but it's only needed at the beginning or if Scala code has changed.
-
-First compile included Java classes (note: this might take some time, but it's only needed at the beginning or if Java code has changed)
+Utilizing a Maven container, the getting-started project with the required SDL Scala sources and all required libraries are compiled and packed using the following command.  
 
 <Tabs groupId = "docker-podman-switch"
 defaultValue="docker"
@@ -73,6 +71,9 @@ podman run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-j
 </TabItem>
 </Tabs>
 
+:::note
+This might take some time, but it's only needed at the beginning or if Scala code has changed.
+:::
 
 ## Run SDL with Spark docker image
 
