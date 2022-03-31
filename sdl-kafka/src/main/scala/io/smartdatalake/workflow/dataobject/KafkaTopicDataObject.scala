@@ -90,23 +90,24 @@ private object TemporalQueries {
 /**
  * [[DataObject]] of type KafkaTopic.
  * Provides details to an action to read from Kafka Topics using either
-  * [[org.apache.spark.sql.DataFrameReader]] or [[org.apache.spark.sql.streaming.DataStreamReader]]
-  *
-  * @param topicName The name of the topic to read
-  * @param keyType    Optional type the key column should be converted to. If none is given it will remain a bytearray / binary.
-  * @param valueType  Optional type the value column should be converted to. If none is given it will remain a bytearray / binary.
-  * @param schemaMin  An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
-  * @param selectCols Columns to be selected when reading the DataFrame. Available columns are key, value, topic,
-  *                   partition, offset, timestamp, timestampType. If key/valueType is AvroSchemaRegistry the key/value column are
-  *                   convert to a complex type according to the avro schema. To expand it select "value.*".
-  *                   Default is to select key and value.
-  * @param datePartitionCol definition of date partition column to extract formatted timestamp into column.
-  *                   This is used to list existing partition and is added as additional column on batch read.
-  * @param batchReadConsecutivePartitionsAsRanges Set to true if consecutive partitions should be combined as one range of offsets when batch reading from topic. This results in less tasks but can be a performance problem when reading many partitions. (default=false)
-  * @param batchReadMaxOffsetsPerTask Set number of offsets per Spark task when batch reading from topic.
-  * @param options    Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).
-  *                   These options override connection.options.
-  */
+ * [[org.apache.spark.sql.DataFrameReader]] or [[org.apache.spark.sql.streaming.DataStreamReader]]
+ *
+ * @param topicName The name of the topic to read
+ * @param keyType    Optional type the key column should be converted to. If none is given it will remain a bytearray / binary.
+ * @param valueType  Optional type the value column should be converted to. If none is given it will remain a bytearray / binary.
+ * @param schemaMin  An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
+ *                   Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
+ * @param selectCols Columns to be selected when reading the DataFrame. Available columns are key, value, topic,
+ *                   partition, offset, timestamp, timestampType. If key/valueType is AvroSchemaRegistry the key/value column are
+ *                   convert to a complex type according to the avro schema. To expand it select "value.*".
+ *                   Default is to select key and value.
+ * @param datePartitionCol definition of date partition column to extract formatted timestamp into column.
+ *                   This is used to list existing partition and is added as additional column on batch read.
+ * @param batchReadConsecutivePartitionsAsRanges Set to true if consecutive partitions should be combined as one range of offsets when batch reading from topic. This results in less tasks but can be a performance problem when reading many partitions. (default=false)
+ * @param batchReadMaxOffsetsPerTask Set number of offsets per Spark task when batch reading from topic.
+ * @param options    Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).
+ *                   These options override connection.options.
+ */
 case class KafkaTopicDataObject(override val id: DataObjectId,
                                 topicName: String,
                                 connectionId: ConnectionId,

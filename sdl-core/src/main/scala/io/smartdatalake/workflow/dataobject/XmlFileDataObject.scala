@@ -46,7 +46,9 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * Note that writing XML-file partitioned is not supported by spark-xml.
  *
  * @param xmlOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
- * @param schema An optional data object schema. If defined, any automatic schema inference is avoided. As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
+ * @param schema An optional data object schema. If defined, any automatic schema inference is avoided.
+ *               As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
+ *               Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false

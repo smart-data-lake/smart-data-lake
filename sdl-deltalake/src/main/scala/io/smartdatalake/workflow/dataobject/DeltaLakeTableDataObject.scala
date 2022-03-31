@@ -59,6 +59,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param partitions partition columns for this data object
  * @param options Options for Delta Lake tables see: [[https://docs.delta.io/latest/delta-batch.html]] and [[org.apache.spark.sql.delta.DeltaOptions]]
  * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
+ *                  Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param table DeltaLake table to be written by this output
  * @param saveMode [[SDLSaveMode]] to use when writing files, default is "overwrite". Overwrite, Append and Merge are supported for now.
  * @param allowSchemaEvolution If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.

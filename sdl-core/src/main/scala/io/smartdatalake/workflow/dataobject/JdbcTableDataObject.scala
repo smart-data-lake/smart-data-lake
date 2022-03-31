@@ -54,6 +54,7 @@ import scala.util.Try
  * @param postWriteSql SQL-statement to be executed in exec phase after writing output table, using output jdbc connection
  *                   Use tokens with syntax %{<spark sql expression>} to substitute with values from [[DefaultExpressionData]].
  * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
+ *                  Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param saveMode [[SDLSaveMode]] to use when writing table, default is "Overwrite". Only "Append" and "Overwrite" supported.
  * @param allowSchemaEvolution If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
  * @param table The jdbc table to be read
