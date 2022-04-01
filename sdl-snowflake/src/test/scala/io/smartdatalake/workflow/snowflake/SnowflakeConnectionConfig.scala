@@ -24,14 +24,17 @@ import io.smartdatalake.workflow.connection.SnowflakeConnection
 
 /**
  * Configuration of Snowflake connection for integration tests
+ * Please ensure that the environnement Variables SNOWFLAKE_URL, SNOWFLAKE_WAREHOUSE, SNOWFLAKE_DATABASE, SNOWFLAKE_ROLE,
+ * SNOWFLAKE_USER and SNOWFLAKE_PASSWORD are set in order to connect to Snowflake.
  */
 object SnowflakeConnectionConfig {
   val sfConnection: SnowflakeConnection = SnowflakeConnection(
     id = "sfCon",
-    url = "<accountUrl>",
-    warehouse = "COMPUTE_WH",
-    database = "testdb",
-    role = "ACCOUNTADMIN",
-    authMode = BasicAuthMode("CLEAR#<user>", "CLEAR#<pwd>")
+    url = sys.env("SNOWFLAKE_URL"),
+    warehouse = sys.env("SNOWFLAKE_WAREHOUSE"),
+    database = sys.env("SNOWFLAKE_DATABASE"),
+    role = sys.env("SNOWFLAKE_ROLE"),
+    authMode = BasicAuthMode("CLEAR#" + sys.env("SNOWFLAKE_USER"), "CLEAR#" + sys.env("SNOWFLAKE_PASSWORD"))
   )
 }
+
