@@ -102,7 +102,7 @@ jobs:
           ls
           ls sdl-lang/target/classes
           # note that sdl-schema.json should be available in the location below from the previous maven build.
-          mv /home/runner/work/smart-data-lake/smart-data-lake/sdl-lang/target/classes/sdl-schema.json static/json-schema-viewer/schemas/sdl-schema-${MVN_CURRENT_VERSION}.json
+          mv sdl-lang/target/classes/sdl-schema.json static/json-schema-viewer/schemas/sdl-schema-${MVN_CURRENT_VERSION}.json
           git add static/json-schema-viewer/schemas/sdl-schema-${MVN_CURRENT_VERSION}.json
           git diff-index --quiet HEAD || git commit -m "Update sdl-schema-${MVN_CURRENT_VERSION}.json" # only if there is something to commit
           git push
