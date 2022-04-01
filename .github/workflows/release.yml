@@ -77,7 +77,7 @@ jobs:
         git pull --rebase
         git tag -f ${MVN_RELEASE_VERSION} -m "Release ${MVN_RELEASE_VERSION}"
         git push
-
+        
     # DEVELOP BRANCH
     - name: Develop Git Checkout
       run: |
@@ -103,4 +103,15 @@ jobs:
         git commit -m "Increment to next SNAPSHOT release" -a
     - name: Develop Git Push
       run: |
+        git push
+
+    # DOCUMENTATION BRANCH
+    - name: Push new sdl-schema.json to documentation branch
+      run: |
+        git fetch origin documentation
+        git checkout documentation
+        # note that sdl-schema.json should be available in the location below from the previous maven build.
+        mv sdl-lang/target/classes/sdl-schema.json static/json-schema-viewer/schemas/sdl-schema-${MVN_CURRENT_VERSION}.json
+        git add static/json-schema-viewer/schemas/sdl-schema-${MVN_CURRENT_VERSION}.json
+        git diff-index --quiet HEAD || git commit -m "Update sdl-schema-${MVN_CURRENT_VERSION}.json" # only if there is something to commit
         git push
