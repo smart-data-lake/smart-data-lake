@@ -21,9 +21,9 @@ package io.smartdatalake.workflow.snowflake
 
 import com.snowflake.snowpark.{DataFrame, Session}
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
-import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
+import io.smartdatalake.config.ConfigToolbox
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.workflow.{DataFrameSubFeed, DataFrameSubFeedCompanion}
+import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.generic.customlogic.CustomGenericDfTransformer
 import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, ScalaClassGenericDfTransformer}
@@ -42,6 +42,8 @@ import java.nio.file.Files
  * Action2 will also apply two generic transformation, e.g. filter and add runId column.
  * It needs to be run manually because you need to provide a Snowflake environment.
  * Please configure this in SnowflakeConnectionConfig.
+ * Also ensure that the environment variable SNOWFLAKE_SCHEMA is set to a schema that is accessible
+ * with the connection defined in SnowflakeConnectionConfig
  */
 object SparkAndSnowparkDataPipelineIT extends App {
 
@@ -61,14 +63,15 @@ object SparkAndSnowparkDataPipelineIT extends App {
   val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
   srcDO.dropTable
   instanceRegistry.register(srcDO)
-  val tgt1Table = Table(Some("test"), "tgt1", None, Some(Seq("lastname")))
-  val tgt1DO = SnowflakeTableDataObject( "tgt1", tgt1Table, connectionId = "sfCon")
+  val tgt1Table = Table(Some(System.getenv("SNOWFLAKE_SCHEMA")), "tgt1", None, Some(Seq("lastname")))
+  val tgt1DO = SnowflakeTableDataObject("tgt1", tgt1Table, connectionId = "sfCon")
   tgt1DO.dropTable
   instanceRegistry.register(tgt1DO)
-  val tgt2Table = Table(Some("test"), "tgt2", None, Some(Seq("lastname")))
-  val tgt2DO = SnowflakeTableDataObject( "tgt2", tgt2Table, connectionId = "sfCon")
+  val tgt2Table = Table(Some(System.getenv("SNOWFLAKE_SCHEMA")), "tgt2", None, Some(Seq("lastname")))
+  val tgt2DO = SnowflakeTableDataObject("tgt2", tgt2Table, connectionId = "sfCon")
   tgt2DO.dropTable
   instanceRegistry.register(tgt2DO)
+
 
   // first action copy with Spark from Hive to Snowflake
   val action1 = CopyAction("copySpark", srcDO.id, tgt1DO.id)
@@ -101,7 +104,6 @@ object SparkAndSnowparkDataPipelineIT extends App {
 class TestOptionsSnowparkDfTransformer extends CustomSnowparkDfTransformer {
   def transform(session: Session, options: Map[String,String], df: DataFrame, dataObjectId: String) : DataFrame = {
     import com.snowflake.snowpark.functions._
-    import session.implicits._
     df.withColumn("test", lit(options("test")+"-"+options("appName")))
   }
 }

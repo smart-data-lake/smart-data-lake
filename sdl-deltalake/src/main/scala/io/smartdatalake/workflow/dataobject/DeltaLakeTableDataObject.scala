@@ -22,7 +22,6 @@ import com.typesafe.config.Config
 import io.delta.tables.DeltaTable
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
@@ -31,6 +30,7 @@ import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils}
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
@@ -369,7 +369,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       else Seq()
     )
     logger.debug(s"($id) listPartitions took $d")
-    // return
     pvs
   }
 
