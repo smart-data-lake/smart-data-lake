@@ -303,7 +303,7 @@ You can pass static **options** and **runtimeOptions** to custom transformations
 Specifying options allows to reuse a transformation in different settings. 
  
 #### Java/Scala
-You can use Spark Dataset API in Java/Scala to define custom transformations. 
+You can use Spark DataFrame API in Java/Scala to define custom transformations. 
 If you have a Java project, create a class that extends CustomDfTransformer or CustomDfsTransformer and implement `transform` method.
 Then use **type = ScalaClassSparkDfTransformer** or **type = ScalaClassSparkDfsTransformer** and configure **className** attribute.
 
