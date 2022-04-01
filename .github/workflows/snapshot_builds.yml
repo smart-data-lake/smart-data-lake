@@ -95,7 +95,9 @@ jobs:
 
       - name: Push new sdl-schema.json to documentation branch
         run: |
+          git fetch origin documentation
           git checkout documentation
+          # note that sdl-schema.json should be available in the location below from the previous maven build.
           mv sdl-lang/target/classes/sdl-schema.json sdl-lang/target/classes/sdl-schema-${MVN_CURRENT_VERSION}.json
           git add sdl-lang/target/classes/sdl-schema-${MVN_CURRENT_VERSION}.json
           git diff-index --quiet HEAD || git commit -m "Update sdl-schema-${MVN_CURRENT_VERSION}.json" # only if there is something to commit
