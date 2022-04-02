@@ -5900,6 +5900,6 @@
     }
   },
   "id" : "sdl-schema.json#",
-  "version" : "2.2.1",
+  "version" : "2.2.1-SNAPSHOT",
   "$schema" : "http://json-schema.org/draft-07/schema#"
 }
