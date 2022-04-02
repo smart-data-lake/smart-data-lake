@@ -369,7 +369,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    */
   private[smartdatalake] val runtimeData: RuntimeData = getRuntimeDataImpl
   protected def getRuntimeDataImpl: RuntimeData = {
-    SynchronousRuntimeData(Option(Environment.globalConfig).map(_.runtimeDataNumberOfExecutionsToKeep).getOrElse(10))
+    SynchronousRuntimeData(Environment.runtimeDataNumberOfExecutionsToKeep)
   }
 
   /**

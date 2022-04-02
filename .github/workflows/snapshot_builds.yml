@@ -16,10 +16,18 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Set up JDK 1.8
+      with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+    - name: Set up JDK 11
       uses: actions/setup-java@v1
       with:
-        java-version: 1.8
+        java-version: 11
+    - name: Cache SonarCloud packages
+      uses: actions/cache@v2
+      with:
+        path: ~/.sonar/cache
+        key: ${{ runner.os }}-sonar
+        restore-keys: ${{ runner.os }}-sonar
     - name: Cache Maven
       uses: actions/cache@v2
       with:
@@ -28,11 +36,17 @@ jobs:
         restore-keys: ${{ runner.os }}-maven-
 
     - name: Build with Maven for Scala 2.12
-      run: mvn -P scala-2.12 -B clean test --file pom.xml
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      run: mvn -P scala-2.12,test-sonar -B clean test scoverage:report --file pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake
 
     - name: Build with Maven for Scala 2.11, only if on develop-spark2* branch
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       if: ${{ contains(github.base_ref, 'develop-spark2') || contains(github.ref, 'develop-spark2') }}
-      run: mvn -P scala-2.11 -B clean test --file pom.xml
+      run: mvn -P scala-2.11 -B clean test --file pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake
 
 
   deploy:
@@ -43,10 +57,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - name: Set up JDK 1.8
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PAT_ACTIONS }}      
+      - name: Git Config
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"          
+      - name: Set up JDK 11
         uses: actions/setup-java@v1
         with:
-          java-version: 1.8
+          java-version: 11
       - name: Cache Maven
         uses: actions/cache@v2
         with:
@@ -75,3 +96,16 @@ jobs:
           maven_profiles: scala-2.11,release-sonatype
           # exclude sdl-parent as it is already uploaded with previous deploy, stays the same and cannot be replaced in remote repository
           maven_args: -B -DskipTests -pl '!.' -f pom.xml
+
+      - name: Maven Get Version
+        run: echo MVN_CURRENT_VERSION=$(mvn -B -P scala-2.12 -f /home/runner/work/smart-data-lake/smart-data-lake/pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
+
+      - name: Push new sdl-schema.json to documentation branch
+        run: |
+          git fetch origin documentation
+          git checkout documentation
+          # note that sdl-schema.json should be available in the location below from the previous maven build.
+          mv sdl-lang/target/classes/sdl-schema.json static/json-schema-viewer/schemas/sdl-schema-${MVN_CURRENT_VERSION}.json
+          git add static/json-schema-viewer/schemas/sdl-schema-${MVN_CURRENT_VERSION}.json
+          git diff-index --quiet HEAD || git commit -m "Update sdl-schema-${MVN_CURRENT_VERSION}.json" # only if there is something to commit
+          git push

@@ -23,10 +23,10 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-    - name: JDK 8 Set
+    - name: JDK 11 Set
       uses: actions/setup-java@v1
       with: 
-        java-version: 1.8
+        java-version: 11
     - name: Maven Cache
       uses: actions/cache@v2
       with:
@@ -68,16 +68,16 @@ jobs:
         # exclude sdl-parent as it is already uploaded with previous deploy, stays the same and cannot be replaced in remote repository
         maven_args: -B -pl '!.' -f pom.xml
 
-    - name: Git Commit and Tag Release
+    - name: Git Commit
       run: |
         git add -A
         git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
-        git tag -f ${MVN_RELEASE_VERSION} -m "Release ${MVN_RELEASE_VERSION}"
-    - name: Git Pull Master
+    - name: Git Pull, Tag and Push
       run: |
         git pull --rebase
+        git tag -f ${MVN_RELEASE_VERSION} -m "Release ${MVN_RELEASE_VERSION}"
         git push
-
+        
     # DEVELOP BRANCH
     - name: Develop Git Checkout
       run: |
@@ -103,4 +103,15 @@ jobs:
         git commit -m "Increment to next SNAPSHOT release" -a
     - name: Develop Git Push
       run: |
+        git push
+
+    # DOCUMENTATION BRANCH
+    - name: Push new sdl-schema.json to documentation branch
+      run: |
+        git fetch origin documentation
+        git checkout documentation
+        # note that sdl-schema.json should be available in the location below from the previous maven build.
+        mv sdl-lang/target/classes/sdl-schema.json static/json-schema-viewer/schemas/sdl-schema-${MVN_CURRENT_VERSION}.json
+        git add static/json-schema-viewer/schemas/sdl-schema-${MVN_CURRENT_VERSION}.json
+        git diff-index --quiet HEAD || git commit -m "Update sdl-schema-${MVN_CURRENT_VERSION}.json" # only if there is something to commit
         git push

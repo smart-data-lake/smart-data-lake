@@ -37,7 +37,7 @@ case $op in
       echo '{"type": "LOG", "log": {"level": "ERROR", "message": "1 jsonfile parameter expected, got '$JSONFILE_PARAM_CNT'"}}'
       exit -1
     fi
-    echo '{"type": "CATALOG", "catalog": {"streams": [{"name": "mystream", "json_schema": {"$schema": "http://json-schema.org/draft-07/schema#", "type": "object", "properties": {"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "required": ["produkttyp", "flag", "artikelID"], "properties": {"produkttyp": {"type": "string"}, "flag": {"type": "string"}, "artikelID": {"type": "string"}, "artikelbezeichnung": {"type": "string"}}}}, "supported_sync_modes": ["full_refresh"]}]}}'
+    echo '{ "type": "CATALOG", "catalog": { "streams": [ { "name": "mystream", "json_schema": { "$schema": "http://json-schema.org/draft-07/schema#", "type": "object", "properties": { "produkttyp": { "type":         "string" }, "flag": { "type": "string" }, "artikelID": { "type": "string" }, "artikelbezeichnung": { "type": "string" } } }, "supported_sync_modes": [ "full_refresh" ] } ] } }'
     ;;
 
   read)

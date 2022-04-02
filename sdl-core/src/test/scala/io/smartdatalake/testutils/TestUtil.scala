@@ -81,14 +81,15 @@ object TestUtil extends SmartDataLakeLogger {
   lazy val sessionWithoutHive : SparkSession = sparkSessionBuilder().getOrCreate
 
   def getDefaultActionPipelineContext(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
-    if (Environment.globalConfig == null) Environment._globalConfig = GlobalConfig()
     getDefaultActionPipelineContext(sessionHiveCatalog) // initialize with Spark session incl. Hive support
   }
 
   def getDefaultActionPipelineContext(sparkSession: SparkSession)(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
     val defaultHadoopConf = new SerializableHadoopConfiguration(new Configuration())
-    val context = ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, instanceRegistry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig("feedTest", Some("appTest")), phase = ExecutionPhase.Init, serializableHadoopConf = defaultHadoopConf)
-    context._sparkSession = Some(sparkSession)
+    val globalConfig = GlobalConfig()
+    val context = ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, instanceRegistry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig("feedTest", Some("appTest")), phase = ExecutionPhase.Init, serializableHadoopConf = defaultHadoopConf, globalConfig = globalConfig)
+    // reuse existing spark session
+    globalConfig._sparkSession = Some(sparkSession)
     context
   }
 

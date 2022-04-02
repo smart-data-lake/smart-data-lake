@@ -124,7 +124,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     assert(r1.head.partitionValues.keys == Set("date", "town", "year"))
   }
 
-  test("copy file from sftp to hadoop with partitions and negative top-level partition filter") {
+  test("copy file from sftp to hadoop with partitions and non existing partition filter") {
 
     val feed = "filetransfer"
     val ftpDir = "testSrc"
@@ -149,10 +149,16 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
 
-    // prepare & start load
+    // prepare
     val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id)
-    val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq(PartitionValues(Map("date"->"00010101"))))
+
+    // fail if partition values dont exist
+    val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq(PartitionValues(Map("date"->"00010101", "town"->"NYC", "year"->"2020"))))
     intercept[AssertionError](action1.exec(Seq(srcSubFeed)))
+
+    // fail if partition values dont exist, also if only the first partition value is defined
+    val srcSubFeedValidInit = FileSubFeed(None, "src1", partitionValues = Seq(PartitionValues(Map("date"->"00010101"))))
+    intercept[AssertionError](action1.exec(Seq(srcSubFeedValidInit)))
   }
 
   test("copy file from sftp to hadoop with partitions and positive top-level partition filter") {

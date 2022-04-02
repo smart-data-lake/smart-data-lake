@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,15 +17,11 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.apache.spark.custom
+package io.smartdatalake.statusinfo.websocket
 
-import org.apache.hadoop.conf.Configuration
-import org.apache.spark.SparkConf
-import org.apache.spark.deploy.SparkHadoopUtil
+import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
+import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
+import io.smartdatalake.workflow.action.RuntimeInfo
 
-object PrivateAccessor {
-  def getHadoopConfiguration(properties: Map[String,String]): Configuration = {
-    val sparkConf = new SparkConf().setAll(properties)
-    SparkHadoopUtil.get.newConfiguration(sparkConf)
-  }
-}
+case class StatusUpdate(actionId: Option[String], runtimeInfo: Option[RuntimeInfo], phase: ExecutionPhase, finalState: Option[RuntimeEventState])
+

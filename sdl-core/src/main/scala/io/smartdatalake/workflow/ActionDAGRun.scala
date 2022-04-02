@@ -21,17 +21,16 @@ package io.smartdatalake.workflow
 import io.smartdatalake.app.StateListener
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.dag.{DAG, DAGEdge, DAGEventListener, DAGException, DAGNode, DAGResult, ExceptionSeverity, TaskPredecessorFailureWarning}
+import io.smartdatalake.util.dag.DAGHelper._
+import io.smartdatalake.util.dag._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.dag.DAGHelper._
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action._
-import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject, TransactionalSparkTableDataObject}
+import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject}
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
-import org.apache.spark.sql.SparkSession
 import org.slf4j.event.Level
 
 import scala.concurrent.Await
@@ -47,17 +46,23 @@ private[smartdatalake] case class DummyDAGResult(override val resultId: String) 
 
 private[smartdatalake] trait ActionMetrics {
   def getId: String
+
   def getOrder: Long
-  def getMainInfos: Map[String,Any]
+
+  def getMainInfos: Map[String, Any]
+
   def getAsText: String
 }
 
 private[smartdatalake] case class GenericMetrics(id: String, order: Long, mainInfos: Map[String, Any]) extends ActionMetrics {
   def getId: String = id
+
   def getOrder: Long = order
+
   def getMainInfos: Map[String, Any] = mainInfos
+
   def getAsText: String = {
-    mainInfos.map{ case (k,v) => s"$k=$v" }.mkString(" ")
+    mainInfos.map { case (k, v) => s"$k=$v" }.mkString(" ")
   }
 }
 
@@ -65,7 +70,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
 
   private def createScheduler(parallelism: Int = 1) = Scheduler.fixedPool(s"dag-${executionId.runId}", parallelism)
 
-  private def run[R<:DAGResult](phase: ExecutionPhase, parallelism: Int = 1)(operation: (DAGNode, Seq[R]) => Seq[R])(implicit context: ActionPipelineContext): Seq[R] = {
+  private def run[R <: DAGResult](phase: ExecutionPhase, parallelism: Int = 1)(operation: (DAGNode, Seq[R]) => Seq[R])(implicit context: ActionPipelineContext): Seq[R] = {
     implicit val scheduler: SchedulerService = createScheduler(parallelism)
     val task = dag.buildTaskGraph[R](new ActionEventListener(phase))(operation)
     val futureResult = task.runToFuture(scheduler)
@@ -92,7 +97,9 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
     // log dag on error
     if (dagExceptionsToStop.nonEmpty) ActionDAGRun.logDag(s"$phase ${dagExceptionsToStop.head.severity} for ${context.application} runId=${context.executionId.runId} attemptId=${context.executionId.runId}", dag, Some(executionId))
     // throw most severe exception
-    dagExceptionsToStop.foreach{ throw _ }
+    dagExceptionsToStop.foreach {
+      throw _
+    }
 
     // extract & return subfeeds
     result.filter(_.isSuccess).map(_.get)
@@ -185,7 +192,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
   }
 
   private def getInitialSubFeed(dataObjectId: DataObjectId)(implicit context: ActionPipelineContext) = {
-    initialSubFeeds.find(_.dataObjectId==dataObjectId)
+    initialSubFeeds.find(_.dataObjectId == dataObjectId)
       .getOrElse {
         val partitions = context.instanceRegistry.get[DataObject](dataObjectId) match {
           case dataObject: CanHandlePartitions => dataObject.partitions
@@ -199,7 +206,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
   /**
    * Collect runtime information for every action of the dag and the current executionId
    */
-  def getRuntimeInfos : Map[ActionId, RuntimeInfo] = {
+  def getRuntimeInfos: Map[ActionId, RuntimeInfo] = {
     dag.getNodes.map { a =>
       (a.id, a.getRuntimeInfo(Some(executionId)).getOrElse(RuntimeInfo(executionId, RuntimeEventState.PENDING)))
     }.toMap
@@ -209,12 +216,14 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
    * Save state of dag to file and notify stateListeners
    *
    * @param changedActionId : single action whose state changed, if applicable
-   * @param isFinal : set to true if this is the final save for this DAG run
+   * @param isFinal         : set to true if this is the final save for this DAG run
    */
   def saveState(phase: ExecutionPhase, changedActionId: Option[ActionId] = None, isFinal: Boolean = false)(implicit context: ActionPipelineContext): ActionDAGRunState = {
     val runtimeInfos = getRuntimeInfos
     val runState = ActionDAGRunState(context.appConfig, executionId.runId, executionId.attemptId, context.runStartTime, context.attemptStartTime, actionsSkipped ++ runtimeInfos, isFinal)
-    if (phase==ExecutionPhase.Exec) stateStore.foreach(_.saveState(runState))
+    if (phase == ExecutionPhase.Exec) {
+      stateStore.foreach(_.saveState(runState))
+    }
     stateListeners.foreach(_.notifyState(runState, context, changedActionId))
     // return
     runState
@@ -225,23 +234,26 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
       node.addRuntimeEvent(executionId, phase, RuntimeEventState.STARTED)
       logger.info(s"${node.toStringShort}: $phase started")
     }
+
     override def onNodeSuccess(results: Seq[DAGResult])(node: Action): Unit = {
       val state = phase match {
         case ExecutionPhase.Prepare => RuntimeEventState.PREPARED
         case ExecutionPhase.Init => RuntimeEventState.INITIALIZED
         case ExecutionPhase.Exec => RuntimeEventState.SUCCEEDED
       }
-      node.addRuntimeEvent(executionId, phase, state, results = results.collect{ case x: SubFeed => x })
+      node.addRuntimeEvent(executionId, phase, state, results = results.collect { case x: SubFeed => x })
       logger.info(s"${node.toStringShort}: $phase succeeded")
       saveState(phase, Some(node.id))
     }
+
     override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
       // only first line of message included as logical plan of AnalysisException might have several 100 lines...
-      val exceptionMsg = s"${exception.getClass.getSimpleName}: ${exception.getMessage.linesIterator.next}"
+      val exceptionMsg = s"${exception.getClass.getSimpleName}: ${Option(exception.getMessage).map(_.linesIterator.next).getOrElse("null")}"
       node.addRuntimeEvent(executionId, phase, RuntimeEventState.FAILED, Some(exceptionMsg))
       logger.warn(s"${node.toStringShort}: $phase failed with $exceptionMsg")
       saveState(phase, Some(node.id))
     }
+
     override def onNodeSkipped(exception: Throwable)(node: Action): Unit = {
       val state = exception match {
         case _: TaskPredecessorFailureWarning => RuntimeEventState.CANCELLED
@@ -256,7 +268,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
   /**
    * Get Action count per RuntimeEventState
    */
-  def getStatistics: Map[RuntimeEventState,Int] = {
+  def getStatistics: Map[RuntimeEventState, Int] = {
     getRuntimeInfos.map(_._2.state).groupBy(identity).mapValues(_.size)
   }
 
@@ -270,9 +282,11 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
 
   // Helper methods rename thread so that it includes phase and action id for logging
   private var previousThreadName: Option[String] = None
+
   private def getActionThreadName(id: ActionId)(implicit context: ActionPipelineContext) = {
     s"${context.phase.toString.toLowerCase()}-${id.id}"
   }
+
   private def setThreadName(name: String): String = {
     val previousThreadName = Thread.currentThread().getName
     Thread.currentThread().setName(name)
@@ -290,26 +304,26 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
   /**
    * create ActionDAGRun
    */
-  def apply(actions: Seq[Action], actionsSkipped: Map[ActionId,RuntimeInfo] = Map(), partitionValues: Seq[PartitionValues] = Seq(), parallelism: Int = 1, initialSubFeeds: Seq[SubFeed] = Seq(), dataObjectsState: Seq[DataObjectState] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, stateListeners: Seq[StateListener] = Seq())(implicit context: ActionPipelineContext): ActionDAGRun = {
+  def apply(actions: Seq[Action], actionsSkipped: Map[ActionId, RuntimeInfo] = Map(), partitionValues: Seq[PartitionValues] = Seq(), parallelism: Int = 1, initialSubFeeds: Seq[SubFeed] = Seq(), dataObjectsState: Seq[DataObjectState] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, stateListeners: Seq[StateListener] = Seq())(implicit context: ActionPipelineContext): ActionDAGRun = {
 
     // prepare edges: list of actions dependencies
     // this can be created by combining input and output ids between actions
-    val nodeInputs = actions.map( action => (action.id, action.inputs.map(_.id)))
-    val outputsToNodeMap = actions.flatMap( action => action.outputs.map( output => (output.id, action.id)))
+    val nodeInputs = actions.map(action => (action.id, action.inputs.map(_.id)))
+    val outputsToNodeMap = actions.flatMap(action => action.outputs.map(output => (output.id, action.id)))
       .groupBy(_._1).mapValues(_.map(_._2))
-    val allEdges = nodeInputs.flatMap{ case (nodeIdTo, inputIds) => inputIds.flatMap( inputId => outputsToNodeMap.getOrElse(inputId,Seq()).map(action => (Some(action), nodeIdTo, inputId)))} ++
-      nodeInputs.flatMap{ case (nodeIdTo, inputIds) => inputIds.filter( inputId => !outputsToNodeMap.contains(inputId)).map( inputId => (None, nodeIdTo, inputId))}
+    val allEdges = nodeInputs.flatMap { case (nodeIdTo, inputIds) => inputIds.flatMap(inputId => outputsToNodeMap.getOrElse(inputId, Seq()).map(action => (Some(action), nodeIdTo, inputId))) } ++
+      nodeInputs.flatMap { case (nodeIdTo, inputIds) => inputIds.filter(inputId => !outputsToNodeMap.contains(inputId)).map(inputId => (None, nodeIdTo, inputId)) }
 
     // test
     val duplicateEdges = allEdges.groupBy(identity).mapValues(_.size).filter(_._2 > 1).keys
-    assert( duplicateEdges.isEmpty, s"Duplicate edges found: $duplicateEdges" )
+    assert(duplicateEdges.isEmpty, s"Duplicate edges found: $duplicateEdges")
 
     // create init node from input edges
     val inputEdges = allEdges.filter(_._1.isEmpty)
     logger.info(s"input edges are $inputEdges")
     val initNodeId = "start"
     val initAction = InitDAGNode(initNodeId, inputEdges.map(_._3.id))
-    val edges = allEdges.map{ case (nodeIdFromOpt, nodeIdTo, resultId) => ActionDAGEdge(nodeIdFromOpt.map(_.id).getOrElse(initNodeId), nodeIdTo.id, resultId.id)}
+    val edges = allEdges.map { case (nodeIdFromOpt, nodeIdTo, resultId) => ActionDAGEdge(nodeIdFromOpt.map(_.id).getOrElse(initNodeId), nodeIdTo.id, resultId.id) }
 
     // create dag
     val dag = DAG.create[Action](initAction +: actions, edges)
@@ -325,8 +339,10 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
         case x => x.toString
       }
     }
-    logger.info(s"""$msg:
-                   |${dag.render(nodeToString)}
+
+    logger.info(
+      s"""$msg:
+         |${dag.render(nodeToString)}
     """.stripMargin)
   }
 }

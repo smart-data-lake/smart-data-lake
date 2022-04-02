@@ -20,14 +20,16 @@
 package io.smartdatalake.workflow
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
-import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
+import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{ExecutionId, RuntimeEventState, RuntimeInfo, SDLExecutionId}
+import org.apache.spark.util.Json4sCompat
 import org.json4s._
 import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.{read, writePretty}
+import org.reflections.Reflections
 
 import java.time.{Duration, LocalDateTime}
 
@@ -37,13 +39,30 @@ import java.time.{Duration, LocalDateTime}
 case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime
                                                     , actionsState: Map[ActionId, RuntimeInfo], isFinal: Boolean) {
   def toJson: String = ActionDAGRunState.toJson(this)
-  def isFailed: Boolean = actionsState.exists(_._2.state==RuntimeEventState.FAILED)
+
+  def isFailed: Boolean = actionsState.exists(_._2.state == RuntimeEventState.FAILED)
+
   def isSucceeded: Boolean = isFinal && !isFailed
+
   def isSkipped: Boolean = isFinal &&
-    actionsState.filter(_._2.executionId.isInstanceOf[SDLExecutionId]).forall(_._2.state==RuntimeEventState.SKIPPED)
+    actionsState.filter(_._2.executionId.isInstanceOf[SDLExecutionId]).forall(_._2.state == RuntimeEventState.SKIPPED)
+
   def getDataObjectsState: Seq[DataObjectState] = {
-    actionsState.flatMap{ case (actionId, info) => info.dataObjectsState }.toSeq
+    actionsState.flatMap { case (actionId, info) => info.dataObjectsState }.toSeq
   }
+
+  def finalState: Option[RuntimeEventState] =
+    if (!isFinal) {
+      None
+    } else {
+      if (isFailed)
+        Some(RuntimeEventState.FAILED)
+      else if (isSkipped)
+        Some(RuntimeEventState.SKIPPED)
+      else if (isSucceeded)
+        Some(RuntimeEventState.SUCCEEDED)
+      else throw new IllegalStateException("Illegal State")
+    }
 }
 case class DataObjectState(dataObjectId: DataObjectId, state: String) {
   def getEntry: (DataObjectId, DataObjectState) = (dataObjectId, this)
@@ -51,31 +70,30 @@ case class DataObjectState(dataObjectId: DataObjectId, state: String) {
 
 private[smartdatalake] object ActionDAGRunState {
 
-  private val durationSerializer = new CustomSerializer[Duration](formats => (
+  private val durationSerializer = Json4sCompat.getCustomSerializer[Duration](formats => (
     {
       case json: JString => Duration.parse(json.s)
       case json: JInt => Duration.ofSeconds(json.num.toLong)
     },
     {case obj: Duration => JString(obj.toString)}
   ))
-  private val localDateTimeSerializer = new CustomSerializer[LocalDateTime](formats => (
+  private val localDateTimeSerializer = Json4sCompat.getCustomSerializer[LocalDateTime](formats => (
     {case json: JString => LocalDateTime.parse(json.s)},
     {case obj: LocalDateTime => JString(obj.toString)}
   ))
-  private val actionIdSerializer = new CustomKeySerializer[ActionId](formats => (
-    {case json => ActionId(json)},
+  private val actionIdSerializer = Json4sCompat.getCustomKeySerializer[ActionId](formats => (
+    {case s: String => ActionId(s)},
     {case obj: ActionId => obj.id}
   ))
-  private val dataObjectIdSerializer = new CustomKeySerializer[DataObjectId](formats => (
-    {case json => DataObjectId(json)},
+  private val dataObjectIdSerializer = Json4sCompat.getCustomKeySerializer[DataObjectId](formats => (
+    {case s: String => DataObjectId(s)},
     {case obj: DataObjectId => obj.id}
   ))
 
-  implicit private lazy val workflowReflections = ReflectionUtil.getReflections("io.smartdatalake.workflow")
+  implicit private lazy val workflowReflections: Reflections = ReflectionUtil.getReflections("io.smartdatalake.workflow")
 
   private lazy val typeHints = ShortTypeHints(ReflectionUtil.getTraitImplClasses[SubFeed].toList ++ ReflectionUtil.getSealedTraitImplClasses[ExecutionId], "type")
-  implicit private val formats: Formats = Serialization.formats(typeHints)
-    .withStrictArrayExtraction.withStrictMapExtraction.withStrictOptionParsing + new EnumNameSerializer(RuntimeEventState) +
+  implicit val formats: Formats = Json4sCompat.getStrictSerializationFormat(typeHints) + new EnumNameSerializer(RuntimeEventState) +
     actionIdSerializer + dataObjectIdSerializer + durationSerializer + localDateTimeSerializer
 
   // write state to Json
