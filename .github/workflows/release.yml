@@ -75,8 +75,9 @@ jobs:
     - name: Git Pull, Tag and Push
       run: |
         git pull --rebase
+        git push origin # push commits
         git tag -f ${MVN_RELEASE_VERSION} -m "Release ${MVN_RELEASE_VERSION}"
-        git push
+        git push origin ${MVN_RELEASE_VERSION} # push tag
         
     # DEVELOP BRANCH
     - name: Develop Git Checkout
