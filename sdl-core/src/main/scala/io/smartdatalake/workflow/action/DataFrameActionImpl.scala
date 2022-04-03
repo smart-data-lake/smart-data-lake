@@ -345,12 +345,16 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
   }
 
   /**
-   * apply transformer to SubFeeds
+   * Apply many-to-many transformers to SubFeeds.
+   * Keep outputs of previous transformers as input for next transformer, but in the end only return outputs of last transformer.
+   * @return outputDataFrameMap and outputPartitionValues of last transformer
    */
   protected def applyTransformers(transformers: Seq[GenericDfsTransformerDef], inputPartitionValues: Seq[PartitionValues], inputSubFeeds: Seq[DataFrameSubFeed], outputSubFeeds: Seq[DataFrameSubFeed])(implicit context: ActionPipelineContext): Seq[DataFrameSubFeed] = {
     val inputDfsMap = inputSubFeeds.map(subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap
-    val (outputDfsMap, _) = transformers.foldLeft((inputDfsMap,inputPartitionValues)){
-      case ((dfsMap, partitionValues), transformer) => transformer.applyTransformation(id, partitionValues, dfsMap)
+    val (_, _, outputDfsMap) = transformers.foldLeft((inputDfsMap,inputPartitionValues,Map[String,GenericDataFrame]())){
+      case ((inputDfsMap, inputPartitionValues, _), transformer) =>
+        val (outputDfsMap, outputPartitionValues) = transformer.applyTransformation(id, inputPartitionValues, inputDfsMap)
+        (inputDfsMap ++ outputDfsMap, outputPartitionValues, outputDfsMap)
     }
     // create output subfeeds from transformed dataframes
     outputDfsMap.map {

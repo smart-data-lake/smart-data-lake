@@ -42,7 +42,7 @@ case class DataValidationTransformer(override val name: String = "dataValidation
   private val validationHelper: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(subFeedTypeForValidation)
   // check that rules are parsable
   rules.foreach(_.getValidationColumn(validationHelper))
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
     df.withColumn(errorsColumn, array_construct_compact(rules.map(rule => rule.getValidationColumn): _*))

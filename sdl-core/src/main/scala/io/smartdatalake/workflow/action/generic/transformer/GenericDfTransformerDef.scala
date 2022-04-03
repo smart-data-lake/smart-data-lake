@@ -23,6 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfTransformer.PREVIOUS_TRANSFORMER_NAME
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
@@ -64,7 +65,7 @@ trait GenericDfTransformerDef extends PartitionValueTransformer {
   /**
    * Function to be implemented to define the transformation between an input and output DataFrame (1:1)
    */
-  def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame
+  def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String])(implicit context: ActionPipelineContext): GenericDataFrame
 
   /**
    * Declare supported Language for transformation.
@@ -72,8 +73,8 @@ trait GenericDfTransformerDef extends PartitionValueTransformer {
    */
   private[smartdatalake] def getSubFeedSupportedType: Type = typeOf[DataFrameSubFeed]
 
-  private[smartdatalake] def applyTransformation(actionId: ActionId, subFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
-    val transformedDf = subFeed.dataFrame.map(df => transform(actionId, subFeed.partitionValues, df, subFeed.dataObjectId))
+  private[smartdatalake] def applyTransformation(actionId: ActionId, subFeed: DataFrameSubFeed, previousTransformerName: Option[String])(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    val transformedDf = subFeed.dataFrame.map(df => transform(actionId, subFeed.partitionValues, df, subFeed.dataObjectId, previousTransformerName))
     val transformedPartitionValues = transformPartitionValues(actionId, subFeed.partitionValues).map(_.values.toSeq.distinct)
       .getOrElse(subFeed.partitionValues)
     subFeed.withDataFrame(transformedDf).withPartitionValues(transformedPartitionValues)
@@ -90,7 +91,7 @@ trait GenericDfTransformer extends GenericDfTransformerDef with ParsableFromConf
  */
 trait SparkDfTransformer extends GenericDfTransformer {
   def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame
-  final override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
+  final override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     df match {
       case sparkDf: SparkDataFrame => SparkDataFrame(transform(actionId, partitionValues, sparkDf.inner, dataObjectId))
       case _ => throw new IllegalStateException(s"($actionId) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method transform")
@@ -128,11 +129,11 @@ trait OptionsGenericDfTransformer extends GenericDfTransformer {
     // transform
     transformPartitionValuesWithOptions(actionId, partitionValues, options ++ runtimeOptionsReplaced)
   }
-  final override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
+  final override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     // replace runtime options
     val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
     // transform
-    transformWithOptions(actionId, partitionValues, df, dataObjectId, options ++ runtimeOptionsReplaced )
+    transformWithOptions(actionId, partitionValues, df, dataObjectId, options ++ runtimeOptionsReplaced ++ previousTransformerName.map(PREVIOUS_TRANSFORMER_NAME -> _))
   }
   private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[String,String] = {
     lazy val data = DefaultExpressionData.from(context, partitionValues)
@@ -140,6 +141,9 @@ trait OptionsGenericDfTransformer extends GenericDfTransformer {
       expr => SparkExpressionUtil.evaluateString(actionId, Some(s"transformations.$name.runtimeOptions"), expr, data)
     }.filter(_._2.isDefined).mapValues(_.get)
   }
+}
+object OptionsGenericDfTransformer {
+  private[smartdatalake] val PREVIOUS_TRANSFORMER_NAME = "previousTransformerName"
 }
 
 /**
@@ -163,7 +167,7 @@ trait OptionsSparkDfTransformer extends OptionsGenericDfTransformer {
  */
 case class SparkDfTransformerFunctionWrapper(override val name: String, fn: DataFrame => DataFrame) extends GenericDfTransformerDef {
   override val description: Option[String] = None
-  override def transform(actionId: SdlConfigObject.ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: SdlConfigObject.DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
+  override def transform(actionId: SdlConfigObject.ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: SdlConfigObject.DataObjectId, previousTransformerName: Option[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     df match {
       case sparkDf: SparkDataFrame => SparkDataFrame(fn(sparkDf.inner))
       case _ => throw new IllegalStateException(s"($actionId) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method transform")

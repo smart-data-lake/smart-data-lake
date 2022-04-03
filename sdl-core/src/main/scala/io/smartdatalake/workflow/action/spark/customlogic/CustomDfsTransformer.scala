@@ -18,11 +18,10 @@
  */
 package io.smartdatalake.workflow.action.spark.customlogic
 
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.DefaultExpressionData
-import CustomDfsTransformerConfig.fnTransformType
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformerDef, SQLDfsTransformer}
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig.fnTransformType
 import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfsTransformer, ScalaCodeSparkDfsTransformer}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -65,7 +64,7 @@ trait CustomDfsTransformer extends Serializable {
  * @param className Optional class name implementing trait [[CustomDfsTransformer]]
  * @param scalaFile Optional file where scala code for transformation is loaded from. The scala code in the file needs to be a function of type [[fnTransformType]].
  * @param scalaCode Optional scala code for transformation. The scala code needs to be a function of type [[fnTransformType]].
- * @param sqlCode Optional map of DataObjectId and corresponding SQL Code.
+ * @param sqlCode Optional map of output DataObject id and corresponding SQL Code.
  *                Use tokens %{<key>} to replace with runtimeOptions in SQL code.
  *                Example: "select * from test where run = %{runId}"
  * @param options Options to pass to the transformation
@@ -73,7 +72,7 @@ trait CustomDfsTransformer extends Serializable {
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
 @deprecated("use transformers instead")
-case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Option[Map[DataObjectId,String]] = None, options: Option[Map[String,String]] = None, runtimeOptions: Option[Map[String,String]] = None) {
+case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Option[Map[String,String]] = None, options: Option[Map[String,String]] = None, runtimeOptions: Option[Map[String,String]] = None) {
   require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || sqlCode.isDefined, "Either className, scalaFile, scalaCode or sqlCode must be defined for CustomDfsTransformer")
 
   // Load Transformer code from appropriate location

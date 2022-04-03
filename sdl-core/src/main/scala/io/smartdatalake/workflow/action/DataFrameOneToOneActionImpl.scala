@@ -91,8 +91,8 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
    * apply transformer to SubFeed
    */
   protected def applyTransformers(transformers: Seq[GenericDfTransformerDef], inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
-    val transformedSubFeed = transformers.foldLeft(inputSubFeed){
-      case (subFeed, transformer) => transformer.applyTransformation(id, subFeed)
+    val (transformedSubFeed, _) = transformers.foldLeft((inputSubFeed,Option.empty[String])){
+      case ((subFeed,previousTransformerName), transformer) => (transformer.applyTransformation(id, subFeed, previousTransformerName), Some(transformer.name))
     }
     // Note that transformed partition values are set by execution mode.
     outputSubFeed.withDataFrame(transformedSubFeed.dataFrame)

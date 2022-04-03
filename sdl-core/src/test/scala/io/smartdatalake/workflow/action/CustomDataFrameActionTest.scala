@@ -81,6 +81,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     )
 
     val action1 = CustomDataFrameAction("action1", List(srcDO1.id, srcDO2.id), List(tgtDO1.id, tgtDO2.id), transformers = Seq(customTransformerConfig))
+    instanceRegistry.register(action1)
 
     val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
     srcDO1.writeSparkDataFrame(l1, Seq())
@@ -162,8 +163,9 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     tgtDO1.dropTable
     instanceRegistry.register(tgtDO1)
 
-    val customTransformer = SQLDfsTransformer(code = Map(tgtDO1.id -> s"select * from ${srcDO1.id.id}"))
+    val customTransformer = SQLDfsTransformer(code = Map(tgtDO1.id.id -> s"select * from ${srcDO1.id.id}"))
     val action1 = CustomDataFrameAction("action1", List(srcDO1.id), List(tgtDO1.id), transformers = Seq(customTransformer))
+    instanceRegistry.register(action1)
     val action1IgnoreFilter = CustomDataFrameAction("action1", List(srcDO1.id), List(tgtDO1.id), inputIdsToIgnoreFilter = Seq(srcDO1.id), transformers = Seq(customTransformer))
     val l1 = Seq(("doe", "john", 5),("be", "bob", 3)).toDF("lastname", "firstname", "rating")
     srcDO1.writeSparkDataFrame(l1, Seq())
@@ -287,14 +289,19 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtDO3.getSparkDataFrame().count == 2) // all records read because not partitioned
   }
 
-  test("copy load with 2 transformations from sql code") {
+  test("copy load with multiple transformations and multiple outputs from sql code") {
 
     // setup DataObjects
     val feed = "copy"
     val srcTable = Table(Some("default"), "copy_input")
-    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
-    srcDO.dropTable
-    instanceRegistry.register(srcDO)
+    val srcDO1 = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO1.dropTable
+    instanceRegistry.register(srcDO1)
+
+    val srcTable2 = Table(Some("default"), "copy_input2")
+    val srcDO2 = HiveTableDataObject( "src2", Some(tempPath+s"/${srcTable2.fullName}"), table = srcTable2, numInitialHdfsPartitions = 1)
+    srcDO2.dropTable
+    instanceRegistry.register(srcDO2)
 
     val tgtTable1 = Table(Some("default"), "copy_output_1", None, Some(Seq("lastname","firstname")))
     val tgtDO1 = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable1.fullName}"), Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable1, numInitialHdfsPartitions = 1)
@@ -307,12 +314,16 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO2)
 
     // prepare & start load
-    val customTransformerConfig = SQLDfsTransformer(code = Map(DataObjectId("tgt1")->"select * from copy_input where rating = 5", DataObjectId("tgt2")->"select * from copy_input where rating = 3"))
-    val action1 = CustomDataFrameAction("ca", List(srcDO.id), List(tgtDO1.id,tgtDO2.id), transformers = Seq(customTransformerConfig))
-    val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
-    srcDO.writeSparkDataFrame(l1, Seq())
-    val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
+    // note that src2 is passed on to customTransformerConfig2, even if it's not re-defined in customTransformerConfig1
+    val customTransformerConfig1 = SQLDfsTransformer(code = Map("int1" -> "select * from src1 where rating = 5"))
+    val customTransformerConfig2 = SQLDfsTransformer(code = Map(tgtDO1.id.id -> "select * from int1", tgtDO2.id.id -> "select * from src2 where rating = 3"))
+    val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id,tgtDO2.id), transformers = Seq(customTransformerConfig1,customTransformerConfig2))
+    instanceRegistry.register(action1)
+    val l = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
+    srcDO1.writeSparkDataFrame(l, Seq())
+    srcDO2.writeSparkDataFrame(l, Seq())
+    val srcSubFeeds = Seq(SparkSubFeed(None, "src1", Seq()),SparkSubFeed(None, "src2", Seq()))
+    val tgtSubFeed = action1.exec(srcSubFeeds)(contextExec).head
 
     val r1 = session.table(s"${tgtTable1.fullName}")
       .select($"lastname")
@@ -328,7 +339,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
 
   }
 
-  test("copy load with 2 transformations and skip condition") {
+  test("copy load with 2 transformers and skip condition") {
 
     // setup DataObjects
     val feed = "copy"
@@ -348,7 +359,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO1)
 
     // prepare
-    val customTransformerConfig = SQLDfsTransformer(code = Map(DataObjectId("tgt1")->"select * from src1 union all select * from src2"))
+    val customTransformerConfig = SQLDfsTransformer(code = Map(tgtDO1.id.id -> "select * from src1 union all select * from src2"))
     val l1 = Seq(("jonson","rob",5)).toDF("lastname", "firstname", "rating")
     srcDO1.writeSparkDataFrame(l1, Seq())
     val l2 = Seq(("doe","bob",3)).toDF("lastname", "firstname", "rating")
@@ -359,6 +370,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
 
     // skip if both subfeeds skipped
     val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id), transformers = Seq(customTransformerConfig), executionCondition = executionCondition)
+    instanceRegistry.register(action1)
     val srcSubFeed1 = SparkSubFeed(None, "src1", Seq(), isSkipped = true)
     val srcSubFeed2 = SparkSubFeed(None, "src2", Seq(), isSkipped = true)
     val tgtSubFeed1 = SparkSubFeed(None, "tgt1", Seq(), isSkipped = true)
@@ -368,6 +380,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
 
     // dont skip if one subfeed skipped
     val action2 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id), transformers = Seq(customTransformerConfig), executionCondition = executionCondition)
+    instanceRegistry.register(action2)
     val srcSubFeed3 = SparkSubFeed(None, "src1", Seq(), isSkipped = true)
     val srcSubFeed4 = SparkSubFeed(None, "src2", Seq(), isSkipped = false)
     action2.preInit(Seq(srcSubFeed3,srcSubFeed4), Seq()) // no exception
