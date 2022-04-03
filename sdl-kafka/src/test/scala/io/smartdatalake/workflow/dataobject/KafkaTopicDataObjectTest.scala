@@ -25,6 +25,7 @@ import java.time.temporal.ChronoUnit
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.KafkaConnection
+import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import org.apache.kafka.common.serialization.StringSerializer
 import org.apache.spark.sql.streaming.Trigger
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
@@ -38,7 +39,7 @@ import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
  */
 class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with BeforeAndAfter with EmbeddedKafka with DataObjectTestSuite with SmartDataLakeLogger {
 
-  import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+  import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
   import session.implicits._
 
   private val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6001")
@@ -65,8 +66,8 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
     instanceRegistry.register(kafkaConnection)
     val dataObject = KafkaTopicDataObject("kafka1", topicName = topic, connectionId = "kafkaCon1")
     val df = Seq(("john doe", "5"), ("peter smith", "3"), ("emma brown", "7")).toDF("key", "value")
-    dataObject.writeDataFrame(df, Seq())
-    val dfRead = dataObject.getDataFrame(Seq())
+    dataObject.writeSparkDataFrame(df, Seq())
+    val dfRead = dataObject.getSparkDataFrame(Seq())
     assert(dfRead.symmetricDifference(df).isEmpty)
   }
 
@@ -82,16 +83,16 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
 
     // prepare data
     val df1 = Seq(("john doe", "5"), ("peter smith", "3"), ("emma brown", "7")).toDF("key", "value")
-    dataObject1.writeDataFrame(df1, Seq())
+    dataObject1.writeSparkDataFrame(df1, Seq())
 
     // stream
     val dfStream1 = dataObject1.getStreamingDataFrame(Map("startingOffsets"->"earliest"), None)
-    val query = dataObject2.writeStreamingDataFrame(dfStream1, Trigger.Once, Map(), checkpointLocation = tempDir.resolve("state").toString, "test")
+    val query = dataObject2.writeStreamingDataFrame(SparkDataFrame(dfStream1), Trigger.Once, Map(), checkpointLocation = tempDir.resolve("state").toString, "test")
     query.awaitTermination()
     logger.info(s"streaming query finished, rows processed = ${query.lastProgress.numInputRows}")
 
     // check
-    val df2 = dataObject2.getDataFrame().cache
+    val df2 = dataObject2.getSparkDataFrame().cache
     assert(df2.symmetricDifference(df1).isEmpty)
   }
 
@@ -119,7 +120,7 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
     assert(partitions.size >= 3) // as we have written messages over a timestamp of 3secs
 
     // check query first partitions data
-    val dfP1 = dataObject1.getDataFrame(Seq(partitions.minBy( p => p("sec").toString.toLong))).cache
+    val dfP1 = dataObject1.getSparkDataFrame(Seq(partitions.minBy( p => p("sec").toString.toLong))).cache
     assert(dfP1.columns.contains("sec"))
     val dataP1 = dfP1.select($"key",$"value").as[(String,String)].collect.toSeq
     assert(dataP1 == Seq(("A","1")))

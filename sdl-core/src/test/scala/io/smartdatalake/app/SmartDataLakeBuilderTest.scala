@@ -20,27 +20,27 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-
-import java.nio.file.Files
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{Condition, DataObjectStateIncrementalMode, Environment, PartitionDiffMode, SDLSaveMode}
+import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.EnvironmentUtil
-import io.smartdatalake.workflow.action.customlogic.{CustomDfTransformer, CustomDfTransformerConfig, CustomDfsTransformerConfig, SparkUDFCreator}
-import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction, CustomSparkAction, DeduplicateAction, RuntimeEventState, SDLExecutionId}
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanCreateIncrementalOutput, CsvFileDataObject, DataObject, DataObjectMetadata, HiveTableDataObject, Table, TickTockHiveTableDataObject}
-import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore, SparkSubFeed}
+import io.smartdatalake.workflow.action._
+import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, SQLDfTransformer, SQLDfsTransformer}
+import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, SparkUDFCreator}
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
+import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore}
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.spark.sql.functions.{col, lit, udf}
+import org.apache.spark.sql.expressions.UserDefinedFunction
+import org.apache.spark.sql.functions.udf
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.sql.{DataFrame, SparkSession, functions}
 import org.scalatest.{BeforeAndAfter, FunSuite}
-import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
-import io.smartdatalake.workflow.action.sparktransformer.{AdditionalColumnsTransformer, SQLDfTransformer, SQLDfsTransformer, ScalaClassDfTransformer}
-import org.apache.spark.sql.expressions.UserDefinedFunction
+
+import java.nio.file.Files
 
 /**
  * This tests use configuration test/resources/application.conf
@@ -92,14 +92,14 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val dfSrc = Seq(("20180101", "person", "doe","john",5) // partition 20180101 is included in partition values filter
       ,("20190101", "company", "olmo","-",10)) // partition 20190101 is not included
       .toDF("dt", "type", "lastname", "firstname", "rating")
-    srcDO.writeDataFrame(dfSrc, Seq())
+    srcDO.writeSparkDataFrame(dfSrc, Seq())
 
     // start first dag run -> fail
     // load partition 20180101 only
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action1.copy())
     val action2fail = CopyAction("b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(ScalaClassDfTransformer(className = classOf[FailTransformer].getName)))
+      , transformers = Seq(ScalaClassSparkDfTransformer(className = classOf[FailTransformer].getName)))
     instanceRegistry.register(action2fail.copy())
     val selectedPartitions = Seq(PartitionValues(Map("dt"->"20180101")))
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath)
@@ -111,7 +111,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     intercept[AssertionError](sdlb.run(sdlConfigChanged))
 
     // check failed results
-    assert(tgt1DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(5))
+    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(5))
     assert(!tgt2DO.isTableExisting)
 
     // check latest state
@@ -127,7 +127,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     }
 
     // now fill tgt1 with both partitions
-    tgt1DO.writeDataFrame(dfSrc, Seq())
+    tgt1DO.writeSparkDataFrame(dfSrc, Seq())
 
     // reset DataObjects
     instanceRegistry.clear()
@@ -143,7 +143,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     sdlb.run(sdlConfig)
 
     // check results
-    assert(tgt2DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(5))
+    assert(tgt2DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(5))
 
     // check latest state
     {
@@ -196,15 +196,15 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // prepare data
     val dfSrc = Seq(("20180101", "person", "doe","john",5), ("20190101", "company", "olmo","-",10))
       .toDF("dt", "type", "lastname", "firstname", "rating")
-    srcDO.writeDataFrame(dfSrc, Seq())
-    tgt1DO.writeDataFrame(dfSrc) // create table because it's needed but first action is skipped
+    srcDO.writeSparkDataFrame(dfSrc, Seq())
+    tgt1DO.writeSparkDataFrame(dfSrc) // create table because it's needed but first action is skipped
 
     // start first dag run -> fail
     // action1 skipped (executionMode.applyCondition = false)
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionCondition = Some(Condition("false", Some("always skip this action"))), metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action1.copy())
     val action2fail = CopyAction("b", tgt1DO.id, tgt2DO.id, executionCondition = Some(Condition("true", Some("always execute this action"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(ScalaClassDfTransformer(className = classOf[ExecFailTransformer].getName, runtimeOptions = Map("phase"-> "executionPhase"))))
+      , transformers = Seq(ScalaClassSparkDfTransformer(className = classOf[ExecFailTransformer].getName, runtimeOptions = Map("phase"-> "executionPhase"))))
     instanceRegistry.register(action2fail.copy())
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
     intercept[TaskFailedException](sdlb.run(sdlConfig))
@@ -222,7 +222,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     }
 
     // now fill tgt1 with both partitions
-    tgt1DO.writeDataFrame(dfSrc, Seq())
+    tgt1DO.writeSparkDataFrame(dfSrc, Seq())
 
     // reset DataObjects
     instanceRegistry.clear()
@@ -287,7 +287,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // prepare data
     val dfSrc = Seq(("20180101", "person", "doe","john",5), ("20190101", "company", "olmo","-",10))
       .toDF("dt", "type", "lastname", "firstname", "rating")
-    srcDO.writeDataFrame(dfSrc, Seq())
+    srcDO.writeSparkDataFrame(dfSrc, Seq())
 
     // start first dag run -> fail
     // action1 skipped (executionMode.applyCondition = false)
@@ -295,13 +295,13 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(action1.copy())
     // action2 fails
     val action2fail = CopyAction("b", srcDO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(ScalaClassDfTransformer(className = classOf[FailTransformer].getName)))
+      , transformers = Seq(ScalaClassSparkDfTransformer(className = classOf[FailTransformer].getName)))
     instanceRegistry.register(action2fail.copy())
     // action3 is cancelled because action2 fails
     val action3 = CopyAction("c", tgt2DO.id, tgt3DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action3.copy())
     // action4 is cancelled because action3 is cancelled (cancelled has higher prio than skipped from action1)
-    val action4 = CustomSparkAction("d", Seq(tgt1DO.id, tgt3DO.id), Seq(tgt4DO.id), metadata = Some(ActionMetadata(feed = Some(feedName)))
+    val action4 = CustomDataFrameAction("d", Seq(tgt1DO.id, tgt3DO.id), Seq(tgt4DO.id), metadata = Some(ActionMetadata(feed = Some(feedName)))
       , transformers = Seq(SQLDfsTransformer(code = Map(tgt4DO.id -> "select * from c"))))
     instanceRegistry.register(action4.copy())
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
@@ -386,7 +386,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // fill src table with first partition
     val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
-    srcDO.writeDataFrame(dfSrc1, Seq())
+    srcDO.writeSparkDataFrame(dfSrc1, Seq())
 
     // start first dag run
     // use only first partition col (dt) for partition diff mode
@@ -398,7 +398,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     sdlb.run(sdlConfig)
 
     // check results
-    assert(tgt1DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6)) // +1 because of udfAddX
+    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6)) // +1 because of udfAddX
 
     // check latest state
     {
@@ -416,7 +416,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // now fill src table with second partitions
     val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 10)) // second partition 20190101
       .toDF("dt", "type", "lastname", "firstname", "rating")
-    srcDO.writeDataFrame(dfSrc2, Seq())
+    srcDO.writeSparkDataFrame(dfSrc2, Seq())
 
     // reset Actions / DataObjects
     instanceRegistry.clear
@@ -428,7 +428,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     sdlb.run(sdlConfig)
 
     // check results
-    assert(tgt1DO.getDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6, 11)) // +1 because of udfAddX
+    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6, 11)) // +1 because of udfAddX
 
     // check latest state
     {
@@ -480,7 +480,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     sdlb.run(sdlConfig)
 
     // check results
-    val dfResult1 = tgt1DO.getDataFrame(Seq())
+    val dfResult1 = tgt1DO.getSparkDataFrame(Seq())
     assert(dfResult1.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head == (10,10))
 
     // start second dag run
@@ -488,7 +488,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     sdlb.run(sdlConfig)
 
     // check results
-    val dfResult2 = tgt1DO.getDataFrame(Seq())
+    val dfResult2 = tgt1DO.getSparkDataFrame(Seq())
     assert(dfResult2.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head == (20,20))
 
     // start 3rd dag run
@@ -496,7 +496,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     sdlb.run(sdlConfig)
 
     // check results
-    val dfResult3 = tgt1DO.getDataFrame(Seq())
+    val dfResult3 = tgt1DO.getSparkDataFrame(Seq())
     assert(dfResult3.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head == (30,30))
   }
 
@@ -539,16 +539,17 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val action2 = CopyAction( "b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action2)
     val configStart = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName))
-    val (finalSubFeeds, stats) = sdlb.startSimulation(configStart, Seq(SparkSubFeed(Some(dfSrc1), srcDO.id, Seq())))
+    val (finalSubFeeds, stats) = sdlb.startSimulation(configStart, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc1)), srcDO.id, Seq())))
 
     // check results
     assert(finalSubFeeds.size == 1)
     assert(stats == Map(RuntimeEventState.INITIALIZED -> 2))
-    assert(finalSubFeeds.head.dataFrame.get.select(dfSrc1.columns.map(col):_*).symmetricDifference(dfSrc1).isEmpty)
+    assert(finalSubFeeds.head.dataFrame.get.select(dfSrc1.columns.map(SparkSubFeed.col)).symmetricDifference(SparkDataFrame(dfSrc1)).isEmpty)
   }
 }
 
 class FailTransformer extends CustomDfTransformer {
+  import functions.col
   def transform(session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String): DataFrame = {
     // DataFrame needs at least one string column in schema
     val firstStringColumn = df.schema.fields.find(_.dataType == StringType).map(_.name).get
@@ -600,13 +601,13 @@ object TestSDLPlugin {
  * This test DataObject delivers the 10 next numbers on every increment.
  */
 case class TestIncrementalDataObject(override val id: DataObjectId, override val metadata: Option[DataObjectMetadata] = None)
-  extends DataObject with CanCreateDataFrame with CanCreateIncrementalOutput {
+  extends DataObject with CanCreateSparkDataFrame with CanCreateIncrementalOutput {
 
   // State is the start number of the last delivered increment
   var previousState: Int = 1
   var nextState: Option[Int] = None
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
     val session = context.sparkSession
     import session.implicits._
     nextState = Some(previousState + 10)

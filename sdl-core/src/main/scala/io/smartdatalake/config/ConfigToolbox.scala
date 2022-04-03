@@ -59,7 +59,7 @@ object ConfigToolbox {
     val name = "interactive"
     val globalConfig = GlobalConfig()
     val context = ActionPipelineContext(name, name, SDLExecutionId.executionId1, instanceRegistry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig(name, Some(name)), phase = ExecutionPhase.Exec, serializableHadoopConf = defaultHadoopConf, globalConfig = globalConfig)
-    globalConfig._sparkSession = Some(sparkSession)
+    globalConfig._sparkSession = Option(sparkSession)
     context
   }
 

@@ -23,7 +23,8 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.definitions.{Condition, DefaultExecutionModeExpressionData}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{ExpressionEvaluationException, SmartDataLakeLogger, SparkExpressionUtil}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.{ExpressionEvaluationException, SparkExpressionUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.SparkSession
 

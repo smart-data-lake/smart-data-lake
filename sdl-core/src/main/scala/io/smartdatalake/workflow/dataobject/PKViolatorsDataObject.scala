@@ -21,17 +21,17 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, FromConfigFactory, InstanceRegistry, ParsableFromConfig}
+import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{ArrayType, MapType, StringType, StructField, StructType}
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+
+import scala.reflect.runtime.universe
+import scala.reflect.runtime.universe.{Type, typeOf}
 
 /**
  * Checks for Primary Key violations for all [[DataObject]]s with Primary Keys defined that are registered in the current [[InstanceRegistry]].
- * Returns the list of Primary Key violations as a [[DataFrame]].
+ * Returns the DataFrame of Primary Key violations.
  *
  * Alternatively, it can check for Primary Key violations of all [[DataObject]]s defined in config files. For this, the
  * configuration "config" has to be set to the location of the config.
@@ -60,9 +60,11 @@ case class PKViolatorsDataObject(id: DataObjectId,
                                 (@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with ParsableFromConfig[PKViolatorsDataObject] {
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues], subFeedType: Type)(implicit context: ActionPipelineContext): GenericDataFrame = {
+    val functions = DataFrameSubFeed.getFunctions(subFeedType)
+    import functions._
 
-    import PKViolatorsDataObject.{colListType, columnNameName, columnValueName}
+    import PKViolatorsDataObject.{columnNameName, columnValueName}
     // Get all DataObjects from registry
     val dataObjects: Seq[DataObject with Product] = config match {
       case Some(configLocation) =>
@@ -75,36 +77,35 @@ case class PKViolatorsDataObject(id: DataObjectId,
     val dataObjectsWithPk: Seq[TableDataObject] = dataObjects.collect{ case x:TableDataObject if x.table.primaryKey.isDefined => x.asInstanceOf[TableDataObject] }
     logger.info(s"Prepare DataFrame with primary key violations for ${dataObjectsWithPk.map(_.id).mkString(", ")}")
 
-    def colName2colRepresentation(colName: String) = struct(lit(colName).as(columnNameName),col(colName).as(columnValueName))
-    def optionalCastColToString(doCast: Boolean)(col: Column) = if (doCast) col.cast(StringType) else col
+    def colName2colRepresentation(colName: String) = struct(lit(colName).as(columnNameName),col(colName).cast(stringType).as(columnValueName))
+    def optionalCastColToString(doCast: Boolean)(col: GenericColumn) = if (doCast) col.cast(functions.stringType) else col
 
-    def getPKviolatorDf(tobj: TableDataObject) = {
-      val pkColNames = tobj.table.primaryKey.get.toArray
-      if (tobj.isTableExisting) {
-        val dfTable = tobj.getDataFrame()
+    def getPKviolatorDf(dataObject: TableDataObject) = {
+      val pkColNames = dataObject.table.primaryKey.get.toArray
+      if (dataObject.isTableExisting) {
+        val dfTable = dataObject.getDataFrame(Seq(), subFeedType)
         val dfPKViolators = dfTable.getPKviolators(pkColNames)
-        val scmTable = dfTable.schema
-        val dataColumns = dfPKViolators.columns.diff(pkColNames)
-        val colSchema: Column = lit(scmTable.toDDL).as("schema")
-        val keyCol: Column = optionalCastColToString(flattenOutput) {
-          array(pkColNames.map(colName2colRepresentation): _*).cast(colListType(false)).as("key")
+        val dataColumns = dfPKViolators.schema.columns.diff(pkColNames)
+        val colSchema = lit(dfTable.schema.sql).as("schema")
+        val keyCol = optionalCastColToString(flattenOutput) {
+          array(pkColNames.map(colName2colRepresentation): _*).as("key")
         }
-        val dataCol: Column = optionalCastColToString(flattenOutput) {
+        val dataCol = optionalCastColToString(flattenOutput) {
           if (dataColumns.isEmpty) {
-            lit(null).cast(colListType(true))
+            lit(null).cast(arrayType(structType(Map(columnNameName -> stringType, columnValueName -> stringType))))
           } else {
-            array(dataColumns.map(colName2colRepresentation): _*).cast(colListType(true))
-          }.as("data")
-        }
-        Some( dfPKViolators.select(
-          lit(tobj.id.id).as("data_object_id"),
-          lit(tobj.table.db.get).as("db"),
-          lit(tobj.table.name).as("table"),
-          colSchema, keyCol, dataCol.as("data")
-        ))
+            array(dataColumns.map(colName2colRepresentation): _*)
+          }
+        }.as("data")
+        Some( dfPKViolators.select( Seq(
+          lit(dataObject.id.id).as("data_object_id"),
+          lit(dataObject.table.db.get).as("db"),
+          lit(dataObject.table.name).as("table"),
+          colSchema, keyCol, dataCol
+        )))
       } else {
         // ignore if table missing, it might be not yet created but only exists in metadata...
-        logger.warn(s"(id) Table ${tobj.table.fullName} doesn't exist")
+        logger.warn(s"(id) Table ${dataObject.table.fullName} doesn't exist")
         None
       }
     }
@@ -112,9 +113,16 @@ case class PKViolatorsDataObject(id: DataObjectId,
     if (pkViolatorsDfs.isEmpty) throw NoDataToProcessWarning(id.id, s"($id) No existing table with primary key found")
 
     // combine & return dataframe
-    def unionDf(df1: DataFrame, df2: DataFrame) = df1.union(df2)
-    pkViolatorsDfs.reduce(unionDf)
+    pkViolatorsDfs.reduce(_ unionByName _)
   }
+
+  override private[smartdatalake] def getSubFeed(partitionValues: Seq[PartitionValues], subFeedType: universe.Type)(implicit context: ActionPipelineContext) = {
+    val helper = DataFrameSubFeed.getCompanion(subFeedType)
+    val df = getDataFrame(partitionValues, subFeedType)
+    helper.getSubFeed(df, id, partitionValues)
+  }
+
+  override private[smartdatalake] def getSubFeedSupportedTypes = Seq(typeOf[DataFrameSubFeed])
 
   override def factory: FromConfigFactory[PKViolatorsDataObject] = PKViolatorsDataObject
 }
@@ -124,11 +132,6 @@ object PKViolatorsDataObject extends FromConfigFactory[PKViolatorsDataObject] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): PKViolatorsDataObject = {
     extract[PKViolatorsDataObject](config)
   }
-
-  val columnNameName = "column_name"
-  val columnValueName = "column_value"
-  def colListType(noColumnsPossible: Boolean): ArrayType = ArrayType(StructType(
-    StructField(columnNameName,StringType,nullable = noColumnsPossible)::
-      StructField(columnValueName,StringType,nullable = true):: Nil), containsNull = false)
-
+  private[smartdatalake] val columnNameName = "column_name"
+  private[smartdatalake] val columnValueName = "column_value"
 }

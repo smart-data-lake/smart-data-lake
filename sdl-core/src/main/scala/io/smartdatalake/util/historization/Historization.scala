@@ -23,7 +23,7 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions
 import io.smartdatalake.definitions.{HiveConventions, TechnicalTableColumn}
 import io.smartdatalake.util.evolution.SchemaEvolution
-import io.smartdatalake.util.misc.{DataFrameUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.sql.functions.{lit, when, _}
 import org.apache.spark.sql.types.{StructType, TimestampType}
 import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}

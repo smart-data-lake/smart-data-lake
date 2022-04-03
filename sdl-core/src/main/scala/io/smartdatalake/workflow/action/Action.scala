@@ -23,7 +23,8 @@ import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, Parsab
 import io.smartdatalake.definitions.{Condition, DataObjectStateIncrementalMode, Environment, ExecutionMode, ExecutionModeResult}
 import io.smartdatalake.util.dag.{DAGNode, TaskSkippedDontStopWarning}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{SmartDataLakeLogger, SparkExpressionUtil}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.SparkExpressionUtil
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState

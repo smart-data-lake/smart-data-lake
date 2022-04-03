@@ -19,12 +19,8 @@
 
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.misc.SchemaUtil
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.SchemaViolationException
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.StructType
 
 /**
  * A [[DataObject]] that allows for optional schema validation on read and on write.
@@ -47,29 +43,24 @@ private[smartdatalake] trait SchemaValidation { this: DataObject =>
    * if it is defined.
    * Additionally schemaMin can be used to define the schema used if there is no data or table doesn't yet exist.
    */
-  def schemaMin: Option[StructType]
+  def schemaMin: Option[GenericSchema]
 
   /**
-   * Validate the schema of a given Spark Data Frame `df` against `schemaMin`.
+   * Validate the schema of a given Data Frame `df` against `schemaMin`.
    *
-   * @param df The data frame to validate.
+   * @param schema The schema to validate.
    * @param role role used in exception message. Set to read or write.
    * @throws SchemaViolationException is the `schemaMin` does not validate.
    */
-  def validateSchemaMin(df: DataFrame, role: String): Unit = {
-    val caseSensitive = SQLConf.get.getConf(SQLConf.CASE_SENSITIVE)
+  def validateSchemaMin(schema: GenericSchema, role: String): Unit = {
     schemaMin.foreach { schemaExpected =>
-      val missingCols = SchemaUtil.schemaDiff(schemaExpected, df.schema,
-        ignoreNullable = Environment.schemaValidationIgnoresNullability,
-        deep = Environment.schemaValidationDeepComarison,
-        caseSensitive = caseSensitive
-      )
-      if (missingCols.nonEmpty) {
+      val missingCols = schemaExpected.diffSchema(schema)
+      missingCols.foreach { missing =>
         throw new SchemaViolationException(
           s"""($id) DataFrame does not fulfil schemaMin on $role:
-             |- missingCols=${missingCols.mkString(", ")}
-             |- schemaMin: ${schemaExpected.fields.mkString(", ")}
-             |- schemaDf: ${df.schema.fields.mkString(", ")}""".stripMargin)
+             |- missingCols=${missing.columns.mkString(", ")}
+             |- schemaMin: ${schemaExpected.sql}
+             |- schema: ${schema.sql}""".stripMargin)
       }
     }
   }
@@ -77,30 +68,21 @@ private[smartdatalake] trait SchemaValidation { this: DataObject =>
   /**
    * Validate the schema of a given Spark Data Frame `df` against a given expected schema.
    *
-   * @param df The data frame to validate.
+   * @param schema The schema to validate.
    * @param schemaExpected The expected schema to validate against.
    * @param role role used in exception message. Set to read or write.
    * @throws SchemaViolationException is the `schemaMin` does not validate.
    */
-  def validateSchema(df: DataFrame, schemaExpected: StructType, role: String): Unit = {
-    val caseSensitive = SQLConf.get.getConf(SQLConf.CASE_SENSITIVE)
-    val missingCols = SchemaUtil.schemaDiff(schemaExpected, df.schema,
-      ignoreNullable = Environment.schemaValidationIgnoresNullability,
-      deep = Environment.schemaValidationDeepComarison,
-      caseSensitive = caseSensitive
-    )
-    val superfluousCols = SchemaUtil.schemaDiff(df.schema, schemaExpected,
-      ignoreNullable = Environment.schemaValidationIgnoresNullability,
-      deep = Environment.schemaValidationDeepComarison,
-      caseSensitive = caseSensitive
-    )
-    if (missingCols.nonEmpty || superfluousCols.nonEmpty) {
+  def validateSchema(schema: GenericSchema, schemaExpected: GenericSchema, role: String): Unit = {
+    val missingCols = schemaExpected.diffSchema(schema)
+    val superfluousCols = schema.diffSchema(schemaExpected)
+    if (missingCols.isDefined || superfluousCols.isDefined) {
       throw new SchemaViolationException(
-        s"""($id) DataFrame does not match schema defined on $role:
-           |- missingCols=${missingCols.mkString(", ")}
-           |- superfluousCols=${superfluousCols.mkString(", ")}
-           |- schemaExpected: ${schemaExpected.fields.mkString(", ")}
-           |- schemaDf: ${df.schema.fields.mkString(", ")}""".stripMargin)
+        s"""($id) Schema does not match schema defined on $role:
+           |- missingCols=${missingCols.map(_.columns).getOrElse(Seq()).mkString(", ")}
+           |- superfluousCols=${superfluousCols.map(_.columns).getOrElse(Seq()).mkString(", ")}
+           |- schemaExpected: ${schemaExpected.sql}
+           |- schema: ${schema.sql.mkString(", ")}""".stripMargin)
     }
   }
 }

@@ -31,7 +31,8 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
-import io.smartdatalake.workflow.action.{Action, RuntimeInfo, SDLExecutionId, SparkActionImpl}
+import io.smartdatalake.workflow.action.{Action, DataFrameActionImpl, RuntimeInfo, SDLExecutionId}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.SparkSession
 import scopt.OptionParser
@@ -362,7 +363,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     val actionDAGRun = ActionDAGRun(actionsToExec, actionsToSkip, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(context)
     val finalSubFeeds = try {
       if (simulation) {
-        require(actionsToExec.forall(_.isInstanceOf[SparkActionImpl]), s"Simulation needs all selected actions to be instances of SparkActionImpl. This is not the case for ${actionsToExec.filterNot(_.isInstanceOf[SparkActionImpl]).map(_.id).mkString(", ")}")
+        require(actionsToExec.forall(_.isInstanceOf[DataFrameActionImpl]), s"Simulation needs all selected actions to be instances of DataFrameActionImpl. This is not the case for ${actionsToExec.filterNot(_.isInstanceOf[DataFrameActionImpl]).map(_.id).mkString(", ")}")
         actionDAGRun.init(context)
       } else {
         actionDAGRun.prepare(context)

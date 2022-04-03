@@ -19,21 +19,22 @@
 
 package io.smartdatalake.workflow.action
 
-import java.nio.file.Files
-
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.customlogic.{SparkUDFCreator, SparkUDFCreatorConfig}
+import io.smartdatalake.workflow.action.spark.customlogic.{SparkUDFCreator, SparkUDFCreatorConfig}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
-import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.udf
 import org.scalatest.{BeforeAndAfter, FunSuite}
+
+import java.nio.file.Files
 
 class ExecutionModeTest extends FunSuite with BeforeAndAfter {
 
@@ -53,7 +54,7 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
   srcDO.dropTable
   instanceRegistry.register(srcDO)
   val l1 = Seq(("doe","john",5),("einstein","albert",2)).toDF("lastname", "firstname", "rating")
-  srcDO.writeDataFrame(l1, Seq())
+  srcDO.writeSparkDataFrame(l1, Seq())
 
   val tgt1Table = Table(Some("default"), "tgt1", None, Some(Seq("lastname","firstname")))
   val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), table = tgt1Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
@@ -63,11 +64,11 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
   val tgt2Table = Table(Some("default"), "tgt2", None, Some(Seq("lastname","firstname")))
   val tgt2DO = TickTockHiveTableDataObject("tgt2", Some(tempPath+s"/${tgt2Table.fullName}"), table = tgt2Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
   tgt2DO.dropTable
-  tgt2DO.writeDataFrame(l1.where($"rating"<=2), Seq())
+  tgt2DO.writeSparkDataFrame(l1.where($"rating"<=2), Seq())
   instanceRegistry.register(tgt2DO)
 
   val fileSrcDO = CsvFileDataObject("fileSrcDO", tempPath+s"/fileTestSrc", partitions=Seq("lastname"))
-  fileSrcDO.writeDataFrame(l1, Seq())
+  fileSrcDO.writeSparkDataFrame(l1, Seq())
   instanceRegistry.register(fileSrcDO)
 
   val fileEmptyDO = CsvFileDataObject("fileEmptyDO", tempPath+s"/fileTestEmpty", partitions=Seq("lastname"))
@@ -76,7 +77,7 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
   test("PartitionDiffMode default") {
     val executionMode = PartitionDiffMode()
     executionMode.prepare(ActionId("test"))
-    val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
+    val subFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
     val result = executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping).get
     assert(result.inputPartitionValues == Seq(PartitionValues(Map("lastname" -> "doe")), PartitionValues(Map("lastname" -> "einstein"))))
   }
@@ -154,31 +155,31 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
     intercept[NoDataToProcessWarning](executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping))
   }
 
-  test("SparkIncrementalMode empty source") {
-    val executionMode = SparkIncrementalMode(compareCol = "rating")
+  test("DataFrameIncrementalMode empty source") {
+    val executionMode = DataFrameIncrementalMode(compareCol = "rating")
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, tgt1DO.id, partitionValues = Seq())
     intercept[NoDataToProcessWarning](executionMode.apply(ActionId("test"), tgt1DO, tgt2DO, subFeed, PartitionValues.oneToOneMapping))
   }
 
-  test("SparkIncrementalMode empty target") {
-    val executionMode = SparkIncrementalMode(compareCol = "rating")
+  test("DataFrameIncrementalMode empty target") {
+    val executionMode = DataFrameIncrementalMode(compareCol = "rating")
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
     val result = executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping).get
     assert(result.filter.isEmpty) // no filter if target is empty as everything needs to be copied
   }
 
-  test("SparkIncrementalMode partially filled target") {
-    val executionMode = SparkIncrementalMode(compareCol = "rating")
+  test("DataFrameIncrementalMode partially filled target") {
+    val executionMode = DataFrameIncrementalMode(compareCol = "rating")
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
     val result = executionMode.apply(ActionId("test"), srcDO, tgt2DO, subFeed, PartitionValues.oneToOneMapping).get
     assert(result.filter.nonEmpty)
   }
 
-  test("SparkIncrementalMode no data to process") {
-    val executionMode = SparkIncrementalMode(compareCol = "rating")
+  test("DataFrameIncrementalMode no data to process") {
+    val executionMode = DataFrameIncrementalMode(compareCol = "rating")
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, tgt2DO.id, partitionValues = Seq())
     intercept[NoDataToProcessWarning](executionMode.apply(ActionId("test"), tgt2DO, tgt2DO, subFeed, PartitionValues.oneToOneMapping))

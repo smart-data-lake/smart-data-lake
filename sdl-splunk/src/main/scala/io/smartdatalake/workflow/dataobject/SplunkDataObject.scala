@@ -49,7 +49,7 @@ case class SplunkDataObject(override val id: DataObjectId,
                              connectionId: ConnectionId,
                              override val metadata: Option[DataObjectMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateDataFrame with SplunkService {
+  extends DataObject with CanCreateSparkDataFrame with SplunkService {
 
   /**
    * Connection defines host, port and credentials in central location
@@ -59,7 +59,7 @@ case class SplunkDataObject(override val id: DataObjectId,
   private implicit val rowSeqEncoder: Encoder[Seq[Row]] = Encoders.kryo[Seq[Row]]
   private implicit val queryTimeIntervalEncoder: Encoder[QueryTimeInterval] = Encoders.kryo[QueryTimeInterval]
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     readFromSplunk(params)
   }
 

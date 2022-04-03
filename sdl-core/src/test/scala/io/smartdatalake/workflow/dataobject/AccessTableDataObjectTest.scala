@@ -48,7 +48,7 @@ class AccessTableDataObjectTest extends DataObjectTestSuite {
     val dataObj = AccessTableDataObject.fromConfig(access2016SampleConfig)
 
     // run
-    val df: DataFrame = dataObj.getDataFrame()
+    val df: DataFrame = dataObj.getSparkDataFrame()
 
     // check
     val result: Array[Row] = df.collect()
@@ -77,7 +77,7 @@ class AccessTableDataObjectTest extends DataObjectTestSuite {
     val dataObj = AccessTableDataObject.fromConfig(access2000SampleConfig)
 
     // run
-    val df = dataObj.getDataFrame()
+    val df = dataObj.getSparkDataFrame()
 
     // check
     val result = df.collect()
@@ -132,7 +132,7 @@ class AccessTableDataObjectTest extends DataObjectTestSuite {
       val actionInput = AccessTableDataObject.fromConfig(config)
 
       // run
-      an [Exception] should be thrownBy actionInput.getDataFrame()
+      an [Exception] should be thrownBy actionInput.getSparkDataFrame()
   }
 
 }

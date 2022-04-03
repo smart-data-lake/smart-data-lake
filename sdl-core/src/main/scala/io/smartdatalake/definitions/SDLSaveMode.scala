@@ -50,6 +50,7 @@ object SDLSaveMode extends Enumeration {
   val Ignore: Value = Value("Ignore")
 
   /**
+   * Spark only optimization.
    * This is like SDLSaveMode.Overwrite but doesnt delete the directory of the DataObject and its partition, but only the files
    * inside. Then it uses Sparks append mode to add the new files.
    * Like that ACLs set on the base directory are preserved.
@@ -63,6 +64,7 @@ object SDLSaveMode extends Enumeration {
   val OverwritePreserveDirectories: Value = Value("OverwritePreserveDirectories")
 
   /**
+   * Spark only optimization.
    * This is like SDLSaveMode.Overwrite but processed partitions are manually deleted instead of using dynamic partitioning mode.
    * Then it uses Sparks append mode to add the new partitions.
    * This helps if there are performance problems when using dynamic partitioning mode with hive tables and many partitions.
@@ -83,23 +85,6 @@ object SDLSaveMode extends Enumeration {
    * Note that only few DataObjects are able to merge new data, e.g. DeltaLakeTableDataObject and JdbcTableDataObject
    */
   val Merge: Value = Value("Merge")
-
-  /* add implicit methods to enumeration, e.g. asSparkSaveMode */
-  class SDLSaveModeValue(mode: Value) {
-    /**
-     * Mapping to Spark SaveMode
-     * This is one-to-one except custom modes as OverwritePreserveDirectories
-     */
-    def asSparkSaveMode: SaveMode = mode match {
-      case Overwrite => SaveMode.Overwrite
-      case Append => SaveMode.Append
-      case ErrorIfExists => SaveMode.ErrorIfExists
-      case Ignore => SaveMode.Ignore
-      case OverwritePreserveDirectories => SaveMode.Append // Append with spark, but delete files before with hadoop
-      case OverwriteOptimized => SaveMode.Append // Append with spark, but delete partitions before with hadoop
-    }
-  }
-  implicit def value2SparkSaveMode(mode: Value): SDLSaveModeValue = new SDLSaveModeValue(mode)
 
 }
 

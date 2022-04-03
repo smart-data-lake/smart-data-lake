@@ -18,9 +18,10 @@
  */
 package io.smartdatalake.util.hdfs
 
+import io.smartdatalake.workflow.dataframe.GenericColumn
+import io.smartdatalake.workflow.DataFrameSubFeedCompanion
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.sql.{Column, DataFrame}
-import org.apache.spark.sql.functions._
+import org.apache.spark.sql.DataFrame
 
 import scala.util.matching.Regex
 
@@ -40,7 +41,8 @@ case class PartitionValues(elements: Map[String, Any]) {
   private[smartdatalake] def getPartitionString(partitionLayout: String): String= {
     PartitionLayout.replaceTokens(partitionLayout, this)
   }
-  private[smartdatalake] def getSparkExpr: Column = {
+  private[smartdatalake] def getFilterExpr(implicit helper: DataFrameSubFeedCompanion): GenericColumn = {
+    import helper._
     // "and" filter concatenation of each element
     elements.map {case (k,v) => col(k) === lit(v)}.reduce( (a,b) => a and b)
   }
@@ -146,6 +148,13 @@ private[smartdatalake] object PartitionValues {
     df.distinct.collect.map {
       row => PartitionValues(cols.map(c => (c,row.getAs[Any](c).toString)).toMap)
     }
+  }
+
+  /**
+   * Create a generic filter column expression for a list of partition values
+   */
+  def createFilterExpr(partitionValues: Seq[PartitionValues])(implicit helper: DataFrameSubFeedCompanion): GenericColumn = {
+    partitionValues.map(_.getFilterExpr).reduce(_ or _)
   }
 
   def oneToOneMapping(partitionValues: Seq[PartitionValues]): Map[PartitionValues,PartitionValues] = partitionValues.map(x => (x,x)).toMap

@@ -19,6 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.ConfigFactory
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.workflow.connection.HadoopFileConnection
 import org.apache.spark.sql.DataFrame
@@ -45,8 +46,8 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
          """.stripMargin)
 
     val doSrc1 = ParquetFileDataObject.fromConfig(config)
-    doSrc1.writeDataFrame(testDf, Seq())
-    val result = doSrc1.getDataFrame()
+    doSrc1.writeSparkDataFrame(testDf, Seq())
+    val result = doSrc1.getSparkDataFrame()
     assert(result.count() == 3)
   }
 
@@ -58,7 +59,7 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
                                                    | path = "${escapedFilePath(tempPath)}/test"
          """.stripMargin)
     val doTgt1 = ParquetFileDataObject.fromConfig(configTgt1)
-    doTgt1.writeDataFrame(testDf, Seq())
+    doTgt1.writeSparkDataFrame(testDf, Seq())
 
     // read with connection
     val configSrc1 = ConfigFactory.parseString(s"""
@@ -69,7 +70,7 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
     instanceRegistry.register(HadoopFileConnection("con1", s"file:///${escapedFilePath(tempPath)}"))
     val doSrc1 = ParquetFileDataObject.fromConfig(configSrc1)
 
-    val result = doSrc1.getDataFrame()
+    val result = doSrc1.getSparkDataFrame()
     assert(result.count() == 3)
   }
 
@@ -79,13 +80,13 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
   testsFor(validateSchemaMinOnRead(createDataObjectWithSchemaMin, fileExtension = ".parquet"))
 
   def createDataObject(path: String, schemaOpt: Option[StructType]): ParquetFileDataObject = {
-    val dataObj = ParquetFileDataObject(id = "schemaTestParquetDO", path = path, schema = schemaOpt)
+    val dataObj = ParquetFileDataObject(id = "schemaTestParquetDO", path = path, schema = schemaOpt.map(SparkSchema))
     instanceRegistry.register(dataObj)
     dataObj
   }
 
   def createDataObjectWithSchemaMin(path: String, schemaOpt: Option[StructType], schemaMinOpt: Option[StructType]): ParquetFileDataObject = {
-    val dataObj = ParquetFileDataObject(id = "schemaTestParquetDO", path = path, schema = schemaOpt, schemaMin = schemaMinOpt)
+    val dataObj = ParquetFileDataObject(id = "schemaTestParquetDO", path = path, schema = schemaOpt.map(SparkSchema), schemaMin = schemaMinOpt.map(SparkSchema))
     instanceRegistry.register(dataObj)
     dataObj
   }

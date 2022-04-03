@@ -23,7 +23,7 @@ import com.typesafe.config.ConfigFactory
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.json.JsonUtils
 import io.smartdatalake.util.misc.CustomCodeUtil
-import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.script.CmdScript
 import org.apache.spark.sql.types.DataType
 import org.json4s.JsonAST.JArray
@@ -58,7 +58,7 @@ class AirbyteDataObjectTest extends DataObjectTestSuite {
       linuxCmd = Some(script))
     )
     dataObject.prepare
-    val actual = dataObject.getDataFrame()(contextExec)
+    val actual = dataObject.getSparkDataFrame()(contextExec)
     val expected = Seq(("TEST", "A", "2345.67", "Test Auto")).toDF("produkttyp", "flag", "artikelID", "artikelbezeichnung")
     val resultat = expected.isEqual(actual)
     if (!resultat) TestUtil.printFailedTestResult("wsl cmd test", Seq())(actual)(expected)

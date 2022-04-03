@@ -26,13 +26,15 @@ import java.util.Properties
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.DataFrameUtil
+import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
@@ -88,37 +90,38 @@ private object TemporalQueries {
 /**
  * [[DataObject]] of type KafkaTopic.
  * Provides details to an action to read from Kafka Topics using either
-  * [[org.apache.spark.sql.DataFrameReader]] or [[org.apache.spark.sql.streaming.DataStreamReader]]
-  *
-  * @param topicName The name of the topic to read
-  * @param keyType    Optional type the key column should be converted to. If none is given it will remain a bytearray / binary.
-  * @param valueType  Optional type the value column should be converted to. If none is given it will remain a bytearray / binary.
-  * @param schemaMin  An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
-  * @param selectCols Columns to be selected when reading the DataFrame. Available columns are key, value, topic,
-  *                   partition, offset, timestamp, timestampType. If key/valueType is AvroSchemaRegistry the key/value column are
-  *                   convert to a complex type according to the avro schema. To expand it select "value.*".
-  *                   Default is to select key and value.
-  * @param datePartitionCol definition of date partition column to extract formatted timestamp into column.
-  *                   This is used to list existing partition and is added as additional column on batch read.
-  * @param batchReadConsecutivePartitionsAsRanges Set to true if consecutive partitions should be combined as one range of offsets when batch reading from topic. This results in less tasks but can be a performance problem when reading many partitions. (default=false)
-  * @param batchReadMaxOffsetsPerTask Set number of offsets per Spark task when batch reading from topic.
-  * @param options    Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).
-  *                   These options override connection.options.
-  */
+ * [[org.apache.spark.sql.DataFrameReader]] or [[org.apache.spark.sql.streaming.DataStreamReader]]
+ *
+ * @param topicName The name of the topic to read
+ * @param keyType    Optional type the key column should be converted to. If none is given it will remain a bytearray / binary.
+ * @param valueType  Optional type the value column should be converted to. If none is given it will remain a bytearray / binary.
+ * @param schemaMin  An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
+ *                   Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
+ * @param selectCols Columns to be selected when reading the DataFrame. Available columns are key, value, topic,
+ *                   partition, offset, timestamp, timestampType. If key/valueType is AvroSchemaRegistry the key/value column are
+ *                   convert to a complex type according to the avro schema. To expand it select "value.*".
+ *                   Default is to select key and value.
+ * @param datePartitionCol definition of date partition column to extract formatted timestamp into column.
+ *                   This is used to list existing partition and is added as additional column on batch read.
+ * @param batchReadConsecutivePartitionsAsRanges Set to true if consecutive partitions should be combined as one range of offsets when batch reading from topic. This results in less tasks but can be a performance problem when reading many partitions. (default=false)
+ * @param batchReadMaxOffsetsPerTask Set number of offsets per Spark task when batch reading from topic.
+ * @param options    Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).
+ *                   These options override connection.options.
+ */
 case class KafkaTopicDataObject(override val id: DataObjectId,
                                 topicName: String,
                                 connectionId: ConnectionId,
                                 keyType: KafkaColumnType = KafkaColumnType.String,
                                 valueType: KafkaColumnType = KafkaColumnType.String,
-                                override val schemaMin: Option[StructType] = None,
+                                override val schemaMin: Option[GenericSchema] = None,
                                 selectCols: Seq[String] = Seq("key", "value"),
                                 datePartitionCol: Option[DatePartitionColumnDef] = None,
                                 batchReadConsecutivePartitionsAsRanges: Boolean = false,
                                 batchReadMaxOffsetsPerTask: Option[Int] = None,
-                                options: Map[String, String] = Map(),
+                                override val options: Map[String, String] = Map(),
                                 override val metadata: Option[DataObjectMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateDataFrame with CanCreateStreamingDataFrame with CanWriteDataFrame with CanHandlePartitions with SchemaValidation {
+  extends DataObject with CanCreateSparkDataFrame with CanCreateStreamingDataFrame with CanWriteSparkDataFrame with CanHandlePartitions with SchemaValidation {
 
   override val partitions: Seq[String] = datePartitionCol.map(_.colName).toSeq
   override val expectedPartitionsCondition: Option[String] = None // expect all partitions to exist
@@ -154,9 +157,9 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
   }
 
-  override def init(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
+  override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
     // check schema compatibility
-    require(df.columns.toSet == Set("key","value"), s"(${id}) Expects columns key, value in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
+    require(df.columns.toSet == Set("key","value"), s"($id) Expects columns key, value in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
     convertToKafka(keyType, df("key"), SubjectType.key, eagerCheck = true)
     convertToKafka(valueType, df("value"), SubjectType.value, eagerCheck = true)
   }
@@ -172,7 +175,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   private def convertToReadDataFrame(dfRaw: DataFrame): DataFrame = {
-    import io.smartdatalake.util.misc.DataFrameUtil._
+    import DataFrameUtil._
 
     // convert key & value
     val colsToSelect = ((if (selectCols.nonEmpty) selectCols else Seq("kafka.*")) ++ partitions).distinct.map(col)
@@ -182,12 +185,12 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       .as("kafka")
       .withOptionalColumn(datePartitionCol.map(_.colName), udfFormatPartition(col("timestamp")))
       .select(colsToSelect:_*)
-    validateSchemaMin(df, "read")
+    validateSchemaMin(SparkSchema(df.schema), "read")
     // return
     df
   }
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     implicit val session: SparkSession = context.sparkSession
 
     // get DataFrame from topic
@@ -275,7 +278,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     )
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
+  override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit context: ActionPipelineContext): Unit = {
     convertToWriteDataFrame(df)
       .write
@@ -285,18 +288,22 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       .save
   }
 
-  override def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String, String], checkpointLocation: String, queryName: String, outputMode: OutputMode, saveModeOptions: Option[SaveModeOptions] = None)
+  override def writeStreamingDataFrame(df: GenericDataFrame, trigger: Trigger, options: Map[String, String], checkpointLocation: String, queryName: String, outputMode: OutputMode, saveModeOptions: Option[SaveModeOptions] = None)
                                       (implicit context: ActionPipelineContext): StreamingQuery = {
-    convertToWriteDataFrame(df)
-      .writeStream
-      .format("kafka")
-      .trigger(trigger)
-      .queryName(queryName)
-      .outputMode(outputMode)
-      .options(instanceOptions ++ options)
-      .option("checkpointLocation", checkpointLocation)
-      .option("topic", topicName)
-      .start()
+    df match {
+      case sparkDf: SparkDataFrame =>
+        convertToWriteDataFrame(sparkDf.inner)
+          .writeStream
+          .format("kafka")
+          .trigger(trigger)
+          .queryName(queryName)
+          .outputMode(outputMode)
+          .options(instanceOptions ++ options)
+          .option("checkpointLocation", checkpointLocation)
+          .option("topic", topicName)
+          .start()
+      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method writeStreamingDataFrame")
+    }
   }
 
   private def getTopicPartitionsAtTstmp(topicPartitions: Seq[TopicPartition], localDateTime: LocalDateTime) = {
@@ -363,18 +370,21 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       .map( startTime => PartitionValues(Map(datePartitionCol.get.colName -> datePartitionCol.get.format(startTime))))
   }
 
-  override def createReadSchema(writeSchema: StructType)(implicit context: ActionPipelineContext): StructType = {
-    implicit val session: SparkSession = context.sparkSession
-    // add additional columns created by kafka source
-    val readSchemaRaw = writeSchema
-      .add("topic", StringType)
-      .add("partition", IntegerType)
-      .add("offset", LongType)
-      .add("timestamp", TimestampType)
-      .add("timestampType", IntegerType)
-    // apply selected columns and return schema
-    convertToReadDataFrame(DataFrameUtil.getEmptyDataFrame(readSchemaRaw))
-      .schema
+  override def createReadSchema(writeSchema: GenericSchema)(implicit context: ActionPipelineContext): GenericSchema = {
+    writeSchema match {
+      case sparkWriteSchema: SparkSchema =>
+        implicit val session: SparkSession = context.sparkSession
+        // add additional columns created by kafka source
+        val readSchemaRaw = sparkWriteSchema.inner
+          .add("topic", StringType)
+          .add("partition", IntegerType)
+          .add("offset", LongType)
+          .add("timestamp", TimestampType)
+          .add("timestampType", IntegerType)
+        // apply selected columns and return schema
+        SparkSchema(convertToReadDataFrame(DataFrameUtil.getEmptyDataFrame(readSchemaRaw)).schema)
+      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${writeSchema.subFeedType.typeSymbol.name} in method createReadSchema")
+    }
   }
 
   /**

@@ -22,13 +22,17 @@ package io.smartdatalake.util.misc
 import org.reflections.Reflections
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 import scala.reflect.runtime.universe._
 
 object ReflectionUtil {
 
   private val mirror = scala.reflect.runtime.currentMirror
+  private val reflectionsCache = mutable.Map[String,Reflections]()
 
-  def getReflections(packageName: String) = new Reflections(packageName)
+  def getReflections(packageName: String): Reflections = {
+    reflectionsCache.getOrElseUpdate(packageName, new Reflections(packageName))
+  }
 
   def getSealedTraitImplClasses[T: TypeTag]: Seq[Class[_]] = {
     val subClasses = typeOf[T].typeSymbol.asClass.knownDirectSubclasses

@@ -22,12 +22,11 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
-import io.smartdatalake.util.misc.DataFrameUtil.arrayToSeq
-import io.smartdatalake.util.misc.{AclDef, AclUtil, SerializableHadoopConfiguration, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.ScalaUtil.arrayToSeq
+import io.smartdatalake.util.misc.{AclDef, AclUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.HadoopFileConnection
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.spark.sql.SparkSession
 
 import java.io.{InputStream, OutputStream}
 import scala.util.{Failure, Success, Try}

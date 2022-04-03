@@ -4,8 +4,8 @@ import com.github.takezoe.scaladoc.{Scaladoc => ScaladocAnnotation}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{AuthMode, ExecutionMode, SaveModeOptions}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer, ValidationRule}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
-import io.smartdatalake.workflow.action.sparktransformer.{ParsableDfTransformer, ParsableDfsTransformer, ValidationRule}
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata, HousekeepingMode, Table}
@@ -33,8 +33,8 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     typeOf[DataObjectMetadata],
     typeOf[ActionMetadata],
     typeOf[ConnectionMetadata],
-    typeOf[ParsableDfTransformer],
-    typeOf[ParsableDfsTransformer],
+    typeOf[GenericDfTransformer],
+    typeOf[GenericDfsTransformer],
     typeOf[ParsableScriptDef],
     typeOf[ExecutionMode],
     typeOf[HousekeepingMode],

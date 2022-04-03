@@ -20,11 +20,12 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, SdlConfigObject}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.script.CmdScript
 import io.smartdatalake.workflow.dataobject.{CanReceiveScriptNotification, CsvFileDataObject, DataObject, DataObjectMetadata}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
 import org.apache.commons.lang.NotImplementedException
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
