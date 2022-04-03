@@ -57,6 +57,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PAT_ACTIONS }}      
+      - name: Git Config
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"          
       - name: Set up JDK 11
         uses: actions/setup-java@v1
         with:
@@ -89,3 +96,16 @@ jobs:
           maven_profiles: scala-2.11,release-sonatype
           # exclude sdl-parent as it is already uploaded with previous deploy, stays the same and cannot be replaced in remote repository
           maven_args: -B -DskipTests -pl '!.' -f pom.xml
+
+      - name: Maven Get Version
+        run: echo MVN_CURRENT_VERSION=$(mvn -B -P scala-2.12 -f /home/runner/work/smart-data-lake/smart-data-lake/pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
+
+      - name: Push new sdl-schema.json to documentation branch
+        run: |
+          git fetch origin documentation
+          git checkout documentation
+          # note that sdl-schema.json should be available in the location below from the previous maven build.
+          mv sdl-lang/target/classes/sdl-schema.json static/json-schema-viewer/schemas/sdl-schema-${MVN_CURRENT_VERSION}.json
+          git add static/json-schema-viewer/schemas/sdl-schema-${MVN_CURRENT_VERSION}.json
+          git diff-index --quiet HEAD || git commit -m "Update sdl-schema-${MVN_CURRENT_VERSION}.json" # only if there is something to commit
+          git push
