@@ -581,6 +581,84 @@
               }
             }, {
               "type" : "object",
+              "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Scala code which is compiled at runtime.\nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The scala code has to implement a function of type[[fnTransformType]] .",
+              "additionalProperties" : false,
+              "required" : [ "type" ],
+              "title" : "ScalaCodeDfTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "ScalaCodeDfTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "code" : {
+                  "type" : "string",
+                  "description" : "Scala code for transformation. The scala code needs to be a function of type[[fnTransformType]] ."
+                },
+                "file" : {
+                  "type" : "string",
+                  "description" : "File where scala code for transformation is loaded from. The scala code in the file needs to be a function of type[[fnTransformType]] ."
+                },
+                "options" : {
+                  "type" : "object",
+                  "description" : "Options to pass to the transformation",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                },
+                "runtimeOptions" : {
+                  "type" : "object",
+                  "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }, {
+              "type" : "object",
+              "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The Java/Scala class has to implement interface[[CustomDfTransformer]] .",
+              "additionalProperties" : false,
+              "required" : [ "className", "type" ],
+              "title" : "ScalaClassDfTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "ScalaClassDfTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "className" : {
+                  "type" : "string",
+                  "description" : "class name implementing trait[[CustomDfTransformer]]"
+                },
+                "options" : {
+                  "type" : "object",
+                  "description" : "Options to pass to the transformation",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                },
+                "runtimeOptions" : {
+                  "type" : "object",
+                  "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }, {
+              "type" : "object",
               "description" : "Add additional columns to the DataFrame by extracting information from the context.",
               "additionalProperties" : false,
               "required" : [ "additionalColumns", "type" ],
@@ -644,13 +722,13 @@
               }
             }, {
               "type" : "object",
-              "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The Java/Scala class has to implement interface[[CustomDfTransformer]] .",
+              "description" : "Standardize datatypes of a DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype",
               "additionalProperties" : false,
-              "required" : [ "className", "type" ],
-              "title" : "ScalaClassDfTransformer",
+              "required" : [ "type" ],
+              "title" : "StandardizeDatatypesTransformer",
               "properties" : {
                 "type" : {
-                  "const" : "ScalaClassDfTransformer"
+                  "const" : "StandardizeDatatypesTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -659,35 +737,17 @@
                 "description" : {
                   "type" : "string",
                   "description" : "Optional description of the transformer"
-                },
-                "className" : {
-                  "type" : "string",
-                  "description" : "class name implementing trait[[CustomDfTransformer]]"
-                },
-                "options" : {
-                  "type" : "object",
-                  "description" : "Options to pass to the transformation",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  }
-                },
-                "runtimeOptions" : {
-                  "type" : "object",
-                  "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  }
                 }
               }
             }, {
               "type" : "object",
-              "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Scala code which is compiled at runtime.\nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The scala code has to implement a function of type[[fnTransformType]] .",
+              "description" : "Apply a filter condition to a DataFrame.",
               "additionalProperties" : false,
-              "required" : [ "type" ],
-              "title" : "ScalaCodeDfTransformer",
+              "required" : [ "filterClause", "type" ],
+              "title" : "FilterTransformer",
               "properties" : {
                 "type" : {
-                  "const" : "ScalaCodeDfTransformer"
+                  "const" : "FilterTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -697,27 +757,9 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "code" : {
+                "filterClause" : {
                   "type" : "string",
-                  "description" : "Scala code for transformation. The scala code needs to be a function of type[[fnTransformType]] ."
-                },
-                "file" : {
-                  "type" : "string",
-                  "description" : "File where scala code for transformation is loaded from. The scala code in the file needs to be a function of type[[fnTransformType]] ."
-                },
-                "options" : {
-                  "type" : "object",
-                  "description" : "Options to pass to the transformation",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  }
-                },
-                "runtimeOptions" : {
-                  "type" : "object",
-                  "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  }
+                  "description" : "Spark SQL expression to filter the DataFrame"
                 }
               }
             }, {
@@ -779,48 +821,6 @@
                   "additionalProperties" : {
                     "type" : "string"
                   }
-                }
-              }
-            }, {
-              "type" : "object",
-              "description" : "Apply a filter condition to a DataFrame.",
-              "additionalProperties" : false,
-              "required" : [ "filterClause", "type" ],
-              "title" : "FilterTransformer",
-              "properties" : {
-                "type" : {
-                  "const" : "FilterTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                },
-                "filterClause" : {
-                  "type" : "string",
-                  "description" : "Spark SQL expression to filter the DataFrame"
-                }
-              }
-            }, {
-              "type" : "object",
-              "description" : "Standardize datatypes of a DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype",
-              "additionalProperties" : false,
-              "required" : [ "type" ],
-              "title" : "StandardizeDatatypesTransformer",
-              "properties" : {
-                "type" : {
-                  "const" : "StandardizeDatatypesTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
                 }
               }
             }, {
