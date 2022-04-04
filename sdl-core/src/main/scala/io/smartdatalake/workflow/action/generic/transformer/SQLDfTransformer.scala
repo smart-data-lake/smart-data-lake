@@ -69,7 +69,7 @@ case class SQLDfTransformer(override val name: String = "sqlTransform", override
         preparedSql = ActionHelper.replaceLegacyViewName(preparedSql, inputViewName)
       }
       // create DataFrame from SQL
-      logger.info(s"($actionId.transformers.$name) Preparing DataFrame from SQL statement: $preparedSql")
+      logger.debug(s"($actionId.transformers.$name) Preparing DataFrame from SQL statement: $preparedSql")
       function.sql(preparedSql,dataObjectId)
     } catch {
       case e: Throwable => throw new SQLTransformationException(s"($actionId.transformers.$name) SQL query error: ${e.getMessage}. Also note to use token '%{inputViewName}' or '$inputViewName' as temporary view name in the SQL statement.", e)

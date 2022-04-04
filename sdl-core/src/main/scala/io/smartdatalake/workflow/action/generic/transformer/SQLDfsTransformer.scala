@@ -82,7 +82,7 @@ case class SQLDfsTransformer(override val name: String = "sqlTransform", overrid
             inputViewNameOptions.values.foreach(inputViewName => preparedSql = ActionHelper.replaceLegacyViewName(preparedSql, inputViewName))
           }
           // create DataFrame from SQL
-          logger.info(s"($actionId.transformers.$name) Preparing DataFrame $outputName from SQL statement: $preparedSql")
+          logger.debug(s"($actionId.transformers.$name) Preparing DataFrame $outputName from SQL statement: $preparedSql")
           functions.sql(preparedSql, outputDataObjectId)
         } catch {
           case e: Throwable => throw new SQLTransformationException(s"($actionId.transformers.$name) SQL query error for $outputName: ${e.getMessage}. Also note to use tokens '%{inputViewName_<inputName>}' as temporary view names in the SQL statement.", e)
