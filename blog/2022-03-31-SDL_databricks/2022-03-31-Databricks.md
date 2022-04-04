@@ -10,9 +10,9 @@ tags: [Databricks, Cloud]
 hide_table_of_contents: false
 ---
 
-Many analytics applications are ported to the cloud, Data Lakes and Datahouses in the cloud becoming more and more popular. The [Databricks](databricks.com) platform provides an easy accessible and easy configurable. SmartDataLake Builder on the other hand provides an open source, portable framework to load and transform the data.
+Many analytics applications are ported to the cloud, Data Lakes and Datahouses in the cloud becoming more and more popular. The [Databricks](https://databricks.com) platform provides an easy accessible and easy configurable. SmartDataLake Builder on the other hand provides an open source, portable framework to load and transform the data.
 
-In this article the deployment of SmartDataLakeBuilder (SDLB) on [Databricks](databricks.com) is described. 
+In this article the deployment of SmartDataLakeBuilder (SDLB) on [Databricks](https://databricks.com) is described. 
 
 <!--truncate-->
 
@@ -22,7 +22,7 @@ Further, the presented SDLB pipeline is just a simple example, focusing on the i
 
 Let's get started:
 
-1. [**Databricks**](databricks.com) accounts can be created as [Free Trial](https://databricks.com/try-databricks?itm_data=Homepage-HeroCTA-Trial) or as [Community Account](https://community.databricks.com/s/login/SelfRegister)
+1. [**Databricks**](https://databricks.com) accounts can be created as [Free Trial](https://databricks.com/try-databricks?itm_data=Homepage-HeroCTA-Trial) or as [Community Account](https://community.databricks.com/s/login/SelfRegister)
     - Account and Workspace creation are described in detail [here](https://docs.databricks.com/getting-started/account-setup.html), there are few hints and modifications presented below.
     - I selected AWS backend, but there are conceptual no differences to the other providers. If you already have an Azure, AWS or Google Cloud account/subscription this can be used, otherwise you can register a trial subscription there. 
 1. **Workspace stack** is created using the Quickstart as described in the documentation. When finished launch the Workspace.
