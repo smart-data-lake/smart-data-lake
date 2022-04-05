@@ -27,7 +27,7 @@ With the integration of Snowpark as engine in SDLB we created just that.
 
 This blog post will show how to migrate our example data pipeline of the [Getting Started](../../docs/getting-started/setup) guide Part 1 to use Spark for ingestion and Snowpark for transformation.
 
-## Prerequisits
+## Prerequisites
 
 * Create a Snowflake trial account on https://signup.snowflake.com/ and note the following connection informations:
   * Account URL (copy by navigating to "Organization" and clicking the link symbol on the right of the account name)
@@ -160,7 +160,7 @@ On the other hand the ComputeDistanceTransformer was implemented with the Spark 
         def transform(session: Session, options: Map[String, String], df: DataFrame, dataObjectId: String) : DataFrame = {
           ...
 
-If you have UDFs in your code, it gets trickier. The UDF Code gets serialized to Snowflake, details see [Snowpark UDFs](https://docs.snowflake.com/de/developer-guide/snowpark/scala/creating-udfs.html). Special care must be taken to minimize the scope the UDF is defined in. Thats why we move the function into the companion object.
+If you have UDFs in your code, it gets trickier. The UDF Code gets serialized to Snowflake, details see [Snowpark UDFs](https://docs.snowflake.com/en/developer-guide/snowpark/scala/creating-udfs.html). Special care must be taken to minimize the scope the UDF is defined in. Thats why we move the function into the companion object.
 
       object ComputeDistanceTransformer {
         def calculateDistanceInKilometer(depLat: Double, depLng: Double, arrLat: Double, arrLng: Double): Double = {
@@ -203,7 +203,7 @@ Compute with `--feed-sel compute`:
       podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel compute
 
 If the SDLB run was SUCCESSFUL, you should now see TEST.BTL_DISTANCES table in Snowpark.
-To check that Spark was used for Action select-airport-cols and Snowpark for Action compute-distances, look out for the following logs, e.g. SnowparkSubFeed for Action~compute-distances: 
+To check that Spark was used for Action select-airport-cols and Snowpark for Action compute-distances, look for the following logs, e.g. SnowparkSubFeed for Action~compute-distances: 
 
       INFO  CopyAction - (Action~compute-distances) selected subFeedType SnowparkSubFeed [init-compute-distances]
 
@@ -255,6 +255,6 @@ Compute with Spark and Snowpark again by using `--feed-sel compute` and browsing
 
 # Summary
 
-We have seen that its quite easy to migrate SDLB pipelines to use Snowpark instead of Spark, also only partially for selected Actions. SDLBs support of different DataFrame-AP-engines allows to still benefit of all other features of SDLB, like having full early validation over the whole pipeline by checking the schemas needed by Actions later in the pipeline.
+We have seen that its quite easy to migrate SDLB pipelines to use Snowpark instead of Spark, also only partially for selected Actions. SDLB's support of different DataFrame-API-Engines allows to still benefit of all other features of SDLB, like having full early validation over the whole pipeline by checking the schemas needed by Actions later in the pipeline.
 
 Migrating Scala code of custom transformations using Spark DataFrame API needs some adaptions of import statements, but the rest stays mostly 1:1 the same. UDFs are also supported and dont need changes, but there might be surprises regarding data types (Snowparks Variant-type is not the same as Sparks nested datatypes) and deployment of needed libraries. We might investigate that in future blog post.
