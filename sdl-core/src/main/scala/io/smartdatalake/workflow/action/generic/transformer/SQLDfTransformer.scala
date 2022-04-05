@@ -36,7 +36,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * Configuration of a custom GenericDataFrame transformation between one input and one output (1:1) as SQL code.
  * The input data is available as temporary view in SQL. The inputs name is either the name of the DataObject,
  * or the name of the previous transformation, if this is not the first transformation of the chain. Also note that to create
- * the name of temporary view, special characters are replaces by underscores and a postfix "_sdltemp" is added.
+ * the name of temporary view, special characters are replaced by underscores and a postfix "_sdltemp" is added.
  * It is therefore recommended to use special token %{inputViewName} or ${inputViewName_<input name>} that will be
  * replaced with the name of the temporary view at runtime.
  *

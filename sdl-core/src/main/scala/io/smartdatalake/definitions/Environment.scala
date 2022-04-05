@@ -190,8 +190,7 @@ object Environment {
    * This is enabled by default for backward compatibility.
    */
   var replaceSqlTransformersOldTempViewName: Boolean = {
-    EnvironmentUtil.getSdlParameter("replaceSqlTransformersOldTempViewName")
-      .map(_.toBoolean).getOrElse(true)
+    EnvironmentUtil.getSdlParameter("replaceSqlTransformersOldTempViewName").forall(_.toBoolean)
   }
 
   // static configurations

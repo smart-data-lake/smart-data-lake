@@ -20,14 +20,14 @@
 package io.smartdatalake.workflow.action.generic.transformer
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
-import io.smartdatalake.workflow.action.{Action, ActionHelper}
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer.INPUT_VIEW_NAME
+import io.smartdatalake.workflow.action.{Action, ActionHelper}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
@@ -37,12 +37,12 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * (special characters are replaces by underscores).
  * The input data is available as temporary view in SQL. The input name is either an id of the input DataObject,
  * or the name of an output of the previous transformation if this is not the first transformation of the chain.
- * Also note that to create the name of temporary view, special characters are replaces by underscores and a postfix "_sdltemp" is added.
+ * Also note that to create the name of temporary view, special characters are replaced by underscores and a postfix "_sdltemp" is added.
  * It is therefore recommended to use the special token ${inputViewName_<input name>}, that will be replaced with the name
  * of the temporary view at runtime.
  *
  * Note that you can access arbitrary tables from the metastore in the SQL code, but this is against the principle of SDLB
- * to access data through DataObjects. Access tables directly in SQL code has a negative impact on the maintainability of the project.
+ * to access data through DataObjects. Accessing tables directly in SQL code has a negative impact on the maintainability of the project.
  *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
@@ -63,9 +63,9 @@ case class SQLDfsTransformer(override val name: String = "sqlTransform", overrid
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String,GenericDataFrame] = {
     val functions = DataFrameSubFeed.getFunctions(dfs.values.head.subFeedType)
     // register all inputs as temporary table
-    val inputViewNameOptions = dfs.map {
-      case (inputName,df) =>
-        val inputViewName =  ActionHelper.createTemporaryViewName(inputName)
+    val inputViewNameOptions: Map[String, String] = dfs.map {
+      case (inputName, df) =>
+        val inputViewName = ActionHelper.createTemporaryViewName(inputName)
         df.createOrReplaceTempView(inputViewName)
         (s"${INPUT_VIEW_NAME}_$inputName" -> inputViewName)
     }
