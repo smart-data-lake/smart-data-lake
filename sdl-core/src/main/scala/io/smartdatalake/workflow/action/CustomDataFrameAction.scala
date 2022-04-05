@@ -28,7 +28,6 @@ import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerCo
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
-import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
 
 /**
@@ -37,7 +36,11 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  *
  * @param inputIds               input DataObject's
  * @param outputIds              output DataObject's
- * @param transformer            custom transformation for multiple dataframes to apply
+ * @param transformer            optional custom transformation for multiple dataframes to apply
+ * @param transformers list of transformations to apply. See [[spark.transformer]] for a list of included Transformers.
+ *                     The transformations are applied according to the ordering of the list.
+ *                     Note that all outputs of previous transformers are kept as input for next transformer,
+ *                     but in the end only outputs of the last transformer are mapped to output DataObjects.
  * @param mainInputId            optional selection of main inputId used for execution mode and partition values propagation. Only needed if there are multiple input DataObject's.
  * @param mainOutputId           optional selection of main outputId used for execution mode and partition values propagation. Only needed if there are multiple output DataObject's.
  * @param executionMode          optional execution mode for this Action
@@ -50,6 +53,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
 case class CustomDataFrameAction(override val id: ActionId,
                                  inputIds: Seq[DataObjectId],
                                  outputIds: Seq[DataObjectId],
+                                 @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                                  transformer: Option[CustomDfsTransformerConfig] = None,
                                  transformers: Seq[GenericDfsTransformer] = Seq(),
                                  override val breakDataFrameLineage: Boolean = false,

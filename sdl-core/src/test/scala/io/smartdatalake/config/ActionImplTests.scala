@@ -129,7 +129,7 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
       inputIds = Seq("tdo1"),
       outputIds = Seq("tdo2"),
       transformers = Seq(
-        SQLDfsTransformer(code = Map(DataObjectId("test") -> "select * from test")),
+        SQLDfsTransformer(code = Map("test" -> "select * from test")),
         DfTransformerWrapperDfsTransformer(subFeedsToApply = Seq("test"), transformer = FilterTransformer(filterClause = "1 = 1"))
       )
     )

@@ -302,7 +302,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(action3.copy())
     // action4 is cancelled because action3 is cancelled (cancelled has higher prio than skipped from action1)
     val action4 = CustomDataFrameAction("d", Seq(tgt1DO.id, tgt3DO.id), Seq(tgt4DO.id), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfsTransformer(code = Map(tgt4DO.id -> "select * from c"))))
+      , transformers = Seq(SQLDfsTransformer(code = Map(tgt4DO.id.id -> "select * from c"))))
     instanceRegistry.register(action4.copy())
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
     intercept[TaskFailedException](sdlb.run(sdlConfig))

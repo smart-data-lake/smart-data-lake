@@ -18,12 +18,10 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformerDef
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanCreateSparkDataFrame, CanWriteDataFrame, CanWriteSparkDataFrame, DataObject}
+import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformerDef, SQLDfTransformer}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SubFeed}
-import org.apache.spark.sql.Column
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 
@@ -91,8 +89,10 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
    * apply transformer to SubFeed
    */
   protected def applyTransformers(transformers: Seq[GenericDfTransformerDef], inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
-    val transformedSubFeed = transformers.foldLeft(inputSubFeed){
-      case (subFeed, transformer) => transformer.applyTransformation(id, subFeed)
+    val duplicateTransformerNames = transformers.groupBy(_.name).values.filter(_.size>1).map(_.head.name)
+    assert(!transformers.exists(_.isInstanceOf[SQLDfTransformer]) || duplicateTransformerNames.isEmpty, s"($id) transformers.name must be unique if SQLDfTransformer is used, but duplicate (default?) names ${duplicateTransformerNames.mkString(", ")} where detected")
+    val (transformedSubFeed, _) = transformers.foldLeft((inputSubFeed,Option.empty[String])){
+      case ((subFeed,previousTransformerName), transformer) => (transformer.applyTransformation(id, subFeed, previousTransformerName), Some(transformer.name))
     }
     // Note that transformed partition values are set by execution mode.
     outputSubFeed.withDataFrame(transformedSubFeed.dataFrame)

@@ -185,6 +185,14 @@ object Environment {
     nb
   }
 
+  /**
+   * If enabled the temp view name from versions <= 2.2.x is replaced with the new temp view name including a postfix.
+   * This is enabled by default for backward compatibility.
+   */
+  var replaceSqlTransformersOldTempViewName: Boolean = {
+    EnvironmentUtil.getSdlParameter("replaceSqlTransformersOldTempViewName").forall(_.toBoolean)
+  }
+
   // static configurations
   val configPathsForLocalSubstitution: Seq[String] = Seq(
       "path", "table.name"

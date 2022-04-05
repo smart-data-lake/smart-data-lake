@@ -24,9 +24,9 @@ import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderCo
 import io.smartdatalake.config.ConfigToolbox
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.DataFrameSubFeed
-import io.smartdatalake.workflow.action.CopyAction
+import io.smartdatalake.workflow.action.{CopyAction, CustomDataFrameAction}
 import io.smartdatalake.workflow.action.generic.customlogic.CustomGenericDfTransformer
-import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, ScalaClassGenericDfTransformer}
+import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer, SQLDfsTransformer, ScalaClassGenericDfTransformer}
 import io.smartdatalake.workflow.action.snowflake.customlogic.CustomSnowparkDfTransformer
 import io.smartdatalake.workflow.action.snowflake.transformer.ScalaClassSnowparkDfTransformer
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
@@ -71,6 +71,10 @@ object SparkAndSnowparkDataPipelineIT extends App {
   val tgt2DO = SnowflakeTableDataObject("tgt2", tgt2Table, connectionId = "sfCon")
   tgt2DO.dropTable
   instanceRegistry.register(tgt2DO)
+  val tgt3Table = Table(Some(System.getenv("SNOWFLAKE_SCHEMA")), "tgt3", None, Some(Seq("lastname")))
+  val tgt3DO = SnowflakeTableDataObject("tgt3", tgt3Table, connectionId = "sfCon")
+  tgt3DO.dropTable
+  instanceRegistry.register(tgt3DO)
 
 
   // first action copy with Spark from Hive to Snowflake
@@ -85,10 +89,24 @@ object SparkAndSnowparkDataPipelineIT extends App {
       FilterTransformer(filterClause = "lastname='jonson'"),
       AdditionalColumnsTransformer(additionalColumns = Map("run_id" -> "runId")),
       // a custom generic transformer
-      ScalaClassGenericDfTransformer(className = classOf[TestAdd1GenericDfTransformer].getName, options = Map("column" -> "rating"))
+      ScalaClassGenericDfTransformer(className = classOf[TestAdd1GenericDfTransformer].getName, options = Map("column" -> "rating")),
+      SQLDfTransformer(code = "select %{inputViewName}.*, run_id + 1 as run_id2 from %{inputViewName}"),
+      SQLDfTransformer(code = "select %{inputViewName}.*, run_id2 + 1 as run_id3 from %{inputViewName}")
     )
   )
   instanceRegistry.register(action2)
+  val action3 = CustomDataFrameAction("customSnowpark", Seq(tgt1DO.id, tgt2DO.id), Seq(tgt3DO.id),
+    transformers = Seq(
+      SQLDfsTransformer(code = Map(
+        tgt3DO.id.id -> """
+          select tgt1.*, run_id2 + 1 as run_id3
+          from %{inputViewName_tgt1} as tgt1
+          join %{inputViewName_tgt2} as tgt2 on tgt1.firstname=tgt2.firstname and tgt1.lastname=tgt2.lastname
+        """
+      )),
+    )
+  )
+  instanceRegistry.register(action3)
 
   // prepare data
   import sparkSession.implicits._
@@ -96,7 +114,7 @@ object SparkAndSnowparkDataPipelineIT extends App {
   srcDO.writeSparkDataFrame(l1, Seq())
 
   // run
-  val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "ids:copy.*", applicationName = Some(feed))
+  val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "ids:.*", applicationName = Some(feed))
   sdlb.run(sdlConfig)
 
 }

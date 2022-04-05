@@ -39,7 +39,7 @@ import scala.util.{Failure, Success, Try}
  * @param outputId output DataObject
  * @param deleteDataAfterRead a flag to enable deletion of input partitions after copying.
  * @param transformer optional custom transformation to apply.
- * @param transformers optional list of transformations to apply. See [[sparktransformer]] for a list of included Transformers.
+ * @param transformers optional list of transformations to apply. See [[spark.transformer]] for a list of included Transformers.
  *                     The transformations are applied according to the lists ordering.
  * @param executionMode optional execution mode for this Action
  * @param executionCondition     optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].

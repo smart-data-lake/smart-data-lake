@@ -131,5 +131,20 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
     val invalidCharacters = "[^a-zA-Z0-9_]".r
     invalidCharacters.replaceAllIn(str, "_")
   }
+
+  /**
+   * Create a valid temporary view name for SQL transformation.
+   * Apart from replacing special characters, a postfix is added to make the name unique in case the input name is also an existing table.
+   * @param inputName name of the input the temporary view should be created for
+   */
+  def createTemporaryViewName(inputName: String) : String = {
+    replaceSpecialCharactersWithUnderscore(inputName) + TEMP_VIEW_POSTFIX
+  }
+
+  def replaceLegacyViewName(sql: String, inputViewName: String): String = {
+    sql.replaceAll("\\s"+inputViewName.stripSuffix(ActionHelper.TEMP_VIEW_POSTFIX)+"(\\s|\\.|$)", s" $inputViewName" + "$1")
+  }
+
+  val TEMP_VIEW_POSTFIX = "_sdltemp"
 }
 

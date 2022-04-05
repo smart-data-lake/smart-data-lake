@@ -38,8 +38,8 @@ case class DfTransformerWrapperDfsTransformer(transformer: GenericDfTransformer,
   override def description: Option[String] = transformer.description
   override def transform(actionId: SdlConfigObject.ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, GenericDataFrame])(implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
     val missingSubFeeds = subFeedsToApply.toSet.diff(dfs.keySet)
-    assert(missingSubFeeds.isEmpty, s"($actionId) [transformation.$name] subFeedsToApply to apply not found in input dfs: ${missingSubFeeds.mkString(", ")}")
-    dfs.map { case (subFeedName,df) => if (subFeedsToApply.contains(subFeedName)) (subFeedName, transformer.transform(actionId, partitionValues, df, DataObjectId(subFeedName))) else (subFeedName, df)}.toMap
+    assert(missingSubFeeds.isEmpty, s"($actionId) [transformation.$name] subFeedsToApply ${missingSubFeeds.mkString(", ")} not found in input dfs. Available subFeeds are ${dfs.keys.mkString(", ")}.")
+    dfs.map { case (subFeedName,df) => if (subFeedsToApply.contains(subFeedName)) (subFeedName, transformer.transform(actionId, partitionValues, df, DataObjectId(subFeedName), Some(subFeedName))) else (subFeedName, df)}
   }
   override def transformPartitionValues(actionId: SdlConfigObject.ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {
     transformer.transformPartitionValues(actionId, partitionValues)
