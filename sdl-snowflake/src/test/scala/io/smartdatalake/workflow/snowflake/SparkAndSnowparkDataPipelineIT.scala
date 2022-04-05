@@ -98,7 +98,7 @@ object SparkAndSnowparkDataPipelineIT extends App {
   val action3 = CustomDataFrameAction("customSnowpark", Seq(tgt1DO.id, tgt2DO.id), Seq(tgt3DO.id),
     transformers = Seq(
       SQLDfsTransformer(code = Map(
-        tgt3DO.id -> """
+        tgt3DO.id.id -> """
           select tgt1.*, run_id2 + 1 as run_id3
           from %{inputViewName_tgt1} as tgt1
           join %{inputViewName_tgt2} as tgt2 on tgt1.firstname=tgt2.firstname and tgt1.lastname=tgt2.lastname
