@@ -25,7 +25,7 @@ Here it is interesting to use Spark and its many connectors, in particular to in
 Combining Spark and Snowpark in a smart data pipeline using a DataFrame API would be the ideal solution.
 With the integration of Snowpark as engine in SDLB we created just that. 
 
-This blog post will show how to migrate our example data pipeline of the [Getting Started](getting-started/setup.md) guide Part 1 to use Spark for ingestion and Snowpark for transformation.
+This blog post will show how to migrate our example data pipeline of the [Getting Started](../../docs/getting-started/setup) guide Part 1 to use Spark for ingestion and Snowpark for transformation.
 
 ## Prerequisits
 
@@ -35,7 +35,7 @@ This blog post will show how to migrate our example data pipeline of the [Gettin
   * Password
 * Create database "testdb" in Snowflake: `create database testdb;`
 * Create schema "testdb.test" in Snowflake: `create schema testdb.test;`
-* Setup running SDLB docker image with part-1 configuration as described in [Getting Started](getting-started/setup.md)
+* Setup running SDLB docker image with part-1 configuration as described in [Getting Started](../../docs/getting-started/setup)
   * build sdl-spark image
   * copy final application.conf of part-1: `cp config/application.conf.part-1-solution config/application.conf`
   * run download actions with parameter `--feed-sel download`
@@ -137,7 +137,7 @@ Note that the attribute `db` of the SnowflakeTableDataObject should be filled wi
 The new SDLB version introduced some naming changes:
 - The CustomSparkAction can now also process Snowpark-DataFrames and is therefore renamed to CustomDataFrameAction.
 - The ScalaClassDfTransformer was specific for Spark. In the new SDLB version there is a specific scala-class DataFrame transformer for Spark and Snowpark, e.g. ScalaClassSparkDfTransformer and ScalaClassSnowparkDfTransformer. And there is even a ScalaClassGenericDfTransformer to implement transformations using a unified API. In our case we will migrate the transformation to use Snowpark and set the type to ScalaClassSnowparkDfTransformer.
-- See [Architecture](architecture.md) chapter "breaking changes" for other renamings.
+- See [Architecture](../../docs/architecture) chapter "breaking changes" for other renamings.
 
       join-departures-airports {
         type = CustomSparkAction -> CustomDataFrameAction
