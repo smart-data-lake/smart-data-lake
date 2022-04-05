@@ -36,3 +36,16 @@ A "Generic DataFrame API" Action can run with different execution engines like S
 To check which execution engine was chosen, look for logs like the following:
 
       INFO  CustomDataFrameAction - (Action~...) selected subFeedType SparkSubFeed
+
+### Execution Engines vs Execution Environments
+
+As mentioned in [Architecture](../../docs/architecture), SDLB is first and foremost a Java (Scala) application.
+It can run everywhere. Therefore, SDLB chooses the Execution Engines for your data pipeline independently from the Environment that SDLB lives in.
+For example: Let's say you run SDLB in a distributed fashion on a Spark Cluster using spark-submit. 
+If one of your actions only has SnowflakeTableDataObjects, SDLB will run it using the Snowpark-Engine.
+In practice, this means that SDLB will connect to the Snowflake Environment from inside your Spark-Cluster and then execute your Action from there using Snowpark's Scala Library.
+
+Of course, the Execution Environment you have influences the DataObjects that you have at your disposal: for instance, if you want to connect to Snowflake, you need a Snowflake account.
+But in the end, SDLB does not influence what Execution Environment you choose: your Data and your Transformations do.
+
+
