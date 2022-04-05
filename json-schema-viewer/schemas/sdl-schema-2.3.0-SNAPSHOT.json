@@ -3757,7 +3757,7 @@
       },
       "SQLDfTransformer" : {
         "type" : "object",
-        "description" : "Configuration of a custom GenericDataFrame transformation between one input and one output (1:1) as SQL code.\nThe input data is available as temporary view in SQL. As name for the temporary view the input DataObjectId is used\n(special characters are replaces by underscores). A special token \\'%{inputViewName}\\' will be replaced with the name of\nthe temporary view at runtime.",
+        "description" : "Configuration of a custom GenericDataFrame transformation between one input and one output (1:1) as SQL code.\nThe input data is available as temporary view in SQL. The inputs name is either the name of the DataObject,\nor the name of the previous transformation, if this is not the first transformation of the chain. Also note that to create\nthe name of temporary view, special characters are replaced by underscores and a postfix \\\"_sdltemp\\\" is added.\nIt is therefore recommended to use special token %{inputViewName} or ${inputViewName_<input name>} that will be\nreplaced with the name of the temporary view at runtime.",
         "additionalProperties" : false,
         "required" : [ "code" ],
         "title" : "SQLDfTransformer",
@@ -3775,7 +3775,7 @@
           },
           "code" : {
             "type" : "string",
-            "description" : "SQL code for transformation.\nUse tokens %{<key>} to replace with runtimeOptions in SQL code.\nExample: \\\"select * from test where run = %{runId}\\\"\nA special token %{inputViewName} can be used to insert the temporary view name."
+            "description" : "SQL code for transformation.\nUse tokens %{<key>} to replace with runtimeOptions in SQL code.\nExample: \\\"select * from test where run = %{runId}\\\"\nThe special token %{inputViewName} or ${inputViewName_<input_name>} can be used to insert the temporary view name.\nThe input name is either the name of the DataObject, or the name of the previous transformation\nif this is not the first transformation of the chain. Make sure to change the standard name of\nthe previous transformation in that case."
           },
           "options" : {
             "type" : "object",
@@ -4304,13 +4304,13 @@
             "description" : "Configuration for a GenericDfTransformerDef to be applied",
             "oneOf" : [ {
               "type" : "object",
-              "description" : "Apply a column blacklist to a DataFrame.",
+              "description" : "Apply a column whitelist to a DataFrame.",
               "additionalProperties" : false,
-              "required" : [ "columnBlacklist", "type" ],
-              "title" : "BlacklistTransformer",
+              "required" : [ "columnWhitelist", "type" ],
+              "title" : "WhitelistTransformer",
               "properties" : {
                 "type" : {
-                  "const" : "BlacklistTransformer"
+                  "const" : "WhitelistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -4320,9 +4320,9 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnBlacklist" : {
+                "columnWhitelist" : {
                   "type" : "array",
-                  "description" : "List of columns to exclude from DataFrame",
+                  "description" : "List of columns to keep from DataFrame",
                   "items" : {
                     "type" : "string"
                   }
@@ -4558,6 +4558,43 @@
               }
             }, {
               "type" : "object",
+              "description" : "Configuration of a custom GenericDataFrame transformation between one input and one output (1:1) as SQL code.\nThe input data is available as temporary view in SQL. The inputs name is either the name of the DataObject,\nor the name of the previous transformation, if this is not the first transformation of the chain. Also note that to create\nthe name of temporary view, special characters are replaced by underscores and a postfix \\\"_sdltemp\\\" is added.\nIt is therefore recommended to use special token %{inputViewName} or ${inputViewName_<input name>} that will be\nreplaced with the name of the temporary view at runtime.",
+              "additionalProperties" : false,
+              "required" : [ "code", "type" ],
+              "title" : "SQLDfTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "SQLDfTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "code" : {
+                  "type" : "string",
+                  "description" : "SQL code for transformation.\nUse tokens %{<key>} to replace with runtimeOptions in SQL code.\nExample: \\\"select * from test where run = %{runId}\\\"\nThe special token %{inputViewName} or ${inputViewName_<input_name>} can be used to insert the temporary view name.\nThe input name is either the name of the DataObject, or the name of the previous transformation\nif this is not the first transformation of the chain. Make sure to change the standard name of\nthe previous transformation in that case."
+                },
+                "options" : {
+                  "type" : "object",
+                  "description" : "Options to pass to the transformation",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                },
+                "runtimeOptions" : {
+                  "type" : "object",
+                  "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }, {
+              "type" : "object",
               "description" : "Standardize datatypes of a Spark-DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype",
               "additionalProperties" : false,
               "required" : [ "type" ],
@@ -4573,32 +4610,6 @@
                 "description" : {
                   "type" : "string",
                   "description" : "Optional description of the transformer"
-                }
-              }
-            }, {
-              "type" : "object",
-              "description" : "Add additional columns to the DataFrame by extracting information from the context.",
-              "additionalProperties" : false,
-              "required" : [ "additionalColumns", "type" ],
-              "title" : "AdditionalColumnsTransformer",
-              "properties" : {
-                "type" : {
-                  "const" : "AdditionalColumnsTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                },
-                "additionalColumns" : {
-                  "type" : "object",
-                  "description" : "optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  }
                 }
               }
             }, {
@@ -4644,6 +4655,32 @@
               }
             }, {
               "type" : "object",
+              "description" : "Add additional columns to the DataFrame by extracting information from the context.",
+              "additionalProperties" : false,
+              "required" : [ "additionalColumns", "type" ],
+              "title" : "AdditionalColumnsTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "AdditionalColumnsTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "additionalColumns" : {
+                  "type" : "object",
+                  "description" : "optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }, {
+              "type" : "object",
               "description" : "Repartition DataFrame\nFor detailled description about repartitioning DataFrames see also[[SparkRepartitionDef]]",
               "additionalProperties" : false,
               "required" : [ "numberOfTasksPerPartition", "type" ],
@@ -4668,43 +4705,6 @@
                   "type" : "array",
                   "description" : "Optional key columns to distribute records over Spark tasks inside a partition value.",
                   "items" : {
-                    "type" : "string"
-                  }
-                }
-              }
-            }, {
-              "type" : "object",
-              "description" : "Configuration of a custom GenericDataFrame transformation between one input and one output (1:1) as SQL code.\nThe input data is available as temporary view in SQL. As name for the temporary view the input DataObjectId is used\n(special characters are replaces by underscores). A special token \\'%{inputViewName}\\' will be replaced with the name of\nthe temporary view at runtime.",
-              "additionalProperties" : false,
-              "required" : [ "code", "type" ],
-              "title" : "SQLDfTransformer",
-              "properties" : {
-                "type" : {
-                  "const" : "SQLDfTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                },
-                "code" : {
-                  "type" : "string",
-                  "description" : "SQL code for transformation.\nUse tokens %{<key>} to replace with runtimeOptions in SQL code.\nExample: \\\"select * from test where run = %{runId}\\\"\nA special token %{inputViewName} can be used to insert the temporary view name."
-                },
-                "options" : {
-                  "type" : "object",
-                  "description" : "Options to pass to the transformation",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  }
-                },
-                "runtimeOptions" : {
-                  "type" : "object",
-                  "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
-                  "additionalProperties" : {
                     "type" : "string"
                   }
                 }
@@ -4790,13 +4790,13 @@
               }
             }, {
               "type" : "object",
-              "description" : "Apply a column whitelist to a DataFrame.",
+              "description" : "Apply a column blacklist to a DataFrame.",
               "additionalProperties" : false,
-              "required" : [ "columnWhitelist", "type" ],
-              "title" : "WhitelistTransformer",
+              "required" : [ "columnBlacklist", "type" ],
+              "title" : "BlacklistTransformer",
               "properties" : {
                 "type" : {
-                  "const" : "WhitelistTransformer"
+                  "const" : "BlacklistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -4806,9 +4806,9 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnWhitelist" : {
+                "columnBlacklist" : {
                   "type" : "array",
-                  "description" : "List of columns to keep from DataFrame",
+                  "description" : "List of columns to exclude from DataFrame",
                   "items" : {
                     "type" : "string"
                   }
@@ -4827,7 +4827,7 @@
       },
       "SQLDfsTransformer" : {
         "type" : "object",
-        "description" : "Configuration of a custom GenericDataFrame transformation between many inputs and many outputs (n:m) as SQL code.\nThe input data is available as temporary views in SQL. As name for the temporary views the input DataObjectId is used\n(special characters are replaces by underscores).",
+        "description" : "Configuration of a custom GenericDataFrame transformation between many inputs and many outputs (n:m) as SQL code.\nThe input data is available as temporary views in SQL. As name for the temporary views the input DataObjectId is used\n(special characters are replaces by underscores).\nThe input data is available as temporary view in SQL. The input name is either an id of the input DataObject,\nor the name of an output of the previous transformation if this is not the first transformation of the chain.\nAlso note that to create the name of temporary view, special characters are replaced by underscores and a postfix \\\"_sdltemp\\\" is added.\nIt is therefore recommended to use the special token ${inputViewName_<input name>}, that will be replaced with the name\nof the temporary view at runtime.\nNote that you can access arbitrary tables from the metastore in the SQL code, but this is against the principle of SDLB\nto access data through DataObjects. Accessing tables directly in SQL code has a negative impact on the maintainability of the project.",
         "additionalProperties" : false,
         "required" : [ "code" ],
         "title" : "SQLDfsTransformer",
@@ -4845,7 +4845,7 @@
           },
           "code" : {
             "type" : "object",
-            "description" : "SQL code for transformation.\nUse tokens %{<key>} to replace with runtimeOptions in SQL code.\nExample: \\\"select * from test where run = %{runId}\\\"\nA special token %{inputViewName} can be used to insert the temporary view name.",
+            "description" : "Map of output names and corresponding SQL code for transformation.\nIf this is the last transformation in the chain, the output name has to match an output DataObject id,\notherwise it can be any name which will then be available in the next transformation.\nUse tokens %{<key>} to replace with runtimeOptions in SQL code.\nExample: \\\"select * from test where run = %{runId}\\\"\nThe special token ${inputViewName_<input_name>} can be used to insert the name of temporary views.\nThe input name is either the id of an input DataObject, or the name of an output of the previous transformation\nif this is not the first transformation of the chain.",
             "additionalProperties" : {
               "type" : "string"
             }
@@ -5097,7 +5097,7 @@
           },
           "transformers" : {
             "type" : "array",
-            "description" : "optional list of transformations to apply. See[[sparktransformer]] for a list of included Transformers.\nThe transformations are applied according to the lists ordering.",
+            "description" : "optional list of transformations to apply. See[[spark.transformer]] for a list of included Transformers.\nThe transformations are applied according to the lists ordering.",
             "items" : {
               "oneOf" : [ {
                 "$ref" : "#/definitions/GenericDfTransformer/AdditionalColumnsTransformer"
@@ -5240,7 +5240,7 @@
               },
               "sqlCode" : {
                 "type" : "object",
-                "description" : "Optional map of DataObjectId and corresponding SQL Code.\nUse tokens %{<key>} to replace with runtimeOptions in SQL code.\nExample: \\\"select * from test where run = %{runId}\\\"",
+                "description" : "Optional map of output DataObject id and corresponding SQL Code.\nUse tokens %{<key>} to replace with runtimeOptions in SQL code.\nExample: \\\"select * from test where run = %{runId}\\\"",
                 "additionalProperties" : {
                   "type" : "string"
                 }
@@ -5263,7 +5263,7 @@
           },
           "transformers" : {
             "type" : "array",
-            "description" : "Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject.\nThis can help to save memory and performance if the input DataFrame includes many transformations from previous Actions.\nThe new DataFrame will be initialized according to the SubFeed\\'s partitionValues.",
+            "description" : "list of transformations to apply. See[[spark.transformer]] for a list of included Transformers.\nThe transformations are applied according to the ordering of the list.\nNote that all outputs of previous transformers are kept as input for next transformer,\nbut in the end only outputs of the last transformer are mapped to output DataObjects.",
             "items" : {
               "oneOf" : [ {
                 "$ref" : "#/definitions/GenericDfsTransformer/DfTransformerWrapperDfsTransformer"
