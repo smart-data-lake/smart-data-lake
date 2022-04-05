@@ -132,8 +132,9 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    val customTransformerConfig = SQLDfTransformer(code = "select * from copy_input where rating = 5")
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig))
+    val customTransformerConfig1 = SQLDfTransformer(name = "sql1", code = "select * from copy_input where rating = 5")
+    val customTransformerConfig2 = SQLDfTransformer(name = "sql2", code = "select * from copy_input where rating = 5")
+    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig1, customTransformerConfig2))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())

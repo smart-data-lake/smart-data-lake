@@ -53,12 +53,12 @@ class SQLDfsTransformerTest extends FunSuite {
 
   val emptyDf = Seq((1,"a")).toDF("num","str")
 
-  test("options and view name token are replaced") {
+  test("options and view name token are replaced and sql can be parsed") {
     val customTransformer = SQLDfsTransformer(code = Map(tgtDO1.id.id -> s"select %{inputViewName_src1}.num, %{option1} from %{inputViewName_src1}"))
     customTransformer.transformWithOptions(action1.id, Seq(), Map(srcDO1.id.id -> SparkDataFrame(emptyDf)), Map("option1" -> "str"))
   }
 
-  test("legacy view name without postfix is still supported") {
+  test("legacy view name without postfix is still supported and sql can be parsed") {
     val customTransformer = SQLDfsTransformer(code = Map(tgtDO1.id.id -> s"select src1.num, %{option1} from src1"))
     customTransformer.transformWithOptions(action1.id, Seq(), Map(srcDO1.id.id -> SparkDataFrame(emptyDf)), Map("option1" -> "str"))
   }

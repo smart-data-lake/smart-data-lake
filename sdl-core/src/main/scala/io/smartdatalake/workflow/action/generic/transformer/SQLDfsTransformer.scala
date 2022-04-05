@@ -66,7 +66,6 @@ case class SQLDfsTransformer(override val name: String = "sqlTransform", overrid
     val inputViewNameOptions = dfs.map {
       case (inputName,df) =>
         val inputViewName =  ActionHelper.createTemporaryViewName(inputName)
-        // Using createTempView does not work because the same temporary view is created more than once (Init & Exec phase...)
         df.createOrReplaceTempView(inputViewName)
         (s"${INPUT_VIEW_NAME}_$inputName" -> inputViewName)
     }
@@ -79,7 +78,9 @@ case class SQLDfsTransformer(override val name: String = "sqlTransform", overrid
           var preparedSql = SparkExpressionUtil.substituteOptions(actionId, Some(s"transformers.$name.code"), sql, options ++ inputViewNameOptions)
           // for backward compatibility the temp view name from versions <= 2.2.x is replaced with the new temp view name including a postfix.
           if (Environment.replaceSqlTransformersOldTempViewName) {
-            inputViewNameOptions.values.foreach(inputViewName => preparedSql = ActionHelper.replaceLegacyViewName(preparedSql, inputViewName))
+            preparedSql = inputViewNameOptions.values.foldLeft(preparedSql) {
+              case (sql, inputViewName) => ActionHelper.replaceLegacyViewName(sql, inputViewName)
+            }
           }
           // create DataFrame from SQL
           logger.debug(s"($actionId.transformers.$name) Preparing DataFrame $outputName from SQL statement: $preparedSql")
