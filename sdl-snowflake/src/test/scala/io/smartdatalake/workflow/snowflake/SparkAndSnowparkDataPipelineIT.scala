@@ -71,6 +71,10 @@ object SparkAndSnowparkDataPipelineIT extends App {
   val tgt2DO = SnowflakeTableDataObject("tgt2", tgt2Table, connectionId = "sfCon")
   tgt2DO.dropTable
   instanceRegistry.register(tgt2DO)
+  val tgt3Table = Table(Some(System.getenv("SNOWFLAKE_SCHEMA")), "tgt3", None, Some(Seq("lastname")))
+  val tgt3DO = SnowflakeTableDataObject("tgt3", tgt3Table, connectionId = "sfCon")
+  tgt3DO.dropTable
+  instanceRegistry.register(tgt3DO)
 
 
   // first action copy with Spark from Hive to Snowflake
