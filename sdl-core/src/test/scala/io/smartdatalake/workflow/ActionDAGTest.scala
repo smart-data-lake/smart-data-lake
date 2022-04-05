@@ -25,8 +25,8 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action._
-import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
-import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, CustomDfsTransformerConfig}
+import io.smartdatalake.workflow.action.generic.transformer.{SQLDfTransformer, SQLDfsTransformer}
+import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer}
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject._
@@ -184,6 +184,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     srcDO.writeSparkDataFrame(l1, Seq())
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id)
     val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, transformers = Seq(SQLDfTransformer(code = "select _filename, rating from tgt1")))
+    instanceRegistry.register(Seq(action1, action2))
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2))
 
     // exec dag
@@ -997,7 +998,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
       , executionMode = Some(DataFrameIncrementalMode(compareCol = "tstmp")))
     val action2 = CustomDataFrameAction("b", Seq(tgt1DO.id,src2DO.id), Seq(tgt2DO.id)
       , executionCondition = Some(Condition("true")), executionMode = Some(ProcessAllMode()) // process everything, also if predecessor skipped
-      , transformer = Some(CustomDfsTransformerConfig.apply(sqlCode = Some(Map(tgt2DO.id.id -> "select * from src2 join tgt1 using (lastname, firstname)")))))
+      , transformers = Seq(SQLDfsTransformer(code = Map(tgt2DO.id.id -> "select * from src2 join tgt1 using (lastname, firstname)"))))
+    instanceRegistry.register(Seq(action1, action2))
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1,action2))
 
     // first dag run, first file processed
@@ -1053,9 +1055,10 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val df2 = Seq(("doe","john","waikiki beach")).toDF("lastname", "firstname", "address")
     src2DO.writeSparkDataFrame(df2, Seq())
 
-    val transformation = CustomDfsTransformerConfig.apply(sqlCode = Some(Map(tgt2DO.id.id -> "select * from src2 join tgt1 using (lastname, firstname)")))
+    val sqlTransformer = SQLDfsTransformer(code = Map(tgt2DO.id.id -> "select * from src2 join tgt1 using (lastname, firstname)"))
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(DataFrameIncrementalMode(compareCol = "tstmp")))
-    val action2 = CustomDataFrameAction("b", Seq(tgt1DO.id,src2DO.id), Seq(tgt2DO.id), Some(transformation), executionCondition = Some(Condition("true")))
+    val action2 = CustomDataFrameAction("b", Seq(tgt1DO.id,src2DO.id), Seq(tgt2DO.id), transformers = Seq(sqlTransformer), executionCondition = Some(Condition("true")))
+    instanceRegistry.register(Seq(action1, action2))
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1,action2))
 
     // first dag run, first file processed
@@ -1108,9 +1111,10 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val df2 = Seq(("doe","john","waikiki beach")).toDF("lastname", "firstname", "address")
     src2DO.writeSparkDataFrame(df2, Seq())
 
-    val transformation = CustomDfsTransformerConfig.apply(sqlCode = Some(Map(tgt2DO.id.id -> "select * from src2 join tgt1 using (lastname, firstname)")))
+    val sqlTransformer = SQLDfsTransformer(code = Map(tgt2DO.id.id -> "select * from src2 join tgt1 using (lastname, firstname)"))
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(DataFrameIncrementalMode(compareCol = "tstmp")))
-    val action2 = CustomDataFrameAction("b", Seq(tgt1DO.id,src2DO.id), Seq(tgt2DO.id), Some(transformation), executionCondition = Some(Condition("true")), executionMode = Some(ProcessAllMode()))
+    val action2 = CustomDataFrameAction("b", Seq(tgt1DO.id,src2DO.id), Seq(tgt2DO.id), transformers = Seq(sqlTransformer), executionCondition = Some(Condition("true")), executionMode = Some(ProcessAllMode()))
+    instanceRegistry.register(Seq(action1, action2))
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1,action2))
 
     // first dag run, first file processed
