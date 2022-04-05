@@ -137,7 +137,6 @@ Note that the attribute `db` of the SnowflakeTableDataObject should be filled wi
 The new SDLB version introduced some naming changes:
 - The CustomSparkAction can now also process Snowpark-DataFrames and is therefore renamed to CustomDataFrameAction.
 - The ScalaClassDfTransformer was specific for Spark. In the new SDLB version there is a specific scala-class DataFrame transformer for Spark and Snowpark, e.g. ScalaClassSparkDfTransformer and ScalaClassSnowparkDfTransformer. And there is even a ScalaClassGenericDfTransformer to implement transformations using a unified API. In our case we will migrate the transformation to use Snowpark and set the type to ScalaClassSnowparkDfTransformer.
-- See [Architecture](../../docs/architecture) chapter "breaking changes" for other renamings.
 
       join-departures-airports {
         type = CustomSparkAction -> CustomDataFrameAction

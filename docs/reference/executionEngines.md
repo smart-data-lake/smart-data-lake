@@ -14,8 +14,8 @@ Currently SDLB supports the following execution engines:
 | ------ | -------------- | ---------- | --------- | --------------- | ------------------- |
 |Java-Byte-Stream|File Engine|FileSubFeed|Transfer Byte-Streams without further knowledge about their content|FileTransferAction, CustomFileAction|all HadoopFileDataObjects, WebserviceFileDataObject, SFtpFileDataObject|
 |Generic DataFrame API|Spark Engine|SparkSubFeed|Transform data with Spark DataFrame API|CopyAction, CustomDataFrameAction, DeduplicateAction, HistorizeAction|all Hadoop/SparkFileDataObject, AccessTableDataObject, AirbyteDataObject, CustomDfDataObject, DeltaLakeTableDataObject, HiveTableDataObject, JdbcTableDataObject, JmsDataObject, KafkaTopicDataObject, SnowflakeTableDataObject, SplunkDataObject, TickTockHiveTableDataObject|
-|Generic DataFrame API|Snowflake/Snowpark Engine|SnowparkSubFeed|Transform data within Snowflake with Snowpark DataFrame API|SnowflakeTableDataObject|
-|Script|Script Engine|ScriptSubFeed|Coordinate script task execution and notify DataObjects about script results|No public implementation for now|all DataObjects
+|Generic DataFrame API|Snowflake-Snowpark Engine|SnowparkSubFeed|Transform data within Snowflake with Snowpark DataFrame API|CopyAction, CustomDataFrameAction, DeduplicateAction, (HistorizeAction)|SnowflakeTableDataObject|
+|Script|Script Engine|ScriptSubFeed|Coordinate script task execution and notify DataObjects about script results|No public implementation for now|all DataObjects|
 
 ### Connecting different execution engines
 
@@ -40,12 +40,10 @@ To check which execution engine was chosen, look for logs like the following:
 ### Execution Engines vs Execution Environments
 
 As mentioned in [Architecture](../../docs/architecture), SDLB is first and foremost a Java (Scala) application.
-It can run everywhere. Therefore, SDLB chooses the Execution Engines for your data pipeline independently from the Environment that SDLB lives in.
+It can run in any Execution Environment where you can install a JVM, executing Actions with any of its Execution Engines. SDLB chooses the Execution Engines for your data pipeline independently from the Execution Environment that SDLB lives in.
 For example: Let's say you run SDLB in a distributed fashion on a Spark Cluster using spark-submit. 
-If one of your actions only has SnowflakeTableDataObjects, SDLB will run it using the Snowpark-Engine.
-In practice, this means that SDLB will connect to the Snowflake Environment from inside your Spark-Cluster and then execute your Action from there using Snowpark's Scala Library.
+If one of your Actions only has SnowflakeTableDataObjects as input and output, SDLB will run it using the Snowpark-Engine.
+In practice, this means that SDLB will connect to the Snowflake Environment from inside your Spark-Cluster and then execute your Action from there using Snowpark's Java/Scala Library.
 
-Of course, the Execution Environment you have influences the DataObjects that you have at your disposal: for instance, if you want to connect to Snowflake, you need a Snowflake account.
-But in the end, SDLB does not influence what Execution Environment you choose: your Data and your Transformations do.
-
-
+Of course, the Execution Environment you have influences the DataObjects that you have at your disposal: for instance, if you want to connect to Snowflake, you need a Snowflake account and be able to connect to Snowflake.
+But the Execution Environment does not determine the Execution Engines SDLB will use - your DataObjects, Actions and Transformations do.
