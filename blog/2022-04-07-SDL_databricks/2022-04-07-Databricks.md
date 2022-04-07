@@ -133,7 +133,7 @@ Let's get started:
 	![job status](job_status.png) 
 
 1. **Results**
-	After running the SDLB pipeline the data should be downloaded into the staging file and selected parts into the database:
+	After running the SDLB pipeline the data should be downloaded into the staging file and selected parts into the table `stg_ab:`
 	- csv file: in the first step we downloaded the CSV file. This can be verified, e.g. by inspecting the data directory in the Databricks CLI using `databricks fs ls dbfs:/data/stg-ab` or running in a Workspace Python notebook `!ls /dbfs/data/stg-ab`
 	- database: in the second phase specific columns are put into the database. This can be verified in the Workspace -> Data -> default -> stg_ab
 	![select table](select_table.png)
