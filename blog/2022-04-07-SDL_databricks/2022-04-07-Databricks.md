@@ -43,7 +43,7 @@ Let's get started:
 		databricks fs mkdirs dbfs:/databricks/scripts
 		databricks fs cp ./config-install.sh dbfs:/databricks/scripts/
 		```
-		Note: to double check the typesafe version I ran `grep typesafe pom.xml` in the [SmartDataLake](https://github.com/smart-data-lake/smart-data-lake.git) source
+		Note: to double check the library version I ran `grep typesafe pom.xml` in the [SmartDataLake](https://github.com/smart-data-lake/smart-data-lake.git) source
 
 		Note: the added `-----` will verify that this `.jar` is preferred before the default Workspace Spark version (which starts with `----`). 
 		If you are curious you could double check e.g. with a Workspace Python Notebook running `!ls /databricks/jars/*config*`
