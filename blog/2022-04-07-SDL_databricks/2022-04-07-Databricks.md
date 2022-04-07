@@ -49,7 +49,7 @@ Let's get started:
 		If you are curious you could double check e.g. with a Workspace Python Notebook running `!ls /databricks/jars/*config*`
 
 1. **fat-jar**:
-       We need to provide the SDL sources and all required libraries. Therefore, we compile and pack the Scala code into a Jar including the dependencies. We use the [getting-started](https://github.com/smart-data-lake/getting-started.git) as dummy project, which itself pulls the SDL sources. 
+       We need to provide the SDLB sources and all required libraries. Therefore, we compile and pack the Scala code into a Jar including the dependencies. We use the [getting-started](https://github.com/smart-data-lake/getting-started.git) as dummy project, which itself pulls the SDLB sources. 
 	- download the [getting-started](https://github.com/smart-data-lake/getting-started.git) source and build it with the `-P fat-jar` profile
 	```
     podman run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -DskipTests  -P fat-jar  -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
