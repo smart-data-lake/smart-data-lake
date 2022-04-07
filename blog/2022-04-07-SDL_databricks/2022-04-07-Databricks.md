@@ -16,7 +16,7 @@ In this article the deployment of SmartDataLakeBuilder (SDLB) on [Databricks](ht
 
 <!--truncate-->
 
-Before jumping in, it should be mentioned, that there are also other methods to deploy SDLB in the cloud, e.g. using containers on Azure. 
+Before jumping in, it should be mentioned, that there are also many other methods to deploy SDLB in the cloud, e.g. using containers on Azure, Azure Kubernetes Service, Azure Synapse Clusters, ...
 The present method provides the advantage of **not** needing to deal with the storage and all related configurations, by using Databricks. 
 Further, the presented SDLB pipeline is just a simple example, focusing on the implementation into Databricks environment. SDLB provide a wide range of features and its full power is not revealed here. 
 
