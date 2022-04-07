@@ -31,9 +31,9 @@ Let's get started:
 	- Spark version: When selecting the *Databricks version* pay attention to the related Spark version. 
 	  This need to match with the Spark version we build SDLB later. Here `10.4 TLS` is selected with `Spark 3.2.1` and `Scala 2.12`. 
 	  Alternatively, SDLB can be build with a different Spark versions, see also [Architecture](../../docs/architecture) for supported versions. 
-	- typesafe version correction script: the workspace currently brings typesafe:config 1.2.1 with it. 
-	  SDLB relies on functions of newer typesafe version (>1.3.0). 
-	  Thus, we provide a newer typesafe version in an initialization script: *Advanced options* -> *Init Scripts* specify `dbfs:/databricks/scripts/config-install.sh`
+	- typesafe library version correction script: the workspace currently includes version 1.2.1 from com.typesafe:config java library. 
+	  SDLB relies on functions of a newer version (>1.3.0) of this library. 
+	  Thus, we provide a newer version of the com.typesafe:config java library in an initialization script: *Advanced options* -> *Init Scripts* specify `dbfs:/databricks/scripts/config-install.sh`
 		+ Further, the script need to be created and uploaded. I used the following commands in local Terminal:
 		```
 		cat << EOF >> ./config-install.sh
