@@ -29,7 +29,7 @@ Let's get started:
 1. **Databricks CLI**: for file transfer of configuration files, scripts and data, the [Databricks CLI](https://docs.databricks.com/dev-tools/cli/index.html) is installed locally. **Configure** the CLI, using the Workspace URL and in the Workspace "Settings" -> "User Settings" -> "Access tokens" create a new token.
 1. **Cluster** creation, in the Workspace open the *Cluster* Creation form.
 	- Spark version: When selecting the *Databricks version* pay attention to the related Spark version. 
-	  This need to match with the version we build SDLB later. Here `10.4 TLS` is selected with `Spark 3.2.1` and `Scala 2.12`. 
+	  This need to match with the Spark version we build SDLB later. Here `10.4 TLS` is selected with `Spark 3.2.1` and `Scala 2.12`. 
 	  Alternatively, SDL could be build with a different version. 
 	- typesafe version correction script: the workspace currently brings typesafe:config 1.2.1 with it. 
 	  SDLB relies on functions of newer typesafe version (>1.3.0). 
