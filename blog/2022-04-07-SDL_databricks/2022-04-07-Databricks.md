@@ -140,4 +140,4 @@ Let's get started:
 	![table](table.png)
 
 ## Lessons Learned
-There are a few steps necessary, including building and uploading SDB. Further, we need to be careful with the used versions of the underlying libraries. With these few steps we can reveal the power of SDLB and Databricks, creating a portable and reproducible pipeline into a Databricks Lakehouse.  
+There are a few steps necessary, including building and uploading SDLB. Further, we need to be careful with the used versions of the underlying libraries. With these few steps we can reveal the power of SDLB and Databricks, creating a portable and reproducible pipeline into a Databricks Lakehouse.  
