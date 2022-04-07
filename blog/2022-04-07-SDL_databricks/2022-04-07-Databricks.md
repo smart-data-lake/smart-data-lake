@@ -30,7 +30,7 @@ Let's get started:
 1. **Cluster** creation, in the Workspace open the *Cluster* Creation form.
 	- Spark version: When selecting the *Databricks version* pay attention to the related Spark version. 
 	  This need to match with the Spark version we build SDLB later. Here `10.4 TLS` is selected with `Spark 3.2.1` and `Scala 2.12`. 
-	  Alternatively, SDL could be build with a different version. 
+	  Alternatively, SDLB can be build with a different Spark versions, see also [Architecture](../../docs/architecture) for supported versions. 
 	- typesafe version correction script: the workspace currently brings typesafe:config 1.2.1 with it. 
 	  SDLB relies on functions of newer typesafe version (>1.3.0). 
 	  Thus, we provide a newer typesafe version in an initialization script: *Advanced options* -> *Init Scripts* specify `dbfs:/databricks/scripts/config-install.sh`
