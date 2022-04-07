@@ -10,7 +10,7 @@ tags: [Databricks, Cloud]
 hide_table_of_contents: false
 ---
 
-Many analytics applications are ported to the cloud, Data Lakes and Datahouses in the cloud becoming more and more popular. The [Databricks](https://databricks.com) platform provides an easy accessible and easy configurable. SmartDataLake Builder on the other hand provides an open source, portable framework to load and transform the data.
+Many analytics applications are ported to the cloud, Data Lakes and Lakehouses in the cloud becoming more and more popular. The [Databricks](https://databricks.com) platform provides an easy accessible and easy configurable. SmartDataLake Builder on the other hand provides an open source, portable automation tool to load and transform the data.
 
 In this article the deployment of SmartDataLakeBuilder (SDLB) on [Databricks](https://databricks.com) is described. 
 
