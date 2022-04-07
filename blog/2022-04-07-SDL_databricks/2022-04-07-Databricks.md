@@ -54,7 +54,7 @@ Let's get started:
 	```
     podman run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -DskipTests  -P fat-jar  -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
 	```
-	General build instructions can be fond in the [getting-started](../../docs/getting-started/setup#compile-scala-classes) documentation. 
+	General build instructions can be found in the [getting-started](../../docs/getting-started/setup#compile-scala-classes) documentation. 
 	Therewith, the file `target/getting-started-1.0-jar-with-dependencies.jar` is created. 
 	The *fat-jar* profile will include all required dependencies. The profile is defined in the [smart-data-lake](https://github.com/smart-data-lake/smart-data-lake) pom.xml
 
