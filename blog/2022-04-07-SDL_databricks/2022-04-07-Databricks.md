@@ -133,15 +133,16 @@ Let's get started:
 	When finished in the "Runs" section of that job we can verify the successful run status
 
 1. **Results**
-    After running the SDLB pipeline the data should be downloaded into the staging file and selected parts into the table `stg_ab:`
+    After running the SDLB pipeline the data should be downloaded into the staging file `stg_ab/result.csv` and selected parts into the table `int_ab`
     - csv file: in the first step we downloaded the CSV file. This can be verified, e.g. by inspecting the data directory in the Databricks CLI using `databricks fs ls dbfs:/data/stg-ab` or running in a Workspace shell notebook `ls /dbfs/data/stg-ab`
-    - database: in the second phase specific columns are put into the database. This can be verified in the Workspace -> Data -> default -> stg_ab
+    - database: in the second phase specific columns are put into the database. This can be verified in the Workspace -> Data -> default -> int_ab
     ![select table](select_table.png)
     ![table](table.png)
 
     :::info
     Note that our final table was defined as `DeltaLakeTableDataObject`.
-	With that, Smart Data Lake Builder automatically generates a Delta Lake Table in your Databricks workspace.   
+		With that, Smart Data Lake Builder automatically generates a Delta Lake Table in your Databricks workspace. 
+
 
 ## Lessons Learned
 There are a few steps necessary, including building and uploading SDLB. 
