@@ -62,81 +62,75 @@ Let's get started:
     The *fat-jar* profile will include all required dependencies. The profile is defined in the [smart-data-lake](https://github.com/smart-data-lake/smart-data-lake) pom.xml.
 
 1. upload files
-    - JAR: in the "Workspace" -> your user -> create a directory `jars` and "import" the library using the link in "(To import a library, such as a jar or egg, click here)" and select the above created fat-jar to upload. As a result the jar will be listed in the Workspace directory. 
-    - **SDLB application**: As an example, a dataset from Airbnb NYC will be downloaded from Github, first written into a CSV file and later partially ported into a table. Therefore, the pipeline is defined first locally in a new file `application.conf`:
-    ```
-    dataObjects {
-      ext-ab-csv-web {
-        type = WebserviceFileDataObject
-        url = "https://raw.githubusercontent.com/adishourya/Airbnb/master/new-york-city-airbnb-open-data/AB_NYC_2019.csv"
-        followRedirects = true
-        readTimeoutMs=200000
-      }
-      stg-ab {
-        type = CsvFileDataObject
-        path = "file:///dbfs/data/~{id}"
-      }
-      int-ab {
-        type = DeltaLakeTableDataObject
-        path = "~{id}"
-        table {
-          db = "default"
-          name = "stg_ab"
-          primaryKey = [id]
-        }
-      }
-    }
+	- JAR: in the "Workspace" -> your user -> create a directory `jars` and "import" the library using the link in "(To import a library, such as a jar or egg, click here)" and select the above created fat-jar to upload. As a result the jar will be listed in the Workspace directory. 
+	- **SDLB application**: As an example a dataset from Airbnb NYC will be downloaded from Github, first written into a CSV file and later partially ported into a table. Therefore, the pipeline is defined first locally in a new file `application.conf`:
+	```
+	dataObjects {
+	  ext-ab-csv-web {
+	    type = WebserviceFileDataObject
+	    url = "https://raw.githubusercontent.com/adishourya/Airbnb/master/new-york-city-airbnb-open-data/AB_NYC_2019.csv"
+	    followRedirects = true
+	    readTimeoutMs=200000
+	  }
+	  stg-ab {
+	    type = CsvFileDataObject
+	    schema = """id integer, name string, host_id integer, host_name string, neighbourhood_group string, neighbourhood string, latitude double, longitude double, room_type  string, price integer, minimum_nights integer, number_of_reviews integer, last_review timestamp, reviews_per_month double, calculated_host_listings_count integer,          availability_365 integer"""
+	    path = "file:///dbfs/data/~{id}"
+	  }
+	  int-ab {
+	    type = DeltaLakeTableDataObject
+	    path = "~{id}"
+	    table {
+	      db = "default"
+	      name = "int_ab"
+	      primaryKey = [id]
+	    }
+	  }
+	}
 
-    actions {
-      loadWeb2Csv {
-        type = FileTransferAction
-        inputId = ext-ab-csv-web
-        outputId = stg-ab
-        metadata {
-          feed = download
-        }
-      }
-      loadCsvLoc2Db {
-        type = CopyAction
-        inputId = stg-ab
-        outputId = int-ab
-        transformers = [{
-          type = SQLDfTransformer
-          code = "select id, name, host_id,host_name,neighbourhood_group,neighbourhood,latitude,longitude from stg_ab"
-        }]
-        metadata {
-          feed = copy
-        }
-      }
-    }
-    ```
-    - upload using Databricks CLI 
-    ```
-    databricks fs mkdirs dbfs:/conf/
-    databricks fs cp application.conf dbfs:/conf/application.conf
-    ```
-     :::info
-    For the sake of simplicity, we use directories like file:///dbfs/ directly in this post, so our data is stored in the Databricks Filesystem of your Workspace. 	
-    In a real-world scenario, you would mount a specialised filesystem to the Databricks Workspace like Azure Data Lake Storage or S3.
+	actions {
+	  loadWeb2Csv {
+	    type = FileTransferAction
+	    inputId = ext-ab-csv-web
+	    outputId = stg-ab
+	    metadata {
+	      feed = download
+	    }
+	  }
+	  loadCsvLoc2Db {
+	    type = CopyAction
+	    inputId = stg-ab
+	    outputId = int-ab
+	    transformers = [{
+	      type = SQLDfTransformer
+	      code = "select id, name, host_id,host_name,neighbourhood_group,neighbourhood,latitude,longitude from stg_ab"
+	    }]
+	    metadata {
+	      feed = copy
+	    }
+	  }
+	}
+	```
+	- upload using Databricks CLI 
+	```
+	databricks fs mkdirs dbfs:/conf/
+	databricks fs cp application.conf dbfs:/conf/application.conf
+	```
 
 1. **Job creation**:
-    Here, we did not want to specify the schema of the file, thus two job tasks are necessary, to automatically infer and validate the data scheme. The first job task downloads the data into a CSV file. The second one selects columns and stores data into the database. 
-    Each job step could perform multiple SDLB actions, here we have one action per job step.
-    Define the "download" task by *Jobs* -> *Create Job*: 
-    - **Type**: `JAR`
-    - **Main Class**: `io.smartdatalake.app.LocalSmartDataLakeBuilder`
-    - **add** *Dependent Libraries*: "Workspace" -> select the file previously uploaded "getting-started..." file in the "jars" directory
-    ![jar select](add_library.png)
-    - **Cluster** select the cluster created above with the corrected typesafe library
-    - **Parameters**: `["-c", "file:///dbfs/conf/", "--feed-sel", "download"]`, which specifies the location of the SDLB configuration and selects the feed "download"
-    ![download task](download_task.png)
-
-    Add a second job task (after creation, click the plus below) for the "copy" feed using the same specifications, but parameters `["-c", "file:///dbfs/conf/", "--feed-sel", "copy"]`
-    ![download task](copy_task.png)
+	Here, the Databricks job gets defined, specifying the SDL library and, the entry point and the arguments. Here we specify only the download feed. 
+	Therefore, open in the sidebar *Jobs* -> *Create Job*: 
+	- **Type**: `JAR`
+	- **Main Class**: `io.smartdatalake.app.LocalSmartDataLakeBuilder`
+	- **add** *Dependent Libraries*: "Workspace" -> select the file previously uploaded "getting-started..." file in the "jars" directory
+	![jar select](add_library.png)
+	- **Cluster** select the cluster created above with the corrected typesafe library
+	- **Parameters**: `["-c", "file:///dbfs/conf/", "--feed-sel", "download"]`, which specifies the location of the SDLB configuration and selects the feed "download"
+	![download task](download_task.png)
 
 1. **Launch** the job: 
-    When finished in the "Runs" in that job you should see the successful run status
-    ![job status](job_status.png) 
+	Launch the job. 
+	When finished in the "Runs" section of that job we can verify the successful run status
 
 1. **Results**
     After running the SDLB pipeline the data should be downloaded into the staging file and selected parts into the table `stg_ab:`
