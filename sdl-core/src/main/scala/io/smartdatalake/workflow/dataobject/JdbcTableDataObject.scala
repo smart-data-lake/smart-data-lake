@@ -41,7 +41,10 @@ import scala.util.Try
 
 /**
  * [[DataObject]] of type JDBC.
- * Provides details for an action to access tables in a database through JDBC.
+ * Provides details for an action to read and write tables in a database through JDBC.
+ * Note that writing into a table is done as one transaction. This is implemented by writing to a temporary-table with Spark,
+ * then using a separate "insert into ... select" statement to copy data into the final table.
+ *
  * @param id unique name of this data object
  * @param createSql DDL-statement to be executed in prepare phase, using output jdbc connection.
  *                  Note that it is also possible to let Spark create the table in Init-phase. See jdbcOptions to customize column data types for auto-created DDL-statement.
@@ -231,10 +234,18 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     finalSaveMode match {
 
       case SDLSaveMode.Overwrite =>
-        // cleanup existing data if saveMode=overwrite
-        if (partitionValues.nonEmpty) deletePartitions(partitionValues)
-        else deleteAllData()
-        writeDataFrameInternalWithAppend(df, table.fullName)
+        // cleanup existing data if saveMode=overwrite, commit is done after append
+        if (partitionValues.nonEmpty) deletePartitions(partitionValues, doCommit = false)
+        else deleteAllData(doCommit = false)
+        try {
+          // create & write to temp-table
+          writeToTempTable(df)
+          // append into final table in one step, then commit
+          connection.execJdbcStatement(s"insert into ${table.fullName} select * from $tmpTable", doCommit = true)
+        } finally {
+          // cleanup temp table
+          connection.dropTable(tmpTable.fullName)
+        }
 
       case SDLSaveMode.Merge =>
         // write to tmp-table and merge by primary key
@@ -246,6 +257,18 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
   }
 
+  private def writeToTempTable(df: DataFrame)(implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
+    // cleanup temp table if existing
+    if(connection.catalog.isTableExisting(tmpTable.fullName)) {
+      logger.error(s"($id) Temporary table ${tmpTable.fullName} for merge already exists! There might be a potential conflict with another job. It will be dropped and recreated.")
+      connection.dropTable(tmpTable.fullName)
+    }
+    // create & write to temp-table
+    connection.createTableFromSchema(tmpTable.fullName, df.schema, options)
+    writeDataFrameInternalWithAppend(df, tmpTable.fullName)
+  }
+
   /**
    * Merges DataFrame with existing table data by writing DataFrame to a temp-table and using SQL Merge-statement.
    * Table.primaryKey is used as condition to check if a record is matched or not. If it is matched it gets updated (or deleted), otherwise it is inserted.
@@ -255,15 +278,9 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     implicit val session: SparkSession = context.sparkSession
     assert(table.primaryKey.exists(_.nonEmpty), s"($id) table.primaryKey must be defined to use mergeDataFrameByPrimaryKey")
 
-    // cleanup temp table if existing
-    if(connection.catalog.isTableExisting(tmpTable.fullName)) {
-      logger.error(s"($id) Temporary table ${tmpTable.fullName} for merge already exists! There might be a potential conflict with another job. It will be dropped and recreated.")
-      connection.dropTable(tmpTable.fullName)
-    }
     try {
-      // create & write to temp-table
-      connection.createTableFromSchema(tmpTable.fullName, df.schema, options)
-      writeDataFrameInternalWithAppend(df, tmpTable.fullName)
+      // write data to temp table
+      writeToTempTable(df)
       // prepare SQL merge statement
       val additionalMergePredicateStr = saveModeOptions.additionalMergePredicate.map(p => s" AND $p").getOrElse("")
       val joinConditionStr = table.primaryKey.get.map(quoteCaseSensitiveColumn).map(colName => s"new.$colName = existing.$colName").reduce(_+" AND "+_)
@@ -356,8 +373,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     getExistingSchema.foreach(schema => validateSchema(SparkSchema(df.schema), SparkSchema(schema), "write"))
   }
 
-  def deleteAllData(): Unit = {
-    connection.execJdbcStatement(s"delete from ${table.fullName}")
+  def deleteAllData(doCommit: Boolean = true): Unit = {
+    connection.execJdbcStatement(s"delete from ${table.fullName}", doCommit)
   }
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
@@ -375,10 +392,14 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     } else Seq()
   }
 
+  override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    deletePartitions(partitionValues)
+  }
+
   /**
    * Delete virtual partitions by "delete from" statement
    */
-  override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+  def deletePartitions(partitionValues: Seq[PartitionValues], doCommit: Boolean = true)(implicit context: ActionPipelineContext): Unit = {
     if (partitionValues.nonEmpty) {
       val partitionsColss = partitionValues.map(_.keys).distinct
       assert(partitionsColss.size == 1, "All partition values must have the same set of partition columns defined!")
@@ -389,7 +410,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
         val partitionValuesStr = partitionValues.map(pv => s"(${partitionCols.map(c => s"'${pv(c).toString}'").mkString(",")})")
         s"delete from ${table.fullName} where (${partitionCols.map(quoteCaseSensitiveColumn).mkString(",")}) in (${partitionValuesStr.mkString(",")})"
       }
-      connection.execJdbcStatement(deletePartitionQuery)
+      connection.execJdbcStatement(deletePartitionQuery, doCommit)
     }
   }
 
