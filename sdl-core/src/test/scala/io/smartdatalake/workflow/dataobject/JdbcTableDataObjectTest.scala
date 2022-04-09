@@ -18,12 +18,12 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.connection.{DefaultJdbcCatalog, JdbcTableConnection}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 
 class JdbcTableDataObjectTest extends DataObjectTestSuite {
 
@@ -54,7 +54,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     dataObject.writeSparkDataFrame(df, Seq())
     val dfRead = dataObject.getSparkDataFrame(Seq())
     assert(dfRead.symmetricDifference(df).isEmpty)
-    dataObject.deleteAllData
+    dataObject.deleteAllData()
   }
 
   test("check pre/post sql") {
