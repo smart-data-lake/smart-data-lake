@@ -18,16 +18,15 @@
  */
 package io.smartdatalake.config
 
-import configs.{Config, ConfigError, ConfigKeyNaming, ConfigReader, Result}
+import configs.{ConfigError, ConfigKeyNaming, ConfigReader, Result}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
-import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.definitions.{AuthMode, Condition, Environment, ExecutionMode}
+import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.secrets.SecretProviderConfig
-import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
-import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfCreatorConfig, CustomDfTransformerConfig, CustomDfsTransformerConfig, CustomFileTransformerConfig, SparkUDFCreatorConfig}
+import io.smartdatalake.workflow.action.spark.customlogic._
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
@@ -90,6 +89,7 @@ trait ConfigImplicits {
   implicit val executionModeReader: ConfigReader[ExecutionMode] = ConfigReader.derive[ExecutionMode]
   implicit val conditionReader: ConfigReader[Condition] = ConfigReader.derive[Condition]
   implicit val authModeReader: ConfigReader[AuthMode] = ConfigReader.derive[AuthMode]
+  implicit val saveModeOptionsReader: ConfigReader[SaveModeOptions] = ConfigReader.derive[SaveModeOptions]
   // --------------------------------------------------------------------------------
 
   implicit def mapDataObjectIdStringReader(implicit mapReader: ConfigReader[Map[String,String]]): ConfigReader[Map[DataObjectId, String]] = {
