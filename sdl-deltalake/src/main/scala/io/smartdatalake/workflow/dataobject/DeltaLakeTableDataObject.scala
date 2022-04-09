@@ -291,6 +291,16 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     // set schema evolution support
     // this is done in a synchronized block because DataObjects with or without autoMerge enabled can be mixed and executed in parallel in a DAG
     DeltaLakeTableDataObject.synchronized { // note that this is synchronizing on the object (singleton)
+      // create missing columns to support schema evolution
+      val insertCols = df.columns.diff(saveModeOptions.insertColumnsToIgnore)
+      if (saveModeOptions.updateColumnsOpt.isDefined || saveModeOptions.insertColumnsToIgnore.nonEmpty || saveModeOptions.insertValuesOverride.nonEmpty) {
+        val existingCols = session.table(table.fullName).schema.fieldNames
+        insertCols.diff(existingCols).foreach { col =>
+          val sqlType = df.schema(col).dataType.sql
+          logger.info(s"($id) Manually creating col $col for working around schema evolution limitations with merge statement")
+          session.sql(s"ALTER TABLE ${table.fullName} ADD COLUMN $col $sqlType")
+        }
+      }
       session.conf.set("spark.databricks.delta.schema.autoMerge.enabled", allowSchemaEvolution)
       val deltaTable = DeltaTable.forName(session, table.fullName).as("existing")
       // prepare join condition
@@ -306,9 +316,10 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         mergeStmt.whenMatched(saveModeOptions.updateConditionExpr.getOrElse(lit(true))).updateAll()
       }
       // add insert clause - insertExpr does not support referring new columns in existing table on schema evolution, that's why we use it only when needed, and insertAll otherwise
-      mergeStmt = if (saveModeOptions.insertColumnsToIgnore.nonEmpty) {
-        val insertCols = df.columns.diff(saveModeOptions.insertColumnsToIgnore)
-        mergeStmt.whenNotMatched(saveModeOptions.insertConditionExpr.getOrElse(lit(true))).insertExpr(insertCols.map(c => c -> s"new.$c").toMap)
+      mergeStmt = if (saveModeOptions.insertColumnsToIgnore.nonEmpty || saveModeOptions.insertValuesOverride.nonEmpty) {
+        // create merge statement
+        mergeStmt.whenNotMatched(saveModeOptions.insertConditionExpr.getOrElse(lit(true)))
+          .insertExpr(insertCols.map(c => c -> saveModeOptions.insertValuesOverride.getOrElse(c, s"new.$c")).toMap)
       } else {
         mergeStmt.whenNotMatched(saveModeOptions.insertConditionExpr.getOrElse(lit(true))).insertAll()
       }

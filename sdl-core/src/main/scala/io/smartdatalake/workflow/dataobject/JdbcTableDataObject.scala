@@ -21,8 +21,6 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -31,6 +29,8 @@ import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.JdbcTableConnection
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.StructType
@@ -272,7 +272,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       val updateSpecStr = saveModeOptions.updateColumnsOpt.getOrElse(df.columns.toSeq.diff(table.primaryKey.get)).map(quoteCaseSensitiveColumn).map(colName => s"existing.$colName = new.$colName").reduce(_+", "+_)
       val insertConditionStr = saveModeOptions.insertCondition.map(c => s" AND $c").getOrElse("")
       val insertSpecStr = df.columns.diff(saveModeOptions.insertColumnsToIgnore).map(quoteCaseSensitiveColumn).reduce(_+", "+_)
-      val insertValueSpecStr = df.columns.diff(saveModeOptions.insertColumnsToIgnore).map(quoteCaseSensitiveColumn).map(colName => s"new.$colName").reduce(_+", "+_)
+      val insertValueSpecStr = df.columns.diff(saveModeOptions.insertColumnsToIgnore).map(colName => saveModeOptions.insertValuesOverride.getOrElse(colName, s"new.${quoteCaseSensitiveColumn(colName)}")).reduce(_+", "+_)
       val mergeStmt = s"""
         | MERGE INTO ${table.fullName} as existing
         | USING (SELECT * from ${tmpTable.fullName}) as new

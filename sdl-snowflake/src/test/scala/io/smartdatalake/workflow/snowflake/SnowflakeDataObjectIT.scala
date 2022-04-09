@@ -20,9 +20,7 @@
 package io.smartdatalake.workflow.snowflake
 
 import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
-import io.smartdatalake.definitions.BasicAuthMode
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.workflow.connection.SnowflakeConnection
 import io.smartdatalake.workflow.dataobject.{SnowflakeTableDataObject, Table}
 
 /**
@@ -37,7 +35,7 @@ object SnowflakeDataObjectIT extends App {
   implicit val context =  ConfigToolbox.getDefaultActionPipelineContext
 
   instanceRegistry.register(SnowflakeConnectionConfig.sfConnection)
-  val testDO = SnowflakeTableDataObject("test1", Table(Some("test"), "abc"), connectionId = "sfCon")
+  val testDO = SnowflakeTableDataObject("test1", Table(Some(System.getenv("SNOWFLAKE_SCHEMA")), "abc"), connectionId = "sfCon")
   instanceRegistry.register(testDO)
 
   // create table & write some data with Snowpark
