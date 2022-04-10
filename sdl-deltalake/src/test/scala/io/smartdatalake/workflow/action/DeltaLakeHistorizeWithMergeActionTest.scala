@@ -51,12 +51,11 @@ import java.time.LocalDateTime
      instanceRegistry.clear()
    }
 
-   test("historize 1st 2nd load mergeModeEnable") {
+   test("historize load mergeModeEnable") {
 
      val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
      // setup DataObjects
-     val feed = "historize"
      val srcTable = Table(Some("default"), "historize_input")
      val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable)
      srcDO.dropTable(context)
@@ -73,8 +72,9 @@ import java.time.LocalDateTime
      val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
      srcDO.writeSparkDataFrame(l1, Seq())(context1)
      val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-     action1.init(Seq(srcSubFeed))(context1).head
-     action1.exec(Seq(srcSubFeed))(context1).head
+     action1.prepare(context1.copy(phase = ExecutionPhase.Prepare))
+     action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
+     action1.exec(Seq(srcSubFeed))(context1)
 
      {
        val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp)))
@@ -93,6 +93,8 @@ import java.time.LocalDateTime
      val l2 = Seq(("doe","john",10)).toDF("lastname", "firstname", "rating")
      srcDO.writeSparkDataFrame(l2, Seq())(context1)
      val srcSubFeed2 = SparkSubFeed(None, "src1", Seq())
+     action2.prepare(context2.copy(phase = ExecutionPhase.Prepare))
+     action2.init(Seq(srcSubFeed2))(context2.copy(phase = ExecutionPhase.Init))
      action2.exec(Seq(srcSubFeed2))(context2)
 
      {
@@ -106,9 +108,35 @@ import java.time.LocalDateTime
        if (!resultat) TestUtil.printFailedTestResult("historize 2nd load mergeModeEnable", Seq())(actual)(expected)
        assert(resultat)
      }
+
+     // prepare & start 3rd load with schema evolution
+     val refTimestamp3 = LocalDateTime.now()
+     val context3 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec)
+     val tgtDOwithSchemaEvolution = tgtDO.copy(id = "tgt3", allowSchemaEvolution = true) // table remains the same...
+     instanceRegistry.register(tgtDOwithSchemaEvolution)
+     val action3 = HistorizeAction("ha3", srcDO.id, tgtDOwithSchemaEvolution.id, mergeModeEnable = true)
+     val l3 = Seq(("doe","john",10,"test")).toDF("lastname", "firstname", "rating", "test")
+     srcDO.writeSparkDataFrame(l3, Seq())(context3)
+     val srcSubFeed3 = SparkSubFeed(None, "src1", Seq())
+     action3.prepare(context3.copy(phase = ExecutionPhase.Prepare))
+     action3.init(Seq(srcSubFeed3))(context3.copy(phase = ExecutionPhase.Init))
+     action3.exec(Seq(srcSubFeed3))(context3)
+
+     {
+       val expected = Seq(
+         ("doe", "john", 5, null, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
+         ("doe", "john", 10, null, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(refTimestamp3.minusNanos(1000000L))),
+         ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp))
+       ).toDF("lastname", "firstname", "rating", "test", "dl_ts_captured", "dl_ts_delimited")
+       val actual = tgtDO.getSparkDataFrame()(context3)
+         .drop(Historization.historizeHashColName)
+       val resultat = expected.isEqual(actual)
+       if (!resultat) TestUtil.printFailedTestResult("historize 3rd load mergeModeEnable with schema evolution", Seq())(actual)(expected)
+       assert(resultat)
+     }
    }
 
-   test("historize 1st 2nd load mergeModeEnable CDC") {
+   test("historize load mergeModeEnable CDC") {
 
      val context = TestUtil.getDefaultActionPipelineContext
 
@@ -167,6 +195,33 @@ import java.time.LocalDateTime
          .drop(Historization.historizeDummyColName)
        val resultat = expected.isEqual(actual)
        if (!resultat) TestUtil.printFailedTestResult("historize 2nd load mergeModeEnable", Seq())(actual)(expected)
+       assert(resultat)
+     }
+
+     // prepare & start 3rd load with schema evolution
+     val refTimestamp3 = LocalDateTime.now()
+     val context3 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec)
+     val tgtDOwithSchemaEvolution = tgtDO.copy(id = "tgt3", allowSchemaEvolution = true) // table remains the same...
+     instanceRegistry.register(tgtDOwithSchemaEvolution)
+     val action3 = HistorizeAction("ha3", srcDO.id, tgtDOwithSchemaEvolution.id, mergeModeEnable = true, mergeModeCDCColumn = Some("operation"), mergeModeCDCDeletedValue = Some("deleted"))
+     val l3 = Seq(("doe","john",10,"test","updated")).toDF("lastname", "firstname", "rating", "test", "operation")
+     srcDO.writeSparkDataFrame(l3, Seq())(context3)
+     val srcSubFeed3 = SparkSubFeed(None, "src1", Seq())
+     action3.prepare(context3.copy(phase = ExecutionPhase.Prepare))
+     action3.init(Seq(srcSubFeed3))(context3.copy(phase = ExecutionPhase.Init))
+     action3.exec(Seq(srcSubFeed3))(context3)
+
+     {
+       val expected = Seq(
+         ("doe", "john", 5, null, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
+         ("doe", "john", 10, null, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(refTimestamp3.minusNanos(1000000L))),
+         ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp)),
+         ("pan","peter", 5, null, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L)))
+       ).toDF("lastname", "firstname", "rating", "test", "dl_ts_captured", "dl_ts_delimited")
+       val actual = tgtDO.getSparkDataFrame()(context3)
+         .drop(Historization.historizeDummyColName)
+       val resultat = expected.isEqual(actual)
+       if (!resultat) TestUtil.printFailedTestResult("historize 3rd load mergeModeEnable with schema evolution", Seq())(actual)(expected)
        assert(resultat)
      }
    }
