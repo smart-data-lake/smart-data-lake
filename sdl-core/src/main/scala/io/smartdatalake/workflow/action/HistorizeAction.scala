@@ -43,6 +43,15 @@ import scala.util.{Failure, Success, Try}
  * Historization creates a technical history of data by creating valid-from/to columns.
  * It needs a transactional table as output with defined primary keys.
  *
+ * Normal historization join new with all existing data, and rewrites all data in output table. This is not optimal from
+ * a performance perspective.
+ * It can be optimized if output object supports [[CanMergeDataFrame]]. In that case you can
+ * set mergeModeEnable=true to use incremental historization, which does not rewrite all data in output table. It still needs to
+ * join new data with all existing data, but uses hash values to minimize data transfer.
+ * If you have change-data-capture (CDC) information available to identify deleted records, you can set
+ * mergeModeCDCColumn and mergeModeCDCDeletedValue to even avoid the join between new and existing data. This is optimal from
+ * a performance perspective.
+ *
  * @param inputId inputs DataObject
  * @param outputId output DataObject
  * @param filterClause Filter of data to be processed by historization. It can be used to exclude historical data not needed to create new history, for performance reasons.
@@ -56,12 +65,19 @@ import scala.util.{Failure, Success, Try}
  * @param transformer optional custom transformation to apply
  * @param transformers optional list of transformations to apply before historization. See [[sparktransformer]] for a list of included Transformers.
  *                     The transformations are applied according to the lists ordering.
- * @param mergeModeEnable Set to true to use saveMode.Merge for much better performance. Output DataObject must implement [[CanMergeDataFrame]] if enabled (default = false).
+ * @param mergeModeEnable Set to true to use saveMode.Merge for much better performance by using incremental historization.
+ *                        Output DataObject must implement [[CanMergeDataFrame]] if enabled (default = false).
+ *                        Incremental historization will add an additional "dl_hash" column which is used for change detection between
+ *                        existing and new data.
  * @param mergeModeAdditionalJoinPredicate To optimize performance it might be interesting to limit the records read from the existing table data, e.g. it might be sufficient to use only the last 7 days.
  *                                         Specify a condition to select existing data to be used in transformation as Spark SQL expression.
  *                                         Use table alias 'existing' to reference columns of the existing table data.
- * @param mergeModeDeletedRecordsCondition Optional condition to define deleted records. If this information is available from the source (e.g. CDC) historization can be further optimized,
- *                                         as the join with existing data can be omitted.
+ * @param mergeModeCDCColumn Optional colum holding the CDC operation to replay. If this information is available from the source
+ *                           incremental historization can be further optimized, as the join with existing data can be omitted.
+ *                           You will also need to specify parameter mergeModeCDCDeletedValue to use this and mergeModeEnable=true.
+ *                           Increment CDC historization will add an additional column "dl_dummy" to the target table,
+ *                           which is used to work around limitations of SQL merge statement, but "dl_hash" column is no longer needed.
+ * @param mergeModeCDCDeletedValue Optional value of mergeModeCDCColumn that marks a record as deleted.
  * @param executionMode optional execution mode for this Action
  * @param executionCondition optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
