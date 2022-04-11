@@ -30,6 +30,7 @@
 		<module>sdl-splunk</module>
 		<module>sdl-jms</module>
 		<module>sdl-deltalake</module>
+		<module>sdl-googlecloud</module>
 		<module>sdl-snowflake</module>
 		<module>sdl-azure</module>
 		<module>sdl-lang</module>
