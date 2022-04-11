@@ -6,7 +6,17 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-mobile/1.4.5/jquery.mobile.min.css" />
         <link rel="stylesheet" href="styles/json-schema-viewer.min.css" />
-
+        <style>
+            .dropdown-container{
+                display: flex;
+                align-items: center;
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                text-align: center;
+                justify-content: center;
+            }
+        </style>
     </head>
     <body>
         <div id="loading">
@@ -24,7 +34,10 @@
                     <a href="#" class="ui-btn ui-btn-icon-right ui-icon-minus ui-btn-icon-notext ui-corner-all">Zoom-out</a>-->
 
                 </div>
-                <h1 id="viewer-title">Configuration Schema Viewer<span class="schema-version"></span></h1>
+                <div id="dropdown-container" class="dropdown-container">
+                    <h5 id="version-title" style="padding-bottom:0px;padding-right:10px">JSON Schema Viewer</h5>
+                    <select name="version-dropdown" id="version-dropdown" onchange="dropdownHandler()" title="version-dropdown"></select>
+                </div>
                 <!-- <a class="ui-btn-right ui-btn ui-icon-info ui-btn-icon-notext ui-corner-all" href="#help-panel"  title="Toggle Help">Help</a> -->
                 <a data-rel="popup" data-role="none" data-position-to="window" class="ui-btn-right main-logo" href="https://github.com/jlblcc/json-schema-viewer" title="Github"></a>
             </div><!-- /header -->
