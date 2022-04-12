@@ -22,6 +22,7 @@ package io.smartdatalake.app
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.webservice.ScalaJWebserviceClient
+import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
 import org.eclipse.jetty.websocket.api.{Session, WebSocketAdapter}
@@ -35,7 +36,7 @@ import scala.collection.mutable.ListBuffer
 import scala.util.{Failure, Success}
 
 /**
- * This tests use configuration test/resources/application.conf
+ * This tests use configuration test/resources/configstatusinfo/application.conf
  */
 class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
 
@@ -50,7 +51,7 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
     // setup input DataObject
     val srcDO = CsvFileDataObject("src1", "target/src1")(sdlb.instanceRegistry)
     val dfSrc1 = Seq("testData").toDF("testColumn")
-    srcDO.writeDataFrame(dfSrc1, Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
       getClass.getResource("/configstatusinfo/application.conf").getPath))
@@ -79,7 +80,7 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
     val fut: Future[Session] = client.connect(socket, uri)
     fut.get
 
-    //Verify Rest API is reachable
+    //Verify Rest API context endpoint is reachable and returns correct results
     val webserviceDOContext = WebserviceFileDataObject("dummy", url = s"http://localhost:4440/api/v1/context/")(sdlb.instanceRegistry)
     val webserviceClientContext = ScalaJWebserviceClient(webserviceDOContext)
     webserviceClientContext.get() match {
@@ -89,8 +90,22 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
         val str = new String(value, StandardCharsets.UTF_8)
         assert(str.contains("\"feedSel\":\"test\""))
     }
+
+    //Verify Rest API state endpoint is reachable and returns correct results
+    //Known Issue: if you run this test with Java 11.0.4, you may see a Stackoverflow error.
+    //The problem arises after the second call to the webservice (no matter what the call is)
+    // If you encounter it, either: Comment out one of the Calls to the webservice, or use a different JDK version to run the test.
+    val webserviceDOContext2 = WebserviceFileDataObject("dummy2", url = s"http://localhost:4440/api/v1/state/")(sdlb.instanceRegistry)
+    val webserviceClientContext2 = ScalaJWebserviceClient(webserviceDOContext2)
+    webserviceClientContext2.get() match {
+      case Failure(exception) =>
+        throw exception
+      case Success(value) =>
+        val str = new String(value, StandardCharsets.UTF_8)
+        assert(str.contains("\"actionsState\":{\"Action~a\":{\"executionId\":{\"runId\":1,\"attemptId\":1}"))
+    }
     //Verify a client websocket can connect
-    assert(receivedMessages.head.contains("Hello from io.smartdatalake.communication.statusinfo.websocket.StatusInfoSocket"))
+    assert(receivedMessages.head.contains("Hello from io.smartdatalake.statusinfo.websocket.StatusInfoSocket"))
   }
 }
 

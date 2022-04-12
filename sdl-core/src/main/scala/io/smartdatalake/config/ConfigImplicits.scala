@@ -18,15 +18,16 @@
  */
 package io.smartdatalake.config
 
-import configs.{Config, ConfigError, ConfigKeyNaming, ConfigReader, Result}
+import configs.{ConfigError, ConfigKeyNaming, ConfigReader, Result}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
-import io.smartdatalake.definitions.{AuthMode, Condition, Environment, ExecutionMode}
+import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.secrets.SecretProviderConfig
-import io.smartdatalake.workflow.action.Action
-import io.smartdatalake.workflow.action.customlogic._
+import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
-import io.smartdatalake.workflow.action.sparktransformer.{ParsableDfTransformer, ParsableDfsTransformer}
+import io.smartdatalake.workflow.action.spark.customlogic._
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
 
@@ -48,6 +49,15 @@ trait ConfigImplicits {
    */
   implicit val structTypeReader: ConfigReader[StructType] = ConfigReader.fromTry { (c, p) =>
     StructType.fromDDL(c.getString(p))
+  }
+
+  /**
+   * A [[ConfigReader]] reader that reads [[GenericSchema]] values.
+   *
+   * This reader parses a Spark [[StructType]] from a DDL string and creates a SparkSchema.
+   */
+  implicit val genericSchemaReader: ConfigReader[GenericSchema] = ConfigReader.fromTry { (c, p) =>
+    SparkSchema(StructType.fromDDL(c.getString(p)))
   }
 
   /**
@@ -79,6 +89,7 @@ trait ConfigImplicits {
   implicit val executionModeReader: ConfigReader[ExecutionMode] = ConfigReader.derive[ExecutionMode]
   implicit val conditionReader: ConfigReader[Condition] = ConfigReader.derive[Condition]
   implicit val authModeReader: ConfigReader[AuthMode] = ConfigReader.derive[AuthMode]
+  implicit val saveModeOptionsReader: ConfigReader[SaveModeOptions] = ConfigReader.derive[SaveModeOptions]
   // --------------------------------------------------------------------------------
 
   implicit def mapDataObjectIdStringReader(implicit mapReader: ConfigReader[Map[String,String]]): ConfigReader[Map[DataObjectId, String]] = {
@@ -101,21 +112,21 @@ trait ConfigImplicits {
   implicit val actionIdReader: ConfigReader[ActionId] = ConfigReader.fromTry { (c, p) => ActionId(c.getString(p))}
 
   /**
-   * A reader that reads [[ParsableDfTransformer]] values.
-   * Note that DfSparkTransformer must be parsed according to it's 'type' attribute by using SDL ConfigParser.
+   * A reader that reads [[GenericDfTransformer]] values.
+   * Note that GenericDfTransformer must be parsed according to it's 'type' attribute by using SDL ConfigParser.
    */
-  implicit val dfTransformerReader: ConfigReader[ParsableDfTransformer] = ConfigReader.fromTry { (c, p) =>
+  implicit val dfTransformerReader: ConfigReader[GenericDfTransformer] = ConfigReader.fromTry { (c, p) =>
     implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
-    ConfigParser.parseConfigObject[ParsableDfTransformer](c.getConfig(p))
+    ConfigParser.parseConfigObject[GenericDfTransformer](c.getConfig(p))
   }
 
   /**
-   * A reader that reads [[ParsableDfsTransformer]] values.
-   * Note that DfSparkTransformer must be parsed according to it's 'type' attribute by using SDL ConfigParser.
+   * A reader that reads [[GenericDfsTransformer]] values.
+   * Note that GenericDfsTransformer must be parsed according to it's 'type' attribute by using SDL ConfigParser.
    */
-  implicit val dfsTransformerReader: ConfigReader[ParsableDfsTransformer] = ConfigReader.fromTry { (c, p) =>
+  implicit val dfsTransformerReader: ConfigReader[GenericDfsTransformer] = ConfigReader.fromTry { (c, p) =>
     implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
-    ConfigParser.parseConfigObject[ParsableDfsTransformer](c.getConfig(p))
+    ConfigParser.parseConfigObject[GenericDfsTransformer](c.getConfig(p))
   }
 
   /**

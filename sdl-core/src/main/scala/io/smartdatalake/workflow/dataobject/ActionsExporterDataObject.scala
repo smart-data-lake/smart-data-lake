@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.config.{ConfigLoader, ConfigParser, FromConfigFactory, InstanceRegistry, ParsableFromConfig}
+import io.smartdatalake.config._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ProductUtil._
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -54,14 +54,14 @@ case class ActionsExporterDataObject(id: DataObjectId,
                                      config: Option[String] = None,
                                      override val metadata: Option[DataObjectMetadata] = None)
                                (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateDataFrame with ParsableFromConfig[ActionsExporterDataObject] {
+  extends DataObject with CanCreateSparkDataFrame with ParsableFromConfig[ActionsExporterDataObject] {
 
   /**
    *
    * @param session SparkSession to use
    * @return DataFrame including all Actions in the instanceRegistry, used for exporting the metadata
    */
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     val session: SparkSession = context.sparkSession
     import session.implicits._
 

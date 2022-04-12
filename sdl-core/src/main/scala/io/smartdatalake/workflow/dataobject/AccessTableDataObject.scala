@@ -24,9 +24,10 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
 import java.io.File
@@ -40,13 +41,13 @@ import scala.collection.JavaConverters._
  */
 case class AccessTableDataObject(override val id: DataObjectId,
                                  path: String,
-                                 override val schemaMin: Option[StructType] = None,
+                                 override val schemaMin: Option[GenericSchema] = None,
                                  override var table: Table,
                                  override val metadata: Option[DataObjectMetadata] = None
                                 )(@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TableDataObject {
+  extends TableDataObject with CanCreateSparkDataFrame {
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext) : DataFrame = {
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext) : DataFrame = {
     val session = context.sparkSession
 
     // currently, only the schema is being inferred using [[net.ucanaccess.jdbc.UcanaccessDriver]]...
@@ -74,7 +75,7 @@ case class AccessTableDataObject(override val id: DataObjectId,
     val df = session.createDataFrame(session.sparkContext.makeRDD(rows), tableSchema)
     db.close()
 
-    validateSchemaMin(df, "read")
+    validateSchemaMin(SparkSchema(df.schema), "read")
     //return
     df
   }
@@ -96,7 +97,7 @@ case class AccessTableDataObject(override val id: DataObjectId,
         "driver" -> "net.ucanaccess.jdbc.UcanaccessDriver",
         "dbtable" -> table.name))
       .load()
-    validateSchemaMin(df, "read")
+    validateSchemaMin(SparkSchema(df.schema), "read")
     df
   }
 

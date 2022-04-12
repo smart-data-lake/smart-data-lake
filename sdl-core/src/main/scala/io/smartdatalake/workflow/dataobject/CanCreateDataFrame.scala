@@ -19,23 +19,39 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.types.{DataType, StructType}
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericDataType, GenericSchema}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
+
+import scala.reflect.runtime.universe.Type
 
 private[smartdatalake] trait CanCreateDataFrame {
 
-  def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext) : DataFrame
+  /**
+   * Get a Spark DataFrame for given partition values
+   */
+  def getDataFrame(partitionValues: Seq[PartitionValues], subFeedType: Type)(implicit context: ActionPipelineContext) : GenericDataFrame
+
+  /**
+   * Get a GenericDataFrameSubFeed for the given language.
+   * See getSubFeedSupportedTypes for supported languages.
+   */
+  private[smartdatalake] def getSubFeed(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed
+
+  /**
+   * Declare supported Language for getting DataFrame
+   */
+  private[smartdatalake] def getSubFeedSupportedTypes: Seq[Type]
 
   /**
    * Creates the read schema based on a given write schema.
    * Normally this is the same, but some DataObjects can remove & add columns on read (e.g. KafkaTopicDataObject, SparkFileDataObject)
    * In this cases we have to break the DataFrame lineage und create a dummy DataFrame in init phase.
    */
-  def createReadSchema(writeSchema: StructType)(implicit context: ActionPipelineContext): StructType = writeSchema
+  def createReadSchema(writeSchema: GenericSchema)(implicit context: ActionPipelineContext): GenericSchema = writeSchema
 
-  protected def addFieldIfNotExisting(writeSchema: StructType, colName: String, dataType: DataType): StructType = {
-    if (!writeSchema.fieldNames.contains(colName)) writeSchema.add(colName, dataType)
+  protected def addFieldIfNotExisting(writeSchema: GenericSchema, colName: String, dataType: GenericDataType): GenericSchema = {
+    if (!writeSchema.columns.contains(colName)) writeSchema.add(colName, dataType)
     else writeSchema
   }
 }
+

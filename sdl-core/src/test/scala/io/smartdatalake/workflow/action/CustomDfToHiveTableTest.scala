@@ -18,22 +18,21 @@
  */
 package io.smartdatalake.workflow.action
 
-import java.nio.file.Files
-import java.time.LocalDateTime
-
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.testutils.custom.{TestCustomDfCreator, TestCustomDfManyTypes}
-import io.smartdatalake.util.hive.HiveUtil
-import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
-import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
+import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
+import io.smartdatalake.workflow.action.spark.transformer.StandardizeSparkDatatypesTransformer
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.{CustomDfDataObject, HiveTableDataObject, Table}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types._
 import org.scalatest.{BeforeAndAfter, FunSuite}
+
+import java.nio.file.Files
 
 class CustomDfToHiveTableTest extends FunSuite with BeforeAndAfter {
 
@@ -64,8 +63,8 @@ class CustomDfToHiveTableTest extends FunSuite with BeforeAndAfter {
     val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
     testAction.exec(Seq(srcSubFeed))
 
-    val expected = sourceDO.getDataFrame()
-    val actual = targetDO.getDataFrame()
+    val expected = sourceDO.getSparkDataFrame()
+    val actual = targetDO.getSparkDataFrame()
     val resultat: Boolean = expected.isEqual(actual)
     if (!resultat) printFailedTestResult("Df2HiveTable",Seq())(actual)(expected)
     assert(resultat)
@@ -84,12 +83,12 @@ class CustomDfToHiveTableTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(targetDO)
 
     // prepare & start load
-    val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id, standardizeDatatypes = true)
+    val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id, transformers = Seq(StandardizeSparkDatatypesTransformer()))
     val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
     testAction.exec(Seq(srcSubFeed))
 
-    val actual = targetDO.getDataFrame()
-    val expected = sourceDO.getDataFrame()
+    val actual = targetDO.getSparkDataFrame()
+    val expected = sourceDO.getSparkDataFrame()
       .withColumn("_decimal_2_0", $"_decimal_2_0".cast(ByteType))
       .withColumn("_decimal_4_0", $"_decimal_4_0".cast(ShortType))
       .withColumn("_decimal_10_0", $"_decimal_10_0".cast(IntegerType))

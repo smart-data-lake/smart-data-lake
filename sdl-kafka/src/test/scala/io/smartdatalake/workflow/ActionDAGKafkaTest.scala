@@ -22,15 +22,15 @@ import io.github.embeddedkafka.EmbeddedKafka
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.action.CopyAction
-import io.smartdatalake.workflow.action.customlogic.CustomDfTransformerConfig
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.connection.KafkaConnection
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{StructField, StructType, TimestampType}
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 
 import java.nio.file.Files
-import java.time.LocalDateTime
 
 /**
  * Note about EmbeddedKafka compatibility:
@@ -76,15 +76,15 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
     srcDO.dropTable
     instanceRegistry.register(srcDO)
     createCustomTopic("topic1", Map(), 1, 1)
-    val tgt1DO = KafkaTopicDataObject("kafka1", topicName = "topic1", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"), schemaMin = Some(StructType(Seq(StructField("timestamp", TimestampType)))))
+    val tgt1DO = KafkaTopicDataObject("kafka1", topicName = "topic1", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"), schemaMin = Some(SparkSchema(StructType(Seq(StructField("timestamp", TimestampType))))))
     instanceRegistry.register(tgt1DO)
     createCustomTopic("topic2", Map(), 1, 1)
-    val tgt2DO = KafkaTopicDataObject("kafka2", topicName = "topic2", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"), schemaMin = Some(StructType(Seq(StructField("timestamp", TimestampType)))))
+    val tgt2DO = KafkaTopicDataObject("kafka2", topicName = "topic2", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"), schemaMin = Some(SparkSchema(StructType(Seq(StructField("timestamp", TimestampType))))))
     instanceRegistry.register(tgt2DO)
 
     // prepare DAG
     val l1 = Seq(("doe-john", 5)).toDF("key", "value")
-    srcDO.writeDataFrame(l1, Seq())
+    srcDO.writeSparkDataFrame(l1, Seq())
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id)
     val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, transformer = Some(CustomDfTransformerConfig(sqlCode = Some("select 'test' as key, value from kafka1"))))
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2))
@@ -95,7 +95,7 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
     dag.exec
 
     // check result
-    val dfR1 = tgt2DO.getDataFrame(Seq())
+    val dfR1 = tgt2DO.getSparkDataFrame(Seq())
     assert(dfR1.columns.toSet == Set("value","timestamp"))
     val r1 = dfR1
       .select($"value")

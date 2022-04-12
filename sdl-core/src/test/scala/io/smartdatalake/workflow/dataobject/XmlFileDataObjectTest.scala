@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -25,7 +26,7 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types._
 
 import java.nio.file.Files
-import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import org.apache.hadoop.fs.Path
 
 
@@ -47,33 +48,33 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     val pv1 = Seq(PartitionValues(Map("h1"->"A")), PartitionValues(Map("h1"->"B")))
 
     // Partitions have to be written manually as spark-xml doesn't support writing partitions
-    val dataObj = XmlFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = Some(df1.schema), filenameColumn = Some("_filename"))
-    dataObj.writeDataFrameToPath(df1.where($"h1"==="A"), new Path(dataObj.hadoopPath, "h1=A"), SDLSaveMode.Overwrite)
-    dataObj.writeDataFrameToPath(df1.where($"h1"==="B"), new Path(dataObj.hadoopPath, "h1=B"), SDLSaveMode.Overwrite)
+    val dataObj = XmlFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = Some(SparkSchema(df1.schema)), filenameColumn = Some("_filename"))
+    dataObj.writeDataFrameToPath(SparkDataFrame(df1.where($"h1"==="A")), new Path(dataObj.hadoopPath, "h1=A"), SDLSaveMode.Overwrite)
+    dataObj.writeDataFrameToPath(SparkDataFrame(df1.where($"h1"==="B")), new Path(dataObj.hadoopPath, "h1=B"), SDLSaveMode.Overwrite)
 
     val dataObjPartitioned = dataObj.copy(partitions = Seq("h1"))
 
     // read with list of partition values
-    val dfResult1 = dataObjPartitioned.getDataFrame(pv1).cache
+    val dfResult1 = dataObjPartitioned.getSparkDataFrame(pv1).cache
     assert(dfResult1.columns.toSet == Set("h1", "h2", "h3", "_filename"))
     assert(dfResult1.drop("_filename").isEqual(df1))
     assert(dfResult1.where($"_filename".isNull).isEmpty)
 
     // read all
-    val dfResult2 = dataObjPartitioned.getDataFrame().cache
+    val dfResult2 = dataObjPartitioned.getSparkDataFrame().cache
     assert(dfResult2.columns.toSet == Set("h1", "h2", "h3", "_filename"))
     assert(dfResult2.drop("_filename").isEqual(df1))
     assert(dfResult2.where($"_filename".isNull).isEmpty)
   }
 
   private def createDataObject(path: String, schemaOpt: Option[StructType]): XmlFileDataObject = {
-    val dataObj = XmlFileDataObject(id = "schemaTestXmlDO", path = path, schema = schemaOpt)
+    val dataObj = XmlFileDataObject(id = "schemaTestXmlDO", path = path, schema = schemaOpt.map(SparkSchema))
     instanceRegistry.register(dataObj)
     dataObj
   }
 
   private def createDataObjectWithSchemaMin(path: String, schemaOpt: Option[StructType], schemaMinOpt: Option[StructType]): XmlFileDataObject = {
-    val dataObj = XmlFileDataObject(id = "schemaTestXmlDO", path = path, schema = schemaOpt, schemaMin = schemaMinOpt)
+    val dataObj = XmlFileDataObject(id = "schemaTestXmlDO", path = path, schema = schemaOpt.map(SparkSchema), schemaMin = schemaMinOpt.map(SparkSchema))
     instanceRegistry.register(dataObj)
     dataObj
   }

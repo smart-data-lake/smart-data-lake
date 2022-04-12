@@ -19,6 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types._
 
@@ -32,13 +33,13 @@ class AvroFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
   testsFor(validateSchemaMinOnRead(createDataObjectWithchemaMin, fileExtension = ".avro"))
 
   def createDataObject(path: String, schemaOpt: Option[StructType]): AvroFileDataObject = {
-    val dataObj = AvroFileDataObject(id = "schemaTestAvroDO", path = path, schema = schemaOpt)
+    val dataObj = AvroFileDataObject(id = "schemaTestAvroDO", path = path, schema = schemaOpt.map(SparkSchema))
     instanceRegistry.register(dataObj)
     dataObj
   }
 
   def createDataObjectWithchemaMin(path: String, schemaOpt: Option[StructType], schemaMinOpt: Option[StructType]): AvroFileDataObject = {
-    val dataObj = AvroFileDataObject(id = "schemaTestAvroDO", path = path, schema = schemaOpt, schemaMin = schemaMinOpt)
+    val dataObj = AvroFileDataObject(id = "schemaTestAvroDO", path = path, schema = schemaOpt.map(SparkSchema), schemaMin = schemaMinOpt.map(SparkSchema))
     instanceRegistry.register(dataObj)
     dataObj
   }

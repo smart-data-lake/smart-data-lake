@@ -25,6 +25,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ProcessingLogicException
 import io.smartdatalake.workflow.action.CustomFileActionTest
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions._
@@ -46,19 +47,19 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // write test data 1 - create partition A and B
     val partitionValuesCreated1 = Seq( PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
     val df1 = Seq(("A",1),("A",2),("B",3),("B",4)).toDF("p", "value")
-    dataObject.writeDataFrame(df1, partitionValuesCreated1 )
+    dataObject.writeSparkDataFrame(df1, partitionValuesCreated1 )
 
     // test 1
-    dataObject.getDataFrame().count shouldEqual 4 // four records should remain, 2 from partition A and 2 from partition B
+    dataObject.getSparkDataFrame().count shouldEqual 4 // four records should remain, 2 from partition A and 2 from partition B
     partitionValuesCreated1.toSet shouldEqual dataObject.listPartitions.toSet
 
     // write test data 2 - overwrite partition B
     val partitionValuesCreated2 = Seq(PartitionValues(Map("p"->"B")))
     val df2 = Seq(("B",5)).toDF("p", "value")
-    dataObject.writeDataFrame(df2, partitionValuesCreated2 )
+    dataObject.writeSparkDataFrame(df2, partitionValuesCreated2 )
 
     // test 2
-    dataObject.getDataFrame().count shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
+    dataObject.getSparkDataFrame().count shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
     partitionValuesCreated1.toSet shouldEqual dataObject.listPartitions.toSet
 
     Try(FileUtils.deleteDirectory(tempDir.toFile))
@@ -73,7 +74,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // write test files
     val partitionValuesCreated = Seq(PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
     val df = Seq(("A",1),("B",2)).toDF("p", "value")
-    dataObject.writeDataFrame(df, partitionValuesCreated )
+    dataObject.writeSparkDataFrame(df, partitionValuesCreated )
 
     val partitionValuesListed = dataObject.listPartitions
     partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
@@ -91,7 +92,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     val partitionValuesCreated = Seq( PartitionValues(Map("p1"->"A","p2"->"L2A")), PartitionValues(Map("p1"->"A","p2"->"L2B"))
       , PartitionValues(Map("p1"->"B","p2"->"L2B")), PartitionValues(Map("p1"->"B","p2"->"L2C")))
     val df = Seq(("A","L2A",1),("A","L2B",2),("B","L2B",3),("B","L2C",4)).toDF("p1", "p2", "value")
-    dataObject.writeDataFrame(df, partitionValuesCreated)
+    dataObject.writeSparkDataFrame(df, partitionValuesCreated)
 
     val partitionValuesListed = dataObject.listPartitions
     partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
@@ -108,7 +109,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // write test files
     val partitionValuesCreated = Seq( PartitionValues(Map("p1"->"A","p2"->"L2A")), PartitionValues(Map("p1"->"X","p2"->"L2X")))
     val df = Seq(("A","L2A",1)).toDF("p1", "p2", "value")
-    dataObject.writeDataFrame(df, partitionValuesCreated)
+    dataObject.writeSparkDataFrame(df, partitionValuesCreated)
 
     val partitionValuesListed = dataObject.listPartitions
     partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
@@ -125,12 +126,12 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // write test data - create partition A and B
     val partitionValuesCreated = Seq( PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
     val df1 = Seq(("A",1),("A",2),("B",3),("B",4)).toDF("p", "value")
-    dataObject.writeDataFrame(df1, partitionValuesCreated )
+    dataObject.writeSparkDataFrame(df1, partitionValuesCreated )
 
     // test reading data
-    dataObject.getDataFrame().count shouldEqual 4 // four records in total, 2 from partition A and 2 from partition B
-    dataObject.getDataFrame(Seq(PartitionValues(Map("p"->"B")))).count shouldEqual 2 // two records in partition B
-    dataObject.getDataFrame(Seq(PartitionValues(Map("p"->"A")),PartitionValues(Map("p"->"A","p"->"B")))).count shouldEqual 4
+    dataObject.getSparkDataFrame().count shouldEqual 4 // four records in total, 2 from partition A and 2 from partition B
+    dataObject.getSparkDataFrame(Seq(PartitionValues(Map("p"->"B")))).count shouldEqual 2 // two records in partition B
+    dataObject.getSparkDataFrame(Seq(PartitionValues(Map("p"->"A")),PartitionValues(Map("p"->"A","p"->"B")))).count shouldEqual 4
 
     // test expected partitions
     assert( dataObject.filterExpectedPartitionValues(partitionValuesCreated) == Seq(PartitionValues(Map("p"->"B"))))
@@ -147,15 +148,15 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // write test data - create partition A, B, C
     val partitionValuesCreated1 = Seq( PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
     val df1 = Seq(("A",1),("A",2),("B",3),("B",4),("C",5),("C",6)).toDF("p", "value")
-    dataObject.writeDataFrame(df1, partitionValuesCreated1)
+    dataObject.writeSparkDataFrame(df1, partitionValuesCreated1)
 
     // overwrite partition B with new data, overwrite partition C with no data
     val partitionValuesCreated2 = Seq( PartitionValues(Map("p"->"B")), PartitionValues(Map("p"->"C")))
     val df2 = Seq(("B",7),("B",8)).toDF("p", "value")
-    dataObject.writeDataFrame(df2, partitionValuesCreated2)
+    dataObject.writeSparkDataFrame(df2, partitionValuesCreated2)
 
     // test reading data
-    val result = dataObject.getDataFrame()
+    val result = dataObject.getSparkDataFrame()
       .select($"p",$"value".cast("int"))
       .as[(String,Int)].collect.toSeq.sorted
     assert( result == Seq(("A",1),("A",2),("B",7),("B",8)))
@@ -172,14 +173,14 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
 
     // write test data
     val df1 = Seq(("A",1),("A",2)).toDF("p", "value")
-    dataObject.writeDataFrame(df1)
+    dataObject.writeSparkDataFrame(df1)
 
     // overwrite with new data
     val df2 = Seq(("B",3),("B",4)).toDF("p", "value")
-    dataObject.writeDataFrame(df2)
+    dataObject.writeSparkDataFrame(df2)
 
     // test reading data
-    val result = dataObject.getDataFrame()
+    val result = dataObject.getSparkDataFrame()
       .select($"p",$"value".cast("int"))
       .as[(String,Int)].collect.toSeq.sorted
     assert( result == Seq(("B",3),("B",4)))
@@ -195,14 +196,14 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
 
     // write test data
     val df1 = Seq(("A",1),("A",2)).toDF("p", "value")
-    dataObject.writeDataFrame(df1)
+    dataObject.writeSparkDataFrame(df1)
 
     // overwrite with no data
     val df2 = Seq[(String,Int)]().toDF("p", "value")
-    dataObject.writeDataFrame(df2)
+    dataObject.writeSparkDataFrame(df2)
 
     // test reading data
-    assert(dataObject.getDataFrame().isEmpty)
+    assert(dataObject.getSparkDataFrame().isEmpty)
 
     FileUtils.deleteDirectory(tempDir.toFile)
   }
@@ -215,14 +216,14 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
 
     // write test data
     val df1 = Seq(("A",1),("A",2)).toDF("p", "value")
-    dataObject.writeDataFrame(df1)
+    dataObject.writeSparkDataFrame(df1)
 
     // overwrite with new data
     val df2 = Seq(("B",3),("B",4)).toDF("p", "value")
-    dataObject.writeDataFrame(df2)
+    dataObject.writeSparkDataFrame(df2)
 
     // test reading data
-    val result = dataObject.getDataFrame()
+    val result = dataObject.getSparkDataFrame()
       .select($"p",$"value".cast("int"))
       .as[(String,Int)].collect.toSeq.sorted
     assert( result == Seq(("B",3),("B",4)))
@@ -245,16 +246,16 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // setup DataObject
     val dataObject = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'),
       csvOptions = Map("header" -> "true", "delimiter" -> CustomFileActionTest.delimiter), filenameColumn = Some(sourceFileColName),
-      schema = Some(StructType.fromDDL("id string,name string,host_id string,host_name string,neighbourhood_group string,neighbourhood string,latitude string,longitude string,room_type string,price string,minimum_nights string,number_of_reviews string,last_review string,reviews_per_month string,calculated_host_listings_count string,availability_365 string"))
+      schema = Some(SparkSchema(StructType.fromDDL("id string,name string,host_id string,host_name string,neighbourhood_group string,neighbourhood string,latitude string,longitude string,room_type string,price string,minimum_nights string,number_of_reviews string,last_review string,reviews_per_month string,calculated_host_listings_count string,availability_365 string")))
     )
 
     // test received DataFrame
-    val df = dataObject.getDataFrame()
+    val df = dataObject.getSparkDataFrame()
     df.columns.contains(sourceFileColName) //retrieved Dataframe has sourcefile column appended
     df.select(sourceFileColName).collect().head.getAs[String](0).endsWith(resourceFile) //content of sourcefile column corresponds to sourcefile
 
     // test if it could be written again
-    dataObject.init(df.drop(sourceFileColName), Seq())
+    dataObject.initSparkDataFrame(df.drop(sourceFileColName), Seq())
 
     FileUtils.deleteDirectory(tempDir.toFile)
   }
@@ -296,7 +297,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
 
     // write test data
     val df1 = Seq(("A",1),("A",2)).toDF("p", "value")
-    dataObject.writeDataFrame(df1)
+    dataObject.writeSparkDataFrame(df1)
 
     // delete partition files
     val partitionValues = PartitionValues(Map("p"->"A"))
@@ -323,7 +324,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // create data object
     val tempDir = Files.createTempDirectory("tempHadoopDO")
     val dataObject = CsvFileDataObject(id = "partitionTestCsv", partitions = Seq("p1","p2"), path = tempDir.toString, saveMode = SDLSaveMode.OverwriteOptimized)
-    a [ProcessingLogicException] should be thrownBy dataObject.writeDataFrame(df, partitionValues = Seq())
+    a [ProcessingLogicException] should be thrownBy dataObject.writeSparkDataFrame(df, partitionValues = Seq())
   }
 
   private def createJsonFiles(path: file.Path, nbOfFile: Int = 100, filenamePrefix: String = "test") = {
@@ -355,7 +356,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     //check
     assert(!file.Files.exists(partitionPathA)) // p=A is deleted
     assert(file.Files.list(partitionPathB).count == 20) // check p=A moved to p=B
-    assert(dataObject.getDataFrame(pvsToMove.map(_._2)).select(sum($"value")).as[Long].head == 110) // check completeness of p=A + p=B
+    assert(dataObject.getSparkDataFrame(pvsToMove.map(_._2)).select(sum($"value")).as[Long].head == 110) // check completeness of p=A + p=B
   }
 
   // create data for 2 partitions and compact one of them
@@ -386,7 +387,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
 
     //check
     assert(file.Files.list(partitionPathA).count < 100) // check less files in p=A
-    assert(dataObject.getDataFrame(pvsToCompact).select(sum($"value")).as[Long].head == 5050) // check completeness of p=A
+    assert(dataObject.getSparkDataFrame(pvsToCompact).select(sum($"value")).as[Long].head == 5050) // check completeness of p=A
     assert(file.Files.list(partitionPathB).count == 100) // check p=B not changed
     val specialFiles = dataObject.filesystem.globStatus(new Path(tempDir.toString, s"*/_SDL*"))
     assert(specialFiles.count(_.getPath.getName.endsWith("COMPACTED")) == 1) // one partition marked as compacted

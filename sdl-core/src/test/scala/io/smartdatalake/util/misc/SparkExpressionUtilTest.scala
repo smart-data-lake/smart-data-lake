@@ -23,6 +23,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.DefaultExecutionModeExpressionData
 import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.util.spark.SparkExpressionUtil
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions.udf

@@ -18,15 +18,9 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.{ExecutionMode, ExecutionModeWithMainInputOutput}
-import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.PerformanceUtils
-import io.smartdatalake.workflow.action.sparktransformer.DfsTransformer
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanReceiveScriptNotification, CanWriteDataFrame, DataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, ScriptSubFeed, SparkSubFeed, SubFeed}
-import org.apache.spark.sql.SparkSession
+import io.smartdatalake.definitions.ExecutionMode
+import io.smartdatalake.workflow.dataobject.{CanReceiveScriptNotification, DataObject}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, ScriptSubFeed, SubFeedConverter}
 
 /**
  * Implementation of logic needed for Script Actions
@@ -38,6 +32,8 @@ abstract class ScriptActionImpl extends ActionSubFeedsImpl[ScriptSubFeed] {
 
   override val executionMode: Option[ExecutionMode] = None // no use for execution mode with scripts so far
   override def metricsFailCondition: Option[String] = None // no metrics for script execution so far
+
+  private[smartdatalake] override def subFeedConverter(): SubFeedConverter[ScriptSubFeed] = ScriptSubFeed
 
   /**
    * To be implemented by sub-classes

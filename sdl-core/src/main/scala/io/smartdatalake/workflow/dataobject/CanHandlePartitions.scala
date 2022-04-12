@@ -19,11 +19,11 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{SchemaUtil, SparkExpressionUtil}
-import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.SchemaViolationException
+import io.smartdatalake.util.misc.SchemaUtil
+import io.smartdatalake.util.spark.SparkExpressionUtil
+import io.smartdatalake.workflow.{ActionPipelineContext, SchemaViolationException}
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.DataFrame
 
 /**
  * A trait to be implemented by DataObjects which store partitioned data
@@ -86,9 +86,7 @@ trait CanHandlePartitions { this: DataObject =>
    * Filter list of partition values by expected partitions condition
    */
   private[smartdatalake] final def filterExpectedPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
-    import org.apache.spark.sql.functions.expr
     val session = context.sparkSession
-    import session.implicits._
     expectedPartitionsCondition.map{ condition =>
       // partition values value type is any, we need to convert it to string and keep the hashCode for filtering afterwards
       val partitionsValuesStringWithHashCode = partitionValues.map( pv => (pv.elements.mapValues(_.toString), pv.hashCode))

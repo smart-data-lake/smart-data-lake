@@ -18,10 +18,9 @@
  */
 package io.smartdatalake.workflow
 
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
+import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
@@ -67,15 +66,18 @@ case class ActionPipelineContext (
                                    actionsSelected: Seq[ActionId] = Seq(),
                                    actionsSkipped: Seq[ActionId] = Seq(),
                                    @transient // Prevent polluting output with contents of classLoader field
-                                   serializableHadoopConf: SerializableHadoopConfiguration
+                                   serializableHadoopConf: SerializableHadoopConfiguration,
+                                   globalConfig: GlobalConfig
                                  ) extends SmartDataLakeLogger {
   private[smartdatalake] def getReferenceTimestampOrNow: LocalDateTime = referenceTimestamp.getOrElse(LocalDateTime.now)
+
   private[smartdatalake] def rememberDataFrameReuse(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], actionId: ActionId): Int = dataFrameReuseStatistics.synchronized {
     val key = (dataObjectId, partitionValues)
     val newValue = dataFrameReuseStatistics.getOrElse(key, Seq()) :+ actionId
     dataFrameReuseStatistics.update(key, newValue)
     newValue.size
   }
+
   private[smartdatalake] def forgetDataFrameReuse(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], actionId: ActionId): Option[Int] = dataFrameReuseStatistics.synchronized {
     val key = (dataObjectId, partitionValues)
     val existingValue = dataFrameReuseStatistics.get(key)
@@ -86,37 +88,24 @@ case class ActionPipelineContext (
       newValue.size
     }
   }
+
   // manage executionId
   private[smartdatalake] def incrementRunId = this.copy(executionId = this.executionId.incrementRunId, runStartTime = LocalDateTime.now, attemptStartTime = LocalDateTime.now)
+
   private[smartdatalake] def incrementAttemptId = this.copy(executionId = this.executionId.incrementAttemptId, attemptStartTime = LocalDateTime.now)
-  // helper method to access hadoop configuration
+
+  /**
+   * helper method to access hadoop configuration
+   */
   def hadoopConf: Configuration = serializableHadoopConf.get
 
-  // private holder for spark session
-  private[smartdatalake] var _sparkSession: Option[SparkSession] = None
+  /**
+   * helper method to access spark session
+   */
+  def sparkSession: SparkSession = globalConfig.sparkSession(appConfig.appName, appConfig.master, appConfig.deployMode)
 
   /**
-   * Return SparkSession
-   * Create SparkSession if not yet done, but only if it is used.
+   * True if a SparkSession has been created in this job
    */
-  def sparkSession: SparkSession = {
-    if (_sparkSession.isEmpty) {
-      if (Environment.sparkSession != null) { // take spark session from environment if initialized
-        _sparkSession = Some(Environment.sparkSession)
-        if (Environment.globalConfig != null) { // update spark options and udfs in existing session (needed for unit tests)
-          Environment.globalConfig.setSparkOptions(_sparkSession.get)
-          Environment.globalConfig.registerUdf(_sparkSession.get)
-        }
-      } else {
-        assert(Environment.globalConfig != null, "Cannot create SparkSession because Environment.globalConfig is not initialized.")
-        _sparkSession = Some(Environment.globalConfig.createSparkSession(appConfig.appName, appConfig.master, appConfig.deployMode))
-      }
-    }
-    _sparkSession.get
-  }
-
-  /**
-   * Check if a SparkSession has been created
-   */
-  def hasSparkSession: Boolean = _sparkSession.isDefined
+  def hasSparkSession: Boolean = globalConfig.hasSparkSession
 }

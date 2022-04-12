@@ -18,19 +18,18 @@
  */
 package io.smartdatalake.workflow.action
 
-import java.sql.Timestamp
-import java.time.LocalDateTime
-
-import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.definitions.{Environment, ExecutionModeResult}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, InitSubFeed, SubFeed}
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject}
+import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
+import io.smartdatalake.workflow.dataobject.CanCreateDataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.TimestampType
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, SparkSession}
+
+import java.sql.Timestamp
+import java.time.LocalDateTime
+import scala.reflect.runtime.universe.Type
 
 /**
  * Collection of helper functions for Actions
@@ -114,8 +113,8 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
     else None
   }
 
-  def getOptionalDataFrame(sparkInput: CanCreateDataFrame, partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext) : Option[DataFrame] = try {
-    Some(sparkInput.getDataFrame(partitionValues))
+  def getOptionalDataFrame(input: CanCreateDataFrame, partitionValues: Seq[PartitionValues], subFeedType: Type)(implicit context: ActionPipelineContext) : Option[GenericDataFrame] = try {
+    Some(input.getDataFrame(partitionValues, subFeedType))
   } catch {
     case e: IllegalArgumentException if e.getMessage.contains("DataObject schema is undefined") => None
     case e: AnalysisException if e.getMessage.contains("Table or view not found") => None
@@ -129,5 +128,20 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
     val invalidCharacters = "[^a-zA-Z0-9_]".r
     invalidCharacters.replaceAllIn(str, "_")
   }
+
+  /**
+   * Create a valid temporary view name for SQL transformation.
+   * Apart from replacing special characters, a postfix is added to make the name unique in case the input name is also an existing table.
+   * @param inputName name of the input the temporary view should be created for
+   */
+  def createTemporaryViewName(inputName: String) : String = {
+    replaceSpecialCharactersWithUnderscore(inputName) + TEMP_VIEW_POSTFIX
+  }
+
+  def replaceLegacyViewName(sql: String, inputViewName: String): String = {
+    sql.replaceAll("\\s"+inputViewName.stripSuffix(ActionHelper.TEMP_VIEW_POSTFIX)+"(\\s|\\.|$)", s" $inputViewName" + "$1")
+  }
+
+  val TEMP_VIEW_POSTFIX = "_sdltemp"
 }
 

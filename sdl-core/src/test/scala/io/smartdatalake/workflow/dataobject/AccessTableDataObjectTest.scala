@@ -18,17 +18,15 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.io.File
-import java.nio.file.Paths
-import java.sql.Timestamp
-
 import com.typesafe.config.ConfigFactory
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.testutils.DataObjectTestSuite
-import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.commons.io.FileUtils
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{DataFrame, Row}
+
+import java.io.File
+import java.nio.file.Paths
+import java.sql.Timestamp
 
 
 class AccessTableDataObjectTest extends DataObjectTestSuite {
@@ -48,7 +46,7 @@ class AccessTableDataObjectTest extends DataObjectTestSuite {
     val dataObj = AccessTableDataObject.fromConfig(access2016SampleConfig)
 
     // run
-    val df: DataFrame = dataObj.getDataFrame()
+    val df: DataFrame = dataObj.getSparkDataFrame()
 
     // check
     val result: Array[Row] = df.collect()
@@ -77,7 +75,7 @@ class AccessTableDataObjectTest extends DataObjectTestSuite {
     val dataObj = AccessTableDataObject.fromConfig(access2000SampleConfig)
 
     // run
-    val df = dataObj.getDataFrame()
+    val df = dataObj.getSparkDataFrame()
 
     // check
     val result = df.collect()
@@ -132,7 +130,7 @@ class AccessTableDataObjectTest extends DataObjectTestSuite {
       val actionInput = AccessTableDataObject.fromConfig(config)
 
       // run
-      an [Exception] should be thrownBy actionInput.getDataFrame()
+      an [Exception] should be thrownBy actionInput.getSparkDataFrame()
   }
 
 }

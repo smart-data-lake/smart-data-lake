@@ -18,18 +18,16 @@
  */
 package io.smartdatalake.util.hive
 
-import java.nio.file.{Files, Path, Paths}
-
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.dataobject.Table
 import org.apache.commons.io.FileUtils
+import org.apache.hadoop.fs.{Path => HadoopPath}
 import org.apache.spark.sql.{AnalysisException, DataFrame, SaveMode, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
-import org.apache.hadoop.fs.{Path => HadoopPath}
 
-import scala.util.Try
-import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import java.nio.file.{Files, Path, Paths}
 
 /**
  * Unit tests for HiveUtil

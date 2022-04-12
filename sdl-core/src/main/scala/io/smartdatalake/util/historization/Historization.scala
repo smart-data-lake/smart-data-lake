@@ -18,18 +18,17 @@
  */
 package io.smartdatalake.util.historization
 
-import java.time.LocalDateTime
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions
 import io.smartdatalake.definitions.{HiveConventions, TechnicalTableColumn}
 import io.smartdatalake.util.evolution.SchemaEvolution
-import io.smartdatalake.util.misc.{DataFrameUtil, SmartDataLakeLogger}
-import org.apache.spark.sql.functions.{lit, when, _}
-import org.apache.spark.sql.types.{StructType, TimestampType}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 
 import java.sql.Timestamp
-import scala.util.hashing.MurmurHash3
+import java.time.LocalDateTime
 
 /**
  * Functions for historization
@@ -38,6 +37,7 @@ private[smartdatalake] object Historization extends SmartDataLakeLogger {
 
   private[smartdatalake] val historizeHashColName = "dl_hash" // incrementalHistorize adds hash col to target schema for comparing changes
   private[smartdatalake] val historizeOperationColName = "dl_operation" // incrementalHistorize needs operation col for merge statement. It is temporary and is not added to target schema.
+  private[smartdatalake] val historizeDummyColName = "dl_dummy" // incrementalCDCHistorize needs a dummy col for avoiding deduplication in merge statements join condition.
 
   // High value - symbolic value of timestamp with meaning of "without expiry date"
   //val doomsday = new java.sql.Timestamp(new java.util.Date("9999/12/31").getTime)
@@ -215,7 +215,7 @@ private[smartdatalake] object Historization extends SmartDataLakeLogger {
       .drop(existingHashCol)
       .withColumn(TechnicalTableColumn.captured,
          when(col(historizeOperationColName) === HistorizationRecordOperations.insertNew, timestampNew)
-        .when(col(historizeOperationColName) === HistorizationRecordOperations.updateClose, existingCapturedCol)
+        .when(col(historizeOperationColName) === HistorizationRecordOperations.updateClose, existingCapturedCol) // is needed vor merge join condition
       )
       .withColumn(TechnicalTableColumn.delimited,
          when(col(historizeOperationColName) === HistorizationRecordOperations.insertNew, doomsday)
@@ -227,16 +227,85 @@ private[smartdatalake] object Historization extends SmartDataLakeLogger {
   }
 
   /**
-   * Creates initial history of feed for fullHistorization
+   * Historizes data by merging the current load with the existing history, generating records to update and insert for SQL Upsert statements.
+   * This algorithm uses information about the delete operation from the source system to optimize historization.
+   * If deleted records can be identified, historization can omit the expensive join with existing data and use only SQL Upsert statements.
+   * Normally input data from change-data-capture (CDC) data sources has this information.
+   *
+   * For further description of incremental historization see documentation for [[incrementalHistorize]]
+   *
+   * The operations produced by incrementalCDCHistorize are
+   * 1. updated or inserted record -> update record to close existing version if existing, insert record to create new version
+   * 2. deleted record -> update record to close existing version if existing
+   *
+   * Compared with incrementalHistorize the following performance optimizations are implemented:
+   *  - current existing data is not read
+   *  - no hash column is needed as we know from the CDC event that something has changed
+   */
+  def incrementalCDCHistorize(dfNew: DataFrame,
+                              deletedRecordsCondition: Column,
+                              referenceTimestamp: LocalDateTime
+                             )
+                             (implicit session: SparkSession): DataFrame = {
+    import session.implicits._
+    // Current timestamp (used for insert and update operations, for "new" value)
+    val timestampNew = localDateTimeToCol(referenceTimestamp)
+    // Shortly before the current timestamp ("Tick") used for existing, old records
+    val timestampOld = localDateTimeToCol(referenceTimestamp.minusNanos(offsetNs))
+    // join existing with new and determine operations needed
+    val dfOperations = dfNew
+      .withColumn("_operations",
+        // 1. updated or inserted record -> update record to close existing version if existing, insert record to create new version - dl_hash has to be checked in merge statement
+        when(!deletedRecordsCondition, array(lit(HistorizationRecordOperations.updateClose), lit(lit(HistorizationRecordOperations.insertNew))))
+        // 2. deleted record -> update record to close existing version if existing
+        .otherwise(array(lit(HistorizationRecordOperations.updateClose)))
+      )
+    // add versioning data
+    val dfOperationVersioned = dfOperations
+      .withColumn(historizeOperationColName, explode($"_operations")) // note: this filters records with no action
+      .drop($"_operations")
+      .withColumn(historizeDummyColName, // dummy column is needed in merge join condition to avoid deduplication in merge statement
+        when(col(historizeOperationColName) === HistorizationRecordOperations.insertNew, lit(false)) // inster should not match with existing records in merge join condition
+          .when(col(historizeOperationColName) === HistorizationRecordOperations.updateClose, lit(true)) // should match with existing records in merge join condition
+      )
+      .withColumn(TechnicalTableColumn.captured,
+        when(col(historizeOperationColName) === HistorizationRecordOperations.insertNew, timestampNew)
+          .when(col(historizeOperationColName) === HistorizationRecordOperations.updateClose, lit(null)) // not needed for incremental CDC merge
+      )
+      .withColumn(TechnicalTableColumn.delimited,
+        when(col(historizeOperationColName) === HistorizationRecordOperations.insertNew, doomsday)
+          .when(col(historizeOperationColName) === HistorizationRecordOperations.updateClose, timestampOld)
+      )
+    // return
+    dfOperationVersioned
+  }
+
+  /**
+   * Creates initial history of feed
    *
    * @param df current run of feed
    * @param referenceTimestamp timestamp to use
    * @return initial history, identical with data from current run
    */
-  def getFullInitialHistory(df: DataFrame, referenceTimestamp: LocalDateTime)(implicit session: SparkSession): DataFrame = {
+  def getInitialHistory(df: DataFrame, referenceTimestamp: LocalDateTime)(implicit session: SparkSession): DataFrame = {
     logger.debug(s"Initial history used for ${TechnicalTableColumn.captured}: $referenceTimestamp")
     addVersionCols(df, referenceTimestamp, HiveConventions.getHistorizationSurrogateTimestamp)
   }
+
+  /**
+   * Creates initial history of feed for incrementalCDCHistorization
+   *
+   * @param df current run of feed
+   * @param referenceTimestamp timestamp to use
+   * @return initial history, identical with data from current run
+   */
+  def getInitialHistoryWithDummyCol(df: DataFrame, referenceTimestamp: LocalDateTime)(implicit session: SparkSession): DataFrame = {
+    logger.debug(s"Initial history used for ${TechnicalTableColumn.captured}: $referenceTimestamp")
+    val df1 = df.withColumn(historizeDummyColName, lit(true))
+    addVersionCols(df1, referenceTimestamp, HiveConventions.getHistorizationSurrogateTimestamp)
+  }
+
+    .withColumn(historizeDummyColName, lit(true))
 
   /**
    * Creates initial history of feed for incrementalHistorization
@@ -245,7 +314,7 @@ private[smartdatalake] object Historization extends SmartDataLakeLogger {
    * @param referenceTimestamp timestamp to use
    * @return initial history, identical with data from current run
    */
-  def getIncrementalInitialHistory(df: DataFrame, referenceTimestamp: LocalDateTime, historizeWhitelist: Option[Seq[String]], historizeBlacklist: Option[Seq[String]])(implicit session: SparkSession): DataFrame = {
+  def getInitialHistoryWithHashCol(df: DataFrame, referenceTimestamp: LocalDateTime, historizeWhitelist: Option[Seq[String]], historizeBlacklist: Option[Seq[String]])(implicit session: SparkSession): DataFrame = {
     logger.debug(s"Initial history used for ${TechnicalTableColumn.captured}: $referenceTimestamp")
     val df1 = addHashCol(df, historizeWhitelist, historizeBlacklist, useHash = true)
     addVersionCols(df1, referenceTimestamp, HiveConventions.getHistorizationSurrogateTimestamp)

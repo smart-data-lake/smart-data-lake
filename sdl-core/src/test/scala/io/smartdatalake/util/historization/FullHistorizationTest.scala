@@ -22,12 +22,12 @@ import io.smartdatalake.definitions.TechnicalTableColumn
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.historization.HistorizationTestUtils._
-import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.functions.{col, lit, to_timestamp, when}
+import org.apache.spark.sql.functions.{col, lit, to_timestamp}
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
 /**

@@ -18,17 +18,17 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.nio.file.Files
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.TestUtil._
-import io.smartdatalake.util.misc.{DataFrameUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.{ActionPipelineContext, SchemaViolationException}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.scalatest.{BeforeAndAfter, FunSuite, Matchers}
 
+import java.nio.file.Files
 import scala.collection.mutable._
 
 class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAndAfter with SmartDataLakeLogger {
@@ -56,7 +56,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       primaryKeyColumns = Some(Seq("id"))
     )
 
-    noException should be thrownBy sourceDo.getDataFrame()
+    noException should be thrownBy sourceDo.getSparkDataFrame()
   }
 
   test("Read: SchemaMin equals Schema is valid (ignoring nullable)") {
@@ -69,7 +69,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       primaryKeyColumns = Some(Seq("id"))
     )
 
-    noException should be thrownBy sourceDo.getDataFrame()
+    noException should be thrownBy sourceDo.getSparkDataFrame()
   }
 
   test("Read: SchemaMin is valid subset of Schema") {
@@ -82,7 +82,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       primaryKeyColumns = Some(Seq("id"))
     )
 
-    noException should be thrownBy sourceDo.getDataFrame()
+    noException should be thrownBy sourceDo.getSparkDataFrame()
   }
 
   test("Read: Invalid schema - missing column") {
@@ -99,7 +99,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       primaryKeyColumns = Some(Seq("id"))
     )
 
-    val thrown = the [SchemaViolationException] thrownBy sourceDo.getDataFrame()
+    val thrown = the [SchemaViolationException] thrownBy sourceDo.getSparkDataFrame()
     println(thrown.getMessage)
   }
 
@@ -116,7 +116,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       primaryKeyColumns = Some(Seq("id"))
     )
 
-    val thrown = the [SchemaViolationException] thrownBy sourceDo.getDataFrame()
+    val thrown = the [SchemaViolationException] thrownBy sourceDo.getSparkDataFrame()
     println(thrown.getMessage)
   }
 
@@ -131,7 +131,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       primaryKeyColumns = Some(Seq("id"))
     )
 
-    noException should be thrownBy sourceDo.writeDataFrame(Seq(
+    noException should be thrownBy sourceDo.writeSparkDataFrame(Seq(
       ("foo", "bar")
     ).toDF(schema.names:_*), Seq.empty)
   }
@@ -147,7 +147,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       primaryKeyColumns = Some(Seq("id"))
     )
 
-    noException should be thrownBy sourceDo.writeDataFrame(Seq(
+    noException should be thrownBy sourceDo.writeSparkDataFrame(Seq(
       ("foo", "bar")
     ).toDF(schema.names:_*), Seq.empty)
   }
@@ -163,7 +163,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       primaryKeyColumns = Some(Seq("id"))
     )
 
-    noException should be thrownBy sourceDo.writeDataFrame(Seq(
+    noException should be thrownBy sourceDo.writeSparkDataFrame(Seq(
       ("foo", "bar")
     ).toDF(schema.names:_*), Seq.empty)
   }
@@ -183,7 +183,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       primaryKeyColumns = Some(Seq("id"))
     )
 
-    val thrown = the [SchemaViolationException] thrownBy sourceDo.writeDataFrame(Seq(
+    val thrown = the [SchemaViolationException] thrownBy sourceDo.writeSparkDataFrame(Seq(
       ("foo", "bar")
     ).toDF(schema.names:_*), Seq.empty)
     println(thrown.getMessage)
@@ -203,7 +203,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       primaryKeyColumns = Some(Seq("id"))
     )
 
-    val thrown = the [SchemaViolationException] thrownBy sourceDo.writeDataFrame(Seq(
+    val thrown = the [SchemaViolationException] thrownBy sourceDo.writeSparkDataFrame(Seq(
       ("foo", "bar")
     ).toDF(schema.names:_*), Seq.empty)
     println(thrown.getMessage)

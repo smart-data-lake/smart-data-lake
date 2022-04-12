@@ -22,10 +22,12 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{PartitionDiffMode, SDLSaveMode, SaveModeGenericOptions}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.customlogic.CustomDfTransformer
-import io.smartdatalake.workflow.action.sparktransformer._
+import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer}
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
+import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.spark.sql.functions.{lit, substring}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -62,10 +64,10 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    val customTransformerConfig = ScalaClassDfTransformer(className = classOf[TestDfTransformer].getName)
+    val customTransformerConfig = ScalaClassSparkDfTransformer(className = classOf[TestDfTransformer].getName)
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
-    srcDO.writeDataFrame(l1, Seq())
+    srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe")),PartitionValues(Map("lastname" -> "jonson"))))
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
@@ -89,7 +91,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
       // return as function
       transform _
     """
-    val customTransformerConfig = ScalaCodeDfTransformer(code = Some(codeStr))
+    val customTransformerConfig = ScalaCodeSparkDfTransformer(code = Some(codeStr))
 
     // setup DataObjects
     val feed = "copy"
@@ -105,7 +107,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // prepare & start load
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig))
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
-    srcDO.writeDataFrame(l1, Seq())
+    srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     action1.exec(Seq(srcSubFeed))(contextExec)
 
@@ -130,10 +132,11 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    val customTransformerConfig = SQLDfTransformer(code = "select * from copy_input where rating = 5")
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig))
+    val customTransformerConfig1 = SQLDfTransformer(name = "sql1", code = "select * from copy_input where rating = 5")
+    val customTransformerConfig2 = SQLDfTransformer(name = "sql2", code = "select * from copy_input where rating = 5")
+    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig1, customTransformerConfig2))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
-    srcDO.writeDataFrame(l1, Seq())
+    srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
@@ -165,7 +168,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // prepare & start load
     val action1 = CopyAction("a1", srcDO.id, tgtDO.id, transformer = None)
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
-    srcDO.writeDataFrame(l1, Seq())
+    srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
@@ -197,7 +200,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // prepare & start first load
     val l1 = Seq(("A","doe","john",5)).toDF("type", "lastname", "firstname", "rating")
     val l1PartitionValues = Seq(PartitionValues(Map("type"->"A")))
-    srcDO.writeDataFrame(l1, l1PartitionValues) // prepare testdata
+    srcDO.writeSparkDataFrame(l1, l1PartitionValues) // prepare testdata
     action.preInit(Seq(srcSubFeed), Seq())
     val initOutputSubFeeds = action.init(Seq(srcSubFeed))
     action.preExec(Seq(srcSubFeed))
@@ -205,25 +208,25 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     action.postExec(Seq(srcSubFeed), Seq(tgtSubFeed1))
 
     // check first load
-    assert(initOutputSubFeeds.head.asInstanceOf[SparkSubFeed].dataFrame.get.columns.last == "type", "partition columns must be moved last already in init phase")
+    assert(initOutputSubFeeds.head.asInstanceOf[SparkSubFeed].dataFrame.get.schema.columns.last == "type", "partition columns must be moved last already in init phase")
     assert(tgtSubFeed1.dataObjectId == tgtDO.id)
     assert(tgtSubFeed1.partitionValues.toSet == l1PartitionValues.toSet)
-    assert(tgtDO.getDataFrame().count == 1)
+    assert(tgtDO.getSparkDataFrame().count == 1)
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet)
 
     // prepare & start 2nd load
     action.reset
     val l2 = Seq(("B","pan","peter",11)).toDF("type", "lastname", "firstname", "rating")
     val l2PartitionValues = Seq(PartitionValues(Map("type"->"B")))
-    srcDO.writeDataFrame(l2, l2PartitionValues) // prepare testdata
-    assert(srcDO.getDataFrame().count == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
+    srcDO.writeSparkDataFrame(l2, l2PartitionValues) // prepare testdata
+    assert(srcDO.getSparkDataFrame().count == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
     action.init(Seq(srcSubFeed))
     val tgtSubFeed2 = action.exec(Seq(srcSubFeed))(contextExec).head
 
     // check 2nd load
     assert(tgtSubFeed2.dataObjectId == tgtDO.id)
     assert(tgtSubFeed2.partitionValues.toSet == l2PartitionValues.toSet)
-    assert(tgtDO.getDataFrame().count == 2)
+    assert(tgtDO.getSparkDataFrame().count == 2)
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet ++ l2PartitionValues.toSet)
   }
 
@@ -247,7 +250,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // prepare & start first load
     val l1 = Seq(("A","doe","john",5)).toDF("type", "lastname", "firstname", "rating")
     val l1PartitionValues = Seq(PartitionValues(Map("type"->"A")))
-    srcDO.writeDataFrame(l1, l1PartitionValues) // prepare testdata
+    srcDO.writeSparkDataFrame(l1, l1PartitionValues) // prepare testdata
     action.preInit(Seq(srcSubFeed), Seq())
     val initOutputSubFeeds = action.init(Seq(srcSubFeed))
     action.preExec(Seq(srcSubFeed))
@@ -255,25 +258,25 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     action.postExec(Seq(srcSubFeed), Seq(tgtSubFeed1))
 
     // check first load
-    assert(initOutputSubFeeds.head.asInstanceOf[SparkSubFeed].dataFrame.get.columns.last == "type", "partition columns must be moved last already in init phase")
+    assert(initOutputSubFeeds.head.asInstanceOf[SparkSubFeed].dataFrame.get.schema.columns.last == "type", "partition columns must be moved last already in init phase")
     assert(tgtSubFeed1.dataObjectId == tgtDO.id)
     assert(tgtSubFeed1.partitionValues.toSet == l1PartitionValues.toSet)
-    assert(tgtDO.getDataFrame().count == 1)
+    assert(tgtDO.getSparkDataFrame().count == 1)
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet)
 
     // prepare & start 2nd load
     action.reset
     val l2 = Seq(("B","pan","peter",11)).toDF("type", "lastname", "firstname", "rating")
     val l2PartitionValues = Seq(PartitionValues(Map("type"->"B")))
-    srcDO.writeDataFrame(l2, l2PartitionValues) // prepare testdata
-    assert(srcDO.getDataFrame().count == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
+    srcDO.writeSparkDataFrame(l2, l2PartitionValues) // prepare testdata
+    assert(srcDO.getSparkDataFrame().count == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
     action.init(Seq(srcSubFeed))
     val tgtSubFeed2 = action.exec(Seq(srcSubFeed))(contextExec).head
 
     // check 2nd load
     assert(tgtSubFeed2.dataObjectId == tgtDO.id)
     assert(tgtSubFeed2.partitionValues.toSet == l2PartitionValues.toSet)
-    assert(tgtDO.getDataFrame().count == 2)
+    assert(tgtDO.getSparkDataFrame().count == 2)
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet ++ l2PartitionValues.toSet)
   }
 
@@ -293,18 +296,18 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // prepare & start load
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id,
       transformers = Seq(
-        ScalaClassDfTransformer(className = classOf[TestOptionsDfTransformer].getName, options = Map("test" -> "test"), runtimeOptions = Map("appName" -> "application")),
+        ScalaClassSparkDfTransformer(className = classOf[TestOptionsDfTransformer].getName, options = Map("test" -> "test"), runtimeOptions = Map("appName" -> "application")),
         FilterTransformer(filterClause = "lastname='jonson'"),
         AdditionalColumnsTransformer(additionalColumns = Map("run_id" -> "runId"))
       )
     )
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
-    srcDO.writeDataFrame(l1, Seq())
+    srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
 
-    val r1 = tgtDO.getDataFrame()
+    val r1 = tgtDO.getSparkDataFrame()
       .select($"rating", $"test", $"run_id")
       .as[(Int,String,Int)].collect().toSeq
     assert(r1 == Seq((6, "test-appTest", 1)))
@@ -325,10 +328,10 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare, simulate
     val contextExec = contextInit.copy(phase = ExecutionPhase.Exec)
-    val customTransformerConfig = ScalaClassDfTransformer(className = classOf[TestAggDfTransformer].getName)
+    val customTransformerConfig = ScalaClassSparkDfTransformer(className = classOf[TestAggDfTransformer].getName)
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig), executionMode = Some(PartitionDiffMode(applyPartitionValuesTransform=true)))
     val l1 = Seq(("20100101","jonson","rob",5),("20100103","doe","bob",3)).toDF("dt", "lastname", "firstname", "rating")
-    srcDO.writeDataFrame(l1, Seq())
+    srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     action1.preInit(Seq(srcSubFeed), Seq())
     val tgtSubFeed = action1.init(Seq(srcSubFeed)).head.asInstanceOf[SparkSubFeed]
@@ -337,12 +340,12 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
     val expectedPartitionValues = Seq(PartitionValues(Map("mt" -> "201001")))
     assert(tgtSubFeed.partitionValues == expectedPartitionValues)
-    assert(tgtSubFeed.dataFrame.get.columns.contains("mt"))
+    assert(tgtSubFeed.dataFrame.get.schema.columns.contains("mt"))
 
     // run
     action1.preExec(Seq(srcSubFeed))(contextExec)
     val resultSubFeeds = action1.exec(Seq(srcSubFeed))(contextExec)
-    assert(tgtDO.getDataFrame().count == 2)
+    assert(tgtDO.getSparkDataFrame().count == 2)
     action1.postExec(Seq(srcSubFeed),resultSubFeeds)(contextExec)
 
     // simulate next run with no data
@@ -368,11 +371,11 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // prepare & start 1st load - force SaveMode.Overwrite instead of Append
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id, saveModeOptions = Some(SaveModeGenericOptions(SDLSaveMode.Overwrite)))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
-    srcDO.writeDataFrame(l1, Seq())
+    srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe")),PartitionValues(Map("lastname" -> "jonson"))))
     action1.exec(Seq(srcSubFeed))(contextExec).head
 
-    val r1 = tgtDO.getDataFrame()
+    val r1 = tgtDO.getSparkDataFrame()
       .select($"rating")
       .as[Int].collect().toSeq
     assert(r1.toSet == Set(5,3))
@@ -380,7 +383,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // start 2nd load - data should be overwritten
     action1.exec(Seq(srcSubFeed))(contextExec).head
 
-    val r2 = tgtDO.getDataFrame()
+    val r2 = tgtDO.getSparkDataFrame()
       .select($"rating")
       .as[Int].collect().toSeq
     assert(r2.toSet == Set(5,3))
@@ -402,7 +405,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // prepare
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id)
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
-    srcDO.writeDataFrame(l1, Seq())
+    srcDO.writeSparkDataFrame(l1, Seq())
 
     // dont fail if partition exists
     val srcSubFeedOk = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe", "firstname" -> "bob"))))

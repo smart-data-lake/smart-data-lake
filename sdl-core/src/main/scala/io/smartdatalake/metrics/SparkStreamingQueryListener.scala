@@ -22,9 +22,8 @@ package io.smartdatalake.metrics
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.action.{RuntimeEventState, SparkActionImpl, SparkStreamingExecutionId}
+import io.smartdatalake.workflow.action.{DataFrameActionImpl, RuntimeEventState, SparkStreamingExecutionId}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, GenericMetrics, InitSubFeed}
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.streaming.StreamingQueryListener
 
 import java.time.temporal.ChronoUnit
@@ -36,7 +35,7 @@ import java.util.concurrent.Semaphore
  * Collect metrics for Spark streaming queries
  * This listener registers and unregisters itself in the spark session.
  */
-class SparkStreamingQueryListener(action: SparkActionImpl, dataObjectId: DataObjectId, queryName: String, firstProgressWaitLock: Option[Semaphore] = None)(implicit context: ActionPipelineContext) extends StreamingQueryListener with SmartDataLakeLogger {
+class SparkStreamingQueryListener(action: DataFrameActionImpl, dataObjectId: DataObjectId, queryName: String, firstProgressWaitLock: Option[Semaphore] = None)(implicit context: ActionPipelineContext) extends StreamingQueryListener with SmartDataLakeLogger {
   private var id: UUID = _
   private var isFirstProgress = true
   context.sparkSession.streams.addListener(this) // self-register

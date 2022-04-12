@@ -18,15 +18,11 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.time.LocalDateTime
-
 import com.typesafe.config.ConfigFactory
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.util.hive.HiveUtil
-import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
+import io.smartdatalake.workflow.ProcessingLogicException
 
 class HiveTableDataObjectTest extends DataObjectTestSuite {
 
@@ -40,13 +36,13 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val srcDO = HiveTableDataObject( "input", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1, analyzeTableAfterWrite = true)
     srcDO.dropTable
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
-    srcDO.writeDataFrame(df, Seq())
+    srcDO.writeSparkDataFrame(df, Seq())
     // check table statistics
     val statsStr = session.sql(s"describe extended ${srcTable.fullName}")
       .where($"col_name"==="Statistics").head.getAs[String](1)
     assert(statsStr.contains("3 rows"))
     // check table contents
-    assert(srcDO.getDataFrame().count==3)
+    assert(srcDO.getSparkDataFrame().count==3)
   }
 
   test("write and analyze table with partitions and partition values") {
@@ -54,7 +50,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val srcDO = HiveTableDataObject( "input", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, partitions = Seq("type"), numInitialHdfsPartitions = 1, analyzeTableAfterWrite = true)
     srcDO.dropTable
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
-    srcDO.writeDataFrame(df, Seq(PartitionValues(Map("type"->"ext")),PartitionValues(Map("type"->"int"))))
+    srcDO.writeSparkDataFrame(df, Seq(PartitionValues(Map("type"->"ext")),PartitionValues(Map("type"->"int"))))
     // check table statistics
     val statsStr = session.sql(s"describe extended ${srcTable.fullName}")
       .where($"col_name"==="Statistics").head.getAs[String](1)
@@ -67,7 +63,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
       .where($"col_name"==="Partition Statistics").head.getAs[String](1)
     assert(statsPart2Str.contains("1 rows"))
     // check table contents
-    assert(srcDO.getDataFrame().count==3)
+    assert(srcDO.getSparkDataFrame().count==3)
   }
 
   test("write and analyze table with partitions without partition values") {
@@ -75,7 +71,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val srcDO = HiveTableDataObject( "input", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, partitions = Seq("type"), numInitialHdfsPartitions = 1, analyzeTableAfterWrite = true)
     srcDO.dropTable
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
-    srcDO.writeDataFrame(df, Seq())
+    srcDO.writeSparkDataFrame(df, Seq())
     // check table statistics
     val statsStr = session.sql(s"describe extended ${srcTable.fullName}")
       .where($"col_name"==="Statistics").head.getAs[String](1)
@@ -88,7 +84,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
       .where($"col_name"==="Partition Statistics").head.getAs[String](1)
     assert(statsPart2Str.contains("1 rows"))
     // check table contents
-    assert(srcDO.getDataFrame().count==3)
+    assert(srcDO.getSparkDataFrame().count==3)
   }
 
   test("write and analyze table with multi partition layout and partial partition values") {
@@ -96,7 +92,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val srcDO = HiveTableDataObject( "input", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, partitions = Seq("type","lastname"), numInitialHdfsPartitions = 1, analyzeTableAfterWrite = true)
     srcDO.dropTable
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
-    srcDO.writeDataFrame(df, Seq(PartitionValues(Map("type"->"ext"))))
+    srcDO.writeSparkDataFrame(df, Seq(PartitionValues(Map("type"->"ext"))))
     // check table statistics
     val statsStr = session.sql(s"describe extended ${srcTable.fullName}")
       .where($"col_name"==="Statistics").head.getAs[String](1)
@@ -113,7 +109,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
       .where($"col_name"==="Partition Statistics").head.getAs[String](1)
     assert(!statsPart3Str.contains("1 rows"))
     // check table contents
-    assert(srcDO.getDataFrame().count==3)
+    assert(srcDO.getSparkDataFrame().count==3)
   }
 
   test("write and analyze table with multi partition layout and full partition values") {
@@ -121,7 +117,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val srcDO = HiveTableDataObject( "input", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, partitions = Seq("type","lastname"), numInitialHdfsPartitions = 1, analyzeTableAfterWrite = true)
     srcDO.dropTable
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
-    srcDO.writeDataFrame(df, Seq(PartitionValues(Map("type"->"ext", "lastname"->"doe")),PartitionValues(Map("type"->"ext", "lastname"->"smith"))))
+    srcDO.writeSparkDataFrame(df, Seq(PartitionValues(Map("type"->"ext", "lastname"->"doe")),PartitionValues(Map("type"->"ext", "lastname"->"smith"))))
     // check table statistics
     val statsStr = session.sql(s"describe extended ${srcTable.fullName}")
       .where($"col_name"==="Statistics").head.getAs[String](1)
@@ -138,7 +134,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
       .where($"col_name"==="Partition Statistics").head.getAs[String](1)
     assert(!statsPart3Str.contains("1 rows"))
     // check table contents
-    assert(srcDO.getDataFrame().count==3)
+    assert(srcDO.getSparkDataFrame().count==3)
   }
 
   test("overwrite only one partition") {
@@ -151,19 +147,19 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     // write test data 1 - create partition A and B
     val partitionValuesCreated1 = Seq( PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
     val df1 = Seq(("A",1),("A",2),("B",3),("B",4)).toDF("p", "value")
-    srcDO.writeDataFrame(df1, partitionValuesCreated1 )
+    srcDO.writeSparkDataFrame(df1, partitionValuesCreated1 )
 
     // test 1
-    srcDO.getDataFrame().count shouldEqual 4 // four records should remain, 2 from partition A and 2 from partition B
+    srcDO.getSparkDataFrame().count shouldEqual 4 // four records should remain, 2 from partition A and 2 from partition B
     partitionValuesCreated1.toSet shouldEqual srcDO.listPartitions.toSet
 
     // write test data 2 - overwrite partition B
     val partitionValuesCreated2 = Seq(PartitionValues(Map("p"->"B")))
     val df2 = Seq(("B",5)).toDF("p", "value")
-    srcDO.writeDataFrame(df2, partitionValuesCreated2 )
+    srcDO.writeSparkDataFrame(df2, partitionValuesCreated2 )
 
     // test 2
-    srcDO.getDataFrame().count shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
+    srcDO.getSparkDataFrame().count shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
     partitionValuesCreated1.toSet shouldEqual srcDO.listPartitions.toSet
   }
 
@@ -177,19 +173,19 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     // write test data 1 - create partition A and B
     val partitionValuesCreated1 = Seq( PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
     val df1 = Seq(("A",1),("A",2),("B",3),("B",4)).toDF("p", "value")
-    srcDO.writeDataFrame(df1, partitionValuesCreated1 )
+    srcDO.writeSparkDataFrame(df1, partitionValuesCreated1 )
 
     // test 1
-    srcDO.getDataFrame().count shouldEqual 4 // four records should remain, 2 from partition A and 2 from partition B
+    srcDO.getSparkDataFrame().count shouldEqual 4 // four records should remain, 2 from partition A and 2 from partition B
     partitionValuesCreated1.toSet shouldEqual srcDO.listPartitions.toSet
 
     // write test data 2 - overwrite partition B
     val partitionValuesCreated2 = Seq(PartitionValues(Map("p"->"B")))
     val df2 = Seq(("B",5)).toDF("p", "value")
-    srcDO.writeDataFrame(df2, partitionValuesCreated2 )
+    srcDO.writeSparkDataFrame(df2, partitionValuesCreated2 )
 
     // test 2
-    srcDO.getDataFrame().count shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
+    srcDO.getSparkDataFrame().count shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
     partitionValuesCreated1.toSet shouldEqual srcDO.listPartitions.toSet
   }
 
@@ -203,7 +199,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     // write test files
     val partitionValuesCreated = Seq(PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
     val df = Seq(("A",1),("B",2)).toDF("p", "value")
-    srcDO.writeDataFrame(df, partitionValuesCreated )
+    srcDO.writeSparkDataFrame(df, partitionValuesCreated )
 
     val partitionValuesListed = srcDO.listPartitions
     partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
@@ -220,7 +216,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val partitionValuesCreated = Seq( PartitionValues(Map("p1"->"A","p2"->"L2A")), PartitionValues(Map("p1"->"A","p2"->"L2B"))
       , PartitionValues(Map("p1"->"B","p2"->"L2B")), PartitionValues(Map("p1"->"B","p2"->"L2C")))
     val df = Seq(("A","L2A",1),("A","L2B",2),("B","L2B",3),("B","L2C",4)).toDF("p1", "p2", "value")
-    srcDO.writeDataFrame(df, partitionValuesCreated )
+    srcDO.writeSparkDataFrame(df, partitionValuesCreated )
 
     val partitionValuesListed = srcDO.listPartitions
     partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
@@ -236,7 +232,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     // write test files
     val partitionValuesCreated = Seq( PartitionValues(Map("p1"->"A","p2"->"L2A")), PartitionValues(Map("p1"->"X","p2"->"L2X")))
     val df = Seq(("A","L2A",1)).toDF("p1", "p2", "value")
-    srcDO.writeDataFrame(df, partitionValuesCreated )
+    srcDO.writeSparkDataFrame(df, partitionValuesCreated )
 
     val partitionValuesListed = srcDO.listPartitions
     partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
@@ -259,7 +255,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
        """.stripMargin)
     val dataObj = HiveTableDataObject.fromConfig(config)
 
-    an [Exception] should be thrownBy dataObj.getDataFrame()
+    an [Exception] should be thrownBy dataObj.getSparkDataFrame()
   }
 
   test("writing not possible without ACLs if authority restricted") {
@@ -289,7 +285,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     val df = Seq(("A", "2", 1), ("B", "1", 2), ("C", "X", 3)).toDF("p1", "p2", "value")
     val tgtTable = Table(Some("default"), "nonexistenttgttable")
     val tgtDO = HiveTableDataObject("tgtthatsurelydoesnotexistyet", path=None, table = tgtTable)
-    an [Exception] should be thrownBy tgtDO.writeDataFrame(df, partitionValues = Seq())
+    an [Exception] should be thrownBy tgtDO.writeSparkDataFrame(df, partitionValues = Seq())
   }
 
   test("OverwriteOptimized without partition values not allowed for partitioned DataObject") {
@@ -297,6 +293,6 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     // create data object
     val table = Table(Some("default"), "input")
     val dataObject = HiveTableDataObject( "input", Some(tempPath+s"/${table.fullName}"), table = table, partitions = Seq("p1","p2"), saveMode = SDLSaveMode.OverwriteOptimized)
-    a [ProcessingLogicException] should be thrownBy dataObject.writeDataFrame(df, partitionValues = Seq())
+    a [ProcessingLogicException] should be thrownBy dataObject.writeSparkDataFrame(df, partitionValues = Seq())
   }
 }

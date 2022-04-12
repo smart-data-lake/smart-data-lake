@@ -23,8 +23,7 @@ import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataobject._
-import org.apache.hadoop.fs.permission.FsPermission
-import org.apache.hadoop.fs.{FileContext, FileSystem, Path}
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
 
 object CompactionUtil extends SmartDataLakeLogger {
@@ -48,7 +47,7 @@ object CompactionUtil extends SmartDataLakeLogger {
    * @param dataObject: DataObject with partition values to compact. The DataObject must be partitioned, able to read & write DataFrames and have a hadoop standard partition layout.
    * @param partitionValues: partition values to compact
    */
-  def compactHadoopStandardPartitions(dataObject: DataObject with CanHandlePartitions with CanCreateDataFrame with CanWriteDataFrame with HasHadoopStandardFilestore, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
+  def compactHadoopStandardPartitions(dataObject: DataObject with CanHandlePartitions with CanCreateSparkDataFrame with CanWriteSparkDataFrame with HasHadoopStandardFilestore, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     implicit val session: SparkSession = context.sparkSession
     implicit val fs: FileSystem = dataObject.filesystem
     assert(dataObject.partitions.nonEmpty, "compactPartitions needs a partitionend DataObject")
@@ -103,8 +102,8 @@ object CompactionUtil extends SmartDataLakeLogger {
     logger.info(s"(${dataObject.id}) compacting partitions ${partitionValuesToCompact.mkString(", ")} (filtered already compacted partitions)")
 
     // 4. Rewrite data from partitions to be compacted to temp path
-    val dfRewrite = dataObject.getDataFrame(partitionValuesToCompact)
-    dataObject.writeDataFrameToPath(dfRewrite, tempPath, SDLSaveMode.Overwrite) // if defined this uses DataObjects options for repartition definition, otherwise Spark default parameters/optimizations are applied.
+    val dfRewrite = dataObject.getSparkDataFrame(partitionValuesToCompact)
+    dataObject.writeSparkDataFrameToPath(dfRewrite, tempPath, SDLSaveMode.Overwrite) // if defined this uses DataObjects options for repartition definition, otherwise Spark default parameters/optimizations are applied.
     logger.info(s"(${dataObject.id}) partitions rewritten")
 
     // 5. Move compacted partitions

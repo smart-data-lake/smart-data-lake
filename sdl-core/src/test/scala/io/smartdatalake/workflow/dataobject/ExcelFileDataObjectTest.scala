@@ -18,13 +18,9 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.io.{File, FileOutputStream}
-import java.sql.Timestamp
-import java.text.SimpleDateFormat
-import java.util.{Date, Locale}
-
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.commons.io.{FileUtils, IOUtils}
 import org.apache.poi.hssf.usermodel.HSSFWorkbook
 import org.apache.poi.ss.usermodel
@@ -35,6 +31,10 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Row}
 import org.scalatest.BeforeAndAfterAll
 
+import java.io.{File, FileOutputStream}
+import java.sql.Timestamp
+import java.text.SimpleDateFormat
+import java.util.{Date, Locale}
 import scala.reflect.runtime.universe._
 
 /**
@@ -73,7 +73,7 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
     val actionInputExcel = ExcelFileDataObject.fromConfig(xslxSampleConfig)
 
     // run
-    val df = actionInputExcel.getDataFrame()
+    val df = actionInputExcel.getSparkDataFrame()
 
     // check
     val data = df.collect().toList
@@ -106,7 +106,7 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
     val actionInputExcel = ExcelFileDataObject.fromConfig(testConfig)
 
     // run
-    val df = actionInputExcel.getDataFrame()
+    val df = actionInputExcel.getSparkDataFrame()
 
     // check
     val data: Array[Row] = df.collect()
@@ -204,13 +204,13 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
   }
 
   private def createDataObject(options: ExcelOptions)(path: String, schemaOpt: Option[StructType]): ExcelFileDataObject = {
-    val dataObj = ExcelFileDataObject(id = "schemaTestExcelDO", path = path, schema = schemaOpt, excelOptions = options)
+    val dataObj = ExcelFileDataObject(id = "schemaTestExcelDO", path = path, schema = schemaOpt.map(SparkSchema), excelOptions = options)
     instanceRegistry.register(dataObj)
     dataObj
   }
 
   private def createDataObjectWithSchemaMin(options: ExcelOptions)(path: String, schemaOpt: Option[StructType], schemaMinOpt: Option[StructType]): ExcelFileDataObject = {
-    val dataObj = ExcelFileDataObject(id = "schemaTestExcelDO", path = path, schema = schemaOpt, schemaMin = schemaMinOpt, excelOptions = options)
+    val dataObj = ExcelFileDataObject(id = "schemaTestExcelDO", path = path, schema = schemaOpt.map(SparkSchema), schemaMin = schemaMinOpt.map(SparkSchema), excelOptions = options)
     instanceRegistry.register(dataObj)
     dataObj
   }

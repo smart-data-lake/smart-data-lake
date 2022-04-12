@@ -14,6 +14,7 @@
 package io.smartdatalake.communication.agent
 
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigSyntax}
+import io.smartdatalake.app.GlobalConfig
 import io.smartdatalake.communication.statusinfo.websocket.SDLMessageType.EndConnection
 import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getDataObjectConfigMap, parseConfigObjectWithId}
 import io.smartdatalake.config.InstanceRegistry
@@ -54,7 +55,7 @@ class AgentServerSocket(config: AgentServerConfig, agentController: AgentControl
       .map { case (id, config) => (ActionId(id), parseConfigObjectWithId[Action](id, config)) }
     instanceRegistry.register(actions)
 
-    agentController.sdlb.exec(config.sdlConfig, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), Seq(), None, Seq(), simulation = false)(agentController.instanceRegistry)
+    agentController.sdlb.exec(config.sdlConfig, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), Seq(), None, Seq(), simulation = false, globalConfig = GlobalConfig())(agentController.instanceRegistry)
 
     println("ER HAT ES GESCHAFFT")
 

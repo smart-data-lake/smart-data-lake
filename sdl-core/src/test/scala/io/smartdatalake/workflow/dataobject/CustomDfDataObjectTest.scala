@@ -19,12 +19,10 @@
 
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
-import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.testutils.custom.{TestCustomDfCreator, TestCustomDfCreatorWithSchema}
-import io.smartdatalake.workflow.action.SDLExecutionId
+import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
-import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
 import org.scalatest.Matchers
 
 class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
@@ -41,7 +39,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // run
-    val df = customDfDataObject.getDataFrame(Seq())(context)
+    val df = customDfDataObject.getSparkDataFrame(Seq())(context)
 
     // check
     assert(df.schema.equals(customDfDataObject.creator.schema.get))
@@ -53,7 +51,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     val customDfDataObject = CustomDfDataObject("testId", config)
 
     // run
-    val df = customDfDataObject.getDataFrame(Seq())(context)
+    val df = customDfDataObject.getSparkDataFrame(Seq())(context)
 
     // check
     assert(df.schema.equals(customDfDataObject.creator.exec.schema))
@@ -66,7 +64,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // run
-    val df = customDfDataObject.getDataFrame(Seq())(context)
+    val df = customDfDataObject.getSparkDataFrame(Seq())(context)
 
     // check
     assert(df.count() == 0)
@@ -78,7 +76,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     val customDfDataObject = CustomDfDataObject("testId", config)
 
     // run
-    val df = customDfDataObject.getDataFrame(Seq())(context)
+    val df = customDfDataObject.getSparkDataFrame(Seq())(context)
 
     // check
     assert(df.count() == 2)
@@ -91,7 +89,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // run
-    val df = customDfDataObject.getDataFrame(Seq())(context)
+    val df = customDfDataObject.getSparkDataFrame(Seq())(context)
 
     // check
     assert(df.count() == 2)
@@ -103,7 +101,7 @@ class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
     val customDfDataObject = CustomDfDataObject("testId", config)
 
     // run
-    val df = customDfDataObject.getDataFrame(Seq())(context)
+    val df = customDfDataObject.getSparkDataFrame(Seq())(context)
 
     // check
     assert(df.count() == 2)

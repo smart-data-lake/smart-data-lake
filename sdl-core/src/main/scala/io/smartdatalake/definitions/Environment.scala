@@ -173,6 +173,27 @@ object Environment {
       .map(_.toBoolean).getOrElse(true)
   }
 
+  /**
+   * Number of Executions to keep runtime data for in streaming mode (default = 10).
+   * Must be bigger than 1.
+   */
+  var runtimeDataNumberOfExecutionsToKeep: Int = {
+    val nb = EnvironmentUtil.getSdlParameter("runtimeDataNumberOfExecutionsToKeep")
+      .map(_.toInt).getOrElse(10)
+    assert(nb>1, "runtimeDataNumberOfExecutionsToKeep must be bigger than 1.")
+    // return
+    nb
+  }
+
+  /**
+   * If enabled the temp view name from versions <= 2.2.x is replaced with the new temp view name including a postfix.
+   * This is enabled by default for backward compatibility.
+   */
+  var replaceSqlTransformersOldTempViewName: Boolean = {
+    EnvironmentUtil.getSdlParameter("replaceSqlTransformersOldTempViewName")
+      .map(_.toBoolean).getOrElse(true)
+  }
+
   // static configurations
   val configPathsForLocalSubstitution: Seq[String] = Seq(
       "path", "table.name"
@@ -187,12 +208,15 @@ object Environment {
   }
 
   // dynamically shared environment for custom code (see also #106)
+  // attention: if JVM is shared between different SDL jobs (e.g. Databricks cluster), these variables will be overwritten by the current job. Therefore they should not been used in SDL code, but might be used in custom code on your own risk.
   def sparkSession: SparkSession = _sparkSession
   private [smartdatalake] var _sparkSession: SparkSession = _
   def instanceRegistry: InstanceRegistry = _instanceRegistry
   private [smartdatalake] var _instanceRegistry: InstanceRegistry = _
   def globalConfig: GlobalConfig = _globalConfig
   private [smartdatalake] var _globalConfig: GlobalConfig = _
+
+  // this class loader is needed to find custom classes in some environments (e.g. Polynote)
   def classLoader: ClassLoader = _classLoader
   private [smartdatalake] var _classLoader: ClassLoader = this.getClass.getClassLoader // initialize with default classloader
 

@@ -23,13 +23,12 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.{DateColumnType, KeycloakClientSecretAuthMode, SDLSaveMode}
 import io.smartdatalake.testutils.custom.TestCustomDfCreator
 import io.smartdatalake.util.misc.{AclDef, AclElement}
-import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.connection.JdbcTableConnection
-import io.smartdatalake.workflow.dataobject.{Table, _}
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.scalatest.{FlatSpec, Matchers}
-
-import scala.reflect.runtime.universe.{MethodSymbol, typeOf}
 
 class DataObjectImplTests extends FlatSpec with Matchers {
 
@@ -134,10 +133,10 @@ class DataObjectImplTests extends FlatSpec with Matchers {
         id = "123",
         path = "/path/to/foo",
         csvOptions = Map("header" -> "false"),
-        schema = Some(StructType(Array(
+        schema = Some(SparkSchema(StructType(Array(
           StructField("first", StringType, nullable = true),
           StructField("last", StringType, nullable = true)
-        ))),
+        )))),
         partitions = Seq("dt", "type"),
         saveMode = SDLSaveMode.Append
       ),

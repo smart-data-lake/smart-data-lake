@@ -76,7 +76,7 @@ object LocalAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
     val agentController: AgentController = AgentController(new InstanceRegistry, this)
     AgentServer.start(AgentServerConfig(sdlConfig = envconfig), agentController)
 
-    val result = exec(envconfig, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), Seq(), None, Seq(), simulation = false)(agentController.instanceRegistry)
+    val result = exec(envconfig, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), Seq(), None, Seq(), simulation = false, globalConfig = GlobalConfig())(agentController.instanceRegistry)
 
 
     // start

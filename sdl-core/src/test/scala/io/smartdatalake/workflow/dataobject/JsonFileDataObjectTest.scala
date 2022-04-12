@@ -18,15 +18,16 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.io._
-import java.nio.file.Files
-
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types._
+
+import java.io._
+import java.nio.file.Files
 
 class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjectSchemaBehavior {
 
@@ -59,7 +60,7 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
     os.close()
 
     val aj = JsonFileDataObject.fromConfig(config)
-    val result = aj.getDataFrame()
+    val result = aj.getSparkDataFrame()
     result.show
     assert(result.count() == 3)
 
@@ -110,7 +111,7 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
     os.close()
 
     val aj = JsonFileDataObject.fromConfig(config)
-    val result = aj.getDataFrame()
+    val result = aj.getSparkDataFrame()
     result.show()
     assert(result.count() == 1)
 
@@ -152,7 +153,7 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
     os.close()
 
     val aj = JsonFileDataObject.fromConfig(config)
-    val result = aj.getDataFrame()
+    val result = aj.getSparkDataFrame()
     assert(result.count() == 3)
 
     val expectedSchema = StructType(List(
@@ -173,13 +174,13 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
   testsFor(validateSchemaMinOnRead(createDataObjectWithSchemaMin, ".json"))
 
   private def createDataObject(path: String, schemaOpt: Option[StructType]): JsonFileDataObject = {
-    val dataObj = JsonFileDataObject(id = "schemaTestJsonDO", path = path, schema = schemaOpt)
+    val dataObj = JsonFileDataObject(id = "schemaTestJsonDO", path = path, schema = schemaOpt.map(SparkSchema))
     instanceRegistry.register(dataObj)
     dataObj
   }
 
   private def createDataObjectWithSchemaMin(path: String, schemaOpt: Option[StructType], schemaMinOpt: Option[StructType]): JsonFileDataObject = {
-    val dataObj = JsonFileDataObject(id = "schemaTestJsonDO", path = path, schema = schemaOpt, schemaMin = schemaMinOpt)
+    val dataObj = JsonFileDataObject(id = "schemaTestJsonDO", path = path, schema = schemaOpt.map(SparkSchema), schemaMin = schemaMinOpt.map(SparkSchema))
     instanceRegistry.register(dataObj)
     dataObj
   }

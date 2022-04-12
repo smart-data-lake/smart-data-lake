@@ -23,7 +23,8 @@ import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, Parsab
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.dag.{DAGNode, TaskSkippedDontStopWarning}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{SmartDataLakeLogger, SparkExpressionUtil}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.SparkExpressionUtil
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
@@ -371,7 +372,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    */
   private[smartdatalake] val runtimeData: RuntimeData = getRuntimeDataImpl
   protected def getRuntimeDataImpl: RuntimeData = {
-    SynchronousRuntimeData(Option(Environment.globalConfig).map(_.runtimeDataNumberOfExecutionsToKeep).getOrElse(10))
+    SynchronousRuntimeData(Environment.runtimeDataNumberOfExecutionsToKeep)
   }
 
   /**

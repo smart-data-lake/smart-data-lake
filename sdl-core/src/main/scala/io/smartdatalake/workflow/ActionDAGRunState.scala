@@ -27,7 +27,6 @@ import io.smartdatalake.workflow.action.{ExecutionId, RuntimeEventState, Runtime
 import org.apache.spark.util.Json4sCompat
 import org.json4s._
 import org.json4s.ext.EnumNameSerializer
-import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.{read, writePretty}
 import org.reflections.Reflections
 
@@ -93,8 +92,7 @@ private[smartdatalake] object ActionDAGRunState {
   implicit private lazy val workflowReflections: Reflections = ReflectionUtil.getReflections("io.smartdatalake.workflow")
 
   private lazy val typeHints = ShortTypeHints(ReflectionUtil.getTraitImplClasses[SubFeed].toList ++ ReflectionUtil.getSealedTraitImplClasses[ExecutionId], "type")
-  implicit val formats: Formats = Serialization.formats(typeHints)
-    .withStrictArrayExtraction.withStrictMapExtraction.withStrictOptionParsing + new EnumNameSerializer(RuntimeEventState) +
+  implicit val formats: Formats = Json4sCompat.getStrictSerializationFormat(typeHints) + new EnumNameSerializer(RuntimeEventState) +
     actionIdSerializer + dataObjectIdSerializer + durationSerializer + localDateTimeSerializer
 
   // write state to Json

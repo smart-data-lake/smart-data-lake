@@ -1,6 +1,6 @@
 package io.smartdatalake.meta.jsonschema
 
-import io.smartdatalake.config.{ConfigLoader, ConfigToolbox, ConfigurationException, InstanceRegistry}
+import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.json4s.jackson.JsonMethods.pretty
 import scopt.OptionParser
@@ -48,11 +48,14 @@ object JsonSchemaExporter extends SmartDataLakeLogger {
     parser.parse(args, config) match {
 
       case Some(config) =>
+
         // create schema
         val jsonRootDef = JsonSchemaUtil.createSdlSchema(config.version.getOrElse(appVersion))
         val jsonRoot = jsonRootDef.toJson
         val jsonRootString = pretty(jsonRoot)
+
         // write file
+        logger.info(s"Writing schema to file ${config.filename}")
         Files.write(Paths.get(config.filename), jsonRootString.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING )
 
       case None =>

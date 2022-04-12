@@ -22,10 +22,10 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.sparktransformer.{DataValidationTransformer, RowLevelValidationRule}
+import io.smartdatalake.workflow.action.generic.transformer.{DataValidationTransformer, RowLevelValidationRule}
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.FunSuite
-import org.apache.spark.sql.functions._
 
 class DataValidationTransformerTest extends FunSuite {
 
@@ -41,8 +41,9 @@ class DataValidationTransformerTest extends FunSuite {
       RowLevelValidationRule("rating is not null", Some("rating should not be empty")),
       RowLevelValidationRule("firstname != 'bob'", Some("first should not be 'bob'"))
     ))
-    val dfValidated = validator.transform("testAction", Seq(), df, "testDO" )
-    assert(dfValidated.where($"firstname" === "bob").select(explode($"errors")).as[String].collect.toSet == Set("rating should not be empty", "first should not be 'bob'"))
+    val dfValidated = validator.transform("testAction", Seq(), SparkDataFrame(df), "testDO", None).asInstanceOf[SparkDataFrame]
+    import SparkSubFeed._
+    assert(dfValidated.filter(col("firstname") === lit("bob")).select(explode(col("errors"))).asInstanceOf[SparkDataFrame].inner.as[String].collect.toSet == Set("rating should not be empty", "first should not be 'bob'"))
   }
 
 }

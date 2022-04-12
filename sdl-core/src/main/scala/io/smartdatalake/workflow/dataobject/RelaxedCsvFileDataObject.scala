@@ -8,9 +8,12 @@ import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode}
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
-import io.smartdatalake.util.misc.DataFrameUtil._
-import io.smartdatalake.util.misc.{AclDef, DataFrameUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{AclDef, SmartDataLakeLogger}
+import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.DataFrameUtil._
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.csv.{CSVExprUtils, CSVOptions, UnivocityParser}
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
@@ -25,6 +28,7 @@ import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.unsafe.types.UTF8String
 
 import java.util.{StringTokenizer, TimeZone}
+import scala.reflect.runtime.universe.typeOf
 
 /**
  * A [[DataObject]] which allows for more flexible CSV parsing.
@@ -45,6 +49,7 @@ import java.util.{StringTokenizer, TimeZone}
  * RelaxCsvFileDataObject also supports getting an error msg by adding "<options.columnNameOfCorruptRecord>_msg" as field to the schema.
  *
  * @param schema The data object schema.
+ *               Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param csvOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
  * @param dateColumnType Specifies the string format used for writing date typed data.
  * @param treatMissingColumnsAsCorrupt If set to true records from files with missing columns in its header are treated as corrupt (default=false).
@@ -60,8 +65,8 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
                                     override val path: String,
                                     csvOptions: Map[String, String] = Map(),
                                     override val partitions: Seq[String] = Seq(),
-                                    override val schema: Option[StructType] = None,
-                                    override val schemaMin: Option[StructType] = None,
+                                    override val schema: Option[GenericSchema] = None,
+                                    override val schemaMin: Option[GenericSchema] = None,
                                     dateColumnType: DateColumnType = DateColumnType.Date,
                                     treatMissingColumnsAsCorrupt: Boolean = false,
                                     treatSuperfluousColumnsAsCorrupt: Boolean = false,
@@ -78,8 +83,13 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
   assert(schema.isDefined, "RelaxedCsvFileDataObject needs schema defined")
   private val parserSchema = {
     val colsToRemove = (partitions.map(Some(_)) :+ filenameColumn).flatten
-    StructType(schema.get.filterNot(field => colsToRemove.contains(field.name)))
+    colsToRemove.foldLeft(schema.get)(
+      (schema,colToRemove) => schema.remove(colToRemove)
+    )
   }
+
+  // convert schema to spark schema
+  private val sparkParserSchema = parserSchema.convert(typeOf[SparkSubFeed]).asInstanceOf[SparkSchema].inner
 
   override val format = "csv" // this is overriden with "text" for reading
 
@@ -102,15 +112,15 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
   private val defaultNameOfCorruptRecord = SQLConf.get.getConf(SQLConf.COLUMN_NAME_OF_CORRUPT_RECORD)
   private val parserOptions = new CSVOptions(options, columnPruning = true, defaultTimeZoneId = TimeZone.getDefault.getID, defaultColumnNameOfCorruptRecord = defaultNameOfCorruptRecord)
   assert(parserOptions.parseMode == PermissiveMode || parserOptions.parseMode == FailFastMode || parserOptions.parseMode == DropMalformedMode, s"($id) RelaxedCsvFileDataObject doesn't support the ${parserOptions.parseMode.name} mode. Acceptable modes are ${PermissiveMode.name}, ${FailFastMode.name} and ${DropMalformedMode.name}.")
-  assert(parserOptions.parseMode == PermissiveMode || !schema.get.exists(_.name == parserOptions.columnNameOfCorruptRecord), s"($id) Schema including columnNameOfCorruptRecord '${parserOptions.columnNameOfCorruptRecord}' makes no sense if options.mode != PermissiveMode. Remove ${parserOptions.columnNameOfCorruptRecord} from schema.")
-  ExprUtils.verifyColumnNameOfCorruptRecord(schema.get, parserOptions.columnNameOfCorruptRecord)
+  assert(parserOptions.parseMode == PermissiveMode || !schema.get.columns.contains(parserOptions.columnNameOfCorruptRecord), s"($id) Schema including columnNameOfCorruptRecord '${parserOptions.columnNameOfCorruptRecord}' makes no sense if options.mode != PermissiveMode. Remove ${parserOptions.columnNameOfCorruptRecord} from schema.")
+  ExprUtils.verifyColumnNameOfCorruptRecord(sparkParserSchema, parserOptions.columnNameOfCorruptRecord)
 
   /**
    * This is mostly the same as with SparkFileDataObject
    */
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext) : DataFrame = {
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext) : DataFrame = {
     implicit val session: SparkSession = context.sparkSession
-    import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+    import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 
     val wrongPartitionValues = PartitionValues.checkWrongPartitionValues(partitionValues, partitions)
     assert(wrongPartitionValues.isEmpty, s"getDataFrame got request with PartitionValues keys ${wrongPartitionValues.mkString(",")} not included in $id partition columns ${partitions.mkString(", ")}")
@@ -162,7 +172,7 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
             val values = parsedRow.toSeq ++ csvContentRow.toSeq.drop(1) // add partition column values
             Row(values :_*)
           }
-      }(RowEncoder.apply(StructType(parserSchema ++ dfContent.schema.drop(1)))) // add partition cols
+      }(RowEncoder.apply(StructType(sparkParserSchema ++ dfContent.schema.drop(1)))) // add partition cols
 
     val df = dfParsed
       .withOptionalColumn(filenameColumn, input_file_name)
@@ -183,11 +193,11 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
     val header = CSVUtils.makeSafeHeader(csvParser.parseLine(headerLine), caseSensitive, parserOptions)
       .map(_.trim) // remove spaces from all column names and potential CR from last column name
     val headerNormalized = if (caseSensitive) header else header.map(_.toLowerCase)
-    val schemaNormalizedMap = parserSchema.map(field => (if (caseSensitive) field.name else field.name.toLowerCase, field)).toMap
+    val schemaNormalizedMap = sparkParserSchema.map(field => (if (caseSensitive) field.name else field.name.toLowerCase, field)).toMap
 
     // parse to row with file schema
     val fileSchema = StructType(headerNormalized.map(name => schemaNormalizedMap.getOrElse(name, StructField(name, StringType))))
-    val parser = new RelaxedParser(fileSchema, parserSchema, parserOptions, treatMissingColumnsAsCorrupt, treatSuperfluousColumnsAsCorrupt)
+    val parser = new RelaxedParser(fileSchema, sparkParserSchema, parserOptions, treatMissingColumnsAsCorrupt, treatSuperfluousColumnsAsCorrupt)
     dataIterator.flatMap( line => parser.parse(line.trim)) // remove potential CR from last column value
   }
 

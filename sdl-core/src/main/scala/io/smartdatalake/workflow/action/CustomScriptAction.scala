@@ -20,15 +20,11 @@ package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, ParsableFromConfig}
-import io.smartdatalake.definitions.{Condition, ExecutionMode}
-import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.Condition
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
-import io.smartdatalake.workflow.action.sparktransformer.FilterTransformer.extract
-import io.smartdatalake.workflow.action.sparktransformer.{DfsTransformer, FilterTransformer, ParsableDfTransformer, PartitionValueTransformer}
 import io.smartdatalake.workflow.dataobject.{CanReceiveScriptNotification, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, ScriptSubFeed}
-import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
  * [[Action]] execute script after multiple input DataObjects are ready, notifying multiple output DataObjects when script succeeded.

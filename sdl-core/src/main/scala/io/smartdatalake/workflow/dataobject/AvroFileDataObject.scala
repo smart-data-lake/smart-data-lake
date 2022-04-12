@@ -25,8 +25,7 @@ import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.AclDef
-import org.apache.spark.sql.SaveMode
-import org.apache.spark.sql.types.StructType
+import io.smartdatalake.workflow.dataframe.GenericSchema
 
 /**
  * A [[io.smartdatalake.workflow.dataobject.DataObject]] backed by an Avro data source.
@@ -43,6 +42,7 @@ import org.apache.spark.sql.types.StructType
  * @param schema An optional schema for the spark data frame to be validated on read and write. Note: Existing Avro files
  *               contain a source schema. Therefore, this schema is ignored when reading from existing Avro files.
  *               As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
+ *               Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
@@ -57,8 +57,8 @@ case class AvroFileDataObject( override val id: DataObjectId,
                                override val path: String,
                                override val partitions: Seq[String] = Seq(),
                                avroOptions: Option[Map[String,String]] = None,
-                               override val schema: Option[StructType] = None,
-                               override val schemaMin: Option[StructType] = None,
+                               override val schema: Option[GenericSchema] = None,
+                               override val schemaMin: Option[GenericSchema] = None,
                                override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                override val sparkRepartition: Option[SparkRepartitionDef] = None,
                                override val acl: Option[AclDef] = None,
@@ -68,7 +68,7 @@ case class AvroFileDataObject( override val id: DataObjectId,
                                override val housekeepingMode: Option[HousekeepingMode] = None,
                                override val metadata: Option[DataObjectMetadata] = None
                              )(@transient implicit override val instanceRegistry: InstanceRegistry)
-  extends SparkFileDataObjectWithEmbeddedSchema with CanCreateDataFrame with CanWriteDataFrame {
+  extends SparkFileDataObject {
 
   override val format = "com.databricks.spark.avro"
 

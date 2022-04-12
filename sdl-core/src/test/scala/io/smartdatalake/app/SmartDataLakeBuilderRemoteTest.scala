@@ -27,6 +27,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.TestUtil.sparkSessionBuilder
 import io.smartdatalake.workflow.action.{Action, CopyAction}
+import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -46,7 +47,7 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
     // setup input DataObject
     val srcDO = CsvFileDataObject("src1", "target/src1")(sdlb.instanceRegistry)
     val dfSrc1 = Seq("testData").toDF("testColumn")
-    srcDO.writeDataFrame(dfSrc1, Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
       getClass.getResource("/configremote/application.conf").getPath))
@@ -84,7 +85,7 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
     // setup input DataObject
     val srcDO = CsvFileDataObject("src1", "target/src1")(sdlb.instanceRegistry)
     val dfSrc1 = Seq("testData").toDF("testColumn")
-    srcDO.writeDataFrame(dfSrc1, Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
       getClass.getResource("/configremote/application.conf").getPath))

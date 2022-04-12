@@ -28,8 +28,9 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration._
 import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.misc.DataFrameUtil.{DfSDL, defaultPersistDf}
+import io.smartdatalake.util.spark.DataFrameUtil.{DfSDL, defaultPersistDf}
 import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.SDLExecutionId
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
@@ -81,14 +82,15 @@ object TestUtil extends SmartDataLakeLogger {
   lazy val sessionWithoutHive : SparkSession = sparkSessionBuilder().getOrCreate
 
   def getDefaultActionPipelineContext(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
-    if (Environment.globalConfig == null) Environment._globalConfig = GlobalConfig()
     getDefaultActionPipelineContext(sessionHiveCatalog) // initialize with Spark session incl. Hive support
   }
 
   def getDefaultActionPipelineContext(sparkSession: SparkSession)(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
     val defaultHadoopConf = new SerializableHadoopConfiguration(new Configuration())
-    val context = ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, instanceRegistry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig("feedTest", Some("appTest")), phase = ExecutionPhase.Init, serializableHadoopConf = defaultHadoopConf)
-    context._sparkSession = Some(sparkSession)
+    val globalConfig = GlobalConfig()
+    val context = ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, instanceRegistry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig("feedTest", Some("appTest")), phase = ExecutionPhase.Init, serializableHadoopConf = defaultHadoopConf, globalConfig = globalConfig)
+    // reuse existing spark session
+    globalConfig._sparkSession = Some(sparkSession)
     context
   }
 
@@ -106,7 +108,7 @@ object TestUtil extends SmartDataLakeLogger {
                      )(implicit instanceRegistry: InstanceRegistry, context: ActionPipelineContext): HiveTableDataObject = {
     val table = Table(db=db,name=tableName,primaryKey=primaryKeyColumns)
     val path = dirPath+s"$tableName"
-    val hTabDo = HiveTableDataObject(id=s"${tableName}DO",path=Some(path),schemaMin=schemaMin,table=table)
+    val hTabDo = HiveTableDataObject(id=s"${tableName}DO",path=Some(path),schemaMin=schemaMin.map(SparkSchema),table=table)
     hTabDo.dropTable
     instanceRegistry.register(hTabDo)
     prepareHiveTable(table,path,df,partitionCols)

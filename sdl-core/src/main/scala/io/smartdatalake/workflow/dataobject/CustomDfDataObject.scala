@@ -19,15 +19,15 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
-import configs.ConfigKeyNaming
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.DataFrameUtil
+import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
-import io.smartdatalake.workflow.action.customlogic.CustomDfCreatorConfig
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.sql.DataFrame
 
 /**
  * Generic [[DataObject]] containing a config object.
@@ -35,12 +35,12 @@ import org.apache.spark.sql.{DataFrame, Row, SparkSession}
  */
 case class CustomDfDataObject(override val id: DataObjectId,
                               creator: CustomDfCreatorConfig,
-                              override val schemaMin: Option[StructType] = None,
+                              override val schemaMin: Option[GenericSchema] = None,
                               override val metadata: Option[DataObjectMetadata] = None
                              )(@transient implicit val instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateDataFrame with SchemaValidation {
+  extends DataObject with CanCreateSparkDataFrame with SchemaValidation {
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     implicit val session = context.sparkSession
 
     // During the init phase, we want to enable getting the schema without creating the entire DataFrame
@@ -51,7 +51,7 @@ case class CustomDfDataObject(override val id: DataObjectId,
       case _ => creator.exec
     }
 
-    validateSchemaMin(df, "read")
+    validateSchemaMin(SparkSchema(df.schema), "read")
     df
   }
 
