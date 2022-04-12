@@ -1951,7 +1951,7 @@
       },
       "JdbcTableDataObject" : {
         "type" : "object",
-        "description" : "[[DataObject]] of type JDBC.\nProvides details for an action to access tables in a database through JDBC.",
+        "description" : "[[DataObject]] of type JDBC.\nProvides details for an action to read and write tables in a database through JDBC.\nNote that writing into a table is done as one transaction. This is implemented by writing to a temporary-table with Spark,\nthen using a separate \\\"insert into ... select\\\" statement to copy data into the final table.",
         "additionalProperties" : false,
         "required" : [ "id", "table", "connectionId" ],
         "title" : "JdbcTableDataObject",
@@ -3366,6 +3366,13 @@
               "type" : "string"
             }
           },
+          "insertValuesOverride" : {
+            "type" : "object",
+            "description" : "Optional Map of column name and value expression to override value on insert. Value expressions have to be a sql expression string, e.g. true or \\'abc\\'.",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          },
           "additionalMergePredicate" : {
             "type" : "string",
             "description" : "To optimize performance for SDLSaveMode.Merge it might be interesting to limit the records read from the existing table data, e.g. merge operation might use only the last 7 days."
@@ -4614,32 +4621,6 @@
               }
             }, {
               "type" : "object",
-              "description" : "Add additional columns to the DataFrame by extracting information from the context.",
-              "additionalProperties" : false,
-              "required" : [ "additionalColumns", "type" ],
-              "title" : "AdditionalColumnsTransformer",
-              "properties" : {
-                "type" : {
-                  "const" : "AdditionalColumnsTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                },
-                "additionalColumns" : {
-                  "type" : "object",
-                  "description" : "optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  }
-                }
-              }
-            }, {
-              "type" : "object",
               "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Scala code which is compiled at runtime.\nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The scala code has to implement a function of type[[fnTransformType]] .",
               "additionalProperties" : false,
               "required" : [ "type" ],
@@ -4674,6 +4655,32 @@
                 "runtimeOptions" : {
                   "type" : "object",
                   "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }, {
+              "type" : "object",
+              "description" : "Add additional columns to the DataFrame by extracting information from the context.",
+              "additionalProperties" : false,
+              "required" : [ "additionalColumns", "type" ],
+              "title" : "AdditionalColumnsTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "AdditionalColumnsTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "additionalColumns" : {
+                  "type" : "object",
+                  "description" : "optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
                   "additionalProperties" : {
                     "type" : "string"
                   }
@@ -4752,17 +4759,6 @@
               }
             }, {
               "type" : "object",
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers.",
-              "additionalProperties" : false,
-              "required" : [ "type" ],
-              "title" : "OptionsGenericDfTransformer",
-              "properties" : {
-                "type" : {
-                  "const" : "OptionsGenericDfTransformer"
-                }
-              }
-            }, {
-              "type" : "object",
               "description" : "Apply a filter condition to a DataFrame.",
               "additionalProperties" : false,
               "required" : [ "filterClause", "type" ],
@@ -4786,6 +4782,17 @@
                 "subFeedTypeForValidation" : {
                   "type" : "string",
                   "description" : "When parsing the configuration the runtime subFeedType for validating the filter expression is not yet known.\nBy default SparkSubFeed langauge is used, but you can configure a different one if needed."
+                }
+              }
+            }, {
+              "type" : "object",
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers.",
+              "additionalProperties" : false,
+              "required" : [ "type" ],
+              "title" : "OptionsGenericDfTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "OptionsGenericDfTransformer"
                 }
               }
             }, {
@@ -5775,7 +5782,7 @@
       },
       "HistorizeAction" : {
         "type" : "object",
-        "description" : "[[Action]] to historize a subfeed.\nHistorization creates a technical history of data by creating valid-from/to columns.\nIt needs a transactional table as output with defined primary keys.",
+        "description" : "[[Action]]to historize a subfeed.\nHistorization creates a technical history of data by creating valid-from/to columns.\nIt needs a transactional table as output with defined primary keys.\nNormal historization join new with all existing data, and rewrites all data in output table. This is not optimal from\na performance perspective.\nIt can be optimized if output object supports[[CanMergeDataFrame]] . In that case you can\nset mergeModeEnable=true to use incremental historization, which does not rewrite all data in output table. It still needs to\njoin new data with all existing data, but uses hash values to minimize data transfer.\nIf you have change-data-capture (CDC) information available to identify deleted records, you can set\nmergeModeCDCColumn and mergeModeCDCDeletedValue to even avoid the join between new and existing data. This is optimal from\na performance perspective.",
         "additionalProperties" : false,
         "required" : [ "id", "inputId", "outputId" ],
         "title" : "HistorizeAction",
@@ -5904,11 +5911,19 @@
           },
           "mergeModeEnable" : {
             "type" : "string",
-            "description" : "Set to true to use saveMode.Merge for much better performance. Output DataObject must implement[[CanMergeDataFrame]] if enabled (default = false)."
+            "description" : "Set to true to use saveMode.Merge for much better performance by using incremental historization.\nOutput DataObject must implement[[CanMergeDataFrame]] if enabled (default = false).\nIncremental historization will add an additional \\\"dl_hash\\\" column which is used for change detection between\nexisting and new data."
           },
           "mergeModeAdditionalJoinPredicate" : {
             "type" : "string",
             "description" : "To optimize performance it might be interesting to limit the records read from the existing table data, e.g. it might be sufficient to use only the last 7 days.\nSpecify a condition to select existing data to be used in transformation as Spark SQL expression.\nUse table alias \\'existing\\' to reference columns of the existing table data."
+          },
+          "mergeModeCDCColumn" : {
+            "type" : "string",
+            "description" : "Optional colum holding the CDC operation to replay. If this information is available from the source\nincremental historization can be further optimized, as the join with existing data can be omitted.\nYou will also need to specify parameter mergeModeCDCDeletedValue to use this and mergeModeEnable=true.\nIncrement CDC historization will add an additional column \\\"dl_dummy\\\" to the target table,\nwhich is used to work around limitations of SQL merge statement, but \\\"dl_hash\\\" column is no longer needed."
+          },
+          "mergeModeCDCDeletedValue" : {
+            "type" : "string",
+            "description" : "Optional value of mergeModeCDCColumn that marks a record as deleted."
           },
           "breakDataFrameLineage" : {
             "type" : "string",
