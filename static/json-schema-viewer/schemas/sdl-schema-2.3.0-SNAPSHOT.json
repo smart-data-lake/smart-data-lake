@@ -5966,7 +5966,7 @@
       }
     }
   },
-  "id" : "sdl-schema.json#",
+  "id" : "sdl-schema-2.3.0-SNAPSHOT.json#",
   "version" : "2.3.0-SNAPSHOT",
   "$schema" : "http://json-schema.org/draft-07/schema#"
 }
