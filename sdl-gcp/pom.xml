@@ -26,10 +26,10 @@
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
-	<artifactId>sdl-googlecloud_${scala.minor.version}</artifactId>
+	<artifactId>sdl-gcp_${scala.minor.version}</artifactId>
 	<packaging>jar</packaging>
 
-	<name>sdl-googlecloud</name>
+	<name>sdl-gcp</name>
 
 	<profiles>
 		<profile>

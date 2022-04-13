@@ -60,10 +60,9 @@ case class BigQueryDataObject(override val id: DataObjectId,
                              (@transient implicit val instanceRegistry: InstanceRegistry)
 extends TableDataObject with CanCreateSparkDataFrame {
 
-  // as per documentation, you can omit dataset if it's defined in the table name
-  assert(table.db.isDefined || table.name.split(".").length==2, "You must either define dataset or include it in the table name (dataset.table)")
-  val tblDataset: String = table.db.getOrElse(table.name.split(".")(0))
-  val tblName: String = if(table.name.contains(".")) table.name.split(".")(1) else table.name
+  // TODO: dataset can also be defined on connection
+  assert(table.db.isDefined, "Dataset needs to be defined for Bigquery tables.")
+  assert(!table.name.contains("."), s"Bigquery table name must not contain a dot. Please use table.db to define dataset name.")
 
   @transient private var bigQueryOptionsHolder: BigQuery = _
   def bigQuery: BigQuery= {
@@ -90,9 +89,8 @@ extends TableDataObject with CanCreateSparkDataFrame {
   // Adapted from https://cloud.google.com/bigquery/docs/samples/bigquery-dataset-exists
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
     try {
-      val dataset = bigQuery.getDataset(DatasetId.of(tblDataset))
-      if (dataset != null) true
-      else false
+      val dataset = bigQuery.getDataset(DatasetId.of(table.db.get))
+      (dataset != null)
     } catch {
       case e: BigQueryException =>
         logger.error(s"Error when checking if dataset exists ${e.getMessage}")
@@ -103,7 +101,7 @@ extends TableDataObject with CanCreateSparkDataFrame {
   // Adapted from https://cloud.google.com/bigquery/docs/samples/bigquery-table-exists
   override def isTableExisting(implicit context: ActionPipelineContext): Boolean = {
     try {
-      val tbl = bigQuery.getTable(TableId.of(tblDataset, tblName))
+      val tbl = bigQuery.getTable(TableId.of(table.db.get, table.name))
       if (tbl != null && tbl.exists) {
         true
       }
@@ -115,20 +113,16 @@ extends TableDataObject with CanCreateSparkDataFrame {
     }
   }
 
+  @throws[BigQueryException]
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
-    try {
-      val success = bigQuery.delete(TableId.of(tblDataset, tblName))
-      if (success) logger.info(s"BigQuery table $tblDataset.$tblName dropped successfully.")
-      else logger.warn(s"Table to drop was not found: $tblDataset.$tblName")
-    } catch {
-      case e: BigQueryException =>
-        logger.error(s"Table $tblDataset.$tblName was not deleted. ${e.getMessage}")
-    }
+    val success = bigQuery.delete(TableId.of(table.db.get, table.name))
+    if (success) logger.info(s"BigQuery table $table.db.get.$table.name dropped successfully.")
+    else logger.warn(s"Table to drop was not found: $table.db.get.$table.name")
   }
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
 
-    val queryOrTable = table.query.getOrElse(tblDataset+"."+tblName)
+    val queryOrTable = table.query.getOrElse(table.db.get+"."+table.name)
 
     val df = context.sparkSession
       .read
