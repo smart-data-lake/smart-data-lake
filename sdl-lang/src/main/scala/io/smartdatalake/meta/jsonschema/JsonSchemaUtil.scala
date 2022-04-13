@@ -81,7 +81,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
     val jsonRootDef = SchemaRootObjectDef(
       `$schema` = "http://json-schema.org/draft-07/schema#",
       version = version,
-      id = "sdl-schema.json#",
+      id = s"sdl-schema-$version.json#",
       properties = ListMap(
         globalKey -> globalJsonDef,
         connectionsKey -> JsonMapDef(JsonOneOfDef(registry.getJsonRefDefs(typeOf[Connection]), Some("Map Connection name : definition"))),
