@@ -33,7 +33,6 @@ private[smartdatalake] trait SdlConfigObject extends ConfigHolder {
   def id: ConfigObjectId
 
   validateId(id.id)
-
 }
 
 object SdlConfigObject {
