@@ -20,12 +20,11 @@ import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getDataObjectCo
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.action.{Action, SDLExecutionId}
+import io.smartdatalake.workflow.action.{Action, CopyAction, SDLExecutionId}
 import io.smartdatalake.workflow.dataobject.DataObject
 import org.eclipse.jetty.websocket.api.{Session, StatusCode, WebSocketAdapter}
 
 import java.time.LocalDateTime
-import java.util.Locale
 
 class AgentServerSocket(config: AgentServerConfig, agentController: AgentController) extends WebSocketAdapter with SmartDataLakeLogger {
 
@@ -53,13 +52,20 @@ class AgentServerSocket(config: AgentServerConfig, agentController: AgentControl
 
     val actions: Map[ActionId, Action] = getActionConfigMap(configFromString)
       .map { case (id, config) => (ActionId(id), parseConfigObjectWithId[Action](id, config)) }
-    instanceRegistry.register(actions)
+    val actions2 = actions.map {
+      case (id, action: CopyAction) => (id, action.copy(remoteActionConfig = None))
+    }
+
+
+    instanceRegistry.register(actions2)
 
     agentController.sdlb.exec(config.sdlConfig, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), Seq(), None, Seq(), simulation = false, globalConfig = GlobalConfig())(agentController.instanceRegistry)
 
     println("ER HAT ES GESCHAFFT")
 
-    if (message.toLowerCase(Locale.US).contains(EndConnection)) {
+    getSession.getRemote.sendString(EndConnection.toString)
+
+    if (message.contains(EndConnection)) {
       getSession.close(StatusCode.NORMAL, "Connection closed by client")
     }
   }

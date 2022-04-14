@@ -268,6 +268,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * @param subFeeds [[SparkSubFeed]]'s to be processed
    * @return processed [[SparkSubFeed]]'s
    */
+  //TODO should Remote/Non Remote Logic happen here?
   def exec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed]
 
   /**

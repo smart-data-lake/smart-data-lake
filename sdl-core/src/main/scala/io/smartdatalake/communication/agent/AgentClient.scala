@@ -25,12 +25,13 @@ import org.eclipse.jetty.websocket.client.WebSocketClient
 import java.net.URI
 
 case class AgentClient(remoteActionConfig: RemoteActionConfig) {
+  val socket = new AgentClientSocket()
   def sendAction(actionToSerialize: Action): Unit = {
     val uri = URI.create(remoteActionConfig.remoteAgentURL)
     val client = new WebSocketClient
 
     client.start()
-    val socket = new AgentClientSocket()
+
     val fut = client.connect(socket, uri)
     // Wait for Connect
     val session = fut.get

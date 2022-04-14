@@ -18,10 +18,11 @@
  */
 package io.smartdatalake.workflow.action
 
+import io.smartdatalake.communication.agent.AgentClient
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformerDef, SQLDfTransformer}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase, SubFeed}
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 
@@ -89,12 +90,25 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
    * apply transformer to SubFeed
    */
   protected def applyTransformers(transformers: Seq[GenericDfTransformerDef], inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
-    val duplicateTransformerNames = transformers.groupBy(_.name).values.filter(_.size>1).map(_.head.name)
+    val duplicateTransformerNames = transformers.groupBy(_.name).values.filter(_.size > 1).map(_.head.name)
     assert(!transformers.exists(_.isInstanceOf[SQLDfTransformer]) || duplicateTransformerNames.isEmpty, s"($id) transformers.name must be unique if SQLDfTransformer is used, but duplicate (default?) names ${duplicateTransformerNames.mkString(", ")} where detected")
-    val (transformedSubFeed, _) = transformers.foldLeft((inputSubFeed,Option.empty[String])){
-      case ((subFeed,previousTransformerName), transformer) => (transformer.applyTransformation(id, subFeed, previousTransformerName), Some(transformer.name))
+
+    if (remoteActionConfig.isDefined && context.phase == ExecutionPhase.Exec) {
+      println("Arrived here")
+      val agentClient = AgentClient(remoteActionConfig.get)
+      agentClient.sendAction(this)
+
+      while (agentClient.socket.actionStillRunning) {
+        Thread.sleep(1000)
+        println("waiting...")
+      }
+    }
+
+    val (transformedSubFeed, _) = transformers.foldLeft((inputSubFeed, Option.empty[String])) {
+      case ((subFeed, previousTransformerName), transformer) => (transformer.applyTransformation(id, subFeed, previousTransformerName), Some(transformer.name))
     }
     // Note that transformed partition values are set by execution mode.
     outputSubFeed.withDataFrame(transformedSubFeed.dataFrame)
   }
+
 }

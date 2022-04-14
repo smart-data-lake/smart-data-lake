@@ -25,7 +25,6 @@ import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getDataObjectCo
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.testutils.TestUtil.sparkSessionBuilder
 import io.smartdatalake.workflow.action.{Action, CopyAction}
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject._
@@ -77,7 +76,7 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
     //Contents of the action and objects should match the contents of /configremote/application.conf
     assert(dataObjects.contains("src1") && dataObjects.contains("tgt1") && actions.contains("a"))
   }
-  test("sdlb run with agent: Test connectivity of Websocket") {
+  test("sdlb run with agent: Test starting remote action from sdlb to agentserver") {
 
     val feedName = "test"
 
@@ -96,9 +95,6 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
     val sdl2Config = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = None)
     val agentController: AgentController = AgentController(new InstanceRegistry, sdlb2)
     AgentServer.start(AgentServerConfig(sdlConfig = sdl2Config), agentController)
-
-
-    sparkSessionBuilder(withHive = true).getOrCreate
 
     //Run SDLB
     sdlb.run(sdlConfig)
