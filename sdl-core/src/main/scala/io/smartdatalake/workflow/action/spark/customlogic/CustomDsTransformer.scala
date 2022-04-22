@@ -43,9 +43,9 @@ trait CustomDsTransformer[In <: scala.Product, Out <: scala.Product] extends Ser
    */
   def transform(session: SparkSession, options: Map[String, String], inputDS: Dataset[In], dataObjectId: String): Dataset[Out]
 
-  def transformWithTypeConversion(session: SparkSession, options: Map[String, String], inputDf: DataFrame, dataObjectId: String)(implicit typeTag: TypeTag[In]): DataFrame = {
-    val myObjEncoder = org.apache.spark.sql.Encoders.product[In]
-    transform(session, options, inputDf.as(myObjEncoder), dataObjectId).toDF
+  private[smartdatalake] def transformWithTypeConversion(session: SparkSession, options: Map[String, String], inputDf: DataFrame, dataObjectId: String)(implicit typeTag: TypeTag[In]): DataFrame = {
+    val inputDSEncoder = org.apache.spark.sql.Encoders.product[In]
+    transform(session, options, inputDf.as(inputDSEncoder), dataObjectId).toDF
   }
 
   /**

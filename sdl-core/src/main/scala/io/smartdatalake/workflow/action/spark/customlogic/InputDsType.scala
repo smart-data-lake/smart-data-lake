@@ -19,4 +19,4 @@
 
 package io.smartdatalake.workflow.action.spark.customlogic
 
-trait OutputDSType extends scala.Product
+abstract class InputDsType extends scala.Product

@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.TestUtil._
-import io.smartdatalake.workflow.action.spark.customlogic.{CustomDsTransformer, InputDSType, OutputDSType}
+import io.smartdatalake.workflow.action.spark.customlogic.{CustomDsTransformer, InputDsType, OutputDsType}
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsTransformer
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.CsvFileDataObject
@@ -32,9 +32,9 @@ import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import java.nio.file.Files
 
-case class InputDataSet(name: String, rating: Int) extends InputDSType
+case class InputDataSet(name: String, rating: Int) extends InputDsType
 
-case class OutputDataSet(name: String, rating: Int, doubled_rating: Int) extends OutputDSType
+case class OutputDataSet(name: String, rating: Int, doubled_rating: Int) extends OutputDsType
 
 class TestDSTransformer extends CustomDsTransformer[InputDataSet, OutputDataSet] {
 
