@@ -31,7 +31,7 @@ import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils}
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.{col, lit}
@@ -390,6 +390,16 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     implicit val helper: SparkSubFeed.type = SparkSubFeed
     val deltaTable = DeltaTable.forName(context.sparkSession, table.fullName)
     partitionValues.map(_.getFilterExpr).foreach(expr => deltaTable.delete(expr.exprSql))
+  }
+
+  override def movePartitions(partitionValues: Seq[(PartitionValues, PartitionValues)])(implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
+    val deltaTable = DeltaTable.forName(context.sparkSession, table.fullName)
+    partitionValues.foreach {
+      case (pvExisting, pvNew) =>
+        deltaTable.update(pvExisting.getFilterExpr(SparkSubFeed).asInstanceOf[SparkColumn].inner, pvNew.elements.mapValues(lit))
+        logger.info(s"($id) Partition $pvExisting moved to $pvNew")
+    }
   }
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = {

@@ -97,6 +97,11 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     val resultat: Boolean = expected.isEqual(actual)
     if (!resultat) TestUtil.printFailedTestResult("CustomDf2DeltaTable_partitioned",Seq())(actual)(expected)
     assert(resultat)
+
+    // move partition
+    assert(targetDO.listPartitions.map(_.elements).toSet == Set(Map("num" -> "0"), Map("num" -> "1")))
+    targetDO.movePartitions(Seq((PartitionValues(Map("num" -> "0")), PartitionValues(Map("num" -> "2")))))
+    assert(targetDO.listPartitions.map(_.elements).toSet == Set(Map("num" -> "1"), Map("num" -> "2")))
   }
 
   test("SaveMode overwrite with different schema") {
