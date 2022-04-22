@@ -148,7 +148,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     val inputIds = if (handleRecursiveInputsAsSubFeeds) (inputs ++ recursiveInputs).map(_.id) else inputs.map(_.id)
     val superfluousSubFeeds = subFeeds.map(_.dataObjectId).diff(inputIds)
     val missingSubFeeds = inputIds.diff(subFeeds.map(_.dataObjectId))
-    assert(superfluousSubFeeds.isEmpty && missingSubFeeds.isEmpty, s"($id) input SubFeed's must match input DataObjects: superfluous=${superfluousSubFeeds.mkString(",")} missing=${missingSubFeeds.mkString(",")})")
+    assert(superfluousSubFeeds.isEmpty && missingSubFeeds.isEmpty, s"($id) input SubFeeds must match input DataObjects: superfluous=${superfluousSubFeeds.mkString(",")} missing=${missingSubFeeds.mkString(",")})")
   }
 
   override final def init(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = {
