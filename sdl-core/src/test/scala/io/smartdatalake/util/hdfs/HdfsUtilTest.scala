@@ -20,8 +20,7 @@
 package io.smartdatalake.util.hdfs
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Options.Rename
-import org.apache.hadoop.fs.{FileContext, FileSystem, Path}
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.scalatest.FunSuite
 
 import java.nio.file.Files
@@ -47,12 +46,40 @@ class HdfsUtilTest extends FunSuite {
     val tempPathSubdir = new Path(tempPath, "test")
     implicit val filesystem: FileSystem = path.getFileSystem(new Configuration())
     filesystem.mkdirs(path)
-    HdfsUtil.touchFile(new Path(path,"test1"))
-    HdfsUtil.touchFile(new Path(tempPathSubdir,"test2"))
+    HdfsUtil.touchFile(new Path(path, "test1"))
+    HdfsUtil.touchFile(new Path(tempPathSubdir, "test2"))
     filesystem.rename(tempPathSubdir, path)
     assert(filesystem.listStatus(tempPath).isEmpty)
     assert(filesystem.listStatus(path).map(_.getPath.getName).toSeq.sorted == Seq("temp", "test", "test1"))
     assert(filesystem.listStatus(new Path(path, "test")).map(_.getPath.getName).toSeq == Seq("test2"))
   }
 
+  test("check isSubdirectory") {
+    val tempDir = Files.createTempDirectory("hdfsUtil")
+    val path1 = new Path(tempDir.toString, "path1")
+    val path2 = new Path(tempDir.toString, "path2")
+    val subPath1 = new Path(path1, "test")
+    val subPath2 = new Path(path2, "test")
+    assert(HdfsUtil.isSubdirectory(subPath1, path1))
+    assert(!HdfsUtil.isSubdirectory(path1, path1))
+    assert(!HdfsUtil.isSubdirectory(subPath2, path1))
+  }
+
+  test("delete empty parent directories") {
+    val tempDir = Files.createTempDirectory("hdfsUtil")
+    val path1 = new Path(tempDir.toString, "path1")
+    implicit val filesystem: FileSystem = path1.getFileSystem(new Configuration())
+    val subPath1 = new Path(path1, "t1")
+    val subPath2 = new Path(subPath1, "t2")
+    val subPath3 = new Path(subPath2, "t3")
+    filesystem.mkdirs(subPath2) // only create path1/t1/t2, but not t3!
+    // path1/t1 is not empty and should not be deleted
+    HdfsUtil.deleteEmptyParentPath(subPath2, path1)
+    assert(filesystem.exists(subPath2))
+    // path1/t1/t2 is not empty and should be deleted
+    HdfsUtil.deleteEmptyParentPath(subPath3, path1)
+    assert(!filesystem.exists(subPath2))
+    assert(!filesystem.exists(subPath1))
+    assert(filesystem.exists(path1))
+  }
 }

@@ -137,6 +137,35 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   }
 
   /**
+   * Deletes parent directories of path if they are empty.
+   * Handles all parent directories up-to base path.
+   * Stops if a not empty directory is found.
+   */
+  def deleteEmptyParentPath( path: Path, basePath: Path )(implicit fs: FileSystem) : Unit = {
+    assert(isSubdirectory(path, basePath), s"$path is not a subdirectory of $basePath")
+    val parentPath = path.getParent
+    if (parentPath.depth() > basePath.depth) {
+      if (fs.exists(parentPath) && fs.listStatus(parentPath).isEmpty) {
+        fs.delete(parentPath, false) // recursive=false
+        logger.info(s"Hadoop path ${parentPath} deleted.")
+      }
+      deleteEmptyParentPath(parentPath, basePath)
+    }
+  }
+
+  /**
+   * Check if subPath is a subdirectory of path
+   */
+  def isSubdirectory( subPath: Path, path: Path): Boolean = {
+    if (subPath.depth() <= path.depth()) false
+    else {
+      val subPathParent = subPath.getParent
+      if (subPathParent.depth() == path.depth()) subPathParent == path
+      else isSubdirectory(subPathParent, path)
+    }
+  }
+
+  /**
    * In contrast to deletePath this supports "globs"
    */
   def deleteFiles(path: Path, doWarn:Boolean)(implicit fs: FileSystem) : Unit = {
@@ -277,6 +306,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
     val newPartitionPath = new Path(basePath, newPartition.getPartitionString(partitionLayout))
     moveFiles( existingPartitionPathWithFilenameGlobs, newPartitionPath, addPrefixIfExisting = true)
     deletePath(existingPartitionPath, doWarn = true)
+    deleteEmptyParentPath(existingPartitionPath, basePath)
   }
 
   def touchFile(path: Path)(implicit filesystem: FileSystem): Unit = {
