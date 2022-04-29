@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action.spark.customlogic
 
 
 import io.smartdatalake.util.hdfs.PartitionValues
-import org.apache.spark.sql.{DataFrame, Dataset, Encoder, SparkSession}
+import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -29,8 +29,7 @@ import scala.reflect.runtime.universe.TypeTag
  * When you implement this interface, you need to provide two case classes: One for your input Dataset
  * and one for your output Dataset.
  */
-trait CustomDsTransformer[In <: scala.Product, Out <: scala.Product] extends Serializable {
-  implicit def outputEncoder(implicit typeTag: TypeTag[Out]): Encoder[Out] = org.apache.spark.sql.Encoders.product[Out]
+trait CustomDsTransformer[In <: Product, Out <: Product] extends Serializable {
 
   /**
    * Function to be implemented to define the transformation between an input and output DataFrame (1:1)
@@ -60,6 +59,3 @@ trait CustomDsTransformer[In <: scala.Product, Out <: scala.Product] extends Ser
    */
   def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Option[Map[PartitionValues, PartitionValues]] = None
 }
-
-
-
