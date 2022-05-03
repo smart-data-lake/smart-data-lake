@@ -4311,13 +4311,13 @@
             "description" : "Configuration for a GenericDfTransformerDef to be applied",
             "oneOf" : [ {
               "type" : "object",
-              "description" : "Apply a column blacklist to a DataFrame.",
+              "description" : "Apply a column whitelist to a DataFrame.",
               "additionalProperties" : false,
-              "required" : [ "columnBlacklist", "type" ],
-              "title" : "BlacklistTransformer",
+              "required" : [ "columnWhitelist", "type" ],
+              "title" : "WhitelistTransformer",
               "properties" : {
                 "type" : {
-                  "const" : "BlacklistTransformer"
+                  "const" : "WhitelistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -4327,9 +4327,9 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnBlacklist" : {
+                "columnWhitelist" : {
                   "type" : "array",
-                  "description" : "List of columns to exclude from DataFrame",
+                  "description" : "List of columns to keep from DataFrame",
                   "items" : {
                     "type" : "string"
                   }
@@ -4759,17 +4759,6 @@
               }
             }, {
               "type" : "object",
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers.",
-              "additionalProperties" : false,
-              "required" : [ "type" ],
-              "title" : "OptionsGenericDfTransformer",
-              "properties" : {
-                "type" : {
-                  "const" : "OptionsGenericDfTransformer"
-                }
-              }
-            }, {
-              "type" : "object",
               "description" : "Apply a filter condition to a DataFrame.",
               "additionalProperties" : false,
               "required" : [ "filterClause", "type" ],
@@ -4797,13 +4786,24 @@
               }
             }, {
               "type" : "object",
-              "description" : "Apply a column whitelist to a DataFrame.",
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers.",
               "additionalProperties" : false,
-              "required" : [ "columnWhitelist", "type" ],
-              "title" : "WhitelistTransformer",
+              "required" : [ "type" ],
+              "title" : "OptionsGenericDfTransformer",
               "properties" : {
                 "type" : {
-                  "const" : "WhitelistTransformer"
+                  "const" : "OptionsGenericDfTransformer"
+                }
+              }
+            }, {
+              "type" : "object",
+              "description" : "Apply a column blacklist to a DataFrame.",
+              "additionalProperties" : false,
+              "required" : [ "columnBlacklist", "type" ],
+              "title" : "BlacklistTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "BlacklistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -4813,9 +4813,9 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnWhitelist" : {
+                "columnBlacklist" : {
                   "type" : "array",
-                  "description" : "List of columns to keep from DataFrame",
+                  "description" : "List of columns to exclude from DataFrame",
                   "items" : {
                     "type" : "string"
                   }
@@ -5981,7 +5981,7 @@
       }
     }
   },
-  "id" : "sdl-schema.json#",
+  "id" : "sdl-schema-2.3.0-SNAPSHOT.json#",
   "version" : "2.3.0-SNAPSHOT",
   "$schema" : "http://json-schema.org/draft-07/schema#"
 }
