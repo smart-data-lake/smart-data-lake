@@ -18,19 +18,20 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
+import io.smartdatalake.util.misc.{CompactionUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.spark.CollectSetDeterministic.collect_set_deterministic
 import io.smartdatalake.util.spark.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
-import io.smartdatalake.util.misc.CompactionUtil
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.{DataFrameUtil, Observation}
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
-import org.apache.spark.sql.functions.input_file_name
-import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
+import org.apache.spark.sql.functions.{col, input_file_name}
 import org.apache.spark.sql.types.StructType
 
 import scala.reflect.runtime.universe.typeOf
@@ -145,10 +146,33 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
         }
     }
 
-    val df = dfContent.withOptionalColumn(filenameColumn, input_file_name)
+    var df = dfContent.withOptionalColumn(filenameColumn, input_file_name)
+
+    // configure observer to get files processed for incremental execution mode
+    if (filesObserver.isDefined) {
+      assert(filenameColumn.isDefined, s"($id) filenameColumn must be set in order to observe files processed")
+      df = filesObserver.get.on(df, filenameColumn.get)
+      filesObserver = None // now we can already forget it and prepare for another query
+    }
 
     // finalize & return DataFrame
     afterRead(df)
+  }
+
+  // Store files observation object between call to setupFilesObserver until it is used in getSparkDataFrame.
+  private var filesObserver: Option[FilesObservation] = None
+
+  /**
+   * Setup an observation of files processed through custom metrics.
+   * This is used for incremental processing to keep track of files processed.
+   * Note that filenameColumn needs to be configured for the DataObject in order for this to work.
+   */
+  def setupFilesObserver(): FilesObservation = {
+    synchronized {
+      if (filesObserver.isDefined) throw new IllegalStateException(s"($id) files observation already set - concurrent use between setupFilesObserver and getSparkDataFrame are not supported!")
+      filesObserver = Some(new FilesObservation(id))
+      filesObserver.get
+    }
   }
 
   override def getStreamingDataFrame(options: Map[String, String], pipelineSchema: Option[StructType])(implicit context: ActionPipelineContext): DataFrame = {
@@ -266,4 +290,28 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
     CompactionUtil.compactHadoopStandardPartitions(this, partitionValues)
   }
 
+}
+
+/**
+ * Observation of files processed using custom metrics.
+ */
+private[smartdatalake] class FilesObservation(dataObjectId: DataObjectId) extends Observation with SmartDataLakeLogger {
+
+  /**
+   * Setup observation of custom metric on Dataset.
+   */
+  def on[T](ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
+    on(ds, collect_set_deterministic(col(filenameColumnName)).as("filesProcessed"))
+  }
+
+  /**
+   * Get processed files observation result.
+   * Note that this blocks until the query finished successfully. Call only after Spark action was started on observed Dataset.
+   */
+  def getFilesProcessed: Seq[String] = {
+    val files = waitFor.getOrElse("filesProcessed", throw new IllegalStateException(s"($dataObjectId) Did not receive filesProcessed observation!"))
+      .asInstanceOf[Seq[String]]
+    if (logger.isDebugEnabled()) logger.debug(s"($dataObjectId) files processed: ${files.mkString(", ")}")
+    files
+  }
 }

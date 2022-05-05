@@ -108,9 +108,12 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
 
   override def deleteFileRefs(fileRefs: Seq[FileRef])(implicit context: ActionPipelineContext): Unit = {
     // delete given files on hdfs
-    fileRefs.foreach { file =>
-      filesystem.delete(new Path(file.fullPath), false) // recursive=false
+    fileRefs.foreach { file => deleteFile(new Path(file.fullPath))
     }
+  }
+
+  def deleteFile(file: Path)(implicit context: ActionPipelineContext): Unit = {
+    filesystem.delete(file, false) // recursive=false
   }
 
   /**
