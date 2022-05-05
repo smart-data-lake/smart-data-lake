@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.workflow.action
 
+import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.TestUtil._
@@ -59,8 +60,7 @@ class ScalaClassSparkDsTransformerTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.clear()
   }
 
-  test("One simple Dataset transformation with different input and output Dataset-type") {
-
+  test("One simple Dataset transformation with different input and output Dataset-type (direct call to exec)") {
     // setup DataObjects
     // source has partition columns dt and type
     val srcDO = CsvFileDataObject("src1", tempPath + "/src1", partitions = Seq("name")
@@ -85,6 +85,29 @@ class ScalaClassSparkDsTransformerTest extends FunSuite with BeforeAndAfter {
     val srcSubFeed = SparkSubFeed(None, "src1", partitionValues = Seq())
     testAction.exec(Seq(srcSubFeed))
 
+    val actual = tgt1DO.getSparkDataFrame().as[OutputDataSet].head()
+    assert(actual.doubled_rating == 10)
+  }
+
+  test("One simple Dataset transformation with different input and output Dataset-type using config file") {
+
+    val sdlb = new DefaultSmartDataLakeBuilder()
+    // setup input data
+    val srcDO = CsvFileDataObject("src1DS", "target/src1DS", partitions = Seq(),
+      schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
+
+    // fill src with first files
+    val dfSrc1 = Seq(("john", 5)).toDF("name", "rating")
+    srcDO.writeSparkDataFrame(dfSrc1, Seq())
+
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Some(Seq(
+      getClass.getResource("/configScalaClassSparkDsTransformer/application.conf").getPath))
+    )
+    //Run SDLB
+    sdlb.run(sdlConfig)
+
+    val tgt1DO = CsvFileDataObject("tgt1DS", "target/tgt1DS", partitions = Seq("name")
+      , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int, doubled_rating int"))))
     val actual = tgt1DO.getSparkDataFrame().as[OutputDataSet].head()
     assert(actual.doubled_rating == 10)
   }
