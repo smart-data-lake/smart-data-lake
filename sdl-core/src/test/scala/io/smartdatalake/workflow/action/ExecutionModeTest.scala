@@ -207,6 +207,11 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
     val subFeed: FileSubFeed = FileSubFeed(fileRefs = None, dataObjectId = fileEmptyDO.id, partitionValues = Seq())
     intercept[NoDataToProcessWarning](executionMode.apply(ActionId("test"), fileEmptyDO, fileEmptyDO, subFeed, PartitionValues.oneToOneMapping))
   }
+
+  test("FileIncrementalMoveMode create archive filename") {
+    val executionMode = FileIncrementalMoveMode(archiveSubdirectory = Some("_archive"))
+    assert(executionMode.createArchiveFileName("hdfs://nameservice1/test/abc.csv") == "hdfs://nameservice1/test/_archive/abc.csv")
+  }
 }
 
 class TestCustomPartitionMode() extends CustomPartitionModeLogic {

@@ -22,8 +22,6 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
 import io.smartdatalake.workflow.{ActionPipelineContext, FileRefMapping}
-import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.SparkSession
 
 private[smartdatalake] trait FileRefDataObject extends FileDataObject {
 
@@ -115,7 +113,12 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
   /**
    * Delete given files. This is used to cleanup files after they are processed.
    */
-  def deleteFileRefs(fileRefs: Seq[FileRef])(implicit context: ActionPipelineContext): Unit = throw new RuntimeException(s"($id) deleteFileRefs not implemented")
+  def deleteFile(file: String)(implicit context: ActionPipelineContext): Unit = throw new RuntimeException(s"($id) deleteFileRefs not implemented")
+
+  /**
+   * Rename given file. This is used to cleanup files after they are processed.
+   */
+  def renameFile(file: String, newFile: String)(implicit context: ActionPipelineContext): Unit = throw new RuntimeException(s"($id) deleteFileRefs not implemented")
 
   /**
    * Delete all data. This is used to implement SaveMode.Overwrite.

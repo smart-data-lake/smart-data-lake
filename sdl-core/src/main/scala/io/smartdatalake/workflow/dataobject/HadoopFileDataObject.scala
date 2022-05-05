@@ -106,14 +106,22 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     files.nonEmpty
   }
 
-  override def deleteFileRefs(fileRefs: Seq[FileRef])(implicit context: ActionPipelineContext): Unit = {
-    // delete given files on hdfs
-    fileRefs.foreach { file => deleteFile(new Path(file.fullPath))
-    }
+  override def deleteFile(file: String)(implicit context: ActionPipelineContext): Unit = {
+    deleteFile(new Path(file))
+  }
+
+  override def renameFile(file: String, newFile: String)(implicit context: ActionPipelineContext): Unit = {
+    renameFile(new Path(file), new Path(newFile))
   }
 
   def deleteFile(file: Path)(implicit context: ActionPipelineContext): Unit = {
+    logger.debug(s"($id) deleteFile $file")
     filesystem.delete(file, false) // recursive=false
+  }
+
+  def renameFile(file: Path, newFile: Path)(implicit context: ActionPipelineContext): Unit = {
+    logger.debug(s"($id) rename file $file to $newFile")
+    filesystem.rename(file, newFile)
   }
 
   /**
@@ -275,6 +283,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    * delete all files inside given path recursively
    */
   def deleteAllFiles(path: Path)(implicit context: ActionPipelineContext): Unit = {
+    logger.info(s"($id) deleteAllFiles $path")
     val dirEntries = filesystem.globStatus(new Path(path, "*")).map(_.getPath)
     dirEntries.foreach { p =>
       if (filesystem.isDirectory(p)) deleteAllFiles(p)

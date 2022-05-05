@@ -32,7 +32,6 @@ import io.smartdatalake.workflow.action.ActionHelper.{getOptionalDataFrame, sear
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
-import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.streaming.{OutputMode, Trigger}
 
 import java.sql.Timestamp
@@ -441,13 +440,17 @@ trait CustomPartitionModeLogic {
 /**
  * Execution mode to incrementally process file-based DataObjects, e.g. FileRefDataObjects and SparkFileDataObjects.
  * For FileRefDataObjects:
- * - All existing files in the input DataObject are processed and removed (deleted) after processing
+ * - All existing files in the input DataObject are processed and removed (deleted or archived) after processing
  * - Input partition values are applied to search for files and also used as output partition values
  * For SparkFileDataObjects:
- * - Files processed are observed by a custom metric and removed (deleted) after processing
+ * - Files processed are observed by a custom metric and removed (deleted or archived) after processing
  * - Partition values preserved.
+ * @param archiveSubdirectory if an archive subdirectory is configured, files are moved into that directory instead of deleted.
+ *                            configure a single directory name which is appended before the filename, e.g. "_archive".
  */
-case class FileIncrementalMoveMode() extends ExecutionMode {
+case class FileIncrementalMoveMode(archiveSubdirectory: Option[String] = None) extends ExecutionMode {
+  assert(archiveSubdirectory.forall(_.nonEmpty))
+  assert(archiveSubdirectory.forall(!_.contains("/")), s"archiveSubdirectory should not contain only one subdirectory name and not nested subdirectory: $archiveSubdirectory")
 
   private var sparkFilesObserver: Option[FilesObservation] = None
 
@@ -477,20 +480,47 @@ case class FileIncrementalMoveMode() extends ExecutionMode {
   }
 
   /**
-   * Delete files after read
+   * Remove files after read
    */
   private[smartdatalake] override def postExec(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, mainInputSubFeed: SubFeed, mainOutputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = {
-    logger.info("Cleaning up processed input files")
     (mainInput, mainOutputSubFeed) match {
       case (fileRefInput: FileRefDataObject, fileSubFeed: FileSubFeed) =>
-        fileSubFeed.fileRefMapping.foreach(fileRefs => fileRefInput.deleteFileRefs(fileRefs.map(_.src)))
-      case (inputDataObject: SparkFileDataObject, inputSubFeed: SparkSubFeed) =>
+        fileSubFeed.fileRefMapping.foreach{
+          fileRefs =>
+            logger.info(s"Cleaning up ${fileRefs.size} processed input files")
+            val inputFiles = fileRefs.map(_.src.fullPath)
+            if (archiveSubdirectory.isDefined) {
+              inputFiles.foreach { file =>
+                val archiveFile = createArchiveFileName(file)
+                fileRefInput.renameFile(file, archiveFile)
+              }
+            } else {
+              inputFiles.foreach(file => fileRefInput.deleteFile(file))
+            }
+        }
+      case (sparkDataObject: SparkFileDataObject, sparkSubFeed: SparkSubFeed) =>
         val files = sparkFilesObserver
           .getOrElse(throw new IllegalStateException(s"($actionId) FilesObserver not setup for ${mainInput.id}"))
           .getFilesProcessed
-        files.foreach(file => inputDataObject.deleteFile(new Path(file)))
+        logger.info(s"Cleaning up ${files.size} processed input files")
+        files.foreach {
+          file =>
+            if (archiveSubdirectory.isDefined) {
+              val archiveFile = createArchiveFileName(file)
+              sparkDataObject.renameFile(file, archiveFile)
+            } else {
+              sparkDataObject.deleteFile(file)
+            }
+        }
       case _ => throw ConfigurationException(s"($actionId) FileIncrementalMoveMode needs FileRefDataObject with FileSubFeed or SparkFileDataObject with SparkSubFeed as input")
     }
+  }
+
+  private[smartdatalake] def createArchiveFileName(file: String) = {
+    assert(archiveSubdirectory.isDefined)
+    assert(file.contains("/"), s"Filename should be absolute path, but no directory separators found in $file")
+    val components = file.split("/")
+    (components.dropRight(1) :+ archiveSubdirectory.get :+ components.last).mkString("/")
   }
 }
 
