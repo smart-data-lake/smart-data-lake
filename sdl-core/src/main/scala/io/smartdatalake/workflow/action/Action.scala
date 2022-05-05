@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
-import io.smartdatalake.definitions.{Condition, DataObjectStateIncrementalMode, Environment, ExecutionMode, ExecutionModeResult}
+import io.smartdatalake.definitions._
 import io.smartdatalake.util.dag.{DAGNode, TaskSkippedDontStopWarning}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -29,7 +29,6 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.dataobject.{CanCreateIncrementalOutput, DataObject, TransactionalSparkTableDataObject}
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions.expr
 
@@ -188,7 +187,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
         val data = SubFeedsExpressionData.fromSubFeeds(subFeeds)
         if (!c.evaluate(id, Some("executionCondition"), data)) {
           val descriptionText = c.description.map(d => s""""$d" """).getOrElse("")
-          val msg = s"""($id) execution skipped because of failed executionCondition ${descriptionText}expression="${c.expression}" $data"""
+          val msg = s"""($id) execution skipped because of failed executionCondition ${descriptionText} expression="${c.expression}" $data"""
           (false, Some(msg))
         } else (true, None)
       }.getOrElse {
