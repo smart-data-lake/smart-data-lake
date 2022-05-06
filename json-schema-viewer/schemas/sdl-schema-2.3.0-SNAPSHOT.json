@@ -3658,6 +3658,25 @@
           }
         }
       },
+      "ColNamesLowercaseTransformer" : {
+        "type" : "object",
+        "description" : "Convert all column names to lowercase.",
+        "additionalProperties" : false,
+        "title" : "ColNamesLowercaseTransformer",
+        "properties" : {
+          "type" : {
+            "const" : "ColNamesLowercaseTransformer"
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "name of the transformer"
+          },
+          "description" : {
+            "type" : "string",
+            "description" : "Optional description of the transformer"
+          }
+        }
+      },
       "DataValidationTransformer" : {
         "type" : "object",
         "description" : "Apply validation rules to a DataFrame and collect potential violation error messages in a new column.",
@@ -4621,32 +4640,6 @@
               }
             }, {
               "type" : "object",
-              "description" : "Add additional columns to the DataFrame by extracting information from the context.",
-              "additionalProperties" : false,
-              "required" : [ "additionalColumns", "type" ],
-              "title" : "AdditionalColumnsTransformer",
-              "properties" : {
-                "type" : {
-                  "const" : "AdditionalColumnsTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                },
-                "additionalColumns" : {
-                  "type" : "object",
-                  "description" : "optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  }
-                }
-              }
-            }, {
-              "type" : "object",
               "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Scala code which is compiled at runtime.\nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The scala code has to implement a function of type[[fnTransformType]] .",
               "additionalProperties" : false,
               "required" : [ "type" ],
@@ -4681,6 +4674,32 @@
                 "runtimeOptions" : {
                   "type" : "object",
                   "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }, {
+              "type" : "object",
+              "description" : "Add additional columns to the DataFrame by extracting information from the context.",
+              "additionalProperties" : false,
+              "required" : [ "additionalColumns", "type" ],
+              "title" : "AdditionalColumnsTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "AdditionalColumnsTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "additionalColumns" : {
+                  "type" : "object",
+                  "description" : "optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
                   "additionalProperties" : {
                     "type" : "string"
                   }
@@ -4755,6 +4774,25 @@
                   "additionalProperties" : {
                     "type" : "string"
                   }
+                }
+              }
+            }, {
+              "type" : "object",
+              "description" : "Convert all column names to lowercase.",
+              "additionalProperties" : false,
+              "required" : [ "type" ],
+              "title" : "ColNamesLowercaseTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "ColNamesLowercaseTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
                 }
               }
             }, {
@@ -5110,6 +5148,8 @@
                 "$ref" : "#/definitions/GenericDfTransformer/AdditionalColumnsTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/BlacklistTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/ColNamesLowercaseTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DataValidationTransformer"
               }, {
@@ -5604,6 +5644,8 @@
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/BlacklistTransformer"
               }, {
+                "$ref" : "#/definitions/GenericDfTransformer/ColNamesLowercaseTransformer"
+              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DataValidationTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/FilterTransformer"
@@ -5856,6 +5898,8 @@
                 "$ref" : "#/definitions/GenericDfTransformer/AdditionalColumnsTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/BlacklistTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/ColNamesLowercaseTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DataValidationTransformer"
               }, {
