@@ -21,18 +21,17 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.definitions._
 import io.smartdatalake.metrics.{SparkStageMetricsListener, SparkStreamingQueryListener}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.ScalaUtil
 import io.smartdatalake.util.spark.DummyStreamProvider
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformerDef, PartitionValueTransformer}
-import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
+import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.streaming.{StreamingQuery, Trigger}
 
@@ -162,7 +161,6 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
           assert(input.isInstanceOf[CanCreateStreamingDataFrame], s"($id) DataObject ${input.id} doesn't implement CanCreateStreamingDataFrame. Can not create StreamingDataFrame for executionMode=SparkStreamingOnceMode")
           logger.info(s"getting streaming DataFrame for ${input.id}")
           val df = input.asInstanceOf[CanCreateStreamingDataFrame].getStreamingDataFrame(m.inputOptions, sparkSubFeed.dataFrame.map(_.schema.inner))
-            .colNamesLowercase // convert to lower case by default
           sparkSubFeed.copy(dataFrame = Some(SparkDataFrame(df)), partitionValues = Seq()) // remove partition values for streaming mode
         } else if (sparkSubFeed.isStreaming.contains(false)) {
           // convert to dummy streaming DataFrame
@@ -192,7 +190,6 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
               logger.info(s"($id) getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
               input.getSubFeed(subFeed.partitionValues, subFeedType) // get SubFeed of specified type with fresh DataFrame
                 .withFilter(subFeed.partitionValues, subFeed.filter)
-                .transform(df => df.colNamesLowercase)
             } else {
               // if skipped create empty DataFrame
               subFeed.withDataFrame(Some(createEmptyDataFrame(input)))
@@ -226,9 +223,8 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
     }
     val readSchema = schema.map(dataObject.createReadSchema)
     readSchema
-      .map(_.toLowerCase) // convert to lower case by default
       .map(s => subFeedHelper.getEmptyDataFrame(s, dataObject.id))
-      .getOrElse(dataObject.getDataFrame(Seq(), subFeedType).filter(subFeedHelper.lit(false)).colNamesLowercase)
+      .getOrElse(dataObject.getDataFrame(Seq(), subFeedType).filter(subFeedHelper.lit(false)))
   }
 
   override protected def preprocessInputSubFeedCustomized(subFeed: DataFrameSubFeed, ignoreFilters: Boolean, isRecursive: Boolean)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
