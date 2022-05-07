@@ -32,7 +32,7 @@ import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, 
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
-import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore}
+import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, ExecutionPhase, HadoopFileActionDAGRunStateStore}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.udf
@@ -475,7 +475,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val action1 = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(DataObjectStateIncrementalMode())
       , transformers = Seq(AdditionalColumnsTransformer(additionalColumns = Map("run_id"-> "runId")))
       , metadata = Some(ActionMetadata(feed = Some(feedName))))
-    instanceRegistry.register(action1.copy())
+    instanceRegistry.register(action1)
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
     sdlb.run(sdlConfig)
 
@@ -491,13 +491,22 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val dfResult2 = tgt1DO.getSparkDataFrame(Seq())
     assert(dfResult2.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head == (20,20))
 
-    // start 3rd dag run
+    // start 3rd dag run -> no data
     action1.reset
     sdlb.run(sdlConfig)
 
     // check results
     val dfResult3 = tgt1DO.getSparkDataFrame(Seq())
-    assert(dfResult3.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head == (30,30))
+    assert(dfResult3.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head == (20,20))
+
+    // start 4th dag run
+    // TODO: keep state when skipped!
+    action1.reset
+    sdlb.run(sdlConfig)
+
+    // check results
+    val dfResult4 = tgt1DO.getSparkDataFrame(Seq())
+    assert(dfResult4.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head == (30,30))
   }
 
   test("sdlb simulation run") {
@@ -606,11 +615,18 @@ case class TestIncrementalDataObject(override val id: DataObjectId, override val
   // State is the start number of the last delivered increment
   var previousState: Int = 1
   var nextState: Option[Int] = None
+  var noDataCreated: Boolean = false
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
     val session = context.sparkSession
     import session.implicits._
+    // simulate no data for one request
+    if (previousState == 21 && !noDataCreated && context.phase==ExecutionPhase.Exec) {
+      noDataCreated = true
+      throw NoDataToProcessWarning(id.id, "test")
+    }
     nextState = Some(previousState + 10)
+    logger.info(s"($id) selecting values $previousState to ${nextState.get}")
     (previousState until nextState.get).toDF("nb")
   }
 

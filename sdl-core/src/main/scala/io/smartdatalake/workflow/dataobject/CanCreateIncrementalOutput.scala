@@ -19,7 +19,6 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.SparkSession
 
 /**
  * DataObjects should implement this interface to allow incremental processing
@@ -36,6 +35,7 @@ private[smartdatalake] trait CanCreateIncrementalOutput {
 
   /**
    * Return the state of the last increment or empty if no increment was processed.
+   * After the state is returned to SDLB by getState, it should be reset in the DataObject to avoid side-effects (e.g. calling getSparkDataFrame from a unit test).
    */
   def getState: Option[String]
 
