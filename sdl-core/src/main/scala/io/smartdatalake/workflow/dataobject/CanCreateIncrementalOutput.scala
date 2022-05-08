@@ -35,7 +35,6 @@ private[smartdatalake] trait CanCreateIncrementalOutput {
 
   /**
    * Return the state of the last increment or empty if no increment was processed.
-   * After the state is returned to SDLB by getState, it should be reset in the DataObject to avoid side-effects (e.g. calling getSparkDataFrame from a unit test).
    */
   def getState: Option[String]
 

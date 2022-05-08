@@ -63,6 +63,10 @@ sealed trait ExecutionMode extends SmartDataLakeLogger {
     applyConditionsDef.foreach(_.syntaxCheck[DefaultExecutionModeExpressionData](actionId, Some("applyCondition")))
   }
   /**
+   * Called in init phase before initialization. Can be used to initialize dataObjectsState, e.g. for DataObjectStateIncrementalMode
+   */
+  private[smartdatalake] def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit context: ActionPipelineContext): Unit = Unit
+  /**
    * Called in init phase to apply execution mode. Result is stored and re-used in execution phase.
    */
   private[smartdatalake] def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
@@ -374,7 +378,30 @@ case class DataFrameIncrementalMode(compareCol: String
 /**
  * An execution mode for incremental processing by remembering DataObjects state from last increment.
  */
-case class DataObjectStateIncrementalMode() extends ExecutionMode
+case class DataObjectStateIncrementalMode() extends ExecutionMode {
+  private var inputsWithIncrementalOutput: Seq[DataObject with CanCreateIncrementalOutput] = Seq()
+  override def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit context: ActionPipelineContext): Unit = {
+    // initialize dataObjectsState
+    val unrelatedStateDataObjectIds = dataObjectsState.map(_.dataObjectId).diff(subFeeds.map(_.dataObjectId))
+    assert(unrelatedStateDataObjectIds.isEmpty, s"Got state for unrelated DataObjects ${unrelatedStateDataObjectIds.mkString(", ")}")
+    // assert SDL is started with state
+    assert(context.appConfig.statePath.isDefined, s"SmartDataLakeBuilder must be started with state path set. Please specify location of state with parameter '--state-path'.")
+    // set DataObjects state
+    inputsWithIncrementalOutput = subFeeds.map(s => context.instanceRegistry.get[DataObject](s.dataObjectId)).flatMap {
+      case input: DataObject with CanCreateIncrementalOutput =>
+        input.setState(dataObjectsState.find(_.dataObjectId == input.id).map(_.state))
+        Some(input)
+      case _ => None
+    }
+    assert(inputsWithIncrementalOutput.nonEmpty, s"DataObjectStateIncrementalMode needs at least one input DataObject implementing CanCreateIncrementalOutput")
+  }
+  override def postExec(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, mainInputSubFeed: SubFeed, mainOutputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = {
+    // update DataObjects incremental state in DataObjectStateIncrementalMode if streaming
+    if (context.appConfig.streaming) {
+      inputsWithIncrementalOutput.foreach(i => i.setState(i.getState))
+    }
+  }
+}
 
 /**
  * An execution mode which just validates that partition values are given.
