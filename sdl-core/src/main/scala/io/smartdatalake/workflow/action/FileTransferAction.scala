@@ -23,9 +23,9 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{Condition, ExecutionMode}
 import io.smartdatalake.util.filetransfer.FileTransfer
-import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRefDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, GenericMetrics}
-import org.apache.spark.sql.SparkSession
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRef, FileRefDataObject}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
 
 /**
  * [[Action]] to transfer files between SFtp, Hadoop and local Fs.
@@ -73,6 +73,23 @@ case class FileTransferAction(override val id: ActionId,
     // return metric to action
     val metrics = Map("files_written"->fileRefMapping.size.toLong)
     WriteSubFeedResult(Some(fileRefMapping.isEmpty), Some(metrics))
+  }
+
+  override def postprocessOutputSubFeedCustomized(subFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {
+    // create output sample file in init-phase
+    if (context.phase == ExecutionPhase.Init) {
+      subFeed.fileRefMapping.flatMap(_.headOption).foreach {
+        sampleFileRefMapping =>
+          val sampleFile = output.createSampleFile
+          // exec only if output returned a sample file to create
+          sampleFile.foreach {
+            file =>
+              val sampleFileTransfer = FileTransfer(input, output, overwrite = true)
+              sampleFileTransfer.exec(Seq(sampleFileRefMapping.copy(tgt = FileRef(file, output.getFilenameFromPath(file), PartitionValues(Map())))))
+          }
+      }
+    }
+    subFeed
   }
 
   override def factory: FromConfigFactory[Action] = FileTransferAction

@@ -217,7 +217,7 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
   def createEmptyDataFrame(dataObject: DataObject with CanCreateDataFrame)(implicit context: ActionPipelineContext): GenericDataFrame = {
     implicit val session: SparkSession = context.sparkSession
     val schema = dataObject match {
-      case input: SparkFileDataObject if input.getSchema(false).isDefined => input.getSchema(false)
+      case input: SparkFileDataObject if input.getSchema.isDefined => input.getSchema
       case input: UserDefinedSchema if input.schema.isDefined => input.schema
       case input: SchemaValidation if input.schemaMin.isDefined => input.schemaMin
       case _ => None

@@ -85,7 +85,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(srcDO.getFileRefs(Seq()).isEmpty)
   }
 
-  test("copy load with custom transformation from code string and incremental move mode (archive)") {
+  test("copy load with custom transformation from code string, incremental move mode (archive) and schema file test") {
 
     // define custom transformation
     val codeStr = """
@@ -109,17 +109,20 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
-    // prepare & start load
+    // prepare data
     val executionMode = FileIncrementalMoveMode(archiveSubdirectory = Some("archive"))
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig), executionMode = Some(executionMode))
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
+
+    // start load
     val srcFiles = srcDO.getFileRefs(Seq()).map(_.fullPath)
     assert(srcFiles.nonEmpty)
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
     action1.postExec(Seq(srcSubFeed),Seq(tgtSubFeed))
 
+    // check result
     val r1 = session.table(s"${tgtTable.fullName}")
       .select($"rating")
       .as[Int].collect().toSeq
@@ -128,6 +131,11 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // check input archived by incremental move mode
     assert(srcDO.getFileRefs(Seq()).isEmpty)
     assert(srcDO.filesystem.exists(new Path(executionMode.createArchiveFileName(srcFiles.head))))
+
+    // start second load without new files - schema should be present because of schema file
+    action1.resetExecutionResult()
+    val tgtSubFeed2 = action1.exec(Seq(srcSubFeed))(contextExec).head
+    intercept[NoDataToProcessWarning](action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed2)))
   }
 
   test("copy load with transformation from sql code") {
@@ -152,9 +160,6 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
-
-    session.table(s"${tgtTable.fullName}").show
-    session.table(s"${tgtTable.fullName}").printSchema
 
     val r1 = session.table(s"${tgtTable.fullName}")
       .select($"lastname")

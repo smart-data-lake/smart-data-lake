@@ -26,7 +26,7 @@ import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.generic.transformer.{SQLDfTransformer, SQLDfsTransformer}
-import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer}
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject._
@@ -482,7 +482,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(recordsTgt2.head == 5)
   }
 
-  test("action dag file ingest - from file to dataframe") {
+  test("action dag file ingest - from file to dataframe with schema inference") {
 
     val feed = "actiondag"
     val srcDir = "testSrc"
@@ -498,8 +498,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(srcDO)
 
     // setup tgt1 CSV DataObject
-    val srcSchema = srcDO.getSparkDataFrame().head.schema // infer schema from original CSV
-    val tgt1DO = new CsvFileDataObject( "tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","), schema = Some(SparkSchema(srcSchema)))
+    val tgt1DO = new CsvFileDataObject( "tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","))
     instanceRegistry.register(tgt1DO)
 
     // setup tgt2 Hive DataObject
@@ -548,12 +547,11 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgt1DO)
 
     // setup tgt2 CSV DataObject
-    val srcSchema = srcDO.getSparkDataFrame().head.schema // infer schema from original CSV
-    val tgt2DO = new CsvFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","), schema = Some(SparkSchema(srcSchema)))
+    val tgt2DO = new CsvFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","))
     instanceRegistry.register(tgt2DO)
 
     // setup tgt3 CSV DataObject
-    val tgt3DO = new CsvFileDataObject( "tgt3", tempDir.resolve("tgt3").toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","), schema = Some(SparkSchema(srcSchema)))
+    val tgt3DO = new CsvFileDataObject( "tgt3", tempDir.resolve("tgt3").toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","))
     instanceRegistry.register(tgt3DO)
 
     // prepare ActionPipeline
