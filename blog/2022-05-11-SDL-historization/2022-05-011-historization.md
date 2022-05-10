@@ -151,21 +151,17 @@ dataObjects {
 }
 ```
 
-Note, the specification of the `dbo.drinks` table from the SQL database. 
+Here we could skip the staging layer for storage and performance reasons, since it is not necessary. In practice this layer is typically used to store raw data, which typically is combined with data from other data sources and pre-processed before merging into the integration layer.
 
-### Action
-On one hand the download is defined, loading the raw data into the staging area. On the other hand the `histData` action defines the historization of the data. 
+### Actions
+The `histData` action defines the copy and historization of the data. 
+By default, the `HistorizeAction` join new with all existing data. The result overwrites all data in the data lake table. 
+Therewith also deleted elements from the source are detected and can be maked as such. All data points get a captured and a delimited timestamp. 
+By default, the result of the join overwrites the existing delta lake table. 
+On the one hand, this procedure can be optimized by only write changed data instead of the whole table. On the other hand, join the join between the existing and the new data can be improved, especially if the source supports CDC. SDL provides features for both topics. These optimizations are discussed later. First, let's run the default way. 
 
 ```
 actions {
-  dwnData {
-    type = CopyAction
-    inputId = ext-data
-    outputId = stg-data
-    metadata {
-      feed = download
-    }
-  }
   histData {
     type = HistorizeAction
     inputId = stg-data
@@ -177,6 +173,8 @@ actions {
 }
 ```
 
+
+
 ## Run
 Now the metastore and the "external" SQL server should already being running within one POD. Now the SDLB container is launched within the same POD, by using 
 
@@ -186,7 +184,9 @@ podman run --hostname localhost -e SPARK_LOCAL_HOSTNAME=localhost --rm --pod sdl
 
 This will initially inject the data into the data lake. 
 
-Launching the [Polynote (click here)](http://localhost:8192) the previous copied notebook `sql_data_monitor.ipynb` provides first the possibility to list the available tables, list the int-data table using a SQL statement and querying the Delta Lake table using SDL Scala libraries. There, two additional columns are visible, dl_ts_captured and dl_ts_delimited. 
+Launching the [Polynote (click here)](http://localhost:8192) the previous copied notebook `sql_data_monitor.ipynb` provides first the possibility to list the available tables, list the int-data table using a SQL statement and querying the Delta Lake table using SDL Scala libraries. 
+
+In the Delta Lake Table we can see there are two additional columns visible: dl_ts_captured and dl_ts_delimited. These are used to track the validity ranges for the data points. If data changes, the original data point gets invalidated by setting the delimted to the current time and a new data point with the new value is created. See example below, after the update. 
 
 ![polynote example output](sdl_sql_injection1res.png)
 
@@ -208,5 +208,4 @@ Then in the notebook the current state can be displayed and compared with the ab
 
 ![polynote updated example output](sdl_sql_injection2res.png)
 
-Not only we see the different time collecting the separate data points, we also see previous values, when the got invalidated and data points which were "deleted". 
-
+Not only we see the different time collecting the separate data points, previous values in separate rows, and "deleted" data points. 
