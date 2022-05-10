@@ -408,13 +408,11 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // create data object
     val tempDir = Files.createTempDirectory("tempHadoopDO")
     val dataObject = ParquetFileDataObject(id = "partitionTest", path = tempDir.toString, saveMode = SDLSaveMode.Append)
-    //dataObject.filesystem.setWriteChecksum(false)
-    //dataObject.filesystem.setVerifyChecksum(false)
 
     // write test data 1
     val df1 = Seq(("A",1),("A",2),("B",3),("B",4)).toDF("p", "value")
     dataObject.writeSparkDataFrame(df1)
-    Thread.sleep(1000) // sleep as SparkFileDataObject works with seconds granularity
+    Thread.sleep(1) // sleep 1 millisecond as file modified date is stored in milliseconds and we need the created file in the next increment
 
     // test 1
     dataObject.setState(None) // initialize incremental output with empty state
@@ -424,7 +422,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // append test data 2
     val df2 = Seq(("B",5)).toDF("p", "value")
     dataObject.writeSparkDataFrame(df2)
-    Thread.sleep(1000) // sleep as SparkFileDataObject works with seconds granularity
+    Thread.sleep(1) // sleep 1 millisecond as file modified date is stored in milliseconds and we need the created file in the next increment
 
     // test 2
     dataObject.setState(newState1)

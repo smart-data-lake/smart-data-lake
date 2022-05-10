@@ -26,7 +26,7 @@ import org.apache.spark.sql.util.QueryExecutionListener
 import java.util.UUID
 
 /**
- * This code is copied from Spark 3.3.0 when it was not yet released (and simplified).
+ * This code is inspired from Spark 3.3.0 when it was not yet released (and simplified).
  * See https://github.com/apache/spark/blob/v3.3.0-rc1/sql/core/src/main/scala/org/apache/spark/sql/Observation.scala
  *
  * Note: the name is used to make metrics unique across parallel queries in the same Spark session

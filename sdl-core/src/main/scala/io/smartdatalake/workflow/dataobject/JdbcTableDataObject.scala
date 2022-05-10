@@ -34,7 +34,7 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{DataType, StructField, StructType}
+import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
 import java.sql.{ResultSet, ResultSetMetaData}
@@ -523,10 +523,6 @@ private[smartdatalake] case class JdbcColumn(name: String, isNameCaseSensitiv: B
   }
   def nameEqualsIgnoreCaseSensitive(name: String): Boolean = {
     this.name.equalsIgnoreCase(name)
-  }
-  def getSparkField(schema: StructType): Option[StructField] = {
-    if (isNameCaseSensitiv) schema.find(_.name.toLowerCase == name.toLowerCase)
-    else schema.find(_.name == name)
   }
 }
 private[smartdatalake] object JdbcColumn {

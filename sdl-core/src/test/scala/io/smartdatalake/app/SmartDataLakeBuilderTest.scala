@@ -500,7 +500,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     assert(dfResult3.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head == (20,20))
 
     // start 4th dag run
-    // TODO: keep state when skipped!
     action1.reset
     sdlb.run(sdlConfig)
 
