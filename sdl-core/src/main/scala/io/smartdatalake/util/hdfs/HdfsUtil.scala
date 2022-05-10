@@ -294,9 +294,22 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
 
   def readHadoopFile(file: String)(implicit hadoopConf: Configuration): String = {
     val path = addHadoopDefaultSchemaAuthority(new Path(file))
-    val fileSystem = getHadoopFsWithConf(path)
-    val is = fileSystem.open(path)
+    val filesystem = getHadoopFsWithConf(path)
+    readHadoopFile(path)(filesystem)
+  }
+
+  def readHadoopFile(file: Path)(implicit filesystem: FileSystem): String = {
+    val is = filesystem.open(file)
     Source.fromInputStream(is).getLines.mkString(sys.props("line.separator"))
+  }
+
+  def writeHadoopFile(file: Path, content: String)(implicit filesystem: FileSystem): Unit = {
+    val os = filesystem.create(file, true)
+    try {
+      os.writeBytes(content)
+    } finally {
+      os.close()
+    }
   }
 
   def movePartition(basePath: Path, existingPartition: PartitionValues, newPartition: PartitionValues, filenameWithGlobs: String)(implicit filesystem: FileSystem): Unit = {

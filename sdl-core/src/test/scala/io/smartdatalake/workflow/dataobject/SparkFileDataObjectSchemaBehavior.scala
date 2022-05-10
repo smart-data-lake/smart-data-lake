@@ -20,13 +20,14 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.spark.DataFrameUtil
-
-import java.io.File
 import io.smartdatalake.workflow.{ActionPipelineContext, SchemaViolationException}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.sql.{AnalysisException, DataFrame, SparkSession}
 import org.scalatest.{FunSuite, Matchers}
+
+import java.io.File
+import java.nio.file.Files
 
 trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
 
@@ -59,9 +60,6 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
         val dataObj = createDataObject(path, Some(StructType(schema)))
         val df = dataObj.getSparkDataFrame()
 
-        df.show()
-        df.printSchema()
-
         df.schema should contain theSameElementsInOrderAs schema
         df shouldBe empty
       } finally {
@@ -90,9 +88,6 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
         val dataObj = createDataObject(path, Some(StructType(userSchema)))
         val df = dataObj.getSparkDataFrame()
 
-        df.show()
-        df.printSchema()
-
         df.schema should contain theSameElementsInOrderAs userSchema
         df shouldBe empty
       } finally {
@@ -111,9 +106,6 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
       try {
         val dataObj = createDataObject(path, None)
         val df = dataObj.getSparkDataFrame()
-
-        df.show()
-        df.printSchema()
 
         df.schema should contain theSameElementsInOrderAs embeddedSchema
         df shouldBe empty
@@ -408,9 +400,9 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
   def createFile(path: String, data: DataFrame = null): Unit
 
   private def tempFilePath(suffix: String): String = {
-    val tempFile = File.createTempFile("temp", suffix)
-    val path = tempFile.getPath
-    FileUtils.forceDelete(tempFile)
-    path
+    val tempDir = Files.createTempDirectory("csv")
+    val tempFile = Files.createTempFile(tempDir, "temp", suffix).toFile
+    FileUtils.forceDelete(tempFile) // we just want the path, but no file created
+    tempFile.getPath
   }
 }

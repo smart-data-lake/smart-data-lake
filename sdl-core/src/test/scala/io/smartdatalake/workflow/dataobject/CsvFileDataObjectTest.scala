@@ -26,7 +26,7 @@ import org.apache.commons.io.{FileUtils, IOUtils}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SaveMode}
 
-import java.io.{File, FileInputStream}
+import java.io.FileInputStream
 import java.nio.file.Files
 import java.util.zip.ZipInputStream
 import scala.util.Random
@@ -39,8 +39,8 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
   import session.implicits._
 
   test("Reading from an empty file with header=true and inferSchema=false results in an empty, schema-less data frame.") {
-    val tempFile = File.createTempFile("temp", "csv")
-    tempFile.deleteOnExit()
+    val tempDir = Files.createTempDirectory("csv")
+    val tempFile = Files.createTempFile(tempDir, "temp", "csv")
     try {
       val config = ConfigFactory.parseString(
         s"""
@@ -50,7 +50,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
            |  header = true
            |  inferSchema = false
            | }
-           | path = "${escapedFilePath(tempFile.getPath)}"
+           | path = "${escapedFilePath(tempFile.toString)}"
            |}
          """.stripMargin)
       val dataObj = CsvFileDataObject.fromConfig(config)
@@ -59,13 +59,13 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
       df.schema shouldBe empty
       df shouldBe empty
     } finally {
-      FileUtils.forceDelete(tempFile)
+      FileUtils.forceDelete(tempDir.toFile)
     }
   }
 
   test("Reading from an empty file with header=true and inferSchema=true results in an empty, schema-less data frame.") {
-    val tempFile = File.createTempFile("temp", "csv")
-    tempFile.deleteOnExit()
+    val tempDir = Files.createTempDirectory("csv")
+    val tempFile = Files.createTempFile(tempDir, "temp", "csv")
     try {
       val config = ConfigFactory.parseString(
         s"""
@@ -75,7 +75,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
            |  header = true
            |  inferSchema = true
            | }
-           | path = "${escapedFilePath(tempFile.getPath)}"
+           | path = "${escapedFilePath(tempFile.toString)}"
            |}
          """.stripMargin)
       val dataObj = CsvFileDataObject.fromConfig(config)
@@ -84,13 +84,13 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
       df.schema shouldBe empty
       df shouldBe empty
     } finally {
-      FileUtils.forceDelete(tempFile)
+      FileUtils.forceDelete(tempDir.toFile)
     }
   }
 
   test("Reading from an empty file with header=false and inferSchema=true results in an empty, schema-less data frame.") {
-    val tempFile = File.createTempFile("temp", "csv")
-    tempFile.deleteOnExit()
+    val tempDir = Files.createTempDirectory("csv")
+    val tempFile = Files.createTempFile(tempDir, "temp", "csv")
     try {
       val config = ConfigFactory.parseString(
         s"""
@@ -100,7 +100,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
            |  header = false
            |  inferSchema = true
            | }
-           | path = "${escapedFilePath(tempFile.getPath)}"
+           | path = "${escapedFilePath(tempFile.toString)}"
            |}
          """.stripMargin)
       val dataObj = CsvFileDataObject.fromConfig(config)
@@ -109,7 +109,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
       df.schema shouldBe empty
       df shouldBe empty
     } finally {
-      FileUtils.forceDelete(tempFile)
+      FileUtils.forceDelete(tempDir.toFile)
     }
   }
 

@@ -18,13 +18,9 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.io.{File, FileOutputStream}
-import java.sql.Timestamp
-import java.text.SimpleDateFormat
-import java.util.{Date, Locale}
 import com.typesafe.config.ConfigFactory
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.commons.io.{FileUtils, IOUtils}
 import org.apache.poi.hssf.usermodel.HSSFWorkbook
 import org.apache.poi.ss.usermodel
@@ -35,6 +31,11 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Row}
 import org.scalatest.BeforeAndAfterAll
 
+import java.io.{File, FileOutputStream}
+import java.nio.file.Files
+import java.sql.Timestamp
+import java.text.SimpleDateFormat
+import java.util.{Date, Locale}
 import scala.reflect.runtime.universe._
 
 /**
@@ -136,13 +137,14 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
   }
 
   private def createTempFile(workbook: Workbook, suffix: String): String = {
-    val tempFile = File.createTempFile("tmp_bd-util-etl_ActionInputExcelTest", suffix)
+    val tempDir = Files.createTempDirectory(suffix)
+    val tempFile = Files.createTempFile(tempDir, "test", suffix).toFile
     tempFile.deleteOnExit()
     val tempOutputStream = new FileOutputStream(tempFile)
     try {
       workbook.write(tempOutputStream)
     } finally {
-      IOUtils.closeQuietly(tempOutputStream)
+      IOUtils.close(tempOutputStream)
     }
     tempFile.getPath
   }

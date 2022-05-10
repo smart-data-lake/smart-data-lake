@@ -22,10 +22,11 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{Condition, ExecutionMode}
+import io.smartdatalake.util.filetransfer.FileTransfer
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, TryWithRessource}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig
 import io.smartdatalake.workflow.dataobject.HadoopFileDataObject
-import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
 import org.apache.hadoop.fs.Path
 
 /**
@@ -106,6 +107,29 @@ case class CustomFileAction(override val id: ActionId,
     // return metric to action
     val metrics = Map("files_written"->fileRefMapping.size.toLong)
     WriteSubFeedResult(Some(fileRefMapping.isEmpty), Some(metrics))
+  }
+
+  override def postprocessOutputSubFeedCustomized(subFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {
+    // create output sample file in init-phase
+    if (context.phase == ExecutionPhase.Init) {
+      subFeed.fileRefMapping.map(_.head).foreach {
+        sampleFileRefMapping =>
+          val sampleFile = output.createSampleFile
+          // exec only if output returned a sample file to create
+          sampleFile.foreach {
+            file =>
+              val sampleFileTransfer = FileTransfer(input, output, overwrite = true)
+              val hadoopSrcPath = new Path(sampleFileRefMapping.src.fullPath)
+              val hadoopTgtPath = new Path(file)
+              val result = TryWithRessource.exec(input.filesystem.open(hadoopSrcPath)) { is =>
+                TryWithRessource.exec(output.filesystem.create(hadoopTgtPath, true)) { os => // overwrite = true
+                  transformer.transform(is, os)
+                }
+              }
+          }
+      }
+    }
+    subFeed
   }
 
   override def factory: FromConfigFactory[Action] = CustomFileAction

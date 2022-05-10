@@ -110,6 +110,11 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
     PartitionLayout.extractPartitionValues(partitionLayout().get, fileName, relativizePath(filePath))
   }
 
+  private[smartdatalake] def getFilenameFromPath(file: String): String = {
+    assert(!file.endsWith(separator.toString))
+    file.split(separator).last
+  }
+
   /**
    * Delete given files. This is used to cleanup files after they are processed.
    */

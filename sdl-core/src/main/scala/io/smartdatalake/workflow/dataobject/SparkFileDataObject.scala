@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
-import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.{CompactionUtil, EnvironmentUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.CollectSetDeterministic.collect_set_deterministic
 import io.smartdatalake.util.spark.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
@@ -32,11 +32,12 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, Execu
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions.{col, input_file_name}
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{DataType, StructType}
 
 import java.time.format.DateTimeFormatter
 import java.time.{Instant, LocalDateTime, ZoneId, ZoneOffset}
 import scala.reflect.runtime.universe.typeOf
+import scala.util.Try
 
 /**
  * A [[DataObject]] backed by a file in HDFS. Can load file contents into an Apache Spark [[DataFrame]]s.
@@ -95,10 +96,55 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
    * If a user-defined schema is returned, it overrides any schema inference. If no user-defined schema is set, the
    * schema may be inferred depending on the configuration and type of data frame reader.
    *
-   * @param sourceExists Whether the source file/table exists already. Existing sources may have a source schema.
    * @return The schema to use for the data frame reader when reading from the source.
    */
-  def getSchema(sourceExists: Boolean): Option[SparkSchema] = schema.map(_.convert(typeOf[SparkSubFeed]).asInstanceOf[SparkSchema])
+  def getSchema(implicit context: ActionPipelineContext): Option[SparkSchema] = {
+    import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
+    _schemaHolder = _schemaHolder.orElse(
+        // get defined schema
+        schema.map(_.convert(typeOf[SparkSubFeed]).asInstanceOf[SparkSchema])
+      )
+      .orElse (
+        // or try reading schema file
+        if (filesystem.exists(schemaFile)) {
+          val schemaContent = HdfsUtil.readHadoopFile(schemaFile)(filesystem)
+          Some(SparkSchema(DataType.fromJson(schemaContent).asInstanceOf[StructType]))
+        } else None
+      )
+      .orElse(
+        // or try inferring schema from sample data file
+        if (filesystem.exists(sampleFile)) {
+          logger.info(s"($id) Inferring schema from sample data file")
+          val df = context.sparkSession.read
+            .format(format)
+            .options(options)
+            .load(sampleFile.toString)
+            .withOptionalColumn(filenameColumn, input_file_name)
+          val dfWithPartitions = partitions.foldLeft(df) {
+            case (df, p) => df.withColumn(p, functions.lit("dummyString"))
+          }
+          Some(SparkSchema(dfWithPartitions.schema))
+        } else None
+      )
+    // return
+    _schemaHolder
+  }
+  private var _schemaHolder: Option[SparkSchema] = None
+  private def schemaFile(implicit context: ActionPipelineContext) = {
+    val fileStat = Try(filesystem.getFileStatus(hadoopPath)).toOption
+    val dataObjectRootPath = if (fileStat.exists(_.isFile)) hadoopPath.getParent else hadoopPath
+    new Path( new Path(dataObjectRootPath, ".schema"), "currentSchema.json")
+  }
+
+  /**
+   * Provide a sample data file name to be created to file-based Action. If none is returned, no file is created.
+   */
+  override def createSampleFile(implicit context: ActionPipelineContext): Option[String] = {
+    // only create new sample file there is no schema file and if it doesnt exist yet, or an update is forced by the environment configuration
+    if (!filesystem.exists(schemaFile) && (Environment.updateSparkFileDataObjectSampleDataFile || !filesystem.exists(sampleFile))) Some(sampleFile.toString)
+    else None
+  }
+  private def sampleFile(implicit context: ActionPipelineContext) = new Path( new Path(hadoopPath, ".sample"), s"sampleData.${fileName.split('.').last.filter(_ != '*')}")
 
   override def options: Map[String, String] = Map() // override options because of conflicting definitions in CanCreateSparkDataFrame and CanWriteSparkDataFrame
 
@@ -115,15 +161,14 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
     val wrongPartitionValues = PartitionValues.checkWrongPartitionValues(partitionValues, partitions)
     assert(wrongPartitionValues.isEmpty, s"getDataFrame got request with PartitionValues keys ${wrongPartitionValues.mkString(",")} not included in $id partition columns ${partitions.mkString(", ")}")
 
-    val filesExists = checkFilesExisting
-    if (!filesExists) {
+    val schemaOpt = getSchema.map(_.inner)
+    if (schemaOpt.isEmpty && !checkFilesExisting) {
       //without either schema or data, no data frame can be created
       require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined if there are no existing files.")
-
-      // Schema exists so an empty data frame can be created
-      // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
-      filesystem.mkdirs(hadoopPath)
     }
+
+    // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
+    if (!filesystem.exists(hadoopPath)) filesystem.mkdirs(hadoopPath)
 
     val incrementalOutputOptions = if (incrementalOutputState.isDefined && context.phase == ExecutionPhase.Exec) {
       val previousOutputState = incrementalOutputState.get
@@ -139,7 +184,6 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
       )
     } else Map[String,String]()
 
-    val schemaOpt = getSchema(filesExists).map(_.inner)
     val dfContent = if (partitions.isEmpty || partitionValues.isEmpty) {
       session.read
         .format(format)
@@ -225,7 +269,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
     // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
     if (!filesystem.exists(hadoopPath.getParent)) filesystem.mkdirs(hadoopPath)
 
-    val schemaOpt = getSchema(checkFilesExisting).map(_.inner).orElse(pipelineSchema).get
+    val schemaOpt = getSchema.map(_.inner).orElse(pipelineSchema).get
     val df = session.readStream
       .format(format)
       .options(options ++ this.options)
@@ -243,8 +287,18 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
   }
 
   override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
+    // validate schema
     validateSchemaMin(SparkSchema(df.schema), "write")
     schema.foreach(schemaExpected => validateSchema(SparkSchema(df.schema), schemaExpected, "write"))
+    // update current schema storage - this is to avoid schema inference and remember the schema if there is no data.
+    createSchemaFile(df)
+  }
+
+  private def createSchemaFile(df: DataFrame)(implicit context: ActionPipelineContext): Unit = {
+    if(Environment.updateSparkFileDataObjectSchemaFile || !filesystem.exists(schemaFile)) {
+      logger.info(s"($id) Writing schema file")
+      HdfsUtil.writeHadoopFile(schemaFile, df.schema.prettyJson)(filesystem)
+    }
   }
 
   /**
@@ -316,6 +370,9 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
       .options(options)
       .optionalPartitionBy(partitions)
       .save(hadoopPathString)
+
+    // recreate current schema file, it gets deleted by SaveMode.Overwrite - this is to avoid schema inference and remember the schema if there is no data.
+    if (SparkSaveMode.from(finalSaveMode) == SaveMode.Overwrite) createSchemaFile(df)
   }
 
   /**

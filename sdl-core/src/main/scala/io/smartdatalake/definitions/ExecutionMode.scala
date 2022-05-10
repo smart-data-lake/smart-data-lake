@@ -527,6 +527,7 @@ case class FileIncrementalMoveMode(archiveSubdirectory: Option[String] = None) e
         val files = sparkFilesObserver
           .getOrElse(throw new IllegalStateException(s"($actionId) FilesObserver not setup for ${mainInput.id}"))
           .getFilesProcessed
+        if (files.isEmpty) throw NoDataToProcessWarning(actionId.id, s"($actionId) No files to process found for ${mainInput.id} by FileIncrementalMoveMode.")
         logger.info(s"Cleaning up ${files.size} processed input files")
         files.foreach {
           file =>
