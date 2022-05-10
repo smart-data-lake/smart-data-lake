@@ -27,6 +27,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
@@ -160,12 +161,14 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       val newDataType = if (SchemaUtil.isSparkCaseSensitive) df.schema.find(_.name == incrementalOutputColumn.get).get.dataType
       else df.schema.find(_.name.equalsIgnoreCase(incrementalOutputColumn.get)).get.dataType
       if (context.phase == ExecutionPhase.Exec) {
-        // Improvement: this could be done with an Observation to avoid a query
         val newWatermarkValue = df.agg(max(col(incrementalOutputColumn.get))).head.get(0)
         incrementalOutputState = Some((incrementalOutputColumn.get, Some((newWatermarkValue.toString, newDataType))))
         logger.info(s"($id) incremental output selected records with '${incrementalOutputColumn.get} > '${lastWatermark.map(_._1).getOrElse("none")}' and <= '${newWatermarkValue}'")
         df = df.where(col(incrementalOutputColumn.get) <= lit(newWatermarkValue).cast(newDataType))
         lastWatermark.foreach { case (value, dataType) =>
+          if (value == newWatermarkValue.toString) {
+            throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode. Watermark is $newWatermarkValue")
+          }
           df = df.where(col(lastColumn) > lit(value).cast(dataType))
         }
       }
