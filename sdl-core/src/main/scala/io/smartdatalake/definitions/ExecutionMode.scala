@@ -493,12 +493,10 @@ case class FileIncrementalMoveMode(archiveSubdirectory: Option[String] = None) e
         // search FileRefs if not present from previous actions
         val fileRefs = inputSubFeed.fileRefs.getOrElse(inputDataObject.getFileRefs(inputSubFeed.partitionValues))
         // skip processing if no new data
-        val warnMsg = if (fileRefs.isEmpty) {
-          Some(s"($actionId) No files to process found for ${inputDataObject.id}, partitionValues=${inputSubFeed.partitionValues.mkString(", ")}")
-        } else None
-        warnMsg.foreach(msg => throw NoDataToProcessWarning(actionId.id, msg))
+        if (fileRefs.isEmpty) throw NoDataToProcessWarning(actionId.id,s"($actionId) No files to process found for ${inputDataObject.id}, partitionValues=${inputSubFeed.partitionValues.mkString(", ")}")
         Some(ExecutionModeResult(fileRefs = Some(fileRefs), inputPartitionValues = inputSubFeed.partitionValues, outputPartitionValues = inputSubFeed.partitionValues))
       case (inputDataObject: SparkFileDataObject, inputSubFeed: SparkSubFeed) =>
+        if (!inputDataObject.checkFilesExisting) throw NoDataToProcessWarning(actionId.id, s"($actionId) No files to process found for ${mainInput.id} by FileIncrementalMoveMode.")
         // setup observation of files processed
         sparkFilesObserver = Some(inputDataObject.setupFilesObserver())
         Some(ExecutionModeResult(inputPartitionValues = inputSubFeed.partitionValues, outputPartitionValues = inputSubFeed.partitionValues))

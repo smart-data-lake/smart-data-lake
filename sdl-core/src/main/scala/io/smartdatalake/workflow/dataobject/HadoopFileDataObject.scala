@@ -22,7 +22,6 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
-import io.smartdatalake.util.misc.ScalaUtil.arrayToSeq
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.HadoopFileConnection
@@ -90,20 +89,11 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    *
    * @throws IllegalArgumentException if `failIfFilesMissing` = true and no files found at `path`.
    */
-  protected def checkFilesExisting(implicit context: ActionPipelineContext): Boolean = {
-
-    val files = if (filesystem.exists(hadoopPath)) {
-      arrayToSeq(filesystem.listStatus(hadoopPath))
-    } else {
-      Seq.empty
-    }
-
-    if (files.isEmpty) {
-      logger.warn(s"($id) No files found at $hadoopPath. Can not import any data.")
+  private[smartdatalake] def checkFilesExisting(implicit context: ActionPipelineContext): Boolean = {
+    if (!filesystem.exists(hadoopPath) || filesystem.listStatus(hadoopPath).isEmpty) {
       require(!failIfFilesMissing, s"($id) failIfFilesMissing is enabled and no files to process have been found in $hadoopPath.")
-    }
-
-    files.nonEmpty
+      false
+    } else true
   }
 
   override def deleteFile(file: String)(implicit context: ActionPipelineContext): Unit = {
