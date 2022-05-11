@@ -128,17 +128,6 @@ dataObjects {
 
     }
   }
-
-  stg-data {
-    type = DeltaLakeTableDataObject
-    path = "~{id}"
-    table {
-      db = "default"
-      name = "stg_data"
-      primaryKey = [id]
-    }
-  }
-
   int-data {
     type = DeltaLakeTableDataObject
     path = "~{id}"
@@ -164,7 +153,7 @@ On the one hand, this procedure can be optimized by only write changed data inst
 actions {
   histData {
     type = HistorizeAction
-    inputId = stg-data
+    inputId = ext-data
     outputId = int-data
     metadata {
       feed = download
@@ -209,3 +198,82 @@ Then in the notebook the current state can be displayed and compared with the ab
 ![polynote updated example output](sdl_sql_injection2res.png)
 
 Not only we see the different time collecting the separate data points, previous values in separate rows, and "deleted" data points. 
+
+## Optimization
+Now let's have a closer look to the performance and two additional optimizations. 
+
+### Test case
+The above test case used just a few rows in the table. For better testing performance we now switch to a larger dataset, a [Chess Game Dataset](https://www.kaggle.com/datasets/datasnaek/chess). This data is a set of 20058 rows, in total 7MB. This is still faily small, but should be better in case of representing performance data.
+
+The dataset is imported into the SQL server using the [db_init_chess.sql](db_init_chess.sql), which should be copied into the `config` directory. 
+
+For performance measurments the SQL database and the SDL metastore will be cleaned between SDLB algorithm changes. Therefore, the [restart_databases.sh](restart_databases.sh) script is launched, which includes a stopping the containers, cleaning databases, freshly starting the containers and initializing the SQL database. 
+
+It should be noted that there are a duplicates in the dataset. The deduplication will be performed when the data is ported into the data lake (see configuration below). 
+
+
+### SDLB configuration
+
+The current configuration file changed to:
+[application.conf](chess.conf)
+
+Here the dataObjects are similar to the ones above. The table and object names changed. 
+
+To the `HistorizeAction` is an additional Transformer added to get rid of duplicates. Further, the `mergeModeEnable` is commented out for the reference run. The action now looks like:
+
+```
+actions {
+  histChess {
+    type = HistorizeAction
+    mergeModeEnable = true
+    inputId = ext-chess
+    outputId = int-chess
+    transformers = [{
+      type = ScalaCodeDfTransformer
+      code = """
+        import org.apache.spark.sql.{DataFrame, SparkSession}
+        (session:SparkSession, options:Map[String, String], df:DataFrame, dataObjectId:String) => {
+          import session.implicits._
+          df.dropDuplicates(Seq("id"))
+        }
+      """
+   }]
+   metadata {
+      feed = chessdownload
+    }
+  }
+}
+```
+
+### Run
+
+Now everything is prepared for the comparison. First, the `mergeModeEnable` is commented out or set to `false`, and the pocedure of:
+
+* clean
+* init SQL server with the dataset
+* copy data to the data lake 
+* change data on SQL server
+* copy data to the data lake
+
+Therefore, the following commands are used:
+
+```
+bash restart_databases.sh
+podman run --hostname localhost -e SPARK_LOCAL_HOSTNAME=localhost --rm --pod sdl_sql -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel chessdownload
+### note the timing
+
+podman exec -it mssql /opt/mssql-tools/bin/sqlcmd -S mssqlserver -U sa -P '%abcd1234%' -i /config/db_mod_chess.sql
+
+podman run --hostname localhost -e SPARK_LOCAL_HOSTNAME=localhost --rm --pod sdl_sql -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel chessdownload
+### note the timing
+```
+
+This procedure is performed once without and one with `mergeModeEnable = true`
+
+|  | mergeModeEnable = false | mergeModeEnable = true |
+| --- | -------------------- | ---------------------- |
+| intital copy | 11.85 | 13 |
+| copy of updated data | 40.3 |16.5 |
+
+### Merge CDC data
+
