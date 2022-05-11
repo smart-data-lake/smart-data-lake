@@ -161,7 +161,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       val newDataType = if (SchemaUtil.isSparkCaseSensitive) df.schema.find(_.name == incrementalOutputColumn.get).get.dataType
       else df.schema.find(_.name.equalsIgnoreCase(incrementalOutputColumn.get)).get.dataType
       if (context.phase == ExecutionPhase.Exec) {
-        val newWatermarkValue = df.agg(max(col(incrementalOutputColumn.get))).head.get(0)
+        val newWatermarkValue = Option(df.agg(max(col(incrementalOutputColumn.get))).head.get(0))
+          .getOrElse(throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode."))
         incrementalOutputState = Some((incrementalOutputColumn.get, Some((newWatermarkValue.toString, newDataType))))
         logger.info(s"($id) incremental output selected records with '${incrementalOutputColumn.get} > '${lastWatermark.map(_._1).getOrElse("none")}' and <= '${newWatermarkValue}'")
         df = df.where(col(incrementalOutputColumn.get) <= lit(newWatermarkValue).cast(newDataType))
