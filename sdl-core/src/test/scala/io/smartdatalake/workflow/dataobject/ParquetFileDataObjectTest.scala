@@ -50,7 +50,7 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
     val doSrc1 = ParquetFileDataObject.fromConfig(config)
     doSrc1.writeSparkDataFrame(testDf, Seq())
     val filesObserver = doSrc1.setupFilesObserver()
-    val result = doSrc1.getSparkDataFrame()
+    val result = doSrc1.getSparkDataFrame()(contextExec)
     assert(result.count() == 3)
     assert(filesObserver.getFilesProcessed.nonEmpty)
   }

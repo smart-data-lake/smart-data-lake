@@ -353,7 +353,7 @@ private[smartdatalake] class FilesObservation(dataObjectId: DataObjectId) extend
    * Note that this blocks until the query finished successfully. Call only after Spark action was started on observed Dataset.
    */
   def getFilesProcessed: Seq[String] = {
-    val files = waitFor.getOrElse("filesProcessed", throw new IllegalStateException(s"($dataObjectId) Did not receive filesProcessed observation!"))
+    val files = waitFor().getOrElse("filesProcessed", throw new IllegalStateException(s"($dataObjectId) Did not receive filesProcessed observation!"))
       .asInstanceOf[Seq[String]]
     if (logger.isDebugEnabled()) logger.debug(s"($dataObjectId) files processed: ${files.mkString(", ")}")
     files

@@ -47,20 +47,21 @@ private[smartdatalake] class Observation(name: String = UUID.randomUUID().toStri
   }
 
   /**
-   * Get the observed metrics. This waits for the observed dataset to finish
-   * its first action. Only the result of the first action is available. Subsequent actions do not
-   * modify the result.
+   * Get the observed metrics. This waits for the observed dataset to finish its first action.
+   * Only the result of the first action is available. Subsequent actions do not modify the result.
    *
+   * @timeoutSec max wait time in seconds. Throws NoMetricsReceivedException if metrics were not received in time.
    * @return the observed metrics as a `Map[String, Any]`
-   * @throws InterruptedException interrupted while waiting
    */
   @throws[InterruptedException]
-  def waitFor: Map[String, _] = {
+  def waitFor(timeoutSec: Int = 10): Map[String, _] = {
     synchronized {
       // we need to loop as wait might return without us calling notify
       // https://en.wikipedia.org/w/index.php?title=Spurious_wakeup&oldid=992601610
+      val ts = System.currentTimeMillis()
       while (metrics.isEmpty) {
-        wait()
+        wait(timeoutSec * 1000L)
+        if (ts + timeoutSec * 1000L <= System.currentTimeMillis) throw NoMetricsReceivedException(s"Observation $name did not receive metrics within timeout of $timeoutSec seconds.")
       }
     }
     metrics.get
@@ -86,3 +87,5 @@ private[smartdatalake] case class ObservationListener(observation: Observation) 
   // ignore result on failure
   override def onFailure(funcName: String, qe: QueryExecution, exception: Exception): Unit = Unit
 }
+
+case class NoMetricsReceivedException(msg: String) extends Exception(msg)
