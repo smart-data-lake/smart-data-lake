@@ -22,7 +22,7 @@ package io.smartdatalake.workflow
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ScalaUtil
-import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame, GenericField, GenericSchema, GenericTypedObject}
+import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, SchemaValidation, UserDefinedSchema}
 
 import scala.reflect.runtime.universe
@@ -110,6 +110,7 @@ object DataFrameSubFeed {
    * Get implementation of generic DataFrameFunctions.
    */
   def getFunctions(tpe: Type): DataFrameFunctions = getCompanion(tpe) // down cast to reduce interface
+  private[smartdatalake] def getFunctions(fullTpeName: String): DataFrameFunctions = ScalaUtil.companionOf[DataFrameFunctions](fullTpeName)
 
   /**
    * Helper method to throw exception for wrong subfeed type including method name of caller

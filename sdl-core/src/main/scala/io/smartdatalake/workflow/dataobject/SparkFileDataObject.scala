@@ -18,21 +18,24 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
+import io.smartdatalake.util.misc.{CompactionUtil, EnvironmentUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.spark.CollectSetDeterministic.collect_set_deterministic
 import io.smartdatalake.util.spark.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
-import io.smartdatalake.util.misc.CompactionUtil
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.{DataFrameUtil, Observation}
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ProcessingLogicException}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
-import org.apache.spark.sql.functions.input_file_name
-import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
+import org.apache.spark.sql.functions.{col, input_file_name}
 import org.apache.spark.sql.types.StructType
 
+import java.time.format.DateTimeFormatter
+import java.time.{Instant, LocalDateTime, ZoneId, ZoneOffset}
 import scala.reflect.runtime.universe.typeOf
 
 /**
@@ -42,7 +45,7 @@ import scala.reflect.runtime.universe.typeOf
  */
 private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
   with CanCreateSparkDataFrame with CanCreateStreamingDataFrame
-  with CanWriteSparkDataFrame
+  with CanWriteSparkDataFrame with CanCreateIncrementalOutput
   with UserDefinedSchema with SchemaValidation {
 
   /**
@@ -122,17 +125,31 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
       filesystem.mkdirs(hadoopPath)
     }
 
+    val incrementalOutputOptions = if (incrementalOutputState.isDefined && context.phase == ExecutionPhase.Exec) {
+      val previousOutputState = incrementalOutputState.get
+      // Comparison of modifiedAfter and modifiedBefore are both exclusive on Microsecond level, but file timestamps maximum detail is milliseconds.
+      // Actually comparison of one operator should be inclusive to avoid reading files in edge cases.
+      // Current timestamp is also at millisecond level. If we subtract one microsecond from current timestamp we can avoid the problems because of exclusive comparison.
+      incrementalOutputState = Some(LocalDateTime.now.minusNanos(1000))
+      val dateFormatter = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSSSSS")
+      logger.info(s"($id) incremental output selected files with modification date greater than ${dateFormatter.format(previousOutputState)} and smaller than ${dateFormatter.format(incrementalOutputState.get)}")
+      Map(
+        "modifiedAfter" -> dateFormatter.format(fixWindowsTimezone(previousOutputState)),
+        "modifiedBefore" -> dateFormatter.format(fixWindowsTimezone(incrementalOutputState.get))
+      )
+    } else Map[String,String]()
+
     val schemaOpt = getSchema(filesExists).map(_.inner)
     val dfContent = if (partitions.isEmpty || partitionValues.isEmpty) {
       session.read
         .format(format)
-        .options(options)
+        .options(options ++ incrementalOutputOptions)
         .optionalSchema(schemaOpt)
         .load(hadoopPath.toString)
     } else {
       val reader = session.read
         .format(format)
-        .options(options)
+        .options(options ++ incrementalOutputOptions)
         .optionalSchema(schemaOpt)
         .option("basePath", hadoopPath.toString) // this is needed for partitioned tables when subdirectories are read directly; it then keeps the partition columns from the subdirectory path in the dataframe
       val pathsToRead = partitionValues.flatMap(getConcretePaths).map(_.toString)
@@ -145,10 +162,61 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
         }
     }
 
-    val df = dfContent.withOptionalColumn(filenameColumn, input_file_name)
+    var df = dfContent.withOptionalColumn(filenameColumn, input_file_name)
+
+    // configure observer to get files processed for incremental execution mode
+    if (filesObserver.isDefined && context.phase == ExecutionPhase.Exec) {
+      assert(filenameColumn.isDefined, s"($id) filenameColumn must be set in order to observe files processed")
+      df = filesObserver.get.on(df, filenameColumn.get)
+      filesObserver = None // now we can already forget it and prepare for another query
+    }
 
     // finalize & return DataFrame
     afterRead(df)
+  }
+
+  /**
+   * It seems that Hadoop on Windows returns modified date in local timezone, but according to documentation it should be in UTC.
+   * This results in wrong comparison of modified date by Spark, as Spark adds an additional local timezone offset to the files modification date.
+   * To fix this we need to add an additional local timezone offset to the comparison thresholds given to spark.
+   */
+  private def fixWindowsTimezone(localDateTime: LocalDateTime): LocalDateTime = {
+    if (EnvironmentUtil.isWindowsOS) LocalDateTime.ofInstant(localDateTime.atOffset(ZoneOffset.UTC).toInstant, ZoneId.systemDefault())
+    else localDateTime
+  }
+
+  // Store incremental output state. It is stored as LocalDateTime because Spark options need local timezone.
+  private var incrementalOutputState: Option[LocalDateTime] = None
+
+  /**
+   * Set timestamp for incremental output
+   */
+  override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
+    incrementalOutputState = state.map(LocalDateTime.parse)
+      .orElse(Some(LocalDateTime.ofInstant(Instant.EPOCH, ZoneId.systemDefault)))
+  }
+
+  /**
+   * Get timestamp of incremental output for saving to state
+   */
+  override def getState: Option[String] = {
+    incrementalOutputState.map(_.toString)
+  }
+
+  // Store files observation object between call to setupFilesObserver until it is used in getSparkDataFrame.
+  private var filesObserver: Option[FilesObservation] = None
+
+  /**
+   * Setup an observation of files processed through custom metrics.
+   * This is used for incremental processing to keep track of files processed.
+   * Note that filenameColumn needs to be configured for the DataObject in order for this to work.
+   */
+  def setupFilesObserver(): FilesObservation = {
+    synchronized {
+      if (filesObserver.isDefined) throw new IllegalStateException(s"($id) files observation already set - concurrent use between setupFilesObserver and getSparkDataFrame are not supported!")
+      filesObserver = Some(new FilesObservation(id))
+      filesObserver.get
+    }
   }
 
   override def getStreamingDataFrame(options: Map[String, String], pipelineSchema: Option[StructType])(implicit context: ActionPipelineContext): DataFrame = {
@@ -266,4 +334,28 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
     CompactionUtil.compactHadoopStandardPartitions(this, partitionValues)
   }
 
+}
+
+/**
+ * Observation of files processed using custom metrics.
+ */
+private[smartdatalake] class FilesObservation(dataObjectId: DataObjectId) extends Observation with SmartDataLakeLogger {
+
+  /**
+   * Setup observation of custom metric on Dataset.
+   */
+  def on[T](ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
+    on(ds, collect_set_deterministic(col(filenameColumnName)).as("filesProcessed"))
+  }
+
+  /**
+   * Get processed files observation result.
+   * Note that this blocks until the query finished successfully. Call only after Spark action was started on observed Dataset.
+   */
+  def getFilesProcessed: Seq[String] = {
+    val files = waitFor().getOrElse("filesProcessed", throw new IllegalStateException(s"($dataObjectId) Did not receive filesProcessed observation!"))
+      .asInstanceOf[Seq[String]]
+    if (logger.isDebugEnabled()) logger.debug(s"($dataObjectId) files processed: ${files.mkString(", ")}")
+    files
+  }
 }

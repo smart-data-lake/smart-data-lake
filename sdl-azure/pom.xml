@@ -58,6 +58,14 @@
             <scope>${sdl-core.scope}</scope>
         </dependency>
 
+        <!-- hadoop classes for azure -->
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-azure</artifactId>
+            <version>${hadoop.version}</version>
+            <scope>${hadoop.deps.scope}</scope>
+        </dependency>
+
         <!-- querying azure active directory -->
         <dependency>
             <groupId>com.microsoft.azure</groupId>

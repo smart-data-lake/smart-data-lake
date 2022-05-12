@@ -19,15 +19,16 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.definitions.{PartitionDiffMode, SDLSaveMode, SaveModeGenericOptions}
+import io.smartdatalake.definitions.{FileIncrementalMoveMode, PartitionDiffMode, SDLSaveMode, SaveModeGenericOptions}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
 import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer}
-import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, ParquetFileDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.{lit, substring}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -50,13 +51,12 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.clear()
   }
 
-  test("copy load with custom transformation class") {
+  test("copy load with custom transformation class and incremental move mode (delete)") {
 
     // setup DataObjects
     val feed = "copy"
-    val srcTable = Table(Some("default"), "copy_input")
-    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
-    srcDO.dropTable
+    val srcDO = ParquetFileDataObject( "src1", tempPath+s"/src1", filenameColumn = Some("_filename"))
+    srcDO.deleteAll
     instanceRegistry.register(srcDO)
     val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("lastname","firstname")))
     val tgtDO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable, numInitialHdfsPartitions = 1)
@@ -65,21 +65,27 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start load
     val customTransformerConfig = ScalaClassSparkDfTransformer(className = classOf[TestDfTransformer].getName)
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig))
+    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig), executionMode = Some(FileIncrementalMoveMode()))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
+    assert(srcDO.getFileRefs(Seq()).nonEmpty)
     val srcSubFeed = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe")),PartitionValues(Map("lastname" -> "jonson"))))
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
+    action1.postExec(Seq(srcSubFeed),Seq(tgtSubFeed))
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
 
+    // check output
     val r1 = session.table(s"${tgtTable.fullName}")
       .select($"rating")
       .as[Int].collect().toSeq
     assert(r1.size == 2)
     assert(r1.head == 4) // should be increased by 1 through TestDfTransformer
+
+    // check input deleted by incremental move mode
+    assert(srcDO.getFileRefs(Seq()).isEmpty)
   }
 
-  test("copy load with custom transformation from code string") {
+  test("copy load with custom transformation from code string and incremental move mode (archive)") {
 
     // define custom transformation
     val codeStr = """
@@ -95,9 +101,8 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 
     // setup DataObjects
     val feed = "copy"
-    val srcTable = Table(Some("default"), "copy_input")
-    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), analyzeTableAfterWrite=true, table = srcTable, numInitialHdfsPartitions = 1)
-    srcDO.dropTable
+    val srcDO = ParquetFileDataObject( "src1", tempPath+s"/src1", filenameColumn = Some("_filename"))
+    srcDO.deleteAll
     instanceRegistry.register(srcDO)
     val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("lastname","firstname")))
     val tgtDO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), analyzeTableAfterWrite=true, table = tgtTable, numInitialHdfsPartitions = 1)
@@ -105,17 +110,24 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig))
+    val executionMode = FileIncrementalMoveMode(archiveSubdirectory = Some("archive"))
+    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig), executionMode = Some(executionMode))
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
+    val srcFiles = srcDO.getFileRefs(Seq()).map(_.fullPath)
+    assert(srcFiles.nonEmpty)
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    action1.exec(Seq(srcSubFeed))(contextExec)
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
+    action1.postExec(Seq(srcSubFeed),Seq(tgtSubFeed))
 
     val r1 = session.table(s"${tgtTable.fullName}")
       .select($"rating")
       .as[Int].collect().toSeq
     assert(r1.size == 1)
     assert(r1.head == 6) // should be increased by 1 through TestDfTransformer
+    // check input archived by incremental move mode
+    assert(srcDO.getFileRefs(Seq()).isEmpty)
+    assert(srcDO.filesystem.exists(new Path(executionMode.createArchiveFileName(srcFiles.head))))
   }
 
   test("copy load with transformation from sql code") {

@@ -27,13 +27,14 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.sql.functions.col
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
 import java.sql.{ResultSet, ResultSetMetaData}
@@ -72,6 +73,7 @@ import scala.util.Try
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
  *                                    Default is to expect all partitions to exist.
+ * @param incrementalOutputColumn Optional column to use for creating incremental output with DataObjectStateIncrementalMode.
  */
 case class JdbcTableDataObject(override val id: DataObjectId,
                                createSql: Option[String] = None,
@@ -88,9 +90,10 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                jdbcOptions: Map[String, String] = Map(),
                                virtualPartitions: Seq[String] = Seq(),
                                override val expectedPartitionsCondition: Option[String] = None,
+                               incrementalOutputColumn: Option[String] = None,
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject with CanHandlePartitions with CanEvolveSchema with CanMergeDataFrame {
+  extends TransactionalSparkTableDataObject with CanHandlePartitions with CanEvolveSchema with CanMergeDataFrame with CanCreateIncrementalOutput {
 
   /**
    * Connection defines driver, url and db in central location
@@ -147,13 +150,58 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     val queryOrTable = Map(table.query.map(q => ("query",q)).getOrElse("dbtable"->table.fullName))
-    val df = context.sparkSession.read.format("jdbc")
+    var df = context.sparkSession.read.format("jdbc")
       .options(options)
       .options(connection.getAuthModeSparkOptions)
       .options(queryOrTable)
       .load()
+    incrementalOutputState.foreach { case (lastColumn, lastHighWatermark)  =>
+      assert(incrementalOutputColumn.isDefined)
+      if (lastColumn != incrementalOutputColumn.get) logger.warn(s"($id) incrementalOutputState has different column as incrementalOutputColumn ($lastColumn != ${incrementalOutputColumn.get}")
+      val newDataType = if (SchemaUtil.isSparkCaseSensitive) df.schema.find(_.name == incrementalOutputColumn.get).get.dataType
+      else df.schema.find(_.name.equalsIgnoreCase(incrementalOutputColumn.get)).get.dataType
+      if (context.phase == ExecutionPhase.Exec) {
+        val newHighWatermarkValue = Option(df.agg(max(col(incrementalOutputColumn.get))).head.get(0))
+          .getOrElse(throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode."))
+        incrementalOutputState = Some((incrementalOutputColumn.get, Some((newHighWatermarkValue.toString, newDataType))))
+        logger.info(s"($id) incremental output selected records with '${incrementalOutputColumn.get} > '${lastHighWatermark.map(_._1).getOrElse("none")}' and <= '${newHighWatermarkValue}'")
+        df = df.where(col(incrementalOutputColumn.get) <= lit(newHighWatermarkValue).cast(newDataType))
+        lastHighWatermark.foreach { case (value, dataType) =>
+          if (value == newHighWatermarkValue.toString) {
+            throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode. High watermark is $newHighWatermarkValue")
+          }
+          df = df.where(col(lastColumn) > lit(value).cast(dataType))
+        }
+      }
+    }
     validateSchemaMin(SparkSchema(df.schema), "read")
     df.colNamesLowercase
+  }
+
+  // Store incremental output state. It is stored as tuple of incrementalOutputColumn, lastHighWatermarkValue, dataType
+  private var incrementalOutputState: Option[(String,Option[(String,DataType)])] = None
+
+  /**
+   * Set state for incremental output.
+   */
+  override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
+    incrementalOutputState = state.map { s =>
+      Try {
+        s.split(';') match {
+          case Array(column, lastHighWatermarkVal, dataType) => (column, Some((lastHighWatermarkVal, DataType.fromDDL(dataType))))
+          case Array(column) => (column, None)
+        }
+      }.getOrElse(throw new IllegalStateException(s"($id) Cannot parse state '$s' into format <incrementalOutputColumn>;<lastHighWatermark>;<dataType>"))
+    }.orElse{
+      assert(incrementalOutputColumn.isDefined, s"($id) incrementalOutputColumn must be set to use DataObjectStateIncrementalMode")
+      Some((incrementalOutputColumn.get, None))
+    }
+  }
+  override def getState: Option[String] = {
+    incrementalOutputState.map{
+      case (column, Some((lastHighWatermarkVal, dataType))) => s"$column;$lastHighWatermarkVal;${dataType.sql}"
+      case (column, None) => s"$column"
+    }
   }
 
   override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {

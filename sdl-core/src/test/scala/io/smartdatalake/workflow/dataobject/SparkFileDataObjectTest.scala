@@ -19,13 +19,13 @@
 
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ProcessingLogicException
 import io.smartdatalake.workflow.action.CustomFileActionTest
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions._
@@ -400,6 +400,40 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     val specialFiles2 = dataObject.filesystem.globStatus(new Path(tempDir.toString, s"*/_SDL*"))
     val compactedTstmp2 = specialFiles.find(_.getPath.getName.endsWith("COMPACTED")).get.getModificationTime
     assert(compactedTstmp == compactedTstmp2)
+  }
+
+
+  test("incremental output mode") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = ParquetFileDataObject(id = "partitionTest", path = tempDir.toString, saveMode = SDLSaveMode.Append)
+
+    // write test data 1
+    val df1 = Seq(("A",1),("A",2),("B",3),("B",4)).toDF("p", "value")
+    dataObject.writeSparkDataFrame(df1)
+    Thread.sleep(1) // sleep 1 millisecond as file modified date is stored in milliseconds and we need the created file in the next increment
+
+    // test 1
+    dataObject.setState(None) // initialize incremental output with empty state
+    dataObject.getSparkDataFrame()(contextExec).count shouldEqual 4
+    val newState1 = dataObject.getState
+
+    // append test data 2
+    val df2 = Seq(("B",5)).toDF("p", "value")
+    dataObject.writeSparkDataFrame(df2)
+    Thread.sleep(1) // sleep 1 millisecond as file modified date is stored in milliseconds and we need the created file in the next increment
+
+    // test 2
+    dataObject.setState(newState1)
+    val df2result = dataObject.getSparkDataFrame()(contextExec)
+    df2result.count shouldEqual 1
+    val newState2 = dataObject.getState
+    assert(newState1.get < newState2.get)
+
+    dataObject.getSparkDataFrame()(contextInit).count shouldEqual 5
+
+    Try(FileUtils.deleteDirectory(tempDir.toFile))
   }
 
 }

@@ -413,14 +413,14 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         }
       }
 
-    // execute DAG
-    val startTime = LocalDateTime.now
-    var finalRunState: ActionDAGRunState = null
-    var subFeeds = try {
-      actionDAGRun.exec(context)
-    } finally {
-      finalRunState = actionDAGRun.saveState(ExecutionPhase.Exec, changedActionId = None, isFinal = true)(context)
-    }
+      // execute DAG
+      val startTime = LocalDateTime.now
+      var finalRunState: ActionDAGRunState = null
+      var subFeeds = try {
+        actionDAGRun.exec(context)
+      } finally {
+        finalRunState = actionDAGRun.saveState(ExecutionPhase.Exec, changedActionId = None, isFinal = true)(context)
+      }
 
       // Iterate execution in streaming mode
       if (context.appConfig.streaming) {
