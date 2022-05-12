@@ -155,20 +155,20 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       .options(connection.getAuthModeSparkOptions)
       .options(queryOrTable)
       .load()
-    incrementalOutputState.foreach { case (lastColumn, lastWatermark)  =>
+    incrementalOutputState.foreach { case (lastColumn, lastHighWatermark)  =>
       assert(incrementalOutputColumn.isDefined)
       if (lastColumn != incrementalOutputColumn.get) logger.warn(s"($id) incrementalOutputState has different column as incrementalOutputColumn ($lastColumn != ${incrementalOutputColumn.get}")
       val newDataType = if (SchemaUtil.isSparkCaseSensitive) df.schema.find(_.name == incrementalOutputColumn.get).get.dataType
       else df.schema.find(_.name.equalsIgnoreCase(incrementalOutputColumn.get)).get.dataType
       if (context.phase == ExecutionPhase.Exec) {
-        val newWatermarkValue = Option(df.agg(max(col(incrementalOutputColumn.get))).head.get(0))
+        val newHighWatermarkValue = Option(df.agg(max(col(incrementalOutputColumn.get))).head.get(0))
           .getOrElse(throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode."))
-        incrementalOutputState = Some((incrementalOutputColumn.get, Some((newWatermarkValue.toString, newDataType))))
-        logger.info(s"($id) incremental output selected records with '${incrementalOutputColumn.get} > '${lastWatermark.map(_._1).getOrElse("none")}' and <= '${newWatermarkValue}'")
-        df = df.where(col(incrementalOutputColumn.get) <= lit(newWatermarkValue).cast(newDataType))
-        lastWatermark.foreach { case (value, dataType) =>
-          if (value == newWatermarkValue.toString) {
-            throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode. Watermark is $newWatermarkValue")
+        incrementalOutputState = Some((incrementalOutputColumn.get, Some((newHighWatermarkValue.toString, newDataType))))
+        logger.info(s"($id) incremental output selected records with '${incrementalOutputColumn.get} > '${lastHighWatermark.map(_._1).getOrElse("none")}' and <= '${newHighWatermarkValue}'")
+        df = df.where(col(incrementalOutputColumn.get) <= lit(newHighWatermarkValue).cast(newDataType))
+        lastHighWatermark.foreach { case (value, dataType) =>
+          if (value == newHighWatermarkValue.toString) {
+            throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode. High watermark is $newHighWatermarkValue")
           }
           df = df.where(col(lastColumn) > lit(value).cast(dataType))
         }
@@ -178,7 +178,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     df.colNamesLowercase
   }
 
-  // Store incremental output state. It is stored as tuple of incrementalOutputColumn, lastWatermarkValue, dataType
+  // Store incremental output state. It is stored as tuple of incrementalOutputColumn, lastHighWatermarkValue, dataType
   private var incrementalOutputState: Option[(String,Option[(String,DataType)])] = None
 
   /**
@@ -188,10 +188,10 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     incrementalOutputState = state.map { s =>
       Try {
         s.split(';') match {
-          case Array(column, lastWatermarkVal, dataType) => (column, Some((lastWatermarkVal, DataType.fromDDL(dataType))))
+          case Array(column, lastHighWatermarkVal, dataType) => (column, Some((lastHighWatermarkVal, DataType.fromDDL(dataType))))
           case Array(column) => (column, None)
         }
-      }.getOrElse(throw new IllegalStateException(s"($id) Cannot parse state '$s' into format <incrementalOutputColumn>;<lastWatermark>;<dataType>"))
+      }.getOrElse(throw new IllegalStateException(s"($id) Cannot parse state '$s' into format <incrementalOutputColumn>;<lastHighWatermark>;<dataType>"))
     }.orElse{
       assert(incrementalOutputColumn.isDefined, s"($id) incrementalOutputColumn must be set to use DataObjectStateIncrementalMode")
       Some((incrementalOutputColumn.get, None))
@@ -199,7 +199,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
   override def getState: Option[String] = {
     incrementalOutputState.map{
-      case (column, Some((lastWatermarkVal, dataType))) => s"$column;$lastWatermarkVal;${dataType.sql}"
+      case (column, Some((lastHighWatermarkVal, dataType))) => s"$column;$lastHighWatermarkVal;${dataType.sql}"
       case (column, None) => s"$column"
     }
   }
