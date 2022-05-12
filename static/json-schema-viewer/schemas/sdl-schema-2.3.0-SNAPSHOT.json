@@ -380,12 +380,16 @@
       },
       "FileIncrementalMoveMode" : {
         "type" : "object",
-        "description" : "Execution mode to incrementally process file-based DataObjects.\nIt takes all existing files in the input DataObject and removes (deletes) them after processing.\nInput partition values are applied when searching for files and also used as output partition values.",
+        "description" : "Execution mode to incrementally process file-based DataObjects, e.g. FileRefDataObjects and SparkFileDataObjects.\nFor FileRefDataObjects:\n- All existing files in the input DataObject are processed and removed (deleted or archived) after processing\n- Input partition values are applied to search for files and also used as output partition values\nFor SparkFileDataObjects:\n- Files processed are observed by a custom metric and removed (deleted or archived) after processing\n- Partition values preserved.",
         "additionalProperties" : false,
         "title" : "FileIncrementalMoveMode",
         "properties" : {
           "type" : {
             "const" : "FileIncrementalMoveMode"
+          },
+          "archiveSubdirectory" : {
+            "type" : "string",
+            "description" : "if an archive subdirectory is configured, files are moved into that directory instead of deleted.\nconfigure a single directory name which is appended before the filename, e.g. \\\"_archive\\\"."
           }
         }
       },
@@ -2024,6 +2028,10 @@
           "expectedPartitionsCondition" : {
             "type" : "string",
             "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
+          },
+          "incrementalOutputColumn" : {
+            "type" : "string",
+            "description" : "Optional column to use for creating incremental output with DataObjectStateIncrementalMode."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -4368,13 +4376,13 @@
             "description" : "Configuration for a GenericDfTransformerDef to be applied",
             "oneOf" : [ {
               "type" : "object",
-              "description" : "Apply a column blacklist to a DataFrame.",
+              "description" : "Apply a column whitelist to a DataFrame.",
               "additionalProperties" : false,
-              "required" : [ "columnBlacklist", "type" ],
-              "title" : "BlacklistTransformer",
+              "required" : [ "columnWhitelist", "type" ],
+              "title" : "WhitelistTransformer",
               "properties" : {
                 "type" : {
-                  "const" : "BlacklistTransformer"
+                  "const" : "WhitelistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -4384,9 +4392,9 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnBlacklist" : {
+                "columnWhitelist" : {
                   "type" : "array",
-                  "description" : "List of columns to exclude from DataFrame",
+                  "description" : "List of columns to keep from DataFrame",
                   "items" : {
                     "type" : "string"
                   }
@@ -4872,6 +4880,17 @@
               }
             }, {
               "type" : "object",
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers.",
+              "additionalProperties" : false,
+              "required" : [ "type" ],
+              "title" : "OptionsGenericDfTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "OptionsGenericDfTransformer"
+                }
+              }
+            }, {
+              "type" : "object",
               "description" : "Apply a filter condition to a DataFrame.",
               "additionalProperties" : false,
               "required" : [ "filterClause", "type" ],
@@ -4899,24 +4918,13 @@
               }
             }, {
               "type" : "object",
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers.",
+              "description" : "Apply a column blacklist to a DataFrame.",
               "additionalProperties" : false,
-              "required" : [ "type" ],
-              "title" : "OptionsGenericDfTransformer",
+              "required" : [ "columnBlacklist", "type" ],
+              "title" : "BlacklistTransformer",
               "properties" : {
                 "type" : {
-                  "const" : "OptionsGenericDfTransformer"
-                }
-              }
-            }, {
-              "type" : "object",
-              "description" : "Apply a column whitelist to a DataFrame.",
-              "additionalProperties" : false,
-              "required" : [ "columnWhitelist", "type" ],
-              "title" : "WhitelistTransformer",
-              "properties" : {
-                "type" : {
-                  "const" : "WhitelistTransformer"
+                  "const" : "BlacklistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -4926,9 +4934,9 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnWhitelist" : {
+                "columnBlacklist" : {
                   "type" : "array",
-                  "description" : "List of columns to keep from DataFrame",
+                  "description" : "List of columns to exclude from DataFrame",
                   "items" : {
                     "type" : "string"
                   }
