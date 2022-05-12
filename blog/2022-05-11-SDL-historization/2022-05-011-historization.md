@@ -10,21 +10,28 @@ tags: [historization, MSSQL]
 hide_table_of_contents: false
 ---
 
-In many cases data has a now constant live. New data points are created, values changed and often data also expires. We are interested in keeping track of all these changes.
+In many cases datasets have no constant live. New data points are created, values changed and data expires. We are interested in keeping track of all these changes.
 
 <!--truncate-->
 
-In the [getting-started -> part2 -> keeping historical data](../../docs/getting-started/part-2/historical-data.md) historization is already introduced briefly. Here we go in slightly more detail and track data originating from an SQL database. For the sake of simplicity, SDL and SQL server gets deployed in containers using Podman. 
+In the [getting-started -> part2 -> keeping historical data](../../docs/getting-started/part-2/historical-data.md) historization is already introduced briefly. Here we go in slightly more detail and track data originating from an SQL database. For the sake of simplicity, SDL, SQL server, as well as the metastoren and polynote get deployed in containers using Podman. 
 
-Here we model a typical setup for a workflow from a (MS)SQL database to the Data Lake. Therefore, a the following steps will be performed:
+Here we model a workflow from a (MS)SQL database to the Data Lake. Therefore, a the following steps will be performed:
 
 * starting a MS SQL server
-* creating a simple dummy table
-* copying the table into the data lake
-* modifying the data
-* re-copy / update the data in the data lake
+* creating a table with data
+* injecting the table into the data lake
+* modifying the data on the SQL server side
+* re-copy / update the data into the data lake
 
-As data store the metastore container will be utilized. Further, the data changes in the data lake will be monitored using a Polynote notebook.
+The data will be inspected and monitored using a Polynote notebook.
+
+## Test Case
+As a test case a [Chess Game Dataset](https://www.kaggle.com/datasets/datasnaek/chess) is selected. This data is a set of 20058 rows, in total 7MB. This is still faily small, but should be kind of representative.
+
+The dataset will be imported into the SQL server using the [db_init_chess.sql](db_init_chess.sql), which should be copied into the `config` directory. 
+
+It should be noted that there are a duplicates in the dataset. The deduplication will be performed when the data is ported into the data lake (see configuration below). The procedure for table creation and modification is described below. 
 
 ## Prerequisites
 
@@ -49,39 +56,47 @@ As data store the metastore container will be utilized. Further, the data change
 	mkdir .mvnrepo
 	podman run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
 	```
+:::warning
+  update notebook
+:::
 * copy polynote notebook [sql_data_monitor.ipynb](sql_data_monitor.ipynb) for later inspection into the `polynote/notebook` directory
-* copy the SQL database initialization script [db_init.sql](sql_data_monitor.ipynb) and modification scripts [db_mod.sql](db_mod.sql) into the `config` directory
-* start the pod with the metastore and the polynote container: `podman-compose up`
+
+* script for creating table on the SQL server: [db_init_chess.sql](db_init_chess.sql) into the `config` directory
+
+* script for modifying the table on the SQL server: [db_mod_chess.sql](db_mod_chess.sql) into the `config` directory
+
+:::warning
+  update the restart script
+:::
+* a restart script [restart_databases.sh](restart_databases.sh) is provided to clean and restart from scratch, including: stopping the containers, cleaning databases, freshly starting the containers and initializing the SQL database 
 
 ## Prepare Source Database
+* start the pod with the metastore and polynote: 
+  ```
+  podman-compose up
+  ```
 * start the MS SQL server: 
   ```
   podman run -d --pod sdl_sql --hostname mssqlserver --add-host mssqlserver:127.0.0.1 --name mssql -v ${PWD}/data:/data  -v ${PWD}/config:/config -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=%abcd1234%" mcr.microsoft.com/mssql/server:2017-latest
   ```
 * intitalize the database: 
   ```
-  podman exec -it mssql /opt/mssql-tools/bin/sqlcmd -S mssqlserver -U sa -P '%abcd1234%' -i /config/db_init.sql
+  podman exec -it mssql /opt/mssql-tools/bin/sqlcmd -S mssqlserver -U sa -P '%abcd1234%' -i /config/db_init_chess.sql
   ```
 * list the table: 
   ```
-  podman exec -it mssql /opt/mssql-tools/bin/sqlcmd -S mssqlserver -U sa -P '%abcd1234%' -Q "SELECT * FROM foobar.dbo.drinks"
+  podman exec -it mssql /opt/mssql-tools/bin/sqlcmd -S mssqlserver -U sa -P '%abcd1234%' -Q "SELECT count(*) FROM foobar.dbo.chess"
   ```
+  This should report 20058 row. 
 
-	```
-	id          item                      category                  price
-  ----------- ------------------------- ------------------------- -----------
-            3 Coffee                    hot beverage                        3
-            2 home made Iced Tea        refresh                             5
-            4 house wine                alcoholic                          10
-            1 water                     refresh                             2
-
-  (4 rows affected)
-  ```
+:::Note
+  This could be shortened, by just calling the `bash restart_databases.sh`
+:::
 
 ## Define Workflow
 The SDLB configuration file `config/application.conf` consists of global settings for the metastore, the connection, the data objects, and the actions. 
 
-### Spark Options
+### Spark Settings
 For the metastore, the location, driver and access is defined
 
 ```
@@ -115,117 +130,47 @@ connections {
 Note the specification of the SQL server name 
 
 ### DataObjects
-Three data objects are defined: One for the external source, using JDBC Table and the above defined connection. One delta lake table as staging area with the raw data, and one delta lake table as integration layer, which already could have basic transformation including de-duplication, historization, etc. 
+
+The `ext-chess` data object defines the external source, using JDBC Table and the above defined connection. Further, delta lake tables as integration layer are defined as targets for our injection/historization action. 
 
 ```
 dataObjects {
-  ext-data {
+  ext-chess {
     type = JdbcTableDataObject
     connectionId = localSql
     table = {
-      name = "dbo.drinks"
+      name = "dbo.chess"
       db = "foobar"
-
     }
   }
-  int-data {
+  int-chess {
     type = DeltaLakeTableDataObject
     path = "~{id}"
     table {
       db = "default"
-      name = "int_data"
+      name = "int_chess"
       primaryKey = [id]
     }
   }
+  #...
 }
 ```
 
-Here we could skip the staging layer for storage and performance reasons, since it is not necessary. In practice this layer is typically used to store raw data, which typically is combined with data from other data sources and pre-processed before merging into the integration layer.
+:::warning
+  update file
+:::
 
 ### Actions
-The `histData` action defines the copy and historization of the data. 
-By default, the `HistorizeAction` join new with all existing data. The result overwrites all data in the data lake table. 
-Therewith also deleted elements from the source are detected and can be maked as such. All data points get a captured and a delimited timestamp. 
-By default, the result of the join overwrites the existing delta lake table. 
-On the one hand, this procedure can be optimized by only write changed data instead of the whole table. On the other hand, join the join between the existing and the new data can be improved, especially if the source supports CDC. SDL provides features for both topics. These optimizations are discussed later. First, let's run the default way. 
+The `histData*` actions define the copy and historization actions. 
+By setting the action to the type **HistorizeAction** the historization of the data will be enabled. Therewith, the incoming data will be joined with the existing data. Each data point gets two additional values: **dl_ts_captured** and **dl_ts_delimited**. The first defines the time captured in the data lake. The second one defines the time of getting invalidated, e.g. not existing anymore or a change is recored. In case of change, the original row gets invalidated and a new row is added with the current caturing time.
+By default, the resulting table will overwrite the existing data lake table.
+
+Furthermore, a *transformer* is added to deduplicate the data, which has duplicated rows with slightly different game times. 
 
 ```
 actions {
   histData {
     type = HistorizeAction
-    inputId = ext-data
-    outputId = int-data
-    metadata {
-      feed = download
-    }
-  }
-}
-```
-
-
-
-## Run
-Now the metastore and the "external" SQL server should already being running within one POD. Now the SDLB container is launched within the same POD, by using 
-
-```
-podman run --hostname localhost -e SPARK_LOCAL_HOSTNAME=localhost --rm --pod sdl_sql -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download
-```
-
-This will initially inject the data into the data lake. 
-
-Launching the [Polynote (click here)](http://localhost:8192) the previous copied notebook `sql_data_monitor.ipynb` provides first the possibility to list the available tables, list the int-data table using a SQL statement and querying the Delta Lake table using SDL Scala libraries. 
-
-In the Delta Lake Table we can see there are two additional columns visible: dl_ts_captured and dl_ts_delimited. These are used to track the validity ranges for the data points. If data changes, the original data point gets invalidated by setting the delimted to the current time and a new data point with the new value is created. See example below, after the update. 
-
-![polynote example output](sdl_sql_injection1res.png)
-
-### SQL update
-
-Now the SQL data is modified using an script:
-
-```
-podman exec -it mssql /opt/mssql-tools/bin/sqlcmd -S mssqlserver -U sa -P '%abcd1234%' -i /config/db_mod.sql
-```
-
-Then the updated table is copied into the data lake, by running again the SDLB command:
-
-```
-podman run --hostname localhost -e SPARK_LOCAL_HOSTNAME=localhost --rm --pod sdl_sql -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download
-```
-
-Then in the notebook the current state can be displayed and compared with the above.
-
-![polynote updated example output](sdl_sql_injection2res.png)
-
-Not only we see the different time collecting the separate data points, previous values in separate rows, and "deleted" data points. 
-
-## Optimization
-Now let's have a closer look to the performance and two additional optimizations. 
-
-### Test case
-The above test case used just a few rows in the table. For better testing performance we now switch to a larger dataset, a [Chess Game Dataset](https://www.kaggle.com/datasets/datasnaek/chess). This data is a set of 20058 rows, in total 7MB. This is still faily small, but should be better in case of representing performance data.
-
-The dataset is imported into the SQL server using the [db_init_chess.sql](db_init_chess.sql), which should be copied into the `config` directory. 
-
-For performance measurments the SQL database and the SDL metastore will be cleaned between SDLB algorithm changes. Therefore, the [restart_databases.sh](restart_databases.sh) script is launched, which includes a stopping the containers, cleaning databases, freshly starting the containers and initializing the SQL database. 
-
-It should be noted that there are a duplicates in the dataset. The deduplication will be performed when the data is ported into the data lake (see configuration below). 
-
-
-### SDLB configuration
-
-The current configuration file changed to:
-[application.conf](chess.conf)
-
-Here the dataObjects are similar to the ones above. The table and object names changed. 
-
-To the `HistorizeAction` is an additional Transformer added to get rid of duplicates. Further, the `mergeModeEnable` is commented out for the reference run. The action now looks like:
-
-```
-actions {
-  histChess {
-    type = HistorizeAction
-    mergeModeEnable = true
     inputId = ext-chess
     outputId = int-chess
     transformers = [{
@@ -239,15 +184,66 @@ actions {
       """
    }]
    metadata {
-      feed = chessdownload
+      feed = hist
     }
   }
+  #...
 }
 ```
 
-### Run
+The full configuration looks like [application.conf](application.conf). 
 
-Now everything is prepared for the comparison. First, the `mergeModeEnable` is commented out or set to `false`, and the pocedure of:
+## Run
+The Pod with metastore, polynote and the "external" SQL server should already being running. Now the SDLB container is launched within the same POD:
+
+```
+podman run --hostname localhost -e SPARK_LOCAL_HOSTNAME=localhost --rm --pod sdl_sql -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel hist
+```
+
+This will initially inject the data into the data lake. In my case this *histData* action needed around 12s. 
+
+Let's assume a change in the source database. Here the `victory_status` `outoftime` is renamed to `overtime` using:
+
+```
+podman exec -it mssql /opt/mssql-tools/bin/sqlcmd -S mssqlserver -U sa -P '%abcd1234%' -i /config/db_mod_chess.sql
+```
+Note: 1680 rows were changed.
+
+Further the data lake gets updated using the same command as above:
+```
+podman run --hostname localhost -e SPARK_LOCAL_HOSTNAME=localhost --rm --pod sdl_sql -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel hist
+```
+Again, the run time of the action is noted. In my case, it needed around 40s, due to the fact that all the data need to be compared, the whole data lake table need to be rewritten. 
+
+In the [Polynote (click here)](http://localhost:8192), the data in the data lake table can be inspected using the previously copied `sql_chessData.ipynb`. 
+::: warning
+  update notebook name
+:::
+
+
+::: warning
+  update pictures, delete old ones
+:::
+![polynote example output](sdl_sql_injection1res.png)
+
+## Optimizations
+
+In the current, default HistorizationAction the all the new data is compared with all the exising data, row by row, column by column. Further, the complete joined table is re-written to the data lake. 
+
+Smart Data Lake Builder provides a merge optimization for transactional database formats. By selecting `mergeModeEnable = true` the resulting table gets another column with `dl_hash`. This hash is used to compare rows much more efficiently. Further, already existing rows (identified by the hash), do not need to be re-written. 
+
+Thus, the merge mode is enabled in the historization action:
+```
+  histDataMerge {
+    type = HistorizeAction
+    mergeModeEnable = true
+    inputId = ext-chess
+    outputId = int-chess-merge
+    transformers = [{
+    ...
+```
+
+and the process is started from scratch again:
 
 * clean
 * init SQL server with the dataset
@@ -255,22 +251,20 @@ Now everything is prepared for the comparison. First, the `mergeModeEnable` is c
 * change data on SQL server
 * copy data to the data lake
 
-Therefore, the following commands are used:
-
 ```
-bash restart_databases.sh
-podman run --hostname localhost -e SPARK_LOCAL_HOSTNAME=localhost --rm --pod sdl_sql -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel chessdownload
+bash restart_databases.sh    ### first cleaning the databases
+podman run --hostname localhost -e SPARK_LOCAL_HOSTNAME=localhost --rm --pod sdl_sql -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel hist_merge
 ### note the timing
 
 podman exec -it mssql /opt/mssql-tools/bin/sqlcmd -S mssqlserver -U sa -P '%abcd1234%' -i /config/db_mod_chess.sql
 
-podman run --hostname localhost -e SPARK_LOCAL_HOSTNAME=localhost --rm --pod sdl_sql -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel chessdownload
+podman run --hostname localhost -e SPARK_LOCAL_HOSTNAME=localhost --rm --pod sdl_sql -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel hist_merge
 ### note the timing
 ```
 
-This procedure is performed once without and one with `mergeModeEnable = true`
+After measuring the timings the following differences is noted:
 
-|  | mergeModeEnable = false | mergeModeEnable = true |
+|  | `mergeModeEnable = false` | `mergeModeEnable = true` |
 | --- | -------------------- | ---------------------- |
 | intital copy | 11.85 | 13 |
 | copy of updated data | 40.3 |16.5 |
