@@ -30,9 +30,7 @@ import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransforme
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDsTransformer
 import org.apache.spark.sql._
 
-//Prevents this Exception:
-// java.lang.UnsupportedOperationException: Unable to find constructor for Product. This could happen if Product is an interface, or a trait without companion object constructor.
-abstract class FakeProduct extends Product
+
 
 
 /**

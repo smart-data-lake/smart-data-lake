@@ -66,7 +66,6 @@ class ScalaClassSparkDsTransformerTest extends FunSuite with BeforeAndAfter {
     val srcDO = CsvFileDataObject("src1", tempPath + "/src1", partitions = Seq("name")
       , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
     instanceRegistry.register(srcDO)
-    // first table has partitions columns dt and type (same as source)
     val tgt1DO = CsvFileDataObject("tgt1", tempPath + "/tgt1", partitions = Seq("name")
       , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int, doubled_rating int"))))
     instanceRegistry.register(tgt1DO)
