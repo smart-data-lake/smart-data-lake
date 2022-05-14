@@ -360,11 +360,11 @@
 			<version>${jetty.version}</version>
 		</dependency>
 
-	<dependency>
-		<groupId>org.eclipse.jetty.websocket</groupId>
-		<artifactId>websocket-server</artifactId>
-		<version>${jetty.version}</version>
-	</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty.websocket</groupId>
+			<artifactId>websocket-server</artifactId>
+			<version>${jetty.version}</version>
+		</dependency>
 
 		<dependency>
 			<groupId>org.eclipse.jetty</groupId>
@@ -466,6 +466,26 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-enforcer-plugin</artifactId>
+			</plugin>
+
+			<!-- generate version info properties file -->
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>generate-version-info</id>
+						<phase>prepare-package</phase>
+						<goals><goal>java</goal></goals>
+						<configuration>
+							<mainClass>io.smartdatalake.app.VersionInfoWriter</mainClass>
+							<arguments>
+								<argument>--outputDir</argument><argument>${project.build.outputDirectory}</argument>
+								<argument>--version</argument><argument>${project.parent.version}</argument>
+							</arguments>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 
 		</plugins>

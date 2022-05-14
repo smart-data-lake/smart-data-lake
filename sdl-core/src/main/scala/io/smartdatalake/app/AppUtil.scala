@@ -18,15 +18,14 @@
  */
 package io.smartdatalake.app
 
-import java.net.{URI, URL, URLClassLoader}
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.{GraphUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.Action
 import org.apache.hadoop.security.UserGroupInformation
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.util.ChildFirstURLClassLoader
 
+import java.net.{URL, URLClassLoader}
 import scala.annotation.tailrec
 import scala.util.Try
 
@@ -206,4 +205,10 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
     }
   }
 
+  /**
+   * read version from package manifest (not defined if project is executed in IntellJ)
+   */
+  def getManifestVersion: Option[String] = {
+    Option(getClass.getPackage.getImplementationVersion)
+  }
 }

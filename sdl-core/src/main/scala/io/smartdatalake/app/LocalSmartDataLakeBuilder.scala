@@ -18,10 +18,10 @@
  */
 package io.smartdatalake.app
 
-import java.io.File
-
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.EnvironmentUtil
+
+import java.io.File
 
 /**
  * Smart Data Lake Builder application for local mode.
@@ -55,7 +55,7 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
    * @param args Command-line arguments.
    */
   def main(args: Array[String]): Unit = {
-    logger.info(s"Starting Program $appType v$appVersion")
+    logger.info(s"Starting Program $appType $appVersion")
 
     // Set defaults from environment variables
     val config = initConfigFromEnvironment.copy(
