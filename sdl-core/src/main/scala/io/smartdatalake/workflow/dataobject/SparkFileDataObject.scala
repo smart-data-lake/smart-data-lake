@@ -18,7 +18,8 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.SdlConfigObject
+import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkRepartitionDef}
@@ -36,6 +37,7 @@ import org.apache.spark.sql.types.{DataType, StructType}
 
 import java.time.format.DateTimeFormatter
 import java.time.{Instant, LocalDateTime, ZoneId, ZoneOffset}
+import scala.collection.mutable
 import scala.reflect.runtime.universe.typeOf
 import scala.util.Try
 
@@ -209,10 +211,13 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
     var df = dfContent.withOptionalColumn(filenameColumn, input_file_name)
 
     // configure observer to get files processed for incremental execution mode
-    if (filesObserver.isDefined && context.phase == ExecutionPhase.Exec) {
+    if (filesObservers.nonEmpty && context.phase == ExecutionPhase.Exec) {
       assert(filenameColumn.isDefined, s"($id) filenameColumn must be set in order to observe files processed")
-      df = filesObserver.get.on(df, filenameColumn.get)
-      filesObserver = None // now we can already forget it and prepare for another query
+      if (filesObservers.size > 1) logger.warn(s"($id) files observation is not yet well supported when using from multiple actions in parallel")
+      df = filesObservers.foldLeft(df) {
+        case (df, (actionId,observer)) => observer.on(df, filenameColumn.get)
+      }
+      filesObservers.clear
     }
 
     // finalize & return DataFrame
@@ -248,19 +253,17 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
   }
 
   // Store files observation object between call to setupFilesObserver until it is used in getSparkDataFrame.
-  private var filesObserver: Option[FilesObservation] = None
+  private val filesObservers: mutable.Map[ActionId, FilesObservation] = mutable.Map()
 
   /**
    * Setup an observation of files processed through custom metrics.
    * This is used for incremental processing to keep track of files processed.
    * Note that filenameColumn needs to be configured for the DataObject in order for this to work.
    */
-  def setupFilesObserver(): FilesObservation = {
-    synchronized {
-      if (filesObserver.isDefined) throw new IllegalStateException(s"($id) files observation already set - concurrent use between setupFilesObserver and getSparkDataFrame are not supported!")
-      filesObserver = Some(new FilesObservation(id))
-      filesObserver.get
-    }
+  def setupFilesObserver(actionId: ActionId): FilesObservation = {
+    logger.debug(s"($id) setting up files observer for $actionId")
+    // return existing observation for this action if existing, otherwise create a new one.
+    filesObservers.getOrElseUpdate(actionId, new FilesObservation(actionId.id + "/" + id.id))
   }
 
   override def getStreamingDataFrame(options: Map[String, String], pipelineSchema: Option[StructType])(implicit context: ActionPipelineContext): DataFrame = {
@@ -396,12 +399,13 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
 /**
  * Observation of files processed using custom metrics.
  */
-private[smartdatalake] class FilesObservation(dataObjectId: DataObjectId) extends Observation with SmartDataLakeLogger {
+private[smartdatalake] class FilesObservation(name: String) extends Observation(name) with SmartDataLakeLogger {
 
   /**
    * Setup observation of custom metric on Dataset.
    */
   def on[T](ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
+    logger.debug(s"($name) add files observation to Dataset")
     on(ds, collect_set_deterministic(col(filenameColumnName)).as("filesProcessed"))
   }
 
@@ -410,9 +414,9 @@ private[smartdatalake] class FilesObservation(dataObjectId: DataObjectId) extend
    * Note that this blocks until the query finished successfully. Call only after Spark action was started on observed Dataset.
    */
   def getFilesProcessed: Seq[String] = {
-    val files = waitFor().getOrElse("filesProcessed", throw new IllegalStateException(s"($dataObjectId) Did not receive filesProcessed observation!"))
+    val files = waitFor().getOrElse("filesProcessed", throw new IllegalStateException(s"($name) Did not receive filesProcessed observation!"))
       .asInstanceOf[Seq[String]]
-    if (logger.isDebugEnabled()) logger.debug(s"($dataObjectId) files processed: ${files.mkString(", ")}")
+    if (logger.isDebugEnabled()) logger.debug(s"($name) files processed: ${files.mkString(", ")}")
     files
   }
 }
