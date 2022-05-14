@@ -28,8 +28,10 @@ import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.SftpFileRefConnection
+import net.schmizz.sshj.sftp.SFTPException
 
 import java.io.{InputStream, OutputStream}
+import java.nio.file.FileAlreadyExistsException
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -92,7 +94,11 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
 
   override def renameFile(file: String, newFile: String)(implicit context: ActionPipelineContext): Unit = {
     connection.execWithSFtpClient {
-      sftp => sftp.rename(file, newFile)
+      sftp => try {
+        sftp.rename(file, newFile)
+      } catch {
+        case e: SFTPException if e.getMessage == "File/Directory already exists" => throw new FileAlreadyExistsException(e.getMessage)
+      }
     }
   }
 

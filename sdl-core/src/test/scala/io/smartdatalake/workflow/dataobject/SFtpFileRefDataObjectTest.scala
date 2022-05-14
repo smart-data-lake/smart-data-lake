@@ -18,7 +18,6 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.nio.file.{Files, Path}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.BasicAuthMode
 import io.smartdatalake.testutils.TestUtil
@@ -29,6 +28,8 @@ import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
 import org.apache.sshd.server.SshServer
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FunSuite, Matchers}
+
+import java.nio.file.{Files, Path}
 
 class SFtpFileRefDataObjectTest extends FunSuite with Matchers with BeforeAndAfterEach with BeforeAndAfterAll {
 
@@ -171,5 +172,38 @@ class SFtpFileRefDataObjectTest extends FunSuite with Matchers with BeforeAndAft
     // check list partition values
     val partitionValuesListed = sftpDO.listPartitions
     partitionValuesListed shouldEqual partitionValuesListed
+  }
+
+  test("rename file, handle already existing") {
+
+    val ftpDir = "testSrc"
+    val resourceFile = "AB_NYC_2019.csv"
+
+    // copy data file to ftp
+    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(resourceFile).toFile)
+
+    // setup DataObject
+    val sftpDO = SFtpFileRefDataObject( "src1", tempDir.resolve(ftpDir).toString.replace('\\','/'), connectionId = "con1")
+    val fileRefs = sftpDO.getFileRefs(Seq())
+    assert(fileRefs.map(_.fileName) == Seq(resourceFile))
+
+    // rename 1
+    sftpDO.renameFileHandleAlreadyExisting(
+      tempDir.resolve(ftpDir).resolve(resourceFile).toString.replace('\\','/'),
+      tempDir.resolve(ftpDir).resolve(resourceFile+".temp").toString.replace('\\','/')
+    )
+    val fileRefs1 = sftpDO.getFileRefs(Seq())
+    assert(fileRefs1.map(_.fileName) == Seq(resourceFile+".temp"))
+
+    // copy data file again to ftp
+    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(resourceFile).toFile)
+
+    // rename 2 -> handle already existing
+    sftpDO.renameFileHandleAlreadyExisting(
+      tempDir.resolve(ftpDir).resolve(resourceFile).toString.replace('\\','/'),
+      tempDir.resolve(ftpDir).resolve(resourceFile+".temp").toString.replace('\\','/')
+    )
+    val fileRefs2 = sftpDO.getFileRefs(Seq())
+    assert(fileRefs2.size == 2 && fileRefs2.map(_.fileName).forall(_.startsWith(resourceFile)))
   }
 }

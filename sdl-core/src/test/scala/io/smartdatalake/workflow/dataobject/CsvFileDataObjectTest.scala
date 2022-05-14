@@ -19,9 +19,9 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.ConfigFactory
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
-import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.commons.io.{FileUtils, IOUtils}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SaveMode}
@@ -264,6 +264,38 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     if (!result) TestUtil.printFailedTestResult("")(dfRead)(df)
     assert(result)
     **/
+  }
+
+  test("rename file, handle already existing") {
+    val tempDir = Files.createTempDirectory("csv")
+    val resourceFile = "AB_NYC_2019.csv"
+
+    // copy data file to ftp
+    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(resourceFile).toFile)
+
+    // setup DataObject
+    val csvDO = CsvFileDataObject( "src1", path = escapedFilePath(tempDir.toFile.getPath))
+    val fileRefs = csvDO.getFileRefs(Seq())
+    assert(fileRefs.map(_.fileName) == Seq(resourceFile))
+
+    // rename 1
+    csvDO.renameFileHandleAlreadyExisting(
+      tempDir.resolve(resourceFile).toString.replace('\\','/'),
+      tempDir.resolve(resourceFile+".temp").toString.replace('\\','/')
+    )
+    val fileRefs1 = csvDO.getFileRefs(Seq())
+    assert(fileRefs1.map(_.fileName) == Seq(resourceFile+".temp"))
+
+    // copy data file again to ftp
+    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(resourceFile).toFile)
+
+    // rename 2 -> handle already existing
+    csvDO.renameFileHandleAlreadyExisting(
+      tempDir.resolve(resourceFile).toString.replace('\\','/'),
+      tempDir.resolve(resourceFile+".temp").toString.replace('\\','/')
+    )
+    val fileRefs2 = csvDO.getFileRefs(Seq())
+    assert(fileRefs2.size == 2 && fileRefs2.map(_.fileName).forall(_.startsWith(resourceFile)))
   }
 
 

@@ -23,6 +23,8 @@ import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
 import io.smartdatalake.workflow.{ActionPipelineContext, FileRefMapping}
 
+import java.nio.file.FileAlreadyExistsException
+
 private[smartdatalake] trait FileRefDataObject extends FileDataObject {
 
   /**
@@ -122,8 +124,25 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
 
   /**
    * Rename given file. This is used to cleanup files after they are processed.
+   * @throws FileAlreadyExistsException
    */
   def renameFile(file: String, newFile: String)(implicit context: ActionPipelineContext): Unit = throw new RuntimeException(s"($id) deleteFileRefs not implemented")
+
+  /**
+   * Rename given file. This is used to cleanup files after they are processed.
+   * If new file already exists, make unique by adding currentTimeMillis as postfix to filename.
+   */
+  final def renameFileHandleAlreadyExisting(file: String, newFile: String)(implicit context: ActionPipelineContext): Unit = {
+    try {
+      renameFile(file, newFile)
+    }catch {
+      case _:FileAlreadyExistsException =>
+        val newFileWithTs = newFile + "." + System.currentTimeMillis
+        logger.info(s"(${id}) file already exists, renaming $file to $newFileWithTs")
+        renameFile(file, newFileWithTs)
+    }
+  }
+
 
   /**
    * Delete all data. This is used to implement SaveMode.Overwrite.
