@@ -2800,6 +2800,14 @@
             "type" : "string",
             "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
           },
+          "housekeepingMode" : {
+            "description" : "Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.\nSee HousekeepingMode for available implementations. Default is None.",
+            "oneOf" : [ {
+              "$ref" : "#/definitions/HousekeepingMode/PartitionArchiveCompactionMode"
+            }, {
+              "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
+            } ]
+          },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
           }
@@ -4376,13 +4384,13 @@
             "description" : "Configuration for a GenericDfTransformerDef to be applied",
             "oneOf" : [ {
               "type" : "object",
-              "description" : "Apply a column whitelist to a DataFrame.",
+              "description" : "Apply a column blacklist to a DataFrame.",
               "additionalProperties" : false,
-              "required" : [ "columnWhitelist", "type" ],
-              "title" : "WhitelistTransformer",
+              "required" : [ "columnBlacklist", "type" ],
+              "title" : "BlacklistTransformer",
               "properties" : {
                 "type" : {
-                  "const" : "WhitelistTransformer"
+                  "const" : "BlacklistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -4392,9 +4400,9 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnWhitelist" : {
+                "columnBlacklist" : {
                   "type" : "array",
-                  "description" : "List of columns to keep from DataFrame",
+                  "description" : "List of columns to exclude from DataFrame",
                   "items" : {
                     "type" : "string"
                   }
@@ -4880,17 +4888,6 @@
               }
             }, {
               "type" : "object",
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers.",
-              "additionalProperties" : false,
-              "required" : [ "type" ],
-              "title" : "OptionsGenericDfTransformer",
-              "properties" : {
-                "type" : {
-                  "const" : "OptionsGenericDfTransformer"
-                }
-              }
-            }, {
-              "type" : "object",
               "description" : "Apply a filter condition to a DataFrame.",
               "additionalProperties" : false,
               "required" : [ "filterClause", "type" ],
@@ -4918,13 +4915,24 @@
               }
             }, {
               "type" : "object",
-              "description" : "Apply a column blacklist to a DataFrame.",
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers.",
               "additionalProperties" : false,
-              "required" : [ "columnBlacklist", "type" ],
-              "title" : "BlacklistTransformer",
+              "required" : [ "type" ],
+              "title" : "OptionsGenericDfTransformer",
               "properties" : {
                 "type" : {
-                  "const" : "BlacklistTransformer"
+                  "const" : "OptionsGenericDfTransformer"
+                }
+              }
+            }, {
+              "type" : "object",
+              "description" : "Apply a column whitelist to a DataFrame.",
+              "additionalProperties" : false,
+              "required" : [ "columnWhitelist", "type" ],
+              "title" : "WhitelistTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "WhitelistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -4934,9 +4942,9 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnBlacklist" : {
+                "columnWhitelist" : {
                   "type" : "array",
-                  "description" : "List of columns to exclude from DataFrame",
+                  "description" : "List of columns to keep from DataFrame",
                   "items" : {
                     "type" : "string"
                   }
