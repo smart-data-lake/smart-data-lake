@@ -19,6 +19,7 @@
 
 package io.smartdatalake.util.spark
 
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.util.QueryExecutionListener
@@ -31,9 +32,9 @@ import java.util.UUID
  *
  * Note: the name is used to make metrics unique across parallel queries in the same Spark session
  */
-private[smartdatalake] class Observation(name: String = UUID.randomUUID().toString) {
+private[smartdatalake] class Observation(name: String = UUID.randomUUID().toString) extends SmartDataLakeLogger {
 
-  private var listener: ObservationListener = ObservationListener(this)
+  private val listener: ObservationListener = ObservationListener(this)
 
   @volatile private var sparkSession: Option[SparkSession] = None
 
@@ -60,6 +61,7 @@ private[smartdatalake] class Observation(name: String = UUID.randomUUID().toStri
       // https://en.wikipedia.org/w/index.php?title=Spurious_wakeup&oldid=992601610
       val ts = System.currentTimeMillis()
       while (metrics.isEmpty) {
+        logger.debug(s"($name) waiting for metrics")
         wait(timeoutSec * 1000L)
         if (ts + timeoutSec * 1000L <= System.currentTimeMillis) throw NoMetricsReceivedException(s"Observation $name did not receive metrics within timeout of $timeoutSec seconds.")
       }
@@ -75,6 +77,8 @@ private[smartdatalake] class Observation(name: String = UUID.randomUUID().toStri
         if (metrics.isDefined) {
           notifyAll()
           sparkSession.foreach(_.listenerManager.unregister(listener))
+        } else {
+          if (logger.isDebugEnabled && qe.observedMetrics.nonEmpty) logger.debug(s"($name) received unexpected metric "+qe.observedMetrics)
         }
       }
     }

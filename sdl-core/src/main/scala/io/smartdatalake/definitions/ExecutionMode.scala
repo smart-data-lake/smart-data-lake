@@ -499,7 +499,7 @@ case class FileIncrementalMoveMode(archiveSubdirectory: Option[String] = None) e
       case (inputDataObject: SparkFileDataObject, inputSubFeed: SparkSubFeed) =>
         if (!inputDataObject.checkFilesExisting) throw NoDataToProcessWarning(actionId.id, s"($actionId) No files to process found for ${mainInput.id} by FileIncrementalMoveMode.")
         // setup observation of files processed
-        sparkFilesObserver = Some(inputDataObject.setupFilesObserver())
+        sparkFilesObserver = Some(inputDataObject.setupFilesObserver(actionId))
         Some(ExecutionModeResult(inputPartitionValues = inputSubFeed.partitionValues, outputPartitionValues = inputSubFeed.partitionValues))
       case _ => throw ConfigurationException(s"($actionId) FileIncrementalMoveMode needs FileRefDataObject with FileSubFeed or SparkFileDataObject with SparkSubFeed as input")
     }
