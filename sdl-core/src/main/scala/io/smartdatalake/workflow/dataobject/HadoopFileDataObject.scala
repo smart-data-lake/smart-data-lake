@@ -25,7 +25,7 @@ import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.HadoopFileConnection
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.{FileAlreadyExistsException, FileContext, FileSystem, Path}
 
 import java.io.{InputStream, OutputStream}
 import scala.util.{Failure, Success, Try}
@@ -106,12 +106,21 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
 
   def deleteFile(file: Path)(implicit context: ActionPipelineContext): Unit = {
     logger.debug(s"($id) deleteFile $file")
-    filesystem.delete(file, false) // recursive=false
+    if (!filesystem.delete(file, false)) { // recursive=false
+      logger.warn(s"($id) deleting $file failed!")
+    }
   }
 
   def renameFile(file: Path, newFile: Path)(implicit context: ActionPipelineContext): Unit = {
+    import java.nio.file.{FileAlreadyExistsException => JavaFileAlreadyExistsException}
     logger.debug(s"($id) rename file $file to $newFile")
-    filesystem.rename(file, newFile)
+    val context = FileContext.getFileContext(newFile.toUri)
+    try {
+      context.rename(file, newFile)
+    } catch {
+      // convert Hadoop exception to standard java exception
+      case e: FileAlreadyExistsException => new JavaFileAlreadyExistsException(e.getMessage)
+    }
   }
 
   /**

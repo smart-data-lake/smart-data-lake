@@ -32,6 +32,7 @@ import io.smartdatalake.workflow.action.ActionHelper.{getOptionalDataFrame, sear
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.streaming.{OutputMode, Trigger}
 
 import java.sql.Timestamp
@@ -505,7 +506,7 @@ case class FileIncrementalMoveMode(archiveSubdirectory: Option[String] = None) e
   }
 
   /**
-   * Remove files after read
+   * Remove/archive files after read
    */
   private[smartdatalake] override def postExec(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, mainInputSubFeed: SubFeed, mainOutputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = {
     (mainInput, mainOutputSubFeed) match {
@@ -517,7 +518,7 @@ case class FileIncrementalMoveMode(archiveSubdirectory: Option[String] = None) e
             if (archiveSubdirectory.isDefined) {
               inputFiles.foreach { file =>
                 val archiveFile = createArchiveFileName(file)
-                fileRefInput.renameFile(file, archiveFile)
+                fileRefInput.renameFileHandleAlreadyExisting(file, archiveFile)
               }
             } else {
               inputFiles.foreach(file => fileRefInput.deleteFile(file))
@@ -528,12 +529,18 @@ case class FileIncrementalMoveMode(archiveSubdirectory: Option[String] = None) e
           .getOrElse(throw new IllegalStateException(s"($actionId) FilesObserver not setup for ${mainInput.id}"))
           .getFilesProcessed
         if (files.isEmpty) throw NoDataToProcessWarning(actionId.id, s"($actionId) No files to process found for ${mainInput.id} by FileIncrementalMoveMode.")
+        // create directory if not existing (otherwise hadoop rename fails)
+        archiveSubdirectory.foreach { dir =>
+          val archiveDir = new Path(sparkDataObject.hadoopPath, dir)
+          if (!sparkDataObject.filesystem.exists(archiveDir)) sparkDataObject.filesystem.mkdirs(archiveDir)
+        }
+        // do cleanup
         logger.info(s"Cleaning up ${files.size} processed input files")
         files.foreach {
           file =>
             if (archiveSubdirectory.isDefined) {
               val archiveFile = createArchiveFileName(file)
-              sparkDataObject.renameFile(file, archiveFile)
+              sparkDataObject.renameFileHandleAlreadyExisting(file, archiveFile)
             } else {
               sparkDataObject.deleteFile(file)
             }
