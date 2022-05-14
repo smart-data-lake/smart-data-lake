@@ -28,7 +28,7 @@ import io.smartdatalake.config.ConfigurationException
 class DefaultSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
   def parseAndRun(args: Array[String], ignoreOverrideJars: Boolean = false): Unit = {
-    logger.info(s"Starting Program $appType v$appVersion")
+    logger.info(s"Starting Program $appType $appVersion")
 
     parseCommandLineArguments(args, initConfigFromEnvironment) match {
       case Some(config) =>

@@ -107,8 +107,7 @@ object TestMode extends Enumeration {
  */
 abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
-  // read version from package manifest (not defined if project is executed in IntellJ)
-  val appVersion: String = Option(getClass.getPackage.getImplementationVersion).getOrElse("develop")
+  val appVersion: String = AppUtil.getManifestVersion.map("v"+_).getOrElse("develop") + ", sdlb-build-version: " + BuildVersionInfo.readBuildVersionInfo.getOrElse("unknown")
   val appType: String = getClass.getSimpleName.replaceAll("\\$$","") // remove $ from object name and use it as appType
 
   /**
@@ -132,7 +131,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   protected val parser: OptionParser[SmartDataLakeBuilderConfig] = new OptionParser[SmartDataLakeBuilderConfig](appType) {
     override def showUsageOnError: Option[Boolean] = Some(true)
 
-    head(appType, appVersion)
+    head(appType, s"$appVersion")
     opt[String]('f', "feed-sel")
       .required
       .action( (arg, config) => config.copy(feedSel = arg) )
