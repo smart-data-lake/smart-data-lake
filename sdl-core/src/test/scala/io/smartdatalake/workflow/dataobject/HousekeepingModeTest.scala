@@ -20,16 +20,16 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.CopyAction
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.lit
 import org.scalatest.{BeforeAndAfter, FunSuite}
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 
 import java.nio.file.Files
 
@@ -92,7 +92,7 @@ class HousekeepingModeTest extends FunSuite with BeforeAndAfter {
     assert(tgtDO.listPartitions == Seq(PartitionValues(Map("dt" -> "20201101"))))
     assert(tgtDO.filesystem.exists(new Path(tgtDO.hadoopPath, "dt=20201101/_SDL_COMPACTED")))
     val actual = tgtDO.getSparkDataFrame()
-    val expected = df1.withColumn("dt", lit(20201101)).withColumn("rating", $"rating".cast("string"))
+    val expected = df1.withColumn("dt", lit("20201101"))
     val resultat = actual.isEqual(expected)
     if (!resultat) TestUtil.printFailedTestResult("historize 1st load mergeModeEnable")(actual)(expected)
     assert(resultat)

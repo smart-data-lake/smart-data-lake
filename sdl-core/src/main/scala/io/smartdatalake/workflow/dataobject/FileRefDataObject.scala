@@ -135,7 +135,7 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
   final def renameFileHandleAlreadyExisting(file: String, newFile: String)(implicit context: ActionPipelineContext): Unit = {
     try {
       renameFile(file, newFile)
-    }catch {
+    } catch {
       case _:FileAlreadyExistsException =>
         val newFileWithTs = newFile + "." + System.currentTimeMillis
         logger.info(s"(${id}) file already exists, renaming $file to $newFileWithTs")

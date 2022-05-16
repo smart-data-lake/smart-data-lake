@@ -23,8 +23,7 @@ import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataobject._
-import org.apache.hadoop.fs.permission.FsPermission
-import org.apache.hadoop.fs.{FileContext, FileSystem, Path}
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
 
 object CompactionUtil extends SmartDataLakeLogger {

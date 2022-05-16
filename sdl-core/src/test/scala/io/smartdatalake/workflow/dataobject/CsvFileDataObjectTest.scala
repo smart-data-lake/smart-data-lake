@@ -295,7 +295,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
       tempDir.resolve(resourceFile+".temp").toString.replace('\\','/')
     )
     val fileRefs2 = csvDO.getFileRefs(Seq())
-    assert(fileRefs2.size == 2 && fileRefs2.map(_.fileName).forall(_.startsWith(resourceFile)))
+    assert(fileRefs2.size == 2 && fileRefs2.map(_.fileName).forall(_.startsWith(resourceFile+".temp")))
   }
 
 
