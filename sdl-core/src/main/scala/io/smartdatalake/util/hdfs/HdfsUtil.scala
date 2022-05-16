@@ -24,9 +24,11 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
+import java.io.IOException
 import java.net.URI
 import scala.collection.AbstractIterator
 import scala.io.Source
+import scala.util.Try
 
 /**
  * Provides utility functions for HDFS.
@@ -183,9 +185,11 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    */
   def renamePath(path: Path, newPath: Path)(implicit fs: FileSystem ): Unit = {
     if (fs.rename(path, newPath)) {
-      logger.info(s"Path $path renamed to $newPath")
+      logger.debug(s"Path $path renamed to $newPath")
     } else {
-      throw new RuntimeException(s"Rename path $path to $newPath failed")
+      val fileStat = Try(fs.getFileStatus(newPath))
+      if (fileStat.isSuccess && fileStat.get.isFile) throw new FileAlreadyExistsException(s"Rename $path to $newPath failed. New file already exists.")
+      else new IOException(s"Rename $path to $newPath failed. Reason unknown.")
     }
   }
 
@@ -195,19 +199,18 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    */
   def moveFiles(path: Path, newPath: Path, failOnError: Boolean = true, customFilter: (FileStatus => Boolean) = _ => true, addPrefixIfExisting: Boolean = false )(implicit fs: FileSystem): Unit = {
     try {
-      if (!fs.exists(newPath)) fs.mkdirs(newPath)
-      else if (!fs.isDirectory(newPath))
-        throw new RuntimeException(s"moveFile: new path $newPath must be a directory")
+      val fileStat = Try(fs.getFileStatus(newPath))
+      if (fileStat.isFailure) fs.mkdirs(newPath)
+      else if (!fileStat.get.isDirectory) throw new RuntimeException(s"moveFile: new path $newPath must be a directory")
       val pathsToMove = fs.globStatus(path).toSeq.filter(_.isFile).filter(customFilter).map(_.getPath)
-      val context = FileContext.getFileContext(newPath.toUri)
       def getParentHash(path: Path) = Integer.toHexString(path.getParent.hashCode())
       pathsToMove.foreach{ path =>
         try {
-          context.rename(path, new Path(newPath, path.getName))
+          renamePath(path, new Path(newPath, path.getName))
         } catch {
           // it's possible that files have the same name in different directories. Rename files adds hash of parent as prefix of filename in those cases.
           case _:FileAlreadyExistsException if (addPrefixIfExisting) =>
-            context.rename(path, new  Path(newPath, s"${getParentHash(path)}-${path.getName}"))
+            renamePath(path, new  Path(newPath, s"${getParentHash(path)}-${path.getName}"))
         }
       }
       logger.info(s"${pathsToMove.size} files moved from $path to $newPath")
