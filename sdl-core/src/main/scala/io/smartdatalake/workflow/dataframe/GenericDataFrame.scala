@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.dataframe
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import scala.reflect.runtime.universe.Type
 
@@ -112,8 +112,8 @@ trait GenericDataFrame extends GenericTypedObject {
   /**
    * Move partition columns at end of DataFrame as required when writing to Hive in Spark > 2.x
    */
-  def movePartitionColsLast(partitions: Seq[String])(implicit helper: DataFrameSubFeedCompanion): GenericDataFrame = {
-    import helper._
+  def movePartitionColsLast(partitions: Seq[String])(implicit function: DataFrameFunctions): GenericDataFrame = {
+    import function._
     val (partitionCols, nonPartitionCols) = schema.columns.partition(c => partitions.contains(c))
     val newColOrder = nonPartitionCols ++ partitionCols
     select(newColOrder.map(col))
@@ -122,8 +122,8 @@ trait GenericDataFrame extends GenericTypedObject {
   /**
    * Convert column names to lower case
    */
-  def colNamesLowercase(implicit helper: DataFrameSubFeedCompanion): GenericDataFrame = {
-    import helper._
+  def colNamesLowercase(implicit function: DataFrameFunctions): GenericDataFrame = {
+    import function._
     select(schema.columns.map(c => col(c).as(c.toLowerCase())))
   }
 

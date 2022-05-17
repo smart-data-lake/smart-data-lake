@@ -27,7 +27,7 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
-import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils}
+import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils, ScalaUtil}
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -323,6 +323,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       } else {
         mergeStmt.whenNotMatched(saveModeOptions.insertConditionExpr.getOrElse(lit(true))).insertAll()
       }
+      logger.info(s"($id) executing merge statement with options: ${ScalaUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1+"="+e._2).mkString(" ")}")
       // execute delta lake statement
       mergeStmt.execute()
     }

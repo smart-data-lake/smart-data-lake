@@ -194,6 +194,26 @@ object Environment {
       .map(_.toBoolean).getOrElse(true)
   }
 
+  /**
+   * If enabled, the sample data file for SparkFileDataObject is updated on every load from a file-based Action, otherwise it's just updated if it's missing.
+   * The advantage of updating the sample file on every load is to enable automatic schema evolution.
+   * This is disabled by default, as it might have performance impact if file size is big. It can be enabled on demand by setting the corresponding java property or environment variable.
+   */
+  var updateSparkFileDataObjectSampleDataFile: Boolean = {
+    EnvironmentUtil.getSdlParameter("updateSparkFileDataObjectSampleDataFile")
+      .map(_.toBoolean).getOrElse(false)
+  }
+
+  /**
+   * If enabled, the schema file for SparkFileDataObject is updated on every load from a DataFrame-based Action, otherwise it's just updated if it's missing.
+   * The advantage of updating the sample file on every load is to enable automatic schema evolution.
+   * This is enabled by default, as it has not big impact on performance.
+   */
+  var updateSparkFileDataObjectSchemaFile: Boolean = {
+    EnvironmentUtil.getSdlParameter("updateSparkFileDataObjectSchemaFile")
+      .map(_.toBoolean).getOrElse(true)
+  }
+
   // static configurations
   val configPathsForLocalSubstitution: Seq[String] = Seq(
       "path", "table.name"

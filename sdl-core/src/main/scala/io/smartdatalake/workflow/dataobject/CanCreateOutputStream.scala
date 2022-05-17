@@ -20,7 +20,6 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.SparkSession
 
 import java.io.OutputStream
 
@@ -43,4 +42,9 @@ private[smartdatalake] trait CanCreateOutputStream {
    */
   def endWritingOutputStreams(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): Unit
 
+  /**
+   * Some DataObjects need a sample file created in init-phase to be ready for schema inference, e.g. SparkFileDataObject.
+   * This method is called in init-phase and should return the sample filename if it has to be created.
+   */
+  def createSampleFile(implicit context: ActionPipelineContext): Option[String] = None
 }

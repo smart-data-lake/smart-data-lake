@@ -4,15 +4,15 @@ import com.typesafe.config.Config
 import com.univocity.parsers.csv.CsvParser
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode}
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
-import io.smartdatalake.util.spark.DataFrameUtil._
 import io.smartdatalake.util.misc.{AclDef, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.DataFrameUtil._
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.csv.{CSVExprUtils, CSVOptions, UnivocityParser}
@@ -60,6 +60,8 @@ import scala.reflect.runtime.universe.typeOf
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
  *                                    Default is to expect all partitions to exist.
+ * @param housekeepingMode Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.
+ *                         See HousekeepingMode for available implementations. Default is None.
  **/
 case class RelaxedCsvFileDataObject(override val id: DataObjectId,
                                     override val path: String,
@@ -76,6 +78,7 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
                                     override val connectionId: Option[ConnectionId] = None,
                                     override val filenameColumn: Option[String] = None,
                                     override val expectedPartitionsCondition: Option[String] = None,
+                                    override val housekeepingMode: Option[HousekeepingMode] = None,
                                     override val metadata: Option[DataObjectMetadata] = None
                             )(@transient implicit override val instanceRegistry: InstanceRegistry)
   extends SparkFileDataObject {

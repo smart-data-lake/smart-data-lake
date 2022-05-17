@@ -21,15 +21,15 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.json.DefaultFlatteningParser
-import io.smartdatalake.util.spark.DataFrameUtil.DataFrameReaderUtils
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.DataFrameUtil.DataFrameReaderUtils
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.{input_file_name, lit}
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -107,17 +107,15 @@ case class XmlFileDataObject(override val id: DataObjectId,
     assert(wrongPartitionValues.isEmpty, s"getDataFrame got request with PartitionValues keys ${wrongPartitionValues.mkString(",")} not included in $id partition columns ${partitions.mkString(", ")}")
     assert(partitionValues.forall(pv => partitions.toSet.diff(pv.keys).isEmpty), "PartitionValues must include values for all partitions when reading XML-Data")
 
-    val filesExists = checkFilesExisting
-    if (!filesExists) {
+    val schemaOpt = getSchema.map(_.inner)
+    if (!(schemaOpt.isDefined || checkFilesExisting)) {
       //without either schema or data, no data frame can be created
       require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined if there are no existing files.")
-
-      // Schema exists so an empty data frame can be created
-      // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
-      filesystem.mkdirs(hadoopPath)
     }
 
-    val schemaOpt = getSchema(filesExists).map(_.inner)
+    // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
+    if (!filesystem.exists(hadoopPath)) filesystem.mkdirs(hadoopPath)
+
     val dfContent = if (partitions.isEmpty) {
       session.read
         .format(format)

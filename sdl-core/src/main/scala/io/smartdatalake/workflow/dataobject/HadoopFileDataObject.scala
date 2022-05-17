@@ -22,11 +22,10 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
-import io.smartdatalake.util.misc.ScalaUtil.arrayToSeq
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.HadoopFileConnection
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.{FileAlreadyExistsException, FileSystem, Path}
 
 import java.io.{InputStream, OutputStream}
 import scala.util.{Failure, Success, Try}
@@ -90,26 +89,30 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    *
    * @throws IllegalArgumentException if `failIfFilesMissing` = true and no files found at `path`.
    */
-  protected def checkFilesExisting(implicit context: ActionPipelineContext): Boolean = {
-
-    val files = if (filesystem.exists(hadoopPath)) {
-      arrayToSeq(filesystem.listStatus(hadoopPath))
-    } else {
-      Seq.empty
-    }
-
-    if (files.isEmpty) {
-      logger.warn(s"($id) No files found at $hadoopPath. Can not import any data.")
+  private[smartdatalake] def checkFilesExisting(implicit context: ActionPipelineContext): Boolean = {
+    if (!filesystem.exists(hadoopPath) || filesystem.listStatus(hadoopPath).isEmpty) {
       require(!failIfFilesMissing, s"($id) failIfFilesMissing is enabled and no files to process have been found in $hadoopPath.")
-    }
-
-    files.nonEmpty
+      false
+    } else true
   }
 
-  override def deleteFileRefs(fileRefs: Seq[FileRef])(implicit context: ActionPipelineContext): Unit = {
-    // delete given files on hdfs
-    fileRefs.foreach { file =>
-      filesystem.delete(new Path(file.fullPath), false) // recursive=false
+  override def deleteFile(file: String)(implicit context: ActionPipelineContext): Unit = {
+    deleteFile(new Path(file))
+  }
+
+  override def renameFile(file: String, newFile: String)(implicit context: ActionPipelineContext): Unit = {
+    import java.nio.file.{FileAlreadyExistsException => JavaFileAlreadyExistsException}
+    try {
+      HdfsUtil.renamePath(new Path(file), new Path(newFile))(filesystem)
+    } catch {
+      case e: FileAlreadyExistsException => throw new JavaFileAlreadyExistsException(e.getMessage)
+    }
+  }
+
+  def deleteFile(file: Path)(implicit context: ActionPipelineContext): Unit = {
+    logger.debug(s"($id) deleteFile $file")
+    if (!filesystem.delete(file, false)) { // recursive=false
+      logger.warn(s"($id) deleting $file failed!")
     }
   }
 
@@ -272,6 +275,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    * delete all files inside given path recursively
    */
   def deleteAllFiles(path: Path)(implicit context: ActionPipelineContext): Unit = {
+    logger.info(s"($id) deleteAllFiles $path")
     val dirEntries = filesystem.globStatus(new Path(path, "*")).map(_.getPath)
     dirEntries.foreach { p =>
       if (filesystem.isDirectory(p)) deleteAllFiles(p)

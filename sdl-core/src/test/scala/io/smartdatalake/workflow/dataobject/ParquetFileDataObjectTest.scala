@@ -19,13 +19,14 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.ConfigFactory
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.HadoopFileConnection
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.StructType
 
-class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjectSchemaBehavior {
+class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjectSchemaBehavior with SmartDataLakeLogger {
 
   private val tempDir = createTempDir
   private val tempPath = tempDir.toAbsolutePath.toString
@@ -38,17 +39,20 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
     ("string3",3,Seq(3,6,9))
   ).toDF("str","number","list")
 
-  test("write and read parquet file") {
+  test("write and read parquet file with observation of processed files") {
 
     val config = ConfigFactory.parseString(s"""
                                                | id = src1
                                                | path = "${escapedFilePath(tempPath)}"
+                                               | filenameColumn = _filename
          """.stripMargin)
 
     val doSrc1 = ParquetFileDataObject.fromConfig(config)
     doSrc1.writeSparkDataFrame(testDf, Seq())
-    val result = doSrc1.getSparkDataFrame()
+    val filesObserver = doSrc1.setupFilesObserver("test")
+    val result = doSrc1.getSparkDataFrame()(contextExec)
     assert(result.count() == 3)
+    assert(filesObserver.getFilesProcessed.nonEmpty)
   }
 
   test("write and read parquet file with connection") {

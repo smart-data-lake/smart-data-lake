@@ -19,7 +19,6 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.SparkSession
 
 /**
  * DataObjects should implement this interface to allow incremental processing
