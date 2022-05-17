@@ -25,13 +25,13 @@ import com.networknt.schema.{JsonSchema, JsonSchemaFactory, SpecVersion, Validat
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.json.JsonUtils._
 import io.smartdatalake.util.json.SchemaConverter
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.action.script.{CmdScript, DockerRunScript, ParsableScriptDef}
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.DataFrame
@@ -132,7 +132,7 @@ case class AirbyteDataObject(override val id: DataObjectId,
 
   override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
     assert(configuredStream.nonEmpty, s"($id) prepare must be called before setState")
-    assert(spec.exists(_.supportsIncremental), s"${id} Connector does not support incremental output")
+    assert(spec.flatMap(_.supportsIncremental).getOrElse(true), s"${id} Connector does not support incremental output")
     assert(configuredStream.exists(_.stream.supported_sync_modes.contains(SyncModeEnum.incremental)), s"${id} Stream '$streamName' does not support incremental output")
     this.state = state
     if (state.isDefined) configuredStream = configuredStream.map(_.copy(sync_mode = SyncModeEnum.incremental))
@@ -141,7 +141,7 @@ case class AirbyteDataObject(override val id: DataObjectId,
 
   override def getState: Option[String] = {
     assert(configuredStream.nonEmpty, s"($id) prepare must be called before getState")
-    assert(spec.exists(_.supportsIncremental), s"${id} Connector does not support incremental output")
+    assert(spec.flatMap(_.supportsIncremental).getOrElse(true), s"${id} Connector does not support incremental output")
     assert(configuredStream.exists(_.sync_mode == SyncModeEnum.incremental), s"${id} Stream configuration must be set to SyncMode.Incremental by calling setState before")
     state
   }
