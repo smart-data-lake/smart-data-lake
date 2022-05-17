@@ -4731,6 +4731,32 @@
               }
             }, {
               "type" : "object",
+              "description" : "Add additional columns to the DataFrame by extracting information from the context.",
+              "additionalProperties" : false,
+              "required" : [ "additionalColumns", "type" ],
+              "title" : "AdditionalColumnsTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "AdditionalColumnsTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "additionalColumns" : {
+                  "type" : "object",
+                  "description" : "optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }, {
+              "type" : "object",
               "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Scala code which is compiled at runtime.\nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The scala code has to implement a function of type[[fnTransformType]] .",
               "additionalProperties" : false,
               "required" : [ "type" ],
@@ -4765,32 +4791,6 @@
                 "runtimeOptions" : {
                   "type" : "object",
                   "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  }
-                }
-              }
-            }, {
-              "type" : "object",
-              "description" : "Add additional columns to the DataFrame by extracting information from the context.",
-              "additionalProperties" : false,
-              "required" : [ "additionalColumns", "type" ],
-              "title" : "AdditionalColumnsTransformer",
-              "properties" : {
-                "type" : {
-                  "const" : "AdditionalColumnsTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                },
-                "additionalColumns" : {
-                  "type" : "object",
-                  "description" : "optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
                   "additionalProperties" : {
                     "type" : "string"
                   }
@@ -4888,6 +4888,17 @@
               }
             }, {
               "type" : "object",
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers.",
+              "additionalProperties" : false,
+              "required" : [ "type" ],
+              "title" : "OptionsGenericDfTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "OptionsGenericDfTransformer"
+                }
+              }
+            }, {
+              "type" : "object",
               "description" : "Apply a filter condition to a DataFrame.",
               "additionalProperties" : false,
               "required" : [ "filterClause", "type" ],
@@ -4911,17 +4922,6 @@
                 "subFeedTypeForValidation" : {
                   "type" : "string",
                   "description" : "When parsing the configuration the runtime subFeedType for validating the filter expression is not yet known.\nBy default SparkSubFeed langauge is used, but you can configure a different one if needed."
-                }
-              }
-            }, {
-              "type" : "object",
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers.",
-              "additionalProperties" : false,
-              "required" : [ "type" ],
-              "title" : "OptionsGenericDfTransformer",
-              "properties" : {
-                "type" : {
-                  "const" : "OptionsGenericDfTransformer"
                 }
               }
             }, {
@@ -6052,7 +6052,7 @@
           },
           "mergeModeEnable" : {
             "type" : "string",
-            "description" : "Set to true to use saveMode.Merge for much better performance by using incremental historization.\nOutput DataObject must implement[[CanMergeDataFrame]] if enabled (default = false).\nIncremental historization will add an additional \\\"dl_hash\\\" column which is used for change detection between\nexisting and new data."
+            "description" : "Set to true to use saveMode.Merge for much better performance by using incremental historization.\nOutput DataObject must implement[[CanMergeDataFrame]] if enabled (default = false).\nIncremental historization will add an additional \\\"dl_hash\\\" column which is used for change detection between\nexisting and new data.\nNote that enabling mergeMode on an existing HistorizeAction will create a new version for every\nnew record in the output table, as \\\"dl_hash\\\" column is initially null."
           },
           "mergeModeAdditionalJoinPredicate" : {
             "type" : "string",
@@ -6060,7 +6060,7 @@
           },
           "mergeModeCDCColumn" : {
             "type" : "string",
-            "description" : "Optional colum holding the CDC operation to replay. If this information is available from the source\nincremental historization can be further optimized, as the join with existing data can be omitted.\nYou will also need to specify parameter mergeModeCDCDeletedValue to use this and mergeModeEnable=true.\nIncrement CDC historization will add an additional column \\\"dl_dummy\\\" to the target table,\nwhich is used to work around limitations of SQL merge statement, but \\\"dl_hash\\\" column is no longer needed."
+            "description" : "Optional colum holding the CDC operation to replay to enable mergeModeCDC. If CDC information is available from the source\nincremental historization can be further optimized, as the join with existing data can be omitted.\nNote that this should be enabled only, if input data contains just inserted, updated and deleted records.\nHistorizeAction in mergeModeCDC will make *no* change detection on its own, and create a new version for every inserted/updated record it receives!\nYou will also need to specify parameter mergeModeCDCDeletedValue to use this and mergeModeEnable=true.\nIncrement CDC historization will add an additional column \\\"dl_dummy\\\" to the target table,\nwhich is used to work around limitations of SQL merge statement, but \\\"dl_hash\\\" column from mergeMode is no longer needed."
           },
           "mergeModeCDCDeletedValue" : {
             "type" : "string",
