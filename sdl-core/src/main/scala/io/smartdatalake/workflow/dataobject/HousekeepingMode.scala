@@ -20,13 +20,11 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.definitions.{Condition, DefaultExecutionModeExpressionData}
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.{ExpressionEvaluationException, SparkExpressionUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.SparkSession
 
 import java.sql.Timestamp
 
@@ -122,11 +120,15 @@ case class PartitionArchiveCompactionMode(archivePartitionExpression: Option[Str
             .filter(pvs => !pvsToArchive.contains(pvs)) // filter out partitions to archive, as they dont need compaction anymore
         ).getOrElse(Seq())
         // archive
-        partitionedDataObject.movePartitions(pvsToArchiveMapping)
-        logger.info(s"(${dataObject.id}) Housekeeping archived partitions ${pvsToArchive.mkString(", ")}" )
+        if (pvsToArchiveMapping.nonEmpty) {
+          partitionedDataObject.movePartitions(pvsToArchiveMapping)
+          logger.info(s"(${dataObject.id}) Housekeeping archived partitions ${pvsToArchive.mkString(", ")}" )
+        }
         // compact
-        partitionedDataObject.compactPartitions(pvsToCompact)
-        logger.info(s"(${dataObject.id}) Housekeeping compacted partitions ${pvsToCompact.mkString(", ")}" )
+        if (pvsToCompact.nonEmpty) {
+          partitionedDataObject.compactPartitions(pvsToCompact)
+          logger.info(s"(${dataObject.id}) Housekeeping compacted partitions ${pvsToCompact.mkString(", ")}")
+        }
     }
   }
 }
