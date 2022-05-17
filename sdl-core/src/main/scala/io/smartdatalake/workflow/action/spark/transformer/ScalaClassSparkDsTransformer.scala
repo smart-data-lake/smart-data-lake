@@ -35,7 +35,7 @@ import org.apache.spark.sql._
 
 /**
  * Configuration of a custom Spark-Dataset transformation between one input and one output (1:1) as Java/Scala Class.
- * Define a transform function which receives a DataObjectId, a Dataset and a map of options and has to return a Dataset.
+ * Define a transform function which receives a SparkSession, a Dataset and a map of options and has to return a Dataset.
  * The Java/Scala class has to implement interface [[CustomDsTransformer]].
  *
  * @param name                 name of the transformer
@@ -45,7 +45,7 @@ import org.apache.spark.sql._
  * @param runtimeOptions       optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                             The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
-case class ScalaClassSparkDsTransformer(override val name: String = "scalaSparkTransform", override val description: Option[String] = None, transformerClassName: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfTransformer {
+case class ScalaClassSparkDsTransformer(override val name: String = "ScalaClassSparkDsTransformer", override val description: Option[String] = None, transformerClassName: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfTransformer {
   private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDsTransformer[FakeProduct, FakeProduct]](transformerClassName)
 
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit context: ActionPipelineContext): DataFrame = {

@@ -19,9 +19,10 @@
 package io.smartdatalake.workflow.action.spark.customlogic
 
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.dataobject.DataObject
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 
-import scala.reflect.runtime.universe.TypeTag
+import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
 
 /**
  * Interface to define a custom Spark-Dataset transformation (1:1)
@@ -42,13 +43,45 @@ trait CustomDs2to1Transformer[In1 <: Product, In2 <: Product, Out <: Product] ex
 
   def transform(session: SparkSession, options: Map[String, String], ds1: Dataset[In1], ds2: Dataset[In2]): Dataset[Out]
 
-  private[smartdatalake] def transformWithTypeConversion(session: SparkSession, options: Map[String, String], df1: DataFrame, df2: DataFrame)
-                                                        (implicit typeTag1: TypeTag[In1], typeTag2: TypeTag[In2]): DataFrame = {
+  def getTypeTag: Type = throw new IllegalArgumentException("When using option \"parameterResolution\" -> \"dataObjectId\"," +
+    " you need to define method getTypeTag next to your transform method as follows: override def getTypeTag: universe.Type = typeOf[this.type]")
+
+  private[smartdatalake] def transformBasedOnDataObjectOrder(session: SparkSession, options: Map[String, String], inputDos: Seq[DataObject], dfs: Map[String, DataFrame])
+                                                            (implicit typeTag1: TypeTag[In1], typeTag2: TypeTag[In2]): DataFrame = {
     val inputDS1Encoder = org.apache.spark.sql.Encoders.product[In1]
     val inputDS2Encoder = org.apache.spark.sql.Encoders.product[In2]
 
-    transform(session, options, df1.as(inputDS1Encoder), df2.as(inputDS2Encoder)).toDF
+    val inputDo1 = inputDos.head
+    val inputDo2 = inputDos(1)
+    val inputDf1 = dfs(inputDo1.id.id)
+    val inputDf2 = dfs(inputDo2.id.id)
+    transform(session, options, inputDf1.as(inputDS1Encoder), inputDf2.as(inputDS2Encoder)).toDF
+  }
 
+  private[smartdatalake] def transformBasedOnDataObjectId(session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame])
+                                                         (implicit typeTag1: TypeTag[In1], typeTag2: TypeTag[In2]): DataFrame = {
+    val inputDS1Encoder = org.apache.spark.sql.Encoders.product[In1]
+    val inputDS2Encoder = org.apache.spark.sql.Encoders.product[In2]
+
+    val typeTagSubclass = getTypeTag
+    val typeTagParentClass = typeOf[this.type]
+    val typesOfParamsOfParentTransformMethod = typeTagParentClass.members.filter(_.isMethod).filter(_.fullName.endsWith(".transform")).head.info.paramLists.head.map(_.typeSignature).map(_.typeSymbol)
+
+    //Here we deal with the case when the user has defined 2 functions that are both named transform.
+    // He could only do that by defining another method called transform that has a type-signature different from the one that is expected.
+    // We only keep the transform method that matches exactly the expected type signature
+    val transformMethodsOfSubclass = typeTagSubclass.members.filter(_.isMethod).filter(_.fullName.endsWith(".transform"))
+    val transformMethodsToPick = transformMethodsOfSubclass.filter(method => method.info.paramLists.head.map(_.typeSignature).map(_.typeSymbol) == typesOfParamsOfParentTransformMethod)
+
+    assert(transformMethodsToPick.size == 1)
+
+    val transformParameterNames: Seq[String] = transformMethodsToPick.head.info.paramLists.head.map(_.name).map(_.toString)
+
+    //Parameters at index one and two are sparkSession and options, see method signature of transform
+    val firstParameter = transformParameterNames(2)
+    val secondParameter = transformParameterNames(3)
+
+    transform(session, options, dfs(firstParameter).as(inputDS1Encoder), dfs(secondParameter).as(inputDS2Encoder)).toDF
   }
 
   /**

@@ -40,11 +40,11 @@ trait CustomDsTransformer[In <: Product, Out <: Product] extends Serializable {
    * @param dataObjectId Id of DataObject of SubFeed
    * @return Transformed DataFrame
    */
-  def transform(session: SparkSession, options: Map[String, String], inputDS: Dataset[In], dataObjectId: String): Dataset[Out]
+  def transform(session: SparkSession, options: Map[String, String], inputDS: Dataset[In]): Dataset[Out]
 
   private[smartdatalake] def transformWithTypeConversion(session: SparkSession, options: Map[String, String], inputDf: DataFrame, dataObjectId: String)(implicit typeTag: TypeTag[In]): DataFrame = {
     val inputDSEncoder = org.apache.spark.sql.Encoders.product[In]
-    transform(session, options, inputDf.as(inputDSEncoder), dataObjectId).toDF
+    transform(session, options, inputDf.as(inputDSEncoder)).toDF
   }
 
   /**

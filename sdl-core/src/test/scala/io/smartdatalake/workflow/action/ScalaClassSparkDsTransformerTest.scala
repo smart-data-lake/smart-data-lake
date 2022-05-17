@@ -38,7 +38,7 @@ case class InputDataSet(name: String, rating: Int)
 case class OutputDataSet(name: String, rating: Int, doubled_rating: Int)
 
 class TestDSTransformer extends CustomDsTransformer[InputDataSet, OutputDataSet] {
-  override def transform(session: SparkSession, options: Map[String, String], inputDS: Dataset[InputDataSet], dataObjectId: String): Dataset[OutputDataSet] = {
+  override def transform(session: SparkSession, options: Map[String, String], inputDS: Dataset[InputDataSet]): Dataset[OutputDataSet] = {
     import session.implicits._
     inputDS.withColumn("doubled_rating", $"rating" * 2).as[OutputDataSet]
   }

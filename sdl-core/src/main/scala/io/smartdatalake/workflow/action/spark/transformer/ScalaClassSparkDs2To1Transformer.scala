@@ -33,30 +33,33 @@ import io.smartdatalake.workflow.dataobject.DataObject
 import org.apache.spark.sql.DataFrame
 
 /**
- * Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m)
- * Define a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and as
- * to return a map of output DataObjectIds with DataFrames, see also trait [[CustomDfsTransformer]].
+ * Configuration of a custom Spark-Dataset transformation between 2 inputs and 1 outputs (2:1) as Java/Scala Class
+ * Define a transform function that receives a SparkSession, a map of options and two DataSets and that has to return a Dataset.
+ * The Java/Scala class has to implement interface [[CustomDs2to1Transformer]].
+ * By default, the Parameter Names of the transform function must match the dataObjectIds provided in the the inputIds list of the config.
+ * By setting the option "parameterResolution"= "dataObjectOrdering", you can name your dataObjects however you want,
+ * but then the ordering in of the inputIds list must match the ordering of the parameters of the transform function.
  *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
  * @param className      class name implementing trait [[CustomDfsTransformer]]
- * @param options        Options to pass to the transformation
+ * @param options        Either: "parameterResolution" -> "dataObjectId" or "parameterResolution" -> "dataObjectOrdering". Default: "parameterResolution" -> "dataObjectId"
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
-case class ScalaClassSparkDs2To1Transformer(override val name: String = "scalaSparkTransform", override val description: Option[String] = None, className: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfsTransformer {
+case class ScalaClassSparkDs2To1Transformer(override val name: String = "ScalaClassSparkDs2To1Transformer", override val description: Option[String] = None, className: String, options: Map[String, String] = Map("parameterResolution" -> "dataObjectId"), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfsTransformer {
   private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDs2to1Transformer[FakeProduct, FakeProduct, FakeProduct]](className)
 
   override def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String, DataFrame] = {
     val thisAction: Action = context.instanceRegistry.getActions.find(_.id == actionId).get
-    val inputDosInOrder: Seq[DataObject] = thisAction.inputs
-    val inputDo1 = inputDosInOrder.head
-    val inputDo2 = inputDosInOrder(1)
+    val inputDos: Seq[DataObject] = thisAction.inputs
     val outputDo: DataObject = thisAction.outputs.head
 
-    val inputDf1 = dfs(inputDo1.id.id)
-    val inputDf2 = dfs(inputDo2.id.id)
-    Map(outputDo.id.id -> customTransformer.transformWithTypeConversion(context.sparkSession, options, inputDf1, inputDf2))
+    options("parameterResolution") match {
+      case "dataObjectId" => Map(outputDo.id.id -> customTransformer.transformBasedOnDataObjectId(context.sparkSession, options, dfs))
+      case "dataObjectOrdering" => Map(outputDo.id.id -> customTransformer.transformBasedOnDataObjectOrder(context.sparkSession, options, inputDos, dfs))
+      case _ => throw new IllegalArgumentException("Option parameterResolution must either be set to dataObjectId or dataObjectOrdering.")
+    }
   }
 
   override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {
