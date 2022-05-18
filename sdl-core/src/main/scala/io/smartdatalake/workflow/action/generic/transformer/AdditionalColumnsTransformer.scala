@@ -47,7 +47,7 @@ case class AdditionalColumnsTransformer(override val name: String = "additionalC
         val value = SparkExpressionUtil.evaluate[DefaultExpressionData,Any](actionId, Some(name), litExpr, data)
         df.withColumn(colName, lit(value.orNull))
     }
-    val dfDerived = additionalColumns.foldLeft(dfLit){
+    val dfDerived = additionalDerivedColumns.foldLeft(dfLit){
       case (df, (colName, deriveExpr)) => df.withColumn(colName, expr(deriveExpr))
     }
     dfDerived
