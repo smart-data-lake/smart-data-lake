@@ -135,14 +135,13 @@ case class AirbyteDataObject(override val id: DataObjectId,
     assert(spec.flatMap(_.supportsIncremental).getOrElse(true), s"${id} Connector does not support incremental output")
     assert(configuredStream.exists(_.stream.supported_sync_modes.contains(SyncModeEnum.incremental)), s"${id} Stream '$streamName' does not support incremental output")
     this.state = state
-    if (state.isDefined) configuredStream = configuredStream.map(_.copy(sync_mode = SyncModeEnum.incremental))
-    else configuredStream = configuredStream.map(_.copy(sync_mode = SyncModeEnum.full_refresh))
+    configuredStream = configuredStream.map(_.copy(sync_mode = SyncModeEnum.incremental))
   }
 
   override def getState: Option[String] = {
     assert(configuredStream.nonEmpty, s"($id) prepare must be called before getState")
     assert(spec.flatMap(_.supportsIncremental).getOrElse(true), s"${id} Connector does not support incremental output")
-    assert(configuredStream.exists(_.sync_mode == SyncModeEnum.incremental), s"${id} Stream configuration must be set to SyncMode.Incremental by calling setState before")
+    assert(state.isEmpty || configuredStream.exists(_.sync_mode == SyncModeEnum.incremental), s"${id} Stream configuration must be set to SyncMode.Incremental by calling setState before")
     state
   }
 
