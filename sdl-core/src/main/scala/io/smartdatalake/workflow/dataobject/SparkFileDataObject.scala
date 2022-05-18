@@ -355,12 +355,19 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
     }
 
     // write
-    writeSparkDataFrameToPath(dfPrepared, hadoopPath, finalSaveMode)
+    try {
+      writeSparkDataFrameToPath(dfPrepared, hadoopPath, finalSaveMode)
+    } catch {
+      // cleanup partition directory on failure to ensure restartability for PartitionDiffMode.
+      case t: Throwable if partitionValues.nonEmpty && SparkSaveMode.from(finalSaveMode) == SaveMode.Overwrite =>
+        deletePartitions(filterPartitionsExisting(partitionValues))
+        throw t
+    }
 
     // make sure empty partitions are created as well
     createMissingPartitions(partitionValues)
 
-    // rename file according to SparkRepartitionDef
+    // rename files according to SparkRepartitionDef
     sparkRepartition.foreach(_.renameFiles(getFileRefs(partitionValues))(filesystem))
   }
 
