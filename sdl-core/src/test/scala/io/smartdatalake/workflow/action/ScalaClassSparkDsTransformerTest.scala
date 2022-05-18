@@ -50,7 +50,7 @@ class ScalaClassSparkDsTransformerTest extends FunSuite with BeforeAndAfter {
 
   import sessionHiveCatalog.implicits._
 
-  private val tempDir = Files.createTempDirectory("test")
+  private val tempDir = Files.createTempDirectory("testScalaClassSparkDs2To1TransformerTest")
   private val tempPath = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
