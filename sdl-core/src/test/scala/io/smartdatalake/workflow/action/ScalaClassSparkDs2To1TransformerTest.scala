@@ -20,9 +20,14 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDs2to1Transformer
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDs2To1Transformer
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataobject.CsvFileDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Dataset, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
@@ -75,6 +80,8 @@ class ScalaClassSparkDs2To1TransformerTest extends FunSuite with BeforeAndAfter 
 
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
 
+  import sessionHiveCatalog.implicits._
+
   private val tempDir = Files.createTempDirectory("testScalaClassSparkDs2To1TransformerTest")
   private val tempPath = tempDir.toAbsolutePath.toString
 
@@ -87,7 +94,7 @@ class ScalaClassSparkDs2To1TransformerTest extends FunSuite with BeforeAndAfter 
   after {
     instanceRegistry.clear()
   }
-/*
+
   test("One DS2To1 Transformation (direct call to exec)") {
     // setup DataObjects
     // source has partition columns dt and type
@@ -127,74 +134,74 @@ class ScalaClassSparkDs2To1TransformerTest extends FunSuite with BeforeAndAfter 
     assert(actual.added_rating == 15)
     assert(actual.concatenated_name == "johndoe")
   }
+  /*
+    test("One DS2To1 Transformation using config file: two identical input types using dataObjectId") {
 
-  test("One DS2To1 Transformation using config file: two identical input types using dataObjectId") {
+      // setup DataObjects
+      // source has partition columns dt and type
+      val srcDO1 = CsvFileDataObject("src1", "target/src1DS2to1", partitions = Seq("name")
+        , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
+      instanceRegistry.register(srcDO1)
+      val srcDO2 = CsvFileDataObject("src2", "target/src2DS2to1", partitions = Seq("name")
+        , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
+      instanceRegistry.register(srcDO2)
 
-    // setup DataObjects
-    // source has partition columns dt and type
-    val srcDO1 = CsvFileDataObject("src1", "target/src1DS2to1", partitions = Seq("name")
-      , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
-    instanceRegistry.register(srcDO1)
-    val srcDO2 = CsvFileDataObject("src2", "target/src2DS2to1", partitions = Seq("name")
-      , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
-    instanceRegistry.register(srcDO2)
+      // fill src with first files
+      val dfSrc1 = Seq(("john", 5))
+        .toDF("name", "rating")
+      srcDO1.writeSparkDataFrame(dfSrc1, Seq())
+      val dfSrc2 = Seq(("doe", 10))
+        .toDF("name", "rating")
+      srcDO2.writeSparkDataFrame(dfSrc2, Seq())
 
-    // fill src with first files
-    val dfSrc1 = Seq(("john", 5))
-      .toDF("name", "rating")
-    srcDO1.writeSparkDataFrame(dfSrc1, Seq())
-    val dfSrc2 = Seq(("doe", 10))
-      .toDF("name", "rating")
-    srcDO2.writeSparkDataFrame(dfSrc2, Seq())
+      val sdlb = new DefaultSmartDataLakeBuilder()
 
-    val sdlb = new DefaultSmartDataLakeBuilder()
+      val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Some(Seq(
+        getClass.getResource("/configScalaClassSparkDs2to1Transformer/usingDataObjectId.conf").getPath))
+      )
+      //Run SDLB
+      sdlb.run(sdlConfig)
 
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Some(Seq(
-      getClass.getResource("/configScalaClassSparkDs2to1Transformer/usingDataObjectId.conf").getPath))
-    )
-    //Run SDLB
-    sdlb.run(sdlConfig)
+      val tgt1DO = CsvFileDataObject("tgt1", "target/tgt1DS2to1", partitions = Seq()
+        , schema = Some(SparkSchema(StructType.fromDDL("concatenated_name string, added_rating int"))))
+      instanceRegistry.register(tgt1DO)
+      val actual = tgt1DO.getSparkDataFrame().as[AnotherOutputDataSet].head()
+      assert(actual.added_rating == 15)
+      assert(actual.concatenated_name == "johndoe")
+    }
 
-    val tgt1DO = CsvFileDataObject("tgt1", "target/tgt1DS2to1", partitions = Seq()
-      , schema = Some(SparkSchema(StructType.fromDDL("concatenated_name string, added_rating int"))))
-    instanceRegistry.register(tgt1DO)
-    val actual = tgt1DO.getSparkDataFrame().as[AnotherOutputDataSet].head()
-    assert(actual.added_rating == 15)
-    assert(actual.concatenated_name == "johndoe")
-  }
+    test("One DS2To1 Transformation using config file: two different input types using dataObjectOrdering") {
 
-  test("One DS2To1 Transformation using config file: two different input types using dataObjectOrdering") {
+      // setup DataObjects
+      // source has partition columns dt and type
+      val srcDO1 = CsvFileDataObject("src1", "target/src1DS2to1", partitions = Seq("name")
+        , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
+      instanceRegistry.register(srcDO1)
+      val srcDO2 = CsvFileDataObject("src2", "target/src2DS2to1", partitions = Seq("name")
+        , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
+      instanceRegistry.register(srcDO2)
 
-    // setup DataObjects
-    // source has partition columns dt and type
-    val srcDO1 = CsvFileDataObject("src1", "target/src1DS2to1", partitions = Seq("name")
-      , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
-    instanceRegistry.register(srcDO1)
-    val srcDO2 = CsvFileDataObject("src2", "target/src2DS2to1", partitions = Seq("name")
-      , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
-    instanceRegistry.register(srcDO2)
+      // fill src with first files
+      val dfSrc1 = Seq(("john", 5))
+        .toDF("name", "rating")
+      srcDO1.writeSparkDataFrame(dfSrc1, Seq())
+      val dfSrc2 = Seq(("doe", 10))
+        .toDF("name", "rating")
+      srcDO2.writeSparkDataFrame(dfSrc2, Seq())
 
-    // fill src with first files
-    val dfSrc1 = Seq(("john", 5))
-      .toDF("name", "rating")
-    srcDO1.writeSparkDataFrame(dfSrc1, Seq())
-    val dfSrc2 = Seq(("doe", 10))
-      .toDF("name", "rating")
-    srcDO2.writeSparkDataFrame(dfSrc2, Seq())
+      val sdlb = new DefaultSmartDataLakeBuilder()
 
-    val sdlb = new DefaultSmartDataLakeBuilder()
+      val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Some(Seq(
+        getClass.getResource("/configScalaClassSparkDs2to1Transformer/usingDataObjectOrdering.conf").getPath))
+      )
+      //Run SDLB
+      sdlb.run(sdlConfig)
 
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Some(Seq(
-      getClass.getResource("/configScalaClassSparkDs2to1Transformer/usingDataObjectOrdering.conf").getPath))
-    )
-    //Run SDLB
-    sdlb.run(sdlConfig)
-
-    val tgt1DO = CsvFileDataObject("tgt1", "target/tgt1DS2to1", partitions = Seq()
-      , schema = Some(SparkSchema(StructType.fromDDL("concatenated_name string, added_rating int"))))
-    instanceRegistry.register(tgt1DO)
-    val actual = tgt1DO.getSparkDataFrame().as[AnotherOutputDataSet].head()
-    assert(actual.added_rating == 15)
-    assert(actual.concatenated_name == "johndoe")
-  }*/
+      val tgt1DO = CsvFileDataObject("tgt1", "target/tgt1DS2to1", partitions = Seq()
+        , schema = Some(SparkSchema(StructType.fromDDL("concatenated_name string, added_rating int"))))
+      instanceRegistry.register(tgt1DO)
+      val actual = tgt1DO.getSparkDataFrame().as[AnotherOutputDataSet].head()
+      assert(actual.added_rating == 15)
+      assert(actual.concatenated_name == "johndoe")
+    }*/
 }
