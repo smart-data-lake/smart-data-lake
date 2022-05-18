@@ -32,7 +32,9 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Dataset, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
+import java.io.File
 import java.nio.file.Files
+import scala.reflect.io.Directory
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.typeOf
 
@@ -169,8 +171,18 @@ class ScalaClassSparkDs2To1TransformerTest extends FunSuite with BeforeAndAfter 
     val actual = tgt1DO.getSparkDataFrame().as[AnotherOutputDataSet].head()
     assert(actual.added_rating == 15)
     assert(actual.concatenated_name == "johndoe")
+
+    //cleanup
+    val directoriesToDelete = {
+      List(
+        new Directory(new File("target/src1DS2to1")),
+        new Directory(new File("target/src2DS2to1")),
+        new Directory(new File("target/tgt1DS2to1")),
+      )
+    }
+    directoriesToDelete.foreach(dir => dir.deleteRecursively())
   }
-  /*
+
     test("One DS2To1 Transformation using config file: two different input types using dataObjectOrdering") {
 
       // setup DataObjects
@@ -204,5 +216,15 @@ class ScalaClassSparkDs2To1TransformerTest extends FunSuite with BeforeAndAfter 
       val actual = tgt1DO.getSparkDataFrame().as[AnotherOutputDataSet].head()
       assert(actual.added_rating == 15)
       assert(actual.concatenated_name == "johndoe")
-    }*/
+
+      //cleanup
+      val directoriesToDelete = {
+        List(
+          new Directory(new File("target/src1DS2to1")),
+          new Directory(new File("target/src2DS2to1")),
+          new Directory(new File("target/tgt1DS2to1")),
+        )
+      }
+      directoriesToDelete.foreach(dir => dir.deleteRecursively())
+    }
 }
