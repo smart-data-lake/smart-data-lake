@@ -153,6 +153,9 @@ private[smartdatalake] object SparkExpressionUtil {
   private def getConfigNameMsg(configName: Option[String]) = configName.map(" from config "+_).getOrElse("")
 }
 
+/**
+ * DefaultExpressionData presents information from the context of the SDLB job for evaluation by Spark expressions in various places of the configuration.
+ */
 case class DefaultExpressionData( feed: String, application: String, runId: Int, attemptId: Int, executionPhase:String, referenceTimestamp: Option[Timestamp]
                                   , runStartTime: Timestamp, attemptStartTime: Timestamp, partitionValues: Seq[Map[String,String]])
 object DefaultExpressionData {
