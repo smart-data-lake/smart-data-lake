@@ -92,6 +92,9 @@ class ScalaClassSparkDs2To1TransformerTest extends FunSuite with BeforeAndAfter 
   before {
     instanceRegistry.clear()
   }
+  after {
+    instanceRegistry.clear()
+  }
 
   test("One DS2To1 Transformation (direct call to exec)") {
     // setup DataObjects

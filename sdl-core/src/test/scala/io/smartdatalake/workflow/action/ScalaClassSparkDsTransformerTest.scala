@@ -59,6 +59,9 @@ class ScalaClassSparkDsTransformerTest extends FunSuite with BeforeAndAfter {
   before {
     instanceRegistry.clear()
   }
+  after {
+    instanceRegistry.clear()
+  }
 
   test("One simple Dataset transformation with different input and output Dataset-type (direct call to exec)") {
     // setup DataObjects
