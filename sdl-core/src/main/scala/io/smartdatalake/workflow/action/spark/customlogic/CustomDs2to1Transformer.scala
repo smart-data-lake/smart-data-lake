@@ -77,7 +77,7 @@ trait CustomDs2to1Transformer[In1 <: Product, In2 <: Product, Out <: Product] ex
 
     val transformParameterNames: Seq[String] = transformMethodsToPick.head.info.paramLists.head.map(_.name).map(_.toString)
 
-    //Parameters at index one and two are sparkSession and options, see method signature of transform
+    //Parameters at index 0 and 1 are sparkSession and options, see method signature of transform
     val firstParameter = transformParameterNames(2)
     val secondParameter = transformParameterNames(3)
 
