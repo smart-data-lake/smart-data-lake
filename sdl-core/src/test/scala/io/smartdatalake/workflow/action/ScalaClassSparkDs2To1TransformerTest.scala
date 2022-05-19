@@ -22,7 +22,7 @@ import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderCo
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.TestUtil._
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDs2to1Transformer
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDsNto1Transformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDs2To1Transformer
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.CsvFileDataObject
@@ -35,8 +35,6 @@ import org.scalatest.{BeforeAndAfter, FunSuite}
 import java.io.File
 import java.nio.file.Files
 import scala.reflect.io.Directory
-import scala.reflect.runtime.universe
-import scala.reflect.runtime.universe.typeOf
 
 case class NameRating(name: String, rating: Int)
 
@@ -44,9 +42,9 @@ case class RatingName(rating: Int, name: String)
 
 case class AnotherOutputDataSet(concatenated_name: String, added_rating: Int)
 
-class TestResolutionByIdDS2To1Transformer extends CustomDs2to1Transformer[NameRating, NameRating, AnotherOutputDataSet] {
+class TestResolutionByIdDS2To1Transformer extends CustomDsNto1Transformer{
 
-  override def transform(session: SparkSession, options: Map[String, String], src1DS: Dataset[NameRating], src2DS: Dataset[NameRating]): Dataset[AnotherOutputDataSet] = {
+  def transform(session: SparkSession, options: Map[String, String], src1DS: Dataset[NameRating], src2DS: Dataset[NameRating]): Dataset[AnotherOutputDataSet] = {
     import session.implicits._
 
     val crossJoined = src1DS.as("ds1").crossJoin(src2DS.as("ds2"))
@@ -58,16 +56,14 @@ class TestResolutionByIdDS2To1Transformer extends CustomDs2to1Transformer[NameRa
   }
 
   //This method is only here to demonstrate that it still works even if the user defined another method that is called transform (this method is ignored by SDLB)
-  def transform(session: SparkSession, src1DS: Dataset[NameRating], src2DS: Dataset[NameRating]): Dataset[AnotherOutputDataSet] = {
+  def transformTest(session: SparkSession, src1DS: Dataset[NameRating], src2DS: Dataset[NameRating]): Dataset[AnotherOutputDataSet] = {
     throw new IllegalArgumentException
   }
-
-  override def getTypeTag: universe.Type = typeOf[this.type]
 }
 
-class TestResolutionByOrderingDS2To1Transformer extends CustomDs2to1Transformer[RatingName, NameRating, AnotherOutputDataSet] {
+class TestResolutionByOrderingDS2To1Transformer extends CustomDsNto1Transformer {
 
-  override def transform(session: SparkSession, options: Map[String, String], firstDataset: Dataset[RatingName], secondDataset: Dataset[NameRating]): Dataset[AnotherOutputDataSet] = {
+  def transform(session: SparkSession, options: Map[String, String], firstDataset: Dataset[RatingName], secondDataset: Dataset[NameRating]): Dataset[AnotherOutputDataSet] = {
     import session.implicits._
 
     val crossJoined = firstDataset.as("ds1").crossJoin(secondDataset.as("ds2"))

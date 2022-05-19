@@ -28,14 +28,14 @@ import io.smartdatalake.util.spark.DefaultExpressionData
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, OptionsSparkDfsTransformer}
-import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, CustomDs2to1Transformer}
+import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, CustomDsNto1Transformer}
 import io.smartdatalake.workflow.dataobject.DataObject
 import org.apache.spark.sql.DataFrame
 
 /**
  * Configuration of a custom Spark-Dataset transformation between 2 inputs and 1 outputs (2:1) as Java/Scala Class
  * Define a transform function that receives a SparkSession, a map of options and two DataSets and that has to return a Dataset.
- * The Java/Scala class has to implement interface [[CustomDs2to1Transformer]].
+ * The Java/Scala class has to implement interface [[CustomDsNto1Transformer]].
  * By default, the Parameter Names of the transform function must match the dataObjectIds provided in the the inputIds list of the config.
  * By setting the option "parameterResolution"= "dataObjectOrdering", you can name your dataObjects however you want,
  * but then the ordering in of the inputIds list must match the ordering of the parameters of the transform function.
@@ -48,7 +48,7 @@ import org.apache.spark.sql.DataFrame
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
 case class ScalaClassSparkDs2To1Transformer(override val name: String = "ScalaClassSparkDs2To1Transformer", override val description: Option[String] = None, className: String, options: Map[String, String] = Map("parameterResolution" -> "dataObjectId"), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfsTransformer {
-  private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDs2to1Transformer[FakeProduct, FakeProduct, FakeProduct]](className)
+  private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDsNto1Transformer](className)
 
   override def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String, DataFrame] = {
     val thisAction: Action = context.instanceRegistry.getActions.find(_.id == actionId).get
@@ -57,7 +57,7 @@ case class ScalaClassSparkDs2To1Transformer(override val name: String = "ScalaCl
 
     options("parameterResolution") match {
       case "dataObjectId" => Map(outputDo.id.id -> customTransformer.transformBasedOnDataObjectId(context.sparkSession, options, dfs))
-      case "dataObjectOrdering" => Map(outputDo.id.id -> customTransformer.transformBasedOnDataObjectOrder(context.sparkSession, options, inputDos, dfs))
+      //case "dataObjectOrdering" => Map(outputDo.id.id -> customTransformer.transformBasedOnDataObjectOrder(context.sparkSession, options, inputDos, dfs))
       case _ => throw new IllegalArgumentException("Option parameterResolution must either be set to dataObjectId or dataObjectOrdering.")
     }
   }
