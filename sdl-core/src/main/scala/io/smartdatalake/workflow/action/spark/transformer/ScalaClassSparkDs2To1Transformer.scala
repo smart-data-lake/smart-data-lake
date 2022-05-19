@@ -52,12 +52,12 @@ case class ScalaClassSparkDs2To1Transformer(override val name: String = "ScalaCl
 
   override def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String, DataFrame] = {
     val thisAction: Action = context.instanceRegistry.getActions.find(_.id == actionId).get
-    val inputDos: Seq[DataObject] = thisAction.inputs
-    val outputDo: DataObject = thisAction.outputs.head
+    val inputDOs: Seq[DataObject] = thisAction.inputs
+    val outputDO: DataObject = thisAction.outputs.head
 
     options("parameterResolution") match {
-      case "dataObjectId" => Map(outputDo.id.id -> customTransformer.transformBasedOnDataObjectId(context.sparkSession, options, dfs))
-      case "dataObjectOrdering" => Map(outputDo.id.id -> customTransformer.transformBasedOnDataObjectOrder(context.sparkSession, options, inputDos, dfs))
+      case "dataObjectId" => Map(outputDO.id.id -> customTransformer.transformBasedOnDataObjectId(context.sparkSession, options, dfs))
+      case "dataObjectOrdering" => Map(outputDO.id.id -> customTransformer.transformBasedOnDataObjectOrder(context.sparkSession, options, inputDOs, dfs))
       case _ => throw new IllegalArgumentException("Option parameterResolution must either be set to dataObjectId or dataObjectOrdering.")
     }
   }

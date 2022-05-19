@@ -25,9 +25,9 @@ import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
 
 /**
- * Interface to define a custom Spark-Dataset transformation (1:1)
- * When you implement this interface, you need to provide two case classes: One for your input Dataset
- * and one for your output Dataset.
+ * Interface to define a custom Spark-Dataset transformation (2:1)
+ * When you implement this interface, you need to provide 3 case classes: 2 for your input Datasets
+ * and 1 for your output Dataset.
  */
 trait CustomDs2to1Transformer[In1 <: Product, In2 <: Product, Out <: Product] extends Serializable {
 
@@ -41,21 +41,21 @@ trait CustomDs2to1Transformer[In1 <: Product, In2 <: Product, Out <: Product] ex
    * @return Transformed DataFrame
    */
 
-  def transform(session: SparkSession, options: Map[String, String], ds1: Dataset[In1], ds2: Dataset[In2]): Dataset[Out]
+  def transform(session: SparkSession, options: Map[String, String], d1: Dataset[In1], d2: Dataset[In2]): Dataset[Out]
 
   def getTypeTag: Type = throw new IllegalArgumentException("When using option \"parameterResolution\" -> \"dataObjectId\"," +
     " you need to define method getTypeTag next to your transform method as follows: override def getTypeTag: universe.Type = typeOf[this.type]")
 
-  private[smartdatalake] def transformBasedOnDataObjectOrder(session: SparkSession, options: Map[String, String], inputDos: Seq[DataObject], dfs: Map[String, DataFrame])
+  private[smartdatalake] def transformBasedOnDataObjectOrder(session: SparkSession, options: Map[String, String], inputDOs: Seq[DataObject], dfs: Map[String, DataFrame])
                                                             (implicit typeTag1: TypeTag[In1], typeTag2: TypeTag[In2]): DataFrame = {
-    val inputDS1Encoder = org.apache.spark.sql.Encoders.product[In1]
-    val inputDS2Encoder = org.apache.spark.sql.Encoders.product[In2]
+    val inputD1Encoder = org.apache.spark.sql.Encoders.product[In1]
+    val inputD2Encoder = org.apache.spark.sql.Encoders.product[In2]
 
-    val inputDo1 = inputDos.head
-    val inputDo2 = inputDos(1)
-    val inputDf1 = dfs(inputDo1.id.id)
-    val inputDf2 = dfs(inputDo2.id.id)
-    transform(session, options, inputDf1.as(inputDS1Encoder), inputDf2.as(inputDS2Encoder)).toDF
+    val inputDO1 = inputDOs.head
+    val inputDO2 = inputDOs(1)
+    val inputDf1 = dfs(inputDO1.id.id)
+    val inputDf2 = dfs(inputDO2.id.id)
+    transform(session, options, inputDf1.as(inputD1Encoder), inputDf2.as(inputD2Encoder)).toDF
   }
 
   private[smartdatalake] def transformBasedOnDataObjectId(session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame])

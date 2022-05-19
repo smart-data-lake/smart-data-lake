@@ -37,7 +37,6 @@ trait CustomDsTransformer[In <: Product, Out <: Product] extends Serializable {
    * @param session      Spark Session
    * @param options      Options specified in the configuration for this transformation
    * @param inputDS      Input Dataset
-   * @param dataObjectId Id of DataObject of SubFeed
    * @return Transformed DataFrame
    */
   def transform(session: SparkSession, options: Map[String, String], inputDS: Dataset[In]): Dataset[Out]
