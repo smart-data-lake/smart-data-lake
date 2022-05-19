@@ -34,7 +34,7 @@ Put this in the existing dataObjects section:
         path = "~{id}"
       }
 
-## Define select-airport-cols action 
+## Define select-airport-cols action
 
 Next, add these lines in the existing actions section:
 
@@ -60,9 +60,9 @@ with some optional transformations of the data along the way.
 HOCON-Objects are just like JSON-Objects (with a few added features, but more on that later).
 - Instead of allowing for just one transformer, we could potentially have multiple transformers within the same action that
   get executed one after the other. That's why we have the bracket followed by the curly brace `[{` :
-  the CustomSparkAction expects it's field *transformers* to be a list of HOCON Objects.
+  the CustomDataFrameAction expects it's field *transformers* to be a list of HOCON Objects.
 - There's different kinds of transformers, in this case we defined a *SQLDfTransformer* and provided it with a custom SQL-Code.
-There are other transformer types such as *ScalaCodeDfTransformer*, *PythonCodeDfTransformer*... More on that later.
+There are other transformer types such as *ScalaCodeSparkDfTransformer*, *PythonCodeDfTransformer*... More on that later.
 
 :::caution
 
@@ -107,22 +107,6 @@ podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/con
 
 </TabItem>
 </Tabs>
-
-:::caution
-
-If you encounter an error that looks like this:
-
-    Exception in thread "main" io.smartdatalake.util.dag.TaskFailedException: Task select-airport-cols failed. 
-	Root cause is 'IllegalArgumentException: requirement failed: (DataObject~stg-airports) DataObject schema 
-	is undefined. A schema must be defined if there are no existing files.'
-    Caused by: java.lang.IllegalArgumentException: requirement failed: (DataObject~stg-airports) DataObject 
-	schema is undefined. A schema must be defined if there are no existing files.
-
-Execute the **`download`**-feed again. After that feed was successfully executed, the execution of the feed `.*` or `compute` will work.
-More on this problem in the list of [Common Problems](../troubleshooting/common-problems.md).
-
-
-:::
 
 Now you should see multiple files in the folder *data/int-airports*. Why is it split accross multiple files?
 This is due to the fact that the query runs with Apache Spark under the hood which computes the query in parallel for different portions of the data.

@@ -15,7 +15,7 @@ We'll do it in a generic way by adding another transformer into the action *join
 Let's start in an unusual way by first changing the action. You'll see why shortly.
 
       join-departures-airports {
-        type = CustomSparkAction
+        type = CustomDataFrameAction
         inputIds = [stg-departures, int-airports]
         outputIds = [btl-departures-arrivals-airports]
         transformers = [{

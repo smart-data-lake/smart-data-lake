@@ -74,7 +74,7 @@ Hence, our `CustomWebserviceDataObject` will enforce the rule that if the chosen
 
 Note that we changed the type to `CustomWebserviceDataObject`.
 This is a custom DataObject type, not included in standard Smart Data Lake Builder. 
-To make it work please go to the project's root directory and **unzip part3.additional-files.zip** into the project's root folder.
+To make it work please go to the project's root directory and `unzip part3.additional-files.zip` into the project's root folder.
 It includes the following file for you:
 
   - ./src/scala/io/smartdatalake/workflow/dataobject/CustomWebserviceDataObject.scala
@@ -126,7 +126,7 @@ docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/con
 ```jsx
 mkdir .mvnrepo
 podman run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
-podmanrun --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:download-departures
+podman run --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:download-departures
 ```
 
 </TabItem>
@@ -235,7 +235,7 @@ If you re-compile the code of this project and then restart the program with the
 you should see that we do not query the API twice anymore.
 
 :::tip
-Use the information of the `ExecutionPhase` in your custom implementations whenever you need to have different logic during the different phases.
+  Use the information of the `ExecutionPhase` in your custom implementations whenever you need to have different logic during the different phases.
 :::
 
 ## Preserve schema
@@ -277,7 +277,7 @@ docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/con
 
 ```jsx
 mkdir -f data
-podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures
+podman run --rm --hostname=localhost -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures
 ```
 
 </TabItem>

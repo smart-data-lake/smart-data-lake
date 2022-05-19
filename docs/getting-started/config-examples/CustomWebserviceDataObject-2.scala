@@ -8,6 +8,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.webservice.WebserviceMethod.WebserviceMethod
 import io.smartdatalake.util.webservice.{ScalaJWebserviceClient, WebserviceException, WebserviceMethod}
+import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.DataType
@@ -37,7 +38,7 @@ case class CustomWebserviceDataObject(override val id: DataObjectId,
                                       override val metadata: Option[DataObjectMetadata] = None
                                      )
                                      (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateDataFrame with CanCreateIncrementalOutput with SmartDataLakeLogger {
+  extends DataObject with CanCreateSparkDataFrame with CanCreateIncrementalOutput with SmartDataLakeLogger {
 
   private var previousState : Seq[State] = Seq()
   private var nextState : Seq[State] = Seq()
@@ -65,7 +66,7 @@ case class CustomWebserviceDataObject(override val id: DataObjectId,
     }
   }
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
     import org.apache.spark.sql.functions._
     implicit val formats: Formats = DefaultFormats
     val session = context.sparkSession

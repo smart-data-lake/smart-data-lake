@@ -85,7 +85,7 @@ docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/con
 <TabItem value="podman">
 
 ```jsx
-podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest -c /mnt/config --feed-sel ids:historize-airports
+podman run --hostname=localhost --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest -c /mnt/config --feed-sel ids:historize-airports
 ```
 
 </TabItem>
@@ -229,7 +229,7 @@ docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/con
 <TabItem value="podman">
 
 ```jsx
-podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest -c /mnt/config --feed-sel ids:deduplicate-departures
+podman run --rm --hostname=localhost -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest -c /mnt/config --feed-sel ids:deduplicate-departures
 ```
 
 </TabItem>
@@ -287,7 +287,7 @@ This would be the case for example, in a messaging context, if you were to recei
 DeduplicateAction doesn't deduplicate your input data again, because deduplication is costly and data often is already unique.
 But in our example we have duplicates in the input data set, and we need to add some deduplication logic to our input data (this will probably become a configuration flag in future SDL version, see issue [#428](https://github.com/smart-data-lake/smart-data-lake/issues/428)).
 
-As the easiest way to do this is by using the Scala Spark API, we will add a second ScalaCodeDfTransformer as follows (make sure you get the brackets right): 
+As the easiest way to do this is by using the Scala Spark API, we will add a second ScalaCodeSparkDfTransformer as follows (make sure you get the brackets right): 
 
     deduplicate-departures {
       type = DeduplicateAction
@@ -296,7 +296,7 @@ As the easiest way to do this is by using the Scala Spark API, we will add a sec
         type = SQLDfTransformer
         code = "select stg_departures.*, date_format(from_unixtime(firstseen),'yyyyMMdd') dt from stg_departures"
       },{
-        type = ScalaCodeDfTransformer
+        type = ScalaCodeSparkDfTransformer
         code = """
           import org.apache.spark.sql.{DataFrame, SparkSession}
           def transform(session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectId: String) : DataFrame = {
@@ -315,7 +315,7 @@ If you run Action `deduplicate-departures` again and check the result in Polynot
 :::info
 Note how we have used a third way of defining transformation logic now:  
 In part 1 we first used a SQLDfsTransformer writing SQL code.   
-Then for the more complex example of computing distances, we used a  ScalaClassDfTransformer pointing to a Scala class.   
+Then for the more complex example of computing distances, we used a  ScalaClassSparkDfTransformer pointing to a Scala class.   
 Here, we simply include Scala code in our configuration file directly.
 :::
 
@@ -328,7 +328,7 @@ Scala is a compiled language. The compiler creates bytecode which can be run on 
 Normally compilation takes place before execution. So how does it work with scala code in the configuration as in our deduplication logic above?
 
 With Scala, you can compile code on the fly. This is actually what the Scala Shell/REPL is doing as well. 
-The Scala code in the configuration above gets compiled when ScalaCodeDfTransformer is instantiated during startup of SDL.
+The Scala code in the configuration above gets compiled when ScalaCodeSparkDfTransformer is instantiated during startup of SDL.
 :::
 
 ## Summary

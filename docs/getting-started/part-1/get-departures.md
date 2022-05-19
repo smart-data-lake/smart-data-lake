@@ -10,7 +10,7 @@ import TabItem from '@theme/TabItem';
 In this step, we will download plane departure data from the REST-Interface described in the previous step using Smart Data Lake Builder.
 
 :::info Smart Data Lake = SDL
-Throughout this documentation, we will mostly refer to *SDL* which is just short for *Smart Data Lake*
+Throughout this documentation, we will mostly refer to *SDL* which is just short for *Smart Data Lake*. Further, we use **SDLB** as abbreviation for Smart Data Lake Builder, the automation tool.
 :::
 
 ## Config File
