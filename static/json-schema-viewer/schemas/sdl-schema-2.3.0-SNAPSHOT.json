@@ -3622,9 +3622,8 @@
     "GenericDfTransformer" : {
       "AdditionalColumnsTransformer" : {
         "type" : "object",
-        "description" : "Add additional columns to the DataFrame by extracting information from the context.",
+        "description" : "Add additional columns to the DataFrame by extracting information from the context or derived from input columns.",
         "additionalProperties" : false,
-        "required" : [ "additionalColumns" ],
         "title" : "AdditionalColumnsTransformer",
         "properties" : {
           "type" : {
@@ -3640,7 +3639,14 @@
           },
           "additionalColumns" : {
             "type" : "object",
-            "description" : "optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
+            "description" : "optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]]and added to the DataFrame as literal columns.\n[[DefaultExpressionData]] contains informations from the context of the SDLB job, like runId or feed name.",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          },
+          "additionalDerivedColumns" : {
+            "type" : "object",
+            "description" : "optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.\nThe spark sql expressions are evaluated against the input DataFrame and added to the DataFrame as derived columns.",
             "additionalProperties" : {
               "type" : "string"
             }
@@ -4772,32 +4778,6 @@
               }
             }, {
               "type" : "object",
-              "description" : "Add additional columns to the DataFrame by extracting information from the context.",
-              "additionalProperties" : false,
-              "required" : [ "additionalColumns", "type" ],
-              "title" : "AdditionalColumnsTransformer",
-              "properties" : {
-                "type" : {
-                  "const" : "AdditionalColumnsTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                },
-                "additionalColumns" : {
-                  "type" : "object",
-                  "description" : "optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  }
-                }
-              }
-            }, {
-              "type" : "object",
               "description" : "Repartition DataFrame\nFor detailled description about repartitioning DataFrames see also[[SparkRepartitionDef]]",
               "additionalProperties" : false,
               "required" : [ "numberOfTasksPerPartition", "type" ],
@@ -4888,17 +4868,6 @@
               }
             }, {
               "type" : "object",
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers.",
-              "additionalProperties" : false,
-              "required" : [ "type" ],
-              "title" : "OptionsGenericDfTransformer",
-              "properties" : {
-                "type" : {
-                  "const" : "OptionsGenericDfTransformer"
-                }
-              }
-            }, {
-              "type" : "object",
               "description" : "Apply a filter condition to a DataFrame.",
               "additionalProperties" : false,
               "required" : [ "filterClause", "type" ],
@@ -4922,6 +4891,50 @@
                 "subFeedTypeForValidation" : {
                   "type" : "string",
                   "description" : "When parsing the configuration the runtime subFeedType for validating the filter expression is not yet known.\nBy default SparkSubFeed langauge is used, but you can configure a different one if needed."
+                }
+              }
+            }, {
+              "type" : "object",
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers.",
+              "additionalProperties" : false,
+              "required" : [ "type" ],
+              "title" : "OptionsGenericDfTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "OptionsGenericDfTransformer"
+                }
+              }
+            }, {
+              "type" : "object",
+              "description" : "Add additional columns to the DataFrame by extracting information from the context or derived from input columns.",
+              "additionalProperties" : false,
+              "required" : [ "type" ],
+              "title" : "AdditionalColumnsTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "AdditionalColumnsTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "additionalColumns" : {
+                  "type" : "object",
+                  "description" : "optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]]and added to the DataFrame as literal columns.\n[[DefaultExpressionData]] contains informations from the context of the SDLB job, like runId or feed name.",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                },
+                "additionalDerivedColumns" : {
+                  "type" : "object",
+                  "description" : "optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.\nThe spark sql expressions are evaluated against the input DataFrame and added to the DataFrame as derived columns.",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
                 }
               }
             }, {
