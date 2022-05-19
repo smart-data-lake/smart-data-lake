@@ -380,12 +380,16 @@
       },
       "FileIncrementalMoveMode" : {
         "type" : "object",
-        "description" : "Execution mode to incrementally process file-based DataObjects.\nIt takes all existing files in the input DataObject and removes (deletes) them after processing.\nInput partition values are applied when searching for files and also used as output partition values.",
+        "description" : "Execution mode to incrementally process file-based DataObjects, e.g. FileRefDataObjects and SparkFileDataObjects.\nFor FileRefDataObjects:\n- All existing files in the input DataObject are processed and removed (deleted or archived) after processing\n- Input partition values are applied to search for files and also used as output partition values\nFor SparkFileDataObjects:\n- Files processed are observed by a custom metric and removed (deleted or archived) after processing\n- Partition values preserved.",
         "additionalProperties" : false,
         "title" : "FileIncrementalMoveMode",
         "properties" : {
           "type" : {
             "const" : "FileIncrementalMoveMode"
+          },
+          "archiveSubdirectory" : {
+            "type" : "string",
+            "description" : "if an archive subdirectory is configured, files are moved into that directory instead of deleted.\nconfigure a single directory name which is appended before the filename, e.g. \\\"_archive\\\"."
           }
         }
       },
@@ -2025,6 +2029,10 @@
             "type" : "string",
             "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
           },
+          "incrementalOutputColumn" : {
+            "type" : "string",
+            "description" : "Optional column to use for creating incremental output with DataObjectStateIncrementalMode."
+          },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
           }
@@ -2791,6 +2799,14 @@
           "expectedPartitionsCondition" : {
             "type" : "string",
             "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
+          },
+          "housekeepingMode" : {
+            "description" : "Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.\nSee HousekeepingMode for available implementations. Default is None.",
+            "oneOf" : [ {
+              "$ref" : "#/definitions/HousekeepingMode/PartitionArchiveCompactionMode"
+            }, {
+              "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
+            } ]
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -3933,6 +3949,44 @@
           }
         }
       },
+      "ScalaClassSparkDsTransformer" : {
+        "type" : "object",
+        "description" : "Configuration of a custom Spark-Dataset transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a DataObjectId, a Dataset and a map of options and has to return a Dataset.\nThe Java/Scala class has to implement interface[[CustomDsTransformer]] .",
+        "additionalProperties" : false,
+        "required" : [ "transformerClassName" ],
+        "title" : "ScalaClassSparkDsTransformer",
+        "properties" : {
+          "type" : {
+            "const" : "ScalaClassSparkDsTransformer"
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "name of the transformer"
+          },
+          "description" : {
+            "type" : "string",
+            "description" : "Optional description of the transformer"
+          },
+          "transformerClassName" : {
+            "type" : "string",
+            "description" : "class name implementing trait[[CustomDsTransformer]]"
+          },
+          "options" : {
+            "type" : "object",
+            "description" : "Options to pass to the transformation",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          },
+          "runtimeOptions" : {
+            "type" : "object",
+            "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
       "ScalaCodeSparkDfTransformer" : {
         "type" : "object",
         "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Scala code which is compiled at runtime.\nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The scala code has to implement a function of type[[fnTransformType]] .",
@@ -4390,6 +4444,43 @@
               }
             }, {
               "type" : "object",
+              "description" : "Configuration of a custom Spark-Dataset transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a DataObjectId, a Dataset and a map of options and has to return a Dataset.\nThe Java/Scala class has to implement interface[[CustomDsTransformer]] .",
+              "additionalProperties" : false,
+              "required" : [ "transformerClassName", "type" ],
+              "title" : "ScalaClassSparkDsTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "ScalaClassSparkDsTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "transformerClassName" : {
+                  "type" : "string",
+                  "description" : "class name implementing trait[[CustomDsTransformer]]"
+                },
+                "options" : {
+                  "type" : "object",
+                  "description" : "Options to pass to the transformation",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                },
+                "runtimeOptions" : {
+                  "type" : "object",
+                  "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }, {
+              "type" : "object",
               "description" : "Interface to implement Spark-DataFrame transformers working with one input and one output (1:1)",
               "additionalProperties" : false,
               "required" : [ "type" ],
@@ -4797,6 +4888,17 @@
               }
             }, {
               "type" : "object",
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers.",
+              "additionalProperties" : false,
+              "required" : [ "type" ],
+              "title" : "OptionsGenericDfTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "OptionsGenericDfTransformer"
+                }
+              }
+            }, {
+              "type" : "object",
               "description" : "Apply a filter condition to a DataFrame.",
               "additionalProperties" : false,
               "required" : [ "filterClause", "type" ],
@@ -4820,17 +4922,6 @@
                 "subFeedTypeForValidation" : {
                   "type" : "string",
                   "description" : "When parsing the configuration the runtime subFeedType for validating the filter expression is not yet known.\nBy default SparkSubFeed langauge is used, but you can configure a different one if needed."
-                }
-              }
-            }, {
-              "type" : "object",
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers.",
-              "additionalProperties" : false,
-              "required" : [ "type" ],
-              "title" : "OptionsGenericDfTransformer",
-              "properties" : {
-                "type" : {
-                  "const" : "OptionsGenericDfTransformer"
                 }
               }
             }, {
@@ -5164,6 +5255,8 @@
                 "$ref" : "#/definitions/GenericDfTransformer/ScalaClassSnowparkDfTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/ScalaClassSparkDfTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/ScalaClassSparkDsTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/ScalaCodeSparkDfTransformer"
               }, {
@@ -5660,6 +5753,8 @@
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/ScalaClassSparkDfTransformer"
               }, {
+                "$ref" : "#/definitions/GenericDfTransformer/ScalaClassSparkDsTransformer"
+              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/ScalaCodeSparkDfTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/ScalaNotebookSparkDfTransformer"
@@ -5915,6 +6010,8 @@
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/ScalaClassSparkDfTransformer"
               }, {
+                "$ref" : "#/definitions/GenericDfTransformer/ScalaClassSparkDsTransformer"
+              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/ScalaCodeSparkDfTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/ScalaNotebookSparkDfTransformer"
@@ -5955,7 +6052,7 @@
           },
           "mergeModeEnable" : {
             "type" : "string",
-            "description" : "Set to true to use saveMode.Merge for much better performance by using incremental historization.\nOutput DataObject must implement[[CanMergeDataFrame]] if enabled (default = false).\nIncremental historization will add an additional \\\"dl_hash\\\" column which is used for change detection between\nexisting and new data."
+            "description" : "Set to true to use saveMode.Merge for much better performance by using incremental historization.\nOutput DataObject must implement[[CanMergeDataFrame]] if enabled (default = false).\nIncremental historization will add an additional \\\"dl_hash\\\" column which is used for change detection between\nexisting and new data.\nNote that enabling mergeMode on an existing HistorizeAction will create a new version for every\nnew record in the output table, as \\\"dl_hash\\\" column is initially null."
           },
           "mergeModeAdditionalJoinPredicate" : {
             "type" : "string",
@@ -5963,7 +6060,7 @@
           },
           "mergeModeCDCColumn" : {
             "type" : "string",
-            "description" : "Optional colum holding the CDC operation to replay. If this information is available from the source\nincremental historization can be further optimized, as the join with existing data can be omitted.\nYou will also need to specify parameter mergeModeCDCDeletedValue to use this and mergeModeEnable=true.\nIncrement CDC historization will add an additional column \\\"dl_dummy\\\" to the target table,\nwhich is used to work around limitations of SQL merge statement, but \\\"dl_hash\\\" column is no longer needed."
+            "description" : "Optional colum holding the CDC operation to replay to enable mergeModeCDC. If CDC information is available from the source\nincremental historization can be further optimized, as the join with existing data can be omitted.\nNote that this should be enabled only, if input data contains just inserted, updated and deleted records.\nHistorizeAction in mergeModeCDC will make *no* change detection on its own, and create a new version for every inserted/updated record it receives!\nYou will also need to specify parameter mergeModeCDCDeletedValue to use this and mergeModeEnable=true.\nIncrement CDC historization will add an additional column \\\"dl_dummy\\\" to the target table,\nwhich is used to work around limitations of SQL merge statement, but \\\"dl_hash\\\" column from mergeMode is no longer needed."
           },
           "mergeModeCDCDeletedValue" : {
             "type" : "string",
