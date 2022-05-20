@@ -99,10 +99,14 @@ private object TemporalQueries {
  * @param topicName The name of the topic to read
  * @param keyType    Optional type the key column should be converted to. If none is given it will be interpreted as string.
  * @param keySchema  An optional schema for parsing the key column. This can be used if keyType = Json or Avro to parse the corresponding content.
- *                   Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
+ *                   Define the schema by using one of the schema providers DDL, jsonSchemaFile, avroSchemaFile, xsdFile or caseClassName.
+ *                   The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
+ *                   A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param valueType  Optional type the value column should be converted to. If none is given it will be interpreted as string.
  * @param valueSchema An optional schema for parsing the value column. This has to be specified if valueType = Json or Avro to parse the corresponding content.
- *                    Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
+ *                    Define the schema by using one of the schema providers DDL, jsonSchemaFile, avroSchemaFile, xsdFile or caseClassName.
+ *                    The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
+ *                    A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param schemaMin  An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
  *                   Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param selectCols Columns to be selected when reading the DataFrame. Available columns are key, value, topic,
