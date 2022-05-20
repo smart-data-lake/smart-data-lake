@@ -28,14 +28,14 @@ import io.smartdatalake.util.spark.DefaultExpressionData
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, OptionsSparkDfsTransformer}
-import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, CustomDs2to1Transformer}
+import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, CustomDsNto1Transformer}
 import io.smartdatalake.workflow.dataobject.DataObject
 import org.apache.spark.sql.DataFrame
 
 /**
  * Configuration of a custom Spark-Dataset transformation between 2 inputs and 1 outputs (2:1) as Java/Scala Class
  * Define a transform function that receives a SparkSession, a map of options and two DataSets and that has to return a Dataset.
- * The Java/Scala class has to implement interface [[CustomDs2to1Transformer]].
+ * The Java/Scala class has to implement interface [[CustomDsNto1Transformer]].
  * By default, the Parameter Names of the transform function must match the dataObjectIds provided in the the inputIds list of the config.
  * By setting the option "parameterResolution"= "dataObjectOrdering", you can name your dataObjects however you want,
  * but then the ordering in of the inputIds list must match the ordering of the parameters of the transform function.
@@ -47,17 +47,18 @@ import org.apache.spark.sql.DataFrame
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
-case class ScalaClassSparkDs2To1Transformer(override val name: String = "ScalaClassSparkDs2To1Transformer", override val description: Option[String] = None, className: String, options: Map[String, String] = Map("parameterResolution" -> "dataObjectId"), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfsTransformer {
-  private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDs2to1Transformer[FakeProduct, FakeProduct, FakeProduct]](className)
+case class ScalaClassSparkDsNTo1Transformer(override val name: String = "ScalaClassSparkDs2To1Transformer", override val description: Option[String] = None, className: String, options: Map[String, String] = Map("parameterResolution" -> "dataObjectId"), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfsTransformer {
+  private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDsNto1Transformer](className)
 
   override def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String, DataFrame] = {
     val thisAction: Action = context.instanceRegistry.getActions.find(_.id == actionId).get
     val inputDOs: Seq[DataObject] = thisAction.inputs
     val outputDO: DataObject = thisAction.outputs.head
 
+
     options("parameterResolution") match {
-      case "dataObjectId" => Map(outputDO.id.id -> customTransformer.transformBasedOnDataObjectId(context.sparkSession, options, dfs))
-      case "dataObjectOrdering" => Map(outputDO.id.id -> customTransformer.transformBasedOnDataObjectOrder(context.sparkSession, options, inputDOs, dfs))
+      case "dataObjectId" => Map(outputDO.id.id -> customTransformer.transformWithParamMapping(context.sparkSession, options, dfs, inputDOs, useInputDOOrdering = false))
+      case "dataObjectOrdering" => Map(outputDO.id.id -> customTransformer.transformWithParamMapping(context.sparkSession, options, dfs, inputDOs, useInputDOOrdering = true))
       case _ => throw new IllegalArgumentException("Option parameterResolution must either be set to dataObjectId or dataObjectOrdering.")
     }
   }
@@ -66,11 +67,11 @@ case class ScalaClassSparkDs2To1Transformer(override val name: String = "ScalaCl
     customTransformer.transformPartitionValues(options, partitionValues)
   }
 
-  override def factory: FromConfigFactory[GenericDfsTransformer] = ScalaClassSparkDs2To1Transformer
+  override def factory: FromConfigFactory[GenericDfsTransformer] = ScalaClassSparkDsNTo1Transformer
 }
 
-object ScalaClassSparkDs2To1Transformer extends FromConfigFactory[GenericDfsTransformer] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ScalaClassSparkDs2To1Transformer = {
-    extract[ScalaClassSparkDs2To1Transformer](config)
+object ScalaClassSparkDsNTo1Transformer extends FromConfigFactory[GenericDfsTransformer] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ScalaClassSparkDsNTo1Transformer = {
+    extract[ScalaClassSparkDsNTo1Transformer](config)
   }
 }
