@@ -1,12 +1,12 @@
 ---
-title: Data historization
-description: Tracking Data Changes of an SQL source
+title: Data historization of SQL sources
+description: Tracking Data Changes of MSSQL databases with and without CDC
 slug: sdl-hist
 authors:
   - name: Mandes Schönherr
     title: Dr.sc.nat.
     url: https://github.com/mand35
-tags: [historization, MSSQL]
+tags: [historization, MSSQL, incremental, CDC]
 hide_table_of_contents: false
 ---
 
