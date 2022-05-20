@@ -22,6 +22,8 @@ import configs.{ConfigError, ConfigKeyNaming, ConfigReader, Result}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
+import io.smartdatalake.util.misc.SchemaProviderType.SchemaProviderType
+import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.secrets.SecretProviderConfig
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
@@ -45,19 +47,22 @@ trait ConfigImplicits {
   /**
    * A [[ConfigReader]] reader that reads [[StructType]] values.
    *
-   * This reader parses a [[StructType]] from a DDL string.
+   * This reader parses a Spark [[StructType]] by using the desired schema provider.
+   * The schema provider is included in the configuration value as prefix terminated by '#'.
+   * See [[SchemaProviderType]] for available providers.
    */
   implicit val structTypeReader: ConfigReader[StructType] = ConfigReader.fromTry { (c, p) =>
-    StructType.fromDDL(c.getString(p))
+    SchemaUtil.readSchemaFromConfigValue(c.getString(p))
   }
 
   /**
    * A [[ConfigReader]] reader that reads [[GenericSchema]] values.
    *
-   * This reader parses a Spark [[StructType]] from a DDL string and creates a SparkSchema.
+   * This reader parses a Spark [[StructType]] by using the desired schema provider.
+   * The schema provider is included in the configuration value as prefix terminated by '#'.
    */
   implicit val genericSchemaReader: ConfigReader[GenericSchema] = ConfigReader.fromTry { (c, p) =>
-    SparkSchema(StructType.fromDDL(c.getString(p)))
+    SparkSchema(SchemaUtil.readSchemaFromConfigValue(c.getString(p)))
   }
 
   /**
