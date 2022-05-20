@@ -5899,7 +5899,7 @@
       }
     }
   },
-  "id" : "sdl-schema.json#",
+  "id" : "sdl-schema-2.2.1-SNAPSHOT.json#",
   "version" : "2.2.1-SNAPSHOT",
   "$schema" : "http://json-schema.org/draft-07/schema#"
 }
