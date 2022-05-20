@@ -95,7 +95,6 @@
 			<groupId>com.databricks</groupId>
 			<artifactId>spark-xml_${scala.minor.version}</artifactId>
 			<version>${databricks.spark-xml.version}</version>
-			<scope>runtime</scope>
 		</dependency>
 
 		<dependency>

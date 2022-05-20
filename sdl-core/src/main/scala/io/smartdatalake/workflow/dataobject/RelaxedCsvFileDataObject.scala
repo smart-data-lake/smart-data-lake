@@ -49,7 +49,9 @@ import scala.reflect.runtime.universe.typeOf
  * RelaxCsvFileDataObject also supports getting an error msg by adding "<options.columnNameOfCorruptRecord>_msg" as field to the schema.
  *
  * @param schema The data object schema.
- *               Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
+ *               Define the schema by using one of the schema providers DDL, jsonSchemaFile, xsdFile or caseClassName.
+ *               The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
+ *               A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param csvOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
  * @param dateColumnType Specifies the string format used for writing date typed data.
  * @param treatMissingColumnsAsCorrupt If set to true records from files with missing columns in its header are treated as corrupt (default=false).

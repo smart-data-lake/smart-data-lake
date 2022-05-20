@@ -18,10 +18,14 @@
  */
 package io.smartdatalake.util.misc
 
-import java.time.format.DateTimeFormatter
-
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
+import org.apache.spark.sql.catalyst.ScalaReflection
+import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
+
+import java.time.format.DateTimeFormatter
+import scala.reflect.ClassTag
+import scala.reflect.runtime.universe.Type
 
 private[smartdatalake] object ProductUtil {
 
@@ -154,5 +158,16 @@ private[smartdatalake] object ProductUtil {
     val msg = StringBuilder.newBuilder
     addObjToBuilder(msg, obj, spacing = false)
     msg.toString
+  }
+
+  /**
+   * Create an Encoder for a product based on it's type given as parameter (not as type parameter).
+   */
+  def createEncoder(tpe: Type): ExpressionEncoder[_] = {
+    val mirror = ScalaReflection.mirror
+    val cls = mirror.runtimeClass(tpe)
+    val serializer = ScalaReflection.serializerForType(tpe)
+    val deserializer = ScalaReflection.deserializerForType(tpe)
+    new ExpressionEncoder(serializer, deserializer, ClassTag(cls))
   }
 }

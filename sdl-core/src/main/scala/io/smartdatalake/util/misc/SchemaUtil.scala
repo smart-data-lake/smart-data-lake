@@ -19,16 +19,26 @@
 
 package io.smartdatalake.util.misc
 
+import com.databricks.spark.xml.util.XSDToSchema
+import io.smartdatalake.config.{ConfigUtil, ConfigurationException}
+import io.smartdatalake.util.hdfs.HdfsUtil
+import io.smartdatalake.util.json.{SchemaConverter => JsonSchemaConverter}
 import io.smartdatalake.workflow.dataframe._
+import org.apache.hadoop.conf.Configuration
+import org.apache.spark.sql.Encoders
+import org.apache.spark.sql.catalyst.JavaTypeInference
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.types.{ArrayType, StructType}
+
+import scala.reflect.runtime.universe.{Type, TypeTag}
 
 object SchemaUtil {
 
   /**
    * Computes the set difference between the columns of `schemaLeft` and of the columns of `schemaRight`: `Set(schemaLeft)` \ `Set(schemaRight)`.
    *
-   * @param schemaLeft schema used as minuend.
-   * @param schemaRight schema used as subtrahend.
+   * @param schemaLeft     schema used as minuend.
+   * @param schemaRight    schema used as subtrahend.
    * @param ignoreNullable if `true`, columns that only differ in their `nullable` property are considered equal.
    * @return the set of columns contained in `schemaRight` but not in `schemaLeft`.
    */
@@ -66,7 +76,7 @@ object SchemaUtil {
       rightNamesIndex.get(leftName) match {
         case Some(rightFieldsWithSameName) if rightFieldsWithSameName.foldLeft(false) {
           (hasPreviousSubset, rightField) =>
-            hasPreviousSubset || ( //if no previous match found check this rightField
+            hasPreviousSubset || (//if no previous match found check this rightField
               (ignoreNullability || leftField.nullable == rightField.nullable) //either nullability is ignored or nullability must match
                 && deepIsTypeSubset(leftField.dataType, rightField.dataType, ignoreNullability, caseSensitive) //left field must be a subset of right field
               )
@@ -87,18 +97,18 @@ object SchemaUtil {
    * @param ignoreNullability whether to ignore differences in nullability.
    * @return `true` iff `leftType` is a subset of `rightType`. `false` otherwise.
    */
-  private def deepIsTypeSubset(leftType: GenericDataType, rightType: GenericDataType, ignoreNullability: Boolean, caseSensitive: Boolean ): Boolean = {
-    if (leftType.typeName != rightType.typeName) false  /*fail fast*/
+  private def deepIsTypeSubset(leftType: GenericDataType, rightType: GenericDataType, ignoreNullability: Boolean, caseSensitive: Boolean): Boolean = {
+    if (leftType.typeName != rightType.typeName) false /*fail fast*/
     else {
       (leftType, rightType) match {
-        case (structL:GenericStructDataType, structR:GenericStructDataType) =>
-          structL.withOtherFields(structR, (l,r) => deepPartialMatchDiffFields(l, r, ignoreNullability, caseSensitive).isEmpty)
-        case (arrayL:GenericArrayDataType, arrayR:GenericArrayDataType) =>
+        case (structL: GenericStructDataType, structR: GenericStructDataType) =>
+          structL.withOtherFields(structR, (l, r) => deepPartialMatchDiffFields(l, r, ignoreNullability, caseSensitive).isEmpty)
+        case (arrayL: GenericArrayDataType, arrayR: GenericArrayDataType) =>
           if (!ignoreNullability && (arrayL.containsNull != arrayR.containsNull)) false
-          else arrayL.withOtherElementType(arrayR, (l,r) =>  deepIsTypeSubset(l, r, ignoreNullability, caseSensitive: Boolean))
-        case (mapL:GenericMapDataType, mapR:GenericMapDataType) =>
+          else arrayL.withOtherElementType(arrayR, (l, r) => deepIsTypeSubset(l, r, ignoreNullability, caseSensitive: Boolean))
+        case (mapL: GenericMapDataType, mapR: GenericMapDataType) =>
           if (!ignoreNullability && (mapL.valueContainsNull != mapR.valueContainsNull)) false
-          else mapL.withOtherKeyType(mapR, (l,r) => deepIsTypeSubset(l, r, ignoreNullability, caseSensitive)) && mapL.withOtherValueType(mapR, (l,r) => deepIsTypeSubset(l, r, ignoreNullability, caseSensitive))
+          else mapL.withOtherKeyType(mapR, (l, r) => deepIsTypeSubset(l, r, ignoreNullability, caseSensitive)) && mapL.withOtherValueType(mapR, (l, r) => deepIsTypeSubset(l, r, ignoreNullability, caseSensitive))
         case _ => true //typeNames are equal
       }
     }
@@ -108,4 +118,128 @@ object SchemaUtil {
     SQLConf.get.getConf(SQLConf.CASE_SENSITIVE)
   }
 
+  def getSchemaFromCaseClass[T <: Product : TypeTag]: StructType = {
+    Encoders.product[T].schema
+  }
+
+  def getSchemaFromCaseClass(tpe: Type): StructType = {
+    ProductUtil.createEncoder(tpe).schema
+  }
+
+  def getSchemaFromJavaBean(beanClass: Class[_]): StructType = {
+    JavaTypeInference.inferDataType(beanClass)._1.asInstanceOf[StructType]
+  }
+
+  def getSchemaFromJsonSchema(jsonSchemaContent: String): StructType = {
+    JsonSchemaConverter.convert(jsonSchemaContent)
+  }
+
+  def getSchemaFromXsd(xsdContent: String): StructType = {
+    XSDToSchema.read(xsdContent)
+  }
+
+  def getSchemaFromDdl(ddl: String): StructType = {
+    StructType.fromDDL(ddl)
+  }
+
+  /**
+   * Parses a Spark [[StructType]] by using the desired schema provider.
+   * The schema provider is included in the configuration value as prefix terminated by '#'.
+   */
+  def readSchemaFromConfigValue(schemaConfig: String): StructType = {
+    import io.smartdatalake.util.misc.SchemaProviderType._
+    implicit lazy val defaultHadoopConf: Configuration = new Configuration()
+    val (providerId, value) = ConfigUtil.parseProviderConfigValue(schemaConfig, Some(DDL.toString))
+    SchemaProviderType.withName(providerId.toLowerCase) match {
+      case DDL =>
+        getSchemaFromDdl(value)
+      case DDLFile =>
+        val content = HdfsUtil.readHadoopFile(value)
+        getSchemaFromDdl(content)
+      case CaseClass =>
+        val clazz = this.getClass.getClassLoader.loadClass(value)
+        val mirror = scala.reflect.runtime.currentMirror
+        val tpe = mirror.classSymbol(clazz).toType
+        getSchemaFromCaseClass(tpe)
+      case JavaBean =>
+        val clazz = this.getClass.getClassLoader.loadClass(value)
+        getSchemaFromJavaBean(clazz)
+      case XsdFile =>
+        val valueElements = value.split(";")
+        assert(valueElements.size == 2, s"XSD schema provider configuration error. Configuration format is '<path-to-xsd-file>;<row-tag>', but received $value.")
+        val Array(path, rowTag) = valueElements
+        val content = HdfsUtil.readHadoopFile(path)
+        val schema = getSchemaFromXsd(content)
+        extractRowTag(schema, rowTag)
+      case JsonSchemaFile =>
+        val valueElements = value.split(";")
+        assert(valueElements.size == 2, s"Json schema provider configuration error. Configuration format is '<path-to-xsd-file>;<row-tag>', but received $value.")
+        val Array(path, rowTag) = valueElements
+        val content = HdfsUtil.readHadoopFile(path)
+        val schema = getSchemaFromJsonSchema(content)
+        extractRowTag(schema, rowTag)
+    }
+  }
+
+  /**
+   * extract nested schema element according to row tag.
+   */
+  private[smartdatalake] def extractRowTag(schema:StructType, rowTag: String) = {
+    rowTag.split("/").filter(_.nonEmpty).foldLeft(schema){
+      case (schema, element) =>
+        val schemaElement = schema.fields.find(_.name == element)
+        assert(schemaElement.isDefined, s"Schema element $element not found while extracting rowTag. Available fields are ${schema.fieldNames.mkString(", ")}")
+        var elementDataType = schemaElement.get.dataType
+        if (elementDataType.isInstanceOf[ArrayType]) elementDataType = elementDataType.asInstanceOf[ArrayType].elementType
+        assert(elementDataType.isInstanceOf[StructType], s"Schema element $element dataType is ${elementDataType.typeName}, but must be a StructType.")
+        elementDataType.asInstanceOf[StructType]
+    }
+  }
+}
+
+
+object SchemaProviderType extends Enumeration {
+  type SchemaProviderType = Value
+
+  /**
+   * Parse SQL DDL (data definition language) using Spark.
+   * Parameter: A DDL-formatted string. This is a comma separated list of field definitions, e.g. 'a INT, b STRING'.
+   */
+  val DDL: SchemaProviderType.Value = Value("ddl")
+
+  /**
+   * Parse SQL DDL (data definition language) using Spark from a file.
+   * Parameter: the hadoop path of the file with a DDL-formatted string as content, see also DDL.
+   */
+  val DDLFile: SchemaProviderType.Value = Value("ddlfile")
+
+  /**
+   * Get schema from a case class using Spark Encoders.
+   * Parameter: the class name of the case class.
+   */
+  val CaseClass: SchemaProviderType.Value = Value("caseclass")
+
+  /**
+   * Get schema from a java bean using Sparks java type inference.
+   * Parameter: the class name of the java bean.
+   */
+  val JavaBean: SchemaProviderType.Value = Value("javabean")
+
+  /**
+   * Get schema from an XSD file (XML schema definition), using spark-xml's XSD support: [[https://github.com/databricks/spark-xml#xsd-support]]
+   * Parameters (semicolon separated):
+   * - the hadoop path of the XSD file.
+   * - row tag to extract a subpart from the schema, see also XML source rowTag option. Put an emtpy string to use root tag.
+   *   To extract a nested row tag, split the elements by slash (/).
+   */
+  val XsdFile: SchemaProviderType.Value = Value("xsdfile")
+
+  /**
+   * Get schema from an Json Schema file, using an adapted verion of zalando-incubator/spark-json-schema library, see also [[JsonSchemaConverter]]
+   * Parameters (semicolon separated):
+   * - the hadoop path of the Json schema file.
+   * - row tag to extract a subpart from the schema, this is similar to XML source rowTag option. Put an emtpy string to use root tag.
+   *   To extract a nested row tag, split the elements by slash (/).
+   */
+  val JsonSchemaFile: SchemaProviderType.Value = Value("jsonschemafile")
 }
