@@ -36,11 +36,11 @@ Specifying options allows to reuse a transformation in different settings.
 #### Java/Scala
 You can use Spark Dataset API in Java/Scala to define custom transformations.
 If you have a Java project, create a class that extends CustomDfTransformer or CustomDfsTransformer and implement `transform` method.
-Then use **type = ScalaClassSparkDfTransformer** or **type = ScalaClassDfsTransformer** and configure **className** attribute.
+Then use **type = ScalaClassSparkDfTransformer** or **type = ScalaClassSparkDfsTransformer** and configure **className** attribute.
 
 If you work without Java project, it's still possible to define your transformation in Java/Scala and compile it at runtime.
 For a 1-to-1 transformation use **type = ScalaCodeSparkDfTransformer** and configure **code** or **file** as a function that takes `session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectName: String` as parameters and returns a `DataFrame`.
-For many-to-many transformations use **type = ScalaCodeDfsTransformer** and configure **code** or **file** as a function that takes `session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]` with DataFrames per input DataObject as parameter, and returns a `Map[String,DataFrame]` with the DataFrame per output DataObject.
+For many-to-many transformations use **type = ScalaCodeSparkDfsTransformer** and configure **code** or **file** as a function that takes `session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]` with DataFrames per input DataObject as parameter, and returns a `Map[String,DataFrame]` with the DataFrame per output DataObject.
 
 See [sdl-examples](https://github.com/smart-data-lake/sdl-examples) for details.
 
