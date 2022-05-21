@@ -47,7 +47,7 @@ import org.apache.spark.sql.DataFrame
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
-case class ScalaClassSparkDsNTo1Transformer(override val name: String = "ScalaClassSparkDs2To1Transformer", override val description: Option[String] = None, className: String, options: Map[String, String] = Map("parameterResolution" -> "dataObjectId"), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfsTransformer {
+case class ScalaClassSparkDsNTo1Transformer(override val name: String = "ScalaClassSparkDs2To1Transformer", override val description: Option[String] = None, className: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map(), parameterResolution: String = "dataObjectId") extends OptionsSparkDfsTransformer {
   private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDsNto1Transformer](className)
 
   override def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String, DataFrame] = {
@@ -56,7 +56,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val name: String = "ScalaCl
     val outputDO: DataObject = thisAction.outputs.head
 
 
-    options("parameterResolution") match {
+    parameterResolution match {
       case "dataObjectId" => Map(outputDO.id.id -> customTransformer.transformWithParamMapping(context.sparkSession, options, dfs, inputDOs, useInputDOOrdering = false))
       case "dataObjectOrdering" => Map(outputDO.id.id -> customTransformer.transformWithParamMapping(context.sparkSession, options, dfs, inputDOs, useInputDOOrdering = true))
       case _ => throw new IllegalArgumentException("Option parameterResolution must either be set to dataObjectId or dataObjectOrdering.")
