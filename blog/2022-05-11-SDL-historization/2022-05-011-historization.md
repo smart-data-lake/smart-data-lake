@@ -251,7 +251,7 @@ I targeted a setup using: WSL2, SDLB with podman, and the Airbyte container with
 I guess in another environment, e.g. in a cloud environment or just using docker in docker, this would work out of the box. 
 
 Here are my steps to get it running:
-* add buildah and the Airbyte container to the SDLB [Dockerfile](Dockerfile) (just before the entrypoint):
+* add buildah and the Airbyte container to the SDLB [Dockerfile](./Dockerfile) (just before the entrypoint):
   ```Bash
   RUN apt-get update
   RUN apt-get -y install buildah
