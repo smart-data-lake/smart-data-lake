@@ -31,7 +31,9 @@ import io.smartdatalake.workflow.action.spark.customlogic.CustomDsTransformer
 import org.apache.spark.sql._
 
 
-
+//Prevents this Exception:
+// java.lang.UnsupportedOperationException: Unable to find constructor for Product. This could happen if Product is an interface, or a trait without companion object constructor.
+private[smartdatalake] abstract class FakeProduct extends Product
 
 /**
  * Configuration of a custom Spark-Dataset transformation between one input and one output (1:1) as Java/Scala Class.
