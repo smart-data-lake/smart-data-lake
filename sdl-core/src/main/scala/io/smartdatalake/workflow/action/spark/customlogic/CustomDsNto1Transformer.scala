@@ -34,10 +34,10 @@ import scala.reflect.runtime.universe.typeOf
  * and 1 for your output Dataset.
  */
 trait CustomDsNto1Transformer extends Serializable with SmartDataLakeLogger {
-  val expectedTransformMessage = "CustomDsNTo1Transformer implementations need to implement exactly one method with name 'transform' with this signature:" +
+  private val expectedTransformMessage = "CustomDsNTo1Transformer implementations need to implement exactly one method with name 'transform' with this signature:" +
     s"def transform(session: SparkSession, options: Map[String, String], src1Ds: Dataset[A], src2Ds: Dataset[B], <more Datasets if needed>): Dataset[C]"
 
-  private[smartdatalake] def transformWithParamMapping(session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame], inputDOs: Seq[DataObject], useInputDOOrdering: Boolean): DataFrame = {
+  private[smartdatalake] def transformWithParamMapping(session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame], inputDOs: Seq[DataObject], parameterResolution: String): DataFrame = {
 
     // lookup transform method
     val methodName = "transform"
@@ -63,10 +63,11 @@ trait CustomDsNto1Transformer extends Serializable with SmartDataLakeLogger {
     }
 
     val mappedDatasetParams: List[(Int, Dataset[_])] =
-      if (useInputDOOrdering)
-        getMappedDatasetParamsBasedOnOrdering(datasetParams, inputDOs, dfs)
-      else
-        getMappedDatasetParamsBasedOnDataObjectId(datasetParams, dfs)
+      parameterResolution match {
+        case "dataObjectId" => getMappedDatasetParamsBasedOnDataObjectId(datasetParams, dfs)
+        case "dataObjectOrdering" => getMappedDatasetParamsBasedOnOrdering(datasetParams, inputDOs, dfs)
+        case _ => throw new IllegalArgumentException("Option parameterResolution must either be set to dataObjectId or dataObjectOrdering.")
+      }
 
     //Sort by original parameterIndex and then forget about the index
     val allMappedParams: List[Object] = (mappedNonDatasetParams ++ mappedDatasetParams).sortBy(_._1).map(_._2)
@@ -80,7 +81,7 @@ trait CustomDsNto1Transformer extends Serializable with SmartDataLakeLogger {
         case e: InvocationTargetException =>
           //Improve stacktrace for the developper. This allows to get the line number where a problem occured, which is otherwise not available
           // when calling a method with reflection
-          e.getTargetException.getStackTrace.filter(el => el.toString.contains(methodName)).foreach(el => logger.error(el.toString))
+          e.getTargetException.getStackTrace.foreach(el => logger.error(s"$methodName method threw an exception: ${el.toString}"))
           throw e
       }
     res.asInstanceOf[Dataset[_]].toDF
