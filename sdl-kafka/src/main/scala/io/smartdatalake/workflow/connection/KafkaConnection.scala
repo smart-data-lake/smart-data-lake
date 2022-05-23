@@ -27,7 +27,6 @@ import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig}
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.config.SslConfigs
 import org.apache.spark.sql.confluent.ConfluentClient
-import org.apache.spark.sql.confluent.avro.ConfluentAvroConnector
 
 import java.util.Properties
 import scala.collection.JavaConverters._
@@ -55,8 +54,6 @@ case class KafkaConnection(override val id: ConnectionId,
     authProps.asScala.foreach { case (k, v) => props.put(k, v) }
     AdminClient.create(props)
   }
-
-  @transient lazy val confluentHelper: Option[ConfluentAvroConnector] = schemaRegistry.map(ConfluentAvroConnector(_))
 
   private[smartdatalake] val KafkaConfigOptionPrefix = "kafka."
   private val KafkaSSLSecurityProtocol = "SSL"
