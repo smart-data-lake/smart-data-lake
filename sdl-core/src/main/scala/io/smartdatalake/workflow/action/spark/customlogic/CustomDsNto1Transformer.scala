@@ -20,92 +20,19 @@ package io.smartdatalake.workflow.action.spark.customlogic
 
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.EncoderUtil
-import io.smartdatalake.workflow.dataobject.DataObject
-import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
-
-import java.lang.reflect.InvocationTargetException
-import scala.reflect.runtime.universe
-import scala.reflect.runtime.universe.typeOf
+import io.smartdatalake.workflow.action.spark.transformer.ParameterResolution
+import io.smartdatalake.workflow.action.spark.transformer.ParameterResolution.ParameterResolution
 
 /**
- * Interface to define a custom Spark-Dataset transformation (2:1)
- * When you implement this interface, you need to provide 3 case classes: 2 for your input Datasets
- * and 1 for your output Dataset.
+ * Interface to define a custom Spark-Dataset transformation with many input Datasets and one output Dataset (n:1)
+ * When you implement this interface, you must define one (and only one) function with name "transform" and the following parameters:
+ * - 'session: SparkSession'
+ * - 'options: Map[String, String]'
+ * - as many '<inputDatasetName>: Dataset[<CaseClass>]' as needed
+ * The transformer will use reflection to search the "transform" method, and fill in the parameters dynamically.
+ * It can match parameters by name or by order, see [[ParameterResolution]].
  */
 trait CustomDsNto1Transformer extends Serializable with SmartDataLakeLogger {
-  private val expectedTransformMessage = "CustomDsNTo1Transformer implementations need to implement exactly one method with name 'transform' with this signature:" +
-    s"def transform(session: SparkSession, options: Map[String, String], src1Ds: Dataset[A], src2Ds: Dataset[B], <more Datasets if needed>): Dataset[C]"
-
-  private[smartdatalake] def transformWithParamMapping(session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame], inputDOs: Seq[DataObject], parameterResolution: String): DataFrame = {
-
-    // lookup transform method
-    val methodName = "transform"
-    val mirror = scala.reflect.runtime.currentMirror
-    val typeTagSubclass = mirror.classSymbol(this.getClass).toType
-    val transformMethodsOfSubclass = typeTagSubclass.members.filter(_.isMethod).filter(_.name.toString == methodName)
-    assert(transformMethodsOfSubclass.size == 1, expectedTransformMessage)
-    val transformMethod = transformMethodsOfSubclass.head
-
-    // prepare parameters.
-    // We need to remember the original order of the method parameters to make sure to keep them in the same order in the output
-    val transformParameters: List[(universe.Symbol, Int)] = transformMethod.info.paramLists.head.zipWithIndex
-    val datasetParams = transformParameters.filter(param => param._1.typeSignature <:< typeOf[Dataset[_]])
-    val nonDatasetParams = transformParameters.filterNot(param => param._1.typeSignature <:< typeOf[Dataset[_]])
-    assert(datasetParams.size == inputDOs.size, s"Number of Dataset-Parameters of transform function does not much number of input DataObjects! datasetParamsWithParamIndex: $datasetParams, inputDOs: ${inputDOs.map(_.id).mkString(",")}")
-
-    val mappedNonDatasetParams: List[(Int, Object)] = nonDatasetParams.map {
-      case (param, paramIndex) if param.typeSignature =:= typeOf[SparkSession] =>
-        (paramIndex, session)
-      case (param, paramIndex) if param.typeSignature =:= typeOf[Map[String, String]] =>
-        (paramIndex, options)
-      case (param, paramIndex) => throw new IllegalStateException(s"Transform method parameter $param at index $paramIndex has unsupported type ${param.typeSignature.typeSymbol.name.toString}. Only parameters of type Dataset, SparkSession and Map[String,String] are allowed. " + expectedTransformMessage)
-    }
-
-    val mappedDatasetParams: List[(Int, Dataset[_])] =
-      parameterResolution match {
-        case "dataObjectId" => getMappedDatasetParamsBasedOnDataObjectId(datasetParams, dfs)
-        case "dataObjectOrdering" => getMappedDatasetParamsBasedOnOrdering(datasetParams, inputDOs, dfs)
-        case _ => throw new IllegalArgumentException("Option parameterResolution must either be set to dataObjectId or dataObjectOrdering.")
-      }
-
-    //Sort by original parameterIndex and then forget about the index
-    val allMappedParams: List[Object] = (mappedNonDatasetParams ++ mappedDatasetParams).sortBy(_._1).map(_._2)
-
-    // call method dynamically
-    val transformMethodInstance = getClass.getMethods.find(_.getName == methodName).get
-    val res =
-      try {
-        transformMethodInstance.invoke(this, allMappedParams: _*)
-      } catch {
-        case e: InvocationTargetException =>
-          //Improve stacktrace for the developper. This allows to get the line number where a problem occured, which is otherwise not available
-          // when calling a method with reflection
-          e.getTargetException.getStackTrace.foreach(el => logger.error(s"$methodName method threw an exception: ${el.toString}"))
-          throw e
-      }
-    res.asInstanceOf[Dataset[_]].toDF
-  }
-
-  private def getMappedDatasetParamsBasedOnOrdering(datasetParamsWithParamIndex: List[(universe.Symbol, Int)], inputDOs: Seq[DataObject], dfs: Map[String, DataFrame]) = {
-    datasetParamsWithParamIndex.zipWithIndex.map {
-      case ((param, paramIndex), datasetIndex) if param.typeSignature <:< typeOf[Dataset[_]] =>
-        val dsType = param.typeSignature.typeArgs.head
-        val dataObjectAtThatIndexInConfig = inputDOs(datasetIndex)
-        val df = dfs(dataObjectAtThatIndexInConfig.id.id)
-        (paramIndex, EncoderUtil.createDataset(df, dsType))
-    }
-  }
-
-  private def getMappedDatasetParamsBasedOnDataObjectId(datasetParamsWithParamIndex: List[(universe.Symbol, Int)], dfs: Map[String, DataFrame]) = {
-    datasetParamsWithParamIndex.map {
-      case (param, paramIndex) if param.typeSignature <:< typeOf[Dataset[_]] =>
-        val paramName = param.name.toString
-        val dsType = param.typeSignature.typeArgs.head
-        val df = dfs.getOrElse(paramName, throw new IllegalStateException(s"DataFrame for DataObject $paramName not found in input DataFrames"))
-        (paramIndex, EncoderUtil.createDataset(df, dsType))
-    }
-  }
 
   /**
    * Optional function to define the transformation of input to output partition values.
