@@ -195,7 +195,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   protected def logWritingFinished(subFeed: S, noData: Option[Boolean], duration: Duration)(implicit context: ActionPipelineContext): Unit = {
     val metricsLog = if (noData.contains(true)) ", no data found"
     else runtimeData.getFinalMetrics(subFeed.dataObjectId).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
-    logger.info(s"($id) finished writing DataFrame to ${subFeed.dataObjectId.id}: jobDuration=$duration" + metricsLog)
+    logger.info(s"($id) finished writing to ${subFeed.dataObjectId.id}: jobDuration=$duration" + metricsLog)
   }
 
   private def getMainDataObjectCandidates(mainId: Option[DataObjectId], dataObjects: Seq[DataObject], inputOutput: String): Seq[DataObject] = {

@@ -86,6 +86,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                postWriteSql: Option[String] = None,
                                override val schemaMin: Option[GenericSchema] = None,
                                override var table: Table,
+                               override val constraints: Seq[Constraint] = Seq(),
+                               override val expectations: Seq[Expectation] = Seq(),
                                jdbcFetchSize: Int = 1000,
                                saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                override val allowSchemaEvolution: Boolean = false,
@@ -96,7 +98,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                incrementalOutputExpr: Option[String] = None,
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject with CanHandlePartitions with CanEvolveSchema with CanMergeDataFrame with CanCreateIncrementalOutput {
+  extends TransactionalSparkTableDataObject with CanHandlePartitions with CanEvolveSchema with CanMergeDataFrame
+    with CanCreateIncrementalOutput with ExpectationValidation {
 
   /**
    * Connection defines driver, url and db in central location

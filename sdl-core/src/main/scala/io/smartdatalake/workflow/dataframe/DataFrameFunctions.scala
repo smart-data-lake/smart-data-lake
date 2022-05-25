@@ -33,7 +33,9 @@ trait DataFrameFunctions {
 
   def col(colName: String): GenericColumn
   def lit(value: Any): GenericColumn
+  def min(column: GenericColumn): GenericColumn
   def max(column: GenericColumn): GenericColumn
+  def size(column: GenericColumn): GenericColumn
   def explode(column: GenericColumn): GenericColumn
   /**
    * Construct array from given columns and removing null values (Snowpark API)
@@ -48,6 +50,9 @@ trait DataFrameFunctions {
   def stringType: GenericDataType
   def arrayType(dataType: GenericDataType): GenericDataType
   def structType(colTypes: Map[String,GenericDataType]): GenericDataType
+  def concat(exprs: GenericColumn*): GenericColumn
+  def regexp_extract(e: GenericColumn, regexp: String, groupIdx: Int): GenericColumn
+  def raise_error(column: GenericColumn): GenericColumn
   /**
    * Get a DataFrame with the result of the given sql statement.
    * @param dataObjectId Snowpark implementation needs to get the Snowpark-Session from the DataObject. This should not be used otherwise.

@@ -25,7 +25,6 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.metrics.{SparkStageMetricsListener, SparkStreamingQueryListener}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ScalaUtil
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.util.spark.DummyStreamProvider
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
@@ -256,20 +255,39 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
   }
 
   override def postprocessOutputSubFeedCustomized(subFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    assert(subFeed.dataFrame.isDefined)
+    val output = outputs.find(_.id == subFeed.dataObjectId).get
+    // initialize outputs
     if (context.phase == ExecutionPhase.Init) {
-      outputs.find(_.id == subFeed.dataObjectId).foreach { output =>
-        output.init(subFeed.dataFrame.get, subFeed.partitionValues, saveModeOptions)
-      }
+      output.init(subFeed.dataFrame.get, subFeed.partitionValues, saveModeOptions)
     }
-    subFeed
+    // apply expectation validation
+    output match {
+      case evDataObject: DataObject with ExpectationValidation =>
+        val (dfExpectations, observation) = evDataObject.setupConstraintsAndExpectations(subFeed.dataFrame.get)
+        subFeed
+          .withDataFrame(Some(dfExpectations))
+          .withObservation(observation)
+      case _ => subFeed
+    }
   }
 
   override protected def writeSubFeed(subFeed: DataFrameSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult = {
+    // write subfeed to output
     setSparkJobMetadata(Some(s"writing to ${subFeed.dataObjectId}"))
     val output = outputs.find(_.id == subFeed.dataObjectId).getOrElse(throw new IllegalStateException(s"($id) output for subFeed ${subFeed.dataObjectId} not found"))
     val noData = writeSubFeed(subFeed, output, isRecursive)
     setSparkJobMetadata(None)
-    WriteSubFeedResult(noData)
+    // get expectations metrics and check violations
+    output match {
+      case evDataObject: DataObject with ExpectationValidation =>
+        val expectationMetrics = subFeed.observation.map(_.waitFor()).getOrElse(Map())
+        evDataObject.validateExpectations(expectationMetrics)
+        // TODO: return metrics
+        WriteSubFeedResult(noData)
+      case _ =>
+        WriteSubFeedResult(noData)
+    }
   }
 
   /**
@@ -303,7 +321,7 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
           // return
           Some(noData)
         } else {
-          logger.debug("($id) streaming query already started")
+          logger.debug(s"($id) streaming query already started")
           None // unknown
         }
       case Some(m: SparkStreamingMode) =>

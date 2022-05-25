@@ -26,7 +26,7 @@ import io.smartdatalake.util.spark.{DataFrameUtil, DummyStreamProvider}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.dataframe._
 import org.apache.spark.sql.types.{ArrayType, StringType, StructField, StructType}
-import org.apache.spark.sql.{Column, DataFrame, functions}
+import org.apache.spark.sql.{DataFrame, functions}
 
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
@@ -48,7 +48,8 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
                         override val isDAGStart: Boolean = false,
                         override val isSkipped: Boolean = false,
                         override val isDummy: Boolean = false,
-                        override val filter: Option[String] = None
+                        override val filter: Option[String] = None,
+                        override val observation: Option[Observation] = None
                        )
   extends DataFrameSubFeed {
   @transient
@@ -99,8 +100,8 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
     // if filter is removed, normally also the DataFrame must be removed so that the next action get's a fresh unfiltered DataFrame with all data of this DataObject
     if (breakLineageOnChange && filter.isDefined) {
       logger.info(s"($dataObjectId) breakLineage called for SubFeed from clearFilter")
-      this.copy(filter = None).breakLineage
-    } else this.copy(filter = None)
+      this.copy(filter = None, observation = None).breakLineage
+    } else this.copy(filter = None, observation = None)
   }
   override def persist: SparkSubFeed = {
     this.dataFrame.foreach(_.inner.persist) // Spark's persist & cache can be called without referencing the resulting DataFrame
@@ -129,6 +130,7 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
     this.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false, dataFrame = None)
   }
   override def withDataFrame(dataFrame: Option[GenericDataFrame]): SparkSubFeed = this.copy(dataFrame = dataFrame.map(_.asInstanceOf[SparkDataFrame]))
+  override def withObservation(dataFrame: Option[Observation]): SparkSubFeed = this.copy(observation = observation)
   override def withPartitionValues(partitionValues: Seq[PartitionValues]): DataFrameSubFeed = this.copy(partitionValues = partitionValues)
   override def asDummy(): SparkSubFeed = this.copy(isDummy = true)
   override def withFilter(partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed = {
@@ -154,6 +156,12 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   override def lit(value: Any): GenericColumn = {
     SparkColumn(functions.lit(value))
   }
+  override def min(column: GenericColumn): GenericColumn = {
+    column match {
+      case sparkColumn: SparkColumn => SparkColumn(functions.min(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
   override def max(column: GenericColumn): GenericColumn = {
     column match {
       case sparkColumn: SparkColumn => SparkColumn(functions.max(sparkColumn.inner))
@@ -163,6 +171,12 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   override def count(column: GenericColumn): GenericColumn = {
     column match {
       case sparkColumn: SparkColumn => SparkColumn(functions.count(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def size(column: GenericColumn): GenericColumn = {
+    column match {
+      case sparkColumn: SparkColumn => SparkColumn(functions.size(sparkColumn.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
@@ -227,6 +241,22 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   override def not(column: GenericColumn): GenericColumn = {
     column match {
       case sparkColumn: SparkColumn => SparkColumn(functions.not(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def concat(exprs: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, exprs.toSeq)
+    SparkColumn(functions.concat(exprs.map(_.asInstanceOf[SparkColumn].inner):_*))
+  }
+  override def regexp_extract(column: GenericColumn, regexp: String, groupIdx: Int): GenericColumn = {
+    column match {
+      case sparkColumn: SparkColumn => SparkColumn(functions.regexp_extract(sparkColumn.inner, regexp, groupIdx))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def raise_error(column: GenericColumn): GenericColumn = {
+    column match {
+      case snowparkColumn: SparkColumn => SparkColumn(functions.raise_error(snowparkColumn.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }

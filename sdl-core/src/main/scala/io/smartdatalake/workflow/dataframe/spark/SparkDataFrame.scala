@@ -24,11 +24,11 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.spark.DataFrameUtil
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import io.smartdatalake.workflow.dataframe._
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Column, DataFrame, RelationalGroupedDataset, Row}
+import org.apache.spark.sql._
 
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.typeOf
@@ -90,6 +90,18 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   }
   override def isEmpty: Boolean = inner.isEmpty
   override def count: Long = inner.count()
+  override def cache: GenericDataFrame = SparkDataFrame(inner.cache)
+  override def uncache: GenericDataFrame = SparkDataFrame(inner.unpersist)
+  override def log(msg: String, loggerFunc: String => Unit): Unit = {
+    loggerFunc(msg + System.lineSeparator() + DatasetHelper.showString(inner, truncate = 0))
+  }
+  override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): (GenericDataFrame, Observation) = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, aggregateColumns)
+    val observation = new SparkObservation(name)
+    val sparkAggregatedColumns = aggregateColumns.map(_.asInstanceOf[SparkColumn].inner)
+    val dfObserved = observation.on(inner, isExecPhase, sparkAggregatedColumns:_*)
+    (SparkDataFrame(dfObserved), observation)
+  }
 }
 
 case class SparkGroupedDataFrame(inner: RelationalGroupedDataset) extends GenericGroupedDataFrame {
@@ -294,4 +306,5 @@ case class SparkRow(inner: Row) extends GenericRow {
   override def subFeedType: universe.Type = typeOf[SparkSubFeed]
   override def get(index: Int): Any = inner.get(index)
   override def getAs[T](index: Int): T = get(index).asInstanceOf[T]
+  override def toSeq: Seq[Any] = inner.toSeq
 }

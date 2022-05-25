@@ -480,7 +480,7 @@ case class FileIncrementalMoveMode(archiveSubdirectory: Option[String] = None) e
   assert(archiveSubdirectory.forall(_.nonEmpty))
   assert(archiveSubdirectory.forall(!_.contains("/")), s"archiveSubdirectory should contain only one subdirectory name and not nested subdirectories: $archiveSubdirectory")
 
-  private var sparkFilesObserver: Option[FilesObservation] = None
+  private var sparkFilesObserver: Option[FilesSparkObservation] = None
 
   /**
    * Check for files in input data object.
