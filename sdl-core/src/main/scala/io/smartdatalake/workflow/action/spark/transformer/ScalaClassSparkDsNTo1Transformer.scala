@@ -147,7 +147,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val name: String = "ScalaCl
   private def tolerantGet[T](map: Map[String,T], key: String): Option[T] = {
     def prepareKey(k: String) = k.toLowerCase.replace("-","").replace("_","")
     val tolerantMap = map.map{ case (k,v) => (prepareKey(k), v)}
-    tolerantMap.get(key.toLowerCase)
+    tolerantMap.get(prepareKey(key))
   }
 
   override def factory: FromConfigFactory[GenericDfsTransformer] = ScalaClassSparkDsNTo1Transformer
