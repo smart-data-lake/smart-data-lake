@@ -3957,7 +3957,7 @@
       },
       "ScalaClassSparkDsTransformer" : {
         "type" : "object",
-        "description" : "Configuration of a custom Spark-Dataset transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a DataObjectId, a Dataset and a map of options and has to return a Dataset.\nThe Java/Scala class has to implement interface[[CustomDsTransformer]] .",
+        "description" : "Configuration of a custom Spark-Dataset transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a SparkSession, a Dataset and a map of options and has to return a Dataset.\nThe Java/Scala class has to implement interface[[CustomDsTransformer]] .",
         "additionalProperties" : false,
         "required" : [ "transformerClassName" ],
         "title" : "ScalaClassSparkDsTransformer",
@@ -4450,43 +4450,6 @@
               }
             }, {
               "type" : "object",
-              "description" : "Configuration of a custom Spark-Dataset transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a DataObjectId, a Dataset and a map of options and has to return a Dataset.\nThe Java/Scala class has to implement interface[[CustomDsTransformer]] .",
-              "additionalProperties" : false,
-              "required" : [ "transformerClassName", "type" ],
-              "title" : "ScalaClassSparkDsTransformer",
-              "properties" : {
-                "type" : {
-                  "const" : "ScalaClassSparkDsTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                },
-                "transformerClassName" : {
-                  "type" : "string",
-                  "description" : "class name implementing trait[[CustomDsTransformer]]"
-                },
-                "options" : {
-                  "type" : "object",
-                  "description" : "Options to pass to the transformation",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  }
-                },
-                "runtimeOptions" : {
-                  "type" : "object",
-                  "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  }
-                }
-              }
-            }, {
-              "type" : "object",
               "description" : "Interface to implement Spark-DataFrame transformers working with one input and one output (1:1)",
               "additionalProperties" : false,
               "required" : [ "type" ],
@@ -4737,6 +4700,43 @@
               }
             }, {
               "type" : "object",
+              "description" : "Configuration of a custom Spark-Dataset transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a SparkSession, a Dataset and a map of options and has to return a Dataset.\nThe Java/Scala class has to implement interface[[CustomDsTransformer]] .",
+              "additionalProperties" : false,
+              "required" : [ "transformerClassName", "type" ],
+              "title" : "ScalaClassSparkDsTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "ScalaClassSparkDsTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "transformerClassName" : {
+                  "type" : "string",
+                  "description" : "class name implementing trait[[CustomDsTransformer]]"
+                },
+                "options" : {
+                  "type" : "object",
+                  "description" : "Options to pass to the transformation",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                },
+                "runtimeOptions" : {
+                  "type" : "object",
+                  "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }, {
+              "type" : "object",
               "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Scala code which is compiled at runtime.\nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The scala code has to implement a function of type[[fnTransformType]] .",
               "additionalProperties" : false,
               "required" : [ "type" ],
@@ -4868,17 +4868,6 @@
               }
             }, {
               "type" : "object",
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers.",
-              "additionalProperties" : false,
-              "required" : [ "type" ],
-              "title" : "OptionsGenericDfTransformer",
-              "properties" : {
-                "type" : {
-                  "const" : "OptionsGenericDfTransformer"
-                }
-              }
-            }, {
-              "type" : "object",
               "description" : "Apply a filter condition to a DataFrame.",
               "additionalProperties" : false,
               "required" : [ "filterClause", "type" ],
@@ -4902,6 +4891,17 @@
                 "subFeedTypeForValidation" : {
                   "type" : "string",
                   "description" : "When parsing the configuration the runtime subFeedType for validating the filter expression is not yet known.\nBy default SparkSubFeed langauge is used, but you can configure a different one if needed."
+                }
+              }
+            }, {
+              "type" : "object",
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers.",
+              "additionalProperties" : false,
+              "required" : [ "type" ],
+              "title" : "OptionsGenericDfTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "OptionsGenericDfTransformer"
                 }
               }
             }, {
@@ -5126,6 +5126,53 @@
             "additionalProperties" : {
               "type" : "string"
             }
+          }
+        }
+      },
+      "ScalaClassSparkDsNTo1Transformer" : {
+        "type" : "object",
+        "description" : "Configuration of a custom Spark-Dataset transformation between N inputs and 1 outputs (N:1) as Java/Scala Class\nDefine a transform function that receives a SparkSession, a map of options and as many DataSets as you want, and that has to return one Dataset.\nThe Java/Scala class has to implement interface[[CustomDsNto1Transformer]] .",
+        "additionalProperties" : false,
+        "required" : [ "className" ],
+        "title" : "ScalaClassSparkDsNTo1Transformer",
+        "properties" : {
+          "type" : {
+            "const" : "ScalaClassSparkDsNTo1Transformer"
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "BName of the transformer"
+          },
+          "description" : {
+            "type" : "string",
+            "description" : "Optional description of the transformer"
+          },
+          "className" : {
+            "type" : "string",
+            "description" : "Class name implementing trait[[CustomDfsTransformer]]"
+          },
+          "options" : {
+            "type" : "object",
+            "description" : "Options to pass to the transformation",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          },
+          "runtimeOptions" : {
+            "type" : "object",
+            "description" : "Optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          },
+          "parameterResolution" : {
+            "type" : "string",
+            "enum" : [ "DataObjectOrdering ", "DataObjectId " ],
+            "description" : "By default parameter resolution for transform function uses input Datasets id to match the corresponding parameter name.\nBut there are other options, see[[ParameterResolution]] ."
+          },
+          "outputDatasetId" : {
+            "type" : "string",
+            "description" : "Optional id of the output Dataset. Default is the id of the Actions first output DataObject."
           }
         }
       },
@@ -5428,6 +5475,8 @@
                 "$ref" : "#/definitions/GenericDfsTransformer/ScalaClassSnowparkDfsTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfsTransformer/ScalaClassSparkDfsTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfsTransformer/ScalaClassSparkDsNTo1Transformer"
               }, {
                 "$ref" : "#/definitions/GenericDfsTransformer/ScalaCodeSparkDfsTransformer"
               } ]
