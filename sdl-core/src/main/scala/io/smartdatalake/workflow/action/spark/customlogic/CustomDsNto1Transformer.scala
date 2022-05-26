@@ -18,34 +18,21 @@
  */
 package io.smartdatalake.workflow.action.spark.customlogic
 
-
 import io.smartdatalake.util.hdfs.PartitionValues
-import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
-
-import scala.reflect.runtime.universe.TypeTag
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.action.spark.transformer.ParameterResolution
+import io.smartdatalake.workflow.action.spark.transformer.ParameterResolution.ParameterResolution
 
 /**
- * Interface to define a custom Spark-Dataset transformation (1:1)
- * When you implement this interface, you need to provide two case classes: One for your input Dataset
- * and one for your output Dataset.
+ * Interface to define a custom Spark-Dataset transformation with many input Datasets and one output Dataset (n:1)
+ * When you implement this interface, you must define one (and only one) function with name "transform" and the following parameters:
+ * - 'session: SparkSession'
+ * - 'options: Map[String, String]'
+ * - as many '<inputDatasetName>: Dataset[<CaseClass>]' as needed
+ * The transformer will use reflection to search the "transform" method, and fill in the parameters dynamically.
+ * It can match parameters by name or by order, see [[ParameterResolution]].
  */
-trait CustomDsTransformer[In <: Product, Out <: Product] extends Serializable {
-
-  /**
-   * Function to be implemented to define the transformation between an input and output DataFrame (1:1)
-   *
-   * @param session      Spark Session
-   * @param options      Options specified in the configuration for this transformation
-   * @param inputDS      Input Dataset
-   * @param dataObjectId name of the input Dataset
-   * @return Transformed DataFrame
-   */
-  def transform(session: SparkSession, options: Map[String, String], inputDS: Dataset[In], dataObjectId: String): Dataset[Out]
-
-  private[smartdatalake] def transformWithTypeConversion(session: SparkSession, options: Map[String, String], inputDf: DataFrame, dataObjectId: String)(implicit typeTag: TypeTag[In]): DataFrame = {
-    val inputDSEncoder = org.apache.spark.sql.Encoders.product[In]
-    transform(session, options, inputDf.as(inputDSEncoder), dataObjectId).toDF
-  }
+trait CustomDsNto1Transformer extends Serializable with SmartDataLakeLogger {
 
   /**
    * Optional function to define the transformation of input to output partition values.

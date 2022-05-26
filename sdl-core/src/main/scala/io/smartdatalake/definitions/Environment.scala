@@ -222,7 +222,7 @@ object Environment {
   val runIdPartitionColumnName = "run_id"
 
   // instantiate sdl plugin if configured
-  private[smartdatalake] lazy val sdlPlugin: Option[SDLPlugin] = {
+  private[smartdatalake] var sdlPlugin: Option[SDLPlugin] = {
     EnvironmentUtil.getSdlParameter("pluginClassName")
       .map(CustomCodeUtil.getClassInstanceByName[SDLPlugin])
   }

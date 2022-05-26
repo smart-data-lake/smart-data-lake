@@ -50,13 +50,16 @@ class ScalaClassSparkDsTransformerTest extends FunSuite with BeforeAndAfter {
 
   import sessionHiveCatalog.implicits._
 
-  private val tempDir = Files.createTempDirectory("test")
+  private val tempDir = Files.createTempDirectory("testScalaClassSparkDs2To1TransformerTest")
   private val tempPath = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
   before {
+    instanceRegistry.clear()
+  }
+  after {
     instanceRegistry.clear()
   }
 
@@ -66,7 +69,6 @@ class ScalaClassSparkDsTransformerTest extends FunSuite with BeforeAndAfter {
     val srcDO = CsvFileDataObject("src1", tempPath + "/src1", partitions = Seq("name")
       , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
     instanceRegistry.register(srcDO)
-    // first table has partitions columns dt and type (same as source)
     val tgt1DO = CsvFileDataObject("tgt1", tempPath + "/tgt1", partitions = Seq("name")
       , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int, doubled_rating int"))))
     instanceRegistry.register(tgt1DO)
