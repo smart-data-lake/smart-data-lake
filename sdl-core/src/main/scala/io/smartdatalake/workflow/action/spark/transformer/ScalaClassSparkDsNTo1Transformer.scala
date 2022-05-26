@@ -48,9 +48,9 @@ import scala.reflect.runtime.universe.typeOf
  * @param options        Options to pass to the transformation
  * @param runtimeOptions Optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
- * @param parameterResolution By default parameter resolution for transform function uses input Datasets name to match the corresponding parameter by name.
+ * @param parameterResolution By default parameter resolution for transform function uses input Datasets id to match the corresponding parameter name.
  *                            But there are other options, see [[ParameterResolution]].
- * @param outputDatasetId Optional name for the output Dataset. Default is the id of the Actions first output DataObject.
+ * @param outputDatasetId Optional id of the output Dataset. Default is the id of the Actions first output DataObject.
  */
 case class ScalaClassSparkDsNTo1Transformer(override val name: String = "ScalaClassSparkDs2To1Transformer", override val description: Option[String] = None, className: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map(), parameterResolution: ParameterResolution = ParameterResolution.DataObjectId, outputDatasetId: Option[String] = None) extends OptionsSparkDfsTransformer {
   private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDsNto1Transformer](className)
@@ -134,10 +134,20 @@ case class ScalaClassSparkDsNTo1Transformer(override val name: String = "ScalaCl
       case (param, paramIndex) if param.typeSignature <:< typeOf[Dataset[_]] =>
         val paramName = param.name.toString
         val dsType = param.typeSignature.typeArgs.head
-        val df = dfs.getOrElse(paramName, throw new IllegalStateException(s"($actionId) [transformers.$name] DataFrame for DataObject $paramName not found in input DataFrames"))
+        val df = tolerantGet(dfs, paramName).getOrElse(throw new IllegalStateException(s"($actionId) [transformers.$name] DataFrame for DataObject $paramName not found in input DataFrames"))
         val ds = EncoderUtil.createDataset(df, dsType)
         (paramIndex, ds)
     }
+  }
+
+  /**
+   * Tolerant lookup of entry in map.
+   * Comparison is made case-insensitive and without underscore and hyphen.
+   */
+  private def tolerantGet[T](map: Map[String,T], key: String): Option[T] = {
+    def prepareKey(k: String) = k.toLowerCase.replace("-","").replace("_","")
+    val tolerantMap = map.map{ case (k,v) => (prepareKey(k), v)}
+    tolerantMap.get(key.toLowerCase)
   }
 
   override def factory: FromConfigFactory[GenericDfsTransformer] = ScalaClassSparkDsNTo1Transformer
@@ -156,8 +166,9 @@ object ParameterResolution extends Enumeration {
   type ParameterResolution = Value
 
   /**
-   * Use input Datasets name to match the corresponding parameter by name.
-   * The Datasets name is equivalent to its input DataObjectId for the first transformer in the chain, later transformers can change the name.
+   * Use input Datasets id to match the corresponding parameter name.
+   * The Datasets id is equivalent to its input DataObjectId for the first transformer in the chain, later transformers can change the id.
+   * The comparison is done case-insensitive without underscore and hyphen.
    */
   val DataObjectId: Value = Value("DataObjectId")
 
