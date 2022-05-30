@@ -221,7 +221,7 @@ In the [Polynote (click here)](http://localhost:8192/notebook/sql_data_monitor.i
 ## Change Data Capture
 
 So far the whole table is collected and compared with the existing data lake table. 
-Various databases support Change Data Capture (CDC). Which already keeps track of changes similar to the above presented historization feature of SDL. 
+Various databases support Change Data Capture (CDC). CDC already keeps track of changes similar to the comparision done by the historization feature of SDL. 
 this can be utilized to only gathering database updates. Thus the amount of transferred and compared data can be significantly reduced. Therewith, only data changed (created, modified, or deleted) since the last syncronisation will be send. Therefore, a status is attached to the successful stream. This **state** is handled in SDLB. 
 
 In the following, an example is presented utilizing the MS SQL server CDC feature. Since the implemented JDBC connector cannot handle CDC data, an Airbyte connector is utilized. 
