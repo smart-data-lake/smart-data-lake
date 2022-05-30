@@ -1,5 +1,5 @@
 ---
-title: Incremantal historization of using CDC from SQL databases
+title: Incremantal historization using CDC and Airbyte MSSQL
 description: Tracking Data Changes of MSSQL databases with and without CDC
 slug: sdl-hist
 authors:
