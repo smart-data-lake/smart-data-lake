@@ -1,5 +1,5 @@
 ---
-title: Data historization of SQL sources
+title: Incremantal historization of using CDC from SQL databases
 description: Tracking Data Changes of MSSQL databases with and without CDC
 slug: sdl-hist
 authors:
