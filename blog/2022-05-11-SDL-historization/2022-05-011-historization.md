@@ -11,7 +11,7 @@ hide_table_of_contents: false
 ---
 
 In many cases datasets have no constant live. New data points are created, values changed and data expires. We are interested in keeping track of all these changes.
-This article first presents collecting data utilizing **JDBC** and **deduplication on the fly**. Then, a **Change Data Capture** (CDC) enabled table will be transfered and historized in the data lake using an **Airbyte connector**. Methods for reducing the computational and storage efforts are mentioned.
+This article first presents collecting data utilizing **JDBC** and **deduplication on the fly**. Then, a **Change Data Capture** (CDC) enabled (MS)SQL table will be transferred and historized in the data lake using the **Airbyte MS SQL connector** supporting CDC. Methods for reducing the computational and storage efforts are mentioned.
 
 <!--truncate-->
 
