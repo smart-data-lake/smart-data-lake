@@ -58,7 +58,7 @@ It should be noted that there are a duplicates in the dataset. In the first case
 	mkdir .mvnrepo
 	podman run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
 	```
-* copy polynote notebook [sql_data_monitor.ipynb](sql_data_monitor.ipynb) for later inspection into the `polynote/notebook` directory
+* copy polynote notebook [sql_data_monitor.ipynb](sql_data_monitor.ipynb) for later inspection into the `polynote/notebooks` directory
 
 :::warning
   The notebook will only be editable if the permissions are changed to be writable by other users `chmod +w polynote/notebook/sql_data_monitor.ipynb`
