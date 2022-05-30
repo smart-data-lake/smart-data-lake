@@ -214,7 +214,7 @@ Furthermore, the data lake gets updated using the same command as above:
 podman run --hostname localhost -e SPARK_LOCAL_HOSTNAME=localhost --rm --pod sdl_sql -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark --config /mnt/config --feed-sel ids:histData
 ```
 
-In the [Polynote (click here)](http://localhost:8192/notebook/sql_data_monitor.ipynb) sql_data_monitor.ipynb, the data lake table can be inspected again. The The table and its additional columns are presented, as well as the original and updated rows for a modified row (*id = QQ3iIM2V*) and the deleted row (*id = 009mKOEz*).
+In the [Polynote (click here)](http://localhost:8192/notebook/sql_data_monitor.ipynb) sql_data_monitor.ipynb, the data lake table can be inspected again. The table and its additional columns are presented, as well as the original and updated rows for a modified row (*id = QQ3iIM2V*) and the deleted row (*id = 009mKOEz*).
 
 ![polynote example output](historization_res.png)
 
