@@ -11,11 +11,11 @@ hide_table_of_contents: false
 ---
 
 In many cases datasets have no constant live. New data points are created, values changed and data expires. We are interested in keeping track of all these changes.
-This article first presents collecting data utilizing **JDBC** and **deduplication on the fly**. Then, a **Change Data Capture** (CDC) enabled table will be transfered and historized in the data lake using an **Airbyte connector**. Methods for reducing the computational and storage efforts are mentioned.
+This article first presents collecting data utilizing **JDBC** and **deduplication on the fly**. Then, a **Change Data Capture** (CDC) enabled (MS)SQL table will be transferred and historized in the data lake using the **Airbyte MS SQL connector** supporting CDC. Methods for reducing the computational and storage efforts are mentioned.
 
 <!--truncate-->
 
-In the [getting-started -> part2 -> keeping historical data](../../docs/getting-started/part-2/historical-data) historization is already introduced briefly. Here, we go in slightly more detail and track data originating from an MS SQL database. For the sake of simplicity, the tools and systems are deployed in Podman containers, including SDL, MSSQL server, as well as the metastore and polynote. 
+In the [getting-started -> part2 -> keeping historical data](../../docs/getting-started/part-2/historical-data) historization is already introduced briefly. Here, we go in slightly more detail and track data originating from an MS SQL database. For the sake of simplicity, the tools and systems are deployed in Podman containers, including SDLB, MSSQL server, as well as the metastore and polynote. 
 
 Here, a workflow is modeled, gathering data from a (MS)SQL database to the Data Lake. Therefore, the following steps will be performed:
 
@@ -58,7 +58,7 @@ It should be noted that there are a duplicates in the dataset. In the first case
 	mkdir .mvnrepo
 	podman run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
 	```
-* copy polynote notebook [sql_data_monitor.ipynb](sql_data_monitor.ipynb) for later inspection into the `polynote/notebook` directory
+* copy polynote notebook [sql_data_monitor.ipynb](sql_data_monitor.ipynb) for later inspection into the `polynote/notebooks` directory
 
 :::warning
   The notebook will only be editable if the permissions are changed to be writable by other users `chmod +w polynote/notebook/sql_data_monitor.ipynb`
@@ -214,17 +214,17 @@ Furthermore, the data lake gets updated using the same command as above:
 podman run --hostname localhost -e SPARK_LOCAL_HOSTNAME=localhost --rm --pod sdl_sql -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark --config /mnt/config --feed-sel ids:histData
 ```
 
-In the [Polynote (click here)](http://localhost:8192/notebook/sql_data_monitor.ipynb) sql_data_monitor.ipynb, the data lake table can be inspected again. The The table and its additional columns are presented, as well as the original and updated rows for a modified row (*id = QQ3iIM2V*) and the deleted row (*id = 009mKOEz*).
+In the [Polynote (click here)](http://localhost:8192/notebook/sql_data_monitor.ipynb) sql_data_monitor.ipynb, the data lake table can be inspected again. The table and its additional columns are presented, as well as the original and updated rows for a modified row (*id = QQ3iIM2V*) and the deleted row (*id = 009mKOEz*).
 
 ![polynote example output](historization_res.png)
 
 ## Change Data Capture
 
 So far the whole table is collected and compared with the existing data lake table. 
-Various databases support Change Data Capture (CDC). Which already keeps track of changes similar to the above presented historization feature of SDL. 
-this can be utilized to only gathering database updates. Thus the amount of transferred and compared data can be significantly reduced. Therewith, only data changed (created, modified, or deleted) since the last syncronisation will be send. Therefore, a status is attached to the successful stream. This **state** is handled in SDLB. 
+Various databases support Change Data Capture (CDC). CDC already keeps track of changes similar to the comparision done by the historization feature of SDL. 
+this can be used to optimize performance of the historiation feature, gathering only database updates, reducing the amount of transferred and compared significantly. Therewith, only data changed (created, modified, or deleted) since the last synchronisation will be read from the database. It needs the status of the last synchronistation to be attached to the successful stream. This **state** is handled in SDLB. 
 
-In the following, an example is presented utilizing the MS SQL server CDC feature. Since the implemented JDBC connector cannot handle CDC data, an Airbyte connector is utilized. 
+In the following, an example is presented utilizing the MS SQL server CDC feature. Since the implemented JDBC connector cannot handle CDC data, an Airbyte connector is utilized, see [Airbyte CDC](https://docs.airbyte.com/understanding-airbyte/cdc/) for details.
 
 ### Enable CDC on the SQL Server
 First the SQL server need to be configured to have a table [CDC enabled](https://docs.microsoft.com/en-us/sql/relational-databases/track-changes/enable-and-disable-change-data-capture-sql-server?view=sql-server-ver15). Additionally to the used table *chess*, another table is created with the CDC feature enabled. This table *chess_cdc* is created by copying and deduplicating the original table. The table creation is already performed in the above introduced and used [MS SQL initalization](db_init_chess.sql) script. In practice, further SQL settings should be considered, including proper user and permissions specification, and an adaptation of the retention period (3 days default). 
