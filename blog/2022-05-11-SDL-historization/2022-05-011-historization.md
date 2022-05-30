@@ -15,7 +15,7 @@ This article first presents collecting data utilizing **JDBC** and **deduplicati
 
 <!--truncate-->
 
-In the [getting-started -> part2 -> keeping historical data](../../docs/getting-started/part-2/historical-data) historization is already introduced briefly. Here, we go in slightly more detail and track data originating from an MS SQL database. For the sake of simplicity, the tools and systems are deployed in Podman containers, including SDL, MSSQL server, as well as the metastore and polynote. 
+In the [getting-started -> part2 -> keeping historical data](../../docs/getting-started/part-2/historical-data) historization is already introduced briefly. Here, we go in slightly more detail and track data originating from an MS SQL database. For the sake of simplicity, the tools and systems are deployed in Podman containers, including SDLB, MSSQL server, as well as the metastore and polynote. 
 
 Here, a workflow is modeled, gathering data from a (MS)SQL database to the Data Lake. Therefore, the following steps will be performed:
 
