@@ -90,7 +90,7 @@ It should be noted that there are a duplicates in the dataset. In the first case
   This should report 20058 row and we see an example of duplicates.
 
 :::note
-  This could be shortened, by just calling the [`bash restart_databases.sh`](restart_databases.sh).
+  This could be shortened, by just calling the [`bash restart_databases.sh`](restart_databases.sh), which contains the above commands, after stopping the containers and cleaning directories. 
 :::
 
 ## Define Workflow
@@ -164,7 +164,7 @@ The `histData` action specifies the copy and historization of data, by setting t
 The default HistorizationAction compares all new data with all the exising data, row by row **AND** column by column. Further, the complete joined table is re-written to the data lake. 
 Smart Data Lake Builder provides a merge optimization for transactional database formats. By selecting `mergeModeEnable = true` the resulting table gets another column with `dl_hash`. This hash is used to compare rows much more efficiently. Not every column need to be compared, only the hash. Further, already existing rows (identified by the hash), do not need to be re-written. 
 
-Furthermore, a *transformer* is added to deduplicate the data, which has duplicated rows with slightly different game times. 
+Furthermore, a *transformer* needs to be added to deduplicate the input data, which has duplicated rows with slightly different game times. This is needed as HistorizationAction expects the input to be unique over the primary key of the output DataObject.
 
 ```hocon
 actions {
