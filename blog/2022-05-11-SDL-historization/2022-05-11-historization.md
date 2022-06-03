@@ -94,7 +94,13 @@ It should be noted that there are a duplicates in the dataset. In the first case
 :::
 
 ## Define Workflow
-The SDLB configuration file [`config/chess.conf`](chess.conf) consists of global settings for the metastore, the connection, the data objects, and the actions. 
+The SDLB configuration file consists of:
+* global settings for the metastore 
+* connection details 
+* data objects and
+* action
+
+Create the `config/chess.conf` file with the following described sections or copy the [full script](chess.conf).
 
 ### Spark Settings
 For the metastore, the location, driver and access is defined. Further, the amount of tasks and partitions are limited, due to our reasonable small problem size.
