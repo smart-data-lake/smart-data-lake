@@ -1,6 +1,12 @@
+
+# shutdown, cleanup
 podman stop mssql
 podman-compose down ### This also deletes the mssql container
 rm -r data/_metastore data/int-* data/spark-warehouse data/state
+mkdir -p data/_metastore
+
+# startup
+set -e # exit on errors
 podman-compose up -d
 podman run -d --pod sdl_sql --hostname mssqlserver --add-host mssqlserver:127.0.0.1 --name mssql -v ${PWD}/data:/data  -v ${PWD}/config:/config -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=%abcd1234%" mcr.microsoft.com/mssql/server:2017-latest
 sleep 10  ### wait until the MSSQL server is ready (maybe a very conservative time)
