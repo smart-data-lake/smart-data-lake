@@ -61,7 +61,7 @@ It should be noted that there are a duplicates in the dataset. In the first case
 * copy polynote notebook [sql_data_monitor.ipynb](sql_data_monitor.ipynb) for later inspection into the `polynote/notebooks` directory
 
 :::warning
-  The notebook will only be editable if the permissions are changed to be writable by other users `chmod +w polynote/notebook/sql_data_monitor.ipynb`
+  The notebook will only be editable if the permissions are changed to be writable by other users `chmod -R 777 polynote/notebooks`
 :::
 
 * script for creating table on the SQL server: [db_init_chess.sql](db_init_chess.sql) into the `config` directory
@@ -71,6 +71,7 @@ It should be noted that there are a duplicates in the dataset. In the first case
 ## Prepare Source Database
 * start the pod with the metastore and polynote: 
   ```Bash
+  mkdir -p data/_metastore
   podman-compose up
   ```
 * start the MS SQL server: 
@@ -112,7 +113,7 @@ global {
 ```
 
 ### Connection
-The connection to the local MS SQL server is specified using JDBC settings and clear text authentication specification. In practice, a more secure authentication mode should be selected, e.g. Keycloak or tokens. 
+The connection to the local MS SQL server is specified using JDBC settings and clear text authentication specification. In practice, a more secure authentication mode should be selected, e.g. injection by environment variables. 
 
 ```hocon
 connections {
@@ -132,7 +133,7 @@ connections {
 
 ### DataObjects
 
-In a first place, two dataObjects are defined. The `ext-chess` defining the external source (the table on the MS SQL server), using JDBC connection. The `int-chess` defines a delta lake table object as integration layer as targets for our injection/historization action. 
+In a first place, two dataObjects are defined. The `ext-chess` defining the external source (the table on the MS SQL server), using JDBC connection. The `int-chess` defines a delta lake table object as integration layer as targets for our ingestion/historization action. 
 
 ```hocon
 dataObjects {
@@ -158,10 +159,10 @@ dataObjects {
 ```
 
 ### Actions
-The `histData` action specifies the copy and historization of data, by setting the type **HistorizeAction**. Therewith, the incoming data will be joined with the existing data. Each data point gets two additional values: **dl_ts_captured** (time the data is captured in the data lake) and **dl_ts_delimited** (time of invalidation). In case of a data record change, the original row gets invalidated (with the current time) and a new row is added with the current time as capturing value. As long as the data point is active and the latest value, **dl_ts_delimited** is set to max date `9999-12-31 23:59:59.999999`. After merging the incoming data with the existing table, by default, the resulting table will overwrite the existing data lake table.
+The `histData` action specifies the copy and historization of data, by setting the type **HistorizeAction**. Therewith, the incoming data will be joined with the existing data. Each data point gets two additional values: **dl_ts_captured** (time the data is captured in the data lake) and **dl_ts_delimited** (time of invalidation). In case of a data record change, the original row gets invalidated (with the current time) and a new row is added with the current time as capturing value. As long as the data point is active, **dl_ts_delimited** is set to max date `9999-12-31 23:59:59.999999.
 
-The default HistorizationAction compares all new data with all the exising data, row by row **AND** column by column. Further, the complete joined table is re-written to the data lake. 
-Smart Data Lake Builder provides a merge optimization for transactional database formats. By selecting `mergeModeEnable = true` the resulting table gets another column with `dl_hash`. This hash is used to compare rows much more efficiently. Not every column need to be compared, only the hash. Further, already existing rows (identified by the hash), do not need to be re-written. 
+The default HistorizationAction algorithm compares all new data with all the existing data, row by row **AND** column by column. Further, the complete joined table is re-written to the data lake. 
+For DataObjects supporting transactions HistorizeAction provides an algorithm using a merge operation to do the historization. By selecting `mergeModeEnable = true` the resulting table gets another column with `dl_hash`. This hash is used to compare rows much more efficiently. Not every column need to be compared, only the hash. Further, already existing rows (identified by the hash), do not need to be re-written. The merge operation applies only the needed inserts and updates to the output DataObject.
 
 Furthermore, a *transformer* is added to deduplicate the data, which has duplicated rows with slightly different game times. 
 
@@ -194,20 +195,20 @@ The full configuration looks like [chess.conf](chess.conf). Note that there are 
 
 ## Run
 
-The Pod with metastore, polynote and the "external" SQL server should already being running. Now the SDLB container is launched within the same POD and the action histData injects the data into the data lake:
+The Pod with metastore, polynote and the "external" SQL server should already being running. Now the SDLB container is launched within the same POD and the action histData ingests the data into the data lake:
 
 ```Bash
 podman run --hostname localhost -e SPARK_LOCAL_HOSTNAME=localhost --rm --pod sdl_sql -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark --config /mnt/config --feed-sel ids:histData
 ```
 
-The data can be inspected using the Polynote notebook (`chessData.ipynb` downloaded above), which can be launched using [Polynote (click here)](http://localhost:8192/notebook/sql_data_monitor.ipynb). 
+The data can be inspected using the Polynote notebook (`sql_data_monitor.ipynb` downloaded above), which can be launched using [Polynote (click here)](http://localhost:8192/notebook/sql_data_monitor.ipynb). 
 
 Now, let's assume a change in the source database. Here the `victory_status` `outoftime` is renamed to `overtime`. Furthermore one entry is deleted. Run script using:
 
 ```Bash
 podman exec -it mssql /opt/mssql-tools/bin/sqlcmd -S mssqlserver -U sa -P '%abcd1234%' -i /config/db_mod_chess.sql
 ```
-Note: 1680 rows were changed.
+Note: 1680 rows were changed + 1 row deleted.
 
 Furthermore, the data lake gets updated using the same command as above:
 ```Bash
