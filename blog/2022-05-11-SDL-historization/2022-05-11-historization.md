@@ -58,6 +58,7 @@ It should be noted that there are a duplicates in the dataset. In the first case
 	mkdir .mvnrepo
 	podman run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
 	```
+* download the test case data from [Kaggle](https://www.kaggle.com/datasets/datasnaek/chess/download) and unzip into `SDL_sql/data` directory
 * copy polynote notebook [sql_data_monitor.ipynb](sql_data_monitor.ipynb) for later inspection into the `polynote/notebooks` directory
 
 :::warning
