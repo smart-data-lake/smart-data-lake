@@ -107,6 +107,8 @@ const config = {
             //additionalLanguages: ['scala'],
       },
     }),
+
+  plugins:  ['./src/plugins/PostBuildCreateSchemaListPlugin'],
 };
 
 module.exports = config;
