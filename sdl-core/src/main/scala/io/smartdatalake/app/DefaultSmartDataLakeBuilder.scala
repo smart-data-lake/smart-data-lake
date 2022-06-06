@@ -35,7 +35,7 @@ class DefaultSmartDataLakeBuilder extends SmartDataLakeBuilder {
         assert(config.overrideJars.isEmpty || ignoreOverrideJars, "Option override-jars is not supported by DefaultSmartDataLakeBuilder. Use DatabricksSmartDataLakeBuilder for this option.")
         val stats = run(config)
           .toSeq.sortBy(_._1).map(x => x._1 + "=" + x._2).mkString(" ") // convert stats to string
-        logger.info(s"$appType v$appVersion finished successfully: $stats")
+        logger.info(s"$appType finished successfully: $stats")
       case None =>
         logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
     }
