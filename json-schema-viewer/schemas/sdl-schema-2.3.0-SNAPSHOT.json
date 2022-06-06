@@ -5,7 +5,7 @@
   "properties" : {
     "global" : {
       "type" : "object",
-      "description" : "Global configuration options\nNote that global configuration is responsible to hold SparkSession, so that its created once and only once per SDLB job.\nThis is especially important if JVM is shared between different SDL jobs (e.g. Databricks cluster), because sharing SparkSession in object Environment survives the current SDLB job.",
+      "description" : "Global configuration options\n\nNote that global configuration is responsible to hold SparkSession, so that its created once and only once per SDLB job.\nThis is especially important if JVM is shared between different SDL jobs (e.g. Databricks cluster), because sharing SparkSession in object Environment survives the current SDLB job.",
       "additionalProperties" : false,
       "title" : "GlobalConfig",
       "properties" : {
@@ -1008,7 +1008,7 @@
     "HousekeepingMode" : {
       "PartitionArchiveCompactionMode" : {
         "type" : "object",
-        "description" : "Archive and compact old partitions:\nArchive partition reduces the number of partitions in the past by moving older partitions into special \\\"archive partitions\\\".\nCompact partition reduces the number of files in a partition by rewriting them with Spark.\nExample: archive and compact a table with partition layout run_id=<integer>\n- archive partitions after 1000 partitions into \\\"archive partition\\\" equal to floor(run_id/1000)\n- compact \\\"archive partition\\\" when full\n{{{\nhousekeepingMode = {\ntype = PartitionArchiveCompactionMode\narchivePartitionExpression = \\\"if( elements[\\'run_id\\'] < runId - 1000, map(\\'run_id\\', elements[\\'run_id\\'] div 1000), elements)\\\"\ncompactPartitionExpression = \\\"elements[\\'run_id\\'] % 1000 = 0 and elements[\\'run_id\\'] <= runId - 2000\\\"\n}\n}}}",
+        "description" : "Archive and compact old partitions:\nArchive partition reduces the number of partitions in the past by moving older partitions into special \\\"archive partitions\\\".\nCompact partition reduces the number of files in a partition by rewriting them with Spark.\nExample: archive and compact a table with partition layout run_id=<integer>\n- archive partitions after 1000 partitions into \\\"archive partition\\\" equal to floor(run_id/1000)\n- compact \\\"archive partition\\\" when full\n\n```\nhousekeepingMode = {\ntype = PartitionArchiveCompactionMode\narchivePartitionExpression = \\\"if( elements[\\'run_id\\'] < runId - 1000, map(\\'run_id\\', elements[\\'run_id\\'] div 1000), elements)\\\"\ncompactPartitionExpression = \\\"elements[\\'run_id\\'] % 1000 = 0 and elements[\\'run_id\\'] <= runId - 2000\\\"\n}\n```",
         "additionalProperties" : false,
         "title" : "PartitionArchiveCompactionMode",
         "properties" : {
@@ -1030,7 +1030,7 @@
       },
       "PartitionRetentionMode" : {
         "type" : "object",
-        "description" : "Keep partitions while retention condition is fulfilled, delete other partitions.\nExample: cleanup partitions with partition layout dt=<yyyymmdd> after 90 days:\n{{{\nhousekeepingMode = {\ntype = PartitionRetentionMode\nretentionCondition = \\\"datediff(now(), to_date(elements[\\'dt\\'], \\'yyyyMMdd\\')) <= 90\\\"\n}\n}}}",
+        "description" : "Keep partitions while retention condition is fulfilled, delete other partitions.\nExample: cleanup partitions with partition layout dt=<yyyymmdd> after 90 days:\n\n```\nhousekeepingMode = {\ntype = PartitionRetentionMode\nretentionCondition = \\\"datediff(now(), to_date(elements[\\'dt\\'], \\'yyyyMMdd\\')) <= 90\\\"\n}\n```",
         "additionalProperties" : false,
         "required" : [ "retentionCondition" ],
         "title" : "PartitionRetentionMode",
@@ -1061,15 +1061,15 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\nSEE: [[DataFrameReader]]\nSEE: [[DataFrameWriter]]"
+            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
           },
           "path" : {
             "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\nSEE: [[DataFrameReader]]\nSEE: [[DataFrameWriter]]"
+            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
           },
           "schemaMin" : {
             "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\nSEE: [[DataFrameReader]]\nSEE: [[DataFrameWriter]]"
+            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
           },
           "table" : {
             "$ref" : "#/definitions/Others/Table"
@@ -1081,7 +1081,7 @@
       },
       "ActionsExporterDataObject" : {
         "type" : "object",
-        "description" : "Exports a util[[DataFrame]]that contains properties and metadata extracted from all[[io.smartdatalake.workflow.action.Action]]s\nthat are registered in the current[[InstanceRegistry]].\nAlternatively, it can export the properties and metadata of all[[io.smartdatalake.workflow.action.Action]]s defined in config files. For this, the\nconfiguration \\\"config\\\" has to be set to the location of the config.\nExample:\n{{{\ndataObjects = {\n...\nactions-exporter {\ntype = ActionsExporterDataObject\nconfig = path/to/myconfiguration.conf\n}\n...\n}\n}}}\nThe config value can point to a configuration file or a directory containing configuration files.\nSEE: Refer to[[ConfigLoader.loadConfigFromFilesystem()]] for details about the configuration loading.",
+        "description" : "Exports a util[[DataFrame]]that contains properties and metadata extracted from all[[io.smartdatalake.workflow.action.Action]]s\nthat are registered in the current[[InstanceRegistry]].\n\nAlternatively, it can export the properties and metadata of all[[io.smartdatalake.workflow.action.Action]]s defined in config files. For this, the\nconfiguration \\\"config\\\" has to be set to the location of the config.\n\nExample:\n\n```\ndataObjects = {\n...\nactions-exporter {\ntype = ActionsExporterDataObject\nconfig = path/to/myconfiguration.conf\n}\n...\n}\n```\n\n\nThe config value can point to a configuration file or a directory containing configuration files.\n\nSEE: Refer to[[ConfigLoader.loadConfigFromFilesystem()]] for details about the configuration loading.",
         "additionalProperties" : false,
         "required" : [ "id" ],
         "title" : "ActionsExporterDataObject",
@@ -1091,11 +1091,11 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\nSEE: [[DataFrameReader]]\nSEE: [[DataFrameWriter]]"
+            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
           },
           "config" : {
             "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\nSEE: [[DataFrameReader]]\nSEE: [[DataFrameWriter]]"
+            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -1142,7 +1142,7 @@
           },
           "schemaMin" : {
             "type" : "string",
-            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -1151,7 +1151,7 @@
       },
       "AvroFileDataObject" : {
         "type" : "object",
-        "description" : "A[[io.smartdatalake.workflow.dataobject.DataObject]]backed by an Avro data source.\nIt manages read and write access and configurations required for[[io.smartdatalake.workflow.action.Action]]s to\nwork on Avro formatted files.\nReading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]]respectively. The reader and writer implementations are provided by\nthe[[https://github.com/databricks/spark-avro databricks spark-avro]] project.\nSEE: [[org.apache.spark.sql.DataFrameReader]]\nSEE: [[org.apache.spark.sql.DataFrameWriter]]",
+        "description" : "A[[io.smartdatalake.workflow.dataobject.DataObject]]backed by an Avro data source.\n\nIt manages read and write access and configurations required for[[io.smartdatalake.workflow.action.Action]]s to\nwork on Avro formatted files.\n\nReading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]]respectively. The reader and writer implementations are provided by\nthe[[https://github.com/databricks/spark-avro databricks spark-avro]] project.\n\nSEE: [[org.apache.spark.sql.DataFrameReader]]\n\nSEE: [[org.apache.spark.sql.DataFrameWriter]]",
         "additionalProperties" : false,
         "required" : [ "id", "path" ],
         "title" : "AvroFileDataObject",
@@ -1196,7 +1196,7 @@
           },
           "sparkRepartition" : {
             "type" : "object",
-            "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.",
+            "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\n\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\n\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.",
             "additionalProperties" : false,
             "required" : [ "numberOfTasksPerPartition" ],
             "title" : "SparkRepartitionDef",
@@ -1276,7 +1276,7 @@
             "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
           },
           "housekeepingMode" : {
-            "description" : "Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.\nSee HousekeepingMode for available implementations. Default is None.\n*",
+            "description" : "Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.\nSee HousekeepingMode for available implementations. Default is None.",
             "oneOf" : [ {
               "$ref" : "#/definitions/HousekeepingMode/PartitionArchiveCompactionMode"
             }, {
@@ -1290,7 +1290,7 @@
       },
       "CsvFileDataObject" : {
         "type" : "object",
-        "description" : "A[[DataObject]]backed by a comma-separated value (CSV) data source.\nIt manages read and write access and configurations required for[[io.smartdatalake.workflow.action.Action]]s to\nwork on CSV formatted files.\nCSV reading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]]respectively.\nRead Schema specifications:\nIf a data object schema is not defined via the`schema`attribute (default) and`inferSchema`option is\ndisabled (default) in`csvOptions`, then all column types are set to String and the first row of the CSV file is read\nto determine the column names and the number of fields.\nIf the`header`option is disabled (default) in`csvOptions`, then the header is defined as \\\"_c#\\\" for each column\nwhere \\\"#\\\" is the column index.\nOtherwise the first row of the CSV file is not included in the DataFrame content and its entries\nare used as the column names for the schema.\nIf a data object schema is not defined via the`schema`attribute and`inferSchema`is enabled in`csvOptions`, then\nthe`samplingRatio`(default: 1.0) option in`csvOptions` is used to extract a sample from the CSV file in order to\ndetermine the input schema automatically.\nNOTE: This data object sets the following default values for`csvOptions`: delimiter = \\\"|\\\", quote = null, header = false, and inferSchema = false.\nAll other`csvOption` default to the values defined by Apache Spark.\nSEE: [[org.apache.spark.sql.DataFrameReader]]\nSEE: [[org.apache.spark.sql.DataFrameWriter]]",
+        "description" : "A[[DataObject]]backed by a comma-separated value (CSV) data source.\n\nIt manages read and write access and configurations required for[[io.smartdatalake.workflow.action.Action]]s to\nwork on CSV formatted files.\n\nCSV reading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]]respectively.\n\nRead Schema specifications:\n\nIf a data object schema is not defined via the`schema`attribute (default) and`inferSchema`option is\ndisabled (default) in`csvOptions`, then all column types are set to String and the first row of the CSV file is read\nto determine the column names and the number of fields.\n\nIf the`header`option is disabled (default) in`csvOptions`, then the header is defined as \\\"_c#\\\" for each column\nwhere \\\"#\\\" is the column index.\nOtherwise the first row of the CSV file is not included in the DataFrame content and its entries\nare used as the column names for the schema.\n\nIf a data object schema is not defined via the`schema`attribute and`inferSchema`is enabled in`csvOptions`, then\nthe`samplingRatio`(default: 1.0) option in`csvOptions` is used to extract a sample from the CSV file in order to\ndetermine the input schema automatically.\n\nNOTE: This data object sets the following default values for`csvOptions`: delimiter = \\\"|\\\", quote = null, header = false, and inferSchema = false.\nAll other`csvOption` default to the values defined by Apache Spark.\n\nSEE: [[org.apache.spark.sql.DataFrameReader]]\n\nSEE: [[org.apache.spark.sql.DataFrameWriter]]",
         "additionalProperties" : false,
         "required" : [ "id", "path" ],
         "title" : "CsvFileDataObject",
@@ -1340,7 +1340,7 @@
           },
           "sparkRepartition" : {
             "type" : "object",
-            "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.",
+            "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\n\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\n\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.",
             "additionalProperties" : false,
             "required" : [ "numberOfTasksPerPartition" ],
             "title" : "SparkRepartitionDef",
@@ -1444,11 +1444,11 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "creator" : {
             "type" : "object",
-            "description" : "Configuration of a custom Spark-DataFrame creator as part of[[CustomDfDataObject]]\nDefine a exec function which receives a map of options and returns a DataFrame to be used as input.\nOptionally define a schema function to return a StructType used as schema in init-phase.\nSee also trait[[CustomDfCreator]] .\nNote that for now implementing CustomDfCreator.schema method is only possible with className configuration attribute.",
+            "description" : "Configuration of a custom Spark-DataFrame creator as part of[[CustomDfDataObject]]\nDefine a exec function which receives a map of options and returns a DataFrame to be used as input.\nOptionally define a schema function to return a StructType used as schema in init-phase.\nSee also trait[[CustomDfCreator]] .\n\nNote that for now implementing CustomDfCreator.schema method is only possible with className configuration attribute.",
             "additionalProperties" : false,
             "title" : "CustomDfCreatorConfig",
             "properties" : {
@@ -1475,7 +1475,7 @@
           },
           "schemaMin" : {
             "type" : "string",
-            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -1524,7 +1524,7 @@
       },
       "DataObjectsExporterDataObject" : {
         "type" : "object",
-        "description" : "Exports a util[[DataFrame]]that contains properties and metadata extracted from all[[DataObject]]s\nthat are registered in the current[[InstanceRegistry]].\nAlternatively, it can export the properties and metadata of all[[DataObject]]s defined in config files. For this, the\nconfiguration \\\"config\\\" has to be set to the location of the config.\nExample:\n{{{\n```dataObjects = {\n...\ndataobject-exporter {\ntype = DataObjectsExporterDataObject\nconfig = path/to/myconfiguration.conf\n}\n...\n}\n}}}\nThe config value can point to a configuration file or a directory containing configuration files.\nSEE: Refer to[[ConfigLoader.loadConfigFromFilesystem()]] for details about the configuration loading.",
+        "description" : "Exports a util[[DataFrame]]that contains properties and metadata extracted from all[[DataObject]]s\nthat are registered in the current[[InstanceRegistry]].\n\nAlternatively, it can export the properties and metadata of all[[DataObject]]s defined in config files. For this, the\nconfiguration \\\"config\\\" has to be set to the location of the config.\n\nExample:\n\n```\ndataObjects = {\n...\ndataobject-exporter {\ntype = DataObjectsExporterDataObject\nconfig = path/to/myconfiguration.conf\n}\n...\n}\n```\n\n\nThe config value can point to a configuration file or a directory containing configuration files.\n\nSEE: Refer to[[ConfigLoader.loadConfigFromFilesystem()]] for details about the configuration loading.",
         "additionalProperties" : false,
         "required" : [ "id" ],
         "title" : "DataObjectsExporterDataObject",
@@ -1534,11 +1534,11 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\nSEE: [[DataFrameReader]]\nSEE: [[DataFrameWriter]]"
+            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
           },
           "config" : {
             "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\nSEE: [[DataFrameReader]]\nSEE: [[DataFrameWriter]]"
+            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -1547,7 +1547,7 @@
       },
       "DeltaLakeTableDataObject" : {
         "type" : "object",
-        "description" : "[[DataObject]] of type DeltaLakeTableDataObject.\nProvides details to access Tables in delta format to an Action.\nDelta format maintains a transaction log in a separate _delta_log subfolder.\nThe schema is registered in Metastore by DeltaLakeTableDataObject.\nThe following anomalies might occur:\n- table is registered in metastore but path does not exist -> table is dropped from metastore\n- table is registered in metastore but path is empty -> error is thrown. Delete the path to clean up\n- table is registered and path contains parquet files, but _delta_log subfolder is missing -> path is converted to delta format\n- table is not registered but path contains parquet files and _delta_log subfolder -> Table is registered\n- table is not registered but path contains parquet files without _delta_log subfolder -> path is converted to delta format and table is registered\n- table is not registered and path does not exists -> table is created on write",
+        "description" : "[[DataObject]] of type DeltaLakeTableDataObject.\nProvides details to access Tables in delta format to an Action.\n\nDelta format maintains a transaction log in a separate _delta_log subfolder.\nThe schema is registered in Metastore by DeltaLakeTableDataObject.\n\nThe following anomalies might occur:\n- table is registered in metastore but path does not exist -> table is dropped from metastore\n- table is registered in metastore but path is empty -> error is thrown. Delete the path to clean up\n- table is registered and path contains parquet files, but _delta_log subfolder is missing -> path is converted to delta format\n- table is not registered but path contains parquet files and _delta_log subfolder -> Table is registered\n- table is not registered but path contains parquet files without _delta_log subfolder -> path is converted to delta format and table is registered\n- table is not registered and path does not exists -> table is created on write",
         "additionalProperties" : false,
         "required" : [ "id", "table" ],
         "title" : "DeltaLakeTableDataObject",
@@ -1658,7 +1658,7 @@
       },
       "ExcelFileDataObject" : {
         "type" : "object",
-        "description" : "A[[DataObject]]backed by an Microsoft Excel data source.\nIt manages read and write access and configurations required for[[io.smartdatalake.workflow.action.Action]]s to\nwork on Microsoft Excel (.xslx) formatted files.\nReading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]]respectively. The reader and writer implementation is provided by the\n[[https://github.com/crealytics/spark-excel Crealytics spark-excel]]project.\nRead Schema:\nWhen`useHeader`is set to true (default), the reader will use the first row of the Excel sheet as column names for\nthe schema and not include the first row as data values. Otherwise the column names are taken from the schema.\nIf the schema is not provided or inferred, then each column name is defined as \\\"_c#\\\" where \\\"#\\\" is the column index.\nWhen a data object schema is provided, it is used as the schema for the DataFrame. Otherwise if`inferSchema`is\nenabled (default), then the data types of the columns are inferred based on the first`excerptSize`rows\n(excluding the first).\nWhen no schema is provided and`inferSchema` is disabled, all columns are assumed to be of string type.",
+        "description" : "A[[DataObject]]backed by an Microsoft Excel data source.\n\nIt manages read and write access and configurations required for[[io.smartdatalake.workflow.action.Action]]s to\nwork on Microsoft Excel (.xslx) formatted files.\n\nReading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]]respectively. The reader and writer implementation is provided by the\n[[https://github.com/crealytics/spark-excel Crealytics spark-excel]]project.\n\nRead Schema:\n\nWhen`useHeader`is set to true (default), the reader will use the first row of the Excel sheet as column names for\nthe schema and not include the first row as data values. Otherwise the column names are taken from the schema.\nIf the schema is not provided or inferred, then each column name is defined as \\\"_c#\\\" where \\\"#\\\" is the column index.\n\nWhen a data object schema is provided, it is used as the schema for the DataFrame. Otherwise if`inferSchema`is\nenabled (default), then the data types of the columns are inferred based on the first`excerptSize`rows\n(excluding the first).\nWhen no schema is provided and`inferSchema` is disabled, all columns are assumed to be of string type.",
         "additionalProperties" : false,
         "required" : [ "id", "path" ],
         "title" : "ExcelFileDataObject",
@@ -1676,7 +1676,7 @@
           },
           "excelOptions" : {
             "type" : "object",
-            "description" : "Options passed to[[org.apache.spark.sql.DataFrameReader]]and[[org.apache.spark.sql.DataFrameWriter]] for\nreading and writing Microsoft Excel files. Excel support is provided by the spark-excel project (see link below).\nSEE: [[https://github.com/crealytics/spark-excel]]",
+            "description" : "Options passed to[[org.apache.spark.sql.DataFrameReader]]and[[org.apache.spark.sql.DataFrameWriter]] for\nreading and writing Microsoft Excel files. Excel support is provided by the spark-excel project (see link below).\n\nSEE: [[https://github.com/crealytics/spark-excel]]",
             "additionalProperties" : false,
             "title" : "ExcelOptions",
             "properties" : {
@@ -1752,7 +1752,7 @@
           },
           "sparkRepartition" : {
             "type" : "object",
-            "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.",
+            "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\n\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\n\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.",
             "additionalProperties" : false,
             "required" : [ "numberOfTasksPerPartition" ],
             "title" : "SparkRepartitionDef",
@@ -2050,7 +2050,7 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "jndiContextFactory" : {
             "type" : "string",
@@ -2062,7 +2062,7 @@
           },
           "schemaMin" : {
             "type" : "string",
-            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "authMode" : {
             "description" : "authentication information: for now BasicAuthMode is supported.",
@@ -2090,15 +2090,15 @@
           },
           "maxWaitSec" : {
             "type" : "integer",
-            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "maxBatchAgeSec" : {
             "type" : "integer",
-            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "txBatchSize" : {
             "type" : "integer",
-            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "connectionFactory" : {
             "type" : "string",
@@ -2115,7 +2115,7 @@
       },
       "JsonFileDataObject" : {
         "type" : "object",
-        "description" : "A[[io.smartdatalake.workflow.dataobject.DataObject]]backed by a JSON data source.\nIt manages read and write access and configurations required for[[io.smartdatalake.workflow.action.Action]]s to\nwork on JSON formatted files.\nReading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]] respectively.\nNOTE: By default, the JSON option`multiline` is enabled.\nSEE: [[org.apache.spark.sql.DataFrameReader]]\nSEE: [[org.apache.spark.sql.DataFrameWriter]]",
+        "description" : "A[[io.smartdatalake.workflow.dataobject.DataObject]]backed by a JSON data source.\n\nIt manages read and write access and configurations required for[[io.smartdatalake.workflow.action.Action]]s to\nwork on JSON formatted files.\n\nReading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]] respectively.\n\nNOTE: By default, the JSON option`multiline` is enabled.\n\nSEE: [[org.apache.spark.sql.DataFrameReader]]\n\nSEE: [[org.apache.spark.sql.DataFrameWriter]]",
         "additionalProperties" : false,
         "required" : [ "id", "path" ],
         "title" : "JsonFileDataObject",
@@ -2160,7 +2160,7 @@
           },
           "sparkRepartition" : {
             "type" : "object",
-            "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.",
+            "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\n\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\n\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.",
             "additionalProperties" : false,
             "required" : [ "numberOfTasksPerPartition" ],
             "title" : "SparkRepartitionDef",
@@ -2244,7 +2244,7 @@
             "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
           },
           "housekeepingMode" : {
-            "description" : "Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.\nSee HousekeepingMode for available implementations. Default is None.\n*",
+            "description" : "Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.\nSee HousekeepingMode for available implementations. Default is None.",
             "oneOf" : [ {
               "$ref" : "#/definitions/HousekeepingMode/PartitionArchiveCompactionMode"
             }, {
@@ -2268,7 +2268,7 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "topicName" : {
             "type" : "string",
@@ -2276,7 +2276,7 @@
           },
           "connectionId" : {
             "type" : "string",
-            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "keyType" : {
             "type" : "string",
@@ -2350,7 +2350,7 @@
       },
       "PKViolatorsDataObject" : {
         "type" : "object",
-        "description" : "Checks for Primary Key violations for all[[DataObject]]s with Primary Keys defined that are registered in the current[[InstanceRegistry]].\nReturns the DataFrame of Primary Key violations.\nAlternatively, it can check for Primary Key violations of all[[DataObject]]s defined in config files. For this, the\nconfiguration \\\"config\\\" has to be set to the location of the config.\nExample:\n{{{\n```dataObjects = {\n...\nprimarykey-violations {\ntype = PKViolatorsDataObject\nconfig = path/to/myconfiguration.conf\n}\n...\n}\n}}}\nSEE: Refer to[[ConfigLoader.loadConfigFromFilesystem()]] for details about the configuration loading.",
+        "description" : "Checks for Primary Key violations for all[[DataObject]]s with Primary Keys defined that are registered in the current[[InstanceRegistry]].\nReturns the DataFrame of Primary Key violations.\n\nAlternatively, it can check for Primary Key violations of all[[DataObject]]s defined in config files. For this, the\nconfiguration \\\"config\\\" has to be set to the location of the config.\n\nExample:\n\n```\ndataObjects = {\n...\nprimarykey-violations {\ntype = PKViolatorsDataObject\nconfig = path/to/myconfiguration.conf\n}\n...\n}\n```\n\nSEE: Refer to[[ConfigLoader.loadConfigFromFilesystem()]] for details about the configuration loading.",
         "additionalProperties" : false,
         "required" : [ "id" ],
         "title" : "PKViolatorsDataObject",
@@ -2368,7 +2368,7 @@
           },
           "flattenOutput" : {
             "type" : "string",
-            "description" : ": if true, key and data column are converted from type map<k,v> to string (default).\n*"
+            "description" : ": if true, key and data column are converted from type map<k,v> to string (default)."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -2377,7 +2377,7 @@
       },
       "ParquetFileDataObject" : {
         "type" : "object",
-        "description" : "A[[io.smartdatalake.workflow.dataobject.DataObject]]backed by an Apache Hive data source.\nIt manages read and write access and configurations required for[[io.smartdatalake.workflow.action.Action]]s to\nwork on Parquet formatted files.\nReading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]] respectively.\nSEE: [[org.apache.spark.sql.DataFrameReader]]\nSEE: [[org.apache.spark.sql.DataFrameWriter]]",
+        "description" : "A[[io.smartdatalake.workflow.dataobject.DataObject]]backed by an Apache Hive data source.\n\nIt manages read and write access and configurations required for[[io.smartdatalake.workflow.action.Action]]s to\nwork on Parquet formatted files.\n\nReading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]] respectively.\n\nSEE: [[org.apache.spark.sql.DataFrameReader]]\n\nSEE: [[org.apache.spark.sql.DataFrameWriter]]",
         "additionalProperties" : false,
         "required" : [ "id", "path" ],
         "title" : "ParquetFileDataObject",
@@ -2422,7 +2422,7 @@
           },
           "sparkRepartition" : {
             "type" : "object",
-            "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.",
+            "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\n\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\n\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.",
             "additionalProperties" : false,
             "required" : [ "numberOfTasksPerPartition" ],
             "title" : "SparkRepartitionDef",
@@ -2569,7 +2569,7 @@
           },
           "sparkRepartition" : {
             "type" : "object",
-            "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.",
+            "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\n\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\n\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.",
             "additionalProperties" : false,
             "required" : [ "numberOfTasksPerPartition" ],
             "title" : "SparkRepartitionDef",
@@ -2663,7 +2663,7 @@
       },
       "RelaxedCsvFileDataObject" : {
         "type" : "object",
-        "description" : "A[[DataObject]] which allows for more flexible CSV parsing.\nThe standard CsvFileDataObject doesnt support reading multiple CSV-Files with different column order, missing columns\nor additional columns.\nRelaxCsvFileDataObject works more like reading JSON-Files. You need to define a schema, then it tries to read every file\nwith that schema independently of the column order, adding missing columns and removing superfluous ones.\nCSV files are read by Spark as whole text files and then parsed manually with Sparks CSV parser class. You can therefore use the\nnormal CSV options of spark, but some properties are fixed, e.g. header=true, inferSchema=false, enforceSchema (ignored).\nNOTE: This data object sets the following default values for`csvOptions`: delimiter = \\\",\\\", quote = null\nAll other`csvOption` default to the values defined by Apache Spark.\nSEE: [[org.apache.spark.sql.DataFrameReader]]\nSEE: [[org.apache.spark.sql.DataFrameWriter]] \nIf mode is permissive you can retrieve the corrupt input record by adding <options.columnNameOfCorruptRecord> as field to the schema.\nRelaxCsvFileDataObject also supports getting an error msg by adding \\\"<options.columnNameOfCorruptRecord>_msg\\\" as field to the schema.",
+        "description" : "A[[DataObject]] which allows for more flexible CSV parsing.\nThe standard CsvFileDataObject doesnt support reading multiple CSV-Files with different column order, missing columns\nor additional columns.\nRelaxCsvFileDataObject works more like reading JSON-Files. You need to define a schema, then it tries to read every file\nwith that schema independently of the column order, adding missing columns and removing superfluous ones.\n\nCSV files are read by Spark as whole text files and then parsed manually with Sparks CSV parser class. You can therefore use the\nnormal CSV options of spark, but some properties are fixed, e.g. header=true, inferSchema=false, enforceSchema (ignored).\n\nNOTE: This data object sets the following default values for`csvOptions`: delimiter = \\\",\\\", quote = null\nAll other`csvOption` default to the values defined by Apache Spark.\n\nSEE: [[org.apache.spark.sql.DataFrameReader]]\n\nSEE: [[org.apache.spark.sql.DataFrameWriter]] \n\nIf mode is permissive you can retrieve the corrupt input record by adding <options.columnNameOfCorruptRecord> as field to the schema.\nRelaxCsvFileDataObject also supports getting an error msg by adding \\\"<options.columnNameOfCorruptRecord>_msg\\\" as field to the schema.",
         "additionalProperties" : false,
         "required" : [ "id", "path" ],
         "title" : "RelaxedCsvFileDataObject",
@@ -2721,7 +2721,7 @@
           },
           "sparkRepartition" : {
             "type" : "object",
-            "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.",
+            "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\n\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\n\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.",
             "additionalProperties" : false,
             "required" : [ "numberOfTasksPerPartition" ],
             "title" : "SparkRepartitionDef",
@@ -2879,7 +2879,7 @@
           },
           "schemaMin" : {
             "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\nSEE: [[DataFrameReader]]\nSEE: [[DataFrameWriter]]"
+            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
           },
           "saveMode" : {
             "type" : "string",
@@ -2911,7 +2911,7 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\nSEE: [[DataFrameReader]]\nSEE: [[DataFrameWriter]]"
+            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
           },
           "params" : {
             "type" : "object",
@@ -2947,7 +2947,7 @@
           },
           "connectionId" : {
             "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\nSEE: [[DataFrameReader]]\nSEE: [[DataFrameWriter]]"
+            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -3184,7 +3184,7 @@
       },
       "XmlFileDataObject" : {
         "type" : "object",
-        "description" : "A[[io.smartdatalake.workflow.dataobject.DataObject]]backed by an XML data source.\nIt manages read and write access and configurations required for[[io.smartdatalake.workflow.action.Action]]s to\nwork on XML formatted files.\nReading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]]respectively. The reader and writer implementations are provided by\nthe[[https://github.com/databricks/spark-xml databricks spark-xml]] project.\nNote that writing XML-file partitioned is not supported by spark-xml.\nSEE: [[org.apache.spark.sql.DataFrameReader]]\nSEE: [[org.apache.spark.sql.DataFrameWriter]]",
+        "description" : "A[[DataObject]]backed by an XML data source.\n\nIt manages read and write access and configurations required for[[Action]]s to\nwork on XML formatted files.\n\nReading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]]respectively. The reader and writer implementations are provided by\nthe[[https://github.com/databricks/spark-xml databricks spark-xml]] project.\nNote that writing XML-file partitioned is not supported by spark-xml.\n\nSEE: [[org.apache.spark.sql.DataFrameReader]]\n\nSEE: [[org.apache.spark.sql.DataFrameWriter]]",
         "additionalProperties" : false,
         "required" : [ "id", "path" ],
         "title" : "XmlFileDataObject",
@@ -3233,7 +3233,7 @@
           },
           "sparkRepartition" : {
             "type" : "object",
-            "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.",
+            "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\n\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\n\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file.",
             "additionalProperties" : false,
             "required" : [ "numberOfTasksPerPartition" ],
             "title" : "SparkRepartitionDef",
@@ -3317,7 +3317,7 @@
             "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
           },
           "housekeepingMode" : {
-            "description" : "Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.\nSee HousekeepingMode for available implementations. Default is None.\n*",
+            "description" : "Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.\nSee HousekeepingMode for available implementations. Default is None.",
             "oneOf" : [ {
               "$ref" : "#/definitions/HousekeepingMode/PartitionArchiveCompactionMode"
             }, {
@@ -3399,7 +3399,7 @@
     "ParsableScriptDef" : {
       "CmdScript" : {
         "type" : "object",
-        "description" : "Execute a command on the command line and get its std output\nCommand can be different for windows and linux operating systems, but it must be defined for at least one of them.\nIf return value is not zero an exception is thrown.\nNote about internal implementation: on execution value of parameter map entries where key starts with\n- \\'param\\' will be added as parameter after the docker run command, sorted by key.\nThis allows to customize execution behaviour through Actions or DataObjects using CmdScript.",
+        "description" : "Execute a command on the command line and get its std output\nCommand can be different for windows and linux operating systems, but it must be defined for at least one of them.\n\nIf return value is not zero an exception is thrown.\n\nNote about internal implementation: on execution value of parameter map entries where key starts with\n- \\'param\\' will be added as parameter after the docker run command, sorted by key.\nThis allows to customize execution behaviour through Actions or DataObjects using CmdScript.",
         "additionalProperties" : false,
         "title" : "CmdScript",
         "properties" : {
@@ -3426,7 +3426,7 @@
       },
       "DockerRunScript" : {
         "type" : "object",
-        "description" : "Run a docker image and get its std output.\nIf return value is not zero an exception is thrown.\nNote about internal implementation: on execution value of parameter map entries where key starts with\n- \\'runParam\\' will be added as parameter after the docker run command, sorted by their key.\n- \\'dockerParam\\' will be added as parameter for the docker command, e.g. before the image name in the docker run command, sorted by their key.\nThis allows to customize execution behaviour through Actions or DataObjects using CmdScript.",
+        "description" : "Run a docker image and get its std output.\n\nIf return value is not zero an exception is thrown.\n\nNote about internal implementation: on execution value of parameter map entries where key starts with\n- \\'runParam\\' will be added as parameter after the docker run command, sorted by their key.\n- \\'dockerParam\\' will be added as parameter for the docker command, e.g. before the image name in the docker run command, sorted by their key.\nThis allows to customize execution behaviour through Actions or DataObjects using CmdScript.",
         "additionalProperties" : false,
         "required" : [ "image" ],
         "title" : "DockerRunScript",
@@ -4390,13 +4390,13 @@
             "description" : "Configuration for a GenericDfTransformerDef to be applied",
             "oneOf" : [ {
               "type" : "object",
-              "description" : "Apply a column whitelist to a DataFrame.",
+              "description" : "Apply a column blacklist to a DataFrame.",
               "additionalProperties" : false,
-              "required" : [ "columnWhitelist", "type" ],
-              "title" : "WhitelistTransformer",
+              "required" : [ "columnBlacklist", "type" ],
+              "title" : "BlacklistTransformer",
               "properties" : {
                 "type" : {
-                  "const" : "WhitelistTransformer"
+                  "const" : "BlacklistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -4406,9 +4406,9 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnWhitelist" : {
+                "columnBlacklist" : {
                   "type" : "array",
-                  "description" : "List of columns to keep from DataFrame",
+                  "description" : "List of columns to exclude from DataFrame",
                   "items" : {
                     "type" : "string"
                   }
@@ -4868,6 +4868,17 @@
               }
             }, {
               "type" : "object",
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers.",
+              "additionalProperties" : false,
+              "required" : [ "type" ],
+              "title" : "OptionsGenericDfTransformer",
+              "properties" : {
+                "type" : {
+                  "const" : "OptionsGenericDfTransformer"
+                }
+              }
+            }, {
+              "type" : "object",
               "description" : "Apply a filter condition to a DataFrame.",
               "additionalProperties" : false,
               "required" : [ "filterClause", "type" ],
@@ -4891,17 +4902,6 @@
                 "subFeedTypeForValidation" : {
                   "type" : "string",
                   "description" : "When parsing the configuration the runtime subFeedType for validating the filter expression is not yet known.\nBy default SparkSubFeed langauge is used, but you can configure a different one if needed."
-                }
-              }
-            }, {
-              "type" : "object",
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers.",
-              "additionalProperties" : false,
-              "required" : [ "type" ],
-              "title" : "OptionsGenericDfTransformer",
-              "properties" : {
-                "type" : {
-                  "const" : "OptionsGenericDfTransformer"
                 }
               }
             }, {
@@ -4939,13 +4939,13 @@
               }
             }, {
               "type" : "object",
-              "description" : "Apply a column blacklist to a DataFrame.",
+              "description" : "Apply a column whitelist to a DataFrame.",
               "additionalProperties" : false,
-              "required" : [ "columnBlacklist", "type" ],
-              "title" : "BlacklistTransformer",
+              "required" : [ "columnWhitelist", "type" ],
+              "title" : "WhitelistTransformer",
               "properties" : {
                 "type" : {
-                  "const" : "BlacklistTransformer"
+                  "const" : "WhitelistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -4955,9 +4955,9 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnBlacklist" : {
+                "columnWhitelist" : {
                   "type" : "array",
-                  "description" : "List of columns to exclude from DataFrame",
+                  "description" : "List of columns to keep from DataFrame",
                   "items" : {
                     "type" : "string"
                   }
@@ -4976,7 +4976,7 @@
       },
       "SQLDfsTransformer" : {
         "type" : "object",
-        "description" : "Configuration of a custom GenericDataFrame transformation between many inputs and many outputs (n:m) as SQL code.\nThe input data is available as temporary views in SQL. As name for the temporary views the input DataObjectId is used\n(special characters are replaces by underscores).\nThe input data is available as temporary view in SQL. The input name is either an id of the input DataObject,\nor the name of an output of the previous transformation if this is not the first transformation of the chain.\nAlso note that to create the name of temporary view, special characters are replaced by underscores and a postfix \\\"_sdltemp\\\" is added.\nIt is therefore recommended to use the special token ${inputViewName_<input name>}, that will be replaced with the name\nof the temporary view at runtime.\nNote that you can access arbitrary tables from the metastore in the SQL code, but this is against the principle of SDLB\nto access data through DataObjects. Accessing tables directly in SQL code has a negative impact on the maintainability of the project.",
+        "description" : "Configuration of a custom GenericDataFrame transformation between many inputs and many outputs (n:m) as SQL code.\nThe input data is available as temporary views in SQL. As name for the temporary views the input DataObjectId is used\n(special characters are replaces by underscores).\nThe input data is available as temporary view in SQL. The input name is either an id of the input DataObject,\nor the name of an output of the previous transformation if this is not the first transformation of the chain.\nAlso note that to create the name of temporary view, special characters are replaced by underscores and a postfix \\\"_sdltemp\\\" is added.\nIt is therefore recommended to use the special token ${inputViewName_<input name>}, that will be replaced with the name\nof the temporary view at runtime.\n\nNote that you can access arbitrary tables from the metastore in the SQL code, but this is against the principle of SDLB\nto access data through DataObjects. Accessing tables directly in SQL code has a negative impact on the maintainability of the project.",
         "additionalProperties" : false,
         "required" : [ "code" ],
         "title" : "SQLDfsTransformer",
@@ -5247,7 +5247,7 @@
           },
           "transformer" : {
             "type" : "object",
-            "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1)\nDefine a transform function which receives a DataObjectIds, a DataFrames and a map of options and has to return a\nDataFrame, see also[[CustomDfTransformer]].\nNote about Python transformation: Environment with Python and PySpark needed.\nPySpark session is initialize and available under variables`sc`,`session`,`sqlContext`.\nOther variables available are\n-`inputDf`: Input DataFrame\n-`options`: Transformation options as Map[String,String]\n-`dataObjectId`: Id of input dataObject as String\nOutput DataFrame must be set with`setOutputDf(df)` .",
+            "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1)\nDefine a transform function which receives a DataObjectIds, a DataFrames and a map of options and has to return a\nDataFrame, see also[[CustomDfTransformer]].\n\nNote about Python transformation: Environment with Python and PySpark needed.\nPySpark session is initialize and available under variables`sc`,`session`,`sqlContext`.\nOther variables available are\n-`inputDf`: Input DataFrame\n-`options`: Transformation options as Map[String,String]\n-`dataObjectId`: Id of input dataObject as String\nOutput DataFrame must be set with`setOutputDf(df)` .",
             "additionalProperties" : false,
             "title" : "CustomDfTransformerConfig",
             "properties" : {
@@ -5724,7 +5724,7 @@
       },
       "DeduplicateAction" : {
         "type" : "object",
-        "description" : "[[Action]]to deduplicate a subfeed.\nDeduplication keeps the last record for every key, also after it has been deleted in the source.\nDeduplicateAction adds an additional Column[[TechnicalTableColumn.captured]]. It contains the timestamp of the last occurrence of the record in the source.\nThis creates lots of updates. Especially when using saveMode.Merge it is better to set[[TechnicalTableColumn.captured]]to the last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to enable this optimization.\nDeduplicateAction needs a transactional table (e.g.[[TransactionalSparkTableDataObject]]) as output with defined primary keys.\nIf output implements[[CanMergeDataFrame]] , saveMode.Merge can be enabled by setting mergeModeEnable = true. This allows for much better performance.",
+        "description" : "[[Action]]to deduplicate a subfeed.\nDeduplication keeps the last record for every key, also after it has been deleted in the source.\nDeduplicateAction adds an additional Column[[TechnicalTableColumn.captured]]. It contains the timestamp of the last occurrence of the record in the source.\nThis creates lots of updates. Especially when using saveMode.Merge it is better to set[[TechnicalTableColumn.captured]]to the last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to enable this optimization.\n\nDeduplicateAction needs a transactional table (e.g.[[TransactionalSparkTableDataObject]]) as output with defined primary keys.\nIf output implements[[CanMergeDataFrame]] , saveMode.Merge can be enabled by setting mergeModeEnable = true. This allows for much better performance.",
         "additionalProperties" : false,
         "required" : [ "id", "inputId", "outputId" ],
         "title" : "DeduplicateAction",
@@ -5746,7 +5746,7 @@
           },
           "transformer" : {
             "type" : "object",
-            "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1)\nDefine a transform function which receives a DataObjectIds, a DataFrames and a map of options and has to return a\nDataFrame, see also[[CustomDfTransformer]].\nNote about Python transformation: Environment with Python and PySpark needed.\nPySpark session is initialize and available under variables`sc`,`session`,`sqlContext`.\nOther variables available are\n-`inputDf`: Input DataFrame\n-`options`: Transformation options as Map[String,String]\n-`dataObjectId`: Id of input dataObject as String\nOutput DataFrame must be set with`setOutputDf(df)` .",
+            "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1)\nDefine a transform function which receives a DataObjectIds, a DataFrames and a map of options and has to return a\nDataFrame, see also[[CustomDfTransformer]].\n\nNote about Python transformation: Environment with Python and PySpark needed.\nPySpark session is initialize and available under variables`sc`,`session`,`sqlContext`.\nOther variables available are\n-`inputDf`: Input DataFrame\n-`options`: Transformation options as Map[String,String]\n-`dataObjectId`: Id of input dataObject as String\nOutput DataFrame must be set with`setOutputDf(df)` .",
             "additionalProperties" : false,
             "title" : "CustomDfTransformerConfig",
             "properties" : {
@@ -5981,7 +5981,7 @@
       },
       "HistorizeAction" : {
         "type" : "object",
-        "description" : "[[Action]]to historize a subfeed.\nHistorization creates a technical history of data by creating valid-from/to columns.\nIt needs a transactional table as output with defined primary keys.\nNormal historization join new with all existing data, and rewrites all data in output table. This is not optimal from\na performance perspective.\nIt can be optimized if output object supports[[CanMergeDataFrame]] . In that case you can\nset mergeModeEnable=true to use incremental historization, which does not rewrite all data in output table. It still needs to\njoin new data with all existing data, but uses hash values to minimize data transfer.\nIf you have change-data-capture (CDC) information available to identify deleted records, you can set\nmergeModeCDCColumn and mergeModeCDCDeletedValue to even avoid the join between new and existing data. This is optimal from\na performance perspective.",
+        "description" : "[[Action]]to historize a subfeed.\nHistorization creates a technical history of data by creating valid-from/to columns.\nIt needs a transactional table as output with defined primary keys.\n\nNormal historization join new with all existing data, and rewrites all data in output table. This is not optimal from\na performance perspective.\nIt can be optimized if output object supports[[CanMergeDataFrame]] . In that case you can\nset mergeModeEnable=true to use incremental historization, which does not rewrite all data in output table. It still needs to\njoin new data with all existing data, but uses hash values to minimize data transfer.\nIf you have change-data-capture (CDC) information available to identify deleted records, you can set\nmergeModeCDCColumn and mergeModeCDCDeletedValue to even avoid the join between new and existing data. This is optimal from\na performance perspective.",
         "additionalProperties" : false,
         "required" : [ "id", "inputId", "outputId" ],
         "title" : "HistorizeAction",
@@ -6003,7 +6003,7 @@
           },
           "transformer" : {
             "type" : "object",
-            "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1)\nDefine a transform function which receives a DataObjectIds, a DataFrames and a map of options and has to return a\nDataFrame, see also[[CustomDfTransformer]].\nNote about Python transformation: Environment with Python and PySpark needed.\nPySpark session is initialize and available under variables`sc`,`session`,`sqlContext`.\nOther variables available are\n-`inputDf`: Input DataFrame\n-`options`: Transformation options as Map[String,String]\n-`dataObjectId`: Id of input dataObject as String\nOutput DataFrame must be set with`setOutputDf(df)` .",
+            "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1)\nDefine a transform function which receives a DataObjectIds, a DataFrames and a map of options and has to return a\nDataFrame, see also[[CustomDfTransformer]].\n\nNote about Python transformation: Environment with Python and PySpark needed.\nPySpark session is initialize and available under variables`sc`,`session`,`sqlContext`.\nOther variables available are\n-`inputDf`: Input DataFrame\n-`options`: Transformation options as Map[String,String]\n-`dataObjectId`: Id of input dataObject as String\nOutput DataFrame must be set with`setOutputDf(df)` .",
             "additionalProperties" : false,
             "title" : "CustomDfTransformerConfig",
             "properties" : {
