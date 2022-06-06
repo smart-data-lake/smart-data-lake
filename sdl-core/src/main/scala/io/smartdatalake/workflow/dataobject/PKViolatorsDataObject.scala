@@ -20,11 +20,11 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.config.{ConfigLoader, ConfigParser, FromConfigFactory, InstanceRegistry, ParsableFromConfig}
-import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}
+import io.smartdatalake.config._
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
+import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
@@ -38,7 +38,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  *
  * Example:
  * {{{
- * ```dataObjects = {
+ * dataObjects = {
  *  ...
  *  primarykey-violations {
  *    type = PKViolatorsDataObject
@@ -62,9 +62,8 @@ case class PKViolatorsDataObject(id: DataObjectId,
 
   override def getDataFrame(partitionValues: Seq[PartitionValues], subFeedType: Type)(implicit context: ActionPipelineContext): GenericDataFrame = {
     val functions = DataFrameSubFeed.getFunctions(subFeedType)
-    import functions._
-
     import PKViolatorsDataObject.{columnNameName, columnValueName}
+    import functions._
     // Get all DataObjects from registry
     val dataObjects: Seq[DataObject with Product] = config match {
       case Some(configLocation) =>

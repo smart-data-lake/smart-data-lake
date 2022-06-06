@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.config.{ConfigLoader, ConfigParser, FromConfigFactory, InstanceRegistry, ParsableFromConfig}
+import io.smartdatalake.config._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ProductUtil._
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -35,7 +35,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  *
  * Example:
  * {{{
- * ```dataObjects = {
+ * dataObjects = {
  *  ...
  *  dataobject-exporter {
  *    type = DataObjectsExporterDataObject

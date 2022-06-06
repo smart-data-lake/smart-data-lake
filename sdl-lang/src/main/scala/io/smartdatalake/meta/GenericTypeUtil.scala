@@ -144,16 +144,19 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
   }
 
   private def formatScaladocString(str: String) = {
-    str.replace(raw"\n", System.lineSeparator()).replaceAll(raw"(?m)^\s*\*\s*", "").trim
+    str.replaceAll(raw"(\\r)?\\n", "\n") // convert & standardize line separator
+      .replaceAll(raw"\n\h*\*\h*", "\n") // remove trailing asterisk
+      .trim // remove leading and trailing line separators
   }
 
   private def formatScaladocMarkup(markup: Markup) = {
     formatScaladocString(markup.trimmed.plainString)
+      .replaceAll(raw"\{\{\{", "```") // convert wiki code block to markup code block
+      .replaceAll(raw"}}}", "```"); // convert wiki code block to markup code block
   }
 
   private def formatScaladoc(doc: scaladoc.Scaladoc, filter: scaladoc.Tag => Boolean = _ => true): String = {
-    val rawText = doc.tags.filter(filter).flatMap(formatScaladocTag).mkString(System.lineSeparator())
-    formatScaladocString(rawText)
+    doc.tags.filter(filter).flatMap(formatScaladocTag).mkString("\n\n")
   }
 
   private def extractScalaDoc(annotations: Seq[Annotation]) = {

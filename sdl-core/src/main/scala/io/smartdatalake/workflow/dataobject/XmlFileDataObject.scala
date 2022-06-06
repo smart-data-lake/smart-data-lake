@@ -35,9 +35,9 @@ import org.apache.spark.sql.functions.{input_file_name, lit}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
- * A [[io.smartdatalake.workflow.dataobject.DataObject]] backed by an XML data source.
+ * A [[DataObject]] backed by an XML data source.
  *
- * It manages read and write access and configurations required for [[io.smartdatalake.workflow.action.Action]]s to
+ * It manages read and write access and configurations required for [[Action]]s to
  * work on XML formatted files.
  *
  * Reading and writing details are delegated to Apache Spark [[org.apache.spark.sql.DataFrameReader]]
