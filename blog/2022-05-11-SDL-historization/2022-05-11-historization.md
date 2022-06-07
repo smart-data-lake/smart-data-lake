@@ -44,6 +44,9 @@ It should be noted that there are a duplicates in the dataset. In the first case
 	cd SDL_sql
 	unzip part2.additional-files.zip
   ```
+  :::note "Directory Naming"
+  Note: The directory name "SDL_sql" will be related to the pod created later and thus to the specified commands below.
+  :::
 * Utilizing JDBC to MS SQL server, SDLB required this additional dependency. Therefore, add the following dependency to the `pom.xml`:
 	```xml
 	<dependency>
