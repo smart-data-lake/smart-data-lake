@@ -309,7 +309,7 @@ dataObjects {
 }
 ```
 #### Action
-Again the SDLB action *HistorizeAction* with *mergeModeEnabled* is selected. Further, the incremental execution mode is enabled. With CDC we get only changed data, which will be merged with the SDL existing table. Further, the column and value need to be specified to identify deleted data points. Depending on the CDC implementation this could be the deletion date (like we have here) or an operation flag mentioning the deletion operation as code, or even differently. SDLB expects a fixed value for deletion, why we here specify an `AdditionalColumnsTransformer` transformer to first create an intermediate column mapping any date to *true*. 
+Again the SDLB action *HistorizeAction* with *mergeModeEnabled* is selected. Further, the incremental execution mode is enabled. With CDC we get only changed data, which will be merged with the SDL existing table. Further, the column and value need to be specified to identify deleted data points. Depending on the CDC implementation this could be the deletion date (like we have here) or an operation flag mentioning the deletion operation as code, or even differently. SDLB expects a fixed value for deletion. That's why we specify an `AdditionalColumnsTransformer` transformer to first create an intermediate column mapping any date to *true*. 
 ```hocon
 actions {
   histDataAirbyte {
