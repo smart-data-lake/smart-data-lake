@@ -331,7 +331,7 @@ actions {
 }
 ```
 
-Finally, SDLB is launched using the same settings as above, now with the feed `ids:histDataAirbyte` and the specifying the *state* directory and name:
+Finally, SDLB is launched using the same settings as above, now with the feed `ids:histDataAirbyte` and specifying the *state* directory and name:
 ```Bash
 podman run --hostname localhost -e SPARK_LOCAL_HOSTNAME=localhost --rm --pod sdl_sql -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark --config /mnt/config --feed-sel ids:histDataAirbyte --state-path /mnt/data/state -n SDL_sql
 ```
