@@ -253,7 +253,7 @@ Let's double check the CDC enabled table:
 podman exec -it mssql /opt/mssql-tools/bin/sqlcmd -S mssqlserver -U sa -P '%abcd1234%' -Q "SELECT * FROM foobar.cdc.dbo_chess_cdc_CT where id = '079kHDqh'"
 ```
 
-Here the first 5 columns are added for the CDC. Here, only *id* and *victory_status* are selected from the original table. The other columns originating from the related CDC tables. 
+Here the first 5 columns are added for the CDC. 
 It should be noted that CDC additional data vary from implementation to implementation. 
 
 ### Airbyte MSSQL connector
