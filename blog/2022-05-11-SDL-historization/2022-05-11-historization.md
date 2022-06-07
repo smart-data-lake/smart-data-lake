@@ -254,7 +254,7 @@ podman exec -it mssql /opt/mssql-tools/bin/sqlcmd -S mssqlserver -U sa -P '%abcd
 ```
 
 Here the first 5 columns are added for the CDC. 
-It should be noted that CDC additional data vary from implementation to implementation. 
+It should be noted that CDC additional data vary by implementation from different DB products.
 
 ### Airbyte MSSQL connector
 Since the implemented JDBC (used above) does not support CDC data, the connector is changed to [Airbyte MSSQL](https://docs.airbyte.com/integrations/sources/mssql). In contrast to the article [Using Airbyte connector to inspect github data](../blog/2022-03-18-SDL-airbyte/2022-03-18-SDL-airbyte.md), where Airbyte github connector ran as python script, here the connector runs as a container within the SDLB container. 
