@@ -31,7 +31,7 @@
 		  Set the smartdatalake version to use here.
 		  If version cannot be resolved, make sure maven central repository is defined in settings.xml and the corresponding profile activated.
 		-->
-		<version>2.2.1-SNAPSHOT</version>
+		<version>2.3.0-SNAPSHOT</version>
 	</parent>
 
 	<artifactId>getting-started</artifactId>
