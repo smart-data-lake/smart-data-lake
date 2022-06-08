@@ -24,7 +24,7 @@ Like in the previous step, we need one more action and one DataObject for our ou
 ## Define join_departures_airports action
 
       join-departures-airports {
-        type = CustomSparkAction
+        type = CustomDataFrameAction
         inputIds = [stg-departures, int-airports]
         outputIds = [btl-connected-airports]
         transformers = [{
@@ -42,8 +42,8 @@ Like in the previous step, we need one more action and one DataObject for our ou
       }
 
 Now it gets interesting, a couple of things to note here:
-- This time, we changed the Action Type from CopyAction to CustomSparkAction.
-Use CustomSparkAction when you need to do complex operations. For instance, CustomSparkAction allows multiple inputs,
+- This time, we changed the Action Type from CopyAction to CustomDataFrameAction.
+Use CustomDataFrameAction when you need to do complex operations. For instance, CustomDataFrameAction allows multiple inputs,
 which CopyAction does not.
 - Our input/output fields are now called inputId**s** and outputId**s** and they take a list of DataObject ids.
 Similarly, our transformer is now of type SQLDf**s**Transformer.
@@ -57,11 +57,11 @@ The SQL-Code itself is just a join between the two input Data Objects on the ICA
 Note that we can just select all columns from airports, since we selected the ones that interest us in the previous step.
 
 :::tip Tip: Use only one output
-As you can see, with CustomSparkAction it's possible to read from multiple inputs and write to multiple outputs.
+As you can see, with CustomDataFrameAction it's possible to read from multiple inputs and write to multiple outputs.
 We usually discourage writing to multiple Data Objects in one action though. 
-At some point, you will want to use the metadata from SDL to analyze your data lineage. If you have a CustomSparkAction
+At some point, you will want to use the metadata from SDL to analyze your data lineage. If you have a CustomDataFrameAction
 with multiple inputs and multiple outputs (an M:N-relationship), SDL assumes that all outputs depend on all inputs. This might add
-some dependencies between DataObjects that don't really exist in the CustomSparkAction.
+some dependencies between DataObjects that don't really exist in the CustomDataFrameAction.
 Always using one Data Object as output will make your data lineage more detailed and clear.
 :::
 

@@ -49,7 +49,7 @@ In order to wire this CustomTransformation into our config, we add the following
         inputId = btl-departures-arrivals-airports
         outputId = btl-distances
         transformers = [{
-          type = ScalaClassDfTransformer
+          type = ScalaClassSparkDfTransformer
           className = com.sample.ComputeDistanceTransformer
         }]
         metadata {
@@ -58,7 +58,7 @@ In order to wire this CustomTransformation into our config, we add the following
       }
 
 We used a CopyAction and told it to execute the code in the class *com.sample.ComputeDistanceTransformer* to transform the data.
-We could also have used a CustomSparkAction like in the previous step, 
+We could also have used a CustomDataFrameAction like in the previous step, 
 but this would have resulted in more complex code working with lists of inputs, outputs and transformers.
 
 
@@ -180,18 +180,22 @@ values={[
 <TabItem value="docker">
 
 ```jsx
-docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel .*
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ".*"
 ```
 
 </TabItem>
 <TabItem value="podman">
 
 ```jsx
-podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel .*
+podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ".*"
 ```
 
 </TabItem>
 </Tabs>        
+
+:::warning
+  Note the regex feed selection .* need to be specified in quotation marks (`'.*'` or `".*"`), otherwise our system would substitute the asterics.
+:::
 
 The successful execution DAG looks like this
 
