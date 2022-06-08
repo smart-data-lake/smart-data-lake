@@ -20,14 +20,16 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.spark.sql.DataFrame
 import com.google.cloud.spark.bigquery.repackaged.com.google.cloud.bigquery.{BigQuery, BigQueryException, BigQueryOptions, DatasetId, TableId}
+import io.smartdatalake.definitions.{SDLSaveMode, SaveModeOptions}
+import io.smartdatalake.workflow.connection.BigQueryTableConnection
 
 /**
  * Allows reading a BigQuery table or view from a given Dataset.
@@ -45,6 +47,7 @@ import com.google.cloud.spark.bigquery.repackaged.com.google.cloud.bigquery.{Big
  * @param parentProject The Google Cloud Project ID of the table to bill for the export. Defaults to the project of the Service Account being used.
  * @param viewsEnabled Enables the connector to read from views and not only tables. Read caveats in official documentation before activating : https://github.com/GoogleCloudDataproc/spark-bigquery-connector#reading-from-views
  * @param pushAllFilters If set to true, the connector pushes all the filters Spark can delegate to BigQuery Storage API. Reduces amount of data transferred.
+ * @param temporaryGcsBucket  GCS bucket to use for indirect write
  * @param instanceRegistry InstanceRegistry
  */
 case class BigQueryDataObject(override val id: DataObjectId,
@@ -52,16 +55,23 @@ case class BigQueryDataObject(override val id: DataObjectId,
                               override val options: Map[String,String] = Map(),
                               override val schemaMin: Option[GenericSchema] = None,
                               override var table: Table, // db corresponds to dataset
+                              connectionId: Option[ConnectionId] = None,
                               project: Option[String] = None,
                               parentProject: Option[String],
                               viewsEnabled: Boolean = false,
-                              pushAllFilters: Boolean = true
+                              pushAllFilters: Boolean = true,
+                              temporaryGcsBucket: Option[String] = None
                              )
                              (@transient implicit val instanceRegistry: InstanceRegistry)
-extends TableDataObject with CanCreateSparkDataFrame {
+extends TableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame {
 
-  // TODO: dataset can also be defined on connection
-  assert(table.db.isDefined, "Dataset needs to be defined for Bigquery tables.")
+  private val connection = connectionId.map(c => getConnection[BigQueryTableConnection](c))
+
+  table = table.overrideDb(connection.map(_.db))
+  if (table.db.isEmpty) {
+    throw ConfigurationException(s"($id) Dataset (db) is not defined in table or connection for dataObject.")
+  }
+
   assert(!table.name.contains("."), s"Bigquery table name must not contain a dot. Please use table.db to define dataset name.")
 
   @transient private var bigQueryOptionsHolder: BigQuery = _
@@ -77,20 +87,28 @@ extends TableDataObject with CanCreateSparkDataFrame {
     bigQueryOptionsHolder
   }
 
-  val instanceOptions: Map[String,String] = Map(
+  val generalOptions: Map[String,String] = Map() ++
+    parentProject.map(pp => "parentProject"->pp) ++
+    project.map(p => "project"->p) ++
+    options
+
+  val instanceReadOptions: Map[String,String] = Map(
     "viewsEnabled" -> viewsEnabled.toString,
     "pushAllFilters" -> pushAllFilters.toString,
   ) ++
-  parentProject.map(pp => ("parentProject"->pp)) ++
-  project.map(p => ("project"->p)) ++
-  options
+  generalOptions
+
+  val instanceWriteOptions: Map[String, String] = {
+    (if(temporaryGcsBucket.isDefined) Map("temporaryGcsBucket"->temporaryGcsBucket.get) else Map()) ++
+    generalOptions
+  }
 
 
   // Adapted from https://cloud.google.com/bigquery/docs/samples/bigquery-dataset-exists
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
     try {
       val dataset = bigQuery.getDataset(DatasetId.of(table.db.get))
-      (dataset != null)
+      dataset != null
     } catch {
       case e: BigQueryException =>
         logger.error(s"Error when checking if dataset exists ${e.getMessage}")
@@ -116,8 +134,8 @@ extends TableDataObject with CanCreateSparkDataFrame {
   @throws[BigQueryException]
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
     val success = bigQuery.delete(TableId.of(table.db.get, table.name))
-    if (success) logger.info(s"BigQuery table $table.db.get.$table.name dropped successfully.")
-    else logger.warn(s"Table to drop was not found: $table.db.get.$table.name")
+    if (success) logger.info(s"BigQuery table ${table.db.get}.${table.name} dropped successfully.")
+    else logger.warn(s"Table to drop was not found: ${table.db.get}.${table.name}")
   }
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
@@ -127,15 +145,34 @@ extends TableDataObject with CanCreateSparkDataFrame {
     val df = context.sparkSession
       .read
       .format("bigquery")
-      .options(instanceOptions)
+      .options(instanceReadOptions)
       .load(queryOrTable)
 
     validateSchemaMin(SparkSchema(df.schema), "read")
     df
   }
 
-  override def factory: FromConfigFactory[DataObject] = BigQueryDataObject
+  override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])
+                                  (implicit context: ActionPipelineContext): Unit = {
 
+    validateSchemaMin(SparkSchema(df.schema), role = "write")
+
+    assert(saveModeOptions.isEmpty, "SaveMode is currently not supported.")
+    assert(temporaryGcsBucket.isDefined, "Only indirect writes are supported. You need to define a temporaryGcsBucket." )
+
+    // TODO: Where do we put this?
+    val hc = context.sparkSession.sparkContext.hadoopConfiguration
+    hc.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
+    hc.set("fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
+
+    df
+      .write
+      .format("bigquery")
+      .options(instanceWriteOptions)
+      .save(table.db.get+"."+table.name)
+  }
+
+  override def factory: FromConfigFactory[DataObject] = BigQueryDataObject
 }
 
 object BigQueryDataObject extends FromConfigFactory[DataObject] {
