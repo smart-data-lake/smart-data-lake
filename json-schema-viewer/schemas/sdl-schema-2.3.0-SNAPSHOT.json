@@ -2029,9 +2029,9 @@
             "type" : "string",
             "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
           },
-          "incrementalOutputColumn" : {
+          "incrementalOutputExpr" : {
             "type" : "string",
-            "description" : "Optional column to use for creating incremental output with DataObjectStateIncrementalMode."
+            "description" : "Optional expression to use for creating incremental output with DataObjectStateIncrementalMode.\nThe expression is used to get the high-water-mark for the incremental update state.\nNormally this can be just a column name, e.g. an id or updated timestamp which is continually increasing."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -4390,13 +4390,13 @@
             "description" : "Configuration for a GenericDfTransformerDef to be applied",
             "oneOf" : [ {
               "type" : "object",
-              "description" : "Apply a column whitelist to a DataFrame.",
+              "description" : "Apply a column blacklist to a DataFrame.",
               "additionalProperties" : false,
-              "required" : [ "columnWhitelist", "type" ],
-              "title" : "WhitelistTransformer",
+              "required" : [ "columnBlacklist", "type" ],
+              "title" : "BlacklistTransformer",
               "properties" : {
                 "type" : {
-                  "const" : "WhitelistTransformer"
+                  "const" : "BlacklistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -4406,9 +4406,9 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnWhitelist" : {
+                "columnBlacklist" : {
                   "type" : "array",
-                  "description" : "List of columns to keep from DataFrame",
+                  "description" : "List of columns to exclude from DataFrame",
                   "items" : {
                     "type" : "string"
                   }
@@ -4939,13 +4939,13 @@
               }
             }, {
               "type" : "object",
-              "description" : "Apply a column blacklist to a DataFrame.",
+              "description" : "Apply a column whitelist to a DataFrame.",
               "additionalProperties" : false,
-              "required" : [ "columnBlacklist", "type" ],
-              "title" : "BlacklistTransformer",
+              "required" : [ "columnWhitelist", "type" ],
+              "title" : "WhitelistTransformer",
               "properties" : {
                 "type" : {
-                  "const" : "BlacklistTransformer"
+                  "const" : "WhitelistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -4955,9 +4955,9 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnBlacklist" : {
+                "columnWhitelist" : {
                   "type" : "array",
-                  "description" : "List of columns to exclude from DataFrame",
+                  "description" : "List of columns to keep from DataFrame",
                   "items" : {
                     "type" : "string"
                   }
