@@ -33,6 +33,7 @@ import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.annotation.DeveloperApi
+import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
@@ -73,7 +74,9 @@ import scala.util.Try
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
  *                                    Default is to expect all partitions to exist.
- * @param incrementalOutputColumn Optional column to use for creating incremental output with DataObjectStateIncrementalMode.
+ * @param incrementalOutputExpr Optional expression to use for creating incremental output with DataObjectStateIncrementalMode.
+ *                              The expression is used to get the high-water-mark for the incremental update state.
+ *                              Normally this can be just a column name, e.g. an id or updated timestamp which is continually increasing.
  */
 case class JdbcTableDataObject(override val id: DataObjectId,
                                createSql: Option[String] = None,
@@ -90,7 +93,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                jdbcOptions: Map[String, String] = Map(),
                                virtualPartitions: Seq[String] = Seq(),
                                override val expectedPartitionsCondition: Option[String] = None,
-                               incrementalOutputColumn: Option[String] = None,
+                               incrementalOutputExpr: Option[String] = None,
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalSparkTableDataObject with CanHandlePartitions with CanEvolveSchema with CanMergeDataFrame with CanCreateIncrementalOutput {
@@ -156,16 +159,15 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       .options(queryOrTable)
       .load()
     incrementalOutputState.foreach { case (lastColumn, lastHighWatermark)  =>
-      assert(incrementalOutputColumn.isDefined)
-      if (lastColumn != incrementalOutputColumn.get) logger.warn(s"($id) incrementalOutputState has different column as incrementalOutputColumn ($lastColumn != ${incrementalOutputColumn.get}")
-      val newDataType = if (SchemaUtil.isSparkCaseSensitive) df.schema.find(_.name == incrementalOutputColumn.get).get.dataType
-      else df.schema.find(_.name.equalsIgnoreCase(incrementalOutputColumn.get)).get.dataType
+      assert(incrementalOutputExpr.isDefined)
+      if (lastColumn != incrementalOutputExpr.get) logger.warn(s"($id) incrementalOutputState has different column as incrementalOutputExpr ($lastColumn != ${incrementalOutputExpr.get}")
+      val newDataType = ExpressionEvaluator.resolveExpression(expr(incrementalOutputExpr.get), df.schema, caseSensitive = false).dataType
       if (context.phase == ExecutionPhase.Exec) {
-        val newHighWatermarkValue = Option(df.agg(max(col(incrementalOutputColumn.get))).head.get(0))
+        val newHighWatermarkValue = Option(df.agg(max(col(incrementalOutputExpr.get))).head.get(0))
           .getOrElse(throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode."))
-        incrementalOutputState = Some((incrementalOutputColumn.get, Some((newHighWatermarkValue.toString, newDataType))))
-        logger.info(s"($id) incremental output selected records with '${incrementalOutputColumn.get} > '${lastHighWatermark.map(_._1).getOrElse("none")}' and <= '${newHighWatermarkValue}'")
-        df = df.where(col(incrementalOutputColumn.get) <= lit(newHighWatermarkValue).cast(newDataType))
+        incrementalOutputState = Some((incrementalOutputExpr.get, Some((newHighWatermarkValue.toString, newDataType))))
+        logger.info(s"($id) incremental output selected records with '${incrementalOutputExpr.get} > '${lastHighWatermark.map(_._1).getOrElse("none")}' and <= '${newHighWatermarkValue}'")
+        df = df.where(col(incrementalOutputExpr.get) <= lit(newHighWatermarkValue).cast(newDataType))
         lastHighWatermark.foreach { case (value, dataType) =>
           if (value == newHighWatermarkValue.toString) {
             throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode. High watermark is $newHighWatermarkValue")
@@ -178,7 +180,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     df.colNamesLowercase
   }
 
-  // Store incremental output state. It is stored as tuple of incrementalOutputColumn, lastHighWatermarkValue, dataType
+  // Store incremental output state. It is stored as tuple of incrementalOutputExpr, lastHighWatermarkValue, dataType
   private var incrementalOutputState: Option[(String,Option[(String,DataType)])] = None
 
   /**
@@ -191,10 +193,10 @@ case class JdbcTableDataObject(override val id: DataObjectId,
           case Array(column, lastHighWatermarkVal, dataType) => (column, Some((lastHighWatermarkVal, DataType.fromDDL(dataType))))
           case Array(column) => (column, None)
         }
-      }.getOrElse(throw new IllegalStateException(s"($id) Cannot parse state '$s' into format <incrementalOutputColumn>;<lastHighWatermark>;<dataType>"))
+      }.getOrElse(throw new IllegalStateException(s"($id) Cannot parse state '$s' into format <incrementalOutputExpr>;<lastHighWatermark>;<dataType>"))
     }.orElse{
-      assert(incrementalOutputColumn.isDefined, s"($id) incrementalOutputColumn must be set to use DataObjectStateIncrementalMode")
-      Some((incrementalOutputColumn.get, None))
+      assert(incrementalOutputExpr.isDefined, s"($id) incrementalOutputExpr must be set to use DataObjectStateIncrementalMode")
+      Some((incrementalOutputExpr.get, None))
     }
   }
   override def getState: Option[String] = {

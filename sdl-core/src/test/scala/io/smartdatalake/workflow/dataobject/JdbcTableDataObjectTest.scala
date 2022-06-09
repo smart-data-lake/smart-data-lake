@@ -250,7 +250,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     // create data object
     instanceRegistry.register(jdbcConnection)
     val targetTable = Table(db = Some("public"), name = "test_inc")
-    val targetDO = JdbcTableDataObject( "jdbcDO1", table = targetTable, connectionId = "jdbcCon1", incrementalOutputColumn = Some("id"), saveMode = SDLSaveMode.Append)
+    val targetDO = JdbcTableDataObject( "jdbcDO1", table = targetTable, connectionId = "jdbcCon1", incrementalOutputExpr = Some("id"), saveMode = SDLSaveMode.Append)
     targetDO.dropTable
 
     // write test data 1
