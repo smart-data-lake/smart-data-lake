@@ -18,33 +18,32 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.sql.Timestamp
-import java.time._
-import java.time.format.DateTimeFormatter
-import java.time.temporal.{ChronoUnit, TemporalAccessor, TemporalQuery}
-import java.util.Properties
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
-import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.KafkaConnection
-import io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
+import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
+import io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType
 import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.spark.sql._
-import org.apache.spark.sql.avro.confluent.SubjectType
-import org.apache.spark.sql.avro.confluent.SubjectType.SubjectType
+import org.apache.spark.sql.confluent.SubjectType
+import org.apache.spark.sql.confluent.SubjectType.SubjectType
 import org.apache.spark.sql.functions.{col, udf}
 import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 import org.apache.spark.sql.types._
 
+import java.sql.Timestamp
+import java.time._
+import java.time.format.DateTimeFormatter
+import java.time.temporal.{ChronoUnit, TemporalAccessor, TemporalQuery}
+import java.util.Properties
 import scala.collection.JavaConverters._
 
 /**
