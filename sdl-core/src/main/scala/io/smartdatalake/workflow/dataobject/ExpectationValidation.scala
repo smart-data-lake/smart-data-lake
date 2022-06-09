@@ -67,20 +67,20 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
     // evaluate expectations using a dummy DataFrame
     val defaultExpressionData = DefaultExpressionData.from(context, Seq())
     val validationResults = expectations.map { expectation =>
-      val value = metrics.get(expectation.name)
+      val value = metrics.getOrElse(expectation.name, throw new IllegalStateException(s"($id) Metric for expectation ${expectation.name} not found for validation"))
       val validationErrorExpression = expectation.getValidationErrorColumn(this.id, value).asInstanceOf[SparkColumn].inner
       val errorMsg = SparkExpressionUtil.evaluate[DefaultExpressionData, String](this.id, Some("expectations"), validationErrorExpression, defaultExpressionData)
       (expectation, errorMsg)
     }.toMap.filter(_._2.nonEmpty).mapValues(_.get) // keep only failed results
     // log all failed results (before throwing exception)
-    validationResults.filterKeys(_.failedSeverity == ExpectationSeverity.Warn)
+    validationResults
       .foreach(result => result._1.failedSeverity match {
         case ExpectationSeverity.Warn => logger.warn(result._2)
         case ExpectationSeverity.Error => logger.error(result._2)
       })
     // throw exception on error
     validationResults.filterKeys(_.failedSeverity == ExpectationSeverity.Error)
-      .foreach(result => ExpectationValidationException(result._2))
+      .foreach(result => throw ExpectationValidationException(result._2))
   }
 
   private def internalSetupConstraintsValidation(df: GenericDataFrame): GenericDataFrame = {
@@ -94,13 +94,14 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
         // else log all columns
         case _ => df.schema.columns
       }
+      def mkStringCol(cols: Seq[String]): GenericColumn = concat(col(cols.head) +: cols.tail.flatMap(c => Seq(lit(","), col(c))):_*)
       // add validation as additional column
-      val validationErrorColumns = constraints.map(_.getValidationErrorColumn(this.id, struct(traceCols.map(col): _*)))
+      val validationErrorColumns = constraints.map(_.getValidationExceptionColumn(this.id, mkStringCol(traceCols)))
       val dfErrors = df
         .withColumn("_validation_errors", array_construct_compact(validationErrorColumns: _*))
       // use column in where condition to avoid elimination by optimizer before dropping the column again.
       dfErrors
-        .where(size(col("_validation_errors")) > lit(-1)) // this is always true - but we want to force evaluating column "_validation_errors"
+        .where(size(col("_validation_errors")) < lit(constraints.size+1)) // this is always true - but we want to force evaluating column "_validation_errors" to throw exceptions
         .drop("_validation_errors")
     } else df
   }
@@ -146,7 +147,7 @@ case class Constraint(name: String, description: Option[String] = None, expressi
     val expressionCol = getExpressionColumn(dataObjectId)
     import functions._
     try {
-      when(not(validationCol), concat(lit(s"Constraint '$name' failed - actual: "), expressionCol, lit(s", expectation: $comparisonOperator $expectation, record: "), traceInfo))
+      when(not(validationCol), concat(lit(s"($dataObjectId) Constraint '$name' failed - actual: "), expressionCol, lit(s", expectation: $comparisonOperator $expectation, record: "), traceInfo))
     } catch {
       case e: Exception => throw new ConfigurationException(s"($dataObjectId) Constraint $name: cannot create validation error column", Some(s"constraints.$name"), e)
     }
@@ -168,7 +169,7 @@ case class Constraint(name: String, description: Option[String] = None, expressi
 case class Expectation(name: String, description: Option[String] = None, aggExpression: String, comparisonOperator: String, expectation: String, scope: ExpectationScope = Job, failedSeverity: ExpectationSeverity = ExpectationSeverity.Error ) {
   def getAggExpressionColumn(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions): GenericColumn = {
     try {
-      functions.expr(aggExpression).as("name")
+      functions.expr(aggExpression).as(name)
     } catch {
       case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse SQL aggExpression '$aggExpression'", Some(s"expectations.$name.aggExpression"), e)
     }

@@ -130,7 +130,7 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
     this.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false, dataFrame = None)
   }
   override def withDataFrame(dataFrame: Option[GenericDataFrame]): SparkSubFeed = this.copy(dataFrame = dataFrame.map(_.asInstanceOf[SparkDataFrame]))
-  override def withObservation(dataFrame: Option[Observation]): SparkSubFeed = this.copy(observation = observation)
+  override def withObservation(observation: Option[Observation]): SparkSubFeed = this.copy(observation = observation)
   override def withPartitionValues(partitionValues: Seq[PartitionValues]): DataFrameSubFeed = this.copy(partitionValues = partitionValues)
   override def asDummy(): SparkSubFeed = this.copy(isDummy = true)
   override def withFilter(partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed = {

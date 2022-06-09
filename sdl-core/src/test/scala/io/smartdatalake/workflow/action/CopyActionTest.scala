@@ -26,9 +26,10 @@ import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTr
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
 import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, ParquetFileDataObject, Table}
+import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.hadoop.fs.Path
+import org.apache.spark.SparkException
 import org.apache.spark.sql.functions.{lit, substring}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -138,7 +139,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     intercept[NoDataToProcessWarning](action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed2)))
   }
 
-  test("copy load with transformation from sql code") {
+  test("copy load with transformation from sql code and constraint and expectation") {
 
     // setup DataObjects
     val feed = "copy"
@@ -147,13 +148,16 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("lastname","firstname")))
-    val tgtDO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable, numInitialHdfsPartitions = 1)
+    val tgtDO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable, numInitialHdfsPartitions = 1,
+      constraints = Seq(Constraint("firstnameNotNull", Some("firstname should be non empty"), "firstname", "is", "not null")),
+      expectations = Seq(Expectation("avgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", ">", "1"))
+    )
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
-    // prepare & start load
+    // prepare & start load with positive constraint and expectation evaluation
     val customTransformerConfig1 = SQLDfTransformer(name = "sql1", code = "select * from copy_input where rating = 5")
-    val customTransformerConfig2 = SQLDfTransformer(name = "sql2", code = "select * from copy_input where rating = 5")
+    val customTransformerConfig2 = SQLDfTransformer(name = "sql2", code = "select * from copy_input where rating = 5") // test multiple transformers - it doesnt matter if they do the same.
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig1, customTransformerConfig2))
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
@@ -166,7 +170,24 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
       .as[String].collect().toSeq
     assert(r1.size == 1) // only one record has rating 5 (see where condition)
     assert(r1.head == "jonson")
+
+    // fail constraint evaluation
+    val tgtDOConstraintFail = HiveTableDataObject( "tgt1constraintFail", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), table = tgtTable,
+      constraints = Seq(Constraint("firstnameNull", Some("firstname should be empty"), "firstname", "is", "null")),
+    )
+    instanceRegistry.register(tgtDOConstraintFail)
+    val actionConstraintFail = CopyAction("ca", srcDO.id, tgtDOConstraintFail.id)
+    intercept[SparkException](actionConstraintFail.exec(Seq(srcSubFeed))(contextExec))
+
+    // fail expectation evaluation
+    val tgtDOExpectationFail = HiveTableDataObject( "tgt1expectationFail", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), table = tgtTable,
+      expectations = Seq(Expectation("avgRatingEq1", Some("avg rating should be 1"), "avg(rating)", "=", "1"))
+    )
+    instanceRegistry.register(tgtDOExpectationFail)
+    val actionExpectationFail = CopyAction("ca", srcDO.id, tgtDOExpectationFail.id)
+    intercept[ExpectationValidationException](actionExpectationFail.exec(Seq(srcSubFeed))(contextExec))
   }
+
 
   // Almost the same as copy load but without any transformation
   test("copy load without transformer (similar to old ingest action)") {
