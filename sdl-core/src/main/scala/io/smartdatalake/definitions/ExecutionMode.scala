@@ -478,7 +478,7 @@ trait CustomPartitionModeLogic {
  */
 case class FileIncrementalMoveMode(archiveSubdirectory: Option[String] = None) extends ExecutionMode {
   assert(archiveSubdirectory.forall(_.nonEmpty))
-  assert(archiveSubdirectory.forall(!_.contains("/")), s"archiveSubdirectory should not contain only one subdirectory name and not nested subdirectory: $archiveSubdirectory")
+  assert(archiveSubdirectory.forall(!_.contains("/")), s"archiveSubdirectory should contain only one subdirectory name and not nested subdirectories: $archiveSubdirectory")
 
   private var sparkFilesObserver: Option[FilesObservation] = None
 

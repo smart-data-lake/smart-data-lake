@@ -22,7 +22,7 @@ import com.typesafe.config.{Config, ConfigException, ConfigValueFactory, ConfigV
 import configs.syntax._
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{PerformanceUtils, ReflectionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataobject.DataObject
@@ -48,16 +48,25 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   def parse(config: Config, instanceRegistry: InstanceRegistry = new InstanceRegistry): InstanceRegistry = {
     implicit val registry: InstanceRegistry = instanceRegistry
 
-    val connections: Map[ConnectionId, Connection] = getConnectionConfigMap(config)
-      .map{ case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config))}
+    val (connections, t1) = PerformanceUtils.measureTime {
+      getConnectionConfigMap(config)
+        .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
+    }
+    logger.debug(s"Parsed ${connections.size} in $t1 seconds")
     registry.register(connections)
 
-    val dataObjects: Map[DataObjectId, DataObject] = getDataObjectConfigMap(config)
-      .map{ case (id, config) => (DataObjectId(id), parseConfigObjectWithId[DataObject](id, config))}
+    val (dataObjects, t2) = PerformanceUtils.measureTime {
+      getDataObjectConfigMap(config)
+        .map { case (id, config) => (DataObjectId(id), parseConfigObjectWithId[DataObject](id, config)) }
+    }
+    logger.debug(s"Parsed ${dataObjects.size} in $t2 seconds")
     registry.register(dataObjects)
 
-    val actions: Map[ActionId, Action] = getActionConfigMap(config)
-      .map{ case (id, config) => (ActionId(id), parseConfigObjectWithId[Action](id, config))}
+    val (actions,t3) = PerformanceUtils.measureTime {
+      getActionConfigMap(config)
+        .map { case (id, config) => (ActionId(id), parseConfigObjectWithId[Action](id, config)) }
+    }
+    logger.debug(s"Parsed ${actions.size} in $t3 seconds")
     registry.register(actions)
 
     registry
