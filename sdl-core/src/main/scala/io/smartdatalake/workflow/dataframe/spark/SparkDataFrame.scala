@@ -242,11 +242,13 @@ trait SparkDataType extends GenericDataType {
   override def makeNullable: SparkDataType
   override def toLowerCase: SparkDataType
   override def removeMetadata: SparkDataType
+  override def isSimpleType: Boolean = false
 }
 case class SparkSimpleDataType(inner: DataType) extends SparkDataType {
   override def makeNullable: SparkDataType = this
   override def toLowerCase: SparkDataType = this
   override def removeMetadata: SparkDataType = this
+  override def isSimpleType: Boolean = true
 }
 case class SparkStructDataType(override val inner: StructType) extends SparkDataType with GenericStructDataType {
   override def makeNullable: SparkDataType = SparkStructDataType(SparkSchema(inner).makeNullable.inner)

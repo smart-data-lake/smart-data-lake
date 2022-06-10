@@ -149,8 +149,8 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(srcDO)
     val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("lastname","firstname")))
     val tgtDO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable, numInitialHdfsPartitions = 1,
-      constraints = Seq(Constraint("firstnameNotNull", Some("firstname should be non empty"), "firstname", "is", "not null")),
-      expectations = Seq(Expectation("avgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", ">", "1"))
+      constraints = Seq(Constraint("firstnameNotNull", Some("firstname should be non empty"), "firstname is not null")),
+      expectations = Seq(Expectation("avgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", Some("> 1")))
     )
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
@@ -173,7 +173,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 
     // fail constraint evaluation
     val tgtDOConstraintFail = HiveTableDataObject( "tgt1constraintFail", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), table = tgtTable,
-      constraints = Seq(Constraint("firstnameNull", Some("firstname should be empty"), "firstname", "is", "null")),
+      constraints = Seq(Constraint("firstnameNull", Some("firstname should be empty"), "firstname is null")),
     )
     instanceRegistry.register(tgtDOConstraintFail)
     val actionConstraintFail = CopyAction("ca", srcDO.id, tgtDOConstraintFail.id)
@@ -181,7 +181,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 
     // fail expectation evaluation
     val tgtDOExpectationFail = HiveTableDataObject( "tgt1expectationFail", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), table = tgtTable,
-      expectations = Seq(Expectation("avgRatingEq1", Some("avg rating should be 1"), "avg(rating)", "=", "1"))
+      expectations = Seq(Expectation("avgRatingEq1", Some("avg rating should be 1"), "avg(rating)", Some("= 1")))
     )
     instanceRegistry.register(tgtDOExpectationFail)
     val actionExpectationFail = CopyAction("ca", srcDO.id, tgtDOExpectationFail.id)

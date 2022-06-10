@@ -261,6 +261,7 @@ trait GenericField extends GenericTypedObject {
  */
 trait GenericDataType extends GenericTypedObject {
   def isSortable: Boolean
+  def isSimpleType: Boolean
   def typeName: String
   def sql: String
   def makeNullable: GenericDataType

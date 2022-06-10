@@ -91,8 +91,8 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
       val traceCols: Seq[String] = this match {
         // use primary key if defined
         case tableDataObject: TableDataObject if tableDataObject.table.primaryKey.isDefined => tableDataObject.table.primaryKey.get
-        // else log all columns
-        case _ => df.schema.columns
+        // else log all columns with simple datatype
+        case _ => df.schema.filter(_.dataType.isSimpleType).columns
       }
       def mkStringCol(cols: Seq[String]): GenericColumn = concat(col(cols.head) +: cols.tail.flatMap(c => Seq(lit(","), col(c))):_*)
       // add validation as additional column
@@ -122,11 +122,12 @@ case class ExpectationValidationException(msg: String) extends Exception(msg)
 /**
  * Definition of row-level constraint to validate.
  *
- * @param expression SQL expression to evaluate on every row.
- * @param comparisonOperator Comparison operator to use for comparison of evaluated expression value against expected value. Default is '='.
- * @param expectation SQL literal to define expected value for validation. Default is true.
+ * @param name name of the constraint
+ * @param description optional detailed description of the constraint
+ * @param expression SQL expression to evaluate on every row. The expressions return value should be a boolean.
+ *                   If it evaluates to true the constraint is validated successfully, otherwise it will throw an exception.
  */
-case class Constraint(name: String, description: Option[String] = None, expression: String, comparisonOperator: String = "=", expectation: String = "true") {
+case class Constraint(name: String, description: Option[String] = None, expression: String) {
   def getExpressionColumn(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions): GenericColumn = {
     try {
       functions.expr(expression)
@@ -134,39 +135,38 @@ case class Constraint(name: String, description: Option[String] = None, expressi
       case e: Exception => throw new ConfigurationException(s"($dataObjectId) Constraint $name: cannot parse SQL expression '$expression'", Some(s"constraints.$name.expression"), e)
     }
   }
-  def getValidationColumn(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions): GenericColumn = {
-    val validationExpr = s"$expression $comparisonOperator $expectation"
-    try {
-      functions.expr(validationExpr)
-    } catch {
-      case e: Exception => throw new ConfigurationException(s"($dataObjectId) Constraint $name: cannot parse validation expression '$validationExpr'", Some(s"constraints.$name"), e)
-    }
-  }
   def getValidationErrorColumn(dataObjectId: DataObjectId, traceInfo: GenericColumn)(implicit functions: DataFrameFunctions): GenericColumn = {
-    val validationCol = getValidationColumn(dataObjectId)
     val expressionCol = getExpressionColumn(dataObjectId)
     import functions._
     try {
-      when(not(validationCol), concat(lit(s"($dataObjectId) Constraint '$name' failed - actual: "), expressionCol, lit(s", expectation: $comparisonOperator $expectation, record: "), traceInfo))
+      when(not(expressionCol), concat(lit(s"($dataObjectId) Constraint '$name' failed - actual: "), expressionCol, lit(", record: "), traceInfo))
     } catch {
       case e: Exception => throw new ConfigurationException(s"($dataObjectId) Constraint $name: cannot create validation error column", Some(s"constraints.$name"), e)
     }
   }
   def getValidationExceptionColumn(dataObjectId: DataObjectId, traceInfo: GenericColumn)(implicit functions: DataFrameFunctions): GenericColumn = {
     import functions._
-    when(not(getValidationColumn(dataObjectId)), raise_error(getValidationErrorColumn(dataObjectId, traceInfo)))
+    when(not(getExpressionColumn(dataObjectId)), raise_error(getValidationErrorColumn(dataObjectId, traceInfo)))
   }
 }
 
 /**
  * Definition of expectation to evaluate on dataset-level.
  *
+ * @param name name of the expectation
+ * @param description optional detailed description of the constraint
  * @param aggExpression SQL aggregate expression to evaluate on dataset, e.g. count(*).
- * @param comparisonOperator Comparison operator to use for comparison of evaluated aggregate expression value against expected value.
- * @param expectation SQL literal to define expected value for validation.
+ * @param expectation Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0".
+ *                    Together with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.
+ *                    If no expectation is defined, the aggExpression evaluation result is just recorded in metrics.
  * @param scope The aggregation scope used to evaluate the aggregate expression.
+ *              Default is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.
+ *              Other options are 'All' and 'JobPartitions', which are implemented by reading the output data again.
+ * @param failedSeverity Severity if expectation fails - can be Error (default) or Warn.
+ *                       If set to Error, execution will fail, otherwise there will be just a warning logged.
  */
-case class Expectation(name: String, description: Option[String] = None, aggExpression: String, comparisonOperator: String, expectation: String, scope: ExpectationScope = Job, failedSeverity: ExpectationSeverity = ExpectationSeverity.Error ) {
+// TODO: how to implement primary-key check?
+case class Expectation(name: String, description: Option[String] = None, aggExpression: String, expectation: Option[String] = None, scope: ExpectationScope = Job, failedSeverity: ExpectationSeverity = ExpectationSeverity.Error ) {
   def getAggExpressionColumn(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions): GenericColumn = {
     try {
       functions.expr(aggExpression).as(name)
@@ -174,25 +174,28 @@ case class Expectation(name: String, description: Option[String] = None, aggExpr
       case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse SQL aggExpression '$aggExpression'", Some(s"expectations.$name.aggExpression"), e)
     }
   }
-  def getValidationColumn(dataObjectId: DataObjectId, value: Any)(implicit functions: DataFrameFunctions): GenericColumn = {
-    val valueStr = value match {
-      case str: String => s"'$str'"
-      case x => x.toString
-    }
-    val validationExpr = s"$valueStr $comparisonOperator $expectation"
-    try {
-      functions.expr(validationExpr)
-    } catch {
-      case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse validation expression '$validationExpr'", Some(s"expectations.$name"), e)
+  def getValidationColumn(dataObjectId: DataObjectId, value: Any)(implicit functions: DataFrameFunctions): Option[GenericColumn] = {
+    expectation.map { expectationStr =>
+      val valueStr = value match {
+        case str: String => s"'$str'"
+        case x => x.toString
+      }
+      val validationExpr = s"$valueStr $expectationStr"
+      try {
+        functions.expr(validationExpr)
+      } catch {
+        case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse validation expression '$validationExpr'", Some(s"expectations.$name"), e)
+      }
     }
   }
-  def getValidationErrorColumn(dataObjectId: DataObjectId, value: Any)(implicit functions: DataFrameFunctions): GenericColumn = {
-    val validationCol = getValidationColumn(dataObjectId, value)
-    import functions._
-    try {
-      when(not(validationCol), lit(s"Expectation '$name' failed - actual: $value, expectation: $comparisonOperator $expectation"))
-    } catch {
-      case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot create validation error column", Some(s"expectations.$name"), e)
+  def getValidationErrorColumn(dataObjectId: DataObjectId, value: Any)(implicit functions: DataFrameFunctions): Option[GenericColumn] = {
+    getValidationColumn(dataObjectId, value).map { validationCol =>
+      import functions._
+      try {
+        when(not(validationCol), lit(s"Expectation '$name' failed - actual: $value, expectation: ${expectation.get}"))
+      } catch {
+        case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot create validation error column", Some(s"expectations.$name"), e)
+      }
     }
   }
 }
