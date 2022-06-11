@@ -209,7 +209,7 @@ object SQLCountPctExpectation extends FromConfigFactory[Expectation] {
  * @param expectation Optional SQL comparison operator and literal to define expected value for validation, e.g. '> 100000".
  *                    If no expectation is defined, the result value is is just recorded in metrics.
  */
-case class CountAvgPerPartition(override val name: String, override val description: Option[String] = None, expectation: Option[String] = None, override val failedSeverity: ExpectationSeverity = ExpectationSeverity.Error )
+case class CountAvgPerPartitionExpectation(override val name: String, override val description: Option[String] = None, expectation: Option[String] = None, override val failedSeverity: ExpectationSeverity = ExpectationSeverity.Error )
   extends Expectation {
   override val scope: ExpectationScope = ExpectationScope.Job
   def getAggExpressionColumns(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions): Seq[GenericColumn] = Seq() // no special aggregate needed as count is calculated by default
@@ -242,12 +242,12 @@ case class CountAvgPerPartition(override val name: String, override val descript
       None
     }
   }
-  override def factory: FromConfigFactory[Expectation] = CountAvgPerPartition
+  override def factory: FromConfigFactory[Expectation] = CountAvgPerPartitionExpectation
 }
 
-object CountAvgPerPartition extends FromConfigFactory[Expectation] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CountAvgPerPartition = {
-    extract[CountAvgPerPartition](config)
+object CountAvgPerPartitionExpectation extends FromConfigFactory[Expectation] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CountAvgPerPartitionExpectation = {
+    extract[CountAvgPerPartitionExpectation](config)
   }
 }
 
