@@ -87,16 +87,12 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
     if (constraints.nonEmpty) {
       implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
       import functions._
-      // determine columns to log for identifying records
-      val traceCols: Seq[String] = this match {
-        // use primary key if defined
-        case tableDataObject: TableDataObject if tableDataObject.table.primaryKey.isDefined => tableDataObject.table.primaryKey.get
-        // else log all columns with simple datatype
-        case _ => df.schema.filter(_.dataType.isSimpleType).columns
-      }
-      def mkStringCol(cols: Seq[String]): GenericColumn = concat(col(cols.head) +: cols.tail.flatMap(c => Seq(lit(","), col(c))):_*)
+      // use primary key if defined
+      val pkCols = Some(this).collect{case tdo: TableDataObject => tdo}.flatMap(_.table.primaryKey)
+      // as alternative search all columns with simple datatype
+      val dfSimpleCols = df.schema.filter(_.dataType.isSimpleType).columns
       // add validation as additional column
-      val validationErrorColumns = constraints.map(_.getValidationExceptionColumn(this.id, mkStringCol(traceCols)))
+      val validationErrorColumns = constraints.map(_.getValidationExceptionColumn(this.id, pkCols, dfSimpleCols))
       val dfErrors = df
         .withColumn("_validation_errors", array_construct_compact(validationErrorColumns: _*))
       // use column in where condition to avoid elimination by optimizer before dropping the column again.
@@ -126,8 +122,11 @@ case class ExpectationValidationException(msg: String) extends Exception(msg)
  * @param description optional detailed description of the constraint
  * @param expression SQL expression to evaluate on every row. The expressions return value should be a boolean.
  *                   If it evaluates to true the constraint is validated successfully, otherwise it will throw an exception.
+ * @param errorMsgCols Optional list of column names to add to error message.
+ *                     Note that primary key colums are always included.
+ *                     If there is no primary key defined, by default all columns with simple datatype are included in the error message.
  */
-case class Constraint(name: String, description: Option[String] = None, expression: String) {
+case class Constraint(name: String, description: Option[String] = None, expression: String, errorMsgCols: Seq[String] = Seq()) {
   def getExpressionColumn(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions): GenericColumn = {
     try {
       functions.expr(expression)
@@ -135,18 +134,23 @@ case class Constraint(name: String, description: Option[String] = None, expressi
       case e: Exception => throw new ConfigurationException(s"($dataObjectId) Constraint $name: cannot parse SQL expression '$expression'", Some(s"constraints.$name.expression"), e)
     }
   }
-  def getValidationErrorColumn(dataObjectId: DataObjectId, traceInfo: GenericColumn)(implicit functions: DataFrameFunctions): GenericColumn = {
+  def getValidationErrorColumn(dataObjectId: DataObjectId, pkColNames: Option[Seq[String]], simpleTypeColNames: Seq[String])(implicit functions: DataFrameFunctions): GenericColumn = {
     val expressionCol = getExpressionColumn(dataObjectId)
     import functions._
     try {
-      when(not(expressionCol), concat(lit(s"($dataObjectId) Constraint '$name' failed - actual: "), expressionCol, lit(", record: "), traceInfo))
+      val traceColNames = pkColNames.map(_ ++ errorMsgCols)
+        .orElse(if(errorMsgCols.nonEmpty) Some(errorMsgCols) else None)
+        .getOrElse(simpleTypeColNames)
+      def mkString(cols: Seq[GenericColumn]): GenericColumn = concat(cols.head.cast(stringType) +: cols.tail.flatMap(c => Seq(lit(" "), c.cast(stringType))):_*)
+      val traceCol = mkString(traceColNames.map(c => concat(lit(s"$c="), col(c))))
+      when(not(expressionCol), concat(lit(s"($dataObjectId) Constraint '$name' failed - actual: "), expressionCol, lit(", record: "), traceCol))
     } catch {
       case e: Exception => throw new ConfigurationException(s"($dataObjectId) Constraint $name: cannot create validation error column", Some(s"constraints.$name"), e)
     }
   }
-  def getValidationExceptionColumn(dataObjectId: DataObjectId, traceInfo: GenericColumn)(implicit functions: DataFrameFunctions): GenericColumn = {
+  def getValidationExceptionColumn(dataObjectId: DataObjectId, pkCols: Option[Seq[String]], simpleTypeCols: Seq[String])(implicit functions: DataFrameFunctions): GenericColumn = {
     import functions._
-    when(not(getExpressionColumn(dataObjectId)), raise_error(getValidationErrorColumn(dataObjectId, traceInfo)))
+    when(not(getExpressionColumn(dataObjectId)), raise_error(getValidationErrorColumn(dataObjectId, pkCols, simpleTypeCols)))
   }
 }
 
