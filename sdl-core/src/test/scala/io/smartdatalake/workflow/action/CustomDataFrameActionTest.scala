@@ -19,7 +19,6 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.{Condition, PartitionDiffMode}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskSkippedDontStopWarning
@@ -303,6 +302,11 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     srcDO2.dropTable
     instanceRegistry.register(srcDO2)
 
+    val intTable1 = Table(Some("default"), "copy_int_1", None, Some(Seq("lastname","firstname")))
+    val intDO1 = HiveTableDataObject( "int1", Some(tempPath+s"/${intTable1.fullName}"), Seq("lastname"), analyzeTableAfterWrite=true, table = intTable1, numInitialHdfsPartitions = 1)
+    intDO1.dropTable
+    instanceRegistry.register(intDO1)
+
     val tgtTable1 = Table(Some("default"), "copy_output_1", None, Some(Seq("lastname","firstname")))
     val tgtDO1 = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable1.fullName}"), Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable1, numInitialHdfsPartitions = 1)
     tgtDO1.dropTable
@@ -315,9 +319,10 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start load
     // note that src2 is passed on to customTransformerConfig2, even if it's not re-defined in customTransformerConfig1
-    val customTransformerConfig1 = SQLDfsTransformer(code = Map("int1" -> "select * from src1 where rating = 5"))
+    // note that intermediate dataframe int1 is used as output, and tgt1 is a transformer output but not used as action output
+    val customTransformerConfig1 = SQLDfsTransformer(code = Map(intDO1.id.id -> "select * from src1 where rating = 5"))
     val customTransformerConfig2 = SQLDfsTransformer(code = Map(tgtDO1.id.id -> "select * from int1", tgtDO2.id.id -> "select * from src2 where rating = 3"))
-    val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id,tgtDO2.id), transformers = Seq(customTransformerConfig1,customTransformerConfig2))
+    val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(intDO1.id, tgtDO2.id), transformers = Seq(customTransformerConfig1,customTransformerConfig2))
     instanceRegistry.register(action1)
     val l = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO1.writeSparkDataFrame(l, Seq())
@@ -325,7 +330,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     val srcSubFeeds = Seq(SparkSubFeed(None, "src1", Seq()),SparkSubFeed(None, "src2", Seq()))
     val tgtSubFeed = action1.exec(srcSubFeeds)(contextExec).head
 
-    val r1 = session.table(s"${tgtTable1.fullName}")
+    val r1 = session.table(s"${intTable1.fullName}")
       .select($"lastname")
       .as[String].collect().toSeq
     assert(r1.size == 1) // only one record has rating 5 (see where condition)

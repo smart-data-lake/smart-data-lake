@@ -25,7 +25,6 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.metrics.{SparkStageMetricsListener, SparkStreamingQueryListener}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ScalaUtil
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.util.spark.DummyStreamProvider
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
@@ -348,18 +347,16 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
    */
   protected def applyTransformers(transformers: Seq[GenericDfsTransformerDef], inputPartitionValues: Seq[PartitionValues], inputSubFeeds: Seq[DataFrameSubFeed], outputSubFeeds: Seq[DataFrameSubFeed])(implicit context: ActionPipelineContext): Seq[DataFrameSubFeed] = {
     val inputDfsMap = inputSubFeeds.map(subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap
-    val (_, _, outputDfsMap) = transformers.foldLeft((inputDfsMap,inputPartitionValues,Map[String,GenericDataFrame]())){
-      case ((inputDfsMap, inputPartitionValues, _), transformer) =>
+    val (outputDfsMap, _) = transformers.foldLeft((inputDfsMap,inputPartitionValues)){
+      case ((inputDfsMap, inputPartitionValues), transformer) =>
         val (outputDfsMap, outputPartitionValues) = transformer.applyTransformation(id, inputPartitionValues, inputDfsMap)
-        (inputDfsMap ++ outputDfsMap, outputPartitionValues, outputDfsMap)
+        (inputDfsMap ++ outputDfsMap, outputPartitionValues)
     }
     // create output subfeeds from transformed dataframes
-    outputDfsMap.map {
-      case (dataObjectId, dataFrame) =>
-        val outputSubFeed = outputSubFeeds.find(_.dataObjectId.id == dataObjectId)
-          .getOrElse(throw ConfigurationException(s"($id) No output found for result ${dataObjectId}. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
-        outputSubFeed.withDataFrame(Some(dataFrame))
-    }.toSeq
+    outputSubFeeds.map { subFeed=>
+        val df = outputDfsMap.getOrElse(subFeed.dataObjectId.id, throw ConfigurationException(s"($id) No result found for output ${subFeed.dataObjectId}. Available tesults are ${outputDfsMap.keys.mkString(", ")}."))
+        subFeed.withDataFrame(Some(df))
+    }
   }
 
   /**
