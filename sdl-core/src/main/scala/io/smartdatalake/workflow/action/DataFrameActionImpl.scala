@@ -282,7 +282,7 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
     output match {
       case evDataObject: DataObject with ExpectationValidation =>
         val expectationMetrics = subFeed.observation.map(_.waitFor()).getOrElse(Map())
-        evDataObject.validateExpectations(expectationMetrics)
+        evDataObject.validateExpectations(expectationMetrics, subFeed.partitionValues)
         // TODO: return metrics
         WriteSubFeedResult(noData)
       case _ =>

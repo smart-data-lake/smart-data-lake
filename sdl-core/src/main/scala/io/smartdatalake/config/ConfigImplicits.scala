@@ -28,6 +28,7 @@ import io.smartdatalake.workflow.action.script.ParsableScriptDef
 import io.smartdatalake.workflow.action.spark.customlogic._
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.dataobject.Expectation
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
 
@@ -136,5 +137,14 @@ trait ConfigImplicits {
   implicit val scriptDefReader: ConfigReader[ParsableScriptDef] = ConfigReader.fromTry { (c, p) =>
     implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
     ConfigParser.parseConfigObject[ParsableScriptDef](c.getConfig(p))
+  }
+
+  /**
+   * A reader that reads [[Expectation]] values.
+   * Note that Expectation must be parsed according to it's 'type' attribute by using SDL ConfigParser.
+   */
+  implicit val expectationReader: ConfigReader[Expectation] = ConfigReader.fromTry { (c, p) =>
+    implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
+    ConfigParser.parseConfigObject[Expectation](c.getConfig(p))
   }
 }

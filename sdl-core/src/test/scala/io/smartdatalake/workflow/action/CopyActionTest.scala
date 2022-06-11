@@ -150,7 +150,10 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("lastname","firstname")))
     val tgtDO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable, numInitialHdfsPartitions = 1,
       constraints = Seq(Constraint("firstnameNotNull", Some("firstname should be non empty"), "firstname is not null")),
-      expectations = Seq(Expectation("avgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", Some("> 1")))
+      expectations = Seq(
+        SQLExpectation("avgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", Some("> 1")),
+        SQLCountPctExpectation("pctBob", conditionExpression = "firstname = 'bob'", expectation = Some("= 0")) // because we only select Rob and not Bob...
+      )
     )
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
@@ -171,6 +174,8 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(r1.size == 1) // only one record has rating 5 (see where condition)
     assert(r1.head == "jonson")
 
+    //TODO check expectation value in metrics
+
     // fail constraint evaluation
     val tgtDOConstraintFail = HiveTableDataObject( "tgt1constraintFail", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), table = tgtTable,
       constraints = Seq(Constraint("firstnameNull", Some("firstname should be empty"), "firstname is null")),
@@ -181,7 +186,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 
     // fail expectation evaluation
     val tgtDOExpectationFail = HiveTableDataObject( "tgt1expectationFail", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), table = tgtTable,
-      expectations = Seq(Expectation("avgRatingEq1", Some("avg rating should be 1"), "avg(rating)", Some("= 1")))
+      expectations = Seq(SQLExpectation("avgRatingEq1", Some("avg rating should be 1"), "avg(rating)", Some("= 1")))
     )
     instanceRegistry.register(tgtDOExpectationFail)
     val actionExpectationFail = CopyAction("ca", srcDO.id, tgtDOExpectationFail.id)

@@ -19,14 +19,11 @@
 
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkSubFeed}
-import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn, GenericDataFrame, Observation}
-import io.smartdatalake.workflow.dataobject.ExpectationScope.{ExpectationScope, Job}
-import io.smartdatalake.workflow.dataobject.ExpectationSeverity.ExpectationSeverity
+import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame, Observation}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase}
 
 import java.util.UUID
@@ -53,6 +50,9 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
    * By default their result is logged with level info (ok) and error (failed), but this can be customized to be logged as warning.
    * In case of failed expectations logged as error, an exceptions is thrown and further processing is stopped.
    * Note that the exception is thrown after writing to the DataObject is finished.
+   *
+   * The following expectations names are reserved to create default metrics and should not be used:
+   * - count
    */
   def expectations: Seq[Expectation]
 
@@ -61,16 +61,20 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
     internalSetupExpectations(dfConstraints, context.phase == ExecutionPhase.Exec)
   }
 
-  def validateExpectations(metrics: Map[String, _])(implicit context: ActionPipelineContext): Unit = {
+  private val defaultExpectations = Seq(SQLExpectation(name = "count", aggExpression = "count(*)" ))
+
+  def validateExpectations(metrics: Map[String, _], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     // the evaluation of expectations is made with Spark expression
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(typeOf[SparkSubFeed])
     // evaluate expectations using a dummy DataFrame
     val defaultExpressionData = DefaultExpressionData.from(context, Seq())
-    val validationResults = expectations.map { expectation =>
-      val value = metrics.getOrElse(expectation.name, throw new IllegalStateException(s"($id) Metric for expectation ${expectation.name} not found for validation"))
-      val validationErrorExpression = expectation.getValidationErrorColumn(this.id, value).asInstanceOf[SparkColumn].inner
-      val errorMsg = SparkExpressionUtil.evaluate[DefaultExpressionData, String](this.id, Some("expectations"), validationErrorExpression, defaultExpressionData)
-      (expectation, errorMsg)
+    val validationResults = expectations.flatMap { expectation =>
+      expectation.getValidationErrorColumn(this.id, metrics, partitionValues)
+        .map { col =>
+          val sparkCol = col.asInstanceOf[SparkColumn].inner
+          val errorMsg = SparkExpressionUtil.evaluate[DefaultExpressionData, String](this.id, Some("expectations"), sparkCol, defaultExpressionData)
+          (expectation, errorMsg)
+        }
     }.toMap.filter(_._2.nonEmpty).mapValues(_.get) // keep only failed results
     // log all failed results (before throwing exception)
     validationResults
@@ -105,140 +109,9 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
   private def internalSetupExpectations(df: GenericDataFrame, isExecPhase: Boolean): (GenericDataFrame, Option[Observation]) = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
     if (expectations.nonEmpty) {
-      val expectationColumns = expectations.map(_.getAggExpressionColumn(this.id))
+      val expectationColumns = (defaultExpectations ++ expectations).flatMap(_.getAggExpressionColumns(this.id))
       val (dfObserved, observation) = df.setupObservation(this.id + "-" + UUID.randomUUID(), expectationColumns, isExecPhase)
       (dfObserved, Some(observation))
     } else (df, None)
   }
-}
-
-case class ConstraintValidationException(msg: String) extends Exception(msg)
-case class ExpectationValidationException(msg: String) extends Exception(msg)
-
-/**
- * Definition of row-level constraint to validate.
- *
- * @param name name of the constraint
- * @param description optional detailed description of the constraint
- * @param expression SQL expression to evaluate on every row. The expressions return value should be a boolean.
- *                   If it evaluates to true the constraint is validated successfully, otherwise it will throw an exception.
- * @param errorMsgCols Optional list of column names to add to error message.
- *                     Note that primary key colums are always included.
- *                     If there is no primary key defined, by default all columns with simple datatype are included in the error message.
- */
-case class Constraint(name: String, description: Option[String] = None, expression: String, errorMsgCols: Seq[String] = Seq()) {
-  def getExpressionColumn(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions): GenericColumn = {
-    try {
-      functions.expr(expression)
-    } catch {
-      case e: Exception => throw new ConfigurationException(s"($dataObjectId) Constraint $name: cannot parse SQL expression '$expression'", Some(s"constraints.$name.expression"), e)
-    }
-  }
-  def getValidationErrorColumn(dataObjectId: DataObjectId, pkColNames: Option[Seq[String]], simpleTypeColNames: Seq[String])(implicit functions: DataFrameFunctions): GenericColumn = {
-    val expressionCol = getExpressionColumn(dataObjectId)
-    import functions._
-    try {
-      val traceColNames = pkColNames.map(_ ++ errorMsgCols)
-        .orElse(if(errorMsgCols.nonEmpty) Some(errorMsgCols) else None)
-        .getOrElse(simpleTypeColNames)
-      def mkString(cols: Seq[GenericColumn]): GenericColumn = concat(cols.head.cast(stringType) +: cols.tail.flatMap(c => Seq(lit(" "), c.cast(stringType))):_*)
-      val traceCol = mkString(traceColNames.map(c => concat(lit(s"$c="), col(c))))
-      when(not(expressionCol), concat(lit(s"($dataObjectId) Constraint '$name' failed - actual: "), expressionCol, lit(", record: "), traceCol))
-    } catch {
-      case e: Exception => throw new ConfigurationException(s"($dataObjectId) Constraint $name: cannot create validation error column", Some(s"constraints.$name"), e)
-    }
-  }
-  def getValidationExceptionColumn(dataObjectId: DataObjectId, pkCols: Option[Seq[String]], simpleTypeCols: Seq[String])(implicit functions: DataFrameFunctions): GenericColumn = {
-    import functions._
-    when(not(getExpressionColumn(dataObjectId)), raise_error(getValidationErrorColumn(dataObjectId, pkCols, simpleTypeCols)))
-  }
-}
-
-/**
- * Definition of expectation to evaluate on dataset-level.
- *
- * @param name name of the expectation
- * @param description optional detailed description of the constraint
- * @param aggExpression SQL aggregate expression to evaluate on dataset, e.g. count(*).
- * @param expectation Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0".
- *                    Together with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.
- *                    If no expectation is defined, the aggExpression evaluation result is just recorded in metrics.
- * @param scope The aggregation scope used to evaluate the aggregate expression.
- *              Default is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.
- *              Other options are 'All' and 'JobPartitions', which are implemented by reading the output data again.
- * @param failedSeverity Severity if expectation fails - can be Error (default) or Warn.
- *                       If set to Error, execution will fail, otherwise there will be just a warning logged.
- */
-// TODO: how to implement primary-key check?
-case class Expectation(name: String, description: Option[String] = None, aggExpression: String, expectation: Option[String] = None, scope: ExpectationScope = Job, failedSeverity: ExpectationSeverity = ExpectationSeverity.Error ) {
-  def getAggExpressionColumn(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions): GenericColumn = {
-    try {
-      functions.expr(aggExpression).as(name)
-    } catch {
-      case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse SQL aggExpression '$aggExpression'", Some(s"expectations.$name.aggExpression"), e)
-    }
-  }
-  def getValidationColumn(dataObjectId: DataObjectId, value: Any)(implicit functions: DataFrameFunctions): Option[GenericColumn] = {
-    expectation.map { expectationStr =>
-      val valueStr = value match {
-        case str: String => s"'$str'"
-        case x => x.toString
-      }
-      val validationExpr = s"$valueStr $expectationStr"
-      try {
-        functions.expr(validationExpr)
-      } catch {
-        case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse validation expression '$validationExpr'", Some(s"expectations.$name"), e)
-      }
-    }
-  }
-  def getValidationErrorColumn(dataObjectId: DataObjectId, value: Any)(implicit functions: DataFrameFunctions): Option[GenericColumn] = {
-    getValidationColumn(dataObjectId, value).map { validationCol =>
-      import functions._
-      try {
-        when(not(validationCol), lit(s"Expectation '$name' failed - actual: $value, expectation: ${expectation.get}"))
-      } catch {
-        case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot create validation error column", Some(s"expectations.$name"), e)
-      }
-    }
-  }
-}
-
-
-/**
- * Definition of aggregation scope used to evaluate an expectations aggregate expression.
- */
-// TODO: implement different scopes...
-object ExpectationScope extends Enumeration {
-  type ExpectationScope = Value
-
-  /**
-   * Expectation is evaluated against dataset written to DataObject by the current job.
-   * For Spark this can be implemented using Observations, which does not cost performance.
-   */
-  val Job: Value = Value("Job")
-
-  /**
-   * Expectation is evaluated against dataset written to DataObject by the current job, grouped by the partitions processed.
-   */
-  val JobPartition: Value = Value("JobPartition")
-
-  /**
-   * Expectation is evaluated against all data in DataObject.
-   */
-  val All: Value = Value("All")
-}
-
-object ExpectationSeverity extends Enumeration {
-  type ExpectationSeverity = Value
-
-  /**
-   * Failure of expectation is treated as error.
-   */
-  val Error: Value = Value("Error")
-
-  /**
-   * Failure of expectation is treated as warning.
-   */
-  val Warn: Value = Value("Warn")
 }
