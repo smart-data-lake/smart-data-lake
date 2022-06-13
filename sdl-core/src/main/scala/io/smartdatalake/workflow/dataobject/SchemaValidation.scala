@@ -82,7 +82,7 @@ private[smartdatalake] trait SchemaValidation { this: DataObject =>
            |- missingCols=${missingCols.map(_.columns).getOrElse(Seq()).mkString(", ")}
            |- superfluousCols=${superfluousCols.map(_.columns).getOrElse(Seq()).mkString(", ")}
            |- schemaExpected: ${schemaExpected.sql}
-           |- schema: ${schema.sql.mkString(", ")}""".stripMargin)
+           |- schema: ${schema.sql}""".stripMargin)
     }
   }
 }
