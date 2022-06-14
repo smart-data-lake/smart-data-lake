@@ -158,21 +158,21 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       .options(connection.getAuthModeSparkOptions)
       .options(queryOrTable)
       .load()
-    incrementalOutputState.foreach { case (lastColumn, lastHighWatermark)  =>
+    incrementalOutputState.foreach { case (lastExpr, lastHighWatermark)  =>
       assert(incrementalOutputExpr.isDefined)
-      if (lastColumn != incrementalOutputExpr.get) logger.warn(s"($id) incrementalOutputState has different column as incrementalOutputExpr ($lastColumn != ${incrementalOutputExpr.get}")
+      if (lastExpr != incrementalOutputExpr.get) logger.warn(s"($id) incrementalOutputState has different column as incrementalOutputExpr ($lastExpr != ${incrementalOutputExpr.get}")
       val newDataType = ExpressionEvaluator.resolveExpression(expr(incrementalOutputExpr.get), df.schema, caseSensitive = false).dataType
       if (context.phase == ExecutionPhase.Exec) {
-        val newHighWatermarkValue = Option(df.agg(max(col(incrementalOutputExpr.get))).head.get(0))
+        val newHighWatermarkValue = Option(df.agg(max(expr(incrementalOutputExpr.get))).head.get(0))
           .getOrElse(throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode."))
         incrementalOutputState = Some((incrementalOutputExpr.get, Some((newHighWatermarkValue.toString, newDataType))))
         logger.info(s"($id) incremental output selected records with '${incrementalOutputExpr.get} > '${lastHighWatermark.map(_._1).getOrElse("none")}' and <= '${newHighWatermarkValue}'")
-        df = df.where(col(incrementalOutputExpr.get) <= lit(newHighWatermarkValue).cast(newDataType))
+        df = df.where(expr(incrementalOutputExpr.get) <= lit(newHighWatermarkValue).cast(newDataType))
         lastHighWatermark.foreach { case (value, dataType) =>
           if (value == newHighWatermarkValue.toString) {
             throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode. High watermark is $newHighWatermarkValue")
           }
-          df = df.where(col(lastColumn) > lit(value).cast(dataType))
+          df = df.where(expr(lastExpr) > lit(value).cast(dataType))
         }
       }
     }
