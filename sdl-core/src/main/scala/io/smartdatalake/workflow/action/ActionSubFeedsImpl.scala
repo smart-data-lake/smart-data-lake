@@ -79,10 +79,12 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
 
   def prepareInputSubFeeds(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): (Seq[S],Seq[S]) = {
     val mainInput = getMainInput(subFeeds)
-    // convert subfeeds to SparkSubFeed type or initialize if not yet existing
-    var inputSubFeeds: Seq[S] = subFeeds.map( subFeed =>
-      updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeedConverter.fromSubFeed(subFeed))
-    )
+    val mainSubFeed = subFeeds.find(_.dataObjectId == mainInput.id).get
+    // convert subfeeds to this Actions SubFeed type or initialize if not yet existing
+    var inputSubFeeds: Seq[S] = subFeeds.map { subFeed =>
+      val partitionValues = if (mainSubFeed.partitionValues.nonEmpty) Some(mainSubFeed.partitionValues) else None
+      updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeedConverter.fromSubFeed(subFeed), partitionValues)
+    }
     val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id).get
     // create output subfeeds with transformed partition values from main input
     var outputSubFeeds: Seq[S] = outputs.map(output =>
@@ -215,11 +217,11 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
    * Updates the partition values of a SubFeed to the partition columns of the given input data object:
    * - remove not existing columns from the partition values
    */
-  private def updateInputPartitionValues(dataObject: DataObject, subFeed: S)(implicit context: ActionPipelineContext): S = {
+  private def updateInputPartitionValues(dataObject: DataObject, subFeed: S, partitionValues: Option[Seq[PartitionValues]] = None)(implicit context: ActionPipelineContext): S = {
     dataObject match {
       case partitionedDO: CanHandlePartitions =>
         // remove superfluous partitionValues
-        subFeed.updatePartitionValues(partitionedDO.partitions, newPartitionValues = Some(subFeed.partitionValues)).asInstanceOf[S]
+        subFeed.updatePartitionValues(partitionedDO.partitions, newPartitionValues = partitionValues).asInstanceOf[S]
       case _ =>
         subFeed.clearPartitionValues().asInstanceOf[S]
     }
