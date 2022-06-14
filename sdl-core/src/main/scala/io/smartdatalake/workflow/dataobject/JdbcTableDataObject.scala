@@ -159,7 +159,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       .options(queryOrTable)
       .load()
     incrementalOutputState.foreach { case (lastExpr, lastHighWatermark)  =>
-      assert(incrementalOutputExpr.isDefined)
+      assert(incrementalOutputExpr.isDefined, s"($id) incrementalOutputExpr must be set to use DataObjectStateIncrementalMode")
       if (lastExpr != incrementalOutputExpr.get) logger.warn(s"($id) incrementalOutputState has different column as incrementalOutputExpr ($lastExpr != ${incrementalOutputExpr.get}")
       val newDataType = ExpressionEvaluator.resolveExpression(expr(incrementalOutputExpr.get), df.schema, caseSensitive = false).dataType
       if (context.phase == ExecutionPhase.Exec) {
