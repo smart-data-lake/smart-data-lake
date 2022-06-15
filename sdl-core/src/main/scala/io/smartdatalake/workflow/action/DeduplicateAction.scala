@@ -26,8 +26,8 @@ import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfTransformerDef, SparkDfTransformerFunctionWrapper}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanMergeDataFrame, DataObject, TransactionalSparkTableDataObject}
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanMergeDataFrame, DataObject, TransactionalSparkTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
@@ -114,6 +114,9 @@ case class DeduplicateAction(override val id: ActionId,
   override val recursiveInputs: Seq[TransactionalSparkTableDataObject] = if (!mergeModeEnable) Seq(output) else Seq()
 
   private[smartdatalake] override val handleRecursiveInputsAsSubFeeds: Boolean = false
+
+  // DataFrame created by DeduplicateAction should not be passed on to the next Action, but must be recreated from the DataObject.
+  override val breakDataFrameOutputLineage: Boolean = true
 
   // check preconditions
   require(output.table.primaryKey.isDefined, s"($id) Primary key must be defined for output DataObject")

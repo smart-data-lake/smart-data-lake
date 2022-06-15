@@ -126,8 +126,8 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     }
   }
 
-  def writeOutputSubFeeds(subFeeds: Seq[S])(implicit context: ActionPipelineContext): Unit = {
-    outputs.foreach { output =>
+  def writeOutputSubFeeds(subFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S] = {
+    outputs.map { output =>
       val subFeed = subFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"($id) subFeed for output ${output.id} not found"))
       logWritingStarted(subFeed)
       val isRecursiveInput = recursiveInputs.exists(_.id == subFeed.dataObjectId)
@@ -136,6 +136,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
       }
       result.metrics.foreach(m => if(m.nonEmpty) addRuntimeMetrics(Some(context.executionId), Some(output.id), GenericMetrics(s"$id-${output.id}", 1, m)))
       logWritingFinished(subFeed, result.noData, d)
+      result.subFeed
     }
   }
 
@@ -175,7 +176,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     // check and adapt output SubFeeds
     outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds)
     // write output
-    writeOutputSubFeeds(outputSubFeeds)
+    outputSubFeeds = writeOutputSubFeeds(outputSubFeeds)
     // return
     outputSubFeeds
   }
@@ -302,7 +303,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
    * @param isRecursive If subfeed is recursive (input & output)
    * @return false if there was no data to process, otherwise true.
    */
-  protected def writeSubFeed(subFeed: S, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult
+  protected def writeSubFeed(subFeed: S, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult[S]
 
 }
 
@@ -311,7 +312,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
  * @param noData true if there was no data to write, otherwise false. If unknown set to None.
  * @param metrics Depending on the engine, metrics are received by a listener (SparkSubFeed) or can be returned directly by filling this attribute (FileSubFeed).
  */
-case class WriteSubFeedResult(noData: Option[Boolean], metrics: Option[Map[String, Any]] = None)
+case class WriteSubFeedResult[S <: SubFeed](subFeed: S, noData: Option[Boolean], metrics: Option[Map[String, Any]] = None)
 
 case class SubFeedExpressionData(partitionValues: Seq[Map[String,String]], isDAGStart: Boolean, isSkipped: Boolean)
 case class SubFeedsExpressionData(inputSubFeeds: Map[String, SubFeedExpressionData])
