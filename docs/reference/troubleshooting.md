@@ -39,6 +39,18 @@ Install VC++ Redistributable Package from Microsoft:
 http://www.microsoft.com/en-us/download/details.aspx?id=5555 (x86)  
 http://www.microsoft.com/en-us/download/details.aspx?id=14632 (x64)
 
+## Java IllegalAccessError (Java 17)
+Symptom:
+Starting an SDLB pipeline fails with the following exception:
+```
+java.lang.IllegalAccessError: class org.apache.spark.storage.StorageUtils$ (in unnamed module @0x343570b7) cannot access class sun.nio.ch.DirectBuffer (in module java.base) because module java.base does not export sun.nio.ch to unnamed module @0x343570b7
+        at org.apache.spark.storage.StorageUtils$.<init>(StorageUtils.scala:213)
+        ...
+```
+
+Solution:
+Java 17 is more restrictive regarding usage of module exports. Unfortunately Spark uses classes from unexported packages. Packages can be exported manually. To fix above exception add `--add-exports java.base/sun.nio.ch=ALL-UNNAMED` to the java command line, see also [https://stackoverflow.com/questions/72230174/java-17-solution-for-spark-java-lang-noclassdeffounderror-could-not-initializ](Stackoverflow).
+
 ## Resources not copied
 Symptom:   
 Tests fail due to missing or outdated resources or the execution starts but can not find the feeds specified. 
