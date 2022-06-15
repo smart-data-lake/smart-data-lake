@@ -56,6 +56,12 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
   def breakDataFrameLineage: Boolean
 
   /**
+   * Stop propagating output DataFrame through action. The next action should get a fresh DataFrame from the DataObject according to the partition values.
+   * This is needed for Actions which create a specific DataFrame to implement the logic needed, e.g. Deduplicate- and HistorizeAction
+   */
+  def breakDataFrameOutputLineage: Boolean = false
+
+  /**
    * Force persisting input DataFrame's on Disk.
    * This improves performance if dataFrame is used multiple times in the transformation and can serve as a recovery point
    * in case a task get's lost.
@@ -263,12 +269,13 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
     subFeed
   }
 
-  override protected def writeSubFeed(subFeed: DataFrameSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult = {
+  override protected def writeSubFeed(subFeed: DataFrameSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult[DataFrameSubFeed] = {
     setSparkJobMetadata(Some(s"writing to ${subFeed.dataObjectId}"))
     val output = outputs.find(_.id == subFeed.dataObjectId).getOrElse(throw new IllegalStateException(s"($id) output for subFeed ${subFeed.dataObjectId} not found"))
     val noData = writeSubFeed(subFeed, output, isRecursive)
     setSparkJobMetadata(None)
-    WriteSubFeedResult(noData)
+    val outputSubFeed = if (breakDataFrameOutputLineage) subFeed.breakLineage else subFeed
+    WriteSubFeedResult(outputSubFeed, noData)
   }
 
   /**

@@ -169,6 +169,9 @@ case class HistorizeAction(
 
   private[smartdatalake] override val handleRecursiveInputsAsSubFeeds: Boolean = false
 
+  // DataFrame created by DeduplicateAction should not be passed on to the next Action, but must be recreated from the DataObject.
+  override val breakDataFrameOutputLineage: Boolean = true
+
   // historize black/white list
   require(historizeWhitelist.isEmpty || historizeBlacklist.isEmpty, s"(${id}) HistorizeWhitelist and historizeBlacklist mustn't be used at the same time")
   // primary key
