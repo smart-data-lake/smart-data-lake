@@ -288,6 +288,15 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   }
 
   /**
+   * Start a simulation run and registers all actions from the config file which path is defined in parameter appConfig in the instance registry
+   */
+  def startSimulationWithConfigFile(appConfig: SmartDataLakeBuilderConfig, initialSubFeeds: Seq[SparkSubFeed], dataObjectsState: Seq[DataObjectState] = Seq())(session: SparkSession): (Seq[SparkSubFeed], Map[RuntimeEventState,Int]) = {
+    val config = ConfigLoader.loadConfigFromFilesystem(appConfig.configuration.get, session.sparkContext.hadoopConfiguration)
+    ConfigParser.parse(config, this.instanceRegistry)
+    startSimulation(appConfig, initialSubFeeds, dataObjectsState)(this.instanceRegistry, session)
+  }
+
+    /**
    * Start run.
    * @return tuple of list of final subfeeds and statistics (action count per RuntimeEventState)
    */
