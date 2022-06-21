@@ -147,23 +147,35 @@ object SQLExpectation extends FromConfigFactory[Expectation] {
 }
 
 /**
- * Definition of an expectation based counting rows matching a boolean expression and calculating a percentage against the number of all rows.
+ * Definition of an expectation based on counting how many rows match an expression vs the number of all rows.
+ * The fraction of these two counts is compared against a given expectation.
  *
- * @param conditionExpression SQL expression returning a boolean to match the rows to count.
+ * @param countConditionExpression SQL expression returning a boolean to match the rows to count for the fraction.
+ * @param globalConditionExpression SQL expression returning a boolean used as global filter, e.g. fraction row count and total row count are filtered with global filter before counting.
  * @param expectation Optional SQL comparison operator and literal to define expected percentage for validation, e.g. '= 0.9".
- *                    If no expectation is defined, the result value is is just recorded in metrics.
+ *                    If no expectation is defined, the result value is just recorded in metrics.
  * @param scope The aggregation scope used to evaluate the aggregate expression.
  *              Default is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.
  *              Other options are 'All' and 'JobPartitions', which are implemented by reading the output data again.
  */
-case class SQLCountPctExpectation(override val name: String, override val description: Option[String] = None, conditionExpression: String, expectation: Option[String] = None, override val scope: ExpectationScope = Job, override val failedSeverity: ExpectationSeverity = ExpectationSeverity.Error )
+case class SQLFractionExpectation(override val name: String, override val description: Option[String] = None, countConditionExpression: String, globalConditionExpression: Option[String] = None, expectation: Option[String] = None, override val scope: ExpectationScope = Job, override val failedSeverity: ExpectationSeverity = ExpectationSeverity.Error )
   extends Expectation {
+  private def getGlobalConditionExpression(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions) = {
+    try {
+      import functions._
+      globalConditionExpression.map(expr).getOrElse(lit(true))
+    } catch {
+      case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse SQL expression '${globalConditionExpression.get}'", Some(s"expectations.$name.expression"), e)
+    }
+  }
+  private val totalName = name+"Total"
   def getAggExpressionColumns(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions): Seq[GenericColumn] = {
     try {
       import functions._
-      Seq(count(when(expr(conditionExpression),lit(1))).as(name))
+      Seq(count(when(expr(countConditionExpression) and getGlobalConditionExpression(dataObjectId),lit(1))).as(name)) ++
+        (if (globalConditionExpression.isDefined) Seq(count(when(getGlobalConditionExpression(dataObjectId),lit(1))).as(totalName)) else Seq())
     } catch {
-      case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse SQL expression '$conditionExpression'", Some(s"expectations.$name.expression"), e)
+      case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse SQL expression '$countConditionExpression'", Some(s"expectations.$name.expression"), e)
     }
   }
   def getValidationColumn(dataObjectId: DataObjectId, pct: Any)(implicit functions: DataFrameFunctions): Option[GenericColumn] = {
@@ -179,9 +191,10 @@ case class SQLCountPctExpectation(override val name: String, override val descri
   def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext, functions: DataFrameFunctions): Option[GenericColumn] = {
     val countExpectation = metrics.getOrElse(name, throw new IllegalStateException(s"($dataObjectId) Metric for expectation ${name} not found for validation"))
       .asInstanceOf[Long]
-    val countAll = metrics.getOrElse("count", throw new IllegalStateException(s"($dataObjectId) General 'count' metric for expectation ${name} not found for validation"))
+    val totalMetric = if (globalConditionExpression.isDefined) totalName else "count"
+    val countTotal = metrics.getOrElse(totalMetric, throw new IllegalStateException(s"($dataObjectId) General '$totalMetric' metric for expectation ${name} not found for validation"))
       .asInstanceOf[Long]
-    val pct = if (countAll == 0) "null" else countExpectation.toFloat / countAll.toFloat // float precision is sufficient
+    val pct = if (countTotal == 0) "null" else countExpectation.toFloat / countTotal.toFloat // float precision is sufficient
     getValidationColumn(dataObjectId, pct).map { validationCol =>
       import functions._
       try {
@@ -191,12 +204,12 @@ case class SQLCountPctExpectation(override val name: String, override val descri
       }
     }
   }
-  override def factory: FromConfigFactory[Expectation] = SQLCountPctExpectation
+  override def factory: FromConfigFactory[Expectation] = SQLFractionExpectation
 }
 
-object SQLCountPctExpectation extends FromConfigFactory[Expectation] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SQLCountPctExpectation = {
-    extract[SQLCountPctExpectation](config)
+object SQLFractionExpectation extends FromConfigFactory[Expectation] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SQLFractionExpectation = {
+    extract[SQLFractionExpectation](config)
   }
 }
 
@@ -209,7 +222,7 @@ object SQLCountPctExpectation extends FromConfigFactory[Expectation] {
  * @param expectation Optional SQL comparison operator and literal to define expected value for validation, e.g. '> 100000".
  *                    If no expectation is defined, the result value is is just recorded in metrics.
  */
-case class CountAvgPerPartitionExpectation(override val name: String, override val description: Option[String] = None, expectation: Option[String] = None, override val failedSeverity: ExpectationSeverity = ExpectationSeverity.Error )
+case class AvgCountPerPartitionExpectation(override val name: String, override val description: Option[String] = None, expectation: Option[String] = None, override val failedSeverity: ExpectationSeverity = ExpectationSeverity.Error )
   extends Expectation {
   override val scope: ExpectationScope = ExpectationScope.Job
   def getAggExpressionColumns(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions): Seq[GenericColumn] = Seq() // no special aggregate needed as count is calculated by default
@@ -242,12 +255,12 @@ case class CountAvgPerPartitionExpectation(override val name: String, override v
       None
     }
   }
-  override def factory: FromConfigFactory[Expectation] = CountAvgPerPartitionExpectation
+  override def factory: FromConfigFactory[Expectation] = AvgCountPerPartitionExpectation
 }
 
-object CountAvgPerPartitionExpectation extends FromConfigFactory[Expectation] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CountAvgPerPartitionExpectation = {
-    extract[CountAvgPerPartitionExpectation](config)
+object AvgCountPerPartitionExpectation extends FromConfigFactory[Expectation] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): AvgCountPerPartitionExpectation = {
+    extract[AvgCountPerPartitionExpectation](config)
   }
 }
 

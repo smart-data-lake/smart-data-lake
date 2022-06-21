@@ -152,7 +152,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
       constraints = Seq(Constraint("firstnameNotNull", Some("firstname should be non empty"), "firstname is not null")),
       expectations = Seq(
         SQLExpectation("avgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", Some("> 1")),
-        SQLCountPctExpectation("pctBob", conditionExpression = "firstname = 'bob'", expectation = Some("= 0")) // because we only select Rob and not Bob...
+        SQLFractionExpectation("pctBob", countConditionExpression = "firstname = 'bob'", expectation = Some("= 0")) // because we only select Rob and not Bob...
       )
     )
     tgtDO.dropTable
