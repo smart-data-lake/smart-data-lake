@@ -178,9 +178,9 @@ case class SQLFractionExpectation(override val name: String, override val descri
       case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse SQL expression '$countConditionExpression'", Some(s"expectations.$name.expression"), e)
     }
   }
-  def getValidationColumn(dataObjectId: DataObjectId, pct: Any)(implicit functions: DataFrameFunctions): Option[GenericColumn] = {
+  def getValidationColumn(dataObjectId: DataObjectId, fraction: Any)(implicit functions: DataFrameFunctions): Option[GenericColumn] = {
     expectation.map { expectationStr =>
-      val validationExpr = s"$pct $expectationStr"
+      val validationExpr = s"$fraction $expectationStr"
       try {
         functions.expr(validationExpr)
       } catch {
@@ -213,6 +213,48 @@ object SQLFractionExpectation extends FromConfigFactory[Expectation] {
   }
 }
 
+/**
+ * Definition of an expectation based on the number of records.
+ *
+ * @param expectation Optional SQL comparison operator and literal to define expected value for validation, e.g. '> 100000".
+ *                    If no expectation is defined, the result value is is just recorded in metrics.
+ * @param scope The aggregation scope used to evaluate the aggregate expression.
+ *              Default is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.
+ *              Other options are 'All' and 'JobPartitions', which are implemented by reading the output data again.
+ */
+case class CountExpectation(override val name: String = "count", override val description: Option[String] = None, expectation: Option[String] = None, override val scope: ExpectationScope = Job, override val failedSeverity: ExpectationSeverity = ExpectationSeverity.Error )
+  extends Expectation {
+  def getAggExpressionColumns(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions): Seq[GenericColumn] = Seq() // no special aggregate needed as count is calculated by default
+  def getValidationColumn(dataObjectId: DataObjectId, count: Long)(implicit functions: DataFrameFunctions): Option[GenericColumn] = {
+    expectation.map { expectationStr =>
+      val validationExpr = s"$count $expectationStr"
+      try {
+        functions.expr(validationExpr)
+      } catch {
+        case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse validation expression '$validationExpr'", Some(s"expectations.$name"), e)
+      }
+    }
+  }
+  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext, functions: DataFrameFunctions): Option[GenericColumn] = {
+    import functions._
+    val count: Long = metrics.getOrElse("count", throw new IllegalStateException(s"($dataObjectId) General 'count' metric for expectation ${name} not found for validation"))
+      .asInstanceOf[Long]
+    getValidationColumn(dataObjectId, count).map { validationCol =>
+      try {
+        when(not(validationCol), lit(s"Expectation '$name' failed with count:$count expectation:${expectation.get}"))
+      } catch {
+        case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot create validation error column", Some(s"expectations.$name"), e)
+      }
+    }
+  }
+  override def factory: FromConfigFactory[Expectation] = CountExpectation
+}
+
+object CountExpectation extends FromConfigFactory[Expectation] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CountExpectation = {
+    extract[CountExpectation](config)
+  }
+}
 
 /**
  * Definition of an expectation based on the average number of records per partitions.
@@ -245,13 +287,13 @@ case class AvgCountPerPartitionExpectation(override val name: String, override v
       val avgCount = count / math.max(partitionValues.size, 1)
       getValidationColumn(dataObjectId, avgCount).map { validationCol =>
         try {
-          when(not(validationCol), lit(s"Expectation '$name' failed with count:$avgCount expectation:${expectation.get}"))
+          when(not(validationCol), lit(s"Expectation '$name' failed with avgCount:$avgCount expectation:${expectation.get}"))
         } catch {
           case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot create validation error column", Some(s"expectations.$name"), e)
         }
       }
     } else {
-      logger.warn(s"($dataObjectId) Cannot evaluate CountAvgPerPartition expectation '$name' as there are no partition values")
+      logger.warn(s"($dataObjectId) Cannot evaluate AvgCountPerPartitionExpectation '$name' as there are no partition values")
       None
     }
   }

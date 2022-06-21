@@ -151,6 +151,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val tgtDO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable, numInitialHdfsPartitions = 1,
       constraints = Seq(Constraint("firstnameNotNull", Some("firstname should be non empty"), "firstname is not null")),
       expectations = Seq(
+        CountExpectation(expectation = Some(">= 1")),
         SQLExpectation("avgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", Some("> 1")),
         SQLFractionExpectation("pctBob", countConditionExpression = "firstname = 'bob'", expectation = Some("= 0")) // because we only select Rob and not Bob...
       )
