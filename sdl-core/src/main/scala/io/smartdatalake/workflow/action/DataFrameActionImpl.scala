@@ -251,7 +251,7 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
       }
     } else preparedSubFeed
     // remove potential filter and partition values added by execution mode
-    if (ignoreFilters) preparedSubFeed = preparedSubFeed.clearFilter().clearPartitionValues().clearSkipped()
+    if (ignoreFilters) preparedSubFeed = preparedSubFeed.breakLineage.clearFilter().clearPartitionValues().clearSkipped()
     // break lineage if requested or if it's a streaming DataFrame or if a filter expression is set
     if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined) preparedSubFeed = preparedSubFeed.breakLineage
     // enrich with fresh DataFrame if needed
