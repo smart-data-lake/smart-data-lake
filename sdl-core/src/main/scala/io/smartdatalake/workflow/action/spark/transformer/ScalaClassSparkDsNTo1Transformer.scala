@@ -128,7 +128,8 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
 
     val resAsDF = res.asInstanceOf[Dataset[_]].toDF
     val resWithSelect = if (outputColumnAutoSelect) resAsDF.select(columsFromCaseClass.map(col): _*) else resAsDF
-    val resWithPartitionValues = if (addPartitionValuesToOutput) {
+
+    if (addPartitionValuesToOutput) {
       assert(partitionValues.size == 1, s"When using addPartitionValuesToOutput you can only process one partition-key at a time, but ${partitionValues.size} where given: {${partitionValues.mkString(";")}}")
       partitionValues.head.elements.foldLeft(resWithSelect) {
         (dataframe, pair) => dataframe.withColumn(pair._1, lit(pair._2))
@@ -137,7 +138,6 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
     else {
       resWithSelect
     }
-    resWithPartitionValues
   }
 
   private def getCaseClassColumnNames(className: String): Seq[String] = {
@@ -167,8 +167,8 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
         val df = tolerantGet(dfs, paramName).getOrElse(throw new IllegalStateException(s"($actionId) [transformers.$name] DataFrame for DataObject $paramName not found in input DataFrames: ${dfs.keys.mkString(",")}"))
         val dfWithSelect =
           if (inputColumnAutoSelect) {
-             val columnNames =  getCaseClassColumnNames(dsType.toString)
-            df.select(columnNames.map(col) :_*)
+            val columnNames = getCaseClassColumnNames(dsType.toString)
+            df.select(columnNames.map(col): _*)
           } else {
             df
           }

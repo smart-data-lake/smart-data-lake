@@ -20,14 +20,17 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDsNto1Transformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsNTo1Transformer
-import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.CsvFileDataObject
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SubFeed}
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
+import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
@@ -44,6 +47,8 @@ case class NameRating(name: String, rating: Int)
 case class RatingName(rating: Int, name: String)
 
 case class AnotherOutputDataSet(concatenated_name: String, added_rating: Int)
+
+case class AnotherOutputDataSetPartitioned(concatenated_name: String, added_rating: Int, year: String, month: String, day: String)
 
 case class AddedRating(added_rating: Int)
 
@@ -244,7 +249,7 @@ class ScalaClassSparkDsNTo1TransformerTest extends FunSuite with BeforeAndAfter 
     directoriesToDelete.foreach(dir => dir.deleteRecursively())
   }
 
-  test("One Ds2To1 Transformation using config file: two different input types using dataObjectOrdering") {
+  test("One Ds2To1 Transformation using config file: two identical input types using dataObjectOrdering") {
 
     // setup DataObjects
     // source has partition columns dt and type
@@ -285,6 +290,47 @@ class ScalaClassSparkDsNTo1TransformerTest extends FunSuite with BeforeAndAfter 
       )
     }
     directoriesToDelete.foreach(dir => dir.deleteRecursively())
+  }
+
+  test("One Ds2To1 Transformation using config file: one input type that is partioned, using addPartitionValuesToOutput = true") {
+
+    // setup DataObjects
+    val partitionValues = Seq(PartitionValues(
+      Map(("year" -> "1992"),
+        ("month" -> "04"),
+        ("day" -> "25"))))
+    // fill src with first files
+    val srcDO1 = SparkSubFeed(SparkDataFrame(
+      Seq(("john", 5, "1992", "04", "25"))
+        .toDF("name", "rating", "year", "month", "day")
+    ), DataObjectId("src1Ds"), partitionValues)
+
+    val srcDO2 = SparkSubFeed(SparkDataFrame(
+      Seq(("doe", 10, "1992", "04", "25"))
+        .toDF("name", "rating", "year", "month", "day")
+    ), DataObjectId("src2Ds"), partitionValues)
+
+    val sdlb = new DefaultSmartDataLakeBuilder()
+
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Some(Seq(
+      getClass.getResource("/configScalaClassSparkDsNto1Transformer/usingDataObjectIdWithPartitionAutoSelect.conf").getPath)),
+      partitionValues =
+        Some(Seq(PartitionValues(
+          Map(("year" -> "1992"),
+            ("month" -> "04"),
+            ("day" -> "25")
+          ))))
+    )
+    //Run SDLB
+    val (subFeeds, _): (Seq[SubFeed], Map[RuntimeEventState, Int]) = sdlb.startSimulationWithConfigFile(sdlConfig, Seq(srcDO1, srcDO2))(session)
+
+    val tgt1DO: SparkSubFeed = subFeeds.head.asInstanceOf[SparkSubFeed]
+    val actual = tgt1DO.dataFrame.get.inner.as[AnotherOutputDataSetPartitioned].collect.head
+    assert(actual.added_rating == 15)
+    assert(actual.concatenated_name == "johndoe")
+    assert(actual.year == "1992")
+    assert(actual.month == "04")
+    assert(actual.day == "25")
   }
 
   test("One Ds9To1 Transformation using config file: 9 input dataObjects using dataObjectOrdering") {
