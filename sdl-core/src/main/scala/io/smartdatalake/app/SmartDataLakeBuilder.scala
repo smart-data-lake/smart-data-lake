@@ -209,43 +209,61 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    *
    * @param appConfig Application configuration (parsed from command line).
    */
-  def run(appConfig: SmartDataLakeBuilderConfig): Map[RuntimeEventState,Int] = try {
-    // invoke SDLPlugin if configured
-    Environment.sdlPlugin.foreach(_.startup())
-    // create default hadoop configuration, as we did not yet load custom spark/hadoop properties
-    implicit val defaultHadoopConf: Configuration = new Configuration()
-    // handle state if defined
-    if (appConfig.statePath.isDefined && !appConfig.isDryRun) {
-      assert(appConfig.applicationName.nonEmpty, "Application name must be defined if statePath is set")
-      // check if latest run succeeded
-      val appName = appConfig.applicationName.get
-      val stateStore = HadoopFileActionDAGRunStateStore(appConfig.statePath.get, appName, defaultHadoopConf)
-      val latestRunId = stateStore.getLatestRunId
-      if (latestRunId.isDefined) {
-        val latestStateId = stateStore.getLatestStateId(latestRunId)
-          .getOrElse(throw new IllegalStateException(s"State for last runId=$latestRunId not found"))
-        val latestRunState = stateStore.recoverRunState(latestStateId)
-        if (latestRunState.isFailed) {
-          // start recovery
-          assert(appConfig == latestRunState.appConfig, s"There is a failed run to be recovered. Either you clean-up this state fail or the command line parameters given must match the parameters of the run to be recovered (${latestRunState.appConfig}")
-          recoverRun(appConfig, stateStore, latestRunState)._2
+  def run(appConfig: SmartDataLakeBuilderConfig): Map[RuntimeEventState,Int] = {
+    val stats = try {
+      // invoke SDLPlugin if configured
+      Environment.sdlPlugin.foreach(_.startup())
+      // create default hadoop configuration, as we did not yet load custom spark/hadoop properties
+      implicit val defaultHadoopConf: Configuration = new Configuration()
+      // handle state if defined
+      if (appConfig.statePath.isDefined && !appConfig.isDryRun) {
+        assert(appConfig.applicationName.nonEmpty, "Application name must be defined if statePath is set")
+        // check if latest run succeeded
+        val appName = appConfig.applicationName.get
+        val stateStore = HadoopFileActionDAGRunStateStore(appConfig.statePath.get, appName, defaultHadoopConf)
+        val latestRunId = stateStore.getLatestRunId
+        if (latestRunId.isDefined) {
+          val latestStateId = stateStore.getLatestStateId(latestRunId)
+            .getOrElse(throw new IllegalStateException(s"State for last runId=$latestRunId not found"))
+          val latestRunState = stateStore.recoverRunState(latestStateId)
+          if (latestRunState.isFailed) {
+            // start recovery
+            assert(appConfig == latestRunState.appConfig, s"There is a failed run to be recovered. Either you clean-up this state fail or the command line parameters given must match the parameters of the run to be recovered (${latestRunState.appConfig}")
+            recoverRun(appConfig, stateStore, latestRunState)._2
+          } else {
+            val nextExecutionId = SDLExecutionId(latestRunState.runId + 1)
+            startRun(appConfig, executionId = nextExecutionId, dataObjectsState = latestRunState.getDataObjectsState, stateStore = Some(stateStore))._2
+          }
         } else {
-          val nextExecutionId = SDLExecutionId(latestRunState.runId + 1)
-          startRun(appConfig, executionId = nextExecutionId, dataObjectsState = latestRunState.getDataObjectsState, stateStore = Some(stateStore))._2
+          startRun(appConfig, stateStore = Some(stateStore))._2
         }
-      } else {
-        startRun(appConfig, stateStore = Some(stateStore))._2
-      }
-    } else startRun(appConfig)._2
-  } finally {
+      } else startRun(appConfig)._2
+    } catch {
+      case e: Exception =>
+        // try shutdown but catch potential exception
+        try {
+          shutdown
+        }
+        // throw original exception
+        throw e
+    }
+    shutdown
+    // return
+    stats
+  }
+
+  /**
+   * Execute shutdown/cleanup tasks before SDLB job stops.
+   */
+  private def shutdown: Unit = {
     // make sure memory logger timer task is stopped
     MemoryUtils.stopMemoryLogger()
+
     // invoke SDLPlugin if configured
     Environment.sdlPlugin.foreach(_.shutdown())
 
     //Environment._globalConfig can be null here if global contains superfluous entries
     val stopStatusInfoServer = Option(Environment._globalConfig).flatMap(_.statusInfo.map(_.stopOnEnd)).getOrElse(false)
-
     if (stopStatusInfoServer) {
       StatusInfoServer.stop()
     }
