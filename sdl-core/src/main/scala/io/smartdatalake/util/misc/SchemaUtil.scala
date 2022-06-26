@@ -68,10 +68,10 @@ object SchemaUtil {
    * StructField equality is defined by exact matching of the field name and partial (subset) matching of field
    * data type as computed by `deepIsTypeSubset`.
    *
-   * @param ignoreNullability whether to ignore differences in nullability.
+   * @param ignoreNullable whether to ignore differences in nullability.
    * @return The set of fields in `right` that are not contained in `left`.
    */
-  private def deepPartialMatchDiffFields(left: Seq[GenericField], right: Seq[GenericField], ignoreNullability: Boolean = false, caseSensitive: Boolean = false): Set[GenericField] = {
+  private def deepPartialMatchDiffFields(left: Seq[GenericField], right: Seq[GenericField], ignoreNullable: Boolean = false, caseSensitive: Boolean = false): Set[GenericField] = {
     val rightNamesIndex = right.groupBy(f => if (caseSensitive) f.name else f.name.toLowerCase)
     left.toSet.map { leftField: GenericField =>
       val leftName = if (caseSensitive) leftField.name else leftField.name.toLowerCase
@@ -79,8 +79,8 @@ object SchemaUtil {
         case Some(rightFieldsWithSameName) if rightFieldsWithSameName.foldLeft(false) {
           (hasPreviousSubset, rightField) =>
             hasPreviousSubset || (//if no previous match found check this rightField
-              (ignoreNullability || leftField.nullable == rightField.nullable) //either nullability is ignored or nullability must match
-                && deepIsTypeSubset(leftField.dataType, rightField.dataType, ignoreNullability, caseSensitive) //left field must be a subset of right field
+              (ignoreNullable || leftField.nullable == rightField.nullable) //either nullability is ignored or nullability must match
+                && deepIsTypeSubset(leftField.dataType, rightField.dataType, ignoreNullable, caseSensitive) //left field must be a subset of right field
               )
         } => Set.empty //found a match
         case _ => Set(leftField) //left field is not contained in right
@@ -96,21 +96,21 @@ object SchemaUtil {
    * - For map types it checks recursively whether the key types and value types are subsets and optionally the valueContainsNull property.
    * - For struct types it checks whether all fields is a subset with `deepPartialMatchDiffFields`.
    *
-   * @param ignoreNullability whether to ignore differences in nullability.
+   * @param ignoreNullable whether to ignore differences in nullability.
    * @return `true` iff `leftType` is a subset of `rightType`. `false` otherwise.
    */
-  private def deepIsTypeSubset(leftType: GenericDataType, rightType: GenericDataType, ignoreNullability: Boolean, caseSensitive: Boolean): Boolean = {
+  private def deepIsTypeSubset(leftType: GenericDataType, rightType: GenericDataType, ignoreNullable: Boolean, caseSensitive: Boolean): Boolean = {
     if (leftType.typeName != rightType.typeName) false /*fail fast*/
     else {
       (leftType, rightType) match {
         case (structL: GenericStructDataType, structR: GenericStructDataType) =>
-          structL.withOtherFields(structR, (l, r) => deepPartialMatchDiffFields(l, r, ignoreNullability, caseSensitive).isEmpty)
+          structL.withOtherFields(structR, (l, r) => deepPartialMatchDiffFields(l, r, ignoreNullable, caseSensitive).isEmpty)
         case (arrayL: GenericArrayDataType, arrayR: GenericArrayDataType) =>
-          if (!ignoreNullability && (arrayL.containsNull != arrayR.containsNull)) false
-          else arrayL.withOtherElementType(arrayR, (l, r) => deepIsTypeSubset(l, r, ignoreNullability, caseSensitive: Boolean))
+          if (!ignoreNullable && (arrayL.containsNull != arrayR.containsNull)) false
+          else arrayL.withOtherElementType(arrayR, (l, r) => deepIsTypeSubset(l, r, ignoreNullable, caseSensitive: Boolean))
         case (mapL: GenericMapDataType, mapR: GenericMapDataType) =>
-          if (!ignoreNullability && (mapL.valueContainsNull != mapR.valueContainsNull)) false
-          else mapL.withOtherKeyType(mapR, (l, r) => deepIsTypeSubset(l, r, ignoreNullability, caseSensitive)) && mapL.withOtherValueType(mapR, (l, r) => deepIsTypeSubset(l, r, ignoreNullability, caseSensitive))
+          if (!ignoreNullable && (mapL.valueContainsNull != mapR.valueContainsNull)) false
+          else mapL.withOtherKeyType(mapR, (l, r) => deepIsTypeSubset(l, r, ignoreNullable, caseSensitive)) && mapL.withOtherValueType(mapR, (l, r) => deepIsTypeSubset(l, r, ignoreNullable, caseSensitive))
         case _ => true //typeNames are equal
       }
     }
