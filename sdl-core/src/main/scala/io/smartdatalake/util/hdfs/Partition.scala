@@ -154,7 +154,8 @@ private[smartdatalake] object PartitionValues {
    * Create a generic filter column expression for a list of partition values
    */
   def createFilterExpr(partitionValues: Seq[PartitionValues])(implicit helper: DataFrameSubFeedCompanion): GenericColumn = {
-    partitionValues.map(_.getFilterExpr).reduce(_ or _)
+    if (partitionValues.nonEmpty) partitionValues.map(_.getFilterExpr).reduce(_ or _)
+    else helper.lit(true)
   }
 
   def oneToOneMapping(partitionValues: Seq[PartitionValues]): Map[PartitionValues,PartitionValues] = partitionValues.map(x => (x,x)).toMap
