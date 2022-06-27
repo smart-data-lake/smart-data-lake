@@ -1,0 +1,15 @@
+listen:
+  host: 0.0.0.0
+
+storage:
+  dir: /mnt/notebooks
+      
+spark:
+  properties:
+    spark.hadoop.javax.jdo.option.ConnectionURL: "jdbc:derby://metastore:1527/db;create=true"
+    spark.hadoop.javax.jdo.option.ConnectionDriverName: "org.apache.derby.jdbc.ClientDriver"
+    spark.hadoop.javax.jdo.option.ConnectionUserName: "sa"
+    spark.hadoop.javax.jdo.option.ConnectionPassword: "1234"
+    spark.sql.extensions: "io.delta.sql.DeltaSparkSessionExtension"
+    spark.sql.catalog.spark_catalog: "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+    spark.ui.port: 4140

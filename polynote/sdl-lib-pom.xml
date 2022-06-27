@@ -1,0 +1,145 @@
+<!-- this pom is used to collect all SDL dependencies to add them to polynote -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<!--
+	  By setting sdl-parent as parent you get proper dependency management for Spark and predefined plugin management
+	  Alternatively you could import Spark dependency management from sdl-parent with scope=import (or also directly from spark-parent),
+	  and need to copy all version properties from sdl-parent.pom into this pom.
+	-->
+	<parent>
+		<groupId>io.smartdatalake</groupId>
+		<artifactId>sdl-parent</artifactId>
+		<!--
+		  Set the smartdatalake version to use here.
+		  If version cannot be resolved, make sure maven central repository is defined in settings.xml and the corresponding profile activated.
+		-->
+		<version>2.2.1-SNAPSHOT</version>
+	</parent>
+
+	<artifactId>sdl-lib</artifactId>
+
+	<properties>
+
+		<!-- default scala version - use predefined maven profiles to override -->
+		<scala.minor.version>2.12</scala.minor.version>
+		<scala.version>${scala.minor.version}.12</scala.version>
+
+		<!-- mark dependencies included in spark distribution as provided -->
+		<scala.deps.scope>provided</scala.deps.scope>
+		<spark.deps.scope>provided</spark.deps.scope>
+		<hadoop.deps.scope>provided</hadoop.deps.scope>
+		<flume.deps.scope>provided</flume.deps.scope>
+		<hive.deps.scope>provided</hive.deps.scope>
+		<hive.parquet.scope>provided</hive.parquet.scope>
+		<hive.storage.scope>provided</hive.storage.scope>
+		<hive.common.scope>provided</hive.common.scope>
+		<hive.llap.scope>provided</hive.llap.scope>
+		<hive.serde.scope>provided</hive.serde.scope>
+		<hive.shims.scope>provided</hive.shims.scope>
+		<orc.deps.scope>provided</orc.deps.scope>
+		<parquet.deps.scope>provided</parquet.deps.scope>
+
+	</properties>
+
+	<repositories>
+		<!-- smartdatalake snapshots -->
+		<repository>
+			<id>ossrh</id>
+			<name>ossrh snapshots</name>
+			<url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+			<releases><enabled>false</enabled></releases>
+			<snapshots><enabled>true</enabled></snapshots>
+		</repository>
+	</repositories>
+
+	<build>
+		<plugins>
+			<!-- copy dependencies to target/lib folder -->
+			<plugin>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<executions>
+					<execution>
+						<phase>package</phase>
+						<goals>
+							<goal>copy-dependencies</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>${project.build.directory}/lib</outputDirectory>
+							<includeScope>runtime</includeScope>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+
+	<dependencies>
+
+		<dependency>
+			<groupId>io.smartdatalake</groupId>
+			<artifactId>sdl-core_${scala.minor.version}</artifactId>
+			<version>${project.parent.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>io.smartdatalake</groupId>
+			<artifactId>sdl-deltalake_${scala.minor.version}</artifactId>
+			<version>${project.parent.version}</version>
+			<exclusions>
+				<!-- TODO: this can probably be removed from sdl-deltalake! -->
+				<exclusion>
+					<groupId>org.apache.spark</groupId>
+					<artifactId>spark-sql-kafka-0-10_2.12</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+
+		<!-- override scope for spark dependencies to include/exclude them correctly for the fat-jar -->
+		<!-- note that the corresponding profile defining spark.deps.scope is inherited from sdl-parent -->
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-core_${scala.minor.version}</artifactId>
+			<version>${spark.version}</version>
+			<scope>${spark.deps.scope}</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-sql_${scala.minor.version}</artifactId>
+			<version>${spark.version}</version>
+			<scope>${spark.deps.scope}</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-hive_${scala.minor.version}</artifactId>
+			<version>${spark.version}</version>
+			<scope>${spark.deps.scope}</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-catalyst_${scala.minor.version}</artifactId>
+			<version>${spark.version}</version>
+			<scope>${spark.deps.scope}</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-avro_${scala.minor.version}</artifactId>
+			<version>${spark.version}</version>
+			<scope>${spark.deps.scope}</scope>
+		</dependency>
+
+		<!-- needed for derby metastore -->
+		<dependency>
+			<groupId>org.datanucleus</groupId>
+			<artifactId>datanucleus-api-jdo</artifactId>
+			<version>4.1.4</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.derby</groupId>
+			<artifactId>derbyclient</artifactId>
+			<version>${derby.version}</version>
+		</dependency>
+
+	</dependencies>
+
+</project>
