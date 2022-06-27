@@ -95,6 +95,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
 
   // execution mode is evaluated in init phase and result must be stored for exec phase
   protected var executionModeResult: Option[Try[Option[ExecutionModeResult]]] = None
+  def getExecutionModeResultOptions: Map[String,String] = executionModeResult.flatMap(_.get.map(_.options)).getOrElse(Map())
 
   /**
    * Spark SQL condition evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.

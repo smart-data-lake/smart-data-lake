@@ -322,6 +322,20 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtSubFeed.partitionValues == expectedPartitionValues)
     assert(tgtSubFeed.dataFrame.get.schema.columns.contains("mt"))
   }
+
+  test("custom execution mode result options") {
+    val srcDO = MockDataObject("src1").register
+    val tgtDO1 = MockDataObject("tgt1").register
+
+    // prepare & simulate load (init only)
+    val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerOptions].getName)
+    val customExecutionMode = CustomMode(className=classOf[TestResultOptionsCustomMode].getName)
+    val action1 = CustomDataFrameAction("ca", List(srcDO.id), List(tgtDO1.id), transformers = Seq(customTransformerConfig), executionMode = Some(customExecutionMode))
+    val l1 = Seq(("20100101","jonson","rob",5),("20100103","doe","bob",3)).toDF("dt", "lastname", "firstname", "rating")
+    srcDO.writeSparkDataFrame(l1, Seq())
+    val srcSubFeed = SparkSubFeed(None, "src1", Seq())
+    action1.init(Seq(srcSubFeed))(contextExec)
+  }
 }
 
 
@@ -379,5 +393,19 @@ class TestDfsTransformerFilterDummy extends CustomDfsTransformer {
   override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
     // return only the first df sorted by ID
     dfs.toSeq.sortBy(_._1).take(1).map{ case (id, df) => (id.replaceFirst("src","tgt"), df) }.toMap
+  }
+}
+
+class TestResultOptionsCustomMode extends CustomModeLogic {
+  override def apply(options: Map[String, String], actionId: SdlConfigObject.ActionId, input: DataObject, output: DataObject, givenPartitionValues: Seq[Map[String, String]], context: ActionPipelineContext): Option[ExecutionModeResult] = {
+    Some(ExecutionModeResult(options = Map("testOption" -> "test")))
+  }
+}
+
+class TestDfsTransformerOptions extends CustomDfsTransformer {
+  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
+    assert(options.get("testOption").contains("test"))
+    // one to one...
+    dfs.map{ case (id, df) => (id.replaceFirst("src","tgt"), df) }
   }
 }

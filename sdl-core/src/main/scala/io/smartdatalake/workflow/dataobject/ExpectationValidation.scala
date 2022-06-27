@@ -66,7 +66,7 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
   def validateExpectations(metrics: Map[String, _], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     // the evaluation of expectations is made with Spark expression
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(typeOf[SparkSubFeed])
-    // evaluate expectations using a dummy DataFrame
+    // evaluate expectations using dummy ExpressionData
     val defaultExpressionData = DefaultExpressionData.from(context, Seq())
     val validationResults = expectations.flatMap { expectation =>
       expectation.getValidationErrorColumn(this.id, metrics, partitionValues)
