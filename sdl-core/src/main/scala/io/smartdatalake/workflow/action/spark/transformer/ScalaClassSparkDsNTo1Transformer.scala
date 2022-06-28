@@ -22,8 +22,9 @@ package io.smartdatalake.workflow.action.spark.transformer
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.CustomCodeUtil
+import io.smartdatalake.util.misc.{CustomCodeUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.{DefaultExpressionData, EncoderUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.Action
@@ -31,29 +32,42 @@ import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransform
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, CustomDsNto1Transformer}
 import io.smartdatalake.workflow.action.spark.transformer.ParameterResolution.ParameterResolution
 import io.smartdatalake.workflow.dataobject.DataObject
+import javassist.bytecode.stackmap.TypeTag
+import org.apache.hadoop.shaded.com.sun.jersey.server.impl.cdi.AnnotatedTypeImpl
+import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
+import org.json4s.scalap.scalasig.AnnotatedType
+import sun.reflect.generics.reflectiveObjects.ParameterizedTypeImpl
 
 import java.lang.reflect.InvocationTargetException
 import scala.reflect.runtime.universe
-import scala.reflect.runtime.universe.typeOf
+import scala.reflect.runtime.universe.{MethodSymbol, typeOf}
 
 /**
  * Configuration of a custom Spark-Dataset transformation between N inputs and 1 outputs (N:1) as Java/Scala Class
  * Define a transform function that receives a SparkSession, a map of options and as many DataSets as you want, and that has to return one Dataset.
  * The Java/Scala class has to implement interface [[CustomDsNto1Transformer]].
  *
- * @param name           BName of the transformer
- * @param description    Optional description of the transformer
- * @param className      Class name implementing trait [[CustomDfsTransformer]]
- * @param options        Options to pass to the transformation
- * @param runtimeOptions Optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
- *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
- * @param parameterResolution By default parameter resolution for transform function uses input Datasets id to match the corresponding parameter name.
- *                            But there are other options, see [[ParameterResolution]].
- * @param outputDatasetId Optional id of the output Dataset. Default is the id of the Actions first output DataObject.
+ * @param description                Optional description of the transformer
+ * @param className                  Class name implementing trait [[CustomDfsTransformer]]
+ * @param options                    Options to pass to the transformation
+ * @param runtimeOptions             Optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
+ *                                   The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
+ * @param parameterResolution        By default parameter resolution for transform function uses input Datasets id to match the corresponding parameter name.
+ *                                   But there are other options, see [[ParameterResolution]].
+ * @param strictInputValidation      Enforce that the number of input dataobjects must be the same as the number of input datasets. False by default,
+ *                                   because when chaining multiple transformations in the same action, you may not need all output Data objects of the previous transformations.
+ *                                   However, having more input parameters in your transform method than Dataobjects will always fail.
+ * @param inputColumnAutoSelect      Determine if the input-datasets should contain exactly the columns defined by the corresponding case class (spark does not ensure this out of the box). True per default.
+ * @param outputColumnAutoSelect     Determine if the output-dataset should contain exactly the columns defined by the corresponding case class (spark does not ensure this out of the box). True per default.
+ * @param addPartitionValuesToOutput If set to true and if one partition-value is processed at a time, the partition-columns will be added to the output-dataset
+ *                                   If more than one partition-value is processed simultaneously, the transformation will fail because it cannot
+ *                                   determine which row should get which partition-value. False by default.
+ * @param outputDatasetId            Optional id of the output Dataset. Default is the id of the Actions first output DataObject.
  */
-case class ScalaClassSparkDsNTo1Transformer(override val name: String = "ScalaClassSparkDs2To1Transformer", override val description: Option[String] = None, className: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map(), parameterResolution: ParameterResolution = ParameterResolution.DataObjectId, outputDatasetId: Option[String] = None) extends OptionsSparkDfsTransformer {
+case class ScalaClassSparkDsNTo1Transformer(override val description: Option[String] = None, className: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map(), parameterResolution: ParameterResolution = ParameterResolution.DataObjectId, strictInputValidation: Boolean = false, inputColumnAutoSelect: Boolean = true, outputColumnAutoSelect: Boolean = true, addPartitionValuesToOutput: Boolean = false, outputDatasetId: Option[String] = None) extends OptionsSparkDfsTransformer with SmartDataLakeLogger {
   private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDsNto1Transformer](className)
+  override val name: String = className
 
   override def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String, DataFrame] = {
     val thisAction: Action = context.instanceRegistry.getActions.find(_.id == actionId).get
@@ -61,7 +75,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val name: String = "ScalaCl
     val outputDO: DataObject = thisAction.outputs.head
     val outputDatasetId = this.outputDatasetId.getOrElse(outputDO.id.id)
 
-    Map(outputDatasetId -> transformWithParamMapping(actionId, context.sparkSession, options, dfs, inputDOs))
+    Map(outputDatasetId -> transformWithParamMapping(actionId, context.sparkSession, options, dfs, inputDOs, partitionValues))
   }
 
   override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {
@@ -71,7 +85,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val name: String = "ScalaCl
   private val expectedTransformMessage = "CustomDsNTo1Transformer implementations need to implement exactly one method with name 'transform' with this signature:" +
     s"def transform(session: SparkSession, options: Map[String, String], src1Ds: Dataset[A], src2Ds: Dataset[B], <more Datasets if needed>): Dataset[C]"
 
-  private[smartdatalake] def transformWithParamMapping(actionId: ActionId, session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame], inputDOs: Seq[DataObject]): DataFrame = {
+  private[smartdatalake] def transformWithParamMapping(actionId: ActionId, session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame], inputDOs: Seq[DataObject], partitionValues: Seq[PartitionValues]): DataFrame = {
 
     // lookup transform method
     val methodName = "transform"
@@ -85,7 +99,9 @@ case class ScalaClassSparkDsNTo1Transformer(override val name: String = "ScalaCl
     // We need to remember the original order of the method parameters to make sure to keep them in the same order in the output
     val transformParameters: Seq[(universe.Symbol, Int)] = transformMethod.info.paramLists.head.zipWithIndex
     val (datasetParams, nonDatasetParams) = transformParameters.partition(param => param._1.typeSignature <:< typeOf[Dataset[_]])
-    assert(datasetParams.size == dfs.size, s"($actionId) [transformers.$name] Number of Dataset-Parameters of transform function does not match number of input DataFrames! datasetParamsWithParamIndex: ${datasetParams.map(_._1.name).mkString(", ")}, nbOfDataFrames: ${dfs.size}")
+    if (strictInputValidation) {
+      assert(datasetParams.size == dfs.size, s"($actionId) [transformers.$name] Number of Dataset-Parameters of transform function does not match number of input DataFrames! datasetParamsWithParamIndex: ${datasetParams.map(_._1.name).mkString(", ")}, dataFrames: ${dfs.keys.mkString(",")}")
+    }
 
     val mappedNonDatasetParams: Seq[(Int, Object)] = nonDatasetParams.map {
       case (param, paramIndex) if param.typeSignature =:= typeOf[SparkSession] => (paramIndex, session)
@@ -114,11 +130,33 @@ case class ScalaClassSparkDsNTo1Transformer(override val name: String = "ScalaCl
           targetException.setStackTrace(e.getTargetException.getStackTrace ++ e.getStackTrace)
           throw targetException
       }
-    res.asInstanceOf[Dataset[_]].toDF
+
+    val outputClassType = transformMethodInstance.getAnnotatedReturnType.getType.asInstanceOf[ParameterizedTypeImpl].getActualTypeArguments.head.getTypeName
+    val columsFromCaseClass = getCaseClassColumnNames(outputClassType)
+
+    val resAsDF = res.asInstanceOf[Dataset[_]].toDF
+    val resWithSelect = if (outputColumnAutoSelect) resAsDF.select(columsFromCaseClass.map(col): _*) else resAsDF
+
+    if (addPartitionValuesToOutput) {
+      assert(partitionValues.size == 1, s"When using addPartitionValuesToOutput you can only process one partition-value at a time, but ${partitionValues.size} where given: {${partitionValues.mkString(";")}}")
+      partitionValues.head.elements.foldLeft(resWithSelect) {
+        (dataframe, pair) => dataframe.withColumn(pair._1, lit(pair._2))
+      }
+    }
+    else {
+      resWithSelect
+    }
+  }
+
+  private def getCaseClassColumnNames(className: String): Seq[String] = {
+    val outputCaseClass = Environment.classLoader.loadClass(className)
+    outputCaseClass.getDeclaredFields.toSeq.map(_.getName)
   }
 
   private def getMappedDatasetParamsBasedOnOrdering(actionId: ActionId, datasetParamsWithParamIndex: Seq[(universe.Symbol, Int)], inputDOs: Seq[DataObject], dfs: Map[String, DataFrame]) = {
-    assert(datasetParamsWithParamIndex.size == inputDOs.size, s"($actionId) [transformers.$name] Number of Dataset-Parameters of transform function does not match number of input DataObjects! datasetParams: ${datasetParamsWithParamIndex.map(_._1.name).mkString(",")}, inputDOs: ${inputDOs.map(_.id).mkString(",")}")
+    if (strictInputValidation) {
+      assert(datasetParamsWithParamIndex.size == inputDOs.size, s"($actionId) [transformers.$name] Number of Dataset-Parameters of transform function does not match number of input DataObjects! datasetParams: ${datasetParamsWithParamIndex.map(_._1.name).mkString(",")}, inputDOs: ${inputDOs.map(_.id).mkString(",")}")
+    }
     datasetParamsWithParamIndex.zipWithIndex.map {
       case ((param, paramIndex), datasetIndex) if param.typeSignature <:< typeOf[Dataset[_]] =>
         val dsType = param.typeSignature.typeArgs.head
@@ -134,8 +172,15 @@ case class ScalaClassSparkDsNTo1Transformer(override val name: String = "ScalaCl
       case (param, paramIndex) if param.typeSignature <:< typeOf[Dataset[_]] =>
         val paramName = param.name.toString
         val dsType = param.typeSignature.typeArgs.head
-        val df = tolerantGet(dfs, paramName).getOrElse(throw new IllegalStateException(s"($actionId) [transformers.$name] DataFrame for DataObject $paramName not found in input DataFrames"))
-        val ds = EncoderUtil.createDataset(df, dsType)
+        val df = tolerantGet(dfs, paramName.stripPrefix("ds")).getOrElse(throw new IllegalStateException(s"($actionId) [transformers.$name] DataFrame for DataObject $paramName not found in input DataFrames: ${dfs.keys.mkString(",")}"))
+        val dfWithSelect =
+          if (inputColumnAutoSelect) {
+            val columnNames = getCaseClassColumnNames(dsType.toString)
+            df.select(columnNames.map(col): _*)
+          } else {
+            df
+          }
+        val ds = EncoderUtil.createDataset(dfWithSelect, dsType)
         (paramIndex, ds)
     }
   }
@@ -144,9 +189,10 @@ case class ScalaClassSparkDsNTo1Transformer(override val name: String = "ScalaCl
    * Tolerant lookup of entry in map.
    * Comparison is made case-insensitive and without underscore and hyphen.
    */
-  private def tolerantGet[T](map: Map[String,T], key: String): Option[T] = {
-    def prepareKey(k: String) = k.toLowerCase.replace("-","").replace("_","")
-    val tolerantMap = map.map{ case (k,v) => (prepareKey(k), v)}
+  private def tolerantGet[T](map: Map[String, T], key: String): Option[T] = {
+    def prepareKey(k: String) = k.toLowerCase.replace("-", "").replace("_", "")
+
+    val tolerantMap = map.map { case (k, v) => (prepareKey(k), v) }
     tolerantMap.get(prepareKey(key))
   }
 
