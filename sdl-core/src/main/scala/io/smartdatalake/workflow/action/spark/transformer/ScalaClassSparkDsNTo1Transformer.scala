@@ -48,14 +48,22 @@ import scala.reflect.runtime.universe.{MethodSymbol, typeOf}
  * Define a transform function that receives a SparkSession, a map of options and as many DataSets as you want, and that has to return one Dataset.
  * The Java/Scala class has to implement interface [[CustomDsNto1Transformer]].
  *
- * @param description         Optional description of the transformer
- * @param className           Class name implementing trait [[CustomDfsTransformer]]
- * @param options             Options to pass to the transformation
- * @param runtimeOptions      Optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
- *                            The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
- * @param parameterResolution By default parameter resolution for transform function uses input Datasets id to match the corresponding parameter name.
- *                            But there are other options, see [[ParameterResolution]].
- * @param outputDatasetId     Optional id of the output Dataset. Default is the id of the Actions first output DataObject.
+ * @param description                Optional description of the transformer
+ * @param className                  Class name implementing trait [[CustomDfsTransformer]]
+ * @param options                    Options to pass to the transformation
+ * @param runtimeOptions             Optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
+ *                                   The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
+ * @param parameterResolution        By default parameter resolution for transform function uses input Datasets id to match the corresponding parameter name.
+ *                                   But there are other options, see [[ParameterResolution]].
+ * @param strictInputValidation      Enforce that the number of input dataobjects must be the same as the number of input datasets. False by default,
+ *                                   because when chaining multiple transformations in the same action, you may not need all output Data objects of the previous transformations.
+ *                                   However, having more input parameters in your transform method than Dataobjects will always fail.
+ * @param inputColumnAutoSelect      Determine if the input-datasets should contain exactly the columns defined by the corresponding case class (spark does not ensure this out of the box). True per default.
+ * @param outputColumnAutoSelect     Determine if the output-dataset should contain exactly the columns defined by the corresponding case class (spark does not ensure this out of the box). True per default.
+ * @param addPartitionValuesToOutput If set to true and if one partition-value is processed at a time, the partition-columns will be added to the output-dataset
+ *                                   If more than one partition-value is processed simultaneously, the transformation will fail because it cannot
+ *                                   determine which row should get which partition-value. False by default.
+ * @param outputDatasetId            Optional id of the output Dataset. Default is the id of the Actions first output DataObject.
  */
 case class ScalaClassSparkDsNTo1Transformer(override val description: Option[String] = None, className: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map(), parameterResolution: ParameterResolution = ParameterResolution.DataObjectId, strictInputValidation: Boolean = false, inputColumnAutoSelect: Boolean = true, outputColumnAutoSelect: Boolean = true, addPartitionValuesToOutput: Boolean = false, outputDatasetId: Option[String] = None) extends OptionsSparkDfsTransformer with SmartDataLakeLogger {
   private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDsNto1Transformer](className)
@@ -130,7 +138,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
     val resWithSelect = if (outputColumnAutoSelect) resAsDF.select(columsFromCaseClass.map(col): _*) else resAsDF
 
     if (addPartitionValuesToOutput) {
-      assert(partitionValues.size == 1, s"When using addPartitionValuesToOutput you can only process one partition-key at a time, but ${partitionValues.size} where given: {${partitionValues.mkString(";")}}")
+      assert(partitionValues.size == 1, s"When using addPartitionValuesToOutput you can only process one partition-value at a time, but ${partitionValues.size} where given: {${partitionValues.mkString(";")}}")
       partitionValues.head.elements.foldLeft(resWithSelect) {
         (dataframe, pair) => dataframe.withColumn(pair._1, lit(pair._2))
       }
@@ -164,7 +172,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
       case (param, paramIndex) if param.typeSignature <:< typeOf[Dataset[_]] =>
         val paramName = param.name.toString
         val dsType = param.typeSignature.typeArgs.head
-        val df = tolerantGet(dfs, paramName).getOrElse(throw new IllegalStateException(s"($actionId) [transformers.$name] DataFrame for DataObject $paramName not found in input DataFrames: ${dfs.keys.mkString(",")}"))
+        val df = tolerantGet(dfs, paramName.stripPrefix("ds")).getOrElse(throw new IllegalStateException(s"($actionId) [transformers.$name] DataFrame for DataObject $paramName not found in input DataFrames: ${dfs.keys.mkString(",")}"))
         val dfWithSelect =
           if (inputColumnAutoSelect) {
             val columnNames = getCaseClassColumnNames(dsType.toString)
