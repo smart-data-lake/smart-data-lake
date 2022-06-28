@@ -5147,10 +5147,6 @@
           "type" : {
             "const" : "ScalaClassSparkDsNTo1Transformer"
           },
-          "name" : {
-            "type" : "string",
-            "description" : "BName of the transformer"
-          },
           "description" : {
             "type" : "string",
             "description" : "Optional description of the transformer"
@@ -5177,6 +5173,22 @@
             "type" : "string",
             "enum" : [ "DataObjectOrdering ", "DataObjectId " ],
             "description" : "By default parameter resolution for transform function uses input Datasets id to match the corresponding parameter name.\nBut there are other options, see[[ParameterResolution]] ."
+          },
+          "strictInputValidation" : {
+            "type" : "string",
+            "description" : "Enforce that the number of input dataobjects must be the same as the number of input datasets. False by default,\nbecause when chaining multiple transformations in the same action, you may not need all output Data objects of the previous transformations.\nHowever, having more input parameters in your transform method than Dataobjects will always fail."
+          },
+          "inputColumnAutoSelect" : {
+            "type" : "string",
+            "description" : "Determine if the input-datasets should contain exactly the columns defined by the corresponding case class (spark does not ensure this out of the box). True per default."
+          },
+          "outputColumnAutoSelect" : {
+            "type" : "string",
+            "description" : "Determine if the output-dataset should contain exactly the columns defined by the corresponding case class (spark does not ensure this out of the box). True per default."
+          },
+          "addPartitionValuesToOutput" : {
+            "type" : "string",
+            "description" : "If set to true and if one partition-value is processed at a time, the partition-columns will be added to the output-dataset\nIf more than one partition-value is processed simultaneously, the transformation will fail because it cannot\ndetermine which row should get which partition-value. False by default."
           },
           "outputDatasetId" : {
             "type" : "string",
