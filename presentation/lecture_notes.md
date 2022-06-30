@@ -114,6 +114,22 @@ We have already something prepared...
 	- support for schema evolution, depending on the Action schema will be replaced or extended (new column added, removed columns kept)
 		+ not for partitioned Hive tables
 
+## Excursion: env variables
+- usage of optional env variables
+  ```Hocon
+  basedir = "/whatever/whatever"
+  basedir = ${?FORCED_BASEDIR}
+  ```
+- overwrite prameters with env variables
+  + specify java option `-Dconfig.override_with_env_vars=true` in Docker entrypoint and
+  + env var:
+    * prefix `CONFIG_FORCE_` is stripped
+    * single underscore(`_`) is converted into a dot(`.`)
+    * double underscore(`__`) is converted into a dash(`-`)
+    * triple underscore(`___`) is converted into a single underscore(`_`)
+:warning: TODO overwrite not working
+
+
 What else is supported?
 > open [SDLB Schema Viewer](http://smartdatalake.ch/json-schema-viewer/index.html#viewer-page&version=sdl-schema-2.3.0-SNAPSHOT.json)
 * distinguish `gloabl`, `dataObjects`, `actions`, and `connections`
@@ -162,11 +178,13 @@ Let's have a closer look to the present examples:
 	- can be lists or regex, e.g. `--feed-sel '.*'`
 	- can also be `startWith...` or `endWith...`
 
-> first run config test `podman run --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel 'download' --test config` (fix bug together)
+* > first run config test `podman run --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel 'download' --test config` (fix bug together)
 
-while running we get:
+* while running we get:
 `Exception in thread "main" io.smartdatalake.config.ConfigurationException: (DataObject~stg-airports) ClassNotFoundException: Implementation CsvDataObject of interface DataObject not found`
 let us double check what DataObjects there are available... [SDLB Schema Viewer](http://smartdatalake.ch/json-schema-viewer/index.html#viewer-page&version=sdl-schema-2.3.0-SNAPSHOT.json)
+
+
 
 > fix issue by correcting the dataObject type to `CvsFileDataObject`
 
@@ -270,13 +288,23 @@ The departures are directly loaded into a delta table: open [Polynote at localho
 ### Command Line
 * command line option `-s` or `--streaming`, streaming all selected actions
   - requires `--state-path` to be set
-* just start `podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod getting-started sdl-spark:latest --config /mnt/config/departures_incremental.conf  --feed-sel download --state-path /mnt/data/state -n getting-started -s` and see the action runnning again and again
+* just start `podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod getting-started sdl-spark:latest --config /mnt/config/  --feed-sel download --state-path /mnt/data/state -n getting-started -s` and see the action runnning again and again
   - > notice the recurring of both actions, here in our case we could limit the feed to the specific action
   - > monitor the growth of the table
   - > see strieming trigger interval of 48s in output: `LocalSmartDataLakeBuilder$ - sleeping 48 seconds for synchronous streaming trigger interval [main]`
-    + change it: search stream in Schema Viewer -> `global`->`synchronousStreamingTriggerIntervalSec`
+    + change it: search stream in Schema Viewer -> `global`->`synchronousStreamingTriggerIntervalSec = 10` -> interval between 2 starts (not end to start)
 
-### 
+:warning: TODO other streaming modes???
+
+### Parallelism
+* distinguish 2 types of parallelism
+  - within a spark job: the amount of Spark tasks, controlled by global option `    "spark.sql.shuffle.partitions" = 2`
+  - parallel running DAG actions, by default serial, one by one action
+    + see `Action~download-airports[FileTransferAction]: Exec started` and `Action~download-deduplicate-departures[DeduplicateAction]`
+    + use command line option `--parallelism 2` to run both tasks in parallel
+    + :warning: parallel actions are more difficult to debug
+    
+
 
 :warning: TODO
 
