@@ -116,11 +116,7 @@ case class CustomWebserviceDataObject(override val id: DataObjectId,
         .withColumn("created_at", current_timestamp())
 
       // put simple nextState logic below
-      if(previousState.isEmpty){
-        nextState = currentQueryParameters.map(params => State(params.airport, params.end))
-      } else {
-        nextState = previousState.map(params => State(params.airport, now))
-      }
+      nextState = currentQueryParameters.map(params => State(params.airport, params.end))
       // return
       departuresDf
     }

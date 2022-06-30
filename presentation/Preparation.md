@@ -2,13 +2,18 @@
 
 Smart Data Lake Builder (SDLB) is designed to be provisioned on a variety of systems, on-prem and in the cloud. For this course we avoid to deal with creating accounts and subsriptions and proper cloud setup and have chosen to run SDLB locally within containers. 
 Out target setup will utilize Windows WSL, and podman to run the containers. 
-The following guide will assist you with neccessary steps to setup these tools as well as basic setup of SDLB.  
+The following guide will assist you with neccessary steps to setup these tools as well as basic setup of SDLB.
+
+For the operating system 2 options are presented: 
+* installing [WSL with Ubuntu](#wsl_with_ubuntu) OR
+* installing [VirtualBox with Debian](#vitrualbox_with_debian)
+Depending on your preferences and your underlying setup, choos one option. 
 
 In case you have already a working Unix environment (Linux, MacOS, or Windows Subsystem Linux (WSL) ) you can jump to [Podman installation](#podman). 
 
 If you already have Docker or Podman running, you can directly proceed with [SDLB preparation and testing](#sdlb-preparation-and-testing). 
 
-## Unix environment
+## WSL with Ubuntu
 Assuming you have no Windows Store available you need to follow the following steps:
 
 * enable WSL: Admin-Powershell -> `dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart`
@@ -39,8 +44,18 @@ supporting Documentation:
 * [manual install WSL actual install](https://docs.microsoft.com/en-us/windows/wsl/install-on-server)
 * [MS store patch](https://answers.microsoft.com/en-us/windows/forum/all/microsoft-store-error-code-0xc002001b/8b33966d-6abe-4f17-b04a-bd0744afd9d7)
 
+If you successfully installed Ubutu go to step [Podman](#Podman)
+
+## VirtualBox with Debian
+* install [VirtualBox](https://www.virtualbox.org/wiki/Downloads), on Windows download [this](https://download.virtualbox.org/virtualbox/6.1.34/VirtualBox-6.1.34a-150636-Win.exe)
+* Download the [Debian image](https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-11.3.0-amd64-netinst.iso)
+* after installation open VirtualBox and create a new VM, selecting: Linux, Debian
+	- When asked for the bootable disc to istall from, select the downloaded iso
+	- follow instructions
+
 ## Podman
 SDLB and other tools will be run in a container. Therefore, we utilize the rootless alternative to Docker, called Podman. The installation is easiest using homebrew:
+
 * install curl and git for downloading sources: `sudo apt update && sudo apt upgrade && sudo apt-get install curl git`
 * install homebrew: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`, follow further instructions
 * install podman and podman-compose: `brew install podman podman-compose`
@@ -49,3 +64,15 @@ SDLB and other tools will be run in a container. Therefore, we utilize the rootl
 * download example case: `git@github.com:smart-data-lake/getting-started.git && git checkout training`
 * build SDLB: `podman build -t sdl-spark .`
 * try SDLB: `podman run --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel launchTask --help`
+
+# Additional hints:
+## Git ports
+* if in your netwrok the GIT default port 22 is blocked, set in your `~/.ssh/config`:
+
+```BASH
+Host github.com
+    Hostname ssh.github.com
+    IdentityFile ~/.ssh/id_github
+    Port 443
+    User git
+```

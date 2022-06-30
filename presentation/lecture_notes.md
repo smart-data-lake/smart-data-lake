@@ -14,7 +14,7 @@
 * as data engineers we need to:
   - download data
   - combining/filter/transform data in a general manner
-  - store processed data in data lake, thus can be utilized for various use cases
+  - store processed data, thus it can be utilized for various use cases
   - analyse/compute data for a specific application
 
 
@@ -75,7 +75,7 @@ In our case we could think of the following structure:
 
 ![data layer structure for the use case](images/dataLayers.png)
 
-## Security
+## Security In Cloud
 * protect data especially in the cloud 
 * manage access using permission groups
   - Users belong to role groups
@@ -154,24 +154,25 @@ Let's have a closer look to the present examples:
 
 * there is also Scala Class used in the example, but we will not go into detail yet.
 
-## Application execution
-* `feed-sel` always necessary (see help `--help`)
+## Feeds
+> start application with `--help`: `podman run --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config`
+> Note: `-rm` removes container after exit, `hostname` and `pod` for lauching in same Network as metastore and Polynote, mounting data, target and config directory, container name, config directories/files
+* `feed-sel` always necessary 
 	- can be specified by metadata feed, name, or ids
-	- can be lists or regex
-	- can also be `startWith...` or `endWith`
+	- can be lists or regex, e.g. `--feed-sel '.*'`
+	- can also be `startWith...` or `endWith...`
 
-> first run config test `podman run --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel 'ids:download-airports' --test config` (fix bug together)
+> first run config test `podman run --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel 'download' --test config` (fix bug together)
 
-
-hile running we get:
+while running we get:
 `Exception in thread "main" io.smartdatalake.config.ConfigurationException: (DataObject~stg-airports) ClassNotFoundException: Implementation CsvDataObject of interface DataObject not found`
 let us double check what DataObjects there are available... [SDLB Schema Viewer](http://smartdatalake.ch/json-schema-viewer/index.html#viewer-page&version=sdl-schema-2.3.0-SNAPSHOT.json)
 
 > fix issue by correcting the dataObject type to `CvsFileDataObject`
 
-> run again (and then with) `--test dry-run`: `podman run --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel '.*' --test dry-run`
+> run again (and then with) `--test dry-run` and feed `'.*'` to check all configs: `podman run --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel '.*' --test dry-run`
 
-### DAG
+## DAG
 * (Directed acyclic graph)
 > show DAG in output
 * automatically created using the specifications in the SDLB config. 
@@ -209,23 +210,74 @@ let us double check what DataObjects there are available... [SDLB Schema Viewer]
                   └─────────────────┘
 ```
 
-### Execution Phases
+## Execution Phases
 * logs reveal the **execution phases**
 * in general we have: 
 	- configuration parsing
 	- DAG preparation
 	- DAG init
-	- DAG exec
+	- DAG exec (not processed in dry-run mode)
 * early validation: in init even custom transformation are checked, e.g. identifying mistakes in column names
-* [website link]()
+* [Docu: execution phases](https://smartdatalake.ch/docs/reference/executionPhases)
 
-#### incremental
+## Inspect result
+During the Airport download we created a CSV file: `less data/stg-airports/results.csv`
+The departures are directly loaded into a delta table: open [Polynote at localhost:8192](http://localhost:8192/notebook/SelectingData.ipynb)
+  `departure table consits of 457 row and entries are of original date: 20210829 20210830`
 
-```
+## Incremental Load
+* desire to **not read all** data from input at every run -> incrementally
+* or here: departure source **resricted request** to <7 days
+  - initial request 2 days 29.-20.08.2021
+
+### General aspects
+* in general we often want an inital load and then regular updates
+* distinguish between
+* **StateIncremental** 
+  - stores a state, utilized during request submission, e.g. WebService or DB request
+* **SparkIncremental**
+  - uses max values from **compareCol**
+ 
+### Current Example
+* here we use state to store the last position
+  - [CustomWebserviceDataObject](https://github.com/smart-data-lake/getting-started/blob/training/src/main/scala/io/smartdatalake/workflow/dataobject/CustomWebserviceDataObject.scala) the StateIncremental mode is enabled, by: 
+    + using the proper trait for the class
+    + instantiating state variables and 
+    + defining the setState and getState routines
+    + see also the [documentation](https://smartdatalake.ch/docs/getting-started/part-3/incremental-mode)
+
+* enabled by adding to the `download-deduplicate-departures` action:
+  ```
     executionMode = { type = DataObjectStateIncrementalMode }
     mergeModeEnable = true
     updateCapturedColumnOnlyWhenChanged = true
- ```
+  ```
+  - and add `--state-path /mnt/data/state -n getting-started` to the command line arguments
+
+* **first run** creates `less data/state/succeeded/getting-started.1.1.json` 
+  - see line `"state" : "[{\"airport\":\"LSZB\",\"nextBegin\":1630310979},{\"airport\":\"EDDF\",\"nextBegin\":1630310979}]"`
+  - this is used for the next request
+* see next request in output of **next run**:
+  `CustomWebserviceDataObject - Success for request https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1631002179&end=1631347779 [exec-download-deduplicate-departures]`
+  - also check the [increasing amount fo lines collected in table](http://localhost:8192/notebook/inspectData.ipynb#Cell4)
+> run a couple of times
+
+> :warning: When we get result/error: `Webservice Request failed with error <404>`, if there are no new data avalable. 
+
+## Streaming
+* continious processing, cases we want to run the actions again and again
+
+### Command Line
+* command line option `-s` or `--streaming`, streaming all selected actions
+  - requires `--state-path` to be set
+* just start `podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod getting-started sdl-spark:latest --config /mnt/config/departures_incremental.conf  --feed-sel download --state-path /mnt/data/state -n getting-started -s` and see the action runnning again and again
+  - > notice the recurring of both actions, here in our case we could limit the feed to the specific action
+  - > monitor the growth of the table
+  - > see strieming trigger interval of 48s in output: `LocalSmartDataLakeBuilder$ - sleeping 48 seconds for synchronous streaming trigger interval [main]`
+    + change it: search stream in Schema Viewer -> `global`->`synchronousStreamingTriggerIntervalSec`
+
+### 
+
 :warning: TODO
 
 ## Databricks
