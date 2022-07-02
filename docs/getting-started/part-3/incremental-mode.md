@@ -161,11 +161,7 @@ val currentQueryParameters = if (previousState.isEmpty) checkQueryParameters(que
 ```
 The implemented logic 
 ```scala
-if(previousState.isEmpty){
-  nextState = currentQueryParameters.map(params => State(params.airport, params.end))
-} else {
-  nextState = previousState.map(params => State(params.airport, now))
-}
+nextState = currentQueryParameters.map(params => State(params.airport, params.end))
 ```
 for the next state can be placed below the comment `// put simple nextState logic below`. 
 
