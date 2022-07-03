@@ -177,7 +177,7 @@ private[smartdatalake] object ProductUtil {
     df.as(createEncoder(tpe))
   }
 
-  def classAccessorsNames(className: String): List[String] = {
+  def classAccessorNames(className: String): List[String] = {
     val mirror = scala.reflect.runtime.currentMirror
     val tpe: universe.Type = mirror.classSymbol(mirror.classLoader.loadClass(className)).toType
     classAccessors(tpe).map(_.name.toString)

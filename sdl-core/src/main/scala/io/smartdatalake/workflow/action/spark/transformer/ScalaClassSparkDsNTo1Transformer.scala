@@ -128,7 +128,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
       }
 
     val outputClassType = transformMethodInstance.getAnnotatedReturnType.getType.asInstanceOf[ParameterizedTypeImpl].getActualTypeArguments.head.getTypeName
-    val columsFromCaseClass = ProductUtil.classAccessorsNames(outputClassType)
+    val columsFromCaseClass = ProductUtil.classAccessorNames(outputClassType)
 
     val resAsDF = res.asInstanceOf[Dataset[_]].toDF
     val resWithSelect = if (outputColumnAutoSelect) resAsDF.select(columsFromCaseClass.map(col): _*) else resAsDF
@@ -166,7 +166,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
         val df = tolerantGet(dfs, paramName.stripPrefix("ds")).getOrElse(throw new IllegalStateException(s"($actionId) [transformers.$name] DataFrame for DataObject $paramName not found in input DataFrames: ${dfs.keys.mkString(",")}"))
         val dfWithSelect =
           if (inputColumnAutoSelect) {
-            val columnNames = ProductUtil.classAccessorsNames(dsType)
+            val columnNames = ProductUtil.classAccessorNames(dsType)
             df.select(columnNames.map(col): _*)
           } else {
             df
