@@ -19,8 +19,8 @@
 
 package io.smartdatalake.util.misc
 
-import scala.reflect.runtime.currentMirror
 import scala.reflect.runtime.universe._
+import scala.reflect.runtime.{currentMirror, universe}
 import scala.util.{Failure, Success, Try}
 
 object ScalaUtil {
@@ -87,7 +87,8 @@ object ScalaUtil {
   def attributesWithValuesForCaseClass(obj: Any): Seq[(String, Any)] = {
     val clsSym = mirror.classSymbol(obj.getClass)
     val inst = mirror.reflect(obj)
-    val attributes = clsSym.toType.members.collect { case m: MethodSymbol if m.isCaseAccessor => m }
+
+    val attributes: Iterable[universe.MethodSymbol] = ProductUtil.classAccessors(clsSym.toType)
     attributes.map { m =>
       val key = m.name.toString
       val value = inst.reflectMethod(m).apply()

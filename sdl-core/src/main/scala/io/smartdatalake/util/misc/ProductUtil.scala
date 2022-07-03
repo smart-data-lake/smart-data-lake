@@ -22,10 +22,12 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
 import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
+import org.apache.spark.sql.{DataFrame, Dataset}
 
 import java.time.format.DateTimeFormatter
 import scala.reflect.ClassTag
-import scala.reflect.runtime.universe.Type
+import scala.reflect.runtime.universe
+import scala.reflect.runtime.universe._
 
 private[smartdatalake] object ProductUtil {
 
@@ -170,4 +172,19 @@ private[smartdatalake] object ProductUtil {
     val deserializer = ScalaReflection.deserializerForType(tpe)
     new ExpressionEncoder(serializer, deserializer, ClassTag(cls))
   }
+
+  def createDataset(df: DataFrame, tpe: Type): Dataset[_] = {
+    df.as(createEncoder(tpe))
+  }
+
+  def classAccessorsNames(className: String): List[String] = {
+    val mirror = scala.reflect.runtime.currentMirror
+    val tpe: universe.Type = mirror.classSymbol(mirror.classLoader.loadClass(className)).toType
+    classAccessors(tpe).map(_.name.toString)
+  }
+
+  def classAccessors(tpe: universe.Type): List[MethodSymbol] = tpe.decls.sorted.collect {
+    case m: MethodSymbol if m.isCaseAccessor => m
+  }.toList
+
 }
