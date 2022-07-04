@@ -166,7 +166,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
         val df = tolerantGet(dfs, paramName.stripPrefix("ds")).getOrElse(throw new IllegalStateException(s"($actionId) [transformers.$name] DataFrame for DataObject $paramName not found in input DataFrames: ${dfs.keys.mkString(",")}"))
         val dfWithSelect =
           if (inputColumnAutoSelect) {
-            val columnNames = ProductUtil.classAccessorNames(dsType)
+            val columnNames = ProductUtil.classAccessorsNames(dsType)
             df.select(columnNames.map(col): _*)
           } else {
             df
