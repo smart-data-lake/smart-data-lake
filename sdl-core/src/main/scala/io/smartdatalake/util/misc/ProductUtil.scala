@@ -187,9 +187,7 @@ private[smartdatalake] object ProductUtil {
     classAccessors(tpe).map(_.name.toString)
   }
 
-
   def classAccessors(tpe: universe.Type): List[MethodSymbol] = tpe.decls.sorted.collect {
     case m: MethodSymbol if m.isCaseAccessor => m
   }
-
 }
