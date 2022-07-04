@@ -77,12 +77,15 @@ In our case we could think of the following structure:
 
 ## Security In Cloud
 * protect data especially in the cloud 
+* Data Classification: Public, Internal, Restricted, Personal Data, Confidential
+  - [ELCA concept](https://confluence.svc.elca.ch/display/BL9CONFLUENCE/Data+Security+Concept+for+Cloud+Analytics+Platforms)
 * manage access using permission groups
   - Users belong to role groups
   - role groups have permission groups
   - permission groups mange permissions for apps, devices, and environments
 
 ![permission managment from user over role groups and technical troups to specify permissions](images/authorisationConcept.png)
+More detailed [ELCA concept](https://confluence.svc.elca.ch/display/BL9CONFLUENCE/Authorization+Concept+for+Cloud+Analytics+Platforms)
 
 :warning: TODO
 
@@ -326,17 +329,42 @@ The departures are directly loaded into a delta table: open [Polynote at localho
 
 ## Databricks
 
-### setup
+### Preparation steps (not part of the demonstration)
+For reference see also: [SDL Deployment on Databricks](https://smartdatalake.ch/blog/sdl-databricks/).
+The following setup is already prepared in the elca-dev tenant:
+
 * uploading files
   - upload jar
-    + first build fat-jar
-    + Databricks `Workspace`->`User`->`<Username>`->`Import`-> link in `(To import a library, such as a jar or egg, click here)`
+    + first build fat-jar: `podman run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -DskipTests  -P fat-jar -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package`
+    + upload Databricks `Workspace`->`User`->`<Username>`->`Import`-> link in `(To import a library, such as a jar or egg, click here)`
+  - create typesafe fix:
+    ```BASH
+    cat << EOF >> ./config-install.sh
+    #!/bin/bash
+    wget -O /databricks/jars/-----config-1.4.1.jar https://repo1.maven.org/maven2/com/typesafe/config/1.4.1/config-1.4.1.jar
+    EOF
+    databricks fs mkdirs dbfs:/databricks/scripts
+    databricks fs cp ./config-install.sh dbfs:/databricks/scripts/
+    ```
+  - create compute resource:
+    + use the uploaded jar
+    + use init script: `dbfs:/databricks/scripts/config-install.sh` (uploaded above)
   - upload configs
     + use Linux Databricks CLI: 
-    `datbrics fs mkdirs dbfs:/config`
-    `databricks fs cp config/*.conf dbfs:/conf/application.conf`
-* start job
+    `datbricks fs mkdirs dbfs:/config`
+    `databricks fs cp config/departures.conf dbfs:/databricks/config/departures.conf`
 
-### Notebook Support
+* configure job, using the uploaded jar and 
+  - parameters: `["-c","file:///dbfs/databricks/config/","--feed-sel","ids:download-deduplicate-departures", "--state-path", "file:///dbfs/databricks/data/state", "-n", "getting-started"]`
+  
+### Show case
+* Workspace -> workflow -> SDLB-train job -> run job
+* after finished, show Data -> int-departures table
+* show notbook in Workspace
+
+### Further points
+* cluster swap possible
+* recurring schedule
+* 
 
 :warning: TODO
