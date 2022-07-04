@@ -180,10 +180,10 @@ private[smartdatalake] object ProductUtil {
   def classAccessorNames(className: String): List[String] = {
     val mirror = scala.reflect.runtime.currentMirror
     val tpe: universe.Type = mirror.classSymbol(mirror.classLoader.loadClass(className)).toType
-    classAccessorsNames(tpe)
+    classAccessorNames(tpe)
   }
 
-  def classAccessorsNames(tpe: universe.Type): List[String] = {
+  def classAccessorNames(tpe: universe.Type): List[String] = {
     classAccessors(tpe).map(_.name.toString)
   }
 
