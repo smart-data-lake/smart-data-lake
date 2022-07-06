@@ -54,11 +54,19 @@ If you successfully installed Ubutu go to step [Podman](#Podman)
 	- follow instructions
 
 ## Podman
-SDLB and other tools will be run in a container. Therefore, we utilize the rootless alternative to Docker, called Podman. The installation is easiest using homebrew:
+SDLB and other tools will be run in a container. Therefore, we utilize the rootless alternative to Docker, called Podman:
 
-* install curl and git for downloading sources: `sudo apt update && sudo apt upgrade && sudo apt-get install curl git`
-* install homebrew: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`, follow further instructions
-* install podman and podman-compose: `brew install podman podman-compose`
+```
+. /etc/os-release
+echo "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/ /" | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list
+curl -L "https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/Release.key" | sudo apt-key add -
+sudo apt-get update
+sudo apt-get -y upgrade
+sudo apt-get -y install podman
+sudo apt install python3-pip
+sudo pip3 install podman-compose==0.1.11
+```
+> :warning: podman-compose with major 1 (tested up to 1.0.3) do not create pods automatically. Therewith, the used commands results in networking issues between the containers. Thus, we recommend to use the latest version with automatic pod creation, version 0.1.11. The behaviour may change in future versions. 
 
 ## SDLB preparation and testing
 * download example case: `git@github.com:smart-data-lake/getting-started.git && git checkout training`
