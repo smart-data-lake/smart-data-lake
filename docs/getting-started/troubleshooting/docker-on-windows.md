@@ -32,8 +32,8 @@ Install podman-compose for podman in WSL2:
     sudo apt install python3-pip
     sudo pip3 install podman-compose==0.1.11
 
-:::Info podman version
-Starting with podman-compose major version 1, no pods are created automatically. This results in networking issues between the containers. Therefore, we recommend to use a the latest version of 0.x.x which is here `0.1.11`. The behaviour may change in future versions.
+:::info podman version
+`podman-compose` with major 1 (tested up to 1.0.3) do not create pods automatically. Therewith, the used commands results in networking issues between the containers. Thus, we recommend to use the latest version with automatic pod creation, version 0.1.11. The behaviour may change in future versions. 
 :::
 
 After starting `podman-compose up` in the getting-started folder you should now be able to open Polynote on port localhost:8192, as WSL2 automatically publishes all ports on Windows.
