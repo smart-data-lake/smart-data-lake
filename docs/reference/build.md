@@ -58,4 +58,61 @@ With that, you also get all profiles defined in our parent project,
 so it's easy to generate a ***fat-jar*** for example (including all dependencies you need). 
 When deploying to a cluster with Apache Spark preconfigured, you don't need to include this dependency yourself. 
 Use the profile ***fat-jar*** in this case.   
-If you want to generate a jar for local execution or somewhere Apache Spark is not provided, use the profile ***fat-jar-with-spark*** instead.
+If you want to generate a jar for local execution or somewhere Apache Spark is not provided, use the profile ***fat-jar-with-spark*** instead
+
+## Build an SDL Container
+
+To build an SDL container a *Dockerfile* and a *pom.xml* is neccessary. The Dockerfile specifies:
+
+* maven base image, and the openjdk image
+* SDL specifiaction, defined in the `pom.xml`
+* log4j property file
+* entrypoint
+
+An example would be:
+
+```
+#
+# Build stage
+#
+FROM docker.io/maven:3.6.0-jdk-11-slim AS build
+COPY src /home/app/src
+COPY pom.xml /home/app
+RUN mvn --quiet -f /home/app/pom.xml -Pcopy-libs package
+
+#
+# Package stage
+# Note that *.jar is provided to the docker image through /mnt/lib and added to the class-path for SDL.
+#
+FROM docker.io/openjdk:11-jre-slim
+COPY --from=build /home/app/target/lib/*.jar /opt/app/lib/
+COPY --from=build /home/app/src/main/resources/log4j.properties /home/app/lib/
+ENTRYPOINT ["java","-D${CONFIG_OVERWRITE}", "-Duser.dir=/mnt/data","-Dlog4j.configuration=file:/home/app/lib/log4j.properties","-cp","/opt/app/lib/*:/mnt/lib/*","io.smartdatalake.app.LocalSmartDataLakeBuilder"]
+```
+
+Custom Scala Classes for e.g. dataObjects and transformers, can be build seperately and mounted into the container (into `/mnt/lib`). 
+
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+docker build -t sdl-spark .
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+podman build -t sdl-spark .
+```
+
+</TabItem>
+</Tabs>
+
+
+An example including the log4j.properties is also provided in the [getting-started](https://github.com/smart-data-lake/getting-started.git). 

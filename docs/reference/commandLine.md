@@ -3,7 +3,7 @@ id: commandLine
 title: Command Line
 ---
 
-# Command Line
+# Start Java object using Spark-Submit
 SmartDataLakeBuilder is a java application. 
 To run on a cluster with spark-submit, use **DefaultSmartDataLakeBuilder** application.
 It can be started with the following command line options (for details, see [YARN](deployYarn.md)).
@@ -54,3 +54,64 @@ There are two additional, adapted application versions you can use:
 - **LocalSmartDataLakeBuilder**: default for Spark master is `local[*]` in this case, and it has additional properties to configure Kerberos authentication. 
 Use can use this application to run in a local environment (e.g. IntelliJ) without cluster deployment.
 - **DatabricksSmartDataLakeBuilder**: see [Microsoft Azure](deploy-microsoft-azure.md), special class when running a Databricks Cluster.
+
+# Launching SDL container
+Depending on the container defintion, especially the entrypoint the arguments may vary. Furthermore, we distinguish starting the container using *docker* or *podman*. 
+
+In general a container launch would look like:
+
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+docker run [docker-args] sdl-spark --config [config-file] --feed-sel [feed] [further-SDL-args]
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+podman run [docker-args] sdl-spark --config [config-file] --feed-sel [feed] [further-SDL-args]
+```
+
+</TabItem>
+</Tabs>
+
+These could also include mounted directories for configurations, additional Scala Classes, data directories, etc.
+
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download
+```
+
+</TabItem>
+</Tabs>
+
+
+## Pods with Podman
+When interacting between multiple containers, e.g. SDL container and a metastore container, pods are utilized to manage the container and especially the network. A set of containers is launched using podman-compose and a `docker-compose.yaml`. Podman-compose < 1.0.0 creates the pods automatically. This seams to be broken in later version. That is why we suggest to install podman-compose 0.1.11.
+
+Assuming an existing pod `mypod` running, another container can be started within this pod using the additional podman arguments `--pod mypod --hostname myhost --add-host myhost:127.0.0.1`. 
+The hostname specification fixes an issue in resolving the own localhost.
+
+
+
