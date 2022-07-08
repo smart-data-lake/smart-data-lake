@@ -19,8 +19,8 @@
 
 package io.smartdatalake.util.misc
 
+import scala.reflect.runtime.currentMirror
 import scala.reflect.runtime.universe._
-import scala.reflect.runtime.{currentMirror, universe}
 import scala.util.{Failure, Success, Try}
 
 object ScalaUtil {
@@ -80,22 +80,5 @@ object ScalaUtil {
   def optionalizeMap(m: Map[String,String]): Option[Map[String,String]] = if (m.isEmpty) None else Some(m)
 
   def arrayToSeq[T](arr: Array[T]): Seq[T] = if (arr == null) Seq() else arr.toSeq
-
-  /**
-   * extract case class attributes with values through reflection
-   */
-  def attributesWithValuesForCaseClass(obj: Any): Seq[(String, Any)] = {
-    val clsSym = mirror.classSymbol(obj.getClass)
-    val inst = mirror.reflect(obj)
-
-    val attributes: Iterable[universe.MethodSymbol] = ProductUtil.classAccessors(clsSym.toType)
-    attributes.map { m =>
-      val key = m.name.toString
-      val value = inst.reflectMethod(m).apply()
-      (key, value)
-    }.toSeq
-  }
-
-  private val mirror = scala.reflect.runtime.currentMirror
 
 }

@@ -20,7 +20,7 @@
 package io.smartdatalake.meta.jsonschema
 
 import io.smartdatalake.meta.jsonschema.JsonTypeEnum.JsonTypeEnum
-import io.smartdatalake.util.misc.ScalaUtil
+import io.smartdatalake.util.misc.ProductUtil
 import org.apache.commons.lang.NotImplementedException
 import org.json4s._
 import org.json4s.jackson.Serialization
@@ -217,7 +217,7 @@ private[smartdatalake] object JsonExtractor {
   def jsonTypeDefSerializer() = new CustomSerializer[JsonTypeDef](format => {
     val serializer: PartialFunction[Any, JValue] = {
       case obj: JsonExtractor =>
-        val attributes = ScalaUtil.attributesWithValuesForCaseClass(obj)
+        val attributes = ProductUtil.attributesWithValuesForCaseClass(obj)
           .filter {
             case (k, None) => false
             case (k, v: Iterable[_]) if (v.isEmpty) => false
