@@ -22,26 +22,22 @@ package io.smartdatalake.workflow.action.spark.transformer
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{CustomCodeUtil, SmartDataLakeLogger}
-import io.smartdatalake.util.spark.{DefaultExpressionData, EncoderUtil}
+import io.smartdatalake.util.misc.{CustomCodeUtil, ProductUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.spark.DefaultExpressionData
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, OptionsSparkDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, CustomDsNto1Transformer}
 import io.smartdatalake.workflow.action.spark.transformer.ParameterResolution.ParameterResolution
 import io.smartdatalake.workflow.dataobject.DataObject
-import javassist.bytecode.stackmap.TypeTag
-import org.apache.hadoop.shaded.com.sun.jersey.server.impl.cdi.AnnotatedTypeImpl
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
-import org.json4s.scalap.scalasig.AnnotatedType
 import sun.reflect.generics.reflectiveObjects.ParameterizedTypeImpl
 
 import java.lang.reflect.InvocationTargetException
 import scala.reflect.runtime.universe
-import scala.reflect.runtime.universe.{MethodSymbol, typeOf}
+import scala.reflect.runtime.universe.typeOf
 
 /**
  * Configuration of a custom Spark-Dataset transformation between N inputs and 1 outputs (N:1) as Java/Scala Class
@@ -132,7 +128,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
       }
 
     val outputClassType = transformMethodInstance.getAnnotatedReturnType.getType.asInstanceOf[ParameterizedTypeImpl].getActualTypeArguments.head.getTypeName
-    val columsFromCaseClass = getCaseClassColumnNames(outputClassType)
+    val columsFromCaseClass = ProductUtil.classAccessorNames(outputClassType)
 
     val resAsDF = res.asInstanceOf[Dataset[_]].toDF
     val resWithSelect = if (outputColumnAutoSelect) resAsDF.select(columsFromCaseClass.map(col): _*) else resAsDF
@@ -148,11 +144,6 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
     }
   }
 
-  private def getCaseClassColumnNames(className: String): Seq[String] = {
-    val outputCaseClass = Environment.classLoader.loadClass(className)
-    outputCaseClass.getDeclaredFields.toSeq.map(_.getName)
-  }
-
   private def getMappedDatasetParamsBasedOnOrdering(actionId: ActionId, datasetParamsWithParamIndex: Seq[(universe.Symbol, Int)], inputDOs: Seq[DataObject], dfs: Map[String, DataFrame]) = {
     if (strictInputValidation) {
       assert(datasetParamsWithParamIndex.size == inputDOs.size, s"($actionId) [transformers.$name] Number of Dataset-Parameters of transform function does not match number of input DataObjects! datasetParams: ${datasetParamsWithParamIndex.map(_._1.name).mkString(",")}, inputDOs: ${inputDOs.map(_.id).mkString(",")}")
@@ -162,7 +153,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
         val dsType = param.typeSignature.typeArgs.head
         val dataObjectAtThatIndexInConfig = inputDOs(datasetIndex)
         val df = dfs(dataObjectAtThatIndexInConfig.id.id)
-        val ds = EncoderUtil.createDataset(df, dsType)
+        val ds = ProductUtil.createDataset(df, dsType)
         (paramIndex, ds)
     }
   }
@@ -171,16 +162,16 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
     datasetParamsWithParamIndex.map {
       case (param, paramIndex) if param.typeSignature <:< typeOf[Dataset[_]] =>
         val paramName = param.name.toString
-        val dsType = param.typeSignature.typeArgs.head
+        val dsType: universe.Type = param.typeSignature.typeArgs.head
         val df = tolerantGet(dfs, paramName.stripPrefix("ds")).getOrElse(throw new IllegalStateException(s"($actionId) [transformers.$name] DataFrame for DataObject $paramName not found in input DataFrames: ${dfs.keys.mkString(",")}"))
         val dfWithSelect =
           if (inputColumnAutoSelect) {
-            val columnNames = getCaseClassColumnNames(dsType.toString)
+            val columnNames = ProductUtil.classAccessorNames(dsType)
             df.select(columnNames.map(col): _*)
           } else {
             df
           }
-        val ds = EncoderUtil.createDataset(dfWithSelect, dsType)
+        val ds = ProductUtil.createDataset(dfWithSelect, dsType)
         (paramIndex, ds)
     }
   }

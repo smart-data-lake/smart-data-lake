@@ -24,7 +24,7 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{ScalaUtil, SchemaUtil}
+import io.smartdatalake.util.misc.{ProductUtil, SchemaUtil}
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
@@ -348,7 +348,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
         | WHEN NOT MATCHED $insertConditionStr THEN INSERT ($insertSpecStr) VALUES ($insertValueSpecStr)
         """.stripMargin
       // execute
-      logger.info(s"($id) executing merge statement with options: ${ScalaUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1+"="+e._2).mkString(" ")}")
+      logger.info(s"($id) executing merge statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1+"="+e._2).mkString(" ")}")
       connection.execJdbcStatement(mergeStmt, doCommit = true)
     } finally {
       // cleanup temp table

@@ -1,7 +1,6 @@
 package io.smartdatalake.meta
 
 import com.github.takezoe.scaladoc.{Scaladoc => ScaladocAnnotation}
-import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{AuthMode, ExecutionMode, SaveModeOptions}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer, ValidationRule}
@@ -211,20 +210,4 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
       GenericAttributeDef(p.name.encodedName.toString, tpe, description, isRequired = !isOptional && !hasDefaultValue, isOverride = isOverride, isDeprecated = isDeprecated)
     })
   }
-
-  /**
-   * extract case class attributes with values through reflection
-   */
-  def attributesWithValuesForCaseClass(obj: Any): Seq[(String, Any)] = {
-    val clsSym = mirror.classSymbol(obj.getClass)
-    val inst = mirror.reflect(obj)
-    val attributes = clsSym.toType.members.collect { case m: MethodSymbol if m.isCaseAccessor => m }
-    attributes.map { m =>
-      val key = m.name.toString
-      val value = inst.reflectMethod(m).apply()
-      (key, value)
-    }.toSeq
-  }
-
-  private val mirror = scala.reflect.runtime.currentMirror
 }
