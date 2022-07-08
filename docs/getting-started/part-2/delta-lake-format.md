@@ -214,7 +214,7 @@ podman run --hostname localhost --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/
 </TabItem>
 </Tabs>
 
-:::info Hostname specification
+:::info Podman Hostname Specification
 Without specifying the hostname, the containter name (by default the docker/podman container ID) can not be resolved to localhost. If you need to name your container differently, the following arguments can be used alternatively: `--hostname myhost --add-host myhost:127.0.0.1 -rm ...`
 :::
 
