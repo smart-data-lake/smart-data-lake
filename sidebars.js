@@ -32,9 +32,12 @@ module.exports = {
     {'Reference' : [
         'reference/build',
         'reference/commandLine',
-        //'reference/hoconOverview',
-        //'reference/hoconElements',
-        //'reference/dag',
+        {'Hocon Configuration' : [
+          'reference/hoconOverview',
+          'reference/hoconSecrets',
+          'reference/hoconVariables',
+        ]},
+        'reference/dag',
         'reference/executionPhases',
         'reference/executionEngines',
         //'reference/executionModes',
@@ -43,7 +46,10 @@ module.exports = {
         //'reference/housekeeping',
         //'reference/streaming',
         //'reference/metrics',
-        //'reference/deploymentOptions',
+        {'Deployment' : [
+          'reference/deploymentOptions',
+          'reference/deploy-microsoft-azure',
+        ]},
         //'reference/testing',
         'reference/troubleshooting',
         //'reference/glossary'

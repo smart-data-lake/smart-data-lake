@@ -3,10 +3,6 @@ id: dag
 title: DAG
 ---
 
-:::warning
-This page is under review and currently not visible in the menu.
-:::
-
 The Directed Acyclic Graph (DAG) describes the data pipeline and the dependencies between actions. 
 It is build automatically within SDLB by analyzing the actions, related dataObjects and its dependencies. 
 SDLB uses this DAG to optimize execution of the pipeline as it knows in which order the pipeline needs to be executed.
