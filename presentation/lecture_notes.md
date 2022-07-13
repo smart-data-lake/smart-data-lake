@@ -1,6 +1,5 @@
 
 # Smart Data Lake Builder Hands-On Training
-> &#x1F4DD; 
 
 ## Goal
 * tain loving friend imagine to replace short distant flights with train rides
@@ -17,10 +16,20 @@
   - store processed data, thus it can be utilized for various use cases
   - analyse/compute data for a specific application
 
+## Smart Data Lake vs. Smart Data Lake Builder
+
+|Smart Data Lake | Smart Data Lake Builder |
+|----------------|-------------------------|
+| **Concept**    | **Tool**                |
+| combines advantages of Data Warehouse and Data Lakes | ELCA's tool to build Data Pipelines efficiently |
+| structured data / schema evolution | portable and automated |
+| layer approach / processes / technologies | features like historization, incremental load, partition wise |
+| Similar to Lakehouse | Open Source on Github: [smart-data-lake](https://github.com/smart-data-lake/) |
 
 ## Why Smart Data Lake?
-* also called Lakehouse
+* similar to Lakehouse concept
 * combining the flexibility of Data Lakes with the advantages of Data Warehouses
+Let's have a closer look.
 
 ### Data Warehouse
   - :heavy_plus_sign: preface preparation, structuring and securing data for high quality reporting
@@ -46,20 +55,22 @@
 
 ![data plattforms comparison](images/smartDataLake-dataPlattforms.png)
 
-## Lakehouse Plattform Comparison
-* Lakehouse implementations: Snowflake - DBT, Azure Data Factory, Apache Beam, …
-
-
 ### Why Smart Data Lake Builder (SDLB)?
+* examples of other tools: Snowflake - DBT, Azure Data Factory, Apache Beam, …
+  - able to use Smart Data Lake concepts
+  - different advantages and disadvanteges for building data pipelines
+* dynamic creation of workflow (no specification of step ordering)
 * No Code for easy tasks
-* Complex data pipelines
+* complex data pipelines well suited
+* already implemented loading modes (incremental, patition-wise, streaming, checkpoint/recovery)
+* already implemented transformations (historize, deduplication)
 * Designed to add custom connectors and transformations
 * various data formats, incl. DeltaLake
 * Lineage and Data Catalog from metadata
-* supports incremental load, historize & upsert/merge, Schema evolution (on specific data formats), Partition-wise processing, streaming, checkpoint & recovery, ...
 * DevOps ready: versionable configuration, support for automated testing
-
-:warning: TODO comparison e.g. with Azure Data Factory see PowerPoint or confluence
+* early validation
+* scripted -> portable can run on most (manybe any) cloud or on-prem platform
+* configuration templates allows reuse of configuration blocks
 
 ## Data structuring
 Within Smart Data Lake we structure our data in layers
@@ -76,16 +87,36 @@ In our case we could think of the following structure:
 ![data layer structure for the use case](images/dataLayers.png)
 
 ## Security In Cloud
-* protect data especially in the cloud 
+* typically data need to be protected against unwanted access and modification, especially in the cloud, where data is by default accessible from everywhere (from everyone, if misconfigured)
 * Data Classification: Public, Internal, Restricted, Personal Data, Confidential
-  - [ELCA concept](https://confluence.svc.elca.ch/display/BL9CONFLUENCE/Data+Security+Concept+for+Cloud+Analytics+Platforms)
-* manage access using permission groups
+  - various security measures per class, including (not the full list):
+    + access control
+      * strong authentication
+      * periodic review of permissions
+    + cryptography
+      * encrypt at rest and in transit
+      * elaborated secret stores, for key managment
+    + operations security
+      * documentation and automation (CD), change management
+      * seperated environments with configuration and capacity managment
+    + ...
+    + [ELCAs Cloud Security Concept](https://confluence.svc.elca.ch/display/BL9CONFLUENCE/Data+Security+Concept+for+Cloud+Analytics+Platforms)
+
+  - seperate treatment of Personally Identifiable Information (PII)
+    + e.g. names, address, social sec. numbers, tel.numbers, medical/health data, ...
+    + anonymisation (best), pseudonymisation 
+    + additional encrytion (in use)
+    + further regulations: right of data removal, data location restrictions, etc.
+    + ...
+    + [ELCAs Cloud Data Privacy Concept](https://confluence.svc.elca.ch/display/BL9CONFLUENCE/Technical+Aspects+of+Data+Privacy+Concepts+for+Cloud+Analytics+Platforms)
+* authorisation managment using roles and permission groups
   - Users belong to role groups
   - role groups have permission groups
   - permission groups mange permissions for apps, devices, and environments
+  - ...
+  - [ELCAs Cloud Authorisation Concept](https://confluence.svc.elca.ch/display/BL9CONFLUENCE/Authorization+Concept+for+Cloud+Analytics+Platforms)
 
-![permission managment from user over role groups and technical troups to specify permissions](images/authorisationConcept.png)
-More detailed [ELCA concept](https://confluence.svc.elca.ch/display/BL9CONFLUENCE/Authorization+Concept+for+Cloud+Analytics+Platforms)
+![permission managment from users utilizing role groups and technical troups to specify permissions](images/authorisationConcept.png)
 
 :warning: TODO
 
@@ -104,10 +135,12 @@ We have already something prepared...
 * originating from JSON
 
 > list config directory
+
 * config can be splitted
 * can also be used for managing different entwironments (e.g. `--config ./config/prod,config/global.conf`)
 
 > `nano config/airports.conf`
+
 * here we see an example with 3 stages, 3 data types and 2 actions to get from one to the other
 
 * parameters and structures
@@ -176,30 +209,36 @@ Let's have a closer look to the present examples:
 * there is also Scala Class used in the example, but we will not go into detail yet.
 
 ## Feeds
-> start application with `--help`: `podman run --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config`
+* start application with `--help`: `podman run --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config`
+
 > Note: `-rm` removes container after exit, `hostname` and `pod` for lauching in same Network as metastore and Polynote, mounting data, target and config directory, container name, config directories/files
+
 * `feed-sel` always necessary 
 	- can be specified by metadata feed, name, or ids
 	- can be lists or regex, e.g. `--feed-sel '.*'`
 	- can also be `startWith...` or `endWith...`
 
 ## Environment Variables in HOCON
-* try run feed everything: `podman run --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel '.*'`
+* try run feed everything: 
+`podman run --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel '.*'`
+
 * error: `Could not resolve substitution to a value: ${METASTOREPW}`
   - in `config/global.conf` we defined `"spark.hadoop.javax.jdo.option.ConnectionPassword" = ${METASTOREPW}`
   - -> use environmentvariable `-e METASTOREPW=1234`
 
 ## Test Configuration
-* > first run config test `podman run -e METASTOREPW=1234 --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel 'download' --test config` (fix bug together)
+* first run config test: 
+`podman run -e METASTOREPW=1234 --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel 'download' --test config` (fix bug together)
 
 * while running we get:
 `Exception in thread "main" io.smartdatalake.config.ConfigurationException: (DataObject~stg-airports) ClassNotFoundException: Implementation CsvDataObject of interface DataObject not found`
 let us double check what DataObjects there are available... [SDLB Schema Viewer](http://smartdatalake.ch/json-schema-viewer/index.html#viewer-page&version=sdl-schema-2.3.0-SNAPSHOT.json)
 
-> fix issue by correcting the dataObject type to `CvsFileDataObject`
+> Task: fix issue by correcting the dataObject type to `CvsFileDataObject`
 
 ## Dry-run
-> run again (and then with) `--test dry-run` and feed `'.*'` to check all configs: `podman run -e METASTOREPW=1234 --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel '.*' --test dry-run`
+* run again (and then with) `--test dry-run` and feed `'.*'` to check all configs: 
+  `podman run -e METASTOREPW=1234 --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel '.*' --test dry-run`
 
 ## DAG
 * (Directed acyclic graph)
@@ -327,7 +366,25 @@ The departures are directly loaded into a delta table: open [Polynote at localho
 
 :warning: TODO
 
+
+# Deployment methods
+* SDLB can be deployed in various ways on various platforms
+* distinguish running SDLB as:
+  - java application
+  - containerized
+* on-prem or in the cloud
+
+* here we saw containerized locally
+* during development we often run the java directly using Intellij in Windows
+* in the cloud we have also various options: 
+  - jar in Databricks 
+  - Containers in Kubernetes (AKS)
+  - in Virtual Machines
+
+Here, we want to briefly show the Databricks deployment.
+
 ## Databricks
+Here we have the Databricks setup already prepared, and briefly present the setup, just to give you an idea.
 
 ### Preparation steps (not part of the demonstration)
 For reference see also: [SDL Deployment on Databricks](https://smartdatalake.ch/blog/sdl-databricks/).
@@ -363,8 +420,6 @@ The following setup is already prepared in the elca-dev tenant:
 * show notbook in Workspace
 
 ### Further points
-* cluster swap possible
+* cluster modification/swap possible (scalability)
 * recurring schedule
-* 
-
-:warning: TODO
+* easy maintainable metastore
