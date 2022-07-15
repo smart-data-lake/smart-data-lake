@@ -39,7 +39,7 @@ This can hopefully be simplified in the future.
 6. Start your cluster, check the event log to see if it's up.
     If something is wrong with the init script, the cluster will not start.
 7. On your local machine, create a second the SDLB configuration file(s) e.g. called application.conf. 
-    For more details of the configuration file(s) see [hocon elements](hoconElements.md) and [hocon overview](hoconOverview.md). 
+    For more details of the configuration file(s) see [hocon overview](hoconOverview.md). 
 8. Upload the file(s) to a conf folder in dbfs:
     ```bash
     databricks fs mkdirs dbfs:/conf
