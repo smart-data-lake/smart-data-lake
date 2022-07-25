@@ -78,8 +78,8 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
     val nodesLookup = sortedNodes.map( n => n.nodeId -> n).toMap
     val edges = incomingEdgesMap.values.flatMap {
       incomingEdges => incomingEdges.map(incomingEdge => (nodesLookup(incomingEdge.nodeIdFrom), nodesLookup(incomingEdge.nodeIdTo)))
-    }
-    val g = new Graph(vertices = sortedNodes.toSet, edges = edges.toList)
+    }.toList.distinct
+    val g = new Graph(vertices = sortedNodes.toSet, edges = edges)
     val renderingStrategy = new NodeRenderingStrategy(nodeToString)
     GraphLayout.renderGraph(g, renderingStrategy)
   }
