@@ -205,6 +205,16 @@ object Environment {
   }
 
   /**
+   * Maximal line length for DAG graph log, before switching to list mode.
+   */
+  var dagGraphLogMaxLineLength: Int = {
+    val nb = EnvironmentUtil.getSdlParameter("dagGraphLogMaxLineLength")
+      .map(_.toInt).getOrElse(250)
+    // return
+    nb
+  }
+
+  /**
    * If enabled, the schema file for SparkFileDataObject is updated on every load from a DataFrame-based Action, otherwise it's just updated if it's missing.
    * The advantage of updating the sample file on every load is to enable automatic schema evolution.
    * This is enabled by default, as it has not big impact on performance.

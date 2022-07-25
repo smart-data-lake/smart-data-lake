@@ -35,6 +35,7 @@ import org.slf4j.event.Level
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.collection.JavaConverters._
 
 private[smartdatalake] case class ActionDAGEdge(override val nodeIdFrom: NodeId, override val nodeIdTo: NodeId, override val resultId: String) extends DAGEdge
 
@@ -338,6 +339,10 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
     ActionDAGRun(dag, context.executionId, partitionValues, parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners, actionsSkipped)
   }
 
+  /**
+   * Log DAG-state as Ascii graph.
+   * If graph is wider than a configured number of characters, it is only printed as list in topological order.
+   */
   def logDag(msg: String, dag: DAG[_], executionId: Option[ExecutionId] = None): Unit = {
     def nodeToString(node: DAGNode): String = {
       node match {
@@ -346,9 +351,12 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
       }
     }
 
-    logger.info(
-      s"""$msg:
-         |${dag.render(nodeToString)}
-    """.stripMargin)
+    // log ascii dag if max line length is small enough
+    val dagString = dag.render(nodeToString)
+    if (dagString.lines.iterator.asScala.map(_.size).max <= Environment.dagGraphLogMaxLineLength) {
+      logger.info(s"$msg:\n$dagString\n")
+    } else {
+      logger.info(s"$msg:\n ${dag.sortedNodes.map(nodeToString).mkString("\n ")}\n")
+    }
   }
 }
