@@ -210,7 +210,10 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
     dag.getNodes.map { a =>
       var runtimeInfo = a.getRuntimeInfo(Some(executionId)).getOrElse(RuntimeInfo(executionId, RuntimeEventState.PENDING))
       // overwrite DataObjectsState for skipped actions to keep previous state.
-      if (runtimeInfo.state == RuntimeEventState.SKIPPED) runtimeInfo = runtimeInfo.copy(dataObjectsState = initialDataObjectsState)
+      if (runtimeInfo.state == RuntimeEventState.SKIPPED) {
+        val inputIds = a.inputs.map(_.id)
+        runtimeInfo = runtimeInfo.copy(dataObjectsState = initialDataObjectsState.filter(e => inputIds.contains(e.dataObjectId)))
+      }
       (a.id, runtimeInfo)
     }.toMap
   }
