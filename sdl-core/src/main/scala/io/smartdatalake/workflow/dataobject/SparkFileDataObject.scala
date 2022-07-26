@@ -212,12 +212,17 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
 
     // configure observer to get files processed for incremental execution mode
     if (filesObservers.nonEmpty && context.phase == ExecutionPhase.Exec) {
-      assert(filenameColumn.isDefined, s"($id) filenameColumn must be set in order to observe files processed")
       if (filesObservers.size > 1) logger.warn(s"($id) files observation is not yet well supported when using from multiple actions in parallel")
+      // force creating filenameColumn, and drop the it later again
+      val forcedFilenameColumn = "__filename"
+      if (filenameColumn.isEmpty) df = dfContent.withColumn(forcedFilenameColumn, input_file_name)
+      // initialize observers
       df = filesObservers.foldLeft(df) {
-        case (df, (actionId,observer)) => observer.on(df, filenameColumn.get)
+        case (df, (actionId,observer)) => observer.on(df, filenameColumn.getOrElse(forcedFilenameColumn))
       }
       filesObservers.clear
+      // drop forced filenameColumn
+      if (filenameColumn.isEmpty) df = df.drop(forcedFilenameColumn)
     }
 
     // finalize & return DataFrame

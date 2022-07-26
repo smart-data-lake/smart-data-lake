@@ -101,7 +101,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 
     // setup DataObjects
     val feed = "copy"
-    val srcDO = ParquetFileDataObject( "src1", tempPath+s"/src1", filenameColumn = Some("_filename"))
+    val srcDO = ParquetFileDataObject( "src1", tempPath+s"/src1")
     srcDO.deleteAll
     instanceRegistry.register(srcDO)
     val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("lastname","firstname")))
