@@ -45,4 +45,11 @@ private[smartdatalake] object LogUtil {
     Option(ex.getCause).foreach(simplifyStackTrace)
     ex
   }
+
+  /**
+   * Split string into lines, removing empty lines
+   */
+  def splitLines(s: String): Seq[String] = {
+    s.split("(\r)?\n").toSeq.filter(_.nonEmpty)
+  }
 }

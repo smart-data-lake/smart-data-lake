@@ -24,7 +24,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.DAGHelper._
 import io.smartdatalake.util.dag._
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{LogUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action._
@@ -353,7 +353,7 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
 
     // log ascii dag if max line length is small enough
     val dagString = dag.render(nodeToString)
-    if (dagString.lines.iterator.asScala.map(_.size).max <= Environment.dagGraphLogMaxLineLength) {
+    if (LogUtil.splitLines(dagString).map(_.size).max <= Environment.dagGraphLogMaxLineLength) {
       logger.info(s"$msg:\n$dagString\n")
     } else {
       logger.info(s"$msg:\n ${dag.sortedNodes.map(nodeToString).mkString("\n ")}\n")
