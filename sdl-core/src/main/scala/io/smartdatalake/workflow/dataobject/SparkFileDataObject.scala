@@ -18,7 +18,6 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.config.SdlConfigObject
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
@@ -27,11 +26,14 @@ import io.smartdatalake.util.misc.{CompactionUtil, EnvironmentUtil, SmartDataLak
 import io.smartdatalake.util.spark.CollectSetDeterministic.collect_set_deterministic
 import io.smartdatalake.util.spark.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
 import io.smartdatalake.util.spark.{DataFrameUtil, Observation}
+import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
+import org.apache.spark.sql.execution.FileSourceScanExec
+import org.apache.spark.sql.execution.datasources.FileScanRDD
 import org.apache.spark.sql.functions.{col, input_file_name}
 import org.apache.spark.sql.types.{DataType, StructType}
 
@@ -208,6 +210,12 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
         }
     }
 
+    // early check for no data to process.
+    // This also prevents an error on Databricks when using filesObserver if there are no files to process. The
+    if (context.phase == ExecutionPhase.Exec && getFilesProcessedFromSparkPlan(dfContent).isEmpty)
+      throw NoDataToProcessWarning("-", s"($id) No files to process found in execution plan")
+
+    // add filename column
     var df = dfContent.withOptionalColumn(filenameColumn, input_file_name)
 
     // configure observer to get files processed for incremental execution mode
@@ -227,6 +235,15 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
 
     // finalize & return DataFrame
     afterRead(df)
+  }
+
+  /**
+   * This method is searching for files processed by a given DataFrame by looking at its execution plan.
+   */
+  private[smartdatalake] def getFilesProcessedFromSparkPlan(df: DataFrame): Seq[String] = {
+    df.queryExecution.executedPlan.collectFirst { case x: FileSourceScanExec => x }
+      .getOrElse(throw new IllegalStateException(s"($id) No FileSourceScanExec found in execution plan to check if there is data to process"))
+      .inputRDD.asInstanceOf[FileScanRDD].filePartitions.flatMap(_.files).map(_.filePath)
   }
 
   /**
