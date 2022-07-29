@@ -205,6 +205,15 @@ object Environment {
   }
 
   /**
+   * If enabled, SparkFileDataObject checks in execution plan if there are files available during Exec phase.
+   * NoDataToProcessWarning is thrown if there are no files found in the execution plan.
+   */
+  var enableSparkFileDataObjectNoDataCheck: Boolean = {
+    EnvironmentUtil.getSdlParameter("enableSparkFileDataObjectNoDataCheck")
+      .map(_.toBoolean).getOrElse(true)
+  }
+
+  /**
    * Maximal line length for DAG graph log, before switching to list mode.
    */
   var dagGraphLogMaxLineLength: Int = {
