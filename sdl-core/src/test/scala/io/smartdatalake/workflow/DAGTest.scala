@@ -47,9 +47,12 @@ class TestEventListener extends DAGEventListener[TestNode] with SmartDataLakeLog
   val concurrentRuns: AtomicInteger = new AtomicInteger(0)
   // record the maximum number of concurrently running noes
   val maxConcurrentRuns: AtomicInteger = new AtomicInteger(0)
+  // record node start order
+  val nodeStarts: mutable.Buffer[NodeId] = mutable.Buffer()
   override def onNodeStart(node: TestNode): Unit = {
     concurrentRuns.incrementAndGet
     maxConcurrentRuns.set(Math.max(concurrentRuns.get,maxConcurrentRuns.get))
+    nodeStarts.append(node.nodeId)
     logger.info(s"${node.nodeId} started (" + concurrentRuns.get +" job(s) running currently)") }
   override def onNodeFailure(exception: Throwable)(node: TestNode): Unit = { logger.error(s"${node.nodeId} failed with ${exception.getClass.getSimpleName}"); concurrentRuns.decrementAndGet }
   override def onNodeSkipped(exception: Throwable)(node: TestNode): Unit = logger.warn(s"${node.nodeId} skipped because ${exception.getClass.getSimpleName}")
@@ -126,6 +129,20 @@ class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
     logger.info("Maximum number of parallel executions was " +testEventListener.maxConcurrentRuns.get)
     assert(testEventListener.maxConcurrentRuns.get() == 1)
   }
+
+  test("create and run dag: parallel running nodes are sorted alphabetically") {
+    val singleScheduler = Scheduler.fixedPool("fixed", 1) // scheduler with 1 thread serializes execution (only one task at the time)
+    val nodes = Seq(TestNode("Z"), TestNode("D"), TestNode("C"), TestNode("B"), TestNode("A"))
+    val edges = Seq(TestEgde("D", "Z"), TestEgde("C", "Z"), TestEgde("B", "Z"), TestEgde("A", "Z"))
+    val dag = DAG.create[TestNode](nodes, edges)
+    println(dag.toString)
+    val testEventListener: TestEventListener = new TestEventListener
+    val task =  dag.buildTaskGraph[TestResult](testEventListener) { defaultOp(300) }
+    val resultFuture = task.runToFuture(singleScheduler)
+    val result = Await.result(resultFuture, 10.seconds).map(_.get)
+    assert(testEventListener.nodeStarts == testEventListener.nodeStarts.sorted)
+  }
+
 
   test("cancel running dag: stop pending tasks") {
     val dag = DAG.create[TestNode](
