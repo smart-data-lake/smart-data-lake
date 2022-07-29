@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.HadoopFileConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.spark.sql.DataFrame
@@ -53,6 +54,23 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
     val result = doSrc1.getSparkDataFrame()(contextExec)
     assert(result.count() == 3)
     assert(filesObserver.getFilesProcessed.nonEmpty)
+  }
+
+  // See also notes on [[CollectSetDeterministic]]
+  test("make sure observation of processed files does not crash if there are no files to process") {
+
+    val config = ConfigFactory.parseString(s"""
+                                              | id = src1
+                                              | path = "${escapedFilePath(tempPath)}"
+                                              | filenameColumn = _filename
+                                              | schema = "a int, b string"
+         """.stripMargin)
+
+    val doSrc1 = ParquetFileDataObject.fromConfig(config)
+    doSrc1.deleteAll
+    val filesObserver = doSrc1.setupFilesObserver("test")
+    val df = doSrc1.getSparkDataFrame()(contextInit) // ok in init phase
+    intercept[NoDataToProcessWarning](doSrc1.getSparkDataFrame()(contextExec))
   }
 
   test("write and read parquet file with connection") {

@@ -134,8 +134,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 
     // start second load without new files - schema should be present because of schema file
     action1.resetExecutionResult()
-    val tgtSubFeed2 = action1.exec(Seq(srcSubFeed))(contextExec).head
-    intercept[NoDataToProcessWarning](action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed2)))
+    intercept[NoDataToProcessWarning](action1.exec(Seq(srcSubFeed))(contextExec).head)
   }
 
   test("copy load with transformation from sql code") {

@@ -35,7 +35,10 @@ import scala.collection.mutable
  * Link to original Spark source code:
  * https://github.com/apache/spark/blob/58e07e0f4cca1e3a6387a7e0c57faeb6c5ec9ef5/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/expressions/aggregate/collect.scala#L145
  *
- * Note: Another try was to create user defined aggregate function, but they dont not work in observable metrics as well (strange serialization exception).
+ * Note: There is a Spark problem (NullPointerException with TypedImperativeAggregate (like CollectSetDeterministic) in observe if there is no data! As a workaround we have to check for no data in SparkFileDataObject.
+ * see also https://issues.apache.org/jira/browse/SPARK-39044
+ *
+ * Note: Another try was to create user defined aggregate function (see MyCollectSet below), but they do not work in observable metrics as well (strange serialization exception).
  */
 case class CollectSetDeterministic(
                                     child: Expression,
@@ -88,3 +91,23 @@ case class CollectSetDeterministic(
 object CollectSetDeterministic {
   def collect_set_deterministic(e: Column): Column = new Column(CollectSetDeterministic(e.expr).toAggregateExpression(false))
 }
+
+/*
+// Alternative approach for a custom aggregator. But this one has strange serialization errors when used with df.observe :-(
+// It is left as comment here for possible future tests.
+object MyCollectSet extends Aggregator[String, Array[String], Array[String]] with Serializable {
+  // A zero value for this aggregation. Should satisfy the property that any b + zero = b
+  def zero: Array[String] = Array()
+  // Combine two values to produce a new value. For performance, the function may modify `buffer`
+  // and return it instead of constructing a new object
+  def reduce(buffer: Array[String], in: String): Array[String] = if (buffer.contains(in)) buffer else buffer :+ in
+  // Merge two intermediate values
+  def merge(b1: Array[String], b2: Array[String]): Array[String] = (b1 ++ b2).distinct
+  // Transform the output of the reduction
+  def finish(reduction: Array[String]): Array[String] = reduction
+  // Specifies the Encoder for the intermediate value type
+  def bufferEncoder: Encoder[Array[String]] = Encoders.javaSerialization
+  // Specifies the Encoder for the final output value type
+  def outputEncoder: Encoder[Array[String]] = Encoders.javaSerialization
+}
+*/
