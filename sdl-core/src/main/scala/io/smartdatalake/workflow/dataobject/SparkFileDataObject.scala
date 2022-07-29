@@ -211,7 +211,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
     }
 
     // early check for no data to process.
-    // This also prevents an error on Databricks when using filesObserver if there are no files to process. The
+    // This also prevents an error on Databricks when using filesObserver if there are no files to process. See also [[CollectSetDeterministic]].
     if (context.phase == ExecutionPhase.Exec && getFilesProcessedFromSparkPlan(dfContent).isEmpty)
       throw NoDataToProcessWarning("-", s"($id) No files to process found in execution plan")
 
