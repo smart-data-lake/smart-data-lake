@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  ~ Smart Data Lake - Build your data lake the smart way.
+  ~
+  ~ Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+  ~
+  ~ This program is free software: you can redistribute it and/or modify
+  ~ it under the terms of the GNU General Public License as published by
+  ~ the Free Software Foundation, either version 3 of the License, or
+  ~ (at your option) any later version.
+  ~
+  ~ This program is distributed in the hope that it will be useful,
+  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ~ GNU General Public License for more details.
+  ~
+  ~ You should have received a copy of the GNU General Public License
+  ~ along with this program. If not, see <http://www.gnu.org/licenses/>.
+  -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    <xs:element name="tree">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="nodes" minOccurs="0">
+                    <xs:complexType>
+                        <xs:sequence>
+                            <xs:element name="modified" minOccurs="0">
+                                <xs:complexType>
+                                    <xs:sequence maxOccurs="unbounded">
+                                        <xs:element name="node">
+                                            <xs:complexType>
+                                                <xs:complexContent>
+                                                    <xs:extension base="NodeType" />
+                                                </xs:complexContent>
+                                            </xs:complexType>
+                                        </xs:element>
+                                    </xs:sequence>
+                                </xs:complexType>
+                            </xs:element>
+                            <xs:element name="deleted" minOccurs="0">
+                                <xs:complexType>
+                                    <xs:sequence maxOccurs="unbounded">
+                                        <xs:element name="node" type="DeletedNodeType" />
+                                    </xs:sequence>
+                                </xs:complexType>
+                            </xs:element>
+                        </xs:sequence>
+                    </xs:complexType>
+                </xs:element>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+    <xs:complexType name="NodeType">
+        <xs:annotation>
+            <xs:documentation>A node</xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="name" type="xs:string" minOccurs="0" />
+            <xs:element name="factor" type="xs:decimal" minOccurs="0" />
+            <xs:element name="nodes" minOccurs="0">
+                <xs:complexType>
+                    <xs:sequence maxOccurs="unbounded">
+                        <xs:element name="node" type="NodeType" minOccurs="0" />
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
+        <xs:attribute name="nodeType" use="required">
+            <xs:simpleType>
+                <xs:restriction base="xs:string">
+                    <xs:enumeration value="A" />
+                    <xs:enumeration value="B" />
+                    <xs:enumeration value="C" />
+                </xs:restriction>
+            </xs:simpleType>
+        </xs:attribute>
+        <xs:attributeGroup ref="ValidityRange" />
+    </xs:complexType>
+    <xs:complexType name="DeletedNodeType">
+        <xs:annotation>
+            <xs:documentation>Information about deleted nodes</xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="name" type="xs:string" minOccurs="0" />
+            <xs:element name="reason" type="xs:string" minOccurs="0" />
+        </xs:sequence>
+        <xs:attribute name="nodeType" use="required">
+            <xs:simpleType>
+                <xs:restriction base="xs:string">
+                    <xs:maxLength value="3" />
+                    <xs:enumeration value="R" />
+                    <xs:enumeration value="C" />
+                    <xs:enumeration value="P" />
+                    <xs:enumeration value="G" />
+                    <xs:enumeration value="B" />
+                    <xs:enumeration value="D" />
+                </xs:restriction>
+            </xs:simpleType>
+        </xs:attribute>
+        <xs:attributeGroup ref="ValidityRange" />
+    </xs:complexType>
+    <xs:attributeGroup name="ValidityRange">
+        <xs:attribute name="validFrom" type="xs:date" use="required" />
+        <xs:attribute name="validTo" type="xs:date" use="required" />
+    </xs:attributeGroup>
+</xs:schema>
