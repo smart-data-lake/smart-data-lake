@@ -123,7 +123,8 @@ class XsdSchemaConverter(xmlSchema: XmlSchema, maxRecursion: Int) {
       case complexType: XmlSchemaComplexType =>
         complexType.getContentModel match {
           // check max recursion
-          case _ if path.count(_ == complexType.getName) > maxRecursion => None
+          case _ if complexType.getName != null && path.count(_ == complexType.getName) >= maxRecursion =>
+            None
           case content: XmlSchemaSimpleContent =>
             // xs:simpleContent
             content.getContent match {
