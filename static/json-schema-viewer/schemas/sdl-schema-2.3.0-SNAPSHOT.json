@@ -104,7 +104,7 @@
         },
         "title" : "FileIncrementalMoveMode",
         "additionalProperties" : false,
-        "description" : "Execution mode to incrementally process file-based DataObjects, e.g. FileRefDataObjects and SparkFileDataObjects.\nFor FileRefDataObjects:\n- All existing files in the input DataObject are processed and removed (deleted or archived) after processing\n- Input partition values are applied to search for files and also used as output partition values\nFor SparkFileDataObjects:\n- Files processed are observed by a custom metric and removed (deleted or archived) after processing\n- Partition values preserved."
+        "description" : "Execution mode to incrementally process file-based DataObjects, e.g. FileRefDataObjects and SparkFileDataObjects.\nFor FileRefDataObjects:\n- All existing files in the input DataObject are processed and removed (deleted or archived) after processing\n- Input partition values are applied to search for files and also used as output partition values\nFor SparkFileDataObjects:\n- Files processed are read from the DataFrames execution plan and removed (deleted or archived) after processing.\nNote that is only correct if no additional filters are applied in the DataFrame.\nA better implementation would be to observe files by a custom metric. Unfortunately there is a problem in Spark with that, see also[[CollectSetDeterministic]] \n- Partition values preserved."
       },
       "PartitionDiffMode" : {
         "type" : "object",
@@ -4586,17 +4586,6 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "OptionsGenericDfTransformer"
-                }
-              },
-              "title" : "OptionsGenericDfTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
                   "const" : "FilterTransformer"
                 },
                 "name" : {
@@ -4620,6 +4609,17 @@
               "required" : [ "filterClause", "type" ],
               "additionalProperties" : false,
               "description" : "Apply a filter condition to a DataFrame."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "OptionsGenericDfTransformer"
+                }
+              },
+              "title" : "OptionsGenericDfTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
             }, {
               "type" : "object",
               "properties" : {
@@ -5123,7 +5123,7 @@
         "title" : "CopyAction",
         "required" : [ "id", "inputId", "outputId" ],
         "additionalProperties" : false,
-        "description" : "[[Action]] to copy files (i.e. from stage to integration)"
+        "description" : "This[[Action]] copies data between an input and output DataObject using DataFrames.\nThe input DataObject reads the data and converts it to a DataFrame according to its definition.\nThe DataFrame might be transformed using SQL or DataFrame transformations.\nThen the output DataObjects writes the DataFrame to the output according to its definition."
       },
       "CustomDataFrameAction" : {
         "type" : "object",
@@ -5289,7 +5289,7 @@
         "title" : "CustomDataFrameAction",
         "required" : [ "id", "inputIds", "outputIds" ],
         "additionalProperties" : false,
-        "description" : "[[Action]] to transform data according to a custom transformer.\nAllows to transform multiple input and output dataframes."
+        "description" : "This[[Action]] transforms data between many input and output DataObjects using DataFrames.\nCustomDataFrameAction allows to define transformations between n input DataObjects and m output DataObjects,\nbut is is recommended to implement n:1 or 1:m transformations, as otherwise dependencies between DataObjects might not be accurate anymore.\nThe input DataFrames might be transformed using SQL or DataFrame transformations.\nWhen chaining multiple transformers, output DataFrames of previous transformers are available as input DataFrames for later transformers by their corresponding name."
       },
       "CustomFileAction" : {
         "type" : "object",
@@ -5634,7 +5634,7 @@
         "title" : "DeduplicateAction",
         "required" : [ "id", "inputId", "outputId" ],
         "additionalProperties" : false,
-        "description" : "[[Action]]to deduplicate a subfeed.\nDeduplication keeps the last record for every key, also after it has been deleted in the source.\nDeduplicateAction adds an additional Column[[TechnicalTableColumn.captured]]. It contains the timestamp of the last occurrence of the record in the source.\nThis creates lots of updates. Especially when using saveMode.Merge it is better to set[[TechnicalTableColumn.captured]]to the last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to enable this optimization.\n\nDeduplicateAction needs a transactional table (e.g.[[TransactionalSparkTableDataObject]]) as output with defined primary keys.\nIf output implements[[CanMergeDataFrame]] , saveMode.Merge can be enabled by setting mergeModeEnable = true. This allows for much better performance."
+        "description" : "This[[Action]]copies and deduplicates data between an input and output DataObject using DataFrames.\nDeduplication keeps the last record for every key, also after it has been deleted in the source.\nThe DataFrame might be transformed using SQL or DataFrame transformations. These transformations are applied before the deduplication.\n\nDeduplicateAction adds an additional Column[[TechnicalTableColumn.captured]]. It contains the timestamp of the last occurrence of the record in the source.\nThis creates lots of updates. Especially when using saveMode.Merge it is better to set[[TechnicalTableColumn.captured]]to the last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to enable this optimization.\n\nDeduplicateAction needs a transactional table (e.g.[[TransactionalSparkTableDataObject]]) as output with defined primary keys.\nIf output implements[[CanMergeDataFrame]] , saveMode.Merge can be enabled by setting mergeModeEnable = true. This allows for much better performance."
       },
       "FileTransferAction" : {
         "type" : "object",
@@ -5913,7 +5913,7 @@
         "title" : "HistorizeAction",
         "required" : [ "id", "inputId", "outputId" ],
         "additionalProperties" : false,
-        "description" : "[[Action]]to historize a subfeed.\nHistorization creates a technical history of data by creating valid-from/to columns.\nIt needs a transactional table as output with defined primary keys.\n\nNormal historization join new with all existing data, and rewrites all data in output table. This is not optimal from\na performance perspective.\nIt can be optimized if output object supports[[CanMergeDataFrame]] . In that case you can\nset mergeModeEnable=true to use incremental historization, which does not rewrite all data in output table. It still needs to\njoin new data with all existing data, but uses hash values to minimize data transfer.\nIf you have change-data-capture (CDC) information available to identify deleted records, you can set\nmergeModeCDCColumn and mergeModeCDCDeletedValue to even avoid the join between new and existing data. This is optimal from\na performance perspective."
+        "description" : "This[[Action]]historizes data between an input and output DataObject using DataFrames.\nHistorization creates a technical history of data by creating valid-from/to columns.\nThe DataFrame might be transformed using SQL or DataFrame transformations. These transformations are applied before the deduplication.\n\nHistorizeAction needs a transactional table (e.g. implementation of[[TransactionalSparkTableDataObject]]) as output with defined primary keys.\n\nNormal historization join new with all existing data, and rewrites all data in output table. This is not optimal from\na performance perspective.\nIt can be optimized if output object supports[[CanMergeDataFrame]] . In that case you can\nset mergeModeEnable=true to use incremental historization, which does not rewrite all data in output table. It still needs to\njoin new data with all existing data, but uses hash values to minimize data transfer.\nIf you have change-data-capture (CDC) information available to identify deleted records, you can set\nmergeModeCDCColumn and mergeModeCDCDeletedValue to even avoid the join between new and existing data. This is optimal from\na performance perspective."
       }
     }
   },
