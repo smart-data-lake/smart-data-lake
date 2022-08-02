@@ -80,7 +80,7 @@ case class XmlFileDataObject(override val id: DataObjectId,
                             (@transient implicit override val instanceRegistry: InstanceRegistry)
   extends SparkFileDataObject {
 
-  override val format = "com.databricks.spark.xml"
+  override val format = "com.databricks.spark.xml.patched"
 
   // this is only needed for FileRef actions
   override val fileName: String = "*.xml*"

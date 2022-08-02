@@ -18,16 +18,19 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import io.smartdatalake.definitions.SDLSaveMode
-import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
-import org.apache.spark.sql.DataFrame
+import io.smartdatalake.util.misc.SchemaUtil
+import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
+import io.smartdatalake.util.xml.XsdSchemaConverter
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.{DataFrame, functions}
 
 import java.nio.file.Files
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
-import org.apache.hadoop.fs.Path
+import scala.io.Source
 
 
 class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjectSchemaBehavior {
@@ -65,6 +68,126 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     assert(dfResult2.columns.toSet == Set("h1", "h2", "h3", "_filename"))
     assert(dfResult2.drop("_filename").isEqual(df1))
     assert(dfResult2.where($"_filename".isNull).isEmpty)
+  }
+
+  test("Simple XML file") {
+    val tempDir = Files.createTempDirectory("xml")
+
+    // prepare schema
+    val xsdContent = Source.fromResource("xmlSchema/basket.xsd").mkString
+    val rootSchema = XsdSchemaConverter.read(xsdContent, 10)
+    rootSchema.printTreeString()
+    val schema = SchemaUtil.extractRowTag(rootSchema, "basket/entry")
+      .add(StructField("_corrupt_record", StringType))
+
+    // prepare data
+    val xmlResourceFile = "xmlSchema/basket.xml"
+    val xmlFile = tempDir.resolve(xmlResourceFile.split("/").last).toFile
+    TestUtil.copyResourceToFile(xmlResourceFile, xmlFile)
+
+    /*
+    val df = session.read
+      .format("xml")
+      .option("rowTag", "entry")
+      .option("path", tempDir.toFile.getPath)
+      .load()
+    df.show
+    */
+
+    val dataObj = XmlFileDataObject(id = "test1", path = tempDir.toFile.getPath,
+      schema = Some(SparkSchema(schema)),
+      rowTag = Some("entry"),
+    )
+
+    // read
+    val dfResult2 = dataObj.getSparkDataFrame()
+    dfResult2.show
+  }
+
+  test("Complex XML file") {
+    // TODO
+    // - commented items are still read by spark-xml!
+
+    val tempDir = Files.createTempDirectory("xml")
+
+    // prepare schema
+    val xsdContent = Source.fromResource("xmlSchema/TMS_TMS2TMS_Tariff_1300.xsd").mkString
+    val rootSchema = XsdSchemaConverter.read(xsdContent, 10)
+    //    val schema = SchemaUtil.extractRowTag(rootSchema, "TMSData/update/tariffNodes/modified/tariffNode")
+    //    val schema = SchemaUtil.extractRowTag(rootSchema, "TMSData/initialLoad/tariffNodes/tariffNode")
+    val schema = SchemaUtil.extractRowTag(rootSchema, "TMSData/initialLoad/tariffRoot")
+      .add(StructField("_corrupt_record", StringType))
+    //schema.printTreeString()
+
+    // prepare data
+    val xmlResourceFile = "xmlSchema/tns_minimal_init_test.xml"
+    val xmlFile = tempDir.resolve(xmlResourceFile.split("/").last).toFile
+    TestUtil.copyResourceToFile(xmlResourceFile, xmlFile)
+
+    val dataObj = XmlFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath),
+      schema = Some(SparkSchema(schema)),
+      rowTag = Some("tariffRoot")
+    )
+
+    // read
+    val dfResultL0 = dataObj.getSparkDataFrame().cache
+      .withColumn("cntDesc", functions.size($"descriptions"))
+    //.withColumn("cntChildren", functions.size($"tariffNodes"))
+    dfResultL0.show
+    /*
+    val dfResultL1 = dfResultL0
+      .withColumn("tariffNodes", explode($"tariffNodes"))
+      .select($"tariffNodes.tariffNode.*")
+      .withColumn("cntChildren", functions.size($"tariffNodes"))
+    dfResultL1.show
+    val dfResultL2 = dfResultL1
+      .withColumn("tariffNodes", explode($"tariffNodes"))
+      .select($"tariffNodes.tariffNode.*")
+      .withColumn("cntChildren", functions.size($"tariffNodes"))
+    dfResultL2.show
+    val dfResultL3 = dfResultL2
+      .withColumn("tariffNodes", explode($"tariffNodes"))
+      .select($"tariffNodes.tariffNode.*")
+      .withColumn("cntChildren", functions.size($"tariffNodes"))
+    dfResultL3.show
+    val dfResultL4 = dfResultL3
+      .withColumn("tariffNodes", explode($"tariffNodes"))
+      .select($"tariffNodes.tariffNode.*")
+      .withColumn("cntChildren", functions.size($"tariffNodes"))
+    dfResultL4.show
+    val dfResultL5 = dfResultL4
+      .withColumn("tariffNodes", explode($"tariffNodes"))
+      .select($"tariffNodes.tariffNode.*")
+      .withColumn("cntChildren", functions.size($"tariffNodes"))
+    dfResultL5.show
+    */
+    //https://pig.apache.org/docs/r0.17.0/api/org/apache/pig/piggybank/storage/XMLLoader.XMLRecordReader.html
+  }
+
+  test("XML with nested lists") {
+
+    val tempDir = Files.createTempDirectory("xml")
+
+    // prepare schema
+    val xsdContent = Source.fromResource("xmlSchema/lists.xsd").mkString
+    val rootSchema = XsdSchemaConverter.read(xsdContent, 10)
+    //rootSchema.printTreeString()
+    val schema = SchemaUtil.extractRowTag(rootSchema, "tree/nodes/node")
+    //schema.printTreeString()
+
+    // prepare data and config
+    val xmlResourceFile = "xmlSchema/lists.xml"
+    val xmlFile = tempDir.resolve(xmlResourceFile.split("/").last).toFile
+    TestUtil.copyResourceToFile(xmlResourceFile, xmlFile)
+    val dataObj = XmlFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath),
+      schema = Some(SparkSchema(schema)),
+      rowTag = Some("node")
+    )
+
+    // read and check
+    val dfResult = dataObj.getSparkDataFrame().cache
+    val cntDescriptions = dfResult.select(functions.size($"descriptions.description")).as[Int].collect.toSeq
+    assert(cntDescriptions == Seq(2))
   }
 
   private def createDataObject(path: String, schemaOpt: Option[StructType]): XmlFileDataObject = {
