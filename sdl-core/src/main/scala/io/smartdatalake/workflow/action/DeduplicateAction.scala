@@ -37,8 +37,10 @@ import java.time.LocalDateTime
 import scala.reflect.runtime.universe.Type
 
 /**
- * [[Action]] to deduplicate a subfeed.
+ * This [[Action]] copies and deduplicates data between an input and output DataObject using DataFrames.
  * Deduplication keeps the last record for every key, also after it has been deleted in the source.
+ * The DataFrame might be transformed using SQL or DataFrame transformations. These transformations are applied before the deduplication.
+ *
  * DeduplicateAction adds an additional Column [[TechnicalTableColumn.captured]]. It contains the timestamp of the last occurrence of the record in the source.
  * This creates lots of updates. Especially when using saveMode.Merge it is better to set [[TechnicalTableColumn.captured]] to the last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to enable this optimization.
  *
