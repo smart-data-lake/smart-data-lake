@@ -19,10 +19,10 @@
 
 package io.smartdatalake.util.misc
 
-import com.databricks.spark.xml.util.XSDToSchema
-import io.smartdatalake.config.{ConfigUtil, ConfigurationException}
+import io.smartdatalake.config.ConfigUtil
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.json.{SchemaConverter => JsonSchemaConverter}
+import io.smartdatalake.util.xml.XsdSchemaConverter
 import io.smartdatalake.workflow.dataframe._
 import org.apache.avro.Schema
 import org.apache.hadoop.conf.Configuration
@@ -140,9 +140,8 @@ object SchemaUtil {
     AvroSchemaConverter.toSqlType(new Schema.Parser().parse(avroSchemaContent)).dataType.asInstanceOf[StructType]
   }
 
-
-  def getSchemaFromXsd(xsdContent: String): StructType = {
-    XSDToSchema.read(xsdContent)
+  def getSchemaFromXsd(xsdContent: String, maxRecursion: Option[Int] = None): StructType = {
+    XsdSchemaConverter.read(xsdContent, maxRecursion.getOrElse(10)) // default is maxRecursion=10
   }
 
   def getSchemaFromDdl(ddl: String): StructType = {
@@ -173,11 +172,12 @@ object SchemaUtil {
         getSchemaFromJavaBean(clazz)
       case XsdFile =>
         val valueElements = value.split(";")
-        assert(valueElements.size == 1 || valueElements.size == 2, s"XSD schema provider configuration error. Configuration format is '<path-to-xsd-file>;<row-tag>', but received $value.")
+        assert(valueElements.size <= 3, s"XSD schema provider configuration error. Configuration format is '<path-to-xsd-file>;<row-tag>;<maxRecursion>', but received $value.")
         val path = valueElements.head
         val rowTag = valueElements.drop(1).headOption
+        val maxRecursion = valueElements.drop(2).headOption.map(_.toInt)
         val content = HdfsUtil.readHadoopFile(path)
-        val schema = getSchemaFromXsd(content)
+        val schema = getSchemaFromXsd(content, maxRecursion)
         rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema)
       case JsonSchemaFile =>
         val valueElements = value.split(";")
