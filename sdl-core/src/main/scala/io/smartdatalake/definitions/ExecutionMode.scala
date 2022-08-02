@@ -471,7 +471,9 @@ trait CustomPartitionModeLogic {
  * - All existing files in the input DataObject are processed and removed (deleted or archived) after processing
  * - Input partition values are applied to search for files and also used as output partition values
  * For SparkFileDataObjects:
- * - Files processed are observed by a custom metric and removed (deleted or archived) after processing
+ * - Files processed are read from the DataFrames execution plan and removed (deleted or archived) after processing.
+ *   Note that is only correct if no additional filters are applied in the DataFrame.
+ *   A better implementation would be to observe files by a custom metric. Unfortunately there is a problem in Spark with that, see also [[CollectSetDeterministic]]
  * - Partition values preserved.
  * @param archiveSubdirectory if an archive subdirectory is configured, files are moved into that directory instead of deleted.
  *                            configure a single directory name which is appended before the filename, e.g. "_archive".

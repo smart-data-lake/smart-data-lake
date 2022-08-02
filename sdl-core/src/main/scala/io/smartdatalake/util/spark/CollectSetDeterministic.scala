@@ -35,10 +35,13 @@ import scala.collection.mutable
  * Link to original Spark source code:
  * https://github.com/apache/spark/blob/58e07e0f4cca1e3a6387a7e0c57faeb6c5ec9ef5/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/expressions/aggregate/collect.scala#L145
  *
- * Note: There is a Spark problem (NullPointerException with TypedImperativeAggregate (like CollectSetDeterministic) in observe if there is no data! As a workaround we have to check for no data in SparkFileDataObject.
+ * Note: There is a Spark problem (NullPointerException with TypedImperativeAggregate (like CollectSetDeterministic) in observe if there is no data, but sometimes also occurs otherwise on prod...
+ * The workaround to check for no data in SparkFileDataObject is therefore not enough and we cannot use metrics to check for files processed for now.
  * see also https://issues.apache.org/jira/browse/SPARK-39044
  *
  * Note: Another try was to create user defined aggregate function (see MyCollectSet below), but they do not work in observable metrics as well (strange serialization exception).
+ *
+ * Note: Current workaround is to extract files processed from execution plan in SparkFileDataObject, but this is only valid if there are no additional filters in the DataFrame...
  */
 case class CollectSetDeterministic(
                                     child: Expression,
