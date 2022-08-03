@@ -26,6 +26,7 @@ import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.util.xml.XsdSchemaConverter
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.functions.explode
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, functions}
 
@@ -76,23 +77,12 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     // prepare schema
     val xsdContent = Source.fromResource("xmlSchema/basket.xsd").mkString
     val rootSchema = XsdSchemaConverter.read(xsdContent, 10)
-    rootSchema.printTreeString()
     val schema = SchemaUtil.extractRowTag(rootSchema, "basket/entry")
-      .add(StructField("_corrupt_record", StringType))
 
     // prepare data
     val xmlResourceFile = "xmlSchema/basket.xml"
     val xmlFile = tempDir.resolve(xmlResourceFile.split("/").last).toFile
     TestUtil.copyResourceToFile(xmlResourceFile, xmlFile)
-
-    /*
-    val df = session.read
-      .format("xml")
-      .option("rowTag", "entry")
-      .option("path", tempDir.toFile.getPath)
-      .load()
-    df.show
-    */
 
     val dataObj = XmlFileDataObject(id = "test1", path = tempDir.toFile.getPath,
       schema = Some(SparkSchema(schema)),
@@ -105,63 +95,43 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
   }
 
   test("Complex XML file") {
-    // TODO
-    // - commented items are still read by spark-xml!
-
     val tempDir = Files.createTempDirectory("xml")
 
     // prepare schema
-    val xsdContent = Source.fromResource("xmlSchema/TMS_TMS2TMS_Tariff_1300.xsd").mkString
+    val xsdContent = Source.fromResource("xmlSchema/complex.xsd").mkString
     val rootSchema = XsdSchemaConverter.read(xsdContent, 10)
-    //    val schema = SchemaUtil.extractRowTag(rootSchema, "TMSData/update/tariffNodes/modified/tariffNode")
-    //    val schema = SchemaUtil.extractRowTag(rootSchema, "TMSData/initialLoad/tariffNodes/tariffNode")
-    val schema = SchemaUtil.extractRowTag(rootSchema, "TMSData/initialLoad/tariffRoot")
-      .add(StructField("_corrupt_record", StringType))
-    //schema.printTreeString()
+    // note that we combine rowTags from different branches
+    val schema = SchemaUtil.extractRowTag(rootSchema, "tree/nodes/modified/node,tree/nodes/deleted/node")
 
     // prepare data
-    val xmlResourceFile = "xmlSchema/tns_minimal_init_test.xml"
+    val xmlResourceFile = "xmlSchema/complex.xml"
     val xmlFile = tempDir.resolve(xmlResourceFile.split("/").last).toFile
     TestUtil.copyResourceToFile(xmlResourceFile, xmlFile)
 
     val dataObj = XmlFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath),
       schema = Some(SparkSchema(schema)),
-      rowTag = Some("tariffRoot")
+      rowTag = Some("node")
     )
 
     // read
+    // There is a bug in Spark 3.2.1, fixed in 3.2.2 which might cause "CompileException ... A method named "numElements" is not declared in any enclosing class..." with multiple level of explodes.
+    // see also https://issues.apache.org/jira/browse/SPARK-38285
+    session.conf.set("spark.sql.optimizer.expression.nestedPruning.enabled", false)
+    session.conf.set("spark.sql.optimizer.nestedSchemaPruning.enabled", false)
+    // test L0: should include 1 updated L0 and 1 deleted record
     val dfResultL0 = dataObj.getSparkDataFrame().cache
-      .withColumn("cntDesc", functions.size($"descriptions"))
-    //.withColumn("cntChildren", functions.size($"tariffNodes"))
-    dfResultL0.show
-    /*
+      .withColumn("cntDesc", functions.size($"descriptions.description"))
+      .withColumn("cntChildren", functions.size($"nodes.node"))
+    val resultL0 = dfResultL0.select($"name",$"cntDesc",$"cntChildren").as[(String,Int,Int)].collect.toSeq
+    assert(resultL0 == Seq(("Test Update L0",2,1),("Test Delete",-1,-1)))
+    // test L1: should include 1 updated L1 record
     val dfResultL1 = dfResultL0
-      .withColumn("tariffNodes", explode($"tariffNodes"))
-      .select($"tariffNodes.tariffNode.*")
-      .withColumn("cntChildren", functions.size($"tariffNodes"))
-    dfResultL1.show
-    val dfResultL2 = dfResultL1
-      .withColumn("tariffNodes", explode($"tariffNodes"))
-      .select($"tariffNodes.tariffNode.*")
-      .withColumn("cntChildren", functions.size($"tariffNodes"))
-    dfResultL2.show
-    val dfResultL3 = dfResultL2
-      .withColumn("tariffNodes", explode($"tariffNodes"))
-      .select($"tariffNodes.tariffNode.*")
-      .withColumn("cntChildren", functions.size($"tariffNodes"))
-    dfResultL3.show
-    val dfResultL4 = dfResultL3
-      .withColumn("tariffNodes", explode($"tariffNodes"))
-      .select($"tariffNodes.tariffNode.*")
-      .withColumn("cntChildren", functions.size($"tariffNodes"))
-    dfResultL4.show
-    val dfResultL5 = dfResultL4
-      .withColumn("tariffNodes", explode($"tariffNodes"))
-      .select($"tariffNodes.tariffNode.*")
-      .withColumn("cntChildren", functions.size($"tariffNodes"))
-    dfResultL5.show
-    */
-    //https://pig.apache.org/docs/r0.17.0/api/org/apache/pig/piggybank/storage/XMLLoader.XMLRecordReader.html
+      .withColumn("nodes", explode($"nodes.node"))
+      .select($"nodes.*")
+      .withColumn("cntDesc", functions.size($"descriptions.description"))
+      .withColumn("cntChildren", functions.size($"nodes.node"))
+    val resultL1 = dfResultL1.select($"name",$"cntDesc",$"cntChildren").as[(String,Int,Int)].collect.toSeq
+    assert(resultL1 == Seq(("Test Update L1",2,-1)))
   }
 
   test("XML with nested lists") {

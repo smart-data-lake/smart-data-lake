@@ -199,9 +199,17 @@ object SchemaUtil {
   }
 
   /**
-   * extract nested schema element according to row tag.
+   * Extract nested schema element according to row tag.
+   *
+   * An undocumented feature allows to specify multiple comma-separated rowTags.
+   * extractRowTag will extract both schemas and try to build a superset of it.
+   * A use case for this is to extract nodes with same name but different type of different branches of an XML-file, as spark-xml cannot discern those...
    */
-  private[smartdatalake] def extractRowTag(schema:StructType, rowTag: String) = {
+  private[smartdatalake] def extractRowTag(schema:StructType, rowTag: String): StructType = {
+    val schemas = rowTag.split(",").map(extractSingleRowTag(schema, _))
+    schemas.reduceLeft(unifySchemas)
+  }
+  private[smartdatalake] def extractSingleRowTag(schema:StructType, rowTag: String): StructType = {
     rowTag.split("/").filter(_.nonEmpty).foldLeft(schema){
       case (schema, element) =>
         val schemaElement = schema.fields.find(_.name == element)
@@ -211,6 +219,21 @@ object SchemaUtil {
         assert(elementDataType.isInstanceOf[StructType], s"Schema element $element dataType is ${elementDataType.typeName}, but must be a StructType.")
         elementDataType.asInstanceOf[StructType]
     }
+  }
+  private def unifySchemas(schema1: StructType, schema2: StructType): StructType = {
+    val (fields1Common,fields1Only) = schema1.partition(f => schema2.fieldNames.contains(f.name))
+    val (fields2Common,fields2Only) = schema2.partition(f => schema1.fieldNames.contains(f.name))
+    val fields2CommonMap = fields2Common.map(f => (f.name, f)).toMap
+    // check common fields for same dataType
+    val commonDifferentType = fields1Common.filter(f => f.dataType != fields2CommonMap(f.name).dataType)
+    assert(commonDifferentType.isEmpty, s"Cannot unify schemas. Fields ${commonDifferentType.map(_.name).mkString(",")} have different dataType.")
+    // unify fields, adapting nullable definition
+    val fieldsMap = (fields1Common.map(f => f.copy(nullable = f.nullable || fields2CommonMap(f.name).nullable)) ++
+      fields1Only.map(_.copy(nullable = true)) ++
+      fields2Only.map(_.copy(nullable = true)))
+      .map(f => (f.name, f)).toMap
+    // order fields according to schema1
+    StructType(schema1.fields.map(f => fieldsMap(f.name)) ++ fields2Only.map(f => fieldsMap(f.name)))
   }
 }
 
