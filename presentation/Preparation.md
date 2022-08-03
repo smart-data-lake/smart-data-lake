@@ -20,6 +20,7 @@ Assuming you have no Windows Store available you need to follow the following st
 
 * enable WSL: Admin-Powershell -> `dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart`
 * enable VM feature: Admin-Powershell -> `dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart`
+* set WSL2 as default: `wsl --set-default-version 2`
 * get Ubuntu: PowerShell:
 	- `Invoke-WebRequest -Uri https://aka.ms/wslubuntu2004 -OutFile Ubuntu.appx -UseBasicParsing` OR
 	- `curl.exe -L -o ubuntu-2004.appx https://aka.ms/wslubuntu2004`
