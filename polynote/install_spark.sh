@@ -3,7 +3,7 @@
 
 set -e -x
 
-SPARK_VERSION=${SPARK_VERSION:-"3.2.1"}
+SPARK_VERSION=${SPARK_VERSION:-"3.2.2"}
 SPARK_VERSION_DIR="spark-${SPARK_VERSION}"
 
 if test "${SPARK_VERSION}" \> "3" -a "${SCALA_VERSION}" = "2.11"; then
