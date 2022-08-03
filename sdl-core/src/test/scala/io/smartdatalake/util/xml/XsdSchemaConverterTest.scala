@@ -19,6 +19,7 @@
 
 package io.smartdatalake.util.xml
 
+import org.apache.spark.sql.types.{ArrayType, DataType, StructType}
 import org.scalatest.FunSuite
 
 import scala.io.Source
@@ -28,12 +29,28 @@ class XsdSchemaConverterTest extends FunSuite {
   test("read basket schema") {
     val xsdContent = Source.fromResource("xmlSchema/basket.xsd").mkString
     val schema = XsdSchemaConverter.read(xsdContent, 10)
-    println(schema)
   }
 
   test("read complex schema with recursion") {
     val xsdContent = Source.fromResource("xmlSchema/complex.xsd").mkString
-    val schema = XsdSchemaConverter.read(xsdContent, 10)
-    schema.printTreeString()
+    val schema = XsdSchemaConverter.read(xsdContent, 3)
+    // nested lists
+    val nodeArrayType = extractSubDataType(schema, "node").map(_.asInstanceOf[ArrayType]).get
+    val nodeStructType = nodeArrayType.elementType.asInstanceOf[StructType]
+    // attributeGroup
+    assert(nodeStructType.fieldNames.contains("_validFrom"))
+    // recursion
+    assert(nodeStructType.fieldNames.toSeq == nodeStructType("nodes").dataType.asInstanceOf[StructType]("node").dataType.asInstanceOf[ArrayType].elementType.asInstanceOf[StructType].fieldNames.toSeq)
+  }
+
+  def extractSubDataType(schema: StructType, elementName: String): Option[DataType] = {
+    schema.fields.find(_.name == elementName).map(_.dataType)
+      .orElse {
+        val structFields = schema.fields.map(_.dataType).collect{
+          case x: StructType => x
+          case x: ArrayType if x.elementType.isInstanceOf[StructType] => x.elementType.asInstanceOf[StructType]
+        }
+        structFields.flatMap(x => extractSubDataType(x, elementName)).headOption
+      }
   }
 }
