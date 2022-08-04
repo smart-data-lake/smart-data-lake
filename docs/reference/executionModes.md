@@ -115,7 +115,6 @@ By defining **alternativeOutputId** attribute you can define another DataObject 
 This can be used to select data to process against a DataObject later in the pipeline.
 
 <!-- TODO describe DataFrameIncrementalMode -->
-<!-- TODO describe DataObjectStateIncrementalMode -->
 <!-- TODO describe FileIncrementalMode -->
 
 
@@ -124,7 +123,7 @@ This can be used to select data to process against a DataObject later in the pip
 ## ProcessAllMode
 An execution mode which forces processing all data from it's inputs, removing partitionValues and filter conditions received from previous actions.
 
-##DataObjectStateIncrementalMode
+## DataObjectStateIncrementalMode
 An execution mode for incremental processing by remembering DataObjects state from last increment. The state is saved in a .json file for which the user needs to provide a path using the `--state-path` option. An application name must also be specified with the `-n` option. 
 
 ## Execution Condition
