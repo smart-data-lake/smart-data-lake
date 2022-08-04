@@ -30,12 +30,12 @@ With incremental the difference between input and output can be selected.
 ## Partitions
 <!--TODO find a good introduction to partitions-->
 
-### Default Execution Mode: Fixed partition values filter
+### Default Execution Mode
 A filter based on partitions can be applied manually by specifying the command line parameter `--partition-values` or `--multi-partition-values`, see [Command Line](commandLine.md). The partition values specified are passed to **all** start-Actions of a DAG and filtered for every input DataObject by its defined partition columns.
 On execution every Action takes the partition values of the input and filters them again for every output DataObject by its defined partition columns, which serve again as partition values for the input of the next Action.
+This can be used without providing any explicit Execution Mode in the config of your Actions. If can therefore be viewed as the "Default Execution Mode".
 Note that during execution of the dag, no new partition values are added, they are only filtered. An exception is if you place a `PartitionDiffMode` in the middle of your pipeline, see section [PartitionDiffMode](#partitiondiffmode-dynamic-partition-values-filter) below.
-This can be used without providing any explicit Execution Mode in the config of your Actions. If can be viewed as the "Default Execution Mode".
-If the parameter `--partition-values` is not specified, SDLB will process all available data.
+If the parameters `--partition-values` or `--multi-partition-values` are not specified, SDLB will process all available data.
 
 ### FailIfNoPartitionValuesMode
 The *FailIfNoPartitionValuesMode* enforces to specify partition values. It simply check if partition values are present and fail otherwise.
