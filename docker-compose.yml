@@ -1,0 +1,29 @@
+version: '3.2'
+services:
+  metastore:
+    build:
+      context: ./metastore
+    hostname: metastore
+    ports:
+      - "1527:1527"
+    volumes:
+      - "./data/_metastore:/mnt/database"
+    environment:
+      DB_DIR: "/mnt/database"
+
+  polynote:
+    build:
+      context: ./polynote
+    hostname: polynote
+    depends_on:
+      - metastore
+    command: ["--config", "/opt/polynote/config.yml"]
+    ports:
+      - "8192:8192"
+      - "4140-4199:4140-4199"
+    volumes:
+      - "./polynote/config.yml:/opt/polynote/config.yml"
+      - "./polynote/notebooks:/mnt/notebooks"
+      - "./data:/mnt/data"
+      - "./target:/mnt/lib"
+      - "./config:/mnt/config" # SDL config to use DataObjects in notebooks
