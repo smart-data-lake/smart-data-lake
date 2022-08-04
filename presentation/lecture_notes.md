@@ -1,6 +1,10 @@
 
 # Smart Data Lake Builder Hands-On Training
 
+<!-- 
+Tools: In Teams annotation can be used to point to specific aspects in the configs, SchemaViewer,...
+-->
+
 ## Goal
 * train loving friend imagine to replace short distant flights with train rides
 * discover/count all flights which 
@@ -123,43 +127,84 @@ In our case we could think of the following structure:
 
 ## Setup
 * clone repo
-```
-git clone -b training https://github.com/smart-data-lake/getting-started.git SDLB_training
-```
+  ```
+  git clone -b training https://github.com/smart-data-lake/getting-started.git SDLB_training
+  ```
 * build additional sources
-```
-mkdir .mvnrepo
-podman run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
-```
-* start helping containers
-```
-podman-compose up -d
-```
+  ```
+  mkdir .mvnrepo
+  podman run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
+  ```
+* correct permissions: 
+  `chmod -R go+w polynote/notebooks`
 
-:warning: TODO
+* start helping containers
+  ```
+  podman-compose up -d
+  ```
 
 ## Let's have a look to the actual implementation
-We have already something prepared...
+as a reminder, we want to implement:
+![data layer structure for the use case](images/dataLayers.png)
+... which is already prepared in the present repo
 
-## Hocon
-* Human-Optimized Config Object Notation
+In **SDLB**, we define our pipeline by specifying *data objects* and *actions* to connect them, which is done in *HOCON*
+
+## Hocon - Pipeline Description
+* **H**uman-**O**ptimized **C**onfig **O**bject **N**otation
 * originating from JSON
 
-> list config directory
+Let's have a look to the present implementation:
+> list config directory: `ls config` -> see multiple configuration files
 
-* config can be split
-* can also be used for managing different environments (e.g. `--config ./config/prod,config/global.conf`)
+* specification of the pipeline can be split in **multiple files** and even **directories**
+  - -> directories can be used to manage different environments e.g. 
 
+```
+config
++-- global.conf
++-- prod
+│   +-- injection.conf
+│   +-- transform.conf
++-- test
+    +-- injection.conf
+    +-- transform.conf
+```
+OR
+```
+config
++-- env_dev.conf
++-- env_prod.conf
++-- inject
+│   +-- dataABC.conf
+│   +-- dataXYZ.conf
++-- transform
+│   +-- dataABC.conf
+│   +-- dataXYZ.conf
+```
+
+Let's have a look into a configuration file:
 > `nano config/airports.conf`
+Note: 
 
-* here we see an example with 3 stages, 3 data types and 2 actions to get from one to the other
+* 3 **data objects** for 3 different layers: **ext**, **stg**, **int**
+* here each data object has a different type: WebserviceFileDataObject, CsvFileDataObject, DeltaLakeTableDataObject
+  - `ext-airports`: specifies the location of a file to be downloaded 
+  - `stg-airports`: a staging CSV file to be downloaded into (raw data)
+  - `int-airports`: filtered and written into `DeltaLakeTable`
 
-* parameters and structures
-* `ext-airports` specifies the location of a file to be downloaded and `stg-airport` the destination to be downloaded
-* further the data will be filtered and written into `DeltaLakeTable`
-* Schema inference
-	- support for schema evolution, depending on the Action schema will be replaced or extended (new column added, removed columns kept)
-		+ not for partitioned Hive tables
+
+* 2 **actions** defining the connection between the data objects
+  - first simple download
+  - then filter and historize
+
+* structures and parameters, like *type*, *inputId*,...
+* **Transformer** will be handled later
+
+Schema: A note to data Objects: SDLB creates Schemata for all spark supported data objects: user defined or inference
+	- support for schema evolution 
+    + replaced or extended or extend (new column added, removed columns kept) schema 
+		+ for JDBC and DeltaLakeTable, need to be enabled
 
 
 <!--
@@ -179,12 +224,13 @@ We have already something prepared...
 :warning: TODO overwrite not working'
 -->
 
-### What else is supported?
+### Schema Viewer - What is supported?
 > open [SDLB Schema Viewer](http://smartdatalake.ch/json-schema-viewer/index.html#viewer-page&version=sdl-schema-2.3.0-SNAPSHOT.json)
-* distinguish `gloabl`, `dataObjects`, `actions`, and `connections`
+* distinguish `global`, `dataObjects`, `actions`, and `connections`
 
 ### DataObjects
-mention a few dataObjects: 
+There are data objects different types: files, database connections, and table formats. 
+To mention **a few** dataObjects: 
 
 * `AirbyteDataObject` provides access to a growing list of [Airbyte](https://docs.airbyte.com/integrations/) connectors to various sources and sinks e.g. Facebook, Google {Ads,Analytics,Search,Sheets,...}, Greenhouse, Instagram, Jira,...
 * `JdbcTableDataObject` to connect to a database e.g. MS SQL or Oracle SQL
@@ -192,32 +238,40 @@ mention a few dataObjects:
 * `SnowflakeTableDataObject` access to Snowflake tables 
 
 ### Actions
-* not as many as dataObjects, but very flexible.
-* basis action with additional default functionality like, Deduplication and Historization
-* all further logic is defined in the action as transformer
-* 1to1 (files) up to  many to many
+SDLB is designed to define/customize your own actions. Nevertheless, there are basic/common actions implemented and a general framework provided to implement your own specification
+ 
+* **FileTransferAction**: pure file transfer
+* **CopyAction**: basic generic action. Converts to DataFrame and to target data object. Provides opportunity to add **transformer(s)**
+* **CostumDataFrameAction**: can handle **multiple inputs/outputs** 
+* ...
+* actions with additional logic, e.g.
+  - **DeduplicateAction**: verifies to not have duplicates between input and output, keeps last record and history when *captured*
+  - **HistorizeAction**: technical historization using **valid-from/to** columns
 
 #### Transformations
-* there are 1to1 and many-to-many transformations
+* distinguish between **1to1** (CopyAction, Dedup/Hist) and **many-to-many** (CustomDataFrame) transformations
 * transformers supports languages:
 	- ScalaClass
 	- ScalaCode
 	- SQL
 	- Python
-* predefined transformers, e.g.:
+* more specific transformers, e.g.:
 	- `AdditionalColumnsTransformer` (in HistorizeAction), adding information from context or derived from input, for example, adding input file name
-	- `SparkRepartitionTransformer`
+	- `SparkRepartitionTransformer` for optimized file handling
 
-Let's have a closer look to the present examples:
-> open `config/departures.conf` look at `download-deduplicate-departures`
+What we have here: 
+* in `config/airports.conf` we already saw an SQL transformer
+* in `config/departures.conf` look at `download-deduplicate-departures`
+  - **chained** transformers
+  - first **SQL** query, to convert UnixTime to dateTime format
+  - then **Scala Code** for deduplication
+    + the deduplication action does compare input and target
+    + the transformation verifies that there are no duplicated in the input
+* in `config/distances.conf` a Scala class is called
+  - see `src/main/scala/com/sample/ComputeDistanceTransformer.scala`
+    + definition and usage of distance calculation
 
-* **chained** transformers
-* first **SQL** query, to convert UnixTime to dateTime format
-* then **Scala Code** for deduplication
-	- the deduplication action does compare input and target
-	- The transformation verifies that there are no duplicated in the input
-
-* there is also Scala Class used in the example, but we will not go into detail yet.
+> Note: *transformer* is deprecated
 
 ## Feeds
 * start application with `--help`: `podman run --rm --hostname=localhost --pod SDLB_training sdl-spark:latest --help`
