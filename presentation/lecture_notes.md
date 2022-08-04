@@ -2,11 +2,11 @@
 # Smart Data Lake Builder Hands-On Training
 
 ## Goal
-* tain loving friend imagine to replace short distant flights with train rides
+* train loving friend imagine to replace short distant flights with train rides
 * discover/count all flights which 
   - starting from a certain airport 
   - <500km
-  - asumme destination airport Bern (LSZB) or Frankfurt (EDDF)
+  - assume destination airport Bern (LSZB) or Frankfurt (EDDF)
 
 ![map about flights around Bern](images/flights_BE.png)
 
@@ -42,14 +42,14 @@ Let's have a closer look.
   - :heavy_plus_sign: performant and flexible
   - :heavy_plus_sign: scalable, open source
   - :heavy_plus_sign: unstructured and complex data structures
-  - :heavy_minus_sign: siloed initatives, redundancy
+  - :heavy_minus_sign: siloed initiatives, redundancy
   - :heavy_minus_sign: heavy data preparation for every use case
 
 ### Smart Data Lake aka. Lakehouse
   - :heavy_plus_sign: value & semantic oriented
   - :heavy_plus_sign: known data quality
   - :heavy_plus_sign: secured, handled privacy
-  - :heavy_plus_sign: Metadata (data cataloge & linage)
+  - :heavy_plus_sign: Metadata (data catalog & linage)
   - :heavy_plus_sign: automation, unified batch and streaming
   - :heavy_plus_sign: AI ready
 
@@ -58,25 +58,25 @@ Let's have a closer look.
 ### Why Smart Data Lake Builder (SDLB)?
 * examples of other tools: Snowflake - DBT, Azure Data Factory, Apache Beam, …
   - able to use Smart Data Lake concepts
-  - different advantages and disadvanteges for building data pipelines
+  - different advantages and disadvantages for building data pipelines
 * dynamic creation of workflow (no specification of step ordering)
 * No Code for easy tasks
 * complex data pipelines well suited
-* already implemented loading modes (incremental, patition-wise, streaming, checkpoint/recovery)
-* already implemented transformations (historize, deduplication)
+* already implemented loading modes (incremental, partition-wise, streaming, checkpoint/recovery)
+* already implemented transformations (historize, de-duplication)
 * Designed to add custom connectors and transformations
 * various data formats, incl. DeltaLake
 * Lineage and Data Catalog from metadata
-* DevOps ready: versionable configuration, support for automated testing
+* DevOps ready: version-able configuration, support for automated testing
 * early validation
-* scripted -> portable can run on most (manybe any) cloud or on-prem platform
+* scripted -> portable can run on most (maybe any) cloud or on-prem platform
 * configuration templates allows reuse of configuration blocks
 
 ## Data structuring
 Within Smart Data Lake we structure our data in layers
 
 * stage layer 
-  - copy of the original data, accessible for merging/combining with exisiting/other data sources
+  - copy of the original data, accessible for merging/combining with existing/other data sources
 * integration layer 
   - cleaning/structuring/prepared data
 * business transformation layer
@@ -87,7 +87,7 @@ In our case we could think of the following structure:
 ![data layer structure for the use case](images/dataLayers.png)
 
 ## Security In Cloud
-* typically data need to be protected against unwanted access and modification, especially in the cloud, where data is by default accessible from everywhere (from everyone, if misconfigured)
+* typically data need to be protected against unwanted access and modification, especially in the cloud, where data is by default accessible from everywhere (from everyone, if mis-configured)
 * Data Classification: Public, Internal, Restricted, Personal Data, Confidential
   - various security measures per class, including (not the full list):
     + access control
@@ -95,39 +95,50 @@ In our case we could think of the following structure:
       * periodic review of permissions
     + cryptography
       * encrypt at rest and in transit
-      * elaborated secret stores, for key managment
+      * elaborated secret stores, for key management
     + operations security
       * documentation and automation (CD), change management
-      * seperated environments with configuration and capacity managment
+      * separated environments with configuration and capacity management
     + ...
     + [ELCAs Cloud Security Concept](https://confluence.svc.elca.ch/display/BL9CONFLUENCE/Data+Security+Concept+for+Cloud+Analytics+Platforms)
 
-  - seperate treatment of Personally Identifiable Information (PII)
+  - separate treatment of Personally Identifiable Information (PII)
     + e.g. names, address, social sec. numbers, tel.numbers, medical/health data, ...
     + anonymisation (best), pseudonymisation 
-    + additional encrytion (in use)
+    + additional encryption (in use)
     + further regulations: right of data removal, data location restrictions, etc.
     + ...
     + [ELCAs Cloud Data Privacy Concept](https://confluence.svc.elca.ch/display/BL9CONFLUENCE/Technical+Aspects+of+Data+Privacy+Concepts+for+Cloud+Analytics+Platforms)
-* authorisation managment using roles and permission groups
+* authorisation management using roles and permission groups
   - Users belong to role groups
   - role groups have permission groups
   - permission groups mange permissions for apps, devices, and environments
   - ...
   - [ELCAs Cloud Authorisation Concept](https://confluence.svc.elca.ch/display/BL9CONFLUENCE/Authorization+Concept+for+Cloud+Analytics+Platforms)
 
-![permission managment from users utilizing role groups and technical troups to specify permissions](images/authorisationConcept.png)
+![permission management from users utilizing role groups and technical groups to specify permissions](images/authorisationConcept.png)
 
 :warning: TODO
 
 
 ## Setup
 * clone repo
-> git clone ...
+```
+git clone -b training https://github.com/smart-data-lake/getting-started.git SDLB_training
+```
+* build additional sources
+```
+mkdir .mvnrepo
+podman run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
+```
+* start helping containers
+```
+podman-compose up -d
+```
 
 :warning: TODO
 
-## Let's have a look to the actual impementation
+## Let's have a look to the actual implementation
 We have already something prepared...
 
 ## Hocon
@@ -136,8 +147,8 @@ We have already something prepared...
 
 > list config directory
 
-* config can be splitted
-* can also be used for managing different entwironments (e.g. `--config ./config/prod,config/global.conf`)
+* config can be split
+* can also be used for managing different environments (e.g. `--config ./config/prod,config/global.conf`)
 
 > `nano config/airports.conf`
 
@@ -158,7 +169,7 @@ We have already something prepared...
   basedir = "/whatever/whatever"
   basedir = ${?FORCED_BASEDIR}
   ```
-- overwrite prameters with env variables
+- overwrite parameters with env variables
   + specify java option `-Dconfig.override_with_env_vars=true` in Docker entrypoint and
   + env var:
     * prefix `CONFIG_FORCE_` is stripped
@@ -177,14 +188,14 @@ mention a few dataObjects:
 
 * `AirbyteDataObject` provides access to a growing list of [Airbyte](https://docs.airbyte.com/integrations/) connectors to various sources and sinks e.g. Facebook, Google {Ads,Analytics,Search,Sheets,...}, Greenhouse, Instagram, Jira,...
 * `JdbcTableDataObject` to connect to a database e.g. MS SQL or Oracle SQL
-* `DeltaLakeTableDataObject` tables in delta format (based on parquet), including shema registered in metastore and transaction logs enables time travel (a common destination)
+* `DeltaLakeTableDataObject` tables in delta format (based on parquet), including schema registered in metastore and transaction logs enables time travel (a common destination)
 * `SnowflakeTableDataObject` access to Snowflake tables 
 
 ### Actions
 * not as many as dataObjects, but very flexible.
 * basis action with additional default functionality like, Deduplication and Historization
 * all further logic is defined in the action as transformer
-* 1to1 (files) up to  manay to many
+* 1to1 (files) up to  many to many
 
 #### Transformations
 * there are 1to1 and many-to-many transformations
@@ -209,7 +220,7 @@ Let's have a closer look to the present examples:
 * there is also Scala Class used in the example, but we will not go into detail yet.
 
 ## Feeds
-* start application with `--help`: `podman run --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config`
+* start application with `--help`: `podman run --rm --hostname=localhost --pod SDLB_training sdl-spark:latest --help`
 
 > Note: `-rm` removes container after exit, `hostname` and `pod` for lauching in same Network as metastore and Polynote, mounting data, target and config directory, container name, config directories/files
 
@@ -220,7 +231,7 @@ Let's have a closer look to the present examples:
 
 ## Environment Variables in HOCON
 * try run feed everything: 
-`podman run --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel '.*'`
+`podman run --rm --hostname=localhost --pod SDLB_training -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel '.*'`
 
 * error: `Could not resolve substitution to a value: ${METASTOREPW}`
   - in `config/global.conf` we defined `"spark.hadoop.javax.jdo.option.ConnectionPassword" = ${METASTOREPW}`
@@ -228,7 +239,7 @@ Let's have a closer look to the present examples:
 
 ## Test Configuration
 * first run config test: 
-`podman run -e METASTOREPW=1234 --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel 'download' --test config` (fix bug together)
+`podman run -e METASTOREPW=1234 --rm --hostname=localhost --pod SDLB_training -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel 'download' --test config` (fix bug together)
 
 * while running we get:
 `Exception in thread "main" io.smartdatalake.config.ConfigurationException: (DataObject~stg-airports) ClassNotFoundException: Implementation CsvDataObject of interface DataObject not found`
@@ -238,7 +249,7 @@ let us double check what DataObjects there are available... [SDLB Schema Viewer]
 
 ## Dry-run
 * run again (and then with) `--test dry-run` and feed `'.*'` to check all configs: 
-  `podman run -e METASTOREPW=1234 --rm --hostname=localhost --pod getting-started -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel '.*' --test dry-run`
+  `podman run -e METASTOREPW=1234 --rm --hostname=localhost --pod SDLB_training -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel '.*' --test dry-run`
 
 ## DAG
 * (Directed acyclic graph)
@@ -279,6 +290,7 @@ let us double check what DataObjects there are available... [SDLB Schema Viewer]
 ```
 
 ## Execution Phases
+> real execution: `podman run -e METASTOREPW=1234 --rm --hostname=localhost --pod SDLB_training -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel '.*'`
 * logs reveal the **execution phases**
 * in general we have: 
 	- configuration parsing
@@ -290,21 +302,23 @@ let us double check what DataObjects there are available... [SDLB Schema Viewer]
 
 ## Inspect result
 During the Airport download we created a CSV file: `less data/stg-airports/results.csv`
-The departures are directly loaded into a delta table: open [Polynote at localhost:8192](http://localhost:8192/notebook/SelectingData.ipynb)
-  `departure table consits of 457 row and entries are of original date: 20210829 20210830`
+The departures are directly loaded into a delta table: open [Polynote at localhost:8192](http://localhost:8192/notebook/inspectData.ipynb)
+  `departure table consists of 457 row and entries are of original date: 20210829 20210830`
+
 
 ## Incremental Load
 * desire to **not read all** data from input at every run -> incrementally
-* or here: departure source **resricted request** to <7 days
+* or here: departure source **restricted request** to <7 days
   - initial request 2 days 29.-20.08.2021
 
 ### General aspects
-* in general we often want an inital load and then regular updates
+* in general we often want an initial load and then regular updates
 * distinguish between
 * **StateIncremental** 
   - stores a state, utilized during request submission, e.g. WebService or DB request
 * **SparkIncremental**
   - uses max values from **compareCol**
+  - *DataFrameIncrementalMode* and *FileIncrementalMode*
  
 ### Current Example
 * here we use state to store the last position
@@ -320,9 +334,9 @@ The departures are directly loaded into a delta table: open [Polynote at localho
     mergeModeEnable = true
     updateCapturedColumnOnlyWhenChanged = true
   ```
-  - and add `--state-path /mnt/data/state -n getting-started` to the command line arguments
+  - and add `--state-path /mnt/data/state -n SDLB_training` to the command line arguments
 
-* **first run** creates `less data/state/succeeded/getting-started.1.1.json` 
+* **first run** creates `less data/state/succeeded/SDLB_training.1.1.json` 
   - see line `"state" : "[{\"airport\":\"LSZB\",\"nextBegin\":1630310979},{\"airport\":\"EDDF\",\"nextBegin\":1630310979}]"`
     + > other content we regard later
   - this is used for the next request
@@ -331,18 +345,18 @@ The departures are directly loaded into a delta table: open [Polynote at localho
   - also check the [increasing amount fo lines collected in table](http://localhost:8192/notebook/inspectData.ipynb#Cell4)
 > run a couple of times
 
-> :warning: When we get result/error: `Webservice Request failed with error <404>`, if there are no new data avalable. 
+> :warning: When we get result/error: `Webservice Request failed with error <404>`, if there are no new data available. 
 
 ## Streaming
-* continious processing, cases we want to run the actions again and again
+* continuous processing, cases we want to run the actions again and again
 
 ### Command Line
 * command line option `-s` or `--streaming`, streaming all selected actions
   - requires `--state-path` to be set
-* just start `podman run -e METASTOREPW=1234 --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod getting-started sdl-spark:latest --config /mnt/config/  --feed-sel download --state-path /mnt/data/state -n getting-started -s` and see the action runnning again and again
+* just start `podman run -e METASTOREPW=1234 --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod SDLB_training sdl-spark:latest --config /mnt/config/  --feed-sel download --state-path /mnt/data/state -n SDLB_training -s` and see the action running again and again
   - > notice the recurring of both actions, here in our case we could limit the feed to the specific action
   - > monitor the growth of the table
-  - > see strieming trigger interval of 48s in output: `LocalSmartDataLakeBuilder$ - sleeping 48 seconds for synchronous streaming trigger interval [main]`
+  - > see streaming trigger interval of 48s in output: `LocalSmartDataLakeBuilder$ - sleeping 48 seconds for synchronous streaming trigger interval [main]`
     + change it: search stream in Schema Viewer -> `global`->`synchronousStreamingTriggerIntervalSec = 10` -> interval between 2 starts (not end to start)
 
 :warning: TODO other streaming modes???
@@ -357,11 +371,11 @@ The departures are directly loaded into a delta table: open [Polynote at localho
     
 ## Checkpoint / Restart
 * requires states (`--state-path`)
-  - `podman run -e METASTOREPW=1234 --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod getting-started sdl-spark:latest --config /mnt/config/ --feed-sel '.*' --state-path /mnt/data/state -n getting-started` -> cancel run to simulate crash (after download phase)
-* stored current state in file: `data/state/getting-started.1.1.json`
+  - `podman run -e METASTOREPW=1234 --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod SDLB_training sdl-spark:latest --config /mnt/config/ --feed-sel '.*' --state-path /mnt/data/state -n SDLB_training` -> cancel run to simulate crash (after download phase)
+* stored current state in file: `data/state/SDLB_training.1.1.json`
   - see the SUCCESS and CANCELED statements
 * restart with the same command
-  - notice line at the beginning: `LocalSmartDataLakeBuilder$ - recovering application getting-started runId=1 lastAttemptId=1 [main]`
+  - notice line at the beginning: `LocalSmartDataLakeBuilder$ - recovering application SDLB_training runId=1 lastAttemptId=1 [main]`
   - notice the changed DAG, no download
 
 :warning: TODO
@@ -412,14 +426,22 @@ The following setup is already prepared in the elca-dev tenant:
     `databricks fs cp config/departures.conf dbfs:/databricks/config/departures.conf`
 
 * configure job, using the uploaded jar and 
-  - parameters: `["-c","file:///dbfs/databricks/config/","--feed-sel","ids:download-deduplicate-departures", "--state-path", "file:///dbfs/databricks/data/state", "-n", "getting-started"]`
+  - parameters: `["-c","file:///dbfs/databricks/config/","--feed-sel","ids:download-deduplicate-departures", "--state-path", "file:///dbfs/databricks/data/state", "-n", "SDLB_training"]`
   
 ### Show case
 * Workspace -> workflow -> SDLB-train job -> run job
 * after finished, show Data -> int-departures table
-* show notbook in Workspace
+* show notebook in Workspace
 
 ### Further points
 * cluster modification/swap possible (scalability)
 * recurring schedule
 * easy maintainable metastore
+
+## Further / Planned features
+* Monitoring
+  - metrics in logs, e.g. size of written DataFrame
+* Constrains
+  - specify limitations, error/warning when exceeding
+* Expectations
+  - notifications if diverging from specified expectation, e.g. number of partitions
