@@ -490,7 +490,10 @@ Now it will fail because we need to provide a path for the state-path, so we add
     
 ## Checkpoint / Restart
 * requires states (`--state-path`)
-  - `podman run -e METASTOREPW=1234 --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod SDLB_training sdl-spark:latest --config /mnt/config/ --feed-sel '.*' --state-path /mnt/data/state -n SDLB_training` -> cancel run to simulate crash (after download phase)
+  - `podman run -e METASTOREPW=1234 --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod SDLB_training sdl-spark:latest --config /mnt/config/ --feed-sel '.*' --state-path /mnt/data/state -n SDLB_training` 
+  -> cancel run to simulate crash (after download phase when seeing in the logs 
+  - `(Action~download-airports) finished writing DataFrame to stg-airports: jobDuration=PT0.871S files_written=1 [exec-download-airports]` and
+  - `ActionDAGRun$ActionEventListener - Action~download-deduplicate-departures[DeduplicateAction]: Exec succeeded [dag-1-191]`
 * stored current state in file: `data/state/current/SDLB_training.1.1.json`
   - see the SUCCESS and CANCELED statements
 * restart with the same command
