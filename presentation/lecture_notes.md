@@ -342,6 +342,7 @@ let us double check what DataObjects there are available... [SDLB Schema Viewer]
                   │compute-distances│
                   └─────────────────┘
 ```
+--- switch lecturer
 ## Automatic Tests
 runSimulation -> unit with synthetical DataFrames
 [Unit Test in SDLB](https://github.com/smart-data-lake/smart-data-lake/blob/develop-spark3/sdl-core/src/test/scala/io/smartdatalake/workflow/action/ScalaClassSparkDsNTo1TransformerTest.scala#L325)
@@ -355,18 +356,64 @@ If time, create one example for course, else use this one.
 > real execution: `podman run -e METASTOREPW=1234 --rm --hostname=localhost --pod SDLB_training -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel '.*'`
 * logs reveal the **execution phases**
 * in general we have: 
-	- configuration parsing
-	- DAG preparation
-	- DAG init
-	- DAG exec (not processed in dry-run mode)
+    - configuration parsing
+    - DAG preparation
+    - DAG init
+    - DAG exec (not processed in dry-run mode)
 * early validation: in init even custom transformation are checked, e.g. identifying mistakes in column names
 * [Docu: execution phases](https://smartdatalake.ch/docs/reference/executionPhases)
+* Make execution fail in init phase by changing SQL of download-deduplicate-departures to something wrong and then re execute the same command.
+* Output should look like this:
+````
+2022-08-05 07:51:14 INFO  ActionDAGRun$ - Init FAILED for sdlb_training :
+                       ┌─────┐
+                       │start│
+                       └──┬┬─┘
+                          ││
+                          │└─────────────────────────┐
+                          v                          │
+ ┌─────────────────────────────────────────────────┐ │
+ │download-deduplicate-departures FAILED PT0.31359S│ │
+ └───────────────────┬─────────────────────────────┘ │
+                     │           ┌───────────────────┘
+                     │           │
+                     v           v
+         ┌──────────────────────────────────┐
+         │join-departures-airports CANCELLED│
+         └────────────────┬─────────────────┘
+                          │
+                          v
+            ┌───────────────────────────┐
+            │compute-distances CANCELLED│
+            └───────────────────────────┘
+     [main]
+Exception in thread "main" io.smartdatalake.util.dag.TaskFailedException: Task download-deduplicate-departures failed. Root cause is 'AnalysisException: cannot resolve 'nonexisting' given input columns: [ext_departures_sdltemp.arrivalAirportCandidatesCount, ext_departures_sdltemp.callsign, ext_departures_sdltemp.created_at, ext_departures_sdltemp.departureAirportCandidatesCount, ext_departures_sdltemp.estArrivalAirport, ext_departures_sdltemp.estArrivalAirportHorizDistance, ext_departures_sdltemp.estArrivalAirportVertDistance, ext_departures_sdltemp.estDepartureAirport, ext_departures_sdltemp.estDepartureAirportHorizDistance, ext_departures_sdltemp.estDepartureAirportVertDistance, ext_departures_sdltemp.firstSeen, ext_departures_sdltemp.icao24, ext_departures_sdltemp.lastSeen]; line 1 pos 7;'
+````
 
 ## Inspect result
 During the Airport download we created a CSV file: `less data/stg-airports/results.csv`
 The departures are directly loaded into a delta table: open [Polynote at localhost:8192](http://localhost:8192/notebook/inspectData.ipynb)
   `departure table consists of 457 row and entries are of original date: 20210829 20210830`
 
+## Partitions
+First have a look at
+> ll data/btl-distances
+
+We see all data stored in various parquet files.
+Our goal of this chapter is to better organize the data so we can compute distances
+for just one departure airport
+Since we change the format in which data is stored let s delete the data
+
+> rm -r data/btl-distances/ data/btl-departures-arrivals-airports/
+
+Execute
+> podman run -e METASTOREPW=1234 --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod SDLB_training sdl-spark:latest --config /mnt/config/ --feed-sel ids:compute-distances --partition-values estdepartureairport=LSZB
+
+When you now look at data/btl-distances, you will only see partition estdepartureairport=LSZB in the files and in the data (can also be seen in the logs of SDLB: `start writing to DataObject~btl-distances, partitionValues estdepartureairport=LSZB [exec-compute-distances]`)
+
+Working with partitions forces to create the whole data pipeline around them -> everything needs to be partitioned by that key.
+The trend goes towards incremental processing (see next chapter).
+But batch processing with partitioning is still the most performant data processing method when dealing with large amounts of data.
 
 ## Incremental Load
 * desire to **not read all** data from input at every run -> incrementally
@@ -399,10 +446,10 @@ These Requirements are already met.
   ```
 
 After changing our config, try to execute the concerned action
-  - `podman run -e METASTOREPW=1234 --rm --hostname=localhost --pod SDLB_training -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures`
+  - `podman run -e METASTOREPW=1234 --rm --hostname=localhost --pod SDLB_training -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download`
 Now it will fail because we need to provide a path for the state-path, so we add
   - add `--state-path /mnt/data/state -n SDLB_training` to the command line arguments
-  - `podman run -e METASTOREPW=1234 --rm --hostname=localhost --pod SDLB_training -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures --state-path /mnt/data/state -n SDLB_training`
+  - `podman run -e METASTOREPW=1234 --rm --hostname=localhost --pod SDLB_training -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download --state-path /mnt/data/state -n SDLB_training`
 
 
 * **first run** creates `less data/state/succeeded/SDLB_training.1.1.json` 
@@ -423,7 +470,7 @@ Now it will fail because we need to provide a path for the state-path, so we add
 ### Command Line
 * command line option `-s` or `--streaming`, streaming all selected actions
   - requires `--state-path` to be set
-* just start `podman run -e METASTOREPW=1234 --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod SDLB_training sdl-spark:latest --config /mnt/config/  --feed-sel ids:download-deduplicate-departures --state-path /mnt/data/state -n SDLB_training -s` and see the action running again and again
+* just start `podman run -e METASTOREPW=1234 --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod SDLB_training sdl-spark:latest --config /mnt/config/  --feed-sel download --state-path /mnt/data/state -n SDLB_training -s` and see the action running again and again
   - > notice the recurring of both actions, here in our case we could limit the feed to the specific action
     `podman run -e METASTOREPW=1234 --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod SDLB_training sdl-spark:latest --config /mnt/config/  --feed-sel ids:download-deduplicate-departures --state-path /mnt/data/state -n SDLB_training -s`
   We could also Use SparkStreamingMode here. TODO Example?
@@ -448,6 +495,8 @@ Now it will fail because we need to provide a path for the state-path, so we add
       2022-08-04 10:56:28 INFO  LocalSmartDataLakeBuilder$ - sleeping 5 seconds for synchronous streaming trigger interval [main]
     ````
     - Quickly mention other streming modes in IntelliJ or link to Execution Modes when ready
+    
+
 
 ## Parallelism
 * distinguish 2 types of parallelism
