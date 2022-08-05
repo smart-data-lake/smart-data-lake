@@ -562,7 +562,12 @@ Now it will fail because we need to provide a path for the state-path, so we add
 
 ## Execution Engines vs Execution Environments
 [Go through documentation](https://smartdatalake.ch/docs/reference/executionEngines)
+> Look at diagram and explain when which Engine is running: 
+> When copying Files, when copying Data from a File to a Spark Table,
+> When Transforming Data with Snowflake via Snowpark
+> When Transforming Data between Spark and Snowflake
 
+If you are interested in trying out SDLB with Snowflake, you can follow this [Blog Post](https://smartdatalake.ch/blog/sdl-snowpark/)
 
 # Deployment methods
 * SDLB can be deployed in various ways on various platforms
@@ -621,7 +626,78 @@ The following setup is already prepared in the elca-dev tenant:
 * recurring schedule
 * easy maintainable metastore
 
-## Further / Planned features
+## Further features
+
+* HousekeepingMode
+  * When working with many partitions, SDLB offers two modes to perform Housekeeping activities:
+    * PartitionRetentionMode:  Keep partitions while retention condition is fulfilled, delete other partitions
+    * PartitionArchiveCompactionMode: Archive and compact old partitions -> Is not covered by Deltalake
+* Spark Specific Features
+  * BreakDataFrameLineage and Autocaching
+  ````
+  val dataFrame2 = spark.table("table1).transform(doSomeComplexStuff1)
+  dataFrame2.write.saveAsTable("table2")
+  val dataFrame3 = dataFrame2.transform(doSomeComplexStuff2)
+  dataFrame3.write.format("csv").save("/path/of/csv")
+  
+  dataFrame3.show() // Restarts from table 1
+  dataFrame3.show() // Restarts from table 1
+  ````
+  The same Scenario as Config with SDLB
+ 
+````
+dataObjects {
+  object1 {
+    type = JdbcTableDataObject
+    path = "~{id}"
+    table {
+      db = "default"
+      name = "table1"
+    }
+  object2 {
+    type = DeltaLakeTableDataObject
+    path = "~{id}"
+    table {
+      db = "default"
+      name = "table2"
+    }
+    object3 {
+    type = CsvFileDataObject
+    path = "~{id}"
+  }
+  
+actions {
+  A1 {
+    type = CustomDataFrameAction
+    inputId = object1
+    outputId = object2
+    ...
+  }
+    A2 {
+    type = CustomDataFrameAction
+    inputId = object2
+    outputId = object3
+    ...
+  }
+````
+SDLB automatically caches all DataFrames of DataObjects.
+If spark you would write `dataFrame2.cache`
+Therefore, if Action A2 has to be re-run, it will be able to start from object2.
+However it will still keep the original Spark-Execution DAG, go over it and then realize that some steps are already cached.
+When chaining lots of transformations together, Spark's Execution DAG can get very large and this can cause performance issue and weird bugs.
+SDLB allows you to break the DAG into smaller pieces with the option `breakDataFrameLineage=true` set on the desired action.
+````
+    A2 {
+    type = CustomDataFrameAction
+    inputId = object2
+    outputId = object3
+    breakDataFrameLineage=true
+    ...
+  }
+````
+With the above config, SDLB will always read from whatever was written in table2 without considering iresults that were cached in-memory.
+
+## Planned 
 * Monitoring
   - metrics in logs, e.g. size of written DataFrame
 * Constrains
