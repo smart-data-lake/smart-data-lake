@@ -401,13 +401,24 @@ First have a look at
 
 We see all data stored in various parquet files.
 Our goal of this chapter is to better organize the data so we can compute distances
-for just one departure airport
+for just one departure airport. The column we want to partition by is estdepartureairport
+Let's use the Schema Viewer to find out how to do that.
+
+Task: use partitioning for Action compute-distances
+
+> <details><summary>Solution: Click to expand!</summary>
+
+> In `config/distances.conf` add partitions = [estdepartureairport] 
+> to dataObjects  btl_departures_arrivals_airports and btl_distances 
+
+> </details>
+
 Since we change the format in which data is stored let s delete the data
 
 > rm -r data/btl-distances/ data/btl-departures-arrivals-airports/
 
 Execute
-> podman run -e METASTOREPW=1234 --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod SDLB_training sdl-spark:latest --config /mnt/config/ --feed-sel ids:compute-distances --partition-values estdepartureairport=LSZB
+> podman run -e METASTOREPW=1234 --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod SDLB_training sdl-spark:latest --config /mnt/config/ --feed-sel compute --partition-values estdepartureairport=LSZB
 
 When you now look at data/btl-distances, you will only see partition estdepartureairport=LSZB in the files and in the data (can also be seen in the logs of SDLB: `start writing to DataObject~btl-distances, partitionValues estdepartureairport=LSZB [exec-compute-distances]`)
 
