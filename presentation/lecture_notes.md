@@ -744,7 +744,8 @@ SDLB allows you to break the DAG into smaller pieces with the option `breakDataF
     ...
   }
 ````
-With the above config, SDLB will always read from whatever was written in table2 without considering iresults that were cached in-memory.
+With the above config, SDLB will always read from whatever was written in table2 without considering results that were cached in-memory.
+[This is an example of what a typical DAG in Spark may look like](https://stackoverflow.com/questions/41169873/spark-dynamic-dag-is-a-lot-slower-and-different-from-hard-coded-dag)
 
 ## Planned 
 * Monitoring
