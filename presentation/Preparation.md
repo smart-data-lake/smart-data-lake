@@ -79,9 +79,12 @@ sudo pip3 install podman-compose==0.1.11
 > :warning: podman-compose with major 1 (tested up to 1.0.3) do not create pods automatically. Therewith, the used commands results in networking issues between the containers. Thus, we recommend to use the latest version with automatic pod creation, version 0.1.11. The behaviour may change in future versions. 
 
 ## SDLB preparation and testing
-* download example case: `git@github.com:smart-data-lake/getting-started.git && git checkout training`
+* download example case: `git clone -b training https://github.com/smart-data-lake/getting-started.git SDLB_training`
 * build SDLB: `podman build -t sdl-spark .`
-* try SDLB: `podman run --rm sdl-spark:latest --config /mnt/config --feed-sel launchTask --help`
+	- this takes ~5-10 min
+* podman-compose test: `podman-compose up -d`
+
+* podman-compose: `podman run --rm sdl-spark:latest --config /mnt/config --feed-sel launchTask --help`
 	- when you see the SDL help the test was successful.
 
 # Additional hints:
