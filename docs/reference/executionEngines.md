@@ -47,3 +47,4 @@ In practice, this means that SDLB will connect to the Snowflake Environment from
 
 Of course, the Execution Environment you have influences the DataObjects that you have at your disposal: for instance, if you want to connect to Snowflake, you need a Snowflake account and be able to connect to Snowflake.
 But the Execution Environment does not determine the Execution Engines SDLB will use - your DataObjects, Actions and Transformations do.
+![img.png](../images/execution_engines_layers.png)
