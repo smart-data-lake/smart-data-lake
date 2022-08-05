@@ -677,6 +677,7 @@ The following setup is already prepared in the elca-dev tenant:
     * PartitionRetentionMode:  Keep partitions while retention condition is fulfilled, delete other partitions
     * PartitionArchiveCompactionMode: Archive and compact old partitions -> Is not covered by Deltalake
 * Spark Specific Features: BreakDataFrameLineage and Autocaching
+
 Let's consider the scenario illustrated in this figure:
 ![img.png](images/lineageExample.png)
  
