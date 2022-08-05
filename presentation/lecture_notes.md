@@ -288,6 +288,14 @@ let us double check what DataObjects there are available... [SDLB Schema Viewer]
                   │compute-distances│
                   └─────────────────┘
 ```
+## Automatic Tests
+runSimulation -> unit with synthetical DataFrames
+[Unit Test in SDLB](https://github.com/smart-data-lake/smart-data-lake/blob/develop-spark3/sdl-core/src/test/scala/io/smartdatalake/workflow/action/ScalaClassSparkDsNTo1TransformerTest.scala#L325)
+and
+[Corresponding Config File](https://github.com/smart-data-lake/smart-data-lake/blob/develop-spark3/sdl-core/src/test/resources/configScalaClassSparkDsNto1Transformer/usingDataObjectIdWithPartitionAutoSelect.conf)
+
+If time, create one example for course, else use this one.
+
 
 ## Execution Phases
 > real execution: `podman run -e METASTOREPW=1234 --rm --hostname=localhost --pod SDLB_training -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel '.*'`
@@ -321,20 +329,27 @@ The departures are directly loaded into a delta table: open [Polynote at localho
   - *DataFrameIncrementalMode* and *FileIncrementalMode*
  
 ### Current Example
-* here we use state to store the last position
-  - [CustomWebserviceDataObject](https://github.com/smart-data-lake/getting-started/blob/training/src/main/scala/io/smartdatalake/workflow/dataobject/CustomWebserviceDataObject.scala) the StateIncremental mode is enabled, by: 
-    + using the proper trait for the class
-    + instantiating state variables and 
-    + defining the setState and getState routines
+Let's try out StateIncremental with the action download-deduplicate-departures
+* Here we use state to store the last position
+  - To be able to use the StateIncremental mode [CustomWebserviceDataObject](https://github.com/smart-data-lake/getting-started/blob/training/src/main/scala/io/smartdatalake/workflow/dataobject/CustomWebserviceDataObject.scala) needs to: 
+    + Implement Interface CanCreateIncrementalOutput and defining the setState and getState methods
+    + instantiating state variables 
     + see also the [documentation](https://smartdatalake.ch/docs/getting-started/part-3/incremental-mode)
+These Requirements are already met.
 
-* enabled by adding to the `download-deduplicate-departures` action:
+* To enable stateIncremental we need to change the action `download-deduplicate-departures` and set these parameters of the DeduplicateAction:
   ```
     executionMode = { type = DataObjectStateIncrementalMode }
     mergeModeEnable = true
     updateCapturedColumnOnlyWhenChanged = true
   ```
-  - and add `--state-path /mnt/data/state -n SDLB_training` to the command line arguments
+
+After changing our config, try to execute the concerned action
+  - `podman run -e METASTOREPW=1234 --rm --hostname=localhost --pod SDLB_training -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures`
+Now it will fail because we need to provide a path for the state-path, so we add
+  - add `--state-path /mnt/data/state -n SDLB_training` to the command line arguments
+  - `podman run -e METASTOREPW=1234 --rm --hostname=localhost --pod SDLB_training -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures --state-path /mnt/data/state -n SDLB_training`
+
 
 * **first run** creates `less data/state/succeeded/SDLB_training.1.1.json` 
   - see line `"state" : "[{\"airport\":\"LSZB\",\"nextBegin\":1630310979},{\"airport\":\"EDDF\",\"nextBegin\":1630310979}]"`
@@ -342,8 +357,9 @@ The departures are directly loaded into a delta table: open [Polynote at localho
   - this is used for the next request
 * see next request in output of **next run**:
   `CustomWebserviceDataObject - Success for request https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1631002179&end=1631347779 [exec-download-deduplicate-departures]`
-  - also check the [increasing amount fo lines collected in table](http://localhost:8192/notebook/inspectData.ipynb#Cell4)
 > run a couple of times
+  - check the [increasing amount of lines collected in table](http://localhost:8192/notebook/inspectData.ipynb#Cell4)
+
 
 > :warning: When we get result/error: `Webservice Request failed with error <404>`, if there are no new data available. 
 
@@ -353,32 +369,84 @@ The departures are directly loaded into a delta table: open [Polynote at localho
 ### Command Line
 * command line option `-s` or `--streaming`, streaming all selected actions
   - requires `--state-path` to be set
-* just start `podman run -e METASTOREPW=1234 --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod SDLB_training sdl-spark:latest --config /mnt/config/  --feed-sel download --state-path /mnt/data/state -n SDLB_training -s` and see the action running again and again
+* just start `podman run -e METASTOREPW=1234 --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod SDLB_training sdl-spark:latest --config /mnt/config/  --feed-sel ids:download-deduplicate-departures --state-path /mnt/data/state -n SDLB_training -s` and see the action running again and again
   - > notice the recurring of both actions, here in our case we could limit the feed to the specific action
+    `podman run -e METASTOREPW=1234 --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod SDLB_training sdl-spark:latest --config /mnt/config/  --feed-sel ids:download-deduplicate-departures --state-path /mnt/data/state -n SDLB_training -s`
+  We could also Use SparkStreamingMode here. TODO Example?
   - > monitor the growth of the table
   - > see streaming trigger interval of 48s in output: `LocalSmartDataLakeBuilder$ - sleeping 48 seconds for synchronous streaming trigger interval [main]`
     + change it: search stream in Schema Viewer -> `global`->`synchronousStreamingTriggerIntervalSec = 10` -> interval between 2 starts (not end to start)
-
-:warning: TODO other streaming modes???
+    + Now output looks like this :
+    ````
+      2022-08-04 10:56:28 INFO  ActionDAGRun$ActionEventListener - Action~download-deduplicate-departures[DeduplicateAction]: Exec succeeded [dag-24-651]
+      2022-08-04 10:56:28 INFO  HadoopFileActionDAGRunStateStore - updated state into file:/mnt/data/state/current/SDLB_training.24.1.json [dag-24-651]
+      2022-08-04 10:56:28 INFO  ActionDAGRun$ - exec SUCCEEDED for dag 24:
+      ┌─────┐
+      │start│
+      └───┬─┘
+      │
+      v
+      ┌─────────────────────────────────────────────────────┐
+      │download-deduplicate-departures SUCCEEDED PT4.829176S│
+      └─────────────────────────────────────────────────────┘
+      [main]
+      2022-08-04 10:56:28 INFO  HadoopFileActionDAGRunStateStore - updated state into file:/mnt/data/state/succeeded/SDLB_training.24.1.json [main]
+      2022-08-04 10:56:28 INFO  LocalSmartDataLakeBuilder$ - sleeping 5 seconds for synchronous streaming trigger interval [main]
+    ````
+    - Quickly mention other streming modes in IntelliJ or link to Execution Modes when ready
 
 ## Parallelism
 * distinguish 2 types of parallelism
   - within a spark job: the amount of Spark tasks, controlled by global option `    "spark.sql.shuffle.partitions" = 2`
-  - parallel running DAG actions, by default serial, one by one action
+  - parallel running DAG actions of SDLB, by default serial, one by one action
     + see `Action~download-airports[FileTransferAction]: Exec started` and `Action~download-deduplicate-departures[DeduplicateAction]`
     + use command line option `--parallelism 2` to run both tasks in parallel
+    ``
+      podman run -e METASTOREPW=1234 --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod SDLB_training sdl-spark:latest --config /mnt/config/ --feed-sel download --state-path /mnt/data/state -n SDLB_training -s
+    ``
+    + ``
+        podman run -e METASTOREPW=1234 --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod SDLB_training sdl-spark:latest --config /mnt/config/ --feed-sel download --state-path /mnt/data/state -n SDLB_training -s --parallelism 2
+      ``
+  + With parallelsim: Action2 starts while Action1 is still running
+  ````    
+       2022-08-04 12:23:08 INFO  ActionDAGRun$ActionEventListener - Action~download-airports[FileTransferAction]: Exec started [dag-29-93]
+       2022-08-04 12:23:08 INFO  ActionDAGRun$ActionEventListener - Action~download-deduplicate-departures[DeduplicateAction]: Exec started [dag-29-94]
+       2022-08-04 12:23:08 INFO  DeduplicateAction - (Action~download-deduplicate-departures) getting DataFrame for DataObject~ext-departures [exec-download-deduplicate-departures]
+       2022-08-04 12:23:08 INFO  FileTransferAction - (Action~download-airports) start writing to DataObject~stg-airports [exec-download-airports]
+       2022-08-04 12:23:08 INFO  CsvFileDataObject - (DataObject~stg-airports) deleteAll stg-airports [exec-download-airports]
+       2022-08-04 12:23:08 INFO  StreamFileTransfer - Copy DataObject~ext-airports:result -> DataObject~stg-airports:stg-airports/result.csv [exec-download-airports]
+       2022-08-04 12:23:09 INFO  CustomWebserviceDataObject - Success for request https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1630310979&end=1630656579 [exec-download-deduplicate-departures]
+       2022-08-04 12:23:09 INFO  FileTransferAction - (Action~download-airports) finished writing DataFrame to stg-airports: jobDuration=PT1.699S files_written=1 [exec-download-airports]
+       2022-08-04 12:23:09 INFO  ActionDAGRun$ActionEventListener - Action~download-airports[FileTransferAction]: Exec succeeded [dag-29-93]
+       2022-08-04 12:23:09 INFO  HadoopFileActionDAGRunStateStore - updated state into file:/mnt/data/state/current/SDLB_training.29.1.json [dag-29-93]
+  ````
+  + Without parallelsim: Action2 starts only after Action1 is finished
+  ````    
+       2022-08-04 12:24:18 INFO  ActionDAGRun$ActionEventListener - Action~download-airports[FileTransferAction]: Exec started [dag-30-109]
+       2022-08-04 12:24:18 INFO  FileTransferAction - (Action~download-airports) start writing to DataObject~stg-airports [exec-download-airports]
+       2022-08-04 12:24:18 INFO  CsvFileDataObject - (DataObject~stg-airports) deleteAll stg-airports [exec-download-airports]
+       2022-08-04 12:24:18 INFO  StreamFileTransfer - Copy DataObject~ext-airports:result -> DataObject~stg-airports:stg-airports/result.csv [exec-download-airports]
+       2022-08-04 12:24:19 INFO  FileTransferAction - (Action~download-airports) finished writing DataFrame to stg-airports: jobDuration=PT0.984S files_written=1 [exec-download-airports]
+       2022-08-04 12:24:19 INFO  ActionDAGRun$ActionEventListener - Action~download-airports[FileTransferAction]: Exec succeeded [dag-30-109]
+       2022-08-04 12:24:19 INFO  HadoopFileActionDAGRunStateStore - updated state into file:/mnt/data/state/current/SDLB_training.30.1.json [dag-30-109]
+       2022-08-04 12:24:19 INFO  ActionDAGRun$ActionEventListener - Action~download-deduplicate-departures[DeduplicateAction]: Exec started [dag-30-109]
+       2022-08-04 12:24:19 INFO  DeduplicateAction - (Action~download-deduplicate-departures) getting DataFrame for DataObject~ext-departures [exec-download-deduplicate-departures]
+  ````
     + :warning: parallel actions are more difficult to debug
     
 ## Checkpoint / Restart
 * requires states (`--state-path`)
   - `podman run -e METASTOREPW=1234 --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --hostname=localhost --pod SDLB_training sdl-spark:latest --config /mnt/config/ --feed-sel '.*' --state-path /mnt/data/state -n SDLB_training` -> cancel run to simulate crash (after download phase)
-* stored current state in file: `data/state/SDLB_training.1.1.json`
+* stored current state in file: `data/state/current/SDLB_training.1.1.json`
   - see the SUCCESS and CANCELED statements
 * restart with the same command
   - notice line at the beginning: `LocalSmartDataLakeBuilder$ - recovering application SDLB_training runId=1 lastAttemptId=1 [main]`
   - notice the changed DAG, no download
 
 :warning: TODO
+
+## Execution Engines vs Execution Environments
+[Go through documentation](https://smartdatalake.ch/docs/reference/executionEngines)
 
 
 # Deployment methods
