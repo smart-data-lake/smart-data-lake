@@ -679,6 +679,8 @@ The following setup is already prepared in the elca-dev tenant:
 * Spark Specific Features: BreakDataFrameLineage and Autocaching
 Let's consider the scenario illustrated in this figure:
 ![img.png](images/lineageExample.png)
+ 
+This can also be illustrated by these lines of Spark Code:
 
   ````
   val dataFrame2 = spark.table("table1).transform(doSomeComplexStuff1)
@@ -689,7 +691,7 @@ Let's consider the scenario illustrated in this figure:
   dataFrame3.show() // Restarts from table 1
   dataFrame3.show() // Restarts from table 1
   ````
-  The same Scenario as Config with SDLB
+  The same Scenario as Config with SDLB would look like this:
  
 ````
 dataObjects {
@@ -727,7 +729,7 @@ actions {
   }
 ````
 SDLB automatically caches all DataFrames of DataObjects.
-If spark you would write `dataFrame2.cache`
+In spark you would write `dataFrame2.cache`
 Therefore, if Action A2 has to be re-run, it will be able to start from object2.
 However it will still keep the original Spark-Execution DAG, go over it and then realize that some steps are already cached.
 When chaining lots of transformations together, Spark's Execution DAG can get very large and this can cause performance issue and weird bugs.
