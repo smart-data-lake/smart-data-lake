@@ -407,10 +407,8 @@ Let's use the Schema Viewer to find out how to do that.
 Task: use partitioning for Action compute-distances
 
 > <details><summary>Solution: Click to expand!</summary>
-
 > In `config/distances.conf` add partitions = [estdepartureairport] 
 > to dataObjects  btl_departures_arrivals_airports and btl_distances 
-
 > </details>
 
 Since we change the format in which data is stored let s delete the data
