@@ -283,23 +283,43 @@ What we have here:
 	- can be lists or regex, e.g. `--feed-sel '.*'`
 	- can also be `startWith...` or `endWith...`
 
-## Environment Variables in HOCON
 * try run feed everything: 
 `podman run --rm --hostname=localhost --pod SDLB_training -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel '.*'`
+  - Note: data, target and config directories are mounted into the container:
+
+## Environment Variables in HOCON
 
 * error: `Could not resolve substitution to a value: ${METASTOREPW}`
   - in `config/global.conf` we defined `"spark.hadoop.javax.jdo.option.ConnectionPassword" = ${METASTOREPW}`
-  - -> use environmentvariable `-e METASTOREPW=1234`
+
+Task: What is the issue? -> fix issue 
+<!-- A collapsible section with markdown -->
+> <details><summary>Solution: Click to expand!</summary>
+  
+> the Metastore password is set while configuring the metastore. In the Metastore Dockerfile the `metastore/entrypoint.sh` is specified. In this file the Password is specified as 1234
+
+> Thus, set environment variable in the container using the podman option: `-e METASTOREPW=1234`
+
+> Note: better not to use clear test passwords anywhere. In cloud environment use password stores and its handling. There passwords should also not appear in logs as plain text. 
+
+> </details>
 
 ## Test Configuration
-* first run config test: 
+since we realize there could be issues, let's first run a config test:
+
 `podman run -e METASTOREPW=1234 --rm --hostname=localhost --pod SDLB_training -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel 'download' --test config` (fix bug together)
 
 * while running we get:
 `Exception in thread "main" io.smartdatalake.config.ConfigurationException: (DataObject~stg-airports) ClassNotFoundException: Implementation CsvDataObject of interface DataObject not found`
 let us double check what DataObjects there are available... [SDLB Schema Viewer](http://smartdatalake.ch/json-schema-viewer/index.html#viewer-page&version=sdl-schema-2.3.0-SNAPSHOT.json)
 
-> Task: fix issue by correcting the dataObject type to `CvsFileDataObject`
+Task: fix issue 
+<!-- A collapsible section with markdown -->
+> <details><summary>Solution: Click to expand!</summary>
+  
+> In `config/airports.conf` correct the data object type of stg-airports to *CvsFileDataObject*
+
+> </details>
 
 ## Dry-run
 * run again (and then with) `--test dry-run` and feed `'.*'` to check all configs: 
@@ -313,7 +333,7 @@ let us double check what DataObjects there are available... [SDLB Schema Viewer]
 * no recursion
 
 ```
-                        ┌─────┐                                                       
+                        ┌─────┐          
                         │start│
                         └─┬─┬─┘
                           │ │
@@ -391,9 +411,33 @@ Exception in thread "main" io.smartdatalake.util.dag.TaskFailedException: Task d
 ````
 
 ## Inspect result
-During the Airport download we created a CSV file: `less data/stg-airports/results.csv`
-The departures are directly loaded into a delta table: open [Polynote at localhost:8192](http://localhost:8192/notebook/inspectData.ipynb)
-  `departure table consists of 457 row and entries are of original date: 20210829 20210830`
+* files in the file system: `stg-airport`: CSV files located at `data/stg-airports/`
+
+> <details><summary>Example content</summary>
+  
+> ```
+> $ head data/stg-airports/result.csv
+> "id","ident","type","name","latitude_deg","longitude_deg","elevation_ft","continent","iso_country","iso_region","municipality","scheduled_service","gps_code","iata_code","local_code","home_link","wikipedia_link","keywords"
+> : 6523,"00A","heliport","Total Rf Heliport",40.07080078125,-74.93360137939453,11,"NA","US","US-PA","Bensalem","no","00A",,"00A",,,
+> 323361,"00AA","small_airport","Aero B Ranch Airport",38.704022,-101.473911,3435,"NA","US","US-KS","Leoti","no","00AA",,"00AA",,,
+> 6524,"00AK","small_airport","Lowell Field",59.947733,-151.692524,450,"NA","US","US-AK","Anchor Point","no","00AK",,"00AK",,,
+> 6525,"00AL","small_airport","Epps Airpark",34.86479949951172,-86.77030181884766,820,"NA","US","US-AL","Harvest","no","00AL",,"00AL",,,
+> 6526,"00AR","closed","Newport Hospital & Clinic Heliport",35.6087,-91.254898,237,"NA","US","US-AR","Newport","no",,,,,,"00AR"
+> 322127,"00AS","small_airport","Fulton Airport",34.9428028,-97.8180194,1100,"NA","US","US-OK","Alex","no","00AS",,"00AS",,,
+> 6527,"00AZ","small_airport","Cordes Airport",34.305599212646484,-112.16500091552734,3810,"NA","US","US-AZ","Cordes","no","00AZ",,"00AZ",,,
+> 6528,"00CA","small_airport","Goldstone (GTS) Airport",35.35474,-116.885329,3038,"NA","US","US-CA","Barstow","no","00CA",,"00CA",,,
+> 324424,"00CL","small_airport","Williams Ag Airport",39.427188,-121.763427,87,"NA","US","US-CA","Biggs","no","00CL",,"00CL",,,
+> ```
+
+> </details>
+
+  
+* Polynote: tables in the DataLake
+  - open [Polynote at localhost:8192](http://localhost:8192/notebook/inspectData.ipynb)
+    after the listing tables and schema, we monitor the amount of data in the tables and the latest value
+    `departure table consists of 457 row and entries are of original date: 20210829 20210830`
+
+<!-- TODO When we have Ilias frontend ready, use it as Data Catalog Viewer -->
 
 ## Partitions
 First have a look at
