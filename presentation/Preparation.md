@@ -20,6 +20,7 @@ Assuming you have no Windows Store available you need to follow the following st
 
 * enable WSL: Admin-Powershell -> `dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart`
 * enable VM feature: Admin-Powershell -> `dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart`
+* ARM64 Linux kernel update: download and install [https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi](https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi)
 * set WSL2 as default: `wsl --set-default-version 2`
 * get Ubuntu: PowerShell:
 	- `Invoke-WebRequest -Uri https://aka.ms/wslubuntu2004 -OutFile Ubuntu.appx -UseBasicParsing` OR
