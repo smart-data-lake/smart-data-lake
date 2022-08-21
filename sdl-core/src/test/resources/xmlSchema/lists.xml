@@ -1,0 +1,10 @@
+<tree>
+    <nodes>
+        <node nodeType="A" name="Test">
+            <descriptions>
+                <description language="en"><summary>English Test</summary></description>
+                <description language="de"><summary>German Test</summary></description>
+            </descriptions>
+        </node>
+    </nodes>
+</tree>

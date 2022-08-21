@@ -1,0 +1,37 @@
+<tree>
+    <nodes>
+        <modified>
+            <node nodeType="A" validFrom="2008-01-01+01:00" validTo="2999-12-31+01:00">
+                <name>Test Update L0</name>
+                <factor>0.75</factor>
+                <descriptions>
+                    <description language="en">
+                        <summary>Englisch Test</summary>
+                    </description>
+                    <description language="de">
+                        <summary>German Test</summary>
+                    </description>
+                </descriptions>
+                <nodes>
+                    <node nodeType="B" validFrom="2008-01-01+01:00" validTo="2999-12-31+01:00">
+                        <name>Test Update L1</name>
+                        <factor>0.25</factor>
+                        <descriptions>
+                            <description language="en">
+                                <summary>Englisch Test</summary>
+                            </description>
+                            <description language="de">
+                                <summary>German Test</summary>
+                            </description>
+                        </descriptions>
+                    </node>
+                </nodes>
+            </node>
+        </modified>
+        <deleted>
+            <node nodeType="B" validFrom="2008-01-01+01:00" validTo="2999-12-31+01:00">
+                <name>Test Delete</name>
+            </node>
+        </deleted>
+    </nodes>
+</tree>
