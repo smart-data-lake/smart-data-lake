@@ -23,11 +23,11 @@ import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
-import io.smartdatalake.util.xml.XsdSchemaConverter
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.explode
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.xml.XsdSchemaConverter
 import org.apache.spark.sql.{DataFrame, functions}
 
 import java.nio.file.Files

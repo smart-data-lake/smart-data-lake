@@ -22,7 +22,6 @@ package io.smartdatalake.util.misc
 import io.smartdatalake.config.ConfigUtil
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.json.{SchemaConverter => JsonSchemaConverter}
-import io.smartdatalake.util.xml.XsdSchemaConverter
 import io.smartdatalake.workflow.dataframe._
 import org.apache.avro.Schema
 import org.apache.hadoop.conf.Configuration
@@ -31,6 +30,7 @@ import org.apache.spark.sql.catalyst.JavaTypeInference
 import org.apache.spark.sql.confluent.avro.AvroSchemaConverter
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{ArrayType, StructType}
+import org.apache.spark.sql.xml.XsdSchemaConverter
 
 import scala.reflect.runtime.universe.{Type, TypeTag}
 
