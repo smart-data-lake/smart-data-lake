@@ -20,7 +20,7 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigLoader, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskFailedException
@@ -33,6 +33,7 @@ import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTrans
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, ExecutionPhase, HadoopFileActionDAGRunStateStore}
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.udf
@@ -565,6 +566,28 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     assert(stats == Map(RuntimeEventState.INITIALIZED -> 2))
     assert(finalSubFeeds.head.dataFrame.get.select(dfSrc1.columns.map(SparkSubFeed.col)).symmetricDifference(SparkDataFrame(dfSrc1)).isEmpty)
   }
+
+  test("sdlb run with external state file using FinalStateWriter") {
+    
+    val feedName = "test"
+    val sdlb = new DefaultSmartDataLakeBuilder()
+
+    // setup input DataObject
+    val srcDO = CsvFileDataObject("src1", "target/src1")(sdlb.instanceRegistry)
+    val dfSrc1 = Seq("testData").toDF("testColumn")
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
+          getClass.getResource("/configState/WithFinalStateWriter.conf").getPath)) )
+
+    // Run SDLB
+    sdlb.run(sdlConfig)
+
+    // check result
+    val fileResult = filesystem.exists(new Path("ext-state/state-test"))
+    assert(fileResult)
+  }
+
 }
 
 class FailTransformer extends CustomDfTransformer {
