@@ -22,6 +22,7 @@ package io.smartdatalake.workflow.dataframe
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
+import io.smartdatalake.util.spark.DataFrameUtil.strCamelCase2LowerCaseWithUnderscores
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import scala.reflect.runtime.universe.Type
@@ -125,6 +126,14 @@ trait GenericDataFrame extends GenericTypedObject {
   def colNamesLowercase(implicit function: DataFrameFunctions): GenericDataFrame = {
     import function._
     select(schema.columns.map(c => col(c).as(c.toLowerCase())))
+  }
+
+  /**
+   * Convert camel case column names to lower case with underscore
+   */
+  def colCamelNamesLowercase(implicit function: DataFrameFunctions): GenericDataFrame = {
+    import function._
+    select(schema.columns.map(c => col(c).as(strCamelCase2LowerCaseWithUnderscores(c))))
   }
 
   /**

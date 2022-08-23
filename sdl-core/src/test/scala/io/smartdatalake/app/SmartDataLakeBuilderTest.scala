@@ -19,7 +19,7 @@
 
 package io.smartdatalake.app
 
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId, stringToDataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil
@@ -564,6 +564,51 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     assert(finalSubFeeds.size == 1)
     assert(stats == Map(RuntimeEventState.INITIALIZED -> 2))
     assert(finalSubFeeds.head.dataFrame.get.select(dfSrc1.columns.map(SparkSubFeed.col)).symmetricDifference(SparkDataFrame(dfSrc1)).isEmpty)
+  }
+  test("sdlb run converting col names to lower case") {
+    val feedName = "test"
+    val sdlb = new DefaultSmartDataLakeBuilder()
+
+    // setup input DataObject
+    val srcDO = CsvFileDataObject("src1", "target/src1")(sdlb.instanceRegistry)
+    val dfSrc1 = Seq("testData").toDF("testColumn")
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
+      getClass.getResource("/configTransformer/colToLower.conf").getPath)) )
+
+    // Run SDLB
+    sdlb.run(sdlConfig)
+
+    // check result
+    //TODO
+    //val idObj = stringToDataObjectId("tgt")
+    //val dObjs = sdlb.instanceRegistry.getDataObjects
+    //val tgt = dObjs(1)
+    //RelaxedCsvFileDataObject(id="tgt", path="target/tgt1")
+
+
+    //val fileResult = filesystem.exists(new Path("ext-state/state-test"))
+    //assert(fileResult)
+  }
+
+  test("sdlb run converting camel case col names to lower case with underscores") {
+    val feedName = "test"
+    val sdlb = new DefaultSmartDataLakeBuilder()
+
+    // setup input DataObject
+    val srcDO = CsvFileDataObject("src1", "target/src1")(sdlb.instanceRegistry)
+    val dfSrc1 = Seq("testData").toDF("testColumn")
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
+      getClass.getResource("/configTransformer/colCamelToLower.conf").getPath)) )
+
+    // Run SDLB
+    sdlb.run(sdlConfig)
+
+    // check result
+    //TODO
   }
 }
 

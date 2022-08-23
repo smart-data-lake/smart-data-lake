@@ -19,22 +19,34 @@
 
 package io.smartdatalake.workflow.action.generic.transformer
 
+import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
+
 /**
  * Convert all column names to lowercase.
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
+ * @param camelCaseToLower if selected, converts Camel case names to lower case  with underscores, i.e. TestString -> test_string
  */
-case class ColNamesLowercaseTransformer(override val name: String = "colNamesLowercase", override val description: Option[String] = None) extends GenericDfTransformer {
+case class ColNamesLowercaseTransformer(override val name: String = "colNamesLowercase", override val description: Option[String] = None, camelCaseToLower: Boolean=false) extends GenericDfTransformer {
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
-    df.colNamesLowercase
+    if (camelCaseToLower) {
+      df.colCamelNamesLowercase
+    } else {
+      df.colNamesLowercase
+    }
   }
-  override def factory: FromConfigFactory[GenericDfTransformer] = BlacklistTransformer
+  override def factory: FromConfigFactory[GenericDfTransformer] = ColNamesLowercaseTransformer
 }
 
+object ColNamesLowercaseTransformer extends FromConfigFactory[GenericDfTransformer] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ColNamesLowercaseTransformer = {
+    extract[ColNamesLowercaseTransformer](config)
+  }
+}
