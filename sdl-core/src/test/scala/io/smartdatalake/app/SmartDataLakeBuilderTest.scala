@@ -568,7 +568,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
   }
 
   test("sdlb run with external state file using FinalStateWriter") {
-    //TODO
+    
     val feedName = "test"
     val sdlb = new DefaultSmartDataLakeBuilder()
 
