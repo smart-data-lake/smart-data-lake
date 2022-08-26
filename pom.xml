@@ -280,7 +280,7 @@
 		<scala.minor.version>2.12</scala.minor.version>
 		<scala.version>${scala.minor.version}.15</scala.version>
 
-		<spark.version>3.2.1</spark.version>
+		<spark.version>3.2.2</spark.version>
 		<spark-extensions.version>3.2.3</spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
 		<spark.minor.version>3.2</spark.minor.version> <!-- this is used in sdl-snowflake -->
 
@@ -412,7 +412,7 @@
 		<snowflake-spark.version>2.10.0</snowflake-spark.version>
 		<snowflake-snowpark.version>1.2.0</snowflake-snowpark.version>
 		<keycloak.version>15.0.2</keycloak.version>
-		<delta.version>1.1.0</delta.version>
+		<delta.version>2.0.0</delta.version>
 		<poi.version>5.2.2</poi.version>
 
 		<json4s.version>3.7.0-M11</json4s.version>
