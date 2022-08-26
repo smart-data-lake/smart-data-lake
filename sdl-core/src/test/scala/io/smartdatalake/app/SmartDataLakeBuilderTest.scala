@@ -21,7 +21,6 @@ package io.smartdatalake.app
 
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId, stringToDataObjectId}
-import io.smartdatalake.config.objects.TestDataObject
 import io.smartdatalake.config.{ConfigParser, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil
@@ -35,7 +34,6 @@ import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTrans
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, ExecutionPhase, HadoopFileActionDAGRunStateStore}
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.udf
