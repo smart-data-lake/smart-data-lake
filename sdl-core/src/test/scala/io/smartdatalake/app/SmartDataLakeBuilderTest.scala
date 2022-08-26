@@ -35,6 +35,7 @@ import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTrans
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, ExecutionPhase, HadoopFileActionDAGRunStateStore}
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.udf
@@ -669,6 +670,28 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val dfTgt = tgt.getSparkDataFrame()
     val colName = dfTgt.columns
     assert(colName.toSeq == Seq("foo", "nocamel"))
+  }
+
+
+  test("sdlb run with external state file using FinalStateWriter") {
+
+    val feedName = "test"
+    val sdlb = new DefaultSmartDataLakeBuilder()
+
+    // setup input DataObject
+    val srcDO = CsvFileDataObject("src1", "target/src1")(sdlb.instanceRegistry)
+    val dfSrc1 = Seq("testData").toDF("testColumn")
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
+      getClass.getResource("/configState/WithFinalStateWriter.conf").getPath)) )
+
+    // Run SDLB
+    sdlb.run(sdlConfig)
+
+    // check result
+    val fileResult = filesystem.exists(new Path("ext-state/state-test"))
+    assert(fileResult)
   }
 }
 
