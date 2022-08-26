@@ -37,16 +37,16 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * @param normalizeToAscii If selected, converts UTF-8 special characters (e.g. diacritics, umlauts) to ASCII chars (best effort), i.e. Öffi_émily -> Oeffi_emily
  * @param removeNonStandardSQLNameChars Remove all chars from a string which dont belong to lowercase SQL standard naming characters, i.e abc$!-& -> abc
  */
-case class ColNamesLowercaseTransformer(override val name: String = "colNamesLowercase", override val description: Option[String] = None, camelCaseToLower: Boolean=true, normalizeToAscii: Boolean=true, removeNonStandardSQLNameChars: Boolean=true) extends GenericDfTransformer {
+case class StandardizeColNamesTransformer(override val name: String = "colNamesLowercase", override val description: Option[String] = None, camelCaseToLower: Boolean=true, normalizeToAscii: Boolean=true, removeNonStandardSQLNameChars: Boolean=true) extends GenericDfTransformer {
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
     df.standardizeColNames(camelCaseToLower, normalizeToAscii, removeNonStandardSQLNameChars)
   }
-  override def factory: FromConfigFactory[GenericDfTransformer] = ColNamesLowercaseTransformer
+  override def factory: FromConfigFactory[GenericDfTransformer] = StandardizeColNamesTransformer
 }
 
-object ColNamesLowercaseTransformer extends FromConfigFactory[GenericDfTransformer] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ColNamesLowercaseTransformer = {
-    extract[ColNamesLowercaseTransformer](config)
+object StandardizeColNamesTransformer extends FromConfigFactory[GenericDfTransformer] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): StandardizeColNamesTransformer = {
+    extract[StandardizeColNamesTransformer](config)
   }
 }
