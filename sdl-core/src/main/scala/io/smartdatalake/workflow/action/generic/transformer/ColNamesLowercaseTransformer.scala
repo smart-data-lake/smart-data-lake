@@ -31,7 +31,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * Convert all column names to lowercase.
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
- * @param camelCaseToLower if selected, converts Camel case names to lower case  with underscores, i.e. TestString -> test_string
+ * @param camelCaseToLower if selected, converts Camel case names to lower case  with underscores, i.e. TestString -> test_string, testABCtest -> test_ABCtest
  */
 case class ColNamesLowercaseTransformer(override val name: String = "colNamesLowercase", override val description: Option[String] = None, camelCaseToLower: Boolean=false) extends GenericDfTransformer {
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String])(implicit context: ActionPipelineContext): GenericDataFrame = {

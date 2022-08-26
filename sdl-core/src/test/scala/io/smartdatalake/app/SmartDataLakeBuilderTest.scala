@@ -19,8 +19,10 @@
 
 package io.smartdatalake.app
 
+import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId, stringToDataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.objects.TestDataObject
+import io.smartdatalake.config.{ConfigParser, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskFailedException
@@ -568,47 +570,103 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
   test("sdlb run converting col names to lower case") {
     val feedName = "test"
     val sdlb = new DefaultSmartDataLakeBuilder()
+    //implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
 
-    // setup input DataObject
-    val srcDO = CsvFileDataObject("src1", "target/src1")(sdlb.instanceRegistry)
-    val dfSrc1 = Seq("testData").toDF("testColumn")
-    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+    val config = ConfigFactory.parseString(
+      """
+        |actions = {
+        |   act = {
+        |     type = CopyAction
+        |     inputId = src
+        |     outputId = tgt
+        |     transformers = [{
+        |       type = ColNamesLowercaseTransformer
+        |     }]
+        |   }
+        |}
+        |dataObjects {
+        |  src {
+        |    #id = ~{id}
+        |    type = CsvFileDataObject
+        |    path = "target/src"
+        |  }
+        |  tgt {
+        |    type = CsvFileDataObject
+        |    path = "target/tgt"
+        |  }
+        |}
+        |""".stripMargin).resolve
 
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
-      getClass.getResource("/configTransformer/colToLower.conf").getPath)) )
+    implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
+    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel="ids:act")
+
+    val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
+    assert(srcDO != None)
+    val dfSrc = Seq(("testData", "Foo"),("bar", "Space")).toDF("testColumn", "COLUMNtest")
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
     // Run SDLB
-    sdlb.run(sdlConfig)
+    sdlb.startSimulation(sdlConfig, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc)), srcDO.id, Seq())))
+    //sdlb.run(sdlConfig)
 
     // check result
-    //TODO
-    //val idObj = stringToDataObjectId("tgt")
-    //val dObjs = sdlb.instanceRegistry.getDataObjects
-    //val tgt = dObjs(1)
-    //RelaxedCsvFileDataObject(id="tgt", path="target/tgt1")
-
-
-    //val fileResult = filesystem.exists(new Path("ext-state/state-test"))
-    //assert(fileResult)
+    val tgt = instanceRegistry.get[CsvFileDataObject]("tgt")
+    val dfTgt = tgt.getSparkDataFrame()
+    val colName = dfTgt.columns
+    assert(colName.toSeq == Seq("testcolumn", "columntest"))
   }
+
 
   test("sdlb run converting camel case col names to lower case with underscores") {
     val feedName = "test"
     val sdlb = new DefaultSmartDataLakeBuilder()
+    //implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
 
-    // setup input DataObject
-    val srcDO = CsvFileDataObject("src1", "target/src1")(sdlb.instanceRegistry)
-    val dfSrc1 = Seq("testData").toDF("testColumn")
-    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+    val config = ConfigFactory.parseString(
+      """
+        |actions = {
+        |   act = {
+        |     type = CopyAction
+        |     inputId = src
+        |     outputId = tgt
+        |     transformers = [{
+        |       type = ColNamesLowercaseTransformer
+        |       camelCaseToLower = true
+        |     }]
+        |   }
+        |}
+        |dataObjects {
+        |  src {
+        |    #id = ~{id}
+        |    type = CsvFileDataObject
+        |    path = "target/src"
+        |  }
+        |  tgt {
+        |    type = CsvFileDataObject
+        |    path = "target/tgt"
+        |  }
+        |}
+        |""".stripMargin).resolve
 
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
-      getClass.getResource("/configTransformer/colCamelToLower.conf").getPath)) )
+    implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
+    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel="ids:act")
+
+    val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
+    assert(srcDO != None)
+    val dfSrc = Seq(("testData", "Foo"),("bar", "Space")).toDF("testColumn", "cOLuMnTest")
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
     // Run SDLB
-    sdlb.run(sdlConfig)
+    sdlb.startSimulation(sdlConfig, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc)), srcDO.id, Seq())))
+    //sdlb.run(sdlConfig)
 
     // check result
-    //TODO
+    val tgt = instanceRegistry.get[CsvFileDataObject]("tgt")
+    val dfTgt = tgt.getSparkDataFrame()
+    val colName = dfTgt.columns
+    assert(colName.toSeq == Seq("test_column", "c_olu_mn_test"))
   }
 }
 

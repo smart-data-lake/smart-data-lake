@@ -125,6 +125,13 @@ private[smartdatalake] object DataFrameUtil {
     def colNamesLowercase: DataFrame = df.select(df.columns.map(c => col(c).as(c.toLowerCase)): _*)
 
     /**
+     * Transforms column names of [[DataFrame]] to lowercase, Camel case to lower case with underscores.
+     *
+     * @return transformed [[DataFrame]]
+     */
+    def colCamelNamesLowercase: DataFrame = df.select(df.columns.map(c => col(c).as(strCamelCase2LowerCaseWithUnderscores(c.toString))): _*)
+
+    /**
      * Checks whether the specified columns contain nulls
      *
      * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
