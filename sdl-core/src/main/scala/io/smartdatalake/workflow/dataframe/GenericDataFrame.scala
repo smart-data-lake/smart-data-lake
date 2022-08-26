@@ -22,7 +22,8 @@ package io.smartdatalake.workflow.dataframe
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
-import io.smartdatalake.util.spark.DataFrameUtil.strCamelCase2LowerCaseWithUnderscores
+import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.DataFrameUtil.{normalizeToAscii, strCamelCase2LowerCaseWithUnderscores}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import scala.reflect.runtime.universe.Type
@@ -129,11 +130,19 @@ trait GenericDataFrame extends GenericTypedObject {
   }
 
   /**
-   * Convert camel case column names to lower case with underscore
+   * Standardize column names according to enabled rules.
    */
-  def colCamelNamesLowercase(implicit function: DataFrameFunctions): GenericDataFrame = {
+  def standardizeColNames(camelCaseToLower: Boolean = true, normalizeToAscii: Boolean = true, removeNonStandardSQLNameChars: Boolean = true)( implicit function: DataFrameFunctions): GenericDataFrame = {
+    def standardizeColName(name: String): String = {
+      var standardName = name
+      standardName = if (normalizeToAscii) DataFrameUtil.normalizeToAscii(standardName) else standardName
+      standardName = if (camelCaseToLower) DataFrameUtil.strCamelCase2LowerCaseWithUnderscores(standardName) else standardName.toLowerCase
+      standardName = if (removeNonStandardSQLNameChars) DataFrameUtil.removeNonStandardSQLNameChars(standardName) else standardName
+      // return
+      standardName
+    }
     import function._
-    select(schema.columns.map(c => col(c).as(strCamelCase2LowerCaseWithUnderscores(c))))
+    select(schema.columns.map(c => col(c).as(standardizeColName(c))))
   }
 
   /**
