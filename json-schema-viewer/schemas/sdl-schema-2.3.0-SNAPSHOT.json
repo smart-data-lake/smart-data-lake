@@ -3401,25 +3401,6 @@
         "additionalProperties" : false,
         "description" : "Apply a column blacklist to a DataFrame."
       },
-      "ColNamesLowercaseTransformer" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "const" : "ColNamesLowercaseTransformer"
-          },
-          "name" : {
-            "type" : "string",
-            "description" : "name of the transformer"
-          },
-          "description" : {
-            "type" : "string",
-            "description" : "Optional description of the transformer"
-          }
-        },
-        "title" : "ColNamesLowercaseTransformer",
-        "additionalProperties" : false,
-        "description" : "Convert all column names to lowercase."
-      },
       "DataValidationTransformer" : {
         "type" : "object",
         "properties" : {
@@ -3848,6 +3829,37 @@
         "additionalProperties" : false,
         "description" : "Repartition DataFrame\nFor detailled description about repartitioning DataFrames see also[[SparkRepartitionDef]]"
       },
+      "StandardizeColNamesTransformer" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "StandardizeColNamesTransformer"
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "name of the transformer"
+          },
+          "description" : {
+            "type" : "string",
+            "description" : "Optional description of the transformer"
+          },
+          "camelCaseToLower" : {
+            "type" : "string",
+            "description" : "If selected, converts Camel case names to lower case  with underscores, i.e. TestString -> test_string, testABCtest -> test_ABCtest\nOtherwise converts just to lower case."
+          },
+          "normalizeToAscii" : {
+            "type" : "string",
+            "description" : "If selected, converts UTF-8 special characters (e.g. diacritics, umlauts) to ASCII chars (best effort), i.e. Öffi_émily -> Oeffi_emily"
+          },
+          "removeNonStandardSQLNameChars" : {
+            "type" : "string",
+            "description" : "Remove all chars from a string which dont belong to lowercase SQL standard naming characters, i.e abc$!-& -> abc"
+          }
+        },
+        "title" : "StandardizeColNamesTransformer",
+        "additionalProperties" : false,
+        "description" : "Standardizes column names to be used without quoting by using camelCase to lower_case_with_underscore rule (default), and further cleanup rules for special characters (default).\nParameters below can be used to disable specific rules if needed."
+      },
       "StandardizeSparkDatatypesTransformer" : {
         "type" : "object",
         "properties" : {
@@ -4105,6 +4117,37 @@
           },
           "transformer" : {
             "oneOf" : [ {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "StandardizeColNamesTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "camelCaseToLower" : {
+                  "type" : "string",
+                  "description" : "If selected, converts Camel case names to lower case  with underscores, i.e. TestString -> test_string, testABCtest -> test_ABCtest\nOtherwise converts just to lower case."
+                },
+                "normalizeToAscii" : {
+                  "type" : "string",
+                  "description" : "If selected, converts UTF-8 special characters (e.g. diacritics, umlauts) to ASCII chars (best effort), i.e. Öffi_émily -> Oeffi_emily"
+                },
+                "removeNonStandardSQLNameChars" : {
+                  "type" : "string",
+                  "description" : "Remove all chars from a string which dont belong to lowercase SQL standard naming characters, i.e abc$!-& -> abc"
+                }
+              },
+              "title" : "StandardizeColNamesTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Standardizes column names to be used without quoting by using camelCase to lower_case_with_underscore rule (default), and further cleanup rules for special characters (default).\nParameters below can be used to disable specific rules if needed."
+            }, {
               "type" : "object",
               "properties" : {
                 "type" : {
@@ -4567,25 +4610,6 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "ColNamesLowercaseTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                }
-              },
-              "title" : "ColNamesLowercaseTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Convert all column names to lowercase."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
                   "const" : "OptionsGenericDfTransformer"
                 }
               },
@@ -5028,8 +5052,6 @@
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/BlacklistTransformer"
               }, {
-                "$ref" : "#/definitions/GenericDfTransformer/ColNamesLowercaseTransformer"
-              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DataValidationTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/FilterTransformer"
@@ -5051,6 +5073,8 @@
                 "$ref" : "#/definitions/GenericDfTransformer/ScalaNotebookSparkDfTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/SparkRepartitionTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/StandardizeColNamesTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/StandardizeSparkDatatypesTransformer"
               }, {
@@ -5527,8 +5551,6 @@
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/BlacklistTransformer"
               }, {
-                "$ref" : "#/definitions/GenericDfTransformer/ColNamesLowercaseTransformer"
-              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DataValidationTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/FilterTransformer"
@@ -5550,6 +5572,8 @@
                 "$ref" : "#/definitions/GenericDfTransformer/ScalaNotebookSparkDfTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/SparkRepartitionTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/StandardizeColNamesTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/StandardizeSparkDatatypesTransformer"
               }, {
@@ -5784,8 +5808,6 @@
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/BlacklistTransformer"
               }, {
-                "$ref" : "#/definitions/GenericDfTransformer/ColNamesLowercaseTransformer"
-              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DataValidationTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/FilterTransformer"
@@ -5807,6 +5829,8 @@
                 "$ref" : "#/definitions/GenericDfTransformer/ScalaNotebookSparkDfTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/SparkRepartitionTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/StandardizeColNamesTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/StandardizeSparkDatatypesTransformer"
               }, {
