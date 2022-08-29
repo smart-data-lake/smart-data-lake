@@ -27,3 +27,13 @@ services:
       - "./data:/mnt/data"
       - "./target:/mnt/lib"
       - "./config:/mnt/config" # SDL config to use DataObjects in notebooks
+
+  sdlb-visualizer:
+    build:
+      context: ./sdlb-viewer
+    hostname: vizualizer
+    ports:
+      - "5000:5000"
+    volumes:
+      - "./config:/config" # SDL config to visualize
+      - "./description:/description" # SDL descriptions to visualize
