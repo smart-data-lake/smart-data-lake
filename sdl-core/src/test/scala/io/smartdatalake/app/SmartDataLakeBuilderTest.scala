@@ -19,8 +19,9 @@
 
 package io.smartdatalake.app
 
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{ConfigLoader, FromConfigFactory, InstanceRegistry}
+import com.typesafe.config.ConfigFactory
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId, stringToDataObjectId}
+import io.smartdatalake.config.{ConfigParser, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskFailedException
@@ -33,7 +34,6 @@ import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTrans
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, ExecutionPhase, HadoopFileActionDAGRunStateStore}
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.udf
@@ -566,9 +566,113 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     assert(stats == Map(RuntimeEventState.INITIALIZED -> 2))
     assert(finalSubFeeds.head.dataFrame.get.select(dfSrc1.columns.map(SparkSubFeed.col)).symmetricDifference(SparkDataFrame(dfSrc1)).isEmpty)
   }
+  test("sdlb run converting col names to lower case") {
+    val feedName = "test"
+    val sdlb = new DefaultSmartDataLakeBuilder()
+    //implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+
+    val config = ConfigFactory.parseString(
+      """
+        |actions = {
+        |   act = {
+        |     type = CopyAction
+        |     inputId = src
+        |     outputId = tgt
+        |     transformers = [{
+        |       type = StandardizeColNamesTransformer
+        |     }]
+        |   }
+        |}
+        |dataObjects {
+        |  src {
+        |    #id = ~{id}
+        |    type = CsvFileDataObject
+        |    path = "target/src"
+        |  }
+        |  tgt {
+        |    type = CsvFileDataObject
+        |    path = "target/tgt"
+        |  }
+        |}
+        |""".stripMargin).resolve
+
+    implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
+    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel="ids:act")
+
+    val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
+    assert(srcDO != None)
+    val dfSrc = Seq(("testData", "Foo"),("bar", "Space")).toDF("testColumn", "c?olumnN[ä]me")
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+
+    // Run SDLB
+    sdlb.startSimulation(sdlConfig, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc)), srcDO.id, Seq())))
+    //sdlb.run(sdlConfig)
+
+    // check result
+    val tgt = instanceRegistry.get[CsvFileDataObject]("tgt")
+    val dfTgt = tgt.getSparkDataFrame()
+    val colName = dfTgt.columns
+    assert(colName.toSeq == Seq("test_column", "column_naeme"))
+  }
+
+
+  test("sdlb run converting camel case col names to lower case with underscores") {
+    val feedName = "test"
+    val sdlb = new DefaultSmartDataLakeBuilder()
+    //implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+
+    val config = ConfigFactory.parseString(
+      """
+        |actions = {
+        |   act = {
+        |     type = CopyAction
+        |     inputId = src
+        |     outputId = tgt
+        |     transformers = [{
+        |       type = StandardizeColNamesTransformer
+        |       camelCaseToLower = false
+        |       normalizeToAscii = false
+        |       removeNonStandardSQLNameChars = false
+        |     }]
+        |   }
+        |}
+        |dataObjects {
+        |  src {
+        |    #id = ~{id}
+        |    type = CsvFileDataObject
+        |    path = "target/src"
+        |  }
+        |  tgt {
+        |    type = CsvFileDataObject
+        |    path = "target/tgt"
+        |  }
+        |}
+        |""".stripMargin).resolve
+
+    implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
+    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel="ids:act")
+
+    val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
+    assert(srcDO != None)
+    val dfSrc = Seq(("testData", "Foo"),("bar", "Space")).toDF("FOO", "noCamel")
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+
+    // Run SDLB
+    sdlb.startSimulation(sdlConfig, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc)), srcDO.id, Seq())))
+    //sdlb.run(sdlConfig)
+
+    // check result
+    val tgt = instanceRegistry.get[CsvFileDataObject]("tgt")
+    val dfTgt = tgt.getSparkDataFrame()
+    val colName = dfTgt.columns
+    assert(colName.toSeq == Seq("foo", "nocamel"))
+  }
+
 
   test("sdlb run with external state file using FinalStateWriter") {
-    
+
     val feedName = "test"
     val sdlb = new DefaultSmartDataLakeBuilder()
 
@@ -578,7 +682,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
-          getClass.getResource("/configState/WithFinalStateWriter.conf").getPath)) )
+      getClass.getResource("/configState/WithFinalStateWriter.conf").getPath)) )
 
     // Run SDLB
     sdlb.run(sdlConfig)
@@ -587,7 +691,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val fileResult = filesystem.exists(new Path("ext-state/state-test"))
     assert(fileResult)
   }
-
 }
 
 class FailTransformer extends CustomDfTransformer {
