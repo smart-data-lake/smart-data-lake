@@ -3,7 +3,7 @@ id: commandLine
 title: Command Line
 ---
 
-# Start Java object using Spark-Submit
+# Launch Java application using Spark-Submit
 SmartDataLakeBuilder is a java application. 
 To run on a cluster with spark-submit, use **DefaultSmartDataLakeBuilder** application.
 It can be started with the following command line options (for details, see [YARN](deployYarn.md)).
