@@ -36,7 +36,7 @@ global {
 ```
 
 ## Environment variables
-In Hocon environment variables can be used. Further we distinguish if the variables are required or optional. 
+In Hocon, environment variables can be used. Further we distinguish if the variables are required or optional. 
 
 As an example, requiring a DB password, due to the absence of an elaborated secret store:
 ```
