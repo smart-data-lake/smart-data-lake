@@ -24,7 +24,7 @@ Furthermore, there are the following general (Hocon) features:
 
 The pipeline definition can be separated in multiple files and directories, specified with the SDLB option `-c, --config <file1>[,<file2>...]`. This could also be a list of directories or a mixture of directories and files. All configuration files (`*.conf`) within the specified directories and its subdirectories are taken into account. 
 
-> Note: Also `.json` is an accepted file extension. Files with other extensions are disregarded. 
+> Note: Also `.properties` and `.json` are accepted file extensions. Files with other extensions are disregarded. 
 
 ## Global Options
 Options listed in the **global** section are used by all executions. These include Spark options, UDFs, [secretProviders](hoconSecrets) and more.

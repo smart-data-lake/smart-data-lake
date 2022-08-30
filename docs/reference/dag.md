@@ -8,7 +8,7 @@ It is build automatically within SDLB by analyzing the actions, related dataObje
 SDLB uses this DAG to optimize execution of the pipeline as it knows in which order the pipeline needs to be executed.
 Because it's acyclic, it cannot have loops, so it's impossible to define an action that depends on an output of subsequent actions.
 
-This has the advantage, that we do not have to explicitly define the order of actions and not the dependencies between actions. 
+This has the advantage, that we do not have to explicitly define the order of actions nor the dependencies between actions. 
 Especially for complex structures the configuration is more easy to maintain. 
 
 Further, independent actions are identified, which SDLB can execute in parallel. 

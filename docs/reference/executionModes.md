@@ -42,7 +42,7 @@ The *FailIfNoPartitionValuesMode* enforces to specified partition values. It sim
 This is useful to prevent potential reprocessing of whole tables due to wrong usage.
 
 ### PartitionDiffMode: Dynamic partition values filter
-In contrast to specifying the partitions manually, you can let SmartDataLakeBuilder find missing partitions and set partition values automatically by specifying execution mode *PartitionDiffMode*. This mode has a couple of action to fine tune:
+In contrast to specifying the partitions manually, you can let SmartDataLakeBuilder find missing partitions and set partition values automatically by specifying execution mode *PartitionDiffMode*. This mode has a couple of options to fine tune:
 
 By defining the **applyCondition** attribute you can give a condition to decide at runtime if the PartitionDiffMode should be applied or not.
 Default is to apply the PartitionDiffMode if the given partition values are empty (partition values from command line or passed from previous action).
@@ -80,7 +80,7 @@ This can be used to select data to process against a DataObject later in the pip
 <!--TODO describe also PartitionDiffMode options  selectAdditionalInputExpression -->
 
 ### CustomPartitionMode
-An execution mode to create custom partition execution mode logic in scala.
+This prepares for custom specification of partition logic in scala.
 Implement trait CustomPartitionModeLogic by defining a function which receives main input&output DataObject and returns partition values to process as Seq[Map[String,String]\]
 
 
