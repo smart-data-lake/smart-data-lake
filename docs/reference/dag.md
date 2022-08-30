@@ -15,7 +15,7 @@ Further, independent actions are identified, which SDLB can execute in parallel.
 
 If you don't get the results you expect, it's good to check if the DAG looks correct.
 
-An example could look like:
+A visual representation of the DAG will be printed in the execution log, an example could look like this:
 
 ```
                                         ┌───────────────┐
