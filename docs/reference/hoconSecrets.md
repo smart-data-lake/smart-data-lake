@@ -48,7 +48,7 @@ global = {
 
 #### Databricks Secret configuration
 
-Using Databricks credentials and other values can be stored encrypted as [Databricks secrets](https://docs.databricks.com/security/secrets/index.html). This can be used within SDLB by utilizing the class DatabricksSecretProvider. Here the ID `DBSECRETS` is uses for further SDLB configuration references. Further, the [secret scope](https://docs.databricks.com/security/secrets/secret-scopes.html) (here `scope=test`) is required in Databricks. The configuration would look like:
+Using Databricks credentials and other values can be stored encrypted as [Databricks secrets](https://docs.databricks.com/security/secrets/index.html). This can be used within SDLB by utilizing the class DatabricksSecretProvider. Here the ID `DBSECRETS` is used for further SDLB configuration references. Further, the [secret scope](https://docs.databricks.com/security/secrets/secret-scopes.html) (here `scope=test`) is required in Databricks. The configuration would look like:
 ```
 global {
   secretProviders {
