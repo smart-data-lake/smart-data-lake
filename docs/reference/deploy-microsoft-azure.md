@@ -10,7 +10,7 @@ Smart Data Lake Builder can be executed in multiple ways on Microsoft Azure:
 * as virtual machine
 
 ## SDLB on Databricks
-Databricks has the advantage of pre-configurated features like metastore and notebook support.
+Databricks has the advantage of pre-configurated features like metastore, notebook support and integrated SQL endpoints.
 
 At the time of this writing, a few extra steps are needed to overwrite specific libraries. 
 When running a job in Databricks, a few dependencies are given and can not be simply overwritten with your own as described in the
