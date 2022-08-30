@@ -11,7 +11,7 @@ Data pipelines are defined with four sections:
 * [**global options**](#global-options) variables e.g. Spark settings
 * [**connections**](#connections): defining the settings for external sources or targets
 * [**data objects**](#data-objects): including type, format, location etc., and 
-* [**actions**](#actions), which describes how to get from one to another dataObject, including transformations
+* [**actions**](#actions), which describes how to get from one dataObject to another, including transformations 
 
 The settings are structured in a hierarchy. 
 
@@ -24,10 +24,10 @@ Furthermore, there are the following general (Hocon) features:
 
 The pipeline definition can be separated in multiple files and directories, specified with the SDLB option `-c, --config <file1>[,<file2>...]`. This could also be a list of directories or a mixture of directories and files. All configuration files (`*.conf`) within the specified directories and its subdirectories are taken into account. 
 
-> Note: Also `.json` is an excepted file extension. Files with other extensions are disregarded. 
+> Note: Also `.json` is an accepted file extension. Files with other extensions are disregarded. 
 
 ## Global Options
-Options listed in the **global** section are used by all executions. These includes Spark options, UDFs, [secretProviders](hoconSecrets) and more.
+Options listed in the **global** section are used by all executions. These include Spark options, UDFs, [secretProviders](hoconSecrets) and more.
 
 As an example:
 ```
@@ -62,7 +62,7 @@ connections {
 }
 ```
 
-Here the connection to an MS SQL server is defined using JDBC protocol. Beside driver and location, the authentication is handled. 
+Here the connection to an MS SQL server is defined using JDBC protocol. Besides driver and location, the authentication is handled. 
 
 All available connections and available parameters are listed in the [Configuration Schema Viewer](https://smartdatalake.ch/json-schema-viewer/index.html#viewer-page?v=1).
 
@@ -79,9 +79,9 @@ All available data objects and available parameters are listed in the [Configura
 Within the SDLB the data objects are organized in a hierarchical manner, as many attributes are shared between them. 
 For example, `HiveTables` and `TransactionalSparkTables` share common attributes modeled in the generic `TableDataObject`, as shown in the following overview: 
 ![data object hierarchy](../images/dataobject_hierarchy.png)
-(Note: this list of DataObjects is **not** complete).
+(Note: this list of DataObjects is **not** exhaustive).
 
-If necessary, additional formats could be implemented based on this generic dataObjects.
+If necessary, additional formats could be implemented based on these generic dataObjects.
 
 ## Actions
 As the name suggest, these objects specify the process from one dataObject to another dataObject. These could also include multiple sources or targets, depending on the action type. 
@@ -92,7 +92,7 @@ Furthermore, there are actions which provide elaborated features, e.g. historiza
 For a list of all available actions, please consult the [Configuration Schema Viewer](https://smartdatalake.ch/json-schema-viewer/index.html#viewer-page?v=3).
 
 ### Transformer
-Transformations can be described in SQL, Scala or Python, directly in the configuration file (see example below) or in a separate source code file. Furthermore, th action could also consist of a list of transformations (see `transformers`). 
+Transformations can be described in SQL, Scala or Python, directly in the configuration file (see example below) or in a separate source code file. Furthermore, the action could also consist of a list of transformations (see `transformers`). 
 
 
 

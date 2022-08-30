@@ -9,7 +9,7 @@ This page is under review
 
 ## Spark Transformations
 To implement custom transformation logic, specify **transformers** attribute of an Action. 
-It allows you to chain several transformations in a linear process, where output SubFeeds from one transformation are use as input for the next.  
+It allows you to chain several transformations in a linear process, where the output SubFeeds of one transformation are used as input for the next.
 
 Depending on your Action type the transformations have different format (described later). The two types are:
 
@@ -25,7 +25,7 @@ The configuration allows you to use [*predefined standard transformations*](#pre
 
 ### Predefined Transformations
 Predefined transformations implement generic logic to be reused in different actions. 
-Depending on the transformer there are a couple of option to specify properties, see [Configuration Schema Viewer](../../JsonSchemaViewer).
+Depending on the transformer there are a couple of properties you can specify, see [Configuration Schema Viewer](../../JsonSchemaViewer).
 The following Transformers exist:
 
 * AdditionalColumnsTransformer (1-to-1): Add additional columns to the DataFrame by extracting information from the context

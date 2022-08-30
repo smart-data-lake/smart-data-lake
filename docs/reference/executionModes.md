@@ -38,8 +38,8 @@ Note that during execution of the dag, no new partition values are added, they a
 If the parameters `--partition-values` or `--multi-partition-values` are not specified, SDLB will process all available data.
 
 ### FailIfNoPartitionValuesMode
-The *FailIfNoPartitionValuesMode* enforces to specify partition values. It simply check if partition values are present and fail otherwise.
-This is useful to prevent potential reprocessing of whole table through wrong usage.
+The *FailIfNoPartitionValuesMode* enforces to specified partition values. It simply checks if partition values are present and fails otherwise.
+This is useful to prevent potential reprocessing of whole tables due to wrong usage.
 
 ### PartitionDiffMode: Dynamic partition values filter
 In contrast to specifying the partitions manually, you can let SmartDataLakeBuilder find missing partitions and set partition values automatically by specifying execution mode *PartitionDiffMode*. This mode has a couple of action to fine tune:
@@ -124,7 +124,7 @@ This can be used to select data to process against a DataObject later in the pip
 An execution mode which forces processing all data from it's inputs, removing partitionValues and filter conditions received from previous actions.
 
 ## DataObjectStateIncrementalMode
-An execution mode for incremental processing by remembering DataObjects state from last increment. The state is saved in a .json file for which the user needs to provide a path using the `--state-path` option. An application name must also be specified with the `-n` option. 
+An execution mode for incremental processing by remembering DataObjects state from last increment. The state is saved in a .json file for which the user needs to provide a path using the `--state-path` option. An application name must also be specified with the `-n` option. The state file will be named after the application name.
 
 ## Execution Condition
 For every Action an executionCondition can be defined. The execution condition allows to define if an action is executed or skipped. The default behaviour is that an Action is skipped if at least one input SubFeed is skipped.

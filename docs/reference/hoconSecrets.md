@@ -24,15 +24,15 @@ Provider            |Pattern    |Meaning
 --------------------|-----------|---
 clear text          | `CLEAR#pd`|The secret will be used literally (cleartext). This is only recommended for test environments.
 environment variable| `ENV#pd`  |The value for this secret will be read from the environment variable called "pd".
-file                |`FILE#filename;secretName`| read `secretName` from file `filename`. The file need to be a property file with line format `secretName=secretValue`
+file                |`FILE#filename;secretName`| read `secretName` from file `filename`. The file needs to be a property file with line format `secretName=secretValue`
 Azure KeyVault      | e.g. `AZKV#secretName`| Azure KeyVault element `secretName`. KeyValut specified in global section (see below)
 Databricks Secret   |e.g. `DBSECRET#secretName`| Databricks element `secretName`. Secret provider specified in global section (see below)
 
-Additional, custom providers can be implemed, see [Custom Secret Providers](#custom-secret-provider).
+Additionaly, custom providers can be implemented, see [Custom Secret Providers](#custom-secret-provider).
 
 #### Azure KeyVault configuration
 
-An [Azure KeyVault](https://docs.microsoft.com/en-us/azure/key-vault/general/) would be specified as follows, here using an ID `AZKV`. The KeyVault name still need to be specified. 
+An [Azure KeyVault](https://docs.microsoft.com/en-us/azure/key-vault/general/) would be specified as follows, here using an ID `AZKV`. The KeyVault name still needs to be specified. 
 ```
 global = {
   secretProviders = {
