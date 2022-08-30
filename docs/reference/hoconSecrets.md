@@ -62,7 +62,7 @@ global {
 
 
 ## Custom Secret Provider
-Furtermore, a custom secret provider could be implemented as class using trait SecretProvider and a constructor with parameter `options: Map[String,String]`.
+Furthermore, a custom secret provider could be implemented as class using the trait SecretProvider and a constructor with parameter `options: Map[String,String]`.
 The specification in the global section would in general look like:
 
 ```
