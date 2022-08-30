@@ -25,7 +25,7 @@ There are 2 major types of Execution Modes selecting the subset of data based on
 * updates (incremental)
 
 With partitions, the user selects the targeted partition or selecting all different partitions. 
-With incremental the difference between input and output can be selected. 
+With incremental, the difference between input and output can be selected. 
 
 ## Partitions
 <!--TODO find a good introduction to partitions-->
