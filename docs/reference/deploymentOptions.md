@@ -4,7 +4,7 @@ title: Deployment options
 ---
 
 Smart Data Lake Builder is built to run anywhere.
-It can be run in as as java application using e.g. spark-submit OR in a container, as shown in [Getting Started](../getting-started/setup.md).
+It can be run as java application using e.g. spark-submit or in a container, as shown in [Getting Started](../getting-started/setup.md).
 
 It can be run locally, on your server or in a large cluster to leverage the resources of your on-premise or cloud infrastructure.
 
