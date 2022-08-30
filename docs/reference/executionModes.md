@@ -17,7 +17,7 @@ executionMode {
   attribute1 = ...
 }
 ```
-If no explicit executionMode is specified, the Default Behavior is used (see chapter below).
+If no explicit executionMode is specified, the default behavior is used (see chapter below).
 
 There are 2 major types of Execution Modes selecting the subset of data based on:
 
