@@ -110,7 +110,7 @@ podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/con
 ## Pods with Podman
 When interacting between multiple containers, e.g. SDL container and a metastore container, pods are utilized to manage the container and especially the network. A set of containers is launched using podman-compose and a `docker-compose.yaml`. Podman-compose < 1.0.0 creates the pods automatically. This seems to be broken in later versions. That is why we suggest to install podman-compose 0.1.11.
 
-Assuming an existing pod `mypod` running, another container can be started within this pod using the additional podman arguments `--pod mypod --hostname myhost --add-host myhost:127.0.0.1`. 
+Assuming an existing pod `mypod` is running, another container can be started within this pod using the additional podman arguments `--pod mypod --hostname myhost --add-host myhost:127.0.0.1`. 
 The hostname specification fixes an issue in resolving the own localhost.
 
 
