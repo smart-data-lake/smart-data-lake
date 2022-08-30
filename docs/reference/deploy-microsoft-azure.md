@@ -7,7 +7,7 @@ Smart Data Lake Builder can be executed in multiple ways on Microsoft Azure:
 
 * on Databricks
 * as containers orchestrated with Kubernetes
-* as an VM
+* as virtual machine
 
 ## SDLB on Databricks
 Databricks has the advantage of pre-configurated features like metastore and notebook support.
