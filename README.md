@@ -64,12 +64,12 @@ To see how all this works in action, head over to the [Getting Started](docs/Get
 [www.elca.ch](http://www.elca.ch) : Did the comprehensive revision and provision as open source project 
 
 # Additional Documentation
-[Getting Started](docs/GettingStarted.md)  
-[Reference](docs/Reference.md)  
-[Architecture](docs/Architecture.md)  
-[Testing](docs/Testing.md)  
+[Getting Started](https://smartdatalake.ch/docs/getting-started/setup)  
+[Reference](https://smartdatalake.ch/docs/reference/build)  
+[Architecture](https://smartdatalake.ch/docs/architecture)  
+[Testing](/smart-data-lake/smart-data-lake/blob/documentation/docs/reference/testing.md)  
 [Glossary](docs/Glossary.md)  
-[Troubleshooting](docs/Troubleshooting.md)    
+[Troubleshooting](https://smartdatalake.ch/docs/getting-started/troubleshooting/common-problems)    
 [FAQ](docs/FAQ.md)  
 [Contributing](docs/Contribute.md)  
 [Running in the Public Cloud](docs/PublicCloud.md)  
