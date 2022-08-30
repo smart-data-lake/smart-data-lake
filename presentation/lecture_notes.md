@@ -184,15 +184,14 @@ config
 ```
 
 Let's have a look into a configuration file:
-> `nano config/airports.conf`
-Note: 
+> `less config/airports.conf`
+Note: you can also use other viewer/editor, e.g. vim in Ubuntu or SublimeText or Intellij in Windows using `\\wsl$\Ubuntu\home\<username>\...`
 
 * 3 **data objects** for 3 different layers: **ext**, **stg**, **int**
-* here each data object has a different type: WebserviceFileDataObject, CsvFileDataObject, DeltaLakeTableDataObject
+  - here each data object has a different type: WebserviceFileDataObject, CsvFileDataObject, DeltaLakeTableDataObject
   - `ext-airports`: specifies the location of a file to be downloaded 
   - `stg-airports`: a staging CSV file to be downloaded into (raw data)
   - `int-airports`: filtered and written into `DeltaLakeTable`
-
 
 * 2 **actions** defining the connection between the data objects
   - first simple download
@@ -201,7 +200,7 @@ Note:
 * structures and parameters, like *type*, *inputId*,...
 * **Transformer** will be handled later
 
-Schema: A note to data Objects: SDLB creates Schemata for all spark supported data objects: user defined or inference
+**Schema** A note to dataObjects: SDLB creates Schemata for all spark supported data objects: user defined or inference
 	- support for schema evolution 
     + replaced or extended or extend (new column added, removed columns kept) schema 
 		+ for JDBC and DeltaLakeTable, need to be enabled
@@ -455,7 +454,7 @@ Task: use partitioning for Action compute-distances
 > to dataObjects  btl_departures_arrivals_airports and btl_distances 
 > </details>
 
-Since we change the format in which data is stored let s delete the data
+Since we change the format in which data is stored let's delete the data
 
 > rm -r data/btl-distances/ data/btl-departures-arrivals-airports/
 
@@ -601,6 +600,11 @@ Now it will fail because we need to provide a path for the state-path, so we add
 * restart with the same command
   - notice line at the beginning: `LocalSmartDataLakeBuilder$ - recovering application SDLB_training runId=1 lastAttemptId=1 [main]`
   - notice the changed DAG, no download
+
+## SDL Viewer
+There is a new extension of SDLB which visualize the configuration and its documentation. This acts as an data catalog and presents beside the dependencies (DAG) all metadata information of dataObject and Actions. 
+The viewer runs in a seperate container and can be launched browsing to [localhost:5000](http://localhost:5000).
+> Note: there is still an issue with parsing "unresolved" variables. If you see just "Loading", uncomment out the `$METASTOREPW` in `config/global.conf`.
 
 :warning: TODO
 
