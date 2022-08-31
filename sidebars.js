@@ -32,6 +32,10 @@ module.exports = {
     {'Reference' : [
         'reference/build',
         'reference/commandLine',
+        {'SDLB objects' : [
+          'reference/dataObjects',
+          'reference/actions',
+        ]},
         {'Hocon Configuration' : [
           'reference/hoconOverview',
           'reference/hoconSecrets',
@@ -44,7 +48,7 @@ module.exports = {
         'reference/transformations',
         //'reference/schemaEvolution',
         //'reference/housekeeping',
-        //'reference/streaming',
+        'reference/streaming',
         //'reference/metrics',
         {'Deployment' : [
           'reference/deploymentOptions',
