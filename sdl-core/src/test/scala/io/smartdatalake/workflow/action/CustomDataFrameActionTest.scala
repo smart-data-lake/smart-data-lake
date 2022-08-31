@@ -237,7 +237,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     // setup DataObjects
     val srcDO1 = MockDataObject("src1").register
     val srcDO2 = MockDataObject("src2").register
-    val intDO1 = MockDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname","firstname"))).register
+    val intDO1 = MockDataObject("int1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname","firstname"))).register
     val tgtDO1 = MockDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname","firstname"))).register
     val tgtDO2 = MockDataObject("tgt2", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname","firstname"))).register
 

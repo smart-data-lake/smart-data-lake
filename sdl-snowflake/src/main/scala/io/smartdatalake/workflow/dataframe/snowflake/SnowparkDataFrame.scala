@@ -248,6 +248,7 @@ trait SnowparkDataType extends GenericDataType {
 case class SnowparkSimpleDataType(inner: DataType) extends SnowparkDataType {
   override def makeNullable: SnowparkDataType = this
   override def toLowerCase: SnowparkDataType = this
+  override def isSimpleType: Boolean = true
 }
 case class SnowparkStructDataType(override val inner: StructType) extends SnowparkDataType with GenericStructDataType {
   override def makeNullable: SnowparkDataType = SnowparkStructDataType(SnowparkSchema(inner).makeNullable.inner)
@@ -259,6 +260,7 @@ case class SnowparkStructDataType(override val inner: StructType) extends Snowpa
     }
   }
   override def fields: Seq[SnowparkField] = inner.fields.map(SnowparkField)
+  override def isSimpleType: Boolean = false
 }
 case class SnowparkArrayDataType(inner: ArrayType) extends SnowparkDataType with GenericArrayDataType {
   override def makeNullable: SnowparkDataType = SnowparkArrayDataType(ArrayType(SnowparkArrayDataType(inner).makeNullable.inner))
@@ -271,6 +273,7 @@ case class SnowparkArrayDataType(inner: ArrayType) extends SnowparkDataType with
   }
   override def containsNull: Boolean = true // not existing in Snowpark
   override def elementDataType: SnowparkDataType = SnowparkDataType(inner.elementType)
+  override def isSimpleType: Boolean = false
 }
 case class SnowparkMapDataType(inner: MapType) extends SnowparkDataType with GenericMapDataType {
   override def makeNullable: SnowparkDataType = SnowparkMapDataType(MapType(SnowparkDataType(inner.keyType).makeNullable.inner,SnowparkDataType(inner.valueType).makeNullable.inner))
@@ -290,6 +293,7 @@ case class SnowparkMapDataType(inner: MapType) extends SnowparkDataType with Gen
   override def valueContainsNull: Boolean = true // not existing in Snowpark
   override def keyDataType: SnowparkDataType = SnowparkDataType(inner.keyType)
   override def valueDataType: SnowparkDataType = SnowparkDataType(inner.valueType)
+  override def isSimpleType: Boolean = false
 }
 object SnowparkDataType {
   def apply(inner: DataType): SnowparkDataType = inner match {
