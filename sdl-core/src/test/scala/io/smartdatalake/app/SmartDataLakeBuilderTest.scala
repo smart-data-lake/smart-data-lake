@@ -617,7 +617,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
   }
 
 
-  test("sdlb run converting camel case col names to lower case with underscores") {
+  test("sdlb run converting column names to lower without additional options") {
     val feedName = "test"
     val sdlb = new DefaultSmartDataLakeBuilder()
     //implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
