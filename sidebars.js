@@ -46,6 +46,7 @@ module.exports = {
           'reference/hoconVariables',
         ]},
         'reference/dag',
+        'reference/schema',
         'reference/executionPhases',
         'reference/executionEngines',
         'reference/executionModes',
