@@ -3,11 +3,8 @@ id: dataObjects
 title: Data Objects
 ---
 
-:::warning
-This page is under review and currently not visible in the menu.
-:::
-
-DataObjects are the core element of the smart data lake. These objects define the properties, where and how the data is stored. 
+DataObjects are the core element of Smart data Lake Builder. These objects define the properties, including location, type and others.
+Furthermore, a section with metadata can be used. 
 
 For a list of features please see the [Schema Viewer](http://smartdatalake.ch/json-schema-viewer/index.html).
 

@@ -1,6 +1,10 @@
 module.exports = {
   docs: [
-    {'Smart Data Lake' : ['intro', 'features', 'architecture']},
+    {'Smart Data Lake' : [
+      'intro',
+      'features',
+      'architecture'
+    ]},
     {'Getting Started' : [
       'getting-started/setup',
       'getting-started/get-input-data',
