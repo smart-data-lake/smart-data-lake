@@ -21,6 +21,7 @@ package io.smartdatalake.util.dag
 
 import com.github.mdr.ascii.common.Dimension
 import com.github.mdr.ascii.layout.coordAssign.VertexRenderingStrategy
+import io.smartdatalake.util.misc.LogUtil
 
 /**
  * Render a node by centering it horizontally and vertically within the given region.
@@ -31,23 +32,16 @@ import com.github.mdr.ascii.layout.coordAssign.VertexRenderingStrategy
 class NodeRenderingStrategy(nodeToString: DAGNode => String) extends VertexRenderingStrategy[DAGNode] {
 
   def getPreferredSize(v: DAGNode): Dimension = {
-    val lines = splitLines(nodeToString(v))
+    val lines = LogUtil.splitLines(nodeToString(v))
     Dimension(lines.size, if (lines.isEmpty) 0 else lines.map(_.size).max)
   }
 
   def getText(v: DAGNode, allocatedSize: Dimension): List[String] = {
-    val unpaddedLines =
-      splitLines(nodeToString(v)).take(allocatedSize.height).map { line ⇒ centerLine(allocatedSize, line) }
+    val unpaddedLines = LogUtil.splitLines(nodeToString(v)).take(allocatedSize.height).map { line ⇒ centerLine(allocatedSize, line) }
     val verticalDiscrepancy = Math.max(0, allocatedSize.height - unpaddedLines.size)
     val verticalPadding = List.fill(verticalDiscrepancy / 2)("")
     verticalPadding ++ unpaddedLines ++ verticalPadding
   }
-
-  private def splitLines(s: String): List[String] =
-    s.split("(\r)?\n").toList match {
-      case Nil | List("") ⇒ Nil
-      case xs             ⇒ xs
-    }
 
   private def centerLine(allocatedSize: Dimension, line: String): String = {
     val discrepancy = allocatedSize.width - line.size

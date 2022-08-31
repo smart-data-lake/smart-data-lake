@@ -78,8 +78,8 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
     val nodesLookup = sortedNodes.map( n => n.nodeId -> n).toMap
     val edges = incomingEdgesMap.values.flatMap {
       incomingEdges => incomingEdges.map(incomingEdge => (nodesLookup(incomingEdge.nodeIdFrom), nodesLookup(incomingEdge.nodeIdTo)))
-    }
-    val g = new Graph(vertices = sortedNodes.toSet, edges = edges.toList)
+    }.toList.distinct
+    val g = new Graph(vertices = sortedNodes.toSet, edges = edges)
     val renderingStrategy = new NodeRenderingStrategy(nodeToString)
     GraphLayout.renderGraph(g, renderingStrategy)
   }
@@ -291,7 +291,7 @@ object DAG extends SmartDataLakeLogger {
    * Create a lookup table to retrieve incoming (source) node IDs for a node.
    */
   private def buildIncomingIdLookupTable(nodes: Seq[DAGNode], edges: Seq[DAGEdge]): Map[DAGNode, Seq[NodeId]] = {
-    val incomingIDsForTargetIDMap = edges.groupBy(_.nodeIdTo).mapValues(_.map(_.nodeIdFrom).distinct)
+    val incomingIDsForTargetIDMap = edges.groupBy(_.nodeIdTo).mapValues(_.map(_.nodeIdFrom).distinct.sorted)
     nodes.map(n => (n, incomingIDsForTargetIDMap.getOrElse(n.nodeId, Seq.empty))).toMap
   }
 
@@ -308,7 +308,7 @@ object DAG extends SmartDataLakeLogger {
       assert(startNodeIds.nonEmpty, s"Loop detected in remaining nodes ${incomingIds.keys.mkString(", ")}")
       // remove start nodes from incoming node list of remaining nodes
       val nonStartNodeIdsWithoutIncomingStartNodes: Map[NodeId, Seq[NodeId]] = nonStartNodeIds.mapValues(_.filterNot(startNodeIds.isDefinedAt))
-      val newSortedNotes = sortedNodes ++ startNodeIds.keys
+      val newSortedNotes = sortedNodes ++ startNodeIds.keys.toSeq.sorted
       if (nonStartNodeIdsWithoutIncomingStartNodes.isEmpty) newSortedNotes
       else go(newSortedNotes, nonStartNodeIdsWithoutIncomingStartNodes)
     }

@@ -19,8 +19,9 @@
 
 package io.smartdatalake.app
 
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import com.typesafe.config.ConfigFactory
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId, stringToDataObjectId}
+import io.smartdatalake.config.{ConfigParser, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskFailedException
@@ -466,16 +467,24 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
-    val srcDO = TestIncrementalDataObject("src1")
-    instanceRegistry.register(srcDO)
+    val srcDO1 = TestIncrementalDataObject("src1")
+    instanceRegistry.register(srcDO1)
+    val srcDO2 = TestIncrementalDataObject("src2", initVal = 5)
+    instanceRegistry.register(srcDO2)
     val tgt1DO = CsvFileDataObject( "tgt1", tempPath+s"/tgt1", saveMode = SDLSaveMode.Append)
     instanceRegistry.register(tgt1DO)
+    val tgt2DO = CsvFileDataObject( "tgt2", tempPath+s"/tgt2", saveMode = SDLSaveMode.Append)
+    instanceRegistry.register(tgt2DO)
 
     // start first dag run
-    val action1 = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(DataObjectStateIncrementalMode())
+    val action1 = CopyAction( "a", srcDO1.id, tgt1DO.id, executionMode = Some(DataObjectStateIncrementalMode())
       , transformers = Seq(AdditionalColumnsTransformer(additionalColumns = Map("run_id"-> "runId")))
       , metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action1)
+    val action2 = CopyAction( "b", srcDO2.id, tgt2DO.id, executionMode = Some(DataObjectStateIncrementalMode())
+      , transformers = Seq(AdditionalColumnsTransformer(additionalColumns = Map("run_id"-> "runId")))
+      , metadata = Some(ActionMetadata(feed = Some(feedName))))
+    instanceRegistry.register(action2)
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
     sdlb.run(sdlConfig)
 
@@ -485,6 +494,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // start second dag run
     action1.reset
+    action2.reset
     sdlb.run(sdlConfig)
 
     // check results
@@ -493,6 +503,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // start 3rd dag run -> no data
     action1.reset
+    action2.reset
     sdlb.run(sdlConfig)
 
     // check results
@@ -501,6 +512,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // start 4th dag run
     action1.reset
+    action2.reset
     sdlb.run(sdlConfig)
 
     // check results
@@ -553,6 +565,131 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     assert(finalSubFeeds.size == 1)
     assert(stats == Map(RuntimeEventState.INITIALIZED -> 2))
     assert(finalSubFeeds.head.dataFrame.get.select(dfSrc1.columns.map(SparkSubFeed.col)).symmetricDifference(SparkDataFrame(dfSrc1)).isEmpty)
+  }
+  test("sdlb run converting col names to lower case") {
+    val feedName = "test"
+    val sdlb = new DefaultSmartDataLakeBuilder()
+    //implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+
+    val config = ConfigFactory.parseString(
+      """
+        |actions = {
+        |   act = {
+        |     type = CopyAction
+        |     inputId = src
+        |     outputId = tgt
+        |     transformers = [{
+        |       type = StandardizeColNamesTransformer
+        |     }]
+        |   }
+        |}
+        |dataObjects {
+        |  src {
+        |    #id = ~{id}
+        |    type = CsvFileDataObject
+        |    path = "target/src"
+        |  }
+        |  tgt {
+        |    type = CsvFileDataObject
+        |    path = "target/tgt"
+        |  }
+        |}
+        |""".stripMargin).resolve
+
+    implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
+    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel="ids:act")
+
+    val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
+    assert(srcDO != None)
+    val dfSrc = Seq(("testData", "Foo"),("bar", "Space")).toDF("testColumn", "c?olumnN[ä]me")
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+
+    // Run SDLB
+    sdlb.startSimulation(sdlConfig, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc)), srcDO.id, Seq())))
+    //sdlb.run(sdlConfig)
+
+    // check result
+    val tgt = instanceRegistry.get[CsvFileDataObject]("tgt")
+    val dfTgt = tgt.getSparkDataFrame()
+    val colName = dfTgt.columns
+    assert(colName.toSeq == Seq("test_column", "column_naeme"))
+  }
+
+
+  test("sdlb run converting column names to lower without additional options") {
+    val feedName = "test"
+    val sdlb = new DefaultSmartDataLakeBuilder()
+    //implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+
+    val config = ConfigFactory.parseString(
+      """
+        |actions = {
+        |   act = {
+        |     type = CopyAction
+        |     inputId = src
+        |     outputId = tgt
+        |     transformers = [{
+        |       type = StandardizeColNamesTransformer
+        |       camelCaseToLower = false
+        |       normalizeToAscii = false
+        |       removeNonStandardSQLNameChars = false
+        |     }]
+        |   }
+        |}
+        |dataObjects {
+        |  src {
+        |    #id = ~{id}
+        |    type = CsvFileDataObject
+        |    path = "target/src"
+        |  }
+        |  tgt {
+        |    type = CsvFileDataObject
+        |    path = "target/tgt"
+        |  }
+        |}
+        |""".stripMargin).resolve
+
+    implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
+    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel="ids:act")
+
+    val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
+    assert(srcDO != None)
+    val dfSrc = Seq(("testData", "Foo"),("bar", "Space")).toDF("FOO", "noCamel")
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+
+    // Run SDLB
+    sdlb.startSimulation(sdlConfig, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc)), srcDO.id, Seq())))
+    //sdlb.run(sdlConfig)
+
+    // check result
+    val tgt = instanceRegistry.get[CsvFileDataObject]("tgt")
+    val dfTgt = tgt.getSparkDataFrame()
+    val colName = dfTgt.columns
+    assert(colName.toSeq == Seq("foo", "nocamel"))
+  }
+
+
+  test("sdlb run with external state file using FinalStateWriter") {
+
+    val feedName = "test"
+    val sdlb = new DefaultSmartDataLakeBuilder()
+
+    // setup input DataObject
+    val srcDO = CsvFileDataObject("src1", "target/src1")(sdlb.instanceRegistry)
+    val dfSrc1 = Seq("testData").toDF("testColumn")
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
+      getClass.getResource("/configState/WithFinalStateWriter.conf").getPath)) )
+
+    // Run SDLB
+    sdlb.run(sdlConfig)
+
+    // check result
+    val fileResult = filesystem.exists(new Path("ext-state/state-test"))
+    assert(fileResult)
   }
 }
 
@@ -608,11 +745,11 @@ object TestSDLPlugin {
 /**
  * This test DataObject delivers the 10 next numbers on every increment.
  */
-case class TestIncrementalDataObject(override val id: DataObjectId, override val metadata: Option[DataObjectMetadata] = None)
+case class TestIncrementalDataObject(override val id: DataObjectId, override val metadata: Option[DataObjectMetadata] = None, initVal: Int = 1)
   extends DataObject with CanCreateSparkDataFrame with CanCreateIncrementalOutput {
 
   // State is the start number of the last delivered increment
-  var previousState: Int = 1
+  var previousState: Int = initVal
   var nextState: Option[Int] = None
   var noDataCreated: Boolean = false
 
@@ -630,7 +767,7 @@ case class TestIncrementalDataObject(override val id: DataObjectId, override val
   }
 
   override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
-    previousState = state.map(_.toInt).getOrElse(1)
+    previousState = state.map(_.toInt).getOrElse(initVal)
   }
 
   override def getState: Option[String] = {

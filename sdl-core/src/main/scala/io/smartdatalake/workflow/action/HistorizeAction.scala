@@ -39,9 +39,11 @@ import scala.reflect.runtime.universe.Type
 import scala.util.{Failure, Success, Try}
 
 /**
- * [[Action]] to historize a subfeed.
+ * This [[Action]] historizes data between an input and output DataObject using DataFrames.
  * Historization creates a technical history of data by creating valid-from/to columns.
- * It needs a transactional table as output with defined primary keys.
+ * The DataFrame might be transformed using SQL or DataFrame transformations. These transformations are applied before the deduplication.
+ *
+ * HistorizeAction needs a transactional table (e.g. implementation of [[TransactionalSparkTableDataObject]]) as output with defined primary keys.
  *
  * Normal historization join new with all existing data, and rewrites all data in output table. This is not optimal from
  * a performance perspective.
@@ -168,6 +170,9 @@ case class HistorizeAction(
   override val recursiveInputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
 
   private[smartdatalake] override val handleRecursiveInputsAsSubFeeds: Boolean = false
+
+  // DataFrame created by HistorizeAction should not be passed on to the next Action, but must be recreated from the DataObject.
+  override val breakDataFrameOutputLineage: Boolean = true
 
   // historize black/white list
   require(historizeWhitelist.isEmpty || historizeBlacklist.isEmpty, s"(${id}) HistorizeWhitelist and historizeBlacklist mustn't be used at the same time")

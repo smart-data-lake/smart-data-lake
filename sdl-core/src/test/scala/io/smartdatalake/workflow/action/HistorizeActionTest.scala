@@ -73,6 +73,7 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
     action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(context1).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
+    assert(tgtSubFeed.asInstanceOf[SparkSubFeed].isDummy) // should return a dummy DataFrame as breakDataFrameOutputLineage is set to true
 
     {
       val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp)))

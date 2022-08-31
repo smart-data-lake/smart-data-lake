@@ -17,26 +17,28 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.util.spark
+package io.smartdatalake.workflow.dataobject;
 
-import org.apache.spark.sql.catalyst.ScalaReflection
-import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.{DataFrame, Dataset}
-
-import scala.reflect.ClassTag
-import scala.reflect.runtime.universe.Type
-
-object EncoderUtil {
-
-  def createProductEncoder(tpe: Type): ExpressionEncoder[_] = {
-    val mirror = ScalaReflection.mirror
-    val cls = mirror.runtimeClass(tpe)
-    val serializer = ScalaReflection.serializerForType(tpe)
-    val deserializer = ScalaReflection.deserializerForType(tpe)
-    new ExpressionEncoder(serializer, deserializer, ClassTag(cls))
-  }
-
-  def createDataset(df: DataFrame, tpe: Type): Dataset[_] = {
-    df.as(createProductEncoder(tpe))
-  }
+public class User {
+    private long userId;
+    private String firstName;
+    private String lastName;
+    public long getUserId() {
+        return userId;
+    }
+    public void setUserId(long userId) {
+        this.userId = userId;
+    }
+    public String getFirstName() {
+        return firstName;
+    }
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+    public String getLastName() {
+        return lastName;
+    }
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
 }

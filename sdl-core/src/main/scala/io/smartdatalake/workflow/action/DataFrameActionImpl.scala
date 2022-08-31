@@ -56,6 +56,12 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
   def breakDataFrameLineage: Boolean
 
   /**
+   * Stop propagating output DataFrame through action. The next action should get a fresh DataFrame from the DataObject according to the partition values.
+   * This is needed for Actions which create a specific DataFrame to implement the logic needed, e.g. Deduplicate- and HistorizeAction
+   */
+  def breakDataFrameOutputLineage: Boolean = false
+
+  /**
    * Force persisting input DataFrame's on Disk.
    * This improves performance if dataFrame is used multiple times in the transformation and can serve as a recovery point
    * in case a task get's lost.
@@ -272,21 +278,23 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
     }
   }
 
-  override protected def writeSubFeed(subFeed: DataFrameSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult = {
+  override protected def writeSubFeed(subFeed: DataFrameSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult[DataFrameSubFeed] = {
     // write subfeed to output
     setSparkJobMetadata(Some(s"writing to ${subFeed.dataObjectId}"))
     val output = outputs.find(_.id == subFeed.dataObjectId).getOrElse(throw new IllegalStateException(s"($id) output for subFeed ${subFeed.dataObjectId} not found"))
     val noData = writeSubFeed(subFeed, output, isRecursive)
     setSparkJobMetadata(None)
+    val outputSubFeed = if (breakDataFrameOutputLineage) subFeed.breakLineage else subFeed
+    WriteSubFeedResult(outputSubFeed, noData)
     // get expectations metrics and check violations
     output match {
       case evDataObject: DataObject with ExpectationValidation =>
         val expectationMetrics = subFeed.observation.map(_.waitFor()).getOrElse(Map())
         evDataObject.validateExpectations(expectationMetrics, subFeed.partitionValues)
         // TODO: return metrics
-        WriteSubFeedResult(noData)
+        WriteSubFeedResult(outputSubFeed, noData)
       case _ =>
-        WriteSubFeedResult(noData)
+        WriteSubFeedResult(outputSubFeed, noData)
     }
   }
 
@@ -366,10 +374,10 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
    */
   protected def applyTransformers(transformers: Seq[GenericDfsTransformerDef], inputPartitionValues: Seq[PartitionValues], inputSubFeeds: Seq[DataFrameSubFeed], outputSubFeeds: Seq[DataFrameSubFeed])(implicit context: ActionPipelineContext): Seq[DataFrameSubFeed] = {
     val inputDfsMap = inputSubFeeds.map(subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap
-    val (_, _, outputDfsMap) = transformers.foldLeft((inputDfsMap,inputPartitionValues,Map[String,GenericDataFrame]())){
-      case ((inputDfsMap, inputPartitionValues, _), transformer) =>
-        val (outputDfsMap, outputPartitionValues) = transformer.applyTransformation(id, inputPartitionValues, inputDfsMap, getExecutionModeResultOptions)
-        (inputDfsMap ++ outputDfsMap, outputPartitionValues, outputDfsMap)
+    val (outputDfsMap, _) = transformers.foldLeft((inputDfsMap,inputPartitionValues)){
+      case ((inputDfsMap, inputPartitionValues), transformer) =>
+        val (outputDfsMap, outputPartitionValues) = transformer.applyTransformation(id, inputPartitionValues, inputDfsMap)
+        (inputDfsMap ++ outputDfsMap, outputPartitionValues)
     }
     // create output subfeeds from transformed dataframes
     outputSubFeeds.map { subFeed=>

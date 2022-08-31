@@ -33,7 +33,10 @@ import scala.reflect.runtime.universe.{Type, typeOf}
 import scala.util.{Failure, Success, Try}
 
 /**
- * [[Action]] to copy files (i.e. from stage to integration)
+ * This [[Action]] copies data between an input and output DataObject using DataFrames.
+ * The input DataObject reads the data and converts it to a DataFrame according to its definition.
+ * The DataFrame might be transformed using SQL or DataFrame transformations.
+ * Then the output DataObjects writes the DataFrame to the output according to its definition.
  *
  * @param inputId inputs DataObject
  * @param outputId output DataObject

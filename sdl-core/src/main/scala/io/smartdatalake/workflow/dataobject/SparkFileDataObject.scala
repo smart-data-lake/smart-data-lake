@@ -18,7 +18,6 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.config.SdlConfigObject
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
@@ -27,11 +26,14 @@ import io.smartdatalake.util.misc.{CompactionUtil, EnvironmentUtil, SmartDataLak
 import io.smartdatalake.util.spark.CollectSetDeterministic.collect_set_deterministic
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.util.spark.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
+import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkObservation, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
+import org.apache.spark.sql.execution.FileSourceScanExec
+import org.apache.spark.sql.execution.datasources.FileScanRDD
 import org.apache.spark.sql.functions.{col, input_file_name}
 import org.apache.spark.sql.types.{DataType, StructType}
 
@@ -208,16 +210,27 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
         }
     }
 
+    // early check for no data to process.
+    // This also prevents an error on Databricks when using filesObserver if there are no files to process. See also [[CollectSetDeterministic]].
+    if (context.phase == ExecutionPhase.Exec && Environment.enableSparkFileDataObjectNoDataCheck && SparkFileDataObject.getFilesProcessedFromSparkPlan(id.id, dfContent).isEmpty)
+      throw NoDataToProcessWarning("-", s"($id) No files to process found in execution plan")
+
+    // add filename column
     var df = dfContent.withOptionalColumn(filenameColumn, input_file_name)
 
     // configure observer to get files processed for incremental execution mode
     if (filesObservers.nonEmpty && context.phase == ExecutionPhase.Exec) {
-      assert(filenameColumn.isDefined, s"($id) filenameColumn must be set in order to observe files processed")
       if (filesObservers.size > 1) logger.warn(s"($id) files observation is not yet well supported when using from multiple actions in parallel")
+      // force creating filenameColumn, and drop the it later again
+      val forcedFilenameColumn = "__filename"
+      if (filenameColumn.isEmpty) df = dfContent.withColumn(forcedFilenameColumn, input_file_name)
+      // initialize observers
       df = filesObservers.foldLeft(df) {
-        case (df, (actionId,observer)) => observer.on(df, filenameColumn.get)
+        case (df, (actionId,observer)) => observer.on(df, filenameColumn.getOrElse(forcedFilenameColumn))
       }
       filesObservers.clear
+      // drop forced filenameColumn
+      if (filenameColumn.isEmpty) df = df.drop(forcedFilenameColumn)
     }
 
     // finalize & return DataFrame
@@ -403,17 +416,36 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
 
 }
 
+object SparkFileDataObject {
+  /**
+   * This method is searching for files processed by a given DataFrame by looking at its execution plan.
+   */
+  private[smartdatalake] def getFilesProcessedFromSparkPlan(id: String, df: Dataset[_]): Seq[String] = {
+    df.queryExecution.executedPlan.collectFirst { case x: FileSourceScanExec => x }
+      .getOrElse(throw new IllegalStateException(s"($id) No FileSourceScanExec found in execution plan to check if there is data to process"))
+      .inputRDD.asInstanceOf[FileScanRDD].filePartitions.flatMap(_.files).map(_.filePath)
+  }
+}
+
 /**
  * Observation of files processed using custom metrics.
  */
 private[smartdatalake] class FilesSparkObservation(name: String) extends SparkObservation(name) with SmartDataLakeLogger {
+
+  var filesInExecutionPlan: Option[Seq[String]] = None
 
   /**
    * Setup observation of custom metric on Dataset.
    */
   def on[T](ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
     logger.debug(s"($name) add files observation to Dataset")
-    on(ds, registerListener = true, collect_set_deterministic(col(filenameColumnName)).as("filesProcessed"))
+    // Note: There is a Spark problem (NullPointerException with TypedImperativeAggregate (like CollectSetDeterministic) in observe if there is no data, but sometimes also occurs otherwise on prod...
+    // see also https://issues.apache.org/jira/browse/SPARK-39044
+    //on(ds, collect_set_deterministic(col(filenameColumnName)).as("filesProcessed"))
+
+    // Workaround - get files processed from DataFrames execution plan. Note that this might be incorrect if there are additional filters applied.
+    filesInExecutionPlan = Some(SparkFileDataObject.getFilesProcessedFromSparkPlan(name, ds))
+    ds
   }
 
   /**
@@ -421,8 +453,9 @@ private[smartdatalake] class FilesSparkObservation(name: String) extends SparkOb
    * Note that this blocks until the query finished successfully. Call only after Spark action was started on observed Dataset.
    */
   def getFilesProcessed: Seq[String] = {
-    val files = waitFor().getOrElse("filesProcessed", throw new IllegalStateException(s"($name) Did not receive filesProcessed observation!"))
-      .asInstanceOf[Seq[String]]
+    //val files = waitFor().getOrElse("filesProcessed", throw new IllegalStateException(s"($name) Did not receive filesProcessed observation!"))
+    //  .asInstanceOf[Seq[String]]
+    val files = filesInExecutionPlan.getOrElse(throw new IllegalStateException(s"($name) filesInExecutionPlan is empty!"))
     if (logger.isDebugEnabled()) logger.debug(s"($name) files processed: ${files.mkString(", ")}")
     files
   }

@@ -24,7 +24,7 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{ScalaUtil, SchemaUtil}
+import io.smartdatalake.util.misc.{ProductUtil, SchemaUtil}
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
@@ -34,6 +34,7 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.custom.ExpressionEvaluator
+import org.apache.spark.sql.custom.ExpressionEvaluator.findUnresolvedAttributes
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
@@ -161,21 +162,27 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       .options(connection.getAuthModeSparkOptions)
       .options(queryOrTable)
       .load()
-    incrementalOutputState.foreach { case (lastColumn, lastHighWatermark)  =>
+    incrementalOutputState.foreach { case (lastExpr, lastHighWatermark)  =>
       assert(incrementalOutputExpr.isDefined, s"($id) incrementalOutputExpr must be set to use DataObjectStateIncrementalMode")
-      if (lastColumn != incrementalOutputExpr.get) logger.warn(s"($id) incrementalOutputState has different column as incrementalOutputExpr ($lastColumn != ${incrementalOutputExpr.get}")
-      val newDataType = ExpressionEvaluator.resolveExpression(expr(incrementalOutputExpr.get), df.schema, caseSensitive = false).dataType
+      if (lastExpr != incrementalOutputExpr.get) logger.warn(s"($id) incrementalOutputState has different column as incrementalOutputExpr ($lastExpr != ${incrementalOutputExpr.get}")
+      val resolvedExpr = ExpressionEvaluator.resolveExpression(expr(incrementalOutputExpr.get), df.schema, caseSensitive = false)
+      // check if expression is fully resolved
+      if (!resolvedExpr.resolved) {
+        val attrs = ExpressionEvaluator.findUnresolvedAttributes(resolvedExpr).map(_.name)
+        throw new IllegalStateException(s"($id) incrementalOutputExpr can not be resolved" + (if (attrs.nonEmpty) s", unresolved attributes are ${attrs.mkString(", ")}" else ""))
+      }
+      val newDataType = resolvedExpr.dataType
       if (context.phase == ExecutionPhase.Exec) {
-        val newHighWatermarkValue = Option(df.agg(max(col(incrementalOutputExpr.get))).head.get(0))
+        val newHighWatermarkValue = Option(df.agg(max(expr(incrementalOutputExpr.get))).head.get(0))
           .getOrElse(throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode."))
         incrementalOutputState = Some((incrementalOutputExpr.get, Some((newHighWatermarkValue.toString, newDataType))))
         logger.info(s"($id) incremental output selected records with '${incrementalOutputExpr.get} > '${lastHighWatermark.map(_._1).getOrElse("none")}' and <= '${newHighWatermarkValue}'")
-        df = df.where(col(incrementalOutputExpr.get) <= lit(newHighWatermarkValue).cast(newDataType))
+        df = df.where(expr(incrementalOutputExpr.get) <= lit(newHighWatermarkValue).cast(newDataType))
         lastHighWatermark.foreach { case (value, dataType) =>
           if (value == newHighWatermarkValue.toString) {
             throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode. High watermark is $newHighWatermarkValue")
           }
-          df = df.where(col(lastColumn) > lit(value).cast(dataType))
+          df = df.where(expr(lastExpr) > lit(value).cast(dataType))
         }
       }
     }
@@ -351,7 +358,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
         | WHEN NOT MATCHED $insertConditionStr THEN INSERT ($insertSpecStr) VALUES ($insertValueSpecStr)
         """.stripMargin
       // execute
-      logger.info(s"($id) executing merge statement with options: ${ScalaUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1+"="+e._2).mkString(" ")}")
+      logger.info(s"($id) executing merge statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1+"="+e._2).mkString(" ")}")
       connection.execJdbcStatement(mergeStmt, doCommit = true)
     } finally {
       // cleanup temp table

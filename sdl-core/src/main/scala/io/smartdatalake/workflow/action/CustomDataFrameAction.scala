@@ -31,8 +31,11 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import scala.reflect.runtime.universe.{Type, typeOf}
 
 /**
- * [[Action]] to transform data according to a custom transformer.
- * Allows to transform multiple input and output dataframes.
+ * This [[Action]] transforms data between many input and output DataObjects using DataFrames.
+ * CustomDataFrameAction allows to define transformations between n input DataObjects and m output DataObjects,
+ * but is is recommended to implement n:1 or 1:m transformations, as otherwise dependencies between DataObjects might not be accurate anymore.
+ * The input DataFrames might be transformed using SQL or DataFrame transformations.
+ * When chaining multiple transformers, output DataFrames of previous transformers are available as input DataFrames for later transformers by their corresponding name.
  *
  * @param inputIds               input DataObject's
  * @param outputIds              output DataObject's

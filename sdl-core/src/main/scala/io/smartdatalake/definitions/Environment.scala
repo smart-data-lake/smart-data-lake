@@ -205,6 +205,25 @@ object Environment {
   }
 
   /**
+   * If enabled, SparkFileDataObject checks in execution plan if there are files available during Exec phase.
+   * NoDataToProcessWarning is thrown if there are no files found in the execution plan.
+   */
+  var enableSparkFileDataObjectNoDataCheck: Boolean = {
+    EnvironmentUtil.getSdlParameter("enableSparkFileDataObjectNoDataCheck")
+      .map(_.toBoolean).getOrElse(true)
+  }
+
+  /**
+   * Maximal line length for DAG graph log, before switching to list mode.
+   */
+  var dagGraphLogMaxLineLength: Int = {
+    val nb = EnvironmentUtil.getSdlParameter("dagGraphLogMaxLineLength")
+      .map(_.toInt).getOrElse(250)
+    // return
+    nb
+  }
+
+  /**
    * If enabled, the schema file for SparkFileDataObject is updated on every load from a DataFrame-based Action, otherwise it's just updated if it's missing.
    * The advantage of updating the sample file on every load is to enable automatic schema evolution.
    * This is enabled by default, as it has not big impact on performance.

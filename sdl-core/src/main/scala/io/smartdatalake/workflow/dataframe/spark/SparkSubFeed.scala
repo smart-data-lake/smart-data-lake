@@ -267,4 +267,8 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, fields)
     SparkSchema(StructType(fields.map(_.asInstanceOf[SparkField].inner)))
   }
+
+  def apply( dataFrame: SparkDataFrame, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues]): SparkSubFeed = {
+    SparkSubFeed(Some(dataFrame), dataObjectId: DataObjectId, partitionValues)
+  }
 }

@@ -21,6 +21,7 @@ package io.smartdatalake.util.dag
 
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.DAGHelper.NodeId
+import io.smartdatalake.util.misc.LogUtil
 import io.smartdatalake.workflow.SimplifiedAnalysisException
 import org.apache.spark.sql.AnalysisException
 
@@ -37,7 +38,8 @@ private[smartdatalake] object TaskFailedException {
     // get root cause to show create message of this exception
     val rootCause = getRootCause(cause)
     // create message including first line of cause message
-    val msg = s"Task $id failed. Root cause is '${rootCause.getClass.getSimpleName}: ${rootCause.getMessage.linesIterator.next}'"
+    val rootCauseFirstLine = LogUtil.splitLines(rootCause.getMessage).headOption
+    val msg = s"Task $id failed. Root cause is '${rootCause.getClass.getSimpleName}${rootCauseFirstLine.map(": "+_)}'"
     // create exception
     val ex = cause match {
       case ex: DAGException => TaskFailedException(id, msg, cause, ex.severity)

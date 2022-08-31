@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.util.secrets
 
-import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.config.{ConfigUtil, ConfigurationException}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.annotation.DeveloperApi
 
@@ -45,17 +45,8 @@ object SecretsUtil extends SmartDataLakeLogger {
    */
   def getSecret(secretConfigValue: String): String = {
     logger.debug(s"getting secret $secretConfigValue")
-    val (providerId, secretName) = parseConfigValue(secretConfigValue)
+    val (providerId, secretName) = ConfigUtil.parseProviderConfigValue(secretConfigValue)
     val provider = providers.getOrElse(providerId, throw new ConfigurationException(s"There is no registered secret provider with id ${providerId}"))
     provider.getSecret(secretName)
-  }
-
-  private val configValuePattern = "([^#]*)#(.*)".r
-  private def parseConfigValue(credentialsConfig: String): (String, String) = {
-    logger.debug(s"Parsing variable ${credentialsConfig}")
-    credentialsConfig match {
-      case configValuePattern(providerId, secretName) => (providerId, secretName)
-      case _ => throw new ConfigurationException(s"Secret config value $credentialsConfig is invalid, make sure it's of the form PROVIDERID#SECRETNAME")
-    }
   }
 }

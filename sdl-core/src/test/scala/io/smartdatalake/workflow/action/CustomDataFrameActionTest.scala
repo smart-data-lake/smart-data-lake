@@ -237,14 +237,16 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     // setup DataObjects
     val srcDO1 = MockDataObject("src1").register
     val srcDO2 = MockDataObject("src2").register
+    val intDO1 = MockDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname","firstname"))).register
     val tgtDO1 = MockDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname","firstname"))).register
     val tgtDO2 = MockDataObject("tgt2", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname","firstname"))).register
 
     // prepare & start load
     // note that src2 is passed on to customTransformerConfig2, even if it's not re-defined in customTransformerConfig1
-    val customTransformerConfig1 = SQLDfsTransformer(code = Map("int1" -> "select * from src1 where rating = 5"))
+    // note that intermediate dataframe int1 is used as output, and tgt1 is a transformer output but not used as action output
+    val customTransformerConfig1 = SQLDfsTransformer(code = Map(intDO1.id.id -> "select * from src1 where rating = 5"))
     val customTransformerConfig2 = SQLDfsTransformer(code = Map(tgtDO1.id.id -> "select * from int1", tgtDO2.id.id -> "select * from src2 where rating = 3"))
-    val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id,tgtDO2.id), transformers = Seq(customTransformerConfig1,customTransformerConfig2))
+    val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(intDO1.id, tgtDO2.id), transformers = Seq(customTransformerConfig1,customTransformerConfig2))
     instanceRegistry.register(action1)
     val l = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO1.writeSparkDataFrame(l, Seq())
@@ -252,7 +254,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     val srcSubFeeds = Seq(SparkSubFeed(None, "src1", Seq()),SparkSubFeed(None, "src2", Seq()))
     val tgtSubFeed = action1.exec(srcSubFeeds)(contextExec).head
 
-    val r1 = tgtDO1.getSparkDataFrame()
+    val r1 = intDO1.getSparkDataFrame()
       .select($"lastname")
       .as[String].collect().toSeq
     assert(r1.size == 1) // only one record has rating 5 (see where condition)

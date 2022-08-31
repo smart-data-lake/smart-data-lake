@@ -209,43 +209,61 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    *
    * @param appConfig Application configuration (parsed from command line).
    */
-  def run(appConfig: SmartDataLakeBuilderConfig): Map[RuntimeEventState,Int] = try {
-    // invoke SDLPlugin if configured
-    Environment.sdlPlugin.foreach(_.startup())
-    // create default hadoop configuration, as we did not yet load custom spark/hadoop properties
-    implicit val defaultHadoopConf: Configuration = new Configuration()
-    // handle state if defined
-    if (appConfig.statePath.isDefined && !appConfig.isDryRun) {
-      assert(appConfig.applicationName.nonEmpty, "Application name must be defined if statePath is set")
-      // check if latest run succeeded
-      val appName = appConfig.applicationName.get
-      val stateStore = HadoopFileActionDAGRunStateStore(appConfig.statePath.get, appName, defaultHadoopConf)
-      val latestRunId = stateStore.getLatestRunId
-      if (latestRunId.isDefined) {
-        val latestStateId = stateStore.getLatestStateId(latestRunId)
-          .getOrElse(throw new IllegalStateException(s"State for last runId=$latestRunId not found"))
-        val latestRunState = stateStore.recoverRunState(latestStateId)
-        if (latestRunState.isFailed) {
-          // start recovery
-          assert(appConfig == latestRunState.appConfig, s"There is a failed run to be recovered. Either you clean-up this state fail or the command line parameters given must match the parameters of the run to be recovered (${latestRunState.appConfig}")
-          recoverRun(appConfig, stateStore, latestRunState)._2
+  def run(appConfig: SmartDataLakeBuilderConfig): Map[RuntimeEventState,Int] = {
+    val stats = try {
+      // invoke SDLPlugin if configured
+      Environment.sdlPlugin.foreach(_.startup())
+      // create default hadoop configuration, as we did not yet load custom spark/hadoop properties
+      implicit val defaultHadoopConf: Configuration = new Configuration()
+      // handle state if defined
+      if (appConfig.statePath.isDefined && !appConfig.isDryRun) {
+        assert(appConfig.applicationName.nonEmpty, "Application name must be defined if statePath is set")
+        // check if latest run succeeded
+        val appName = appConfig.applicationName.get
+        val stateStore = HadoopFileActionDAGRunStateStore(appConfig.statePath.get, appName, defaultHadoopConf)
+        val latestRunId = stateStore.getLatestRunId
+        if (latestRunId.isDefined) {
+          val latestStateId = stateStore.getLatestStateId(latestRunId)
+            .getOrElse(throw new IllegalStateException(s"State for last runId=$latestRunId not found"))
+          val latestRunState = stateStore.recoverRunState(latestStateId)
+          if (latestRunState.isFailed) {
+            // start recovery
+            assert(appConfig == latestRunState.appConfig, s"There is a failed run to be recovered. Either you clean-up this state fail or the command line parameters given must match the parameters of the run to be recovered (${latestRunState.appConfig}")
+            recoverRun(appConfig, stateStore, latestRunState)._2
+          } else {
+            val nextExecutionId = SDLExecutionId(latestRunState.runId + 1)
+            startRun(appConfig, executionId = nextExecutionId, dataObjectsState = latestRunState.getDataObjectsState, stateStore = Some(stateStore))._2
+          }
         } else {
-          val nextExecutionId = SDLExecutionId(latestRunState.runId + 1)
-          startRun(appConfig, executionId = nextExecutionId, dataObjectsState = latestRunState.getDataObjectsState, stateStore = Some(stateStore))._2
+          startRun(appConfig, stateStore = Some(stateStore))._2
         }
-      } else {
-        startRun(appConfig, stateStore = Some(stateStore))._2
-      }
-    } else startRun(appConfig)._2
-  } finally {
+      } else startRun(appConfig)._2
+    } catch {
+      case e: Exception =>
+        // try shutdown but catch potential exception
+        try {
+          shutdown
+        }
+        // throw original exception
+        throw e
+    }
+    shutdown
+    // return
+    stats
+  }
+
+  /**
+   * Execute shutdown/cleanup tasks before SDLB job stops.
+   */
+  private def shutdown: Unit = {
     // make sure memory logger timer task is stopped
     MemoryUtils.stopMemoryLogger()
+
     // invoke SDLPlugin if configured
     Environment.sdlPlugin.foreach(_.shutdown())
 
     //Environment._globalConfig can be null here if global contains superfluous entries
     val stopStatusInfoServer = Option(Environment._globalConfig).flatMap(_.statusInfo.map(_.stopOnEnd)).getOrElse(false)
-
     if (stopStatusInfoServer) {
       StatusInfoServer.stop()
     }
@@ -288,6 +306,15 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   }
 
   /**
+   * Starts a simulation run and registers all SDL first class objects that are defined in the config file which path is defined in parameter appConfig
+   */
+  def startSimulationWithConfigFile(appConfig: SmartDataLakeBuilderConfig, initialSubFeeds: Seq[SparkSubFeed], dataObjectsState: Seq[DataObjectState] = Seq())(session: SparkSession): (Seq[SparkSubFeed], Map[RuntimeEventState,Int]) = {
+    val config = ConfigLoader.loadConfigFromFilesystem(appConfig.configuration.get, session.sparkContext.hadoopConfiguration)
+    ConfigParser.parse(config, this.instanceRegistry)
+    startSimulation(appConfig, initialSubFeeds, dataObjectsState)(this.instanceRegistry, session)
+  }
+
+    /**
    * Start run.
    * @return tuple of list of final subfeeds and statistics (action count per RuntimeEventState)
    */
@@ -352,8 +379,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     if (missingActionsToSkip.nonEmpty) logger.warn(s"actions to skip ${missingActionsToSkip.mkString(" ,")} not found in selected actions")
     val actionIdsSkipped = actionIdsSelected.filter( id => actionIdsToSkip.contains(id))
     val actionsToExec = actionsSelected.filterNot( action => actionIdsToSkip.contains(action.id))
-    require(actionsToExec.nonEmpty, s"No actions to execute. All selected actions are skipped (${actionIdsSkipped.mkString(", ")})")
-    logger.info(s"actions to execute ${actionsToExec.map(_.id).mkString(", ")}" + (if (actionIdsSkipped.nonEmpty) s"; actions skipped ${actionIdsSkipped.mkString(", ")}" else ""))
+    if (actionsToExec.isEmpty) logger.warn(s"No actions to execute. All selected actions are skipped: ${actionIdsSkipped.mkString(", ")}")
+    else logger.info(s"actions to execute ${actionsToExec.map(_.id).mkString(", ")}" + (if (actionIdsSkipped.nonEmpty) s"; actions skipped ${actionIdsSkipped.mkString(", ")}" else ""))
 
     // create and execute DAG
     logger.info(s"starting application ${appConfig.appName} runId=${executionId.runId} attemptId=${executionId.attemptId}")

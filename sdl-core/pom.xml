@@ -95,7 +95,6 @@
 			<groupId>com.databricks</groupId>
 			<artifactId>spark-xml_${scala.minor.version}</artifactId>
 			<version>${databricks.spark-xml.version}</version>
-			<scope>runtime</scope>
 		</dependency>
 
 		<dependency>
@@ -207,7 +206,7 @@
 		<dependency>
 			<groupId>org.jboss.resteasy</groupId>
 			<artifactId>resteasy-client</artifactId>
-			<version>4.5.7.Final</version>
+			<version>4.6.0.Final</version>
 			<scope>runtime</scope>
 		</dependency>
 		<!-- End Keycloak dependencies -->
