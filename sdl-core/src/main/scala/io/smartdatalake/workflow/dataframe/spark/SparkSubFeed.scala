@@ -49,7 +49,7 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
                         override val isSkipped: Boolean = false,
                         override val isDummy: Boolean = false,
                         override val filter: Option[String] = None,
-                        override val observation: Option[Observation] = None
+                        @transient override val observation: Option[Observation] = None
                        )
   extends DataFrameSubFeed {
   @transient

@@ -44,6 +44,7 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
 
   import session.implicits._
 
+  // Note that this test produces a StackOverflowError in the Log with JDK11. The test succeeds nevertheless. Details see below.
   test("sdlb run with statusinfoserver: Test connectivity of REST API and Websocket") {
 
     val feedName = "test"
