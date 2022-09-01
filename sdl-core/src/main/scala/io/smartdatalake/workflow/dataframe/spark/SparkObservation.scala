@@ -76,7 +76,7 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
       //TODO: streaming: reset metrics for each microbatch
       if (metrics.isEmpty) {
         val row = qe.observedMetrics.get(name)
-        this.metrics = row.map(r => r.getValuesMap[Any](r.schema.fieldNames))
+        metrics = row.map(r => r.getValuesMap[Any](r.schema.fieldNames))
         if (metrics.isDefined) {
           notifyAll()
           sparkSession.foreach(_.listenerManager.unregister(listener))

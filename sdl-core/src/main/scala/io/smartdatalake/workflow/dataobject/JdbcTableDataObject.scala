@@ -34,7 +34,6 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.custom.ExpressionEvaluator
-import org.apache.spark.sql.custom.ExpressionEvaluator.findUnresolvedAttributes
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
@@ -118,6 +117,10 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
   // Define partition columns
   override val partitions: Seq[String] = if (SchemaUtil.isSparkCaseSensitive) virtualPartitions else virtualPartitions.map(_.toLowerCase)
+
+  // TODO: Spark jdbc data source does not execute Spark observations, e.g. CopyWithMergeModeActionTest fails...
+  // Using generic observations is forced therefore.
+  override val forceGenericObservation = true
 
   // prepare final table
   table = table.overrideDb(connection.db)

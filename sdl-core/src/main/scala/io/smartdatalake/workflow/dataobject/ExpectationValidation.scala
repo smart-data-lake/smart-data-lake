@@ -22,13 +22,10 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
-import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkSubFeed}
-import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn, GenericDataFrame, GenericRow, Observation}
+import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase}
-import org.apache.spark.sql.Row
 
 import java.util.UUID
-import scala.reflect.runtime.universe.typeOf
 
 /**
  * A trait that allows for optional constraint validation and expectation evaluation on write when implemented by a [[DataObject]].
@@ -168,8 +165,9 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
     } else df
   }
 
+  protected def forceGenericObservation = false
   private def setupObservation(df: GenericDataFrame, expectationColumns: Seq[GenericColumn], isExecPhase: Boolean): (GenericDataFrame, Observation) = {
-    val (dfObserved, observation) = df.setupObservation(this.id + "-" + UUID.randomUUID(), expectationColumns, isExecPhase)
+    val (dfObserved, observation) = df.setupObservation(this.id + "-" + UUID.randomUUID(), expectationColumns, isExecPhase, forceGenericObservation)
     (dfObserved, observation)
   }
 }

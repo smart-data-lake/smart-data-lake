@@ -19,8 +19,6 @@
 
 package io.smartdatalake.workflow.dataframe
 
-import io.smartdatalake.workflow.dataobject.ExpectationScope.ExpectationScope
-
 /**
  * An Observation can observe metrics during evaluation of DataFrames.
  * In case the engine or implementation does not support observing metrics, they can also be calculated when calling waitFor method.
@@ -42,7 +40,6 @@ trait Observation {
 
 /**
  * Calculate metrics to fake observation result.
- * For Spark this is used instead of SparkObservation if metrics scope is different scope of current DataFrame, see also [[ExpectationScope]].
  * For Snowpark this is the only method to observe metrics.
  */
 private[smartdatalake] case class GenericCalculatedObservation(df: GenericDataFrame, aggregateColumns: GenericColumn*) extends Observation {

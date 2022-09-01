@@ -95,12 +95,19 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   override def log(msg: String, loggerFunc: String => Unit): Unit = {
     loggerFunc(msg + System.lineSeparator() + DatasetHelper.showString(inner, truncate = 0))
   }
-  override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): (GenericDataFrame, Observation) = {
+  override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, Observation) = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, aggregateColumns)
-    val observation = new SparkObservation(name)
-    val sparkAggregatedColumns = aggregateColumns.map(_.asInstanceOf[SparkColumn].inner)
-    val dfObserved = observation.on(inner, isExecPhase, sparkAggregatedColumns:_*)
-    (SparkDataFrame(dfObserved), observation)
+    // Some Spark data sources dont execute observations, e.g. jdbc. The generic observation can be forced for these cases.
+    if (forceGenericObservation) {
+      val observation = GenericCalculatedObservation(this, aggregateColumns:_*)
+      // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.
+      (this.cache, observation)
+    } else {
+      val observation = new SparkObservation(name)
+      val sparkAggregatedColumns = aggregateColumns.map(_.asInstanceOf[SparkColumn].inner)
+      val dfObserved = observation.on(inner, isExecPhase, sparkAggregatedColumns: _*)
+      (SparkDataFrame(dfObserved), observation)
+    }
   }
 }
 
