@@ -307,6 +307,6 @@ object SparkDataType {
 case class SparkRow(inner: Row) extends GenericRow {
   override def subFeedType: universe.Type = typeOf[SparkSubFeed]
   override def get(index: Int): Any = inner.get(index)
-  override def getAs[T](index: Int): T = get(index).asInstanceOf[T]
+  override def getAs[T](index: Int): T = inner.getAs[T](index)
   override def toSeq: Seq[Any] = inner.toSeq
 }

@@ -321,5 +321,6 @@ trait GenericMapDataType { this: GenericDataType =>
 trait GenericRow extends GenericTypedObject {
   def get(index: Int): Any
   def getAs[T](index: Int): T
+  //Note: getAs[T](fieldName: String) can not be implemented as in Snowpark a Row does not know the names of its fields!
   def toSeq: Seq[Any]
 }

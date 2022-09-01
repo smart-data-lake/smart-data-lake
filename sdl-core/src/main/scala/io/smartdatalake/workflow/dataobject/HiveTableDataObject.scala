@@ -54,6 +54,8 @@ import scala.collection.JavaConverters._
  *                  Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param saveMode spark [[SaveMode]] to use when writing files, default is "overwrite"
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
+ * @param constraints List of row-level [[Constraint]]s to enforce when writing to this data object.
+ * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
  * @param numInitialHdfsPartitions number of files created when writing into an empty table (otherwise the number will be derived from the existing data)
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false

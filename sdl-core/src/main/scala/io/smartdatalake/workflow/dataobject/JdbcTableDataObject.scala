@@ -78,6 +78,8 @@ import scala.util.Try
  * @param incrementalOutputExpr Optional expression to use for creating incremental output with DataObjectStateIncrementalMode.
  *                              The expression is used to get the high-water-mark for the incremental update state.
  *                              Normally this can be just a column name, e.g. an id or updated timestamp which is continually increasing.
+ * @param constraints List of row-level [[Constraint]]s to enforce when writing to this data object.
+ * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
  */
 case class JdbcTableDataObject(override val id: DataObjectId,
                                createSql: Option[String] = None,

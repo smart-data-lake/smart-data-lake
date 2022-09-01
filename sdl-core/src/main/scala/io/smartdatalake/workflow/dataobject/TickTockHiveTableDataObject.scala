@@ -45,6 +45,8 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
                                        dateColumnType: DateColumnType = DateColumnType.Date,
                                        override val schemaMin: Option[GenericSchema] = None,
                                        override var table: Table,
+                                       override val constraints: Seq[Constraint] = Seq(),
+                                       override val expectations: Seq[Expectation] = Seq(),
                                        numInitialHdfsPartitions: Int = 16,
                                        saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                        acl: Option[AclDef] = None,
@@ -53,7 +55,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
                                        override val housekeepingMode: Option[HousekeepingMode] = None,
                                        override val metadata: Option[DataObjectMetadata] = None)
                                       (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject with CanHandlePartitions {
+  extends TransactionalSparkTableDataObject with CanHandlePartitions with ExpectationValidation {
 
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
