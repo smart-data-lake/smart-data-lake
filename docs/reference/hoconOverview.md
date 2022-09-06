@@ -4,7 +4,7 @@ title: Hocon Configurations
 ---
 
 ## Overview
-Data piplines in SmartDataLakeBuilder are defined and stored in the [Human-Optimized Config Object Notation (HOCON)](https://github.com/lightbend/config/blob/master/HOCON.md) file format, which is a superset of JSON.
+Data piplines in SmartDataLakeBuilder are configured in the [Human-Optimized Config Object Notation (HOCON)](https://github.com/lightbend/config/blob/master/HOCON.md) file format, which is a superset of JSON. Beside being less picky about syntax (semicolons, quotation marks) it supports advanced features as substitutions, merging config from different files and inheritance.
 
 Data pipelines are defined with four sections:
 

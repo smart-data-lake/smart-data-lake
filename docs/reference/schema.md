@@ -21,7 +21,7 @@ To fix the schema for a specific DataObject many DataObjects support the `schema
 The `schema` attribute allows to define the schema the DataObject tries to read data with, and can be used to avoid schema inference with Spark DataSources.
 On write the DataFrame to be written must match the defined `schema` exactly (nullability and column order are ignored).
 
-
+<!-- TODO describe sample files -->
 <!-- TODO Review all below -->
 
 ## Schema Evolution

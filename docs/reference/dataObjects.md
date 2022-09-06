@@ -20,7 +20,7 @@ Examples:
 
 ## Schema
 SDLB required a schema for each data object. This can be specified manually, with an option in the dataObject, delivered by the connector or infered from data (sampling). The latter enables fast development, but should be avoided in production. 
-By default SDLB will verify that new data have fit to the existing schema, otherwise an error will be thrown. If wanted schema evolution can be enabled using **allowSchemaEvolution**. Then, old row will get null in new columns and new rows get null in old (not existing anymore) columns. 
+By default SDLB will verify that new data fits the existing schema, otherwise an error will be thrown. If desired schema evolution can be enabled using **allowSchemaEvolution** on several DataObjects, e.g. JdbcTableDataObject and DeltaLakeTableObject. Then, old rows will get null in new columns and new rows get null in old (not existing anymore) columns. 
 
 
 
