@@ -19,6 +19,7 @@ More details on the roadmap will follow shortly.
 
 ## Execution Engines
 * Spark (DataFrames)
+* Snowflake (DataFrames)
 * File (Input&OutputStream)
 * Future: Kafka Streams, Flink, …
 

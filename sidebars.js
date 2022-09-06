@@ -1,6 +1,10 @@
 module.exports = {
   docs: [
-    {'Smart Data Lake' : ['intro', 'features', 'architecture']},
+    {'Smart Data Lake' : [
+      'intro',
+      'features',
+      'architecture'
+    ]},
     {'Getting Started' : [
       'getting-started/setup',
       'getting-started/get-input-data',
@@ -32,18 +36,30 @@ module.exports = {
     {'Reference' : [
         'reference/build',
         'reference/commandLine',
-        //'reference/hoconOverview',
-        //'reference/hoconElements',
-        //'reference/dag',
+        {'SDLB objects' : [
+          'reference/dataObjects',
+          'reference/actions',
+        ]},
+        {'Hocon Configuration' : [
+          'reference/hoconOverview',
+          'reference/hoconSecrets',
+          'reference/hoconVariables',
+        ]},
+        'reference/dag',
+        'reference/schema',
+        'reference/dataQuality',
         'reference/executionPhases',
         'reference/executionEngines',
-        //'reference/executionModes',
-        //'reference/transformations',
+        'reference/executionModes',
+        'reference/transformations',
         //'reference/schemaEvolution',
         //'reference/housekeeping',
-        //'reference/streaming',
+        'reference/streaming',
         //'reference/metrics',
-        //'reference/deploymentOptions',
+        {'Deployment' : [
+          'reference/deploymentOptions',
+          'reference/deploy-microsoft-azure',
+        ]},
         //'reference/testing',
         'reference/troubleshooting',
         //'reference/glossary'
