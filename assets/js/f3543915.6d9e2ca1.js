@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunksmart_data_lake=self.webpackChunksmart_data_lake||[]).push([[3376],{7698:a=>{a.exports=JSON.parse('{"allTagsPath":"/blog/tags","slug":"/blog/tags/cloud","name":"Cloud","count":1,"permalink":"/blog/tags/cloud"}')}}]);

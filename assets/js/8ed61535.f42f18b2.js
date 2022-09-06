@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunksmart_data_lake=self.webpackChunksmart_data_lake||[]).push([[2024],{8493:a=>{a.exports=JSON.parse('{"allTagsPath":"/blog/tags","slug":"/blog/tags/mssql","name":"MSSQL","count":1,"permalink":"/blog/tags/mssql"}')}}]);
