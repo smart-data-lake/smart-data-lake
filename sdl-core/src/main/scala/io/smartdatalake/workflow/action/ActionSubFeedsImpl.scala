@@ -134,8 +134,12 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
       val (result, d) = PerformanceUtils.measureDuration {
         writeSubFeed(subFeed, isRecursiveInput)
       }
-      result.metrics.foreach(m => if(m.nonEmpty) addRuntimeMetrics(Some(context.executionId), Some(output.id), GenericMetrics(s"$id-${output.id}", 1, m)))
-      logWritingFinished(subFeed, result.noData, d)
+      result.metrics.foreach { m =>
+        val metricsToAdd = if (result.noData.contains(true)) m + ("no_data"->true) else m // manually add no_data metric
+        if(m.nonEmpty) addRuntimeMetrics(Some(context.executionId), Some(output.id), GenericMetrics(s"$id-${output.id}", 1, metricsToAdd))
+      }
+      val allMetrics = runtimeData.getFinalMetrics(subFeed.dataObjectId).map(_.getMainInfos).getOrElse(Map())
+      logWritingFinished(subFeed, allMetrics, d)
       result.subFeed
     }
   }
@@ -195,10 +199,9 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     logger.info(s"($id) start " + msg)
   }
 
-  protected def logWritingFinished(subFeed: S, noData: Option[Boolean], duration: Duration)(implicit context: ActionPipelineContext): Unit = {
-    val metricsLog = if (noData.contains(true)) ", no data found"
-    else runtimeData.getFinalMetrics(subFeed.dataObjectId).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
-    logger.info(s"($id) finished writing to ${subFeed.dataObjectId.id}: jobDuration=$duration" + metricsLog)
+  protected def logWritingFinished(subFeed: S, metrics: Map[String,Any], duration: Duration)(implicit context: ActionPipelineContext): Unit = {
+    val metricsLog = metrics.map( x => x._1+"="+x._2).mkString(" ")
+    logger.info(s"($id) finished writing to ${subFeed.dataObjectId.id}: job_duration=$duration " + metricsLog)
   }
 
   private def getMainDataObjectCandidates(mainId: Option[DataObjectId], dataObjects: Seq[DataObject], inputOutput: String): Seq[DataObject] = {

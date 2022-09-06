@@ -111,7 +111,7 @@ class StateChangeLogger(options: Map[String,String]) extends StateListener with 
               description = extractString(_.description))
           }
 
-          Result(toMetadata, result.mainMetrics.getOrElse("records_written", -1).toString, result.mainMetrics.getOrElse("stageDuration", -1).toString)
+          Result(toMetadata, result.mainMetrics.getOrElse("records_written", -1).toString, result.mainMetrics.getOrElse("stage_duration", -1).toString)
         })
 
       StateLogEvent(logContext, result.orNull)
