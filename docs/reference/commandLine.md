@@ -56,7 +56,7 @@ Use can use this application to run in a local environment (e.g. IntelliJ) witho
 - **DatabricksSmartDataLakeBuilder**: see [Microsoft Azure](deploy-microsoft-azure.md), special class when running a Databricks Cluster.
 
 # Launching SDL container
-Depending on the container defintion, especially the entrypoint the arguments may vary. Furthermore, we distinguish starting the container using *docker* or *podman*. 
+Depending on the container definition, especially the entrypoint the arguments may vary. Furthermore, we distinguish starting the container using *docker* or *podman*. 
 
 In general a container launch would look like:
 
