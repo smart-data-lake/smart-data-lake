@@ -31,7 +31,7 @@ import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn}
  * @param expression SQL expression to evaluate on every row. The expressions return value should be a boolean.
  *                   If it evaluates to true the constraint is validated successfully, otherwise it will throw an exception.
  * @param errorMsgCols Optional list of column names to add to error message.
- *                     Note that primary key colums are always included.
+ *                     Note that primary key columns are always included.
  *                     If there is no primary key defined, by default all columns with simple datatype are included in the error message.
  */
 case class Constraint(name: String, description: Option[String] = None, expression: String, errorMsgCols: Seq[String] = Seq()) {
