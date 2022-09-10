@@ -29,6 +29,7 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject}
 
 import java.time.Duration
+import scala.collection.SortedSet
 import scala.reflect.runtime.universe._
 
 /**
@@ -200,8 +201,12 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   }
 
   protected def logWritingFinished(subFeed: S, metrics: Map[String,Any], duration: Duration)(implicit context: ActionPipelineContext): Unit = {
-    val metricsLog = metrics.map( x => x._1+"="+x._2).mkString(" ")
+    val metricsLog = orderMetrics(metrics, SortedSet("count", "records_written", "num_tasks"))
+      .map( x => x._1+"="+x._2).mkString(" ")
     logger.info(s"($id) finished writing to ${subFeed.dataObjectId.id}: job_duration=$duration " + metricsLog)
+  }
+  private def orderMetrics(metrics: Map[String,Any], orderedKeys: SortedSet[String]): Seq[(String,Any)] = {
+    orderedKeys.toSeq.flatMap(k => metrics.get(k).map(v => (k,v))) ++ metrics.filterKeys(!orderedKeys.contains(_)).toSeq.sortBy(_._1)
   }
 
   private def getMainDataObjectCandidates(mainId: Option[DataObjectId], dataObjects: Seq[DataObject], inputOutput: String): Seq[DataObject] = {

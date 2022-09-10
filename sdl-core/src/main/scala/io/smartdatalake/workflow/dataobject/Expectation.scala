@@ -57,7 +57,12 @@ trait Expectation extends ParsableFromConfig[Expectation] with SmartDataLakeLogg
    */
   def scope: ExpectationScope = Job
   def getAggExpressionColumns(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions): Seq[GenericColumn]
-  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[SparkColumn]
+
+  /**
+   * Create columns to validate the expectation and return error message if failed.
+   * Can cleanup metrics and return them if artifical metrics have been introduced, like for SQLFractionExpectation.
+   */
+  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[SparkColumn],Map[String,_])
 
   // helpers
   protected def getMetric[T](dataObjectId: DataObjectId, metrics: Map[String,Any], key: String): T = {
@@ -148,16 +153,18 @@ case class SQLExpectation(override val name: String, override val description: O
       }
     }
   }
-  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[SparkColumn] = {
+  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[SparkColumn],Map[String,_]) = {
     if (scope == ExpectationScope.JobPartition) {
-      metrics.keys.filter(_.startsWith(name + ExpectationValidation.partitionDelimiter))
+      val cols = metrics.keys.filter(_.startsWith(name + ExpectationValidation.partitionDelimiter))
         .flatMap { n =>
           val value = getMetric[Any](dataObjectId,metrics,name)
           getValidationErrorColumn(dataObjectId, value, n).map(SparkColumn)
         }.toSeq
+      (cols, metrics)
     } else {
       val value = getMetric[Any](dataObjectId,metrics,name)
-      getValidationErrorColumn(dataObjectId, value).map(SparkColumn).toSeq
+      val col = getValidationErrorColumn(dataObjectId, value).map(SparkColumn)
+      (col.toSeq, metrics)
     }
   }
   override def factory: FromConfigFactory[Expectation] = SQLExpectation
@@ -212,32 +219,40 @@ case class SQLFractionExpectation(override val name: String, override val descri
       }
     }
   }
-  private def getValidationErrorColumn(dataObjectId: DataObjectId, countExpectation: Long, countTotal: Long, metricName: String = name)(implicit context: ActionPipelineContext): Option[Column] = {
+  private def getValidationErrorColumn(dataObjectId: DataObjectId, countExpectation: Long, countTotal: Long, metricName: String = name)(implicit context: ActionPipelineContext): (Option[Column],Any) = {
     import org.apache.spark.sql.functions._
     val pct = if (countTotal == 0) "null" else countExpectation.toFloat / countTotal.toFloat // float precision is sufficient
-    getValidationColumn(dataObjectId, pct).map { validationCol =>
+    val col = getValidationColumn(dataObjectId, pct).map { validationCol =>
       try {
         when(not(validationCol.inner), lit(s"Expectation '$metricName' failed with pct:$pct expectation:${expectation.get}"))
       } catch {
         case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot create validation error column", Some(s"expectations.$name"), e)
       }
     }
+    // return
+    (col,pct)
   }
-  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[SparkColumn] = {
+  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[SparkColumn],Map[String,_]) = {
     import ExpectationValidation.partitionDelimiter
     val totalMetric = if (globalConditionExpression.isDefined) totalName else "count"
     if (scope == ExpectationScope.JobPartition) {
-      metrics.keys.filter(_.startsWith(name + partitionDelimiter)).toSeq
-        .flatMap { n =>
+      val colsAndUpdatedMetrics = metrics.keys.filter(_.startsWith(name + partitionDelimiter)).toSeq
+        .map { n =>
           val countExpectation = getMetric[Long](dataObjectId,metrics,n)
           val totalPartitionMetric = (totalMetric +: n.split(partitionDelimiter).drop(1)).mkString(partitionDelimiter)
           val countTotal = getMetric[Long](dataObjectId,metrics,totalPartitionMetric)
-          getValidationErrorColumn(dataObjectId, countExpectation, countTotal, n).map(SparkColumn)
+          val (col, pct) = getValidationErrorColumn(dataObjectId, countExpectation, countTotal, n)
+          (col.map(SparkColumn), Map(n -> pct))
         }
+      val cols = colsAndUpdatedMetrics.flatMap(_._1)
+      val updatedMetrics = metrics.filterKeys(!_.startsWith(totalName)) ++ colsAndUpdatedMetrics.map(_._2).reduce(_ ++ _)
+      (cols, updatedMetrics)
     } else {
       val countExpectation = getMetric[Long](dataObjectId,metrics,name)
       val countTotal = getMetric[Long](dataObjectId,metrics,totalMetric)
-      getValidationErrorColumn(dataObjectId, countExpectation, countTotal).toSeq.map(SparkColumn)
+      val (col, pct) = getValidationErrorColumn(dataObjectId, countExpectation, countTotal)
+      val updatedMetrics = metrics.filterKeys(_ != totalName) + (name -> pct)
+      (col.map(SparkColumn).toSeq, updatedMetrics)
     }
   }
 
@@ -287,16 +302,18 @@ case class CountExpectation(override val name: String = "count", override val de
       }
     }
   }
-  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[SparkColumn] = {
+  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[SparkColumn],Map[String,_]) = {
     if (scope == ExpectationScope.JobPartition) {
-      metrics.keys.filter(_.startsWith(name + ExpectationValidation.partitionDelimiter))
+      val cols = metrics.keys.filter(_.startsWith(name + ExpectationValidation.partitionDelimiter))
         .flatMap { n =>
           val count = getMetric[Long](dataObjectId,metrics,n)
           getValidationErrorColumn(dataObjectId, count, n).map(SparkColumn)
         }.toSeq
+      (cols, metrics)
     } else {
       val count = getMetric[Long](dataObjectId,metrics,name)
-      getValidationErrorColumn(dataObjectId, count).map(SparkColumn).toSeq
+      val col = getValidationErrorColumn(dataObjectId, count).map(SparkColumn)
+      (col.toSeq, metrics)
     }
   }
   override def factory: FromConfigFactory[Expectation] = CountExpectation
@@ -331,26 +348,28 @@ case class AvgCountPerPartitionExpectation(override val name: String, override v
       }
     }
   }
-  private def getValidationErrorColumn(dataObjectId: DataObjectId, countMetric: Long, nbOfPartitionValues: Int)(implicit context: ActionPipelineContext): Option[SparkColumn] = {
+  private def getValidationErrorColumn(dataObjectId: DataObjectId, countMetric: Long, nbOfPartitionValues: Int)(implicit context: ActionPipelineContext): (Option[SparkColumn], Long) = {
     import org.apache.spark.sql.functions._
     val avgCount = countMetric / math.max(nbOfPartitionValues, 1)
-    getValidationColumn(dataObjectId, avgCount).map { validationCol =>
+    val col = getValidationColumn(dataObjectId, avgCount).map { validationCol =>
       try {
         SparkColumn(when(not(validationCol.inner), lit(s"Expectation '$name' failed with avgCount:$avgCount expectation:${expectation.get}")))
       } catch {
         case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot create validation error column", Some(s"expectations.$name"), e)
       }
     }
+    (col, avgCount)
   }
-  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[SparkColumn] = {
+  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[SparkColumn],Map[String,_]) = {
     // needs partition values
     if (partitionValues.nonEmpty) {
       val count: Long = metrics.getOrElse("count", throw new IllegalStateException(s"($dataObjectId) General 'count' metric for expectation ${name} not found for validation"))
         .asInstanceOf[Long]
-      getValidationErrorColumn(dataObjectId, count, partitionValues.size).toSeq
+      val (col,countAvg) = getValidationErrorColumn(dataObjectId, count, partitionValues.size)
+      (col.toSeq, metrics + ("countAvgPerPartition" -> countAvg))
     } else {
       logger.warn(s"($dataObjectId) Cannot evaluate AvgCountPerPartitionExpectation '$name' as there are no partition values")
-      Seq()
+      (Seq(), metrics)
     }
   }
   override def factory: FromConfigFactory[Expectation] = AvgCountPerPartitionExpectation

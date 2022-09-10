@@ -23,6 +23,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.dataframe._
+import io.smartdatalake.workflow.dataframe.spark.SparkColumn
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase}
 
 import java.util.UUID
@@ -126,24 +127,28 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
     // evaluate expectations using dummy ExpressionData
     val metrics = scopeJobMetrics ++ scopeJobPartitionMetrics ++ scopeAllMetrics
     val defaultExpressionData = DefaultExpressionData.from(context, Seq())
-    val validationResults = expectations.flatMap { expectation =>
-      expectation.getValidationErrorColumn(this.id, metrics, partitionValues)
-        .map { col =>
-          val errorMsg = SparkExpressionUtil.evaluate[DefaultExpressionData, String](this.id, Some("expectations"), col.inner, defaultExpressionData)
-          (expectation, errorMsg)
-        }
+    val (expectationValidationCols, updatedMetrics) = expectations.foldLeft(Seq[(Expectation,SparkColumn)](), metrics) {
+      case ((cols, metrics), expectation) =>
+        val (newCols, updatedMetrics) = expectation.getValidationErrorColumn(this.id, metrics, partitionValues)
+        (cols ++ newCols.map(c => (expectation,c)), updatedMetrics)
+    }
+    val validationResults = expectationValidationCols.map {
+      case (expectation, col) =>
+        val errorMsg = SparkExpressionUtil.evaluate[DefaultExpressionData, String](this.id, Some("expectations"), col.inner, defaultExpressionData)
+        (expectation, errorMsg)
     }.toMap.filter(_._2.nonEmpty).mapValues(_.get) // keep only failed results
     // log all failed results (before throwing exception)
     validationResults
       .foreach(result => result._1.failedSeverity match {
-        case ExpectationSeverity.Warn => logger.warn(result._2)
-        case ExpectationSeverity.Error => logger.error(result._2)
+        case ExpectationSeverity.Warn => logger.warn(s"($id) ${result._2}")
+        case ExpectationSeverity.Error => logger.error(s"($id) ${result._2}")
       })
-    // throw exception on error
-    validationResults.filterKeys(_.failedSeverity == ExpectationSeverity.Error)
-      .foreach(result => throw ExpectationValidationException(result._2))
-    // return consolidated metrics
-    metrics
+    // throw exception on error, but log metrics before
+    val errors = validationResults.filterKeys(_.failedSeverity == ExpectationSeverity.Error)
+    if (errors.nonEmpty) logger.error(s"($id) Expectation validation failed with metrics "+updatedMetrics.map{case(k,v) => s"$k=$v"}.mkString(" "))
+    errors.foreach(result => throw ExpectationValidationException(result._2))
+    // return consolidated and updated metrics
+    updatedMetrics
   }
 
   private def setupConstraintsValidation(df: GenericDataFrame): GenericDataFrame = {
