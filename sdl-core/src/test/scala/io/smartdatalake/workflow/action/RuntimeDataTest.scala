@@ -66,17 +66,17 @@ class RuntimeDataTest extends FunSuite {
     val runtimeData = SynchronousRuntimeData(10)
     val dataObjectId = DataObjectId("test")
     runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq()))
-    runtimeData.addMetric(Some(SDLExecutionId(1)), dataObjectId, GenericMetrics("test-metric1", 1, Map()))
-    runtimeData.addMetric(Some(SDLExecutionId(1)), dataObjectId, GenericMetrics("test-metric2", 2, Map()))
+    runtimeData.addMetric(Some(SDLExecutionId(1)), dataObjectId, GenericMetrics("test-metric1", 1, Map("metric1" -> 1)))
+    runtimeData.addMetric(Some(SDLExecutionId(1)), dataObjectId, GenericMetrics("test-metric2", 2, Map("metric2" -> 2)))
     runtimeData.addMetric(Some(SDLExecutionId(1)), dataObjectId+"dummy", GenericMetrics("test-metric99", 2, Map()))
-    assert(runtimeData.getMetrics(dataObjectId, Some(SDLExecutionId(1))).exists(_.getId == "test-metric2"))
-    assert(runtimeData.getMetrics(dataObjectId).exists(_.getId == "test-metric2"))
+    assert(runtimeData.getMetrics(dataObjectId, Some(SDLExecutionId(1))).exists(_.getMainInfos.isDefinedAt("metric2")))
+    assert(runtimeData.getMetrics(dataObjectId).exists(_.getMainInfos.isDefinedAt("metric2")))
     intercept[AssertionError](runtimeData.addMetric(Some(SDLExecutionId(2)), dataObjectId, GenericMetrics("test2-metric1", 1, Map())))
     runtimeData.addEvent(SDLExecutionId(2), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq()))
-    runtimeData.addMetric(Some(SDLExecutionId(2)), dataObjectId, GenericMetrics("test2-metric1", 1, Map()))
-    runtimeData.addMetric(Some(SDLExecutionId(2)), dataObjectId, GenericMetrics("test2-metric2", 2, Map()))
-    assert(runtimeData.getMetrics(dataObjectId, Some(SDLExecutionId(2))).exists(_.getId == "test2-metric2"))
-    assert(runtimeData.getMetrics(dataObjectId).exists(_.getId == "test2-metric2"))
+    runtimeData.addMetric(Some(SDLExecutionId(2)), dataObjectId, GenericMetrics("test2-metric1", 1, Map("metric1" -> 1)))
+    runtimeData.addMetric(Some(SDLExecutionId(2)), dataObjectId, GenericMetrics("test2-metric2", 2, Map("metric2" -> 2)))
+    assert(runtimeData.getMetrics(dataObjectId, Some(SDLExecutionId(2))).exists(_.getMainInfos.isDefinedAt("metric2")))
+    assert(runtimeData.getMetrics(dataObjectId).exists(_.getMainInfos.isDefinedAt("metric2")))
   }
 
   test("store and get asynchronous metrics") {
@@ -88,11 +88,11 @@ class RuntimeDataTest extends FunSuite {
     runtimeData.addMetric(None, dataObjectId, GenericMetrics("spark-metric1", 1, Map()))
     // asynchronous execution 1
     runtimeData.addEvent(SparkStreamingExecutionId(1), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq()))
-    runtimeData.addMetric(Some(SparkStreamingExecutionId(1)), dataObjectId, GenericMetrics("test-metric1", 1, Map()))
-    runtimeData.addMetric(Some(SparkStreamingExecutionId(1)), dataObjectId, GenericMetrics("test-metric2", 2, Map()))
+    runtimeData.addMetric(Some(SparkStreamingExecutionId(1)), dataObjectId, GenericMetrics("test-metric1", 1, Map("metric1" -> 1)))
+    runtimeData.addMetric(Some(SparkStreamingExecutionId(1)), dataObjectId, GenericMetrics("test-metric2", 2, Map("metric2" -> 2)))
     runtimeData.addMetric(Some(SparkStreamingExecutionId(1)), dataObjectId+"dummy", GenericMetrics("test-metric99", 2, Map()))
-    assert(runtimeData.getMetrics(dataObjectId, Some(SparkStreamingExecutionId(1))).exists(_.getId == "test-metric2"))
-    assert(runtimeData.getMetrics(dataObjectId).exists(_.getId == "test-metric2"))
+    assert(runtimeData.getMetrics(dataObjectId, Some(SparkStreamingExecutionId(1))).exists(_.getMainInfos.isDefinedAt("metric2")))
+    assert(runtimeData.getMetrics(dataObjectId).exists(_.getMainInfos.isDefinedAt("metric2")))
     // metric for wrong asynchronous execution
     intercept[AssertionError](runtimeData.addMetric(Some(SparkStreamingExecutionId(2)), dataObjectId, GenericMetrics("test2-metric1", 1, Map())))
     // another synchronous execution (should not happen in real-life, but nevertheless a test what happens)
@@ -100,20 +100,20 @@ class RuntimeDataTest extends FunSuite {
     runtimeData.addMetric(Some(SDLExecutionId(2)), dataObjectId, GenericMetrics("spark-metric2", 1, Map()))
     // second asynchronous execution
     runtimeData.addEvent(SparkStreamingExecutionId(2), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq()))
-    runtimeData.addMetric(Some(SparkStreamingExecutionId(2)), dataObjectId, GenericMetrics("test2-metric1", 1, Map()))
-    runtimeData.addMetric(Some(SparkStreamingExecutionId(2)), dataObjectId, GenericMetrics("test2-metric2", 2, Map()))
-    assert(runtimeData.getMetrics(dataObjectId, Some(SparkStreamingExecutionId(2))).exists(_.getId == "test2-metric2"))
-    assert(runtimeData.getMetrics(dataObjectId).exists(_.getId == "test2-metric2"))
+    runtimeData.addMetric(Some(SparkStreamingExecutionId(2)), dataObjectId, GenericMetrics("test2-metric1", 1, Map("metric1" -> 1)))
+    runtimeData.addMetric(Some(SparkStreamingExecutionId(2)), dataObjectId, GenericMetrics("test2-metric2", 2, Map("metric2" -> 2)))
+    assert(runtimeData.getMetrics(dataObjectId, Some(SparkStreamingExecutionId(2))).exists(_.getMainInfos.isDefinedAt("metric2")))
+    assert(runtimeData.getMetrics(dataObjectId).exists(_.getMainInfos.isDefinedAt("metric2")))
   }
 
   test("get final metrics and exception on late arriving metrics") {
     val runtimeData = SynchronousRuntimeData(10)
     val dataObjectId = DataObjectId("test")
     runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq()))
-    runtimeData.addMetric(Some(SDLExecutionId(1)), dataObjectId, GenericMetrics("test-metric1", 1, Map()))
-    runtimeData.addMetric(Some(SDLExecutionId(1)), dataObjectId, GenericMetrics("test-metric2", 2, Map()))
+    runtimeData.addMetric(Some(SDLExecutionId(1)), dataObjectId, GenericMetrics("test-metric1", 1, Map("metric1" -> 1)))
+    runtimeData.addMetric(Some(SDLExecutionId(1)), dataObjectId, GenericMetrics("test-metric2", 2, Map("metric2" -> 2)))
     runtimeData.addMetric(Some(SDLExecutionId(1)), dataObjectId+"dummy", GenericMetrics("test-metric99", 2, Map()))
-    assert(runtimeData.getFinalMetrics(dataObjectId).exists(_.getId == "test-metric2"))
+    assert(runtimeData.getFinalMetrics(dataObjectId).exists(_.getMainInfos.isDefinedAt("metric2")))
     intercept[LateArrivingMetricException](runtimeData.addMetric(Some(SDLExecutionId(1)), dataObjectId, GenericMetrics("test1-metric3", 3, Map())))
   }
 
