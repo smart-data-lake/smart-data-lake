@@ -3,10 +3,12 @@ id: actions
 title: Actions
 ---
 
-Actions describe dependencies between input and output DataObjects and necessary transformation to connect them. 
+Actions describe dependencies between input and output DataObjects and necessary transformation to connect them.
+
+Some Actions allow only one input and one output, e.g. CopyAction, others can cope with several inputs and outputs, e.g. CustomDataFrameActions. As a best practice implement n:m Actions only if you have a good reason, otherwise stick to 1:1, 1:n and n:1 Actions in order to know exact dependencies from metadata.
 
 ## Transformations
-These can be custom transformers in SQL, Scala/Spark, or Python, OR predefined transformations like Copy, Historization and Deduplication, see [Transformations](transformations). 
+These can be custom transformers in SQL, Scala/Spark, or Python, OR predefined transformations like Copy, Historization and Deduplication, see [Transformations](transformations).
 
 ## MetaData
 As for DataObjects and Connections, various metadata can be provided for Action items. These help manage and explore data in the Smart Data Lake. Beside *name* and *description*, a *feed* and a list of *tags* can be specified. 

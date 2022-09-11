@@ -67,34 +67,12 @@ Here the connection to an MS SQL server is defined using JDBC protocol. Besides 
 All available connections and available parameters are listed in the [Configuration Schema Viewer](https://smartdatalake.ch/json-schema-viewer/index.html#viewer-page?v=1).
 
 ## Data Objects
-Data objects are connectors, specifying the type and location of data. SDLB supports various formats, including: 
 
-* file formats including CSV, XML, JSON, parquet and more
-* databases like SQL via JDBC, DeltaLakeTables, HiveTables, AccessTables and more
-* Airbyte connectors to a long list of services
-
-All available data objects and available parameters are listed in the [Configuration Schema Viewer](https://smartdatalake.ch/json-schema-viewer/index.html#viewer-page?v=2).
-
-
-Within the SDLB the data objects are organized in a hierarchical manner, as many attributes are shared between them. 
-For example, `HiveTables` and `TransactionalSparkTables` share common attributes modeled in the generic `TableDataObject`, as shown in the following overview: 
-![data object hierarchy](../images/dataobject_hierarchy.png)
-(Note: this list of DataObjects is **not** exhaustive).
-
-If necessary, additional formats could be implemented based on these generic DataObjects.
+see [Data Objects](dataObjects.md)
 
 ## Actions
-As the name suggest, these objects specify the process from one DataObject to another DataObject. These could also include multiple sources or targets, depending on the action type. 
-The basic action is `CopyAction` where data is transferred from one DataObject into another DataObject, by default without any additional operation. On top of the copy, an arbitrary transformation (see below) can be added as well as additional settings like `executionMode`. 
 
-Furthermore, there are actions which provide elaborated features, e.g. historization, or deduplication. 
-
-For a list of all available actions, please consult the [Configuration Schema Viewer](https://smartdatalake.ch/json-schema-viewer/index.html#viewer-page?v=3).
-
-### Transformer
-Transformations can be described in SQL, Scala or Python, directly in the configuration file (see example below) or in a separate source code file. Furthermore, the action could also consist of a list of transformations (see `transformers`). 
-
-
+see [Actions](actions.md)
 
 ## Example
 
