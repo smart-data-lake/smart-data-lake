@@ -499,12 +499,12 @@ trait CustomModeLogic {
  *   Note that is only correct if no additional filters are applied in the DataFrame.
  *   A better implementation would be to observe files by a custom metric. Unfortunately there is a problem in Spark with that, see also [[CollectSetDeterministic]]
  * - Partition values preserved.
- * @param archiveSubdirectory if an archive subdirectory is configured, files are moved into that directory instead of deleted.
- *                            configure a single directory name which is appended before the filename, e.g. "_archive".
+ * @param archivePath if an archive directory is configured, files are moved into that directory instead of deleted, preserving partition layout.
+ *                    If this is a relative path, e.g. "_archive", it is appended after the path of the DataObject.
+ *                    If this is an absolute path it replaces the path of the DataObject.
  */
-case class FileIncrementalMoveMode(archiveSubdirectory: Option[String] = None) extends ExecutionMode {
-  assert(archiveSubdirectory.forall(_.nonEmpty))
-  assert(archiveSubdirectory.forall(!_.contains("/")), s"archiveSubdirectory should contain only one subdirectory name and not nested subdirectories: $archiveSubdirectory")
+case class FileIncrementalMoveMode(archivePath: Option[String] = None) extends ExecutionMode {
+  assert(archivePath.forall(_.nonEmpty)) // empty string not allowed
 
   private var sparkFilesObserver: Option[FilesSparkObservation] = None
 
@@ -537,13 +537,15 @@ case class FileIncrementalMoveMode(archiveSubdirectory: Option[String] = None) e
   private[smartdatalake] override def postExec(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, mainInputSubFeed: SubFeed, mainOutputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = {
     (mainInput, mainOutputSubFeed) match {
       case (fileRefInput: FileRefDataObject, fileSubFeed: FileSubFeed) =>
-        fileSubFeed.fileRefMapping.foreach{
+        fileSubFeed.fileRefMapping.foreach {
           fileRefs =>
             logger.info(s"Cleaning up ${fileRefs.size} processed input files")
             val inputFiles = fileRefs.map(_.src.fullPath)
-            if (archiveSubdirectory.isDefined) {
-              inputFiles.foreach { file =>
-                val archiveFile = createArchiveFileName(file)
+            if (archivePath.isDefined) {
+              val newBasePath = if (fileRefInput.isAbsolutePath(archivePath.get)) archivePath.get
+              else fileRefInput.concatPath(fileRefInput.getPath, archivePath.get)
+              inputFiles.foreach{ file =>
+                val archiveFile = fileRefInput.concatPath(newBasePath, fileRefInput.relativizePath(file))
                 fileRefInput.renameFileHandleAlreadyExisting(file, archiveFile)
               }
             } else {
@@ -555,32 +557,27 @@ case class FileIncrementalMoveMode(archiveSubdirectory: Option[String] = None) e
           .getOrElse(throw new IllegalStateException(s"($actionId) FilesObserver not setup for ${mainInput.id}"))
           .getFilesProcessed
         if (files.isEmpty) throw NoDataToProcessWarning(actionId.id, s"($actionId) No files to process found for ${mainInput.id} by FileIncrementalMoveMode.")
-        // create directory if not existing (otherwise hadoop rename fails)
-        archiveSubdirectory.foreach { dir =>
-          val archiveDir = new Path(sparkDataObject.hadoopPath, dir)
-          if (!sparkDataObject.filesystem.exists(archiveDir)) sparkDataObject.filesystem.mkdirs(archiveDir)
-        }
-        // do cleanup
         logger.info(s"Cleaning up ${files.size} processed input files")
-        files.foreach {
-          file =>
-            if (archiveSubdirectory.isDefined) {
-              val archiveFile = createArchiveFileName(file)
-              sparkDataObject.renameFileHandleAlreadyExisting(file, archiveFile)
-            } else {
-              sparkDataObject.deleteFile(file)
-            }
+        if (archivePath.isDefined) {
+          val archiveHadoopPath = new Path(archivePath.get)
+          val newBasePath = if (archiveHadoopPath.isAbsolute) archiveHadoopPath
+          else new Path(sparkDataObject.hadoopPath, archiveHadoopPath)
+          // create archive file names
+          val filePairs = files.map(file => (file, new Path(newBasePath, sparkDataObject.relativizePath(file))))
+          // create directories if not existing (otherwise hadoop rename fails)
+          filePairs.map(_._2).map(_.getParent).distinct
+            .foreach(p => if (!sparkDataObject.filesystem.exists(p)) sparkDataObject.filesystem.mkdirs(p))
+          // rename files
+          filePairs.foreach { case (file,newFile) =>
+            sparkDataObject.renameFileHandleAlreadyExisting(file, newFile.toString)
+          }
+        } else {
+          files.foreach(sparkDataObject.deleteFile)
         }
       case _ => throw ConfigurationException(s"($actionId) FileIncrementalMoveMode needs FileRefDataObject with FileSubFeed or SparkFileDataObject with SparkSubFeed as input")
     }
   }
 
-  private[smartdatalake] def createArchiveFileName(file: String) = {
-    assert(archiveSubdirectory.isDefined)
-    assert(file.contains("/"), s"Filename should be absolute path, but no directory separators found in $file")
-    val components = file.split("/")
-    (components.dropRight(1) :+ archiveSubdirectory.get :+ components.last).mkString("/")
-  }
 }
 
 /**
