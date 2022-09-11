@@ -5,6 +5,33 @@
   "id" : "sdl-schema-2.3.0-SNAPSHOT.json#",
   "definitions" : {
     "ExecutionMode" : {
+      "CustomMode" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "CustomMode"
+          },
+          "className" : {
+            "type" : "string",
+            "description" : "class name implementing trait[[CustomModeLogic]]"
+          },
+          "alternativeOutputId" : {
+            "type" : "string",
+            "description" : "optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.\nIt can be used to ensure processing over multiple actions in case of errors."
+          },
+          "options" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Options specified in the configuration for this execution mode"
+          }
+        },
+        "title" : "CustomMode",
+        "required" : [ "className" ],
+        "additionalProperties" : false,
+        "description" : "Execution mode to create custom execution mode logic.\nDefine a function which receives main input&output DataObject and returns execution mode result"
+      },
       "CustomPartitionMode" : {
         "type" : "object",
         "properties" : {
@@ -1293,6 +1320,184 @@
           "table" : {
             "$ref" : "#/definitions/Others/Table"
           },
+          "constraints" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the constraint"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "optional detailed description of the constraint"
+                },
+                "expression" : {
+                  "type" : "string",
+                  "description" : "SQL expression to evaluate on every row. The expressions return value should be a boolean.\nIf it evaluates to true the constraint is validated successfully, otherwise it will throw an exception."
+                },
+                "errorMsgCols" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  },
+                  "description" : "Optional list of column names to add to error message.\nNote that primary key columns are always included.\nIf there is no primary key defined, by default all columns with simple datatype are included in the error message."
+                }
+              },
+              "title" : "Constraint",
+              "required" : [ "name", "expression" ],
+              "additionalProperties" : false,
+              "description" : "Definition of row-level constraint to validate."
+            },
+            "description" : "List of row-level[[Constraint]] s to enforce when writing to this data object."
+          },
+          "expectations" : {
+            "type" : "array",
+            "items" : {
+              "oneOf" : [ {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLFractionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "countConditionExpression" : {
+                    "type" : "string",
+                    "description" : "SQL expression returning a boolean to match the rows to count for the fraction."
+                  },
+                  "globalConditionExpression" : {
+                    "type" : "string",
+                    "description" : "SQL expression returning a boolean used as global filter, e.g. fraction row count and total row count are filtered with global filter before counting."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected percentage for validation, e.g. \\'= 0.9\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "SQLFractionExpectation",
+                "required" : [ "name", "countConditionExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "aggExpression" : {
+                    "type" : "string",
+                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "SQLExpectation",
+                "required" : [ "name", "aggExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "CountExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              } ]
+            },
+            "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
+          },
           "saveMode" : {
             "type" : "string",
             "description" : "[[SDLSaveMode]] to use when writing files, default is \\\"overwrite\\\". Overwrite, Append and Merge are supported for now.",
@@ -1594,6 +1799,184 @@
           "table" : {
             "$ref" : "#/definitions/Others/Table"
           },
+          "constraints" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the constraint"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "optional detailed description of the constraint"
+                },
+                "expression" : {
+                  "type" : "string",
+                  "description" : "SQL expression to evaluate on every row. The expressions return value should be a boolean.\nIf it evaluates to true the constraint is validated successfully, otherwise it will throw an exception."
+                },
+                "errorMsgCols" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  },
+                  "description" : "Optional list of column names to add to error message.\nNote that primary key columns are always included.\nIf there is no primary key defined, by default all columns with simple datatype are included in the error message."
+                }
+              },
+              "title" : "Constraint",
+              "required" : [ "name", "expression" ],
+              "additionalProperties" : false,
+              "description" : "Definition of row-level constraint to validate."
+            },
+            "description" : "List of row-level[[Constraint]] s to enforce when writing to this data object."
+          },
+          "expectations" : {
+            "type" : "array",
+            "items" : {
+              "oneOf" : [ {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLFractionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "countConditionExpression" : {
+                    "type" : "string",
+                    "description" : "SQL expression returning a boolean to match the rows to count for the fraction."
+                  },
+                  "globalConditionExpression" : {
+                    "type" : "string",
+                    "description" : "SQL expression returning a boolean used as global filter, e.g. fraction row count and total row count are filtered with global filter before counting."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected percentage for validation, e.g. \\'= 0.9\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "SQLFractionExpectation",
+                "required" : [ "name", "countConditionExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "aggExpression" : {
+                    "type" : "string",
+                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "SQLExpectation",
+                "required" : [ "name", "aggExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "CountExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              } ]
+            },
+            "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
+          },
           "numInitialHdfsPartitions" : {
             "type" : "integer",
             "description" : "number of files created when writing into an empty table (otherwise the number will be derived from the existing data)"
@@ -1702,6 +2085,184 @@
           },
           "table" : {
             "$ref" : "#/definitions/Others/Table"
+          },
+          "constraints" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the constraint"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "optional detailed description of the constraint"
+                },
+                "expression" : {
+                  "type" : "string",
+                  "description" : "SQL expression to evaluate on every row. The expressions return value should be a boolean.\nIf it evaluates to true the constraint is validated successfully, otherwise it will throw an exception."
+                },
+                "errorMsgCols" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  },
+                  "description" : "Optional list of column names to add to error message.\nNote that primary key columns are always included.\nIf there is no primary key defined, by default all columns with simple datatype are included in the error message."
+                }
+              },
+              "title" : "Constraint",
+              "required" : [ "name", "expression" ],
+              "additionalProperties" : false,
+              "description" : "Definition of row-level constraint to validate."
+            },
+            "description" : "List of row-level[[Constraint]] s to enforce when writing to this data object."
+          },
+          "expectations" : {
+            "type" : "array",
+            "items" : {
+              "oneOf" : [ {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLFractionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "countConditionExpression" : {
+                    "type" : "string",
+                    "description" : "SQL expression returning a boolean to match the rows to count for the fraction."
+                  },
+                  "globalConditionExpression" : {
+                    "type" : "string",
+                    "description" : "SQL expression returning a boolean used as global filter, e.g. fraction row count and total row count are filtered with global filter before counting."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected percentage for validation, e.g. \\'= 0.9\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "SQLFractionExpectation",
+                "required" : [ "name", "countConditionExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "aggExpression" : {
+                    "type" : "string",
+                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "SQLExpectation",
+                "required" : [ "name", "aggExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "CountExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              } ]
+            },
+            "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
           },
           "jdbcFetchSize" : {
             "type" : "integer",
@@ -2596,7 +3157,185 @@
           },
           "schemaMin" : {
             "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
+            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+          },
+          "constraints" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the constraint"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "optional detailed description of the constraint"
+                },
+                "expression" : {
+                  "type" : "string",
+                  "description" : "SQL expression to evaluate on every row. The expressions return value should be a boolean.\nIf it evaluates to true the constraint is validated successfully, otherwise it will throw an exception."
+                },
+                "errorMsgCols" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  },
+                  "description" : "Optional list of column names to add to error message.\nNote that primary key columns are always included.\nIf there is no primary key defined, by default all columns with simple datatype are included in the error message."
+                }
+              },
+              "title" : "Constraint",
+              "required" : [ "name", "expression" ],
+              "additionalProperties" : false,
+              "description" : "Definition of row-level constraint to validate."
+            },
+            "description" : "List of row-level[[Constraint]] s to enforce when writing to this data object."
+          },
+          "expectations" : {
+            "type" : "array",
+            "items" : {
+              "oneOf" : [ {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLFractionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "countConditionExpression" : {
+                    "type" : "string",
+                    "description" : "SQL expression returning a boolean to match the rows to count for the fraction."
+                  },
+                  "globalConditionExpression" : {
+                    "type" : "string",
+                    "description" : "SQL expression returning a boolean used as global filter, e.g. fraction row count and total row count are filtered with global filter before counting."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected percentage for validation, e.g. \\'= 0.9\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "SQLFractionExpectation",
+                "required" : [ "name", "countConditionExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "aggExpression" : {
+                    "type" : "string",
+                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "SQLExpectation",
+                "required" : [ "name", "aggExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "CountExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              } ]
+            },
+            "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
           },
           "saveMode" : {
             "type" : "string",
@@ -2683,42 +3422,220 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "Definition of partition columns"
+            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
           },
           "path" : {
             "type" : "string",
-            "description" : "Definition of partition columns"
+            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
           },
           "partitions" : {
             "type" : "array",
             "items" : {
               "type" : "string"
             },
-            "description" : "Definition of partition columns"
+            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
           },
           "analyzeTableAfterWrite" : {
             "type" : "string",
-            "description" : "Definition of partition columns"
+            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
           },
           "dateColumnType" : {
             "type" : "string",
-            "description" : "Definition of partition columns",
+            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject.",
             "enum" : [ "Default ", "String ", "Date " ]
           },
           "schemaMin" : {
             "type" : "string",
-            "description" : "Definition of partition columns"
+            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
           },
           "table" : {
             "$ref" : "#/definitions/Others/Table"
           },
+          "constraints" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the constraint"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "optional detailed description of the constraint"
+                },
+                "expression" : {
+                  "type" : "string",
+                  "description" : "SQL expression to evaluate on every row. The expressions return value should be a boolean.\nIf it evaluates to true the constraint is validated successfully, otherwise it will throw an exception."
+                },
+                "errorMsgCols" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  },
+                  "description" : "Optional list of column names to add to error message.\nNote that primary key columns are always included.\nIf there is no primary key defined, by default all columns with simple datatype are included in the error message."
+                }
+              },
+              "title" : "Constraint",
+              "required" : [ "name", "expression" ],
+              "additionalProperties" : false,
+              "description" : "Definition of row-level constraint to validate."
+            },
+            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+          },
+          "expectations" : {
+            "type" : "array",
+            "items" : {
+              "oneOf" : [ {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLFractionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "countConditionExpression" : {
+                    "type" : "string",
+                    "description" : "SQL expression returning a boolean to match the rows to count for the fraction."
+                  },
+                  "globalConditionExpression" : {
+                    "type" : "string",
+                    "description" : "SQL expression returning a boolean used as global filter, e.g. fraction row count and total row count are filtered with global filter before counting."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected percentage for validation, e.g. \\'= 0.9\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "SQLFractionExpectation",
+                "required" : [ "name", "countConditionExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "aggExpression" : {
+                    "type" : "string",
+                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "SQLExpectation",
+                "required" : [ "name", "aggExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "CountExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              } ]
+            },
+            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+          },
           "numInitialHdfsPartitions" : {
             "type" : "integer",
-            "description" : "Definition of partition columns"
+            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
           },
           "saveMode" : {
             "type" : "string",
-            "description" : "Definition of partition columns",
+            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject.",
             "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
           },
           "acl" : {
@@ -2761,11 +3678,11 @@
           },
           "connectionId" : {
             "type" : "string",
-            "description" : "Definition of partition columns"
+            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
-            "description" : "Definition of partition columns"
+            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
           },
           "housekeepingMode" : {
             "oneOf" : [ {
@@ -2773,7 +3690,7 @@
             }, {
               "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
             } ],
-            "description" : "Definition of partition columns"
+            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -4151,7 +5068,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "WhitelistTransformer"
+                  "const" : "BlacklistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -4161,18 +5078,18 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnWhitelist" : {
+                "columnBlacklist" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
                   },
-                  "description" : "List of columns to keep from DataFrame"
+                  "description" : "List of columns to exclude from DataFrame"
                 }
               },
-              "title" : "WhitelistTransformer",
-              "required" : [ "columnWhitelist", "type" ],
+              "title" : "BlacklistTransformer",
+              "required" : [ "columnBlacklist", "type" ],
               "additionalProperties" : false,
-              "description" : "Apply a column whitelist to a DataFrame."
+              "description" : "Apply a column blacklist to a DataFrame."
             }, {
               "type" : "object",
               "properties" : {
@@ -4610,17 +5527,6 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "OptionsGenericDfTransformer"
-                }
-              },
-              "title" : "OptionsGenericDfTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
                   "const" : "FilterTransformer"
                 },
                 "name" : {
@@ -4644,6 +5550,17 @@
               "required" : [ "filterClause", "type" ],
               "additionalProperties" : false,
               "description" : "Apply a filter condition to a DataFrame."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "OptionsGenericDfTransformer"
+                }
+              },
+              "title" : "OptionsGenericDfTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
             }, {
               "type" : "object",
               "properties" : {
@@ -4681,7 +5598,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "BlacklistTransformer"
+                  "const" : "WhitelistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -4691,18 +5608,18 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnBlacklist" : {
+                "columnWhitelist" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
                   },
-                  "description" : "List of columns to exclude from DataFrame"
+                  "description" : "List of columns to keep from DataFrame"
                 }
               },
-              "title" : "BlacklistTransformer",
-              "required" : [ "columnBlacklist", "type" ],
+              "title" : "WhitelistTransformer",
+              "required" : [ "columnWhitelist", "type" ],
               "additionalProperties" : false,
-              "description" : "Apply a column blacklist to a DataFrame."
+              "description" : "Apply a column whitelist to a DataFrame."
             } ],
             "description" : "Configuration for a GenericDfTransformerDef to be applied"
           },
@@ -5093,6 +6010,8 @@
           },
           "executionMode" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/ExecutionMode/CustomMode"
+            }, {
               "$ref" : "#/definitions/ExecutionMode/CustomPartitionMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/DataFrameIncrementalMode"
@@ -5253,6 +6172,8 @@
           },
           "executionMode" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/ExecutionMode/CustomMode"
+            }, {
               "$ref" : "#/definitions/ExecutionMode/CustomPartitionMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/DataFrameIncrementalMode"
@@ -5370,6 +6291,8 @@
           },
           "executionMode" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/ExecutionMode/CustomMode"
+            }, {
               "$ref" : "#/definitions/ExecutionMode/CustomPartitionMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/DataFrameIncrementalMode"
@@ -5612,6 +6535,8 @@
           },
           "executionMode" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/ExecutionMode/CustomMode"
+            }, {
               "$ref" : "#/definitions/ExecutionMode/CustomPartitionMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/DataFrameIncrementalMode"
@@ -5688,6 +6613,8 @@
           },
           "executionMode" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/ExecutionMode/CustomMode"
+            }, {
               "$ref" : "#/definitions/ExecutionMode/CustomPartitionMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/DataFrameIncrementalMode"
@@ -5891,6 +6818,8 @@
           },
           "executionMode" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/ExecutionMode/CustomMode"
+            }, {
               "$ref" : "#/definitions/ExecutionMode/CustomPartitionMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/DataFrameIncrementalMode"
