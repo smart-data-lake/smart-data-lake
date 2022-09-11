@@ -29,6 +29,7 @@ More details on the roadmap will follow shortly.
 * Easy to extend by implementing predefined scala traits
 * Support for getting secrets from different secret providers
 * Support for SQL update & merge (Jdbc, DeltaLake)
+* Support for integration of [Airbyte sources](https://docs.airbyte.com/category/sources)
 
 ## Generic Transformations
 * Spark based: Copy, Historization, Deduplication (incl. incremental update/merge mode for streaming)
@@ -58,7 +59,7 @@ More details on the roadmap will follow shortly.
 * Process all data
 * Partition parameters: give partition values to process for start nodes as parameter
 * Partition Diff: search missing partitions and use as parameter
-* Spark Incremental: compare sortable column between source and target, load the difference
+* Incremental: use stateful input DataObject, or compare sortable column between source and target and load the difference
 * Spark Streaming: asynchronous incremental processing by using Spark Structured Streaming
 * Spark Streaming Once: synchronous incremental processing by using Spark Structured Streaming with Trigger=Once mode
 
@@ -70,6 +71,7 @@ More details on the roadmap will follow shortly.
 ## Metrics
 * Number of rows written per DataObject
 * Execution duration per Action
+* Arbitrary custom metrics defined by aggregation expressions
 * StateListener interface to get notified about progress & metrics
 
 ## Data Catalog
@@ -83,8 +85,9 @@ More details on the roadmap will follow shortly.
 ## Data Quality
 * Metadata support for primary & foreign keys
 * Check & report primary key violations by executing primary key checker action
-* Future: Metadata support for arbitrary data quality checks
-* Future: Report data quality (foreign key matching & arbitrary data quality checks) by executing data quality reporter action
+* Define and validate row-level Constraints before writing DataObject
+* Define and evaluate Expectations when writing DataObject, trigger warning or error, collect result as custom metric
+* Future: Report data quality (foreign key matching & expectations) by executing data quality reporter action
 
 ## Testing
 * Support for CI

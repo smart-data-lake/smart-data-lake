@@ -143,7 +143,7 @@ connections {
 
 ### DataObjects
 
-In a first place, two dataObjects are defined. The `ext-chess` defining the external source (the table on the MS SQL server), using JDBC connection. The `int-chess` defines a delta lake table object as integration layer as targets for our ingestion/historization action. 
+In a first place, two DataObjects are defined. The `ext-chess` defining the external source (the table on the MS SQL server), using JDBC connection. The `int-chess` defines a delta lake table object as integration layer as targets for our ingestion/historization action. 
 
 ```hocon
 dataObjects {
@@ -201,7 +201,7 @@ actions {
 }
 ```
 
-The full configuration looks like [chess.conf](chess.conf). Note that there are already further dataObjects and actions defined, described and used later. 
+The full configuration looks like [chess.conf](chess.conf). Note that there are already further DataObjects and Actions defined, described and used later. 
 
 ## Run
 
@@ -274,7 +274,7 @@ Here are my steps to get it running:
 * workaround script to parse all arguments correctly in the Airbyte container while using buildah without the proper entrypoint. Copy [start_buildah.sh](start_buildah.sh) script into `config` directory
 
 ### SDLB configuration
-Now, the related dataObjects and action are added to the SDLB configuration [config/chess.conf](chess.conf).
+Now, the related DataObjects and Action are added to the SDLB configuration [config/chess.conf](chess.conf).
 
 #### DataObject
 As a source object the AirbyteDataObject is used. Again the MSSQL server with the user credentials are specified. Further, in the streamName the table is selected. The cmd specifies how to run Airbyte. Here the mentioned workaround script is called in the container. As target, again a Delta Lake table is chosen, here called `int_chess_cdc`. Practically, we would prevent of duplicating tables, here we create a new one to provide the possibility to compare both results. 

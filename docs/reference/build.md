@@ -90,7 +90,7 @@ COPY --from=build /home/app/src/main/resources/log4j.properties /home/app/lib/
 ENTRYPOINT ["java","-D${CONFIG_OVERWRITE}", "-Duser.dir=/mnt/data","-Dlog4j.configuration=file:/home/app/lib/log4j.properties","-cp","/opt/app/lib/*:/mnt/lib/*","io.smartdatalake.app.LocalSmartDataLakeBuilder"]
 ```
 
-Custom Scala Classes for e.g. dataObjects and transformers, can be build seperately and mounted into the container (into `/mnt/lib`). 
+Custom Scala Classes for e.g. DataObjects and Transformers, can be build seperately and mounted into the container (into `/mnt/lib`). 
 
 <Tabs groupId = "docker-podman-switch"
 defaultValue="docker"

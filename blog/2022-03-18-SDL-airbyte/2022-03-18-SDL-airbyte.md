@@ -18,7 +18,7 @@ In particular the [github connector](https://docs.airbyte.com/integrations/sourc
 
 Airbyte is a framework to sync data from a variety of sources (APIs and databases) into data warehouses and data lakes. 
 In this example an Airbyte connector is utilized to stream data into Smart Data Lake (SDL). 
-Therefore, the [Airbyte dataObject](http://smartdatalake.ch/json-schema-viewer/index.html#viewer-page?v=2-2) is used and will be configured. 
+Therefore, the [Airbyte DataObject](http://smartdatalake.ch/json-schema-viewer/index.html#viewer-page?v=2-2) is used and will be configured. 
 The general [Airbyte connector handling](https://docs.airbyte.com/understanding-airbyte/airbyte-specification#source) is implemented in SDL, which includes the 4 main steps:
 * `spec`: receiving the specification of the connector
 * `check`: validating the specified configuration
@@ -64,7 +64,7 @@ The first connector command `spec` provides the connector specification. This is
 ## Configuration
 To launch Smart Data Lake Builder (SDLB) with the Airbyte connector the following needs to be modified:
 
-* add the Airbyte ***dataObject*** with its configuration to the `config/application.conf`:
+* add the Airbyte ***DataObject*** with its configuration to the `config/application.conf`:
   ```Python
   dataObjects {
     ext-commits {

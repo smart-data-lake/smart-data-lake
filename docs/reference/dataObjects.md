@@ -19,14 +19,14 @@ Examples:
 * connectors: Airbyte, sFTP
 
 ## Schema
-SDLB required a schema for data object that can create DataFrames, if they are used as starting point of a DAG. The schema can be
+SDLB requires a schema for data object that can create DataFrames, if they are used as starting point of a DAG. The schema can be
 - specified manually with an option in the dataObject
 - specified by adding a sample file or
 - inferred from data (sampling).
 The latter enables fast development, but should be avoided in production. 
 By default SDLB will verify that new data fits the existing schema, otherwise an error will be thrown. If desired schema evolution can be enabled using **allowSchemaEvolution** on several DataObjects, e.g. JdbcTableDataObject and DeltaLakeTableObject. Then, old rows will get null in new columns and new rows get null in old (not existing anymore) columns. 
 
-
+See also details in [Schema](schema.md)
 
 <!-- TODO
 

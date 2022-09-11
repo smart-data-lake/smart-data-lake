@@ -11,7 +11,7 @@ Data pipelines are defined with four sections:
 * [**global options**](#global-options) variables e.g. Spark settings
 * [**connections**](#connections): defining the settings for external sources or targets
 * [**data objects**](#data-objects): including type, format, location etc., and 
-* [**actions**](#actions), which describes how to get from one dataObject to another, including transformations 
+* [**actions**](#actions), which describes how to get from one DataObject to another, including transformations 
 
 The settings are structured in a hierarchy. 
 
@@ -81,11 +81,11 @@ For example, `HiveTables` and `TransactionalSparkTables` share common attributes
 ![data object hierarchy](../images/dataobject_hierarchy.png)
 (Note: this list of DataObjects is **not** exhaustive).
 
-If necessary, additional formats could be implemented based on these generic dataObjects.
+If necessary, additional formats could be implemented based on these generic DataObjects.
 
 ## Actions
-As the name suggest, these objects specify the process from one dataObject to another dataObject. These could also include multiple sources or targets, depending on the action type. 
-The basic action is `CopyAction` where data is transferred from one dataObject into another dataObject, by default without any additional operation. On top of the copy, an arbitrary transformation (see below) can be added as well as additional settings like `executionMode`. 
+As the name suggest, these objects specify the process from one DataObject to another DataObject. These could also include multiple sources or targets, depending on the action type. 
+The basic action is `CopyAction` where data is transferred from one DataObject into another DataObject, by default without any additional operation. On top of the copy, an arbitrary transformation (see below) can be added as well as additional settings like `executionMode`. 
 
 Furthermore, there are actions which provide elaborated features, e.g. historization, or deduplication. 
 

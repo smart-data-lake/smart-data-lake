@@ -108,7 +108,7 @@ See more examples at [sdl-examples](https://github.com/smart-data-lake/sdl-examp
 
 #### SQL
 You can use Spark SQL to define custom transformations.
-Input dataObjects are available as tables to select from. Use tokens %{&ltkey&gt} to replace with runtimeOptions in SQL code.
+Input DataObjects are available as tables to select from. Use tokens %{&ltkey&gt} to replace with runtimeOptions in SQL code.
 For a 1-to-1 transformation use **type = SQLDfTransformer** and configure **code** as your SQL transformation statement.
 For many-to-many transformations use **type = SQLDfsTransformer** and configure **code** as a Map of "&ltoutputDataObjectId&gt, &ltSQL transformation statement&gt".
 
@@ -148,7 +148,7 @@ PySpark session is initialize and available under variables `sc`, `session`, `sq
 Other variables available are
 * `inputDf`: Input DataFrame
 * `options`: Transformation options as Map[String,String]
-* `dataObjectId`: Id of input dataObject as String
+* `dataObjectId`: Id of input DataObject as String
 
 Output DataFrame must be set with `setOutputDf(df)`.
 

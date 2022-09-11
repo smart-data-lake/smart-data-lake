@@ -55,12 +55,11 @@ module.exports = {
         //'reference/schemaEvolution',
         //'reference/housekeeping',
         'reference/streaming',
-        //'reference/metrics',
         {'Deployment' : [
           'reference/deploymentOptions',
           'reference/deploy-microsoft-azure',
         ]},
-        //'reference/testing',
+        'reference/testing',
         'reference/troubleshooting',
         //'reference/glossary'
     ]},

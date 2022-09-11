@@ -1,16 +1,16 @@
 ---
 id: schema
-title: dataObject Schema
+title: Schema
 ---
 
-Smart Data Lake Builder relies on DataFrame schema to verify proper transitions from one dataObject to another. 
+Smart Data Lake Builder relies on DataFrame schema to verify proper transitions from one DataObject to another. 
 
-Depending on the dataObject the schema is provided directly with the data source. Alternative, the schema can be specified in the configuration or inferred from the data. 
+Depending on the DataObject the schema is provided directly with the data source. Alternative, the schema can be specified in the configuration or inferred from the data. 
 
-Furthermore, depending on the dataObject type, schema evolution is supported, see below.
+Furthermore, depending on the DataObject type, schema evolution is supported, see below.
 
 ## Schema inference
-For most dataObjects the Schema can be inferred, e.g. by sampling items in an XML stream.
+For most DataObjects the Schema can be inferred, e.g. by sampling items in an XML stream.
 Nevertheless, best practice especially for production cases are fixed schemata.  
 
 ## schemaMin

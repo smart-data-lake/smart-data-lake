@@ -3,13 +3,14 @@ id: testing
 title: Testing
 ---
 
-:::warning
-This page is under review and currently not visible in the menu.
-:::
-
 Testing is crucial for software quality and maintenance. This is also true for data pipelines.
 
 SDL provides the following possibilities for Testing:
+- **config validation** -> Basic CI test: configuration syntax test without accessing any environment
+- **dry run** -> Integration/Smoke Tests: validation of configuration together with a given environment, including validation of data schemas.
+- **unit tests**: test single transformation logic and UDFs by creating standard unit tests.
+- **data pipeline simulation**: test transformation logic over several DataFrame actions by providing mocked input and validating output produced.
+
 
 ## Config validation
 
@@ -62,12 +63,12 @@ class MyCustomTransformerTest extends FunSuite {
 }
 ```
 
-## Simulation of spark data pipeline
+## Simulation of dataframe data pipeline
 
-Instead of testing single transformation logic, it would be interesting to test whole pipelines of spark actions.
-For this you can start a simulation run programmatically. You have to provide all input data frames and get the output data frames of the end nodes of the DAG.
+Instead of testing single transformation logic, it can be interesting to test whole pipelines of DataFrame actions.
+For this you can start a simulation run programmatically in a test suite by providing all input data frames and get the output data frames of the end nodes of the DAG.
 The simulation mode only executes the init phase with special modification, so it runs without any environment. Of course there are some exceptions like kafka/confluent schema registry.
-Note that simulation mode only supports spark actions for now, you might need to choose "feedSel" accordingly.
+Note that simulation mode only supports DataFrame actions for now, you might need to choose "feedSel" accordingly.
 ```scala
 class MyDataPipelineTest extends FunSuite with TestUtil {
 

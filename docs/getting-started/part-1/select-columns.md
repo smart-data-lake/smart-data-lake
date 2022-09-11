@@ -27,7 +27,7 @@ You can also consult the [Configuration Schema Browser](https://smartdatalake.ch
 In a first step, we want to make the airport data more understandable by removing any columns we don't need. 
 Since we don't introduce any business logic into the transformation, 
 the resulting data object will reside in the integration layer and thus will be called *int-airports*.
-Put this in the existing dataObjects section:
+Put this in the existing `dataObjects` section:
 
       int-airports {
         type = CsvFileDataObject
@@ -254,7 +254,7 @@ One way to get a better error message is to tell Spark that it should promptly f
 You can do that with the option [jsonOptions](https://smartdatalake.ch/json-schema-viewer/index.html#viewer-page?v=2-13-3),
 which allows you to directly pass on settings to Spark.
 
-In our case, we would end up with a faulty dataObject that looks like this:
+In our case, we would end up with a faulty DataObject that looks like this:
 
       stg-airports {
         type = JsonFileDataObject

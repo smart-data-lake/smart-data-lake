@@ -93,7 +93,7 @@ You are of course free to use any other naming conventions, but it's worth to th
 In our case, we simply copy data exactly as is from an external source. Hence, our output DataObject belongs to the Staging Layer.
 
 ## Define download-ext-departures
-After the dataObjects section, add the following lines to your configuration file:
+After the `dataObjects` section, add the following lines to your configuration file:
 
     actions {
         download-departures {
