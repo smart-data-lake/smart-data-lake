@@ -110,7 +110,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
     if (hadoopPathHolder == null) {
       hadoopPathHolder = {
         if (thisIsTableExisting) new Path(HiveUtil.existingTableLocation(table))
-        else HdfsUtil.prefixHadoopPath(path.get, connection.map(_.pathPrefix))
+        else HdfsUtil.prefixHadoopPath(path.get, connection.flatMap(_.pathPrefix))
       }
 
       // For existing tables, check to see if we write to the same directory. If not, issue a warning.
