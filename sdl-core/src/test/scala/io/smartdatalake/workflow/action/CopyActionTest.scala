@@ -110,7 +110,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     // prepare data
-    val executionMode = FileIncrementalMoveMode(archiveSubdirectory = Some("archive"))
+    val executionMode = FileIncrementalMoveMode(archivePath = Some("archive"))
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig), executionMode = Some(executionMode))
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
@@ -130,7 +130,8 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(r1.head == 6) // should be increased by 1 through TestDfTransformer
     // check input archived by incremental move mode
     assert(srcDO.getFileRefs(Seq()).isEmpty)
-    assert(srcDO.filesystem.exists(new Path(executionMode.createArchiveFileName(srcFiles.head))))
+    val srcDOArchived = ParquetFileDataObject( "src1", tempPath+s"/src1/archive")
+    assert(srcDOArchived.getFileRefs(Seq()).nonEmpty)
 
     // start second load without new files - schema should be present because of schema file
     action1.resetExecutionResult()

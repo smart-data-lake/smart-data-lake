@@ -43,4 +43,18 @@ private[smartdatalake] trait FileDataObject extends DataObject with CanHandlePar
    * Make a given path relative to this DataObjects base path
    */
   def relativizePath(filePath: String)(implicit context: ActionPipelineContext): String
+
+  /**
+   * Concat child path to parent path
+   */
+  def concatPath(parent: String, child: String): String = {
+    s"$parent$separator$child"
+  }
+
+  /**
+   * Check if path is absolute
+   */
+  def isAbsolutePath(path: String): Boolean = {
+    path.startsWith(separator.toString)
+  }
 }

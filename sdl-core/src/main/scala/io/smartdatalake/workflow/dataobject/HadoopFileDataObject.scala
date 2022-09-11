@@ -187,6 +187,14 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     pathPrefix.replaceFirstIn(normalizedPath, "").stripPrefix(Path.SEPARATOR)
   }
 
+  override def concatPath(parent: String, child: String): String = {
+    new Path(parent, child).toString
+  }
+
+  override def isAbsolutePath(path: String) = {
+    new Path(path).isAbsolute
+  }
+
   override def createEmptyPartition(partitionValues: PartitionValues)(implicit context: ActionPipelineContext): Unit = {
     // check if valid init of partitions -> otherwise we can not create empty partition as path is not fully defined
     if (partitions.inits.map(_.toSet).contains(partitionValues.keys)) {
