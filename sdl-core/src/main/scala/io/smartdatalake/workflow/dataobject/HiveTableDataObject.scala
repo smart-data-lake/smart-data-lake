@@ -21,7 +21,6 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions._
@@ -29,6 +28,7 @@ import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, CompactionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.connection.HiveTableConnection
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
@@ -54,6 +54,8 @@ import scala.collection.JavaConverters._
  *                  Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param saveMode spark [[SaveMode]] to use when writing files, default is "overwrite"
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
+ * @param constraints List of row-level [[Constraint]]s to enforce when writing to this data object.
+ * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
  * @param numInitialHdfsPartitions number of files created when writing into an empty table (otherwise the number will be derived from the existing data)
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
@@ -69,6 +71,8 @@ case class HiveTableDataObject(override val id: DataObjectId,
                                dateColumnType: DateColumnType = DateColumnType.Date,
                                override val schemaMin: Option[GenericSchema] = None,
                                override var table: Table,
+                               override val constraints: Seq[Constraint] = Seq(),
+                               override val expectations: Seq[Expectation] = Seq(),
                                numInitialHdfsPartitions: Int = 16,
                                saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                acl: Option[AclDef] = None,
@@ -77,7 +81,8 @@ case class HiveTableDataObject(override val id: DataObjectId,
                                override val housekeepingMode: Option[HousekeepingMode] = None,
                                override val metadata: Option[DataObjectMetadata] = None)
                               (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame with CanHandlePartitions with HasHadoopStandardFilestore with SmartDataLakeLogger {
+  extends TableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame with CanHandlePartitions with HasHadoopStandardFilestore
+    with ExpectationValidation with SmartDataLakeLogger {
 
   // Hive tables are always written in parquet format
   private val fileName = "*.parquet"

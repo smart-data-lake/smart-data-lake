@@ -25,7 +25,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn, GenericDataFrame}
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import scala.reflect.runtime.universe.typeOf
 
@@ -39,11 +39,10 @@ import scala.reflect.runtime.universe.typeOf
  *                                 By default SparkSubFeed langauge is used, but you can configure a different one if needed.
  */
 case class DataValidationTransformer(override val name: String = "dataValidation", override val description: Option[String] = None, rules: Seq[ValidationRule], errorsColumn: String = "errors", subFeedTypeForValidation: String = typeOf[SparkSubFeed].typeSymbol.fullName) extends GenericDfTransformer {
-  private val validationHelper: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(subFeedTypeForValidation)
+  private implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedTypeForValidation)
   // check that rules are parsable
-  rules.foreach(_.getValidationColumn(validationHelper))
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
-    implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
+  rules.foreach(_.getValidationColumn(functions))
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     import functions._
     df.withColumn(errorsColumn, array_construct_compact(rules.map(rule => rule.getValidationColumn): _*))
   }

@@ -19,13 +19,13 @@
 
 package io.smartdatalake.workflow.dataframe.snowflake
 
-import com.snowflake.snowpark.{Column, DataFrame, RelationalGroupedDataFrame, Row}
 import com.snowflake.snowpark.types._
+import com.snowflake.snowpark.{Column, DataFrame, RelationalGroupedDataFrame, Row}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
+import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
@@ -89,6 +89,20 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   }
   override def isEmpty: Boolean = inner.count() == 0
   override def count: Long = inner.count()
+  override def cache: GenericDataFrame = SnowparkDataFrame(inner.cacheResult)
+  // not implemented in Snowpark
+  override def uncache: GenericDataFrame = this
+  override def log(msg: String, loggerFunc: String => Unit): Unit = {
+    // for Snowpark we cannot print the DataFrame show output to a string. It is just printed to stdout after logging, which is not optimal as order in stdout is not guaranteed like that.
+    loggerFunc(msg)
+    inner.show()
+  }
+  override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, Observation) = {
+    // Snowpark has no method to observe metrics. They need to be calculated.
+    val observation = GenericCalculatedObservation(this, aggregateColumns:_*)
+    // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.
+    (this.cache, observation)
+  }
 }
 
 case class SnowparkGroupedDataFrame(inner: RelationalGroupedDataFrame) extends GenericGroupedDataFrame {
@@ -234,6 +248,7 @@ trait SnowparkDataType extends GenericDataType {
 case class SnowparkSimpleDataType(inner: DataType) extends SnowparkDataType {
   override def makeNullable: SnowparkDataType = this
   override def toLowerCase: SnowparkDataType = this
+  override def isSimpleType: Boolean = true
 }
 case class SnowparkStructDataType(override val inner: StructType) extends SnowparkDataType with GenericStructDataType {
   override def makeNullable: SnowparkDataType = SnowparkStructDataType(SnowparkSchema(inner).makeNullable.inner)
@@ -245,6 +260,7 @@ case class SnowparkStructDataType(override val inner: StructType) extends Snowpa
     }
   }
   override def fields: Seq[SnowparkField] = inner.fields.map(SnowparkField)
+  override def isSimpleType: Boolean = false
 }
 case class SnowparkArrayDataType(inner: ArrayType) extends SnowparkDataType with GenericArrayDataType {
   override def makeNullable: SnowparkDataType = SnowparkArrayDataType(ArrayType(SnowparkArrayDataType(inner).makeNullable.inner))
@@ -257,6 +273,7 @@ case class SnowparkArrayDataType(inner: ArrayType) extends SnowparkDataType with
   }
   override def containsNull: Boolean = true // not existing in Snowpark
   override def elementDataType: SnowparkDataType = SnowparkDataType(inner.elementType)
+  override def isSimpleType: Boolean = false
 }
 case class SnowparkMapDataType(inner: MapType) extends SnowparkDataType with GenericMapDataType {
   override def makeNullable: SnowparkDataType = SnowparkMapDataType(MapType(SnowparkDataType(inner.keyType).makeNullable.inner,SnowparkDataType(inner.valueType).makeNullable.inner))
@@ -276,6 +293,7 @@ case class SnowparkMapDataType(inner: MapType) extends SnowparkDataType with Gen
   override def valueContainsNull: Boolean = true // not existing in Snowpark
   override def keyDataType: SnowparkDataType = SnowparkDataType(inner.keyType)
   override def valueDataType: SnowparkDataType = SnowparkDataType(inner.valueType)
+  override def isSimpleType: Boolean = false
 }
 object SnowparkDataType {
   def apply(inner: DataType): SnowparkDataType = inner match {
@@ -290,4 +308,5 @@ case class SnowparkRow(inner: Row) extends GenericRow {
   override def subFeedType: universe.Type = typeOf[SnowparkSubFeed]
   override def get(index: Int): Any = inner.get(index)
   override def getAs[T](index: Int): T = get(index).asInstanceOf[T]
+  override def toSeq: Seq[Any] = inner.toSeq
 }

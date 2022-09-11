@@ -61,6 +61,8 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
  *                  Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param table DeltaLake table to be written by this output
+ * @param constraints List of row-level [[Constraint]]s to enforce when writing to this data object.
+ * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
  * @param saveMode [[SDLSaveMode]] to use when writing files, default is "overwrite". Overwrite, Append and Merge are supported for now.
  * @param allowSchemaEvolution If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
  * @param retentionPeriod Optional delta lake retention threshold in hours. Files required by the table for reading versions younger than retentionPeriod will be preserved and the rest of them will be deleted.
@@ -79,6 +81,8 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override val options: Map[String,String] = Map(),
                                     override val schemaMin: Option[GenericSchema] = None,
                                     override var table: Table,
+                                    override val constraints: Seq[Constraint] = Seq(),
+                                    override val expectations: Seq[Expectation] = Seq(),
                                     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     override val allowSchemaEvolution: Boolean = false,
                                     retentionPeriod: Option[Int] = None, // hours
@@ -88,7 +92,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override val housekeepingMode: Option[HousekeepingMode] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore {
+  extends TransactionalSparkTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation {
 
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location

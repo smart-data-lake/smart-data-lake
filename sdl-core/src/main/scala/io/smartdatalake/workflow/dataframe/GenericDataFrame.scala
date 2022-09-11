@@ -70,8 +70,27 @@ trait GenericDataFrame extends GenericTypedObject {
 
   def count: Long
 
+  def cache: GenericDataFrame
+
+  def uncache: GenericDataFrame
+
   // instantiate subfeed helper
   private lazy val functions = DataFrameSubFeed.getFunctions(subFeedType)
+
+  /**
+   * Log message and DataFrame content
+   * @param msg Log message to add before DataFrame content
+   * @param loggerFunc Function used to log
+   */
+  def log(msg: String, loggerFunc: String => Unit): Unit
+
+  /**
+   * Create an Observation of metrics on this DataFrame.
+   * @param name name of the observation
+   * @param aggregateColumns aggregate columns to observe on the DataFrame
+   * @return an Observation object which can return observed metrics after execution
+   */
+  def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, Observation)
 
   /**
    * returns data frame which consists of those rows which contain at least a null in the specified columns
@@ -260,6 +279,7 @@ trait GenericField extends GenericTypedObject {
  */
 trait GenericDataType extends GenericTypedObject {
   def isSortable: Boolean
+  def isSimpleType: Boolean
   def typeName: String
   def sql: String
   def makeNullable: GenericDataType
@@ -301,4 +321,6 @@ trait GenericMapDataType { this: GenericDataType =>
 trait GenericRow extends GenericTypedObject {
   def get(index: Int): Any
   def getAs[T](index: Int): T
+  //Note: getAs[T](fieldName: String) can not be implemented as in Snowpark a Row does not know the names of its fields!
+  def toSeq: Seq[Any]
 }

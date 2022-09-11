@@ -38,7 +38,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  *                                 The spark sql expressions are evaluated against the input DataFrame and added to the DataFrame as derived columns.
  */
 case class AdditionalColumnsTransformer(override val name: String = "additionalColumns", override val description: Option[String] = None, additionalColumns: Map[String,String] = Map(), additionalDerivedColumns: Map[String,String] = Map()) extends GenericDfTransformer {
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
     val data = DefaultExpressionData.from(context, partitionValues)

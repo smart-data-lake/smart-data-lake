@@ -261,21 +261,40 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
   }
 
   override def postprocessOutputSubFeedCustomized(subFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    assert(subFeed.dataFrame.isDefined)
+    val output = outputs.find(_.id == subFeed.dataObjectId).get
+    // initialize outputs
     if (context.phase == ExecutionPhase.Init) {
-      outputs.find(_.id == subFeed.dataObjectId).foreach { output =>
-        output.init(subFeed.dataFrame.get, subFeed.partitionValues, saveModeOptions)
-      }
+      output.init(subFeed.dataFrame.get, subFeed.partitionValues, saveModeOptions)
     }
-    subFeed
+    // apply expectation validation
+    output match {
+      case evDataObject: DataObject with ExpectationValidation =>
+        val (dfExpectations, observation) = evDataObject.setupConstraintsAndJobExpectations(subFeed.dataFrame.get)
+        subFeed
+          .withDataFrame(Some(dfExpectations))
+          .withObservation(Some(observation))
+      case _ => subFeed
+    }
   }
 
   override protected def writeSubFeed(subFeed: DataFrameSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult[DataFrameSubFeed] = {
+    // write subfeed to output
     setSparkJobMetadata(Some(s"writing to ${subFeed.dataObjectId}"))
     val output = outputs.find(_.id == subFeed.dataObjectId).getOrElse(throw new IllegalStateException(s"($id) output for subFeed ${subFeed.dataObjectId} not found"))
     val noData = writeSubFeed(subFeed, output, isRecursive)
     setSparkJobMetadata(None)
     val outputSubFeed = if (breakDataFrameOutputLineage) subFeed.breakLineage else subFeed
     WriteSubFeedResult(outputSubFeed, noData)
+    // get expectations metrics and check violations
+    output match {
+      case evDataObject: DataObject with ExpectationValidation =>
+        val scopeJobExpectationMetrics = subFeed.observation.map(_.waitFor()).getOrElse(Map())
+        val metrics = evDataObject.validateExpectations(subFeed.dataFrame.get, subFeed.partitionValues, scopeJobExpectationMetrics)
+        WriteSubFeedResult(outputSubFeed, noData, Some(metrics))
+      case _ =>
+        WriteSubFeedResult(outputSubFeed, noData)
+    }
   }
 
   /**
@@ -309,7 +328,7 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
           // return
           Some(noData)
         } else {
-          logger.debug("($id) streaming query already started")
+          logger.debug(s"($id) streaming query already started")
           None // unknown
         }
       case Some(m: SparkStreamingMode) =>
@@ -326,7 +345,7 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
         if (noData) logger.info(s"($id) no data to process for ${output.id} in streaming mode")
         // return
         Some(noData)
-      case None | Some(_: DataObjectStateIncrementalMode) | Some(_: PartitionDiffMode) | Some(_: DataFrameIncrementalMode) | Some(_: FailIfNoPartitionValuesMode) | Some(_: CustomPartitionMode) | Some(_: ProcessAllMode) | Some(_: FileIncrementalMoveMode) =>
+      case None | Some(_: DataObjectStateIncrementalMode) | Some(_: PartitionDiffMode) | Some(_: DataFrameIncrementalMode) | Some(_: FailIfNoPartitionValuesMode) | Some(_: CustomPartitionMode) | Some(_: CustomMode) | Some(_: ProcessAllMode) | Some(_: FileIncrementalMoveMode) =>
         // Auto persist if dataFrame is reused later
         val preparedSubFeed = if (context.dataFrameReuseStatistics.contains((output.id, subFeed.partitionValues))) {
           val partitionValuesStr = if (subFeed.partitionValues.nonEmpty) s" and partitionValues ${subFeed.partitionValues.mkString(", ")}" else ""
@@ -356,12 +375,12 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
     val inputDfsMap = inputSubFeeds.map(subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap
     val (outputDfsMap, _) = transformers.foldLeft((inputDfsMap,inputPartitionValues)){
       case ((inputDfsMap, inputPartitionValues), transformer) =>
-        val (outputDfsMap, outputPartitionValues) = transformer.applyTransformation(id, inputPartitionValues, inputDfsMap)
+        val (outputDfsMap, outputPartitionValues) = transformer.applyTransformation(id, inputPartitionValues, inputDfsMap, getExecutionModeResultOptions)
         (inputDfsMap ++ outputDfsMap, outputPartitionValues)
     }
     // create output subfeeds from transformed dataframes
     outputSubFeeds.map { subFeed=>
-        val df = outputDfsMap.getOrElse(subFeed.dataObjectId.id, throw ConfigurationException(s"($id) No result found for output ${subFeed.dataObjectId}. Available results are ${outputDfsMap.keys.mkString(", ")}."))
+        val df = outputDfsMap.getOrElse(subFeed.dataObjectId.id, throw ConfigurationException(s"($id) No result found for output ${subFeed.dataObjectId}. Available tesults are ${outputDfsMap.keys.mkString(", ")}."))
         subFeed.withDataFrame(Some(df))
     }
   }
@@ -371,7 +390,7 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
    */
   protected def applyTransformers(transformers: Seq[PartitionValueTransformer], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
     transformers.foldLeft(PartitionValues.oneToOneMapping(partitionValues)){
-      case (partitionValuesMap, transformer) => transformer.applyTransformation(id, partitionValuesMap)
+      case (partitionValuesMap, transformer) => transformer.applyTransformation(id, partitionValuesMap, getExecutionModeResultOptions)
     }
   }
 

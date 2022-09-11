@@ -38,7 +38,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * @param removeNonStandardSQLNameChars Remove all chars from a string which dont belong to lowercase SQL standard naming characters, i.e abc$!-& -> abc
  */
 case class StandardizeColNamesTransformer(override val name: String = "colNamesLowercase", override val description: Option[String] = None, camelCaseToLower: Boolean=true, normalizeToAscii: Boolean=true, removeNonStandardSQLNameChars: Boolean=true) extends GenericDfTransformer {
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
     df.standardizeColNames(camelCaseToLower, normalizeToAscii, removeNonStandardSQLNameChars)
   }

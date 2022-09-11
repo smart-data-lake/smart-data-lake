@@ -51,9 +51,10 @@ trait GenericDfsTransformerDef extends PartitionValueTransformer {
    * @param actionId id of the action which executes this transformation. This is mainly used to prefix error messages.
    * @param partitionValues partition values to transform
    * @param dfs Map of (dataObjectId, DataFrame) tuples available as input
+   * @param executionModeResultOptions options set by the actions execution mode
    * @return Map of transformed (dataObjectId, DataFrame) tuples
    */
-  def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame])(implicit context: ActionPipelineContext): Map[String,GenericDataFrame]
+  def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Map[String,GenericDataFrame]
 
   /**
    * Declare supported Language for transformation.
@@ -61,9 +62,9 @@ trait GenericDfsTransformerDef extends PartitionValueTransformer {
    */
   private[smartdatalake] def getSubFeedSupportedType: Type = typeOf[DataFrameSubFeed]
 
-  private[smartdatalake] def applyTransformation(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame])(implicit context: ActionPipelineContext): (Map[String,GenericDataFrame], Seq[PartitionValues]) = {
-    val transformedDfs = transform(actionId, partitionValues, dfs)
-    val transformedPartitionValues = transformPartitionValues(actionId, partitionValues).map(_.values.toSeq.distinct)
+  private[smartdatalake] def applyTransformation(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): (Map[String,GenericDataFrame], Seq[PartitionValues]) = {
+    val transformedDfs = transform(actionId, partitionValues, dfs, executionModeResultOptions)
+    val transformedPartitionValues = transformPartitionValues(actionId, partitionValues, executionModeResultOptions).map(_.values.toSeq.distinct)
       .getOrElse(partitionValues)
     (transformedDfs,transformedPartitionValues)
   }
@@ -77,7 +78,7 @@ trait GenericDfsTransformer extends GenericDfsTransformerDef with ParsableFromCo
 trait SparkDfsTransformer extends GenericDfsTransformer {
   // Note: must have a different name as transform because signature is different only in subtypes of parameters.
   def transformSpark(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame])(implicit context: ActionPipelineContext): Map[String, DataFrame]
-  final override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, GenericDataFrame])(implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
+  final override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, GenericDataFrame], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
     assert(dfs.values.forall(_.isInstanceOf[SparkDataFrame]), s"($actionId) Unsupported subFeedType(s) ${dfs.values.filterNot(_.isInstanceOf[SparkDataFrame]).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method transform")
     val sparkDfs = dfs.mapValues(_.asInstanceOf[SparkDataFrame].inner)
     transformSpark(actionId, partitionValues, sparkDfs)
@@ -113,17 +114,17 @@ trait OptionsGenericDfsTransformer extends GenericDfsTransformer {
    */
   def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String,String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = None
 
-  override def transformPartitionValues(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = {
+  override def transformPartitionValues(actionId: ActionId, partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = {
     // replace runtime options
     val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
     // transform
-    transformPartitionValuesWithOptions(actionId, partitionValues, options ++ runtimeOptionsReplaced)
+    transformPartitionValuesWithOptions(actionId, partitionValues, options ++ runtimeOptionsReplaced ++ executionModeResultOptions)
   }
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame])(implicit context: ActionPipelineContext): Map[String,GenericDataFrame] = {
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Map[String,GenericDataFrame] = {
     // replace runtime options
     val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
     // transform
-    transformWithOptions(actionId, partitionValues, dfs, options ++ runtimeOptionsReplaced )
+    transformWithOptions(actionId, partitionValues, dfs, options ++ runtimeOptionsReplaced ++ executionModeResultOptions)
   }
   private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[String,String] = {
     lazy val data = DefaultExpressionData.from(context, partitionValues)

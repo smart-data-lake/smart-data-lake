@@ -46,7 +46,7 @@ case class FilterTransformer(override val name: String = "filter", override val 
     case Success(result) => result
     case Failure(e) => throw new ConfigurationException(s"Error parsing filterClause parameter as expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
   }
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
     df.filter(expr(filterClause))

@@ -1093,7 +1093,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // check metrics
     val action2MainMetrics = action2.runtimeData.getFinalMetrics(action2.outputIds.head).get.getMainInfos
-    assert(action2MainMetrics("records_written")==0)
+    assert(action2MainMetrics("records_written")==0 && action2MainMetrics("no_data")==true)
   }
 
   test("action dag with 2 actions in sequence, first is executionMode=DataFrameIncrementalMode, second with executionCondition=true and ProcessAll mode") {

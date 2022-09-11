@@ -34,7 +34,6 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.custom.ExpressionEvaluator
-import org.apache.spark.sql.custom.ExpressionEvaluator.findUnresolvedAttributes
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
@@ -78,6 +77,8 @@ import scala.util.Try
  * @param incrementalOutputExpr Optional expression to use for creating incremental output with DataObjectStateIncrementalMode.
  *                              The expression is used to get the high-water-mark for the incremental update state.
  *                              Normally this can be just a column name, e.g. an id or updated timestamp which is continually increasing.
+ * @param constraints List of row-level [[Constraint]]s to enforce when writing to this data object.
+ * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
  */
 case class JdbcTableDataObject(override val id: DataObjectId,
                                createSql: Option[String] = None,
@@ -87,6 +88,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                postWriteSql: Option[String] = None,
                                override val schemaMin: Option[GenericSchema] = None,
                                override var table: Table,
+                               override val constraints: Seq[Constraint] = Seq(),
+                               override val expectations: Seq[Expectation] = Seq(),
                                jdbcFetchSize: Int = 1000,
                                saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                override val allowSchemaEvolution: Boolean = false,
@@ -97,7 +100,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                incrementalOutputExpr: Option[String] = None,
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject with CanHandlePartitions with CanEvolveSchema with CanMergeDataFrame with CanCreateIncrementalOutput {
+  extends TransactionalSparkTableDataObject with CanHandlePartitions with CanEvolveSchema with CanMergeDataFrame
+    with CanCreateIncrementalOutput with ExpectationValidation {
 
   /**
    * Connection defines driver, url and db in central location
@@ -113,6 +117,10 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
   // Define partition columns
   override val partitions: Seq[String] = if (SchemaUtil.isSparkCaseSensitive) virtualPartitions else virtualPartitions.map(_.toLowerCase)
+
+  // TODO: Spark jdbc data source does not execute Spark observations, e.g. CopyWithMergeModeActionTest fails...
+  // Using generic observations is forced therefore.
+  override val forceGenericObservation = true
 
   // prepare final table
   table = table.overrideDb(connection.db)

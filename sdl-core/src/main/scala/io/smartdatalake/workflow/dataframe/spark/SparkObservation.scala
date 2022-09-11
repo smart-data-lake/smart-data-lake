@@ -17,14 +17,16 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.util.spark
+package io.smartdatalake.workflow.dataframe.spark
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.dataframe.Observation
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.util.QueryExecutionListener
 
 import java.util.UUID
+
 
 /**
  * This code is inspired from Spark 3.3.0 when it was not yet released (and simplified).
@@ -32,26 +34,26 @@ import java.util.UUID
  *
  * Note: the name is used to make metrics unique across parallel queries in the same Spark session
  */
-private[smartdatalake] class Observation(name: String = UUID.randomUUID().toString) extends SmartDataLakeLogger {
+private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().toString) extends Observation with SmartDataLakeLogger {
 
-  private val listener: ObservationListener = ObservationListener(this)
+  private val listener: SparkObservationListener = SparkObservationListener(this)
 
   @volatile private var sparkSession: Option[SparkSession] = None
 
   @volatile private var metrics: Option[Map[String, Any]] = None
 
-  def on[T](ds: Dataset[T], expr: Column, exprs: Column*): Dataset[T] = {
-    if (ds.isStreaming) throw new IllegalArgumentException("Observation does not support streaming Datasets")
+  def on[T](ds: Dataset[T], registerListener: Boolean, exprs: Column*): Dataset[T] = {
+    if (ds.isStreaming) throw new IllegalArgumentException("SparkObservation does not support streaming Datasets")
     sparkSession = Some(ds.sparkSession)
-    ds.sparkSession.listenerManager.register(listener)
-    ds.observe(name, expr, exprs: _*)
+    if (registerListener) ds.sparkSession.listenerManager.register(listener)
+    ds.observe(name, exprs.head, exprs.tail: _*)
   }
 
   /**
    * Get the observed metrics. This waits for the observed dataset to finish its first action.
    * Only the result of the first action is available. Subsequent actions do not modify the result.
    *
-   * @timeoutSec max wait time in seconds. Throws NoMetricsReceivedException if metrics were not received in time.
+   * @param timeoutSec max wait time in seconds. Throws NoMetricsReceivedException if metrics were not received in time.
    * @return the observed metrics as a `Map[String, Any]`
    */
   @throws[InterruptedException]
@@ -63,7 +65,7 @@ private[smartdatalake] class Observation(name: String = UUID.randomUUID().toStri
       while (metrics.isEmpty) {
         logger.debug(s"($name) waiting for metrics")
         wait(timeoutSec * 1000L)
-        if (ts + timeoutSec * 1000L <= System.currentTimeMillis) throw NoMetricsReceivedException(s"Observation $name did not receive metrics within timeout of $timeoutSec seconds.")
+        if (ts + timeoutSec * 1000L <= System.currentTimeMillis) throw NoMetricsReceivedException(s"SparkObservation $name did not receive metrics within timeout of $timeoutSec seconds.")
       }
     }
     metrics.get
@@ -71,9 +73,10 @@ private[smartdatalake] class Observation(name: String = UUID.randomUUID().toStri
 
   private[spark] def onFinish(qe: QueryExecution): Unit = {
     synchronized {
+      //TODO: streaming: reset metrics for each microbatch
       if (metrics.isEmpty) {
         val row = qe.observedMetrics.get(name)
-        this.metrics = row.map(r => r.getValuesMap[Any](r.schema.fieldNames))
+        metrics = row.map(r => r.getValuesMap[Any](r.schema.fieldNames))
         if (metrics.isDefined) {
           notifyAll()
           sparkSession.foreach(_.listenerManager.unregister(listener))
@@ -85,7 +88,7 @@ private[smartdatalake] class Observation(name: String = UUID.randomUUID().toStri
   }
 }
 
-private[smartdatalake] case class ObservationListener(observation: Observation) extends QueryExecutionListener {
+private[smartdatalake] case class SparkObservationListener(observation: SparkObservation) extends QueryExecutionListener {
   // forward result on success
   override def onSuccess(funcName: String, qe: QueryExecution, durationNs: Long): Unit = observation.onFinish(qe)
   // ignore result on failure

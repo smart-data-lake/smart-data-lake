@@ -46,6 +46,8 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  *
  * @param id           unique name of this data object
  * @param table        Snowflake table to be written by this output
+ * @param constraints  List of row-level [[Constraint]]s to enforce when writing to this data object.
+ * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
  * @param saveMode     spark [[SDLSaveMode]] to use when writing files, default is "overwrite"
  * @param connectionId The SnowflakeTableConnection to use for the table
  * @param comment      An optional comment to add to the table after writing a DataFrame to it
@@ -55,12 +57,14 @@ import scala.reflect.runtime.universe.{Type, typeOf}
 case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     override var table: Table,
                                     override val schemaMin: Option[GenericSchema] = None,
+                                    override val constraints: Seq[Constraint] = Seq(),
+                                    override val expectations: Seq[Expectation] = Seq(),
                                     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     connectionId: ConnectionId,
                                     comment: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject {
+  extends TransactionalSparkTableDataObject with ExpectationValidation {
 
   private val connection = getConnection[SnowflakeConnection](connectionId)
   val fullyQualifiedTableName = connection.database + "." + table.fullName

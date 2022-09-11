@@ -42,7 +42,7 @@ import scala.reflect.runtime.universe.TypeTag
  * Result of execution mode application
  */
 case class ExecutionModeResult( inputPartitionValues: Seq[PartitionValues] = Seq(), outputPartitionValues: Seq[PartitionValues] = Seq()
-                              , filter: Option[String] = None, fileRefs: Option[Seq[FileRef]] = None)
+                              , filter: Option[String] = None, fileRefs: Option[Seq[FileRef]] = None, options: Map[String,String] = Map())
 
 /**
  * Execution mode defines how data is selected when running a data pipeline.
@@ -466,6 +466,30 @@ trait CustomPartitionModeLogic {
 }
 
 /**
+ * Execution mode to create custom execution mode logic.
+ * Define a function which receives main input&output DataObject and returns execution mode result
+ *
+ * @param className class name implementing trait [[CustomModeLogic]]
+ * @param alternativeOutputId optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
+ *                            It can be used to ensure processing over multiple actions in case of errors.
+ * @param options Options specified in the configuration for this execution mode
+ */
+case class CustomMode(className: String, override val alternativeOutputId: Option[DataObjectId] = None, options: Option[Map[String,String]] = None)
+  extends ExecutionMode with ExecutionModeWithMainInputOutput {
+  private[smartdatalake] override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
+  private val impl = CustomCodeUtil.getClassInstanceByName[CustomModeLogic](className)
+  private[smartdatalake] override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
+                                            , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
+                                           (implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
+    val output = alternativeOutput.getOrElse(mainOutput)
+    impl.apply(options.getOrElse(Map()), actionId, mainInput, output, subFeed.partitionValues.map(_.getMapString), context)
+  }
+}
+trait CustomModeLogic {
+  def apply(options: Map[String,String], actionId: ActionId, input: DataObject, output: DataObject, givenPartitionValues: Seq[Map[String,String]], context: ActionPipelineContext): Option[ExecutionModeResult]
+}
+
+/**
  * Execution mode to incrementally process file-based DataObjects, e.g. FileRefDataObjects and SparkFileDataObjects.
  * For FileRefDataObjects:
  * - All existing files in the input DataObject are processed and removed (deleted or archived) after processing
@@ -482,7 +506,7 @@ case class FileIncrementalMoveMode(archiveSubdirectory: Option[String] = None) e
   assert(archiveSubdirectory.forall(_.nonEmpty))
   assert(archiveSubdirectory.forall(!_.contains("/")), s"archiveSubdirectory should contain only one subdirectory name and not nested subdirectories: $archiveSubdirectory")
 
-  private var sparkFilesObserver: Option[FilesObservation] = None
+  private var sparkFilesObserver: Option[FilesSparkObservation] = None
 
   /**
    * Check for files in input data object.

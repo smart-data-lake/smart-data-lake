@@ -105,7 +105,8 @@ case class CustomFileAction(override val id: ActionId,
     }
     output.endWritingOutputStreams(subFeed.partitionValues)
     // return metric to action
-    val metrics = Map("files_written"->fileRefMapping.size.toLong)
+    val filesWritten = fileRefMapping.size.toLong
+    val metrics = Map("files_written"->fileRefMapping.size.toLong) ++ (if (filesWritten == 0) Map ("no_data" -> true) else Map())
     WriteSubFeedResult(subFeed, Some(fileRefMapping.isEmpty), Some(metrics))
   }
 

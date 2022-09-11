@@ -29,6 +29,7 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject}
 
 import java.time.Duration
+import scala.collection.SortedSet
 import scala.reflect.runtime.universe._
 
 /**
@@ -82,7 +83,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     val mainSubFeed = subFeeds.find(_.dataObjectId == mainInput.id).get
     // convert subfeeds to this Actions SubFeed type or initialize if not yet existing
     var inputSubFeeds: Seq[S] = subFeeds.map { subFeed =>
-      val partitionValues = if (subFeed.partitionValues.isEmpty && mainSubFeed.partitionValues.nonEmpty) Some(mainSubFeed.partitionValues) else None
+      val partitionValues = if (mainSubFeed.partitionValues.nonEmpty) Some(mainSubFeed.partitionValues) else None
       updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeedConverter.fromSubFeed(subFeed), partitionValues)
     }
     val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id).get
@@ -134,8 +135,12 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
       val (result, d) = PerformanceUtils.measureDuration {
         writeSubFeed(subFeed, isRecursiveInput)
       }
-      result.metrics.foreach(m => if(m.nonEmpty) addRuntimeMetrics(Some(context.executionId), Some(output.id), GenericMetrics(s"$id-${output.id}", 1, m)))
-      logWritingFinished(subFeed, result.noData, d)
+      result.metrics.foreach { m =>
+        val metricsToAdd = if (result.noData.contains(true)) m + ("no_data"->true) else m // manually add no_data metric
+        if(m.nonEmpty) addRuntimeMetrics(Some(context.executionId), Some(output.id), GenericMetrics(s"$id-${output.id}", 1, metricsToAdd))
+      }
+      val allMetrics = runtimeData.getFinalMetrics(subFeed.dataObjectId).map(_.getMainInfos).getOrElse(Map())
+      logWritingFinished(subFeed, allMetrics, d)
       result.subFeed
     }
   }
@@ -195,10 +200,13 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     logger.info(s"($id) start " + msg)
   }
 
-  protected def logWritingFinished(subFeed: S, noData: Option[Boolean], duration: Duration)(implicit context: ActionPipelineContext): Unit = {
-    val metricsLog = if (noData.contains(true)) ", no data found"
-    else runtimeData.getFinalMetrics(subFeed.dataObjectId).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
-    logger.info(s"($id) finished writing DataFrame to ${subFeed.dataObjectId.id}: jobDuration=$duration" + metricsLog)
+  protected def logWritingFinished(subFeed: S, metrics: Map[String,Any], duration: Duration)(implicit context: ActionPipelineContext): Unit = {
+    val metricsLog = orderMetrics(metrics, SortedSet("count", "records_written", "num_tasks"))
+      .map( x => x._1+"="+x._2).mkString(" ")
+    logger.info(s"($id) finished writing to ${subFeed.dataObjectId.id}: job_duration=$duration " + metricsLog)
+  }
+  private def orderMetrics(metrics: Map[String,Any], orderedKeys: SortedSet[String]): Seq[(String,Any)] = {
+    orderedKeys.toSeq.flatMap(k => metrics.get(k).map(v => (k,v))) ++ metrics.filterKeys(!orderedKeys.contains(_)).toSeq.sortBy(_._1)
   }
 
   private def getMainDataObjectCandidates(mainId: Option[DataObjectId], dataObjects: Seq[DataObject], inputOutput: String): Seq[DataObject] = {

@@ -24,11 +24,11 @@ import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.{CompactionUtil, EnvironmentUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.CollectSetDeterministic.collect_set_deterministic
+import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.util.spark.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
-import io.smartdatalake.util.spark.{DataFrameUtil, Observation}
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.{SparkObservation, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
@@ -266,17 +266,17 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
   }
 
   // Store files observation object between call to setupFilesObserver until it is used in getSparkDataFrame.
-  private val filesObservers: mutable.Map[ActionId, FilesObservation] = mutable.Map()
+  private val filesObservers: mutable.Map[ActionId, FilesSparkObservation] = mutable.Map()
 
   /**
    * Setup an observation of files processed through custom metrics.
    * This is used for incremental processing to keep track of files processed.
    * Note that filenameColumn needs to be configured for the DataObject in order for this to work.
    */
-  def setupFilesObserver(actionId: ActionId): FilesObservation = {
+  def setupFilesObserver(actionId: ActionId): FilesSparkObservation = {
     logger.debug(s"($id) setting up files observer for $actionId")
     // return existing observation for this action if existing, otherwise create a new one.
-    filesObservers.getOrElseUpdate(actionId, new FilesObservation(actionId.id + "/" + id.id))
+    filesObservers.getOrElseUpdate(actionId, new FilesSparkObservation(actionId.id + "/" + id.id))
   }
 
   override def getStreamingDataFrame(options: Map[String, String], pipelineSchema: Option[StructType])(implicit context: ActionPipelineContext): DataFrame = {
@@ -430,7 +430,7 @@ object SparkFileDataObject {
 /**
  * Observation of files processed using custom metrics.
  */
-private[smartdatalake] class FilesObservation(name: String) extends Observation(name) with SmartDataLakeLogger {
+private[smartdatalake] class FilesSparkObservation(name: String) extends SparkObservation(name) with SmartDataLakeLogger {
 
   var filesInExecutionPlan: Option[Seq[String]] = None
 
