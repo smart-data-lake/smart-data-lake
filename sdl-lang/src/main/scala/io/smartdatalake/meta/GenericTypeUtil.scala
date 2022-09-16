@@ -1,11 +1,10 @@
 package io.smartdatalake.meta
 
 import com.github.takezoe.scaladoc.{Scaladoc => ScaladocAnnotation}
-import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{AuthMode, ExecutionMode, SaveModeOptions}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer, ValidationRule}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
-import io.smartdatalake.workflow.action.sparktransformer.{ParsableDfTransformer, ParsableDfsTransformer, ValidationRule}
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata, HousekeepingMode, Table}
@@ -33,8 +32,8 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     typeOf[DataObjectMetadata],
     typeOf[ActionMetadata],
     typeOf[ConnectionMetadata],
-    typeOf[ParsableDfTransformer],
-    typeOf[ParsableDfsTransformer],
+    typeOf[GenericDfTransformer],
+    typeOf[GenericDfsTransformer],
     typeOf[ParsableScriptDef],
     typeOf[ExecutionMode],
     typeOf[HousekeepingMode],
@@ -144,16 +143,19 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
   }
 
   private def formatScaladocString(str: String) = {
-    str.replace(raw"\n", System.lineSeparator()).replaceAll(raw"(?m)^\s*\*\s*", "").trim
+    str.replaceAll(raw"(\\r)?\\n", "\n") // convert & standardize line separator
+      .replaceAll(raw"\n\h*\*\h*", "\n") // remove trailing asterisk
+      .trim // remove leading and trailing line separators
   }
 
   private def formatScaladocMarkup(markup: Markup) = {
     formatScaladocString(markup.trimmed.plainString)
+      .replaceAll(raw"\{\{\{", "```") // convert wiki code block to markup code block
+      .replaceAll(raw"}}}", "```"); // convert wiki code block to markup code block
   }
 
   private def formatScaladoc(doc: scaladoc.Scaladoc, filter: scaladoc.Tag => Boolean = _ => true): String = {
-    val rawText = doc.tags.filter(filter).flatMap(formatScaladocTag).mkString(System.lineSeparator())
-    formatScaladocString(rawText)
+    doc.tags.filter(filter).flatMap(formatScaladocTag).mkString("\n\n")
   }
 
   private def extractScalaDoc(annotations: Seq[Annotation]) = {
@@ -208,20 +210,4 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
       GenericAttributeDef(p.name.encodedName.toString, tpe, description, isRequired = !isOptional && !hasDefaultValue, isOverride = isOverride, isDeprecated = isDeprecated)
     })
   }
-
-  /**
-   * extract case class attributes with values through reflection
-   */
-  def attributesWithValuesForCaseClass(obj: Any): Seq[(String, Any)] = {
-    val clsSym = mirror.classSymbol(obj.getClass)
-    val inst = mirror.reflect(obj)
-    val attributes = clsSym.toType.members.collect { case m: MethodSymbol if m.isCaseAccessor => m }
-    attributes.map { m =>
-      val key = m.name.toString
-      val value = inst.reflectMethod(m).apply()
-      (key, value)
-    }.toSeq
-  }
-
-  private val mirror = scala.reflect.runtime.currentMirror
 }

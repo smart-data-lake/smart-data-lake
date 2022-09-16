@@ -28,12 +28,15 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.json.JsonUtils._
 import io.smartdatalake.util.json.SchemaConverter
-import io.smartdatalake.util.misc.{DataFrameUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.action.script.{CmdScript, DockerRunScript, ParsableScriptDef}
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.from_json
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.json4s.Formats
 import org.json4s.jackson.JsonMethods.compact
 
@@ -57,9 +60,9 @@ case class AirbyteDataObject(override val id: DataObjectId,
                              streamName: String,
                              cmd: ParsableScriptDef,
                              incrementalCursorFields: Seq[String] = Seq(),
-                             override val schemaMin: Option[StructType] = None,
+                             override val schemaMin: Option[GenericSchema] = None,
                              override val metadata: Option[DataObjectMetadata] = None)
-  extends DataObject with CanCreateDataFrame with CanCreateIncrementalOutput with SchemaValidation with SmartDataLakeLogger {
+  extends DataObject with CanCreateSparkDataFrame with CanCreateIncrementalOutput with SchemaValidation with SmartDataLakeLogger {
 
   // these variables will be initialized in prepare phase
   private var spec: Option[AirbyteConnectorSpecification] = None
@@ -94,7 +97,7 @@ case class AirbyteDataObject(override val id: DataObjectId,
     logger.info(s"($id) got schema: ${schema.get.simpleString}")
   }
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     assert(configuredStream.nonEmpty, s"($id) prepare must be called before getDataFrame")
     implicit val session = context.sparkSession
     import session.implicits._
@@ -123,23 +126,22 @@ case class AirbyteDataObject(override val id: DataObjectId,
           .select($"parsed.*")
     }
 
-    validateSchemaMin(df, "read")
+    validateSchemaMin(SparkSchema(df.schema), "read")
     df
   }
 
   override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
     assert(configuredStream.nonEmpty, s"($id) prepare must be called before setState")
-    assert(spec.exists(_.supportsIncremental), s"${id} Connector does not support incremental output")
+    assert(spec.flatMap(_.supportsIncremental).getOrElse(true), s"${id} Connector does not support incremental output")
     assert(configuredStream.exists(_.stream.supported_sync_modes.contains(SyncModeEnum.incremental)), s"${id} Stream '$streamName' does not support incremental output")
     this.state = state
-    if (state.isDefined) configuredStream = configuredStream.map(_.copy(sync_mode = SyncModeEnum.incremental))
-    else configuredStream = configuredStream.map(_.copy(sync_mode = SyncModeEnum.full_refresh))
+    configuredStream = configuredStream.map(_.copy(sync_mode = SyncModeEnum.incremental))
   }
 
   override def getState: Option[String] = {
     assert(configuredStream.nonEmpty, s"($id) prepare must be called before getState")
-    assert(spec.exists(_.supportsIncremental), s"${id} Connector does not support incremental output")
-    assert(configuredStream.exists(_.sync_mode == SyncModeEnum.incremental), s"${id} Stream configuration must be set to SyncMode.Incremental by calling setState before")
+    assert(spec.flatMap(_.supportsIncremental).getOrElse(true), s"${id} Connector does not support incremental output")
+    assert(state.isEmpty || configuredStream.exists(_.sync_mode == SyncModeEnum.incremental), s"${id} Stream configuration must be set to SyncMode.Incremental by calling setState before")
     state
   }
 

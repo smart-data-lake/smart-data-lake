@@ -22,9 +22,10 @@ import com.typesafe.config.{Config, ConfigException, ConfigFactory}
 import io.smartdatalake.config.SdlConfigObject._
 import io.smartdatalake.workflow.action
 import io.smartdatalake.workflow.action.TestDfTransformer
-import io.smartdatalake.workflow.action.customlogic.CustomFileTransformerConfig
+import io.smartdatalake.workflow.action.generic.transformer.{DataValidationTransformer, DfTransformerWrapperDfsTransformer, FilterTransformer, RowLevelValidationRule, SQLDfsTransformer, WhitelistTransformer}
 import io.smartdatalake.workflow.action.script.CmdScript
-import io.smartdatalake.workflow.action.sparktransformer._
+import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
 import org.scalatest.{FlatSpec, Matchers}
 
 
@@ -62,7 +63,7 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
 
   "CopyAction" should "be parsable" in {
 
-    val customTransformerConfig = ScalaClassDfTransformer(
+    val customTransformerConfig = ScalaClassSparkDfTransformer(
       className = classOf[TestDfTransformer].getName
     )
 
@@ -75,7 +76,7 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
         |   outputId = tdo2
         |   delete-data-after-read = false
         |   transformers = [
-        |     { type = ScalaClassDfTransformer, class-name = io.smartdatalake.workflow.action.TestDfTransformer }
+        |     { type = ScalaClassSparkDfTransformer, class-name = io.smartdatalake.workflow.action.TestDfTransformer }
         |     { type = WhitelistTransformer, columnWhitelist = [col1, col2] }
         |     { type = FilterTransformer, filterClause = "1 = 1" }
         |     { type = DataValidationTransformer, rules = [{ type = RowLevelValidationRule, condition = "a is not null" }]}
@@ -98,13 +99,13 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
     )
   }
 
-  "CustomSparkAction" should "be parsable" in {
+  "CustomDataFrameAction" should "be parsable" in {
 
     val config = ConfigFactory.parseString(
       """
         |actions = {
         | 123 = {
-        |   type = CustomSparkAction
+        |   type = CustomDataFrameAction
         |   inputIds = [tdo1]
         |   outputIds = [tdo2]
         |   transformers = [{
@@ -123,12 +124,12 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
         |""".stripMargin).withFallback(dataObjectConfig).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
-    registry.getActions.head shouldBe action.CustomSparkAction(
+    registry.getActions.head shouldBe action.CustomDataFrameAction(
       id = "123",
       inputIds = Seq("tdo1"),
       outputIds = Seq("tdo2"),
       transformers = Seq(
-        SQLDfsTransformer(code = Map(DataObjectId("test") -> "select * from test")),
+        SQLDfsTransformer(code = Map("test" -> "select * from test")),
         DfTransformerWrapperDfsTransformer(subFeedsToApply = Seq("test"), transformer = FilterTransformer(filterClause = "1 = 1"))
       )
     )

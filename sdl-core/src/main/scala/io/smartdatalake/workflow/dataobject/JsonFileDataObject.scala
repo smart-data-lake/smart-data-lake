@@ -25,10 +25,10 @@ import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.AclDef
-import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import org.apache.spark.sql.DataFrame
 
 /**
  * A [[io.smartdatalake.workflow.dataobject.DataObject]] backed by a JSON data source.
@@ -42,7 +42,11 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param stringify Set the data type for all values to string.
  * @param jsonOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and
  *                    [[org.apache.spark.sql.DataFrameWriter]].
- * @param schema An optional data object schema. If defined, any automatic schema inference is avoided. As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
+ * @param schema An optional data object schema. If defined, any automatic schema inference is avoided.
+ *               As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
+ *               Define the schema by using one of the schema providers DDL, jsonSchemaFile, xsdFile or caseClassName.
+ *               The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
+ *               A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
@@ -59,8 +63,8 @@ case class JsonFileDataObject( override val id: DataObjectId,
                                override val path: String,
                                jsonOptions: Option[Map[String, String]] = None,
                                override val partitions: Seq[String] = Seq(),
-                               override val schema: Option[StructType] = None,
-                               override val schemaMin: Option[StructType] = None,
+                               override val schema: Option[GenericSchema] = None,
+                               override val schemaMin: Option[GenericSchema] = None,
                                override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                override val sparkRepartition: Option[SparkRepartitionDef] = None,
                                stringify: Boolean = false,
@@ -71,7 +75,7 @@ case class JsonFileDataObject( override val id: DataObjectId,
                                override val housekeepingMode: Option[HousekeepingMode] = None,
                                override val metadata: Option[DataObjectMetadata] = None
                              )(implicit override val instanceRegistry: InstanceRegistry)
-  extends SparkFileDataObject with CanCreateDataFrame with CanWriteDataFrame {
+  extends SparkFileDataObject {
 
   override val format = "json"
 

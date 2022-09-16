@@ -27,7 +27,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SmartDataLakeLogger}
 import io.smartdatalake.util.secrets.{SecretProviderConfig, SecretsUtil}
-import io.smartdatalake.workflow.action.customlogic.{PythonUDFCreatorConfig, SparkUDFCreatorConfig}
+import io.smartdatalake.workflow.action.spark.customlogic.{PythonUDFCreatorConfig, SparkUDFCreatorConfig}
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.custom.ExpressionEvaluator

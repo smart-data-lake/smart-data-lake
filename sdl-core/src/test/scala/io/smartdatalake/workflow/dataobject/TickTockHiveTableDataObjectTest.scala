@@ -17,19 +17,18 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 package io.smartdatalake.workflow.dataobject
-import java.nio.file.Files
-import java.time.LocalDateTime
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.util.hive.HiveUtil
-import io.smartdatalake.workflow.action.CustomSparkAction
-import io.smartdatalake.workflow.action.customlogic.{CustomDfsTransformer, CustomDfsTransformerConfig}
-import io.smartdatalake.workflow.action.sparktransformer.ScalaClassDfsTransformer
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SparkSubFeed}
+import io.smartdatalake.workflow.action.CustomDataFrameAction
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
+
+import java.nio.file.Files
 
 
 class TickTockHiveTableDataObjectTest extends FunSuite with BeforeAndAfter {
@@ -59,16 +58,16 @@ class TickTockHiveTableDataObjectTest extends FunSuite with BeforeAndAfter {
 
     // create target
     val tgtTable = Table(Some("default"),"output")
-    val tgtDO = TickTockHiveTableDataObject("output", Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, partitions = Seq(), numInitialHdfsPartitions = 1, schemaMin=Some(schemaMin))
+    val tgtDO = TickTockHiveTableDataObject("output", Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, partitions = Seq(), numInitialHdfsPartitions = 1, schemaMin=Some(SparkSchema(schemaMin)))
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
-    val customTransformerConfig = ScalaClassDfsTransformer(className = classOf[TestDfsTransformerEmptyDf].getName)
-    val action = CustomSparkAction("action", List(srcDO.id), List(tgtDO.id), transformers = Seq(customTransformerConfig), recursiveInputIds = List(tgtDO.id))
+    val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerEmptyDf].getName)
+    val action = CustomDataFrameAction("action", List(srcDO.id), List(tgtDO.id), transformers = Seq(customTransformerConfig), recursiveInputIds = List(tgtDO.id))
 
     // write test files
     val l1 = Seq((1, "john", 5)).toDF("id", "name", "rating")
-    srcDO.writeDataFrame(l1, Seq())
+    srcDO.writeSparkDataFrame(l1, Seq())
 
     action.exec(Seq(SparkSubFeed(None, "input", Seq()), SparkSubFeed(None, "output", Seq())))(contextExec)
 

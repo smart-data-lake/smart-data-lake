@@ -27,8 +27,11 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
-import io.smartdatalake.util.misc.{AclDef, AclUtil, DataFrameUtil, PerformanceUtils}
+import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils, ProductUtil}
+import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.{col, lit}
@@ -56,7 +59,10 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param partitions partition columns for this data object
  * @param options Options for Delta Lake tables see: [[https://docs.delta.io/latest/delta-batch.html]] and [[org.apache.spark.sql.delta.DeltaOptions]]
  * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
+ *                  Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param table DeltaLake table to be written by this output
+ * @param constraints List of row-level [[Constraint]]s to enforce when writing to this data object.
+ * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
  * @param saveMode [[SDLSaveMode]] to use when writing files, default is "overwrite". Overwrite, Append and Merge are supported for now.
  * @param allowSchemaEvolution If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
  * @param retentionPeriod Optional delta lake retention threshold in hours. Files required by the table for reading versions younger than retentionPeriod will be preserved and the rest of them will be deleted.
@@ -72,9 +78,11 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     path: Option[String],
                                     override val partitions: Seq[String] = Seq(),
-                                    options: Option[Map[String,String]] = None,
-                                    override val schemaMin: Option[StructType] = None,
+                                    override val options: Map[String,String] = Map(),
+                                    override val schemaMin: Option[GenericSchema] = None,
                                     override var table: Table,
+                                    override val constraints: Seq[Constraint] = Seq(),
+                                    override val expectations: Seq[Expectation] = Seq(),
                                     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     override val allowSchemaEvolution: Boolean = false,
                                     retentionPeriod: Option[Int] = None, // hours
@@ -84,7 +92,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override val housekeepingMode: Option[HousekeepingMode] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore {
+  extends TransactionalSparkTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation {
 
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
@@ -114,7 +122,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         val definedPathNormalized = HiveUtil.normalizePath(getAbsolutePath.toString)
 
         if (definedPathNormalized != hadoopPathNormalized)
-          logger.warn(s"($id) Table ${table.fullName} exists already with different path. The table will use the existing path definition ${hadoopPathHolder}!")
+          logger.warn(s"($id) Table ${table.fullName} exists already with different path $path. The table will use the existing path definition $hadoopPathHolder!")
       }
     }
     hadoopPathHolder
@@ -181,16 +189,15 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     val df = context.sparkSession.table(table.fullName)
-    validateSchemaMin(df, "read")
+    validateSchemaMin(SparkSchema(df.schema), "read")
     validateSchemaHasPartitionCols(df, "read")
     df
   }
 
-  override def init(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
-    super.init(df, partitionValues)
-    validateSchemaMin(df, "write")
+  override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
+    validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
     validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
   }
@@ -203,9 +210,9 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
+  override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit context: ActionPipelineContext): Unit = {
-    validateSchemaMin(df, "write")
+    validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
     validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
     writeDataFrame(df, createTableOnly = false, partitionValues, saveModeOptions)
@@ -219,6 +226,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   def writeDataFrame(df: DataFrame, createTableOnly: Boolean, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions])
                     (implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
+    implicit val helper: SparkSubFeed.type = SparkSubFeed
     val dfPrepared = if (createTableOnly) {
       // create empty df with existing df's schema
       DataFrameUtil.getEmptyDataFrame(df.schema)
@@ -228,11 +236,11 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(dfPrepared)).getOrElse(dfPrepared)
     val dfWriter = saveModeTargetDf.write
       .format("delta")
-      .options(options.getOrElse(Map()))
+      .options(options)
       .option("path", hadoopPath.toString)
 
     if (isTableExisting) {
-      if (!allowSchemaEvolution) validateSchema(saveModeTargetDf, session.table(table.fullName).schema, "write")
+      if (!allowSchemaEvolution) validateSchema(SparkSchema(saveModeTargetDf.schema), SparkSchema(session.table(table.fullName).schema), "write")
       if (finalSaveMode == SDLSaveMode.Merge) {
         // merge operations still need all columns for potential insert/updateConditions. Therefore dfPrepared instead of saveModeTargetDf is passed on.
         mergeDataFrameByPrimaryKey(dfPrepared, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
@@ -241,20 +249,20 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
           dfWriter
             .option("overwriteSchema", allowSchemaEvolution) // allow overwriting schema when overwriting whole table
             .option("mergeSchema", allowSchemaEvolution)
-            .mode(finalSaveMode.asSparkSaveMode)
+            .mode(SparkSaveMode.from(finalSaveMode))
             .save() // SaveMode append has strange errors with Table API in delta version 1.1.9
         } else {
           // insert
           if (finalSaveMode == SDLSaveMode.Overwrite) {
             if (partitionValues.isEmpty) throw new ProcessingLogicException(s"($id) Overwrite without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data.")
             dfWriter
-              .option("replaceWhere", partitionValues.map(_.getSparkExpr).reduce(_ or _).expr.sql)
+              .option("replaceWhere", partitionValues.map(_.getFilterExpr).reduce(_ or _).exprSql)
               .option("mergeSchema", allowSchemaEvolution)
-              .mode(finalSaveMode.asSparkSaveMode)
+              .mode(SparkSaveMode.from(finalSaveMode))
               .save() // atomic replace (replaceWhere) doesn't work with Table API
           } else {
             dfWriter
-              .mode(finalSaveMode.asSparkSaveMode)
+              .mode(SparkSaveMode.from(finalSaveMode))
               .option("mergeSchema", allowSchemaEvolution)
               .save() // it seems generally more stable to work without Table API
           }
@@ -287,6 +295,16 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     // set schema evolution support
     // this is done in a synchronized block because DataObjects with or without autoMerge enabled can be mixed and executed in parallel in a DAG
     DeltaLakeTableDataObject.synchronized { // note that this is synchronizing on the object (singleton)
+      // create missing columns to support schema evolution
+      val insertCols = df.columns.diff(saveModeOptions.insertColumnsToIgnore)
+      if (saveModeOptions.updateColumnsOpt.isDefined || saveModeOptions.insertColumnsToIgnore.nonEmpty || saveModeOptions.insertValuesOverride.nonEmpty) {
+        val existingCols = session.table(table.fullName).schema.fieldNames
+        insertCols.diff(existingCols).foreach { col =>
+          val sqlType = df.schema(col).dataType.sql
+          logger.info(s"($id) Manually creating col $col for working around schema evolution limitations with merge statement")
+          session.sql(s"ALTER TABLE ${table.fullName} ADD COLUMN $col $sqlType")
+        }
+      }
       session.conf.set("spark.databricks.delta.schema.autoMerge.enabled", allowSchemaEvolution)
       val deltaTable = DeltaTable.forName(session, table.fullName).as("existing")
       // prepare join condition
@@ -302,12 +320,14 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         mergeStmt.whenMatched(saveModeOptions.updateConditionExpr.getOrElse(lit(true))).updateAll()
       }
       // add insert clause - insertExpr does not support referring new columns in existing table on schema evolution, that's why we use it only when needed, and insertAll otherwise
-      mergeStmt = if (saveModeOptions.insertColumnsToIgnore.nonEmpty) {
-        val insertCols = df.columns.diff(saveModeOptions.insertColumnsToIgnore)
-        mergeStmt.whenNotMatched(saveModeOptions.insertConditionExpr.getOrElse(lit(true))).insertExpr(insertCols.map(c => c -> s"new.$c").toMap)
+      mergeStmt = if (saveModeOptions.insertColumnsToIgnore.nonEmpty || saveModeOptions.insertValuesOverride.nonEmpty) {
+        // create merge statement
+        mergeStmt.whenNotMatched(saveModeOptions.insertConditionExpr.getOrElse(lit(true)))
+          .insertExpr(insertCols.map(c => c -> saveModeOptions.insertValuesOverride.getOrElse(c, s"new.$c")).toMap)
       } else {
         mergeStmt.whenNotMatched(saveModeOptions.insertConditionExpr.getOrElse(lit(true))).insertAll()
       }
+      logger.info(s"($id) executing merge statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1+"="+e._2).mkString(" ")}")
       // execute delta lake statement
       mergeStmt.execute()
     }
@@ -365,15 +385,26 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       else Seq()
     )
     logger.debug(s"($id) listPartitions took $d")
-    return pvs
+    pvs
   }
 
   /**
    * Note that we will not delete the whole partition but just the data of the partition because delta lake keeps history
    */
   override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    implicit val helper: SparkSubFeed.type = SparkSubFeed
     val deltaTable = DeltaTable.forName(context.sparkSession, table.fullName)
-    partitionValues.map(_.getSparkExpr).foreach(expr => deltaTable.delete(expr))
+    partitionValues.map(_.getFilterExpr).foreach(expr => deltaTable.delete(expr.exprSql))
+  }
+
+  override def movePartitions(partitionValues: Seq[(PartitionValues, PartitionValues)])(implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
+    val deltaTable = DeltaTable.forName(context.sparkSession, table.fullName)
+    partitionValues.foreach {
+      case (pvExisting, pvNew) =>
+        deltaTable.update(pvExisting.getFilterExpr(SparkSubFeed).asInstanceOf[SparkColumn].inner, pvNew.elements.mapValues(lit))
+        logger.info(s"($id) Partition $pvExisting moved to $pvNew")
+    }
   }
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = {

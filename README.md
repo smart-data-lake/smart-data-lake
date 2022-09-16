@@ -28,7 +28,7 @@ Some common use cases include:
 * Data migration - Efficiently create one-time data pipelines
 * Data Catalog / Data Lineage - Generated automatically from metadata 
 
-See [Features](docs/Features.md) for a comprehensive list of Smart Data Lake Builder features.
+See [Features](https://github.com/smart-data-lake/smart-data-lake/blob/documentation/docs/features.md) for a comprehensive list of Smart Data Lake Builder features.
 
 ## How it works
 The following diagram shows the core concepts:
@@ -54,7 +54,7 @@ All metadata i.e. connections, data objects and actions are defined in a central
 The file format used is [HOCON](https://github.com/lightbend/config/blob/master/HOCON.md) which makes it easy to edit.
 
 ### Getting Started
-To see how all this works in action, head over to the [Getting Started](docs/GettingStarted.md) page.
+To see how all this works in action, head over to the [Getting Started](https://smartdatalake.ch/docs/getting-started/setup) page.
 
 # Major Contributors
 ![SBB](docs/images/SBB_logo.png)  
@@ -64,12 +64,12 @@ To see how all this works in action, head over to the [Getting Started](docs/Get
 [www.elca.ch](http://www.elca.ch) : Did the comprehensive revision and provision as open source project 
 
 # Additional Documentation
-[Getting Started](docs/GettingStarted.md)  
-[Reference](docs/Reference.md)  
-[Architecture](docs/Architecture.md)  
-[Testing](docs/Testing.md)  
-[Glossary](docs/Glossary.md)  
-[Troubleshooting](docs/Troubleshooting.md)    
+[Getting Started](https://smartdatalake.ch/docs/getting-started/setup)  
+[Reference](https://smartdatalake.ch/docs/reference/build)  
+[Architecture](https://smartdatalake.ch/docs/architecture)  
+[Testing](https://github.com/smart-data-lake/smart-data-lake/blob/documentation/docs/reference/testing.md)  
+[Glossary](https://github.com/smart-data-lake/smart-data-lake/blob/documentation/docs/reference/glossary.md)  
+[Troubleshooting](https://smartdatalake.ch/docs/getting-started/troubleshooting/common-problems)    
 [FAQ](docs/FAQ.md)  
-[Contributing](docs/Contribute.md)  
+[Contributing](CONTRIBUTING.MD)  
 [Running in the Public Cloud](docs/PublicCloud.md)  

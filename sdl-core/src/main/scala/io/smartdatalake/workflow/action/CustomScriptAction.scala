@@ -21,23 +21,21 @@ package io.smartdatalake.workflow.action
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, ParsableFromConfig}
-import io.smartdatalake.definitions.{Condition, ExecutionMode}
-import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.definitions.Condition
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
-import io.smartdatalake.workflow.action.sparktransformer.FilterTransformer.extract
-import io.smartdatalake.workflow.action.sparktransformer.{DfsTransformer, FilterTransformer, ParsableDfTransformer, PartitionValueTransformer}
 import io.smartdatalake.workflow.dataobject.{CanReceiveScriptNotification, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, ScriptSubFeed}
-import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
  * [[Action]] execute script after multiple input DataObjects are ready, notifying multiple output DataObjects when script succeeded.
+ *
+ * Note that this action can also be used to give your data pipeline additional structure, e.g. adding a decision point after several actions have been executed.
  *
  * @param inputIds               input DataObject's
  * @param outputIds              output DataObject's
  * @param scripts                definition of scripts to execute
  * @param executionCondition     optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
- *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
+ *                               default behaviour: if no executionCondition is defined, Action is executed if no input subFeed is skipped.
  */
 case class CustomScriptAction(override val id: ActionId,
                               inputIds: Seq[DataObjectId],

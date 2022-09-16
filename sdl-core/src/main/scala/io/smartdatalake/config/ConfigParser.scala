@@ -22,10 +22,11 @@ import com.typesafe.config.{Config, ConfigException, ConfigValueFactory, ConfigV
 import configs.syntax._
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{PerformanceUtils, ReflectionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataobject.DataObject
+import org.reflections.Reflections
 
 import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe._
@@ -47,16 +48,25 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   def parse(config: Config, instanceRegistry: InstanceRegistry = new InstanceRegistry): InstanceRegistry = {
     implicit val registry: InstanceRegistry = instanceRegistry
 
-    val connections: Map[ConnectionId, Connection] = getConnectionConfigMap(config)
-      .map{ case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config))}
+    val (connections, t1) = PerformanceUtils.measureTime {
+      getConnectionConfigMap(config)
+        .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
+    }
+    logger.debug(s"Parsed ${connections.size} in $t1 seconds")
     registry.register(connections)
 
-    val dataObjects: Map[DataObjectId, DataObject] = getDataObjectConfigMap(config)
-      .map{ case (id, config) => (DataObjectId(id), parseConfigObjectWithId[DataObject](id, config))}
+    val (dataObjects, t2) = PerformanceUtils.measureTime {
+      getDataObjectConfigMap(config)
+        .map { case (id, config) => (DataObjectId(id), parseConfigObjectWithId[DataObject](id, config)) }
+    }
+    logger.debug(s"Parsed ${dataObjects.size} in $t2 seconds")
     registry.register(dataObjects)
 
-    val actions: Map[ActionId, Action] = getActionConfigMap(config)
-      .map{ case (id, config) => (ActionId(id), parseConfigObjectWithId[Action](id, config))}
+    val (actions,t3) = PerformanceUtils.measureTime {
+      getActionConfigMap(config)
+        .map { case (id, config) => (ActionId(id), parseConfigObjectWithId[Action](id, config)) }
+    }
+    logger.debug(s"Parsed ${actions.size} in $t3 seconds")
     registry.register(actions)
 
     registry
@@ -178,19 +188,23 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   /**
    * Extracts the fully qualified class name from the type parameter in the config.
    *
-   * If a "short name" is provided without package specification, it prepends the package name of its abstract type
-   * inferred from the short name (xxxAction or yyyDataObject).
+   * If a "short name" is provided without package specification, search for an implementation with name configuredType
+   * of the abstract type inside package "io.smartdatalake.workflow".
    *
    * @param configuredType type attribute from configuration.
    * @tparam A            the abstract type of this object, i.e.: [[Action]] or [[DataObject]]
    * @return              the fully qualified class name of this class.
    */
   private def className[A <: ParsableFromConfig[_] : TypeTag](configuredType: String): String = {
-    // if no package name is given, prefix with package name of abstract type
+    // if no package name is given, we search for an implementation with simple class name <configuredType> of the abstract type [A] inside package "io.smartdatalake.workflow"
     if (!configuredType.contains('.')) {
+      implicit val reflections: Reflections = ReflectionUtil.getReflections("io.smartdatalake.workflow")
+      val implClasses = ReflectionUtil.getTraitImplClasses[A]
+        .filter(_.getSimpleName == configuredType)
       val abstractSymbol = symbolOf[A]
-      val abstractOwner = Iterator.iterate(abstractSymbol)(_.owner.asType).takeWhile(!_.isPackage).toSeq.last
-      s"${abstractOwner.fullName.split('.').dropRight(1).mkString(".")}.$configuredType"
+      if (implClasses.isEmpty) throw new ClassNotFoundException(s"Implementation $configuredType of interface ${abstractSymbol.name} not found")
+      if (implClasses.size>1) throw new IllegalStateException(s"Multiple implementation named $configuredType for interface ${abstractSymbol.name} found: ${implClasses.map(_.getName).mkString(", ")}")
+      implClasses.head.getName
     } else configuredType
   }
 

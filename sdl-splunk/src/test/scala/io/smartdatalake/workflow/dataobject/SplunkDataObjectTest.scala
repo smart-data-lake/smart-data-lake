@@ -97,7 +97,7 @@ class SplunkDataObjectTest extends DataObjectTestSuite {
     Assertions
 
     // run
-    val resultDf = sut.getDataFrame()
+    val resultDf = sut.getSparkDataFrame()
 
     // check
     val result = resultDf.collect()
@@ -119,7 +119,7 @@ class SplunkDataObjectTest extends DataObjectTestSuite {
     val sut = createSutWithStubs(splunkDO)
 
     // run
-    val resultDf = sut.getDataFrame()
+    val resultDf = sut.getSparkDataFrame()
     val result = resultDf.collect()
 
     // check

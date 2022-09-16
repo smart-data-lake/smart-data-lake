@@ -24,7 +24,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.DAGHelper._
 import io.smartdatalake.util.dag._
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{LogUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action._
@@ -35,6 +35,7 @@ import org.slf4j.event.Level
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.collection.JavaConverters._
 
 private[smartdatalake] case class ActionDAGEdge(override val nodeIdFrom: NodeId, override val nodeIdTo: NodeId, override val resultId: String) extends DAGEdge
 
@@ -208,7 +209,13 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
    */
   def getRuntimeInfos: Map[ActionId, RuntimeInfo] = {
     dag.getNodes.map { a =>
-      (a.id, a.getRuntimeInfo(Some(executionId)).getOrElse(RuntimeInfo(executionId, RuntimeEventState.PENDING)))
+      var runtimeInfo = a.getRuntimeInfo(Some(executionId)).getOrElse(RuntimeInfo(executionId, RuntimeEventState.PENDING))
+      // overwrite DataObjectsState for skipped actions to keep previous state.
+      if (runtimeInfo.state == RuntimeEventState.SKIPPED) {
+        val inputIds = a.inputs.map(_.id)
+        runtimeInfo = runtimeInfo.copy(dataObjectsState = initialDataObjectsState.filter(e => inputIds.contains(e.dataObjectId)))
+      }
+      (a.id, runtimeInfo)
     }.toMap
   }
 
@@ -332,6 +339,10 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
     ActionDAGRun(dag, context.executionId, partitionValues, parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners, actionsSkipped)
   }
 
+  /**
+   * Log DAG-state as Ascii graph.
+   * If graph is wider than a configured number of characters, it is only printed as list in topological order.
+   */
   def logDag(msg: String, dag: DAG[_], executionId: Option[ExecutionId] = None): Unit = {
     def nodeToString(node: DAGNode): String = {
       node match {
@@ -340,9 +351,12 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
       }
     }
 
-    logger.info(
-      s"""$msg:
-         |${dag.render(nodeToString)}
-    """.stripMargin)
+    // log ascii dag if max line length is small enough
+    val dagString = dag.render(nodeToString)
+    if (LogUtil.splitLines(dagString).map(_.size).max <= Environment.dagGraphLogMaxLineLength) {
+      logger.info(s"$msg:\n$dagString\n")
+    } else {
+      logger.info(s"$msg:\n ${dag.sortedNodes.map(nodeToString).mkString("\n ")}\n")
+    }
   }
 }

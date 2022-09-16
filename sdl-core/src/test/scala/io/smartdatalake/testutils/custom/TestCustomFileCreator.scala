@@ -19,9 +19,9 @@
 
 package io.smartdatalake.testutils.custom
 
-import java.io.ByteArrayInputStream
+import io.smartdatalake.workflow.action.spark.customlogic.CustomFileCreator
 
-import io.smartdatalake.workflow.action.customlogic.CustomFileCreator
+import java.io.ByteArrayInputStream
 import org.apache.spark.sql.SparkSession
 
 class TestCustomFileCreator extends CustomFileCreator {

@@ -28,8 +28,9 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration._
 import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.misc.DataFrameUtil.{DfSDL, defaultPersistDf}
+import io.smartdatalake.util.spark.DataFrameUtil.{DfSDL, defaultPersistDf}
 import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.SDLExecutionId
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
@@ -107,7 +108,7 @@ object TestUtil extends SmartDataLakeLogger {
                      )(implicit instanceRegistry: InstanceRegistry, context: ActionPipelineContext): HiveTableDataObject = {
     val table = Table(db=db,name=tableName,primaryKey=primaryKeyColumns)
     val path = dirPath+s"$tableName"
-    val hTabDo = HiveTableDataObject(id=s"${tableName}DO",path=Some(path),schemaMin=schemaMin,table=table)
+    val hTabDo = HiveTableDataObject(id=s"${tableName}DO",path=Some(path),schemaMin=schemaMin.map(SparkSchema),table=table)
     hTabDo.dropTable
     instanceRegistry.register(hTabDo)
     prepareHiveTable(table,path,df,partitionCols)

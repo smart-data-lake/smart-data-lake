@@ -26,6 +26,7 @@ import io.smartdatalake.meta.{GenericAttributeDef, GenericTypeDef, GenericTypeUt
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.connection.Connection
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataobject.DataObject
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
@@ -80,7 +81,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
     val jsonRootDef = SchemaRootObjectDef(
       `$schema` = "http://json-schema.org/draft-07/schema#",
       version = version,
-      id = "sdl-schema.json#",
+      id = s"sdl-schema-$version.json#",
       properties = ListMap(
         globalKey -> globalJsonDef,
         connectionsKey -> JsonMapDef(JsonOneOfDef(registry.getJsonRefDefs(typeOf[Connection]), Some("Map Connection name : definition"))),
@@ -131,6 +132,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
         case t if t =:= typeOf[Boolean] => JsonBooleanDef(description, deprecated = isDeprecated)
         case t if t.typeSymbol.asType.toType <:< typeOf[ConfigObjectId] => JsonStringDef(description, deprecated = isDeprecated) // map DataObjectId as string
         case t if t =:= typeOf[StructType] => JsonStringDef(description, deprecated = isDeprecated) // map StructType (Spark schema) as string
+        case t if t =:= typeOf[GenericSchema] => JsonStringDef(description, deprecated = isDeprecated) // map GenericSchema as string
         case t if t =:= typeOf[OutputMode] => JsonStringDef(description, enum = Some(Seq("Append", "Complete", "Update")), deprecated = isDeprecated) // OutputMode is not an ordinary enum...
         // BaseTypes needs to be handled before ParsableFromConfig type
         case t if registry.baseTypeExists(t) => {

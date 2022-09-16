@@ -23,14 +23,15 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
-import io.smartdatalake.definitions.{DateColumnType, Environment, OutputType, SDLSaveMode, SaveModeOptions}
+import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, CompactionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.connection.HiveTableConnection
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
-import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.spark.sql.types.StructType
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 
 import scala.collection.JavaConverters._
@@ -50,8 +51,11 @@ import scala.collection.JavaConverters._
  * @param analyzeTableAfterWrite enable compute statistics after writing data (default=false)
  * @param dateColumnType type of date column
  * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
+ *                  Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param saveMode spark [[SaveMode]] to use when writing files, default is "overwrite"
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
+ * @param constraints List of row-level [[Constraint]]s to enforce when writing to this data object.
+ * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
  * @param numInitialHdfsPartitions number of files created when writing into an empty table (otherwise the number will be derived from the existing data)
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
@@ -65,8 +69,10 @@ case class HiveTableDataObject(override val id: DataObjectId,
                                override val partitions: Seq[String] = Seq(),
                                analyzeTableAfterWrite: Boolean = false,
                                dateColumnType: DateColumnType = DateColumnType.Date,
-                               override val schemaMin: Option[StructType] = None,
+                               override val schemaMin: Option[GenericSchema] = None,
                                override var table: Table,
+                               override val constraints: Seq[Constraint] = Seq(),
+                               override val expectations: Seq[Expectation] = Seq(),
                                numInitialHdfsPartitions: Int = 16,
                                saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                acl: Option[AclDef] = None,
@@ -75,7 +81,8 @@ case class HiveTableDataObject(override val id: DataObjectId,
                                override val housekeepingMode: Option[HousekeepingMode] = None,
                                override val metadata: Option[DataObjectMetadata] = None)
                               (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TableDataObject with CanWriteDataFrame with CanHandlePartitions with HasHadoopStandardFilestore with SmartDataLakeLogger {
+  extends TableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame with CanHandlePartitions with HasHadoopStandardFilestore
+    with ExpectationValidation with SmartDataLakeLogger {
 
   // Hive tables are always written in parquet format
   private val fileName = "*.parquet"
@@ -84,6 +91,8 @@ case class HiveTableDataObject(override val id: DataObjectId,
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
    */
   private val connection = connectionId.map(c => getConnection[HiveTableConnection](c))
+
+  override def options: Map[String, String] = Map() // override options because of conflicting definitions in CanCreateSparkDataFrame and CanWriteSparkDataFrame
 
   // prepare table
   table = table.overrideDb(connection.map(_.db))
@@ -101,7 +110,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
     if (hadoopPathHolder == null) {
       hadoopPathHolder = {
         if (thisIsTableExisting) new Path(HiveUtil.existingTableLocation(table))
-        else HdfsUtil.prefixHadoopPath(path.get, connection.map(_.pathPrefix))
+        else HdfsUtil.prefixHadoopPath(path.get, connection.flatMap(_.pathPrefix))
       }
 
       // For existing tables, check to see if we write to the same directory. If not, issue a warning.
@@ -111,7 +120,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
         val definedPathNormalized = HiveUtil.normalizePath(path.get)
 
         if (definedPathNormalized != hadoopPathNormalized)
-          logger.warn(s"($id) Table ${table.fullName} exists already with different path. The table will be written with new path definition ${hadoopPathHolder}!")
+          logger.warn(s"($id) Table ${table.fullName} exists already with different path ${path}. The table will be written with new path definition ${hadoopPathHolder}!")
       }
     }
     hadoopPathHolder
@@ -126,9 +135,9 @@ case class HiveTableDataObject(override val id: DataObjectId,
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
   }
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     val df = context.sparkSession.table(s"${table.fullName}")
-    validateSchemaMin(df, "read")
+    validateSchemaMin(SparkSchema(df.schema), "read")
     validateSchemaHasPartitionCols(df, "read")
     df
   }
@@ -138,13 +147,12 @@ case class HiveTableDataObject(override val id: DataObjectId,
    */
   private def isOverwriteSchemaAllowed = (saveMode==SDLSaveMode.Overwrite || saveMode!=SDLSaveMode.OverwriteOptimized) && partitions.isEmpty
 
-  override def init(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
+  override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
-    super.init(df, partitionValues)
-    validateSchemaMin(df, "write")
+    validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
     // validate against hive table schema if existing
-    if (isTableExisting && !isOverwriteSchemaAllowed) validateSchema(df, session.table(table.fullName).schema, "write")
+    if (isTableExisting && !isOverwriteSchemaAllowed) validateSchema(SparkSchema(df.schema), SparkSchema(session.table(table.fullName).schema), "write")
   }
 
   override def preWrite(implicit context: ActionPipelineContext): Unit = {
@@ -155,10 +163,10 @@ case class HiveTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
+  override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit context: ActionPipelineContext): Unit = {
     require(!isRecursiveInput, "($id) HiveTableDataObject cannot write dataframe when dataobject is also used as recursive input ")
-    validateSchemaMin(df, "write")
+    validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
     writeDataFrameInternal(df, createTableOnly = false, partitionValues, saveModeOptions)
   }
@@ -192,7 +200,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
     }
 
     // write table and fix acls
-    HiveUtil.writeDfToHive( dfPrepared, hadoopPath, table, partitions, finalSaveMode.asSparkSaveMode, numInitialHdfsPartitions=numInitialHdfsPartitions )
+    HiveUtil.writeDfToHive( dfPrepared, hadoopPath, table, partitions, SparkSaveMode.from(finalSaveMode), numInitialHdfsPartitions=numInitialHdfsPartitions )
     val aclToApply = acl.orElse(connection.flatMap(_.acl))
     if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
     if (analyzeTableAfterWrite && !createTableOnly) {
@@ -204,11 +212,11 @@ case class HiveTableDataObject(override val id: DataObjectId,
     createMissingPartitions(partitionValues)
   }
 
-  override def writeDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
+  override def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
     df.write
       .partitionBy(partitions:_*)
       .format(OutputType.Parquet.toString)
-      .mode(finalSaveMode.asSparkSaveMode)
+      .mode(SparkSaveMode.from(finalSaveMode))
       .save(path.toString)
   }
 

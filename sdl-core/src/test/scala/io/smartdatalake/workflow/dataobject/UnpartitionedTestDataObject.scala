@@ -34,15 +34,17 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 case class UnpartitionedTestDataObject(override val id: DataObjectId,
                                        override val metadata: Option[DataObjectMetadata] = None)
                                       (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateDataFrame with CanWriteDataFrame {
+  extends DataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame {
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+  override def options: Map[String, String] = Map() // override options because of conflicting definitions in CanCreateSparkDataFrame and CanWriteSparkDataFrame
+
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     val session = context.sparkSession
     import session.implicits._
     Seq(("test",1),("test",2)).toDF("a","b")
   }
 
-  override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
+  override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit context: ActionPipelineContext): Unit = {
     df.show
   }

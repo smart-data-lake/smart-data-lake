@@ -22,7 +22,7 @@
 	<parent>
 		<groupId>io.smartdatalake</groupId>
 		<artifactId>sdl-parent</artifactId>
-		<version>2.2.1</version>
+		<version>2.3.0-SNAPSHOT</version>
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
@@ -44,6 +44,7 @@
 
 	<properties>
 		<sdl-core.scope>compile</sdl-core.scope>
+		<confluent.version>6.2.1</confluent.version>
 	</properties>
 
 	<dependencyManagement>
@@ -90,13 +91,17 @@
 			<groupId>org.apache.kafka</groupId>
 			<artifactId>kafka-clients</artifactId>
 		</dependency>
+		<dependency>
+			<groupId>io.confluent</groupId>
+			<artifactId>kafka-json-serializer</artifactId>
+			<version>${confluent.version}</version>
+		</dependency>
 		<!-- this is for reading from kafka using confluent schema registry with Spark -->
-		<!-- this is an unused declared dependency but needed -->
+		<!-- this is an unused declared dependency but needed in tests and at runtime -->
 		<dependency>
 			<groupId>io.confluent</groupId>
 			<artifactId>kafka-schema-registry-client</artifactId>
-			<version>6.2.1</version>
-			<scope>runtime</scope>
+			<version>${confluent.version}</version>
 		</dependency>
 
 		<dependency>
@@ -206,23 +211,24 @@
 			<scope>test</scope>
 		</dependency>
 
-		<!-- https://mvnrepository.com/artifact/net.manub/scalatest-embedded-kafka -->
-		<!--- This is old and unmaintained, but supports up to kafka 0.10 which is what
-		 the spark libraries are based on and also Scala 2.11. There is a replacement which we should
-		 use once 2.11 is dead, including Schema Registry-->
 		<dependency>
 			<groupId>io.github.embeddedkafka</groupId>
 			<artifactId>embedded-kafka_${scala.minor.version}</artifactId>
 			<version>${kafka.version}</version>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>io.github.embeddedkafka</groupId>
+			<artifactId>embedded-kafka-schema-registry_${scala.minor.version}</artifactId>
+			<version>${confluent.version}</version>
+			<scope>test</scope>
+		</dependency>
 
 	</dependencies>
 
 	<build>
-
 		<sourceDirectory>src/main/scala</sourceDirectory>
-		<testSourceDirectory>src/test/scala</testSourceDirectory>
+		<testSourceDirectory>src/test/java</testSourceDirectory>
 		<resources>
 			<resource>
 				<directory>src/main/resources</directory>
@@ -247,6 +253,9 @@
 			<plugin>
 				<groupId>net.alchim31.maven</groupId>
 				<artifactId>scala-maven-plugin</artifactId>
+				<configuration>
+					<testSourceDir>src/test/scala</testSourceDir>
+				</configuration>
 			</plugin>
 
 			<!-- rewrite pom for compiling with different scala version profiles -->

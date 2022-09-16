@@ -18,38 +18,45 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
-import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
-import io.smartdatalake.util.misc.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
-import io.smartdatalake.util.misc.{CompactionUtil, DataFrameUtil}
-import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkRepartitionDef}
+import io.smartdatalake.util.misc.{CompactionUtil, EnvironmentUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.spark.CollectSetDeterministic.collect_set_deterministic
+import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
+import io.smartdatalake.workflow.action.NoDataToProcessWarning
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.spark.{SparkObservation, SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
-import org.apache.spark.sql.functions.input_file_name
-import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
-import org.apache.spark.sql.types.{StringType, StructType}
+import org.apache.spark.sql.execution.FileSourceScanExec
+import org.apache.spark.sql.execution.datasources.FileScanRDD
+import org.apache.spark.sql.functions.{col, input_file_name}
+import org.apache.spark.sql.types.{DataType, StructType}
+
+import java.time.format.DateTimeFormatter
+import java.time.{Instant, LocalDateTime, ZoneId, ZoneOffset}
+import scala.collection.mutable
+import scala.reflect.runtime.universe.typeOf
+import scala.util.Try
 
 /**
  * A [[DataObject]] backed by a file in HDFS. Can load file contents into an Apache Spark [[DataFrame]]s.
  *
  * Delegates read and write operations to Apache Spark [[DataFrameReader]] and [[DataFrameWriter]] respectively.
  */
-private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject with CanCreateDataFrame with CanWriteDataFrame with CanCreateStreamingDataFrame
+private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
+  with CanCreateSparkDataFrame with CanCreateStreamingDataFrame
+  with CanWriteSparkDataFrame with CanCreateIncrementalOutput
   with UserDefinedSchema with SchemaValidation {
 
   /**
    * The Spark-Format provider to be used
    */
   def format: String
-
-  /**
-   * Returns the configured options for the Spark [[DataFrameReader]]/[[DataFrameWriter]].
-   *
-   * @see [[DataFrameReader]]
-   * @see [[DataFrameWriter]]
-   */
-  def options: Map[String, String] = Map()
 
   /**
    * The name of the (optional) additional column containing the source filename
@@ -67,9 +74,9 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * Default is to validate the `schemaMin` and not apply any modification.
    */
   def beforeWrite(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
-    validateSchemaMin(df, "write")
+    validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
-    schema.foreach(schemaExpected => validateSchema(df, schemaExpected, "write"))
+    schema.foreach(schemaExpected => validateSchema(SparkSchema(df.schema), schemaExpected, "write"))
     df
   }
 
@@ -80,9 +87,9 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    */
   def afterRead(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
     implicit val session: SparkSession = context.sparkSession
-    validateSchemaMin(df, "read")
+    validateSchemaMin(SparkSchema(df.schema), "read")
     validateSchemaHasPartitionCols(df, "read")
-    schema.map(createReadSchema).foreach(schemaExpected => validateSchema(df, schemaExpected, "read"))
+    schema.map(createReadSchema).foreach(schemaExpected => validateSchema(SparkSchema(df.schema), schemaExpected, "read"))
     df
   }
 
@@ -93,46 +100,104 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * If a user-defined schema is returned, it overrides any schema inference. If no user-defined schema is set, the
    * schema may be inferred depending on the configuration and type of data frame reader.
    *
-   * @param sourceExists Whether the source file/table exists already. Existing sources may have a source schema.
    * @return The schema to use for the data frame reader when reading from the source.
    */
-  def getSchema(sourceExists: Boolean): Option[StructType] = schema
+  def getSchema(implicit context: ActionPipelineContext): Option[SparkSchema] = {
+    import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
+    _schemaHolder = _schemaHolder.orElse(
+        // get defined schema
+        schema.map(_.convert(typeOf[SparkSubFeed]).asInstanceOf[SparkSchema])
+      )
+      .orElse (
+        // or try reading schema file
+        if (filesystem.exists(schemaFile)) {
+          val schemaContent = HdfsUtil.readHadoopFile(schemaFile)(filesystem)
+          Some(SparkSchema(DataType.fromJson(schemaContent).asInstanceOf[StructType]))
+        } else None
+      )
+      .orElse(
+        // or try inferring schema from sample data file
+        if (filesystem.exists(sampleFile)) {
+          logger.info(s"($id) Inferring schema from sample data file")
+          val df = context.sparkSession.read
+            .format(format)
+            .options(options)
+            .load(sampleFile.toString)
+            .withOptionalColumn(filenameColumn, input_file_name)
+          val dfWithPartitions = partitions.foldLeft(df) {
+            case (df, p) => df.withColumn(p, functions.lit("dummyString"))
+          }
+          Some(SparkSchema(dfWithPartitions.schema))
+        } else None
+      )
+    // return
+    _schemaHolder
+  }
+  private var _schemaHolder: Option[SparkSchema] = None
+  private def schemaFile(implicit context: ActionPipelineContext) = {
+    val fileStat = Try(filesystem.getFileStatus(hadoopPath)).toOption
+    val dataObjectRootPath = if (fileStat.exists(_.isFile)) hadoopPath.getParent else hadoopPath
+    new Path( new Path(dataObjectRootPath, ".schema"), "currentSchema.json")
+  }
+
+  /**
+   * Provide a sample data file name to be created to file-based Action. If none is returned, no file is created.
+   */
+  override def createSampleFile(implicit context: ActionPipelineContext): Option[String] = {
+    // only create new sample file there is no schema file and if it doesnt exist yet, or an update is forced by the environment configuration
+    if (!filesystem.exists(schemaFile) && (Environment.updateSparkFileDataObjectSampleDataFile || !filesystem.exists(sampleFile))) Some(sampleFile.toString)
+    else None
+  }
+  private def sampleFile(implicit context: ActionPipelineContext) = new Path( new Path(hadoopPath, ".sample"), s"sampleData.${fileName.split('.').last.filter(_ != '*')}")
+
+  override def options: Map[String, String] = Map() // override options because of conflicting definitions in CanCreateSparkDataFrame and CanWriteSparkDataFrame
 
   /**
    * Constructs an Apache Spark [[DataFrame]] from the underlying file content.
    *
    * @see [[DataFrameReader]]
-   * @param session the current [[SparkSession]].
    * @return a new [[DataFrame]] containing the data stored in the file at `path`
    */
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     implicit val session: SparkSession = context.sparkSession
-    import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+    import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 
     val wrongPartitionValues = PartitionValues.checkWrongPartitionValues(partitionValues, partitions)
     assert(wrongPartitionValues.isEmpty, s"getDataFrame got request with PartitionValues keys ${wrongPartitionValues.mkString(",")} not included in $id partition columns ${partitions.mkString(", ")}")
 
-    val filesExists = checkFilesExisting
-    if (!filesExists) {
+    val schemaOpt = getSchema.map(_.inner)
+    if (schemaOpt.isEmpty && !checkFilesExisting) {
       //without either schema or data, no data frame can be created
       require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined if there are no existing files.")
-
-      // Schema exists so an empty data frame can be created
-      // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
-      filesystem.mkdirs(hadoopPath)
     }
 
-    val schemaOpt = getSchema(filesExists)
+    // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
+    if (!filesystem.exists(hadoopPath)) filesystem.mkdirs(hadoopPath)
+
+    val incrementalOutputOptions = if (incrementalOutputState.isDefined && context.phase == ExecutionPhase.Exec) {
+      val previousOutputState = incrementalOutputState.get
+      // Comparison of modifiedAfter and modifiedBefore are both exclusive on Microsecond level, but file timestamps maximum detail is milliseconds.
+      // Actually comparison of one operator should be inclusive to avoid reading files in edge cases.
+      // Current timestamp is also at millisecond level. If we subtract one microsecond from current timestamp we can avoid the problems because of exclusive comparison.
+      incrementalOutputState = Some(LocalDateTime.now.minusNanos(1000))
+      val dateFormatter = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSSSSS")
+      logger.info(s"($id) incremental output selected files with modification date greater than ${dateFormatter.format(previousOutputState)} and smaller than ${dateFormatter.format(incrementalOutputState.get)}")
+      Map(
+        "modifiedAfter" -> dateFormatter.format(fixWindowsTimezone(previousOutputState)),
+        "modifiedBefore" -> dateFormatter.format(fixWindowsTimezone(incrementalOutputState.get))
+      )
+    } else Map[String,String]()
+
     val dfContent = if (partitions.isEmpty || partitionValues.isEmpty) {
       session.read
         .format(format)
-        .options(options)
+        .options(options ++ incrementalOutputOptions)
         .optionalSchema(schemaOpt)
         .load(hadoopPath.toString)
     } else {
       val reader = session.read
         .format(format)
-        .options(options)
+        .options(options ++ incrementalOutputOptions)
         .optionalSchema(schemaOpt)
         .option("basePath", hadoopPath.toString) // this is needed for partitioned tables when subdirectories are read directly; it then keeps the partition columns from the subdirectory path in the dataframe
       val pathsToRead = partitionValues.flatMap(getConcretePaths).map(_.toString)
@@ -145,10 +210,73 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
         }
     }
 
-    val df = dfContent.withOptionalColumn(filenameColumn, input_file_name)
+    // early check for no data to process.
+    // This also prevents an error on Databricks when using filesObserver if there are no files to process. See also [[CollectSetDeterministic]].
+    if (context.phase == ExecutionPhase.Exec && Environment.enableSparkFileDataObjectNoDataCheck && SparkFileDataObject.getFilesProcessedFromSparkPlan(id.id, dfContent).isEmpty)
+      throw NoDataToProcessWarning("-", s"($id) No files to process found in execution plan")
+
+    // add filename column
+    var df = dfContent.withOptionalColumn(filenameColumn, input_file_name)
+
+    // configure observer to get files processed for incremental execution mode
+    if (filesObservers.nonEmpty && context.phase == ExecutionPhase.Exec) {
+      if (filesObservers.size > 1) logger.warn(s"($id) files observation is not yet well supported when using from multiple actions in parallel")
+      // force creating filenameColumn, and drop the it later again
+      val forcedFilenameColumn = "__filename"
+      if (filenameColumn.isEmpty) df = dfContent.withColumn(forcedFilenameColumn, input_file_name)
+      // initialize observers
+      df = filesObservers.foldLeft(df) {
+        case (df, (actionId,observer)) => observer.on(df, filenameColumn.getOrElse(forcedFilenameColumn))
+      }
+      filesObservers.clear
+      // drop forced filenameColumn
+      if (filenameColumn.isEmpty) df = df.drop(forcedFilenameColumn)
+    }
 
     // finalize & return DataFrame
     afterRead(df)
+  }
+
+  /**
+   * It seems that Hadoop on Windows returns modified date in local timezone, but according to documentation it should be in UTC.
+   * This results in wrong comparison of modified date by Spark, as Spark adds an additional local timezone offset to the files modification date.
+   * To fix this we need to add an additional local timezone offset to the comparison thresholds given to spark.
+   */
+  private def fixWindowsTimezone(localDateTime: LocalDateTime): LocalDateTime = {
+    if (EnvironmentUtil.isWindowsOS) LocalDateTime.ofInstant(localDateTime.atOffset(ZoneOffset.UTC).toInstant, ZoneId.systemDefault())
+    else localDateTime
+  }
+
+  // Store incremental output state. It is stored as LocalDateTime because Spark options need local timezone.
+  private var incrementalOutputState: Option[LocalDateTime] = None
+
+  /**
+   * Set timestamp for incremental output
+   */
+  override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
+    incrementalOutputState = state.map(LocalDateTime.parse)
+      .orElse(Some(LocalDateTime.ofInstant(Instant.EPOCH, ZoneId.systemDefault)))
+  }
+
+  /**
+   * Get timestamp of incremental output for saving to state
+   */
+  override def getState: Option[String] = {
+    incrementalOutputState.map(_.toString)
+  }
+
+  // Store files observation object between call to setupFilesObserver until it is used in getSparkDataFrame.
+  private val filesObservers: mutable.Map[ActionId, FilesSparkObservation] = mutable.Map()
+
+  /**
+   * Setup an observation of files processed through custom metrics.
+   * This is used for incremental processing to keep track of files processed.
+   * Note that filenameColumn needs to be configured for the DataObject in order for this to work.
+   */
+  def setupFilesObserver(actionId: ActionId): FilesSparkObservation = {
+    logger.debug(s"($id) setting up files observer for $actionId")
+    // return existing observation for this action if existing, otherwise create a new one.
+    filesObservers.getOrElseUpdate(actionId, new FilesSparkObservation(actionId.id + "/" + id.id))
   }
 
   override def getStreamingDataFrame(options: Map[String, String], pipelineSchema: Option[StructType])(implicit context: ActionPipelineContext): DataFrame = {
@@ -157,24 +285,36 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
     if (!filesystem.exists(hadoopPath.getParent)) filesystem.mkdirs(hadoopPath)
 
+    val schemaOpt = getSchema.map(_.inner).orElse(pipelineSchema).get
     val df = session.readStream
       .format(format)
       .options(options ++ this.options)
-      .schema(schema.orElse(pipelineSchema).get)
+      .schema(schemaOpt)
       .load(hadoopPath.toString)
 
     afterRead(df)
   }
 
-  override def createReadSchema(writeSchema: StructType)(implicit context: ActionPipelineContext): StructType = {
+  override def createReadSchema(writeSchema: GenericSchema)(implicit context: ActionPipelineContext): GenericSchema = {
+    val functions = DataFrameSubFeed.getFunctions(writeSchema.subFeedType)
     // add additional columns created by SparkFileDataObject
-    filenameColumn.map(colName => addFieldIfNotExisting(writeSchema, colName, StringType))
+    filenameColumn.map(colName => addFieldIfNotExisting(writeSchema, colName, functions.stringType))
       .getOrElse(writeSchema)
   }
 
-  override def init(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
-    validateSchemaMin(df, "write")
-    schema.foreach(schemaExpected => validateSchema(df, schemaExpected, "write"))
+  override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
+    // validate schema
+    validateSchemaMin(SparkSchema(df.schema), "write")
+    schema.foreach(schemaExpected => validateSchema(SparkSchema(df.schema), schemaExpected, "write"))
+    // update current schema storage - this is to avoid schema inference and remember the schema if there is no data.
+    createSchemaFile(df)
+  }
+
+  private def createSchemaFile(df: DataFrame)(implicit context: ActionPipelineContext): Unit = {
+    if(Environment.updateSparkFileDataObjectSchemaFile || !filesystem.exists(schemaFile)) {
+      logger.info(s"($id) Writing schema file")
+      HdfsUtil.writeHadoopFile(schemaFile, df.schema.prettyJson)(filesystem)
+    }
   }
 
   /**
@@ -185,9 +325,8 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
    * @see [[DataFrameWriter.partitionBy]]
    * @param df the [[DataFrame]] to write to the file system.
    * @param partitionValues The partition layout to write.
-   * @param session the current [[SparkSession]].
    */
-  final override def writeDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
+  final override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     require(!isRecursiveInput, "($id) SparkFileDataObject cannot write dataframe when dataobject is also used as recursive input ")
@@ -229,24 +368,34 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     }
 
     // write
-    writeDataFrameToPath(dfPrepared, hadoopPath, finalSaveMode)
+    try {
+      writeSparkDataFrameToPath(dfPrepared, hadoopPath, finalSaveMode)
+    } catch {
+      // cleanup partition directory on failure to ensure restartability for PartitionDiffMode.
+      case t: Throwable if partitionValues.nonEmpty && SparkSaveMode.from(finalSaveMode) == SaveMode.Overwrite =>
+        deletePartitions(filterPartitionsExisting(partitionValues))
+        throw t
+    }
 
     // make sure empty partitions are created as well
     createMissingPartitions(partitionValues)
 
-    // rename file according to SparkRepartitionDef
+    // rename files according to SparkRepartitionDef
     sparkRepartition.foreach(_.renameFiles(getFileRefs(partitionValues))(filesystem))
   }
 
-  override private[smartdatalake] def writeDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
+  override private[smartdatalake] def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
     val hadoopPathString = path.toString
     logger.info(s"($id) Writing DataFrame to $hadoopPathString")
 
     df.write.format(format)
-      .mode(finalSaveMode.asSparkSaveMode)
+      .mode(SparkSaveMode.from(finalSaveMode))
       .options(options)
       .optionalPartitionBy(partitions)
       .save(hadoopPathString)
+
+    // recreate current schema file, it gets deleted by SaveMode.Overwrite - this is to avoid schema inference and remember the schema if there is no data.
+    if (SparkSaveMode.from(finalSaveMode) == SaveMode.Overwrite) createSchemaFile(df)
   }
 
   /**
@@ -265,27 +414,49 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject wi
     CompactionUtil.compactHadoopStandardPartitions(this, partitionValues)
   }
 
-  override def writeStreamingDataFrame(df: DataFrame, trigger: Trigger, options: Map[String,String], checkpointLocation: String, queryName: String, outputMode: OutputMode = OutputMode.Append, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): StreamingQuery = {
+}
 
-    // lambda function is ambiguous with foreachBatch in scala 2.12... we need to create a real function...
-    // Note: no partition values supported when writing streaming target
-    def microBatchWriter(dfMicrobatch: Dataset[Row], batchid: Long): Unit = writeDataFrame(dfMicrobatch, Seq(), saveModeOptions = saveModeOptions)
-
-    df
-      .writeStream
-      .trigger(trigger)
-      .queryName(queryName)
-      .outputMode(outputMode)
-      .option("checkpointLocation", checkpointLocation)
-      .options(streamingOptions ++ options ++ this.options) // options override streamingOptions
-      .foreachBatch(microBatchWriter _)
-      .start()
+object SparkFileDataObject {
+  /**
+   * This method is searching for files processed by a given DataFrame by looking at its execution plan.
+   */
+  private[smartdatalake] def getFilesProcessedFromSparkPlan(id: String, df: Dataset[_]): Seq[String] = {
+    df.queryExecution.executedPlan.collectFirst { case x: FileSourceScanExec => x }
+      .getOrElse(throw new IllegalStateException(s"($id) No FileSourceScanExec found in execution plan to check if there is data to process"))
+      .inputRDD.asInstanceOf[FileScanRDD].filePartitions.flatMap(_.files).map(_.filePath)
   }
-
 }
 
 /**
- * A [[DataObject]] backed by a file in HDFS with an embedded schema.
+ * Observation of files processed using custom metrics.
  */
-private[smartdatalake] trait SparkFileDataObjectWithEmbeddedSchema extends SparkFileDataObject
+private[smartdatalake] class FilesSparkObservation(name: String) extends SparkObservation(name) with SmartDataLakeLogger {
+
+  var filesInExecutionPlan: Option[Seq[String]] = None
+
+  /**
+   * Setup observation of custom metric on Dataset.
+   */
+  def on[T](ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
+    logger.debug(s"($name) add files observation to Dataset")
+    // Note: There is a Spark problem (NullPointerException with TypedImperativeAggregate (like CollectSetDeterministic) in observe if there is no data, but sometimes also occurs otherwise on prod...
+    // see also https://issues.apache.org/jira/browse/SPARK-39044
+    //on(ds, collect_set_deterministic(col(filenameColumnName)).as("filesProcessed"))
+
+    // Workaround - get files processed from DataFrames execution plan. Note that this might be incorrect if there are additional filters applied.
+    filesInExecutionPlan = Some(SparkFileDataObject.getFilesProcessedFromSparkPlan(name, ds))
+    ds
+  }
+
+  /**
+   * Get processed files observation result.
+   * Note that this blocks until the query finished successfully. Call only after Spark action was started on observed Dataset.
+   */
+  def getFilesProcessed: Seq[String] = {
+    //val files = waitFor().getOrElse("filesProcessed", throw new IllegalStateException(s"($name) Did not receive filesProcessed observation!"))
+    //  .asInstanceOf[Seq[String]]
+    val files = filesInExecutionPlan.getOrElse(throw new IllegalStateException(s"($name) filesInExecutionPlan is empty!"))
+    if (logger.isDebugEnabled()) logger.debug(s"($name) files processed: ${files.mkString(", ")}")
+    files
+  }
+}

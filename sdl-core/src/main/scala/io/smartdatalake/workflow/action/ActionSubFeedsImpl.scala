@@ -23,17 +23,19 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{PerformanceUtils, ScalaUtil}
-import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject, TransactionalSparkTableDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, GenericMetrics, SparkSubFeed, SubFeed, SubFeedConverter}
-import org.apache.spark.sql.SparkSession
+import io.smartdatalake.util.misc.PerformanceUtils
+import io.smartdatalake.workflow._
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject}
 
-import scala.reflect.runtime.universe._
 import java.time.Duration
+import scala.collection.SortedSet
+import scala.reflect.runtime.universe._
 
 /**
  * Implementation of SubFeed handling.
  * This is a generic implementation that supports many input and output SubFeeds.
+ *
  * @tparam S SubFeed type this Action is designed for.
  */
 abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
@@ -73,14 +75,17 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   // helper data structures
   private lazy val inputMap = (inputs ++ recursiveInputs).map(i => i.id -> i).toMap
   private lazy val outputMap = outputs.map(i => i.id -> i).toMap
-  private val subFeedConverter = ScalaUtil.companionOf[S, SubFeedConverter[S]]
+
+  private[smartdatalake] def subFeedConverter: SubFeedConverter[S]
 
   def prepareInputSubFeeds(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): (Seq[S],Seq[S]) = {
     val mainInput = getMainInput(subFeeds)
-    // convert subfeeds to SparkSubFeed type or initialize if not yet existing
-    var inputSubFeeds: Seq[S] = subFeeds.map( subFeed =>
-      updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeedConverter.fromSubFeed(subFeed))
-    )
+    val mainSubFeed = subFeeds.find(_.dataObjectId == mainInput.id).get
+    // convert subfeeds to this Actions SubFeed type or initialize if not yet existing
+    var inputSubFeeds: Seq[S] = subFeeds.map { subFeed =>
+      val partitionValues = if (mainSubFeed.partitionValues.nonEmpty) Some(mainSubFeed.partitionValues) else None
+      updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeedConverter.fromSubFeed(subFeed), partitionValues)
+    }
     val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id).get
     // create output subfeeds with transformed partition values from main input
     var outputSubFeeds: Seq[S] = outputs.map(output =>
@@ -122,16 +127,21 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     }
   }
 
-  def writeOutputSubFeeds(subFeeds: Seq[S])(implicit context: ActionPipelineContext): Unit = {
-    outputs.foreach { output =>
+  def writeOutputSubFeeds(subFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S] = {
+    outputs.map { output =>
       val subFeed = subFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"($id) subFeed for output ${output.id} not found"))
       logWritingStarted(subFeed)
       val isRecursiveInput = recursiveInputs.exists(_.id == subFeed.dataObjectId)
       val (result, d) = PerformanceUtils.measureDuration {
         writeSubFeed(subFeed, isRecursiveInput)
       }
-      result.metrics.foreach(m => if(m.nonEmpty) addRuntimeMetrics(Some(context.executionId), Some(output.id), GenericMetrics(s"$id-${output.id}", 1, m)))
-      logWritingFinished(subFeed, result.noData, d)
+      result.metrics.foreach { m =>
+        val metricsToAdd = if (result.noData.contains(true)) m + ("no_data"->true) else m // manually add no_data metric
+        if(m.nonEmpty) addRuntimeMetrics(Some(context.executionId), Some(output.id), GenericMetrics(s"$id-${output.id}", 1, metricsToAdd))
+      }
+      val allMetrics = runtimeData.getFinalMetrics(subFeed.dataObjectId).map(_.getMainInfos).getOrElse(Map())
+      logWritingFinished(subFeed, allMetrics, d)
+      result.subFeed
     }
   }
 
@@ -146,7 +156,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     val inputIds = if (handleRecursiveInputsAsSubFeeds) (inputs ++ recursiveInputs).map(_.id) else inputs.map(_.id)
     val superfluousSubFeeds = subFeeds.map(_.dataObjectId).diff(inputIds)
     val missingSubFeeds = inputIds.diff(subFeeds.map(_.dataObjectId))
-    assert(superfluousSubFeeds.isEmpty && missingSubFeeds.isEmpty, s"($id) input SubFeed's must match input DataObjects: superfluous=${superfluousSubFeeds.mkString(",")} missing=${missingSubFeeds.mkString(",")})")
+    assert(superfluousSubFeeds.isEmpty && missingSubFeeds.isEmpty, s"($id) input SubFeeds must match input DataObjects: superfluous=${superfluousSubFeeds.mkString(",")} missing=${missingSubFeeds.mkString(",")})")
   }
 
   override final def init(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = {
@@ -171,7 +181,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     // check and adapt output SubFeeds
     outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds)
     // write output
-    writeOutputSubFeeds(outputSubFeeds)
+    outputSubFeeds = writeOutputSubFeeds(outputSubFeeds)
     // return
     outputSubFeeds
   }
@@ -190,10 +200,13 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     logger.info(s"($id) start " + msg)
   }
 
-  protected def logWritingFinished(subFeed: S, noData: Option[Boolean], duration: Duration)(implicit context: ActionPipelineContext): Unit = {
-    val metricsLog = if (noData.contains(true)) ", no data found"
-    else runtimeData.getFinalMetrics(subFeed.dataObjectId).map(_.getMainInfos).map(" "+_.map( x => x._1+"="+x._2).mkString(" ")).getOrElse("")
-    logger.info(s"($id) finished writing DataFrame to ${subFeed.dataObjectId.id}: jobDuration=$duration" + metricsLog)
+  protected def logWritingFinished(subFeed: S, metrics: Map[String,Any], duration: Duration)(implicit context: ActionPipelineContext): Unit = {
+    val metricsLog = orderMetrics(metrics, SortedSet("count", "records_written", "num_tasks"))
+      .map( x => x._1+"="+x._2).mkString(" ")
+    logger.info(s"($id) finished writing to ${subFeed.dataObjectId.id}: job_duration=$duration " + metricsLog)
+  }
+  private def orderMetrics(metrics: Map[String,Any], orderedKeys: SortedSet[String]): Seq[(String,Any)] = {
+    orderedKeys.toSeq.flatMap(k => metrics.get(k).map(v => (k,v))) ++ metrics.filterKeys(!orderedKeys.contains(_)).toSeq.sortBy(_._1)
   }
 
   private def getMainDataObjectCandidates(mainId: Option[DataObjectId], dataObjects: Seq[DataObject], inputOutput: String): Seq[DataObject] = {
@@ -213,11 +226,11 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
    * Updates the partition values of a SubFeed to the partition columns of the given input data object:
    * - remove not existing columns from the partition values
    */
-  private def updateInputPartitionValues(dataObject: DataObject, subFeed: S)(implicit context: ActionPipelineContext): S = {
+  private def updateInputPartitionValues(dataObject: DataObject, subFeed: S, partitionValues: Option[Seq[PartitionValues]] = None)(implicit context: ActionPipelineContext): S = {
     dataObject match {
       case partitionedDO: CanHandlePartitions =>
         // remove superfluous partitionValues
-        subFeed.updatePartitionValues(partitionedDO.partitions, newPartitionValues = Some(subFeed.partitionValues)).asInstanceOf[S]
+        subFeed.updatePartitionValues(partitionedDO.partitions, newPartitionValues = partitionValues).asInstanceOf[S]
       case _ =>
         subFeed.clearPartitionValues().asInstanceOf[S]
     }
@@ -298,7 +311,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
    * @param isRecursive If subfeed is recursive (input & output)
    * @return false if there was no data to process, otherwise true.
    */
-  protected def writeSubFeed(subFeed: S, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult
+  protected def writeSubFeed(subFeed: S, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult[S]
 
 }
 
@@ -307,7 +320,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
  * @param noData true if there was no data to write, otherwise false. If unknown set to None.
  * @param metrics Depending on the engine, metrics are received by a listener (SparkSubFeed) or can be returned directly by filling this attribute (FileSubFeed).
  */
-case class WriteSubFeedResult(noData: Option[Boolean], metrics: Option[Map[String, Any]] = None)
+case class WriteSubFeedResult[S <: SubFeed](subFeed: S, noData: Option[Boolean], metrics: Option[Map[String, Any]] = None)
 
 case class SubFeedExpressionData(partitionValues: Seq[Map[String,String]], isDAGStart: Boolean, isSkipped: Boolean)
 case class SubFeedsExpressionData(inputSubFeeds: Map[String, SubFeedExpressionData])

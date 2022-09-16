@@ -24,10 +24,11 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
-import io.smartdatalake.util.misc.{AclDef, DataFrameUtil}
+import io.smartdatalake.util.misc.AclDef
+import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import org.apache.spark.sql.DataFrame
 
 /**
  * A [[DataObject]] backed by an Microsoft Excel data source.
@@ -51,7 +52,11 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * When no schema is provided and `inferSchema` is disabled, all columns are assumed to be of string type.
  *
  * @param excelOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
- * @param schema An optional data object schema. If defined, any automatic schema inference is avoided. As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
+ * @param schema An optional data object schema. If defined, any automatic schema inference is avoided.
+ *               As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
+ *               Define the schema by using one of the schema providers DDL, jsonSchemaFile, xsdFile or caseClassName.
+ *               The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
+ *               A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop. Default is numberOfTasksPerPartition = 1.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
@@ -63,8 +68,8 @@ case class ExcelFileDataObject(override val id: DataObjectId,
                                override val path: String,
                                excelOptions: ExcelOptions = ExcelOptions(),
                                override val partitions: Seq[String] = Seq(),
-                               override val schema: Option[StructType] = None,
-                               override val schemaMin: Option[StructType] = None,
+                               override val schema: Option[GenericSchema] = None,
+                               override val schemaMin: Option[GenericSchema] = None,
                                override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                override val sparkRepartition: Option[SparkRepartitionDef] = Some(SparkRepartitionDef(numberOfTasksPerPartition = 1)),
                                override val acl: Option[AclDef] = None,
@@ -74,7 +79,7 @@ case class ExcelFileDataObject(override val id: DataObjectId,
                                override val housekeepingMode: Option[HousekeepingMode] = None,
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit override val instanceRegistry: InstanceRegistry)
-  extends SparkFileDataObject with CanCreateDataFrame with CanWriteDataFrame {
+  extends SparkFileDataObject {
 
   override val format = "com.crealytics.spark.excel"
 
@@ -183,7 +188,7 @@ case class ExcelOptions(
     } else None
   }
 
-  def toMap(schema: Option[StructType]): Map[String, Option[Any]] = Map(
+  def toMap(schema: Option[GenericSchema]): Map[String, Option[Any]] = Map(
       "dataAddress" -> getDataAddress,
       "treatEmptyValuesAsNulls" -> treatEmptyValuesAsNulls,
       "header" -> Some(useHeader),

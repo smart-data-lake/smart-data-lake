@@ -21,8 +21,8 @@ package io.smartdatalake.app
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.objects.TestAction
-import io.smartdatalake.workflow.action.customlogic.CustomDfsTransformerConfig
-import io.smartdatalake.workflow.action.{Action, ActionMetadata, CopyAction, CustomSparkAction}
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig
+import io.smartdatalake.workflow.action.{Action, ActionMetadata, CopyAction, CustomDataFrameAction}
 import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, DataObjectMetadata, HiveTableDataObject}
 import org.scalatest.FunSuite
 
@@ -48,7 +48,7 @@ class AppUtilTest extends FunSuite {
   instanceRegistry.register(Seq(do1,do2,do3,do4,do5,do6))
   private val actionA = CopyAction("a", "do1", "do2", metadata = Some(ActionMetadata(name = Some("actionA"), feed = Some("test1"))))
   private val actionB = CopyAction("b", "do1", "do3", metadata = Some(ActionMetadata(name = Some("actionB"), feed = Some("test2"))))
-  private val actionC = CustomSparkAction("c", Seq("do2","do3","do4"), Seq("do5"), transformer = Some(CustomDfsTransformerConfig(sqlCode = Some(Map(do5.id -> "select * from do2"))))
+  private val actionC = CustomDataFrameAction("c", Seq("do2","do3","do4"), Seq("do5"), transformer = Some(CustomDfsTransformerConfig(sqlCode = Some(Map(do5.id.id -> "select * from do2"))))
     , metadata = Some(ActionMetadata(name = Some("actionC"), feed = Some("test1")))
   )
   private val actionD = CopyAction("d", "do5", "do6", metadata = Some(ActionMetadata(name = Some("actionD"), feed = Some("test1"))))

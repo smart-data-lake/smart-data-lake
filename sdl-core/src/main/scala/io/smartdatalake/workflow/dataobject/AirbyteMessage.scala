@@ -123,7 +123,7 @@ private[smartdatalake] case class AirbyteConnectorSpecification (
                                            documentationUrl: Option[String] = None,
                                            changelogUrl: Option[String] = None,
                                            connectionSpecification: JObject,
-                                           supportsIncremental: Boolean = false,
+                                           supportsIncremental: Option[Boolean] = None,
                                            supportsNormalization: Boolean = false,
                                            supportsDBT: Boolean = false,
                                            supported_destination_sync_modes: Option[Seq[DestinationSyncModeEnum.Value]] = None,

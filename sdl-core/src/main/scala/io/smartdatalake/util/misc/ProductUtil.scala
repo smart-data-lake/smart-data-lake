@@ -18,10 +18,16 @@
  */
 package io.smartdatalake.util.misc
 
-import java.time.format.DateTimeFormatter
-
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
+import org.apache.spark.sql.catalyst.ScalaReflection
+import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
+import org.apache.spark.sql.{DataFrame, Dataset}
+
+import java.time.format.DateTimeFormatter
+import scala.reflect.ClassTag
+import scala.reflect.runtime.universe._
+import scala.reflect.runtime.{currentMirror, universe}
 
 private[smartdatalake] object ProductUtil {
 
@@ -154,5 +160,61 @@ private[smartdatalake] object ProductUtil {
     val msg = StringBuilder.newBuilder
     addObjToBuilder(msg, obj, spacing = false)
     msg.toString
+  }
+
+  /**
+   * Create an Encoder for a product based on it's type given as parameter (not as type parameter).
+   */
+  def createEncoder(tpe: Type): ExpressionEncoder[_] = {
+    val mirror = ScalaReflection.mirror
+    val cls = mirror.runtimeClass(tpe)
+    val serializer = ScalaReflection.serializerForType(tpe)
+    val deserializer = ScalaReflection.deserializerForType(tpe)
+    new ExpressionEncoder(serializer, deserializer, ClassTag(cls))
+  }
+
+  /**
+   * Create a Dataset based on the given type of a product.
+   */
+  def createDataset(df: DataFrame, tpe: Type): Dataset[_] = {
+    df.as(createEncoder(tpe))
+  }
+
+  /**
+   * Given the name of a Product class, return its attribute names.
+   */
+  def classAccessorNames(className: String): List[String] = {
+    val mirror = scala.reflect.runtime.currentMirror
+    val tpe: universe.Type = mirror.classSymbol(mirror.classLoader.loadClass(className)).toType
+    classAccessorNames(tpe)
+  }
+
+  /**
+   * Given the type of a Product class, return its attribute names.
+   */
+  def classAccessorNames(tpe: universe.Type): List[String] = {
+    classAccessors(tpe).map(_.name.toString)
+  }
+
+  /**
+   * Given the name of a Product class, return its attribute accessor methods.
+   */
+  def classAccessors(tpe: universe.Type): List[MethodSymbol] = tpe.decls.sorted.collect {
+    case m: MethodSymbol if m.isCaseAccessor => m
+  }
+
+  /**
+   * Extract case class attributes with values through reflection
+   */
+  def attributesWithValuesForCaseClass(obj: Any): Seq[(String, Any)] = {
+    val clsSym = currentMirror.classSymbol(obj.getClass)
+    val inst = currentMirror.reflect(obj)
+
+    val attributes: Iterable[universe.MethodSymbol] = ProductUtil.classAccessors(clsSym.toType)
+    attributes.map { m =>
+      val key = m.name.toString
+      val value = inst.reflectMethod(m).apply()
+      (key, value)
+    }.toSeq
   }
 }

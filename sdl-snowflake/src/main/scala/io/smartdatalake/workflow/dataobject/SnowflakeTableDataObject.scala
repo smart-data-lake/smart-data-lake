@@ -19,18 +19,24 @@
 
 package io.smartdatalake.workflow.dataobject
 
-import com.snowflake.snowpark.Session
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
+import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
+import io.smartdatalake.definitions.SDLSaveMode._
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeOptions}
-import io.smartdatalake.smartdatalake.{SnowparkDataFrame, SnowparkStructType, SparkDataFrame, SparkStructType}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.connection.SnowflakeConnection
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import net.snowflake.spark.snowflake.Utils.SNOWFLAKE_SOURCE_NAME
+import org.apache.spark.{sql => spark}
+import com.snowflake.snowpark
+import com.snowflake.snowpark.SaveMode
+import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkDataFrame, SnowparkSubFeed}
+
+import scala.reflect.runtime.universe.{Type, typeOf}
 
 /**
  * [[DataObject]] of type SnowflakeTableDataObject.
@@ -40,36 +46,44 @@ import net.snowflake.spark.snowflake.Utils.SNOWFLAKE_SOURCE_NAME
  *
  * @param id           unique name of this data object
  * @param table        Snowflake table to be written by this output
+ * @param constraints  List of row-level [[Constraint]]s to enforce when writing to this data object.
+ * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
  * @param saveMode     spark [[SDLSaveMode]] to use when writing files, default is "overwrite"
  * @param connectionId The SnowflakeTableConnection to use for the table
  * @param comment      An optional comment to add to the table after writing a DataFrame to it
  * @param metadata     meta data
  */
+// TODO: we should add virtual partitions as for JdbcTableDataObject and KafkaDataObject, so that PartitionDiffMode can be used...
 case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     override var table: Table,
-                                    override val schemaMin: Option[SparkStructType] = None,
+                                    override val schemaMin: Option[GenericSchema] = None,
+                                    override val constraints: Seq[Constraint] = Seq(),
+                                    override val expectations: Seq[Expectation] = Seq(),
                                     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     connectionId: ConnectionId,
                                     comment: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject
-    with CanCreateSnowparkDataFrame
-    with CanWriteSnowparkDataFrame {
+  extends TransactionalSparkTableDataObject with ExpectationValidation {
 
   private val connection = getConnection[SnowflakeConnection](connectionId)
+  val fullyQualifiedTableName = connection.database + "." + table.fullName
 
-  def session: Session = {
+  def snowparkSession: snowpark.Session = {
     connection.getSnowparkSession(table.db.get)
   }
+
+  // check for invalid save modes
+  assert(Seq(SDLSaveMode.Overwrite,SDLSaveMode.Append,SDLSaveMode.ErrorIfExists,SDLSaveMode.Ignore).contains(saveMode), s"($id) Unsupported saveMode $saveMode")
 
   if (table.db.isEmpty) {
     throw ConfigurationException(s"($id) A SnowFlake schema name must be added as the 'db' parameter of a SnowflakeTableDataObject.")
   }
 
+
   // Get a Spark DataFrame with the table contents for Spark transformations
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): SparkDataFrame = {
-    val queryOrTable = Map(table.query.map(q => ("query", q)).getOrElse("dbtable" -> (connection.database + "." + table.fullName)))
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): spark.DataFrame = {
+    val queryOrTable = Map(table.query.map(q => ("query", q)).getOrElse("dbtable" -> fullyQualifiedTableName))
     val df = context.sparkSession
       .read
       .format(SNOWFLAKE_SOURCE_NAME)
@@ -80,16 +94,28 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   }
 
   // Write a Spark DataFrame to the Snowflake table
-  override def writeDataFrame(df: SparkDataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])
-                             (implicit context: ActionPipelineContext): Unit = {
-    validateSchemaMin(df, role = "write")
-    val finalSaveMode: SDLSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
+  override def writeSparkDataFrame(df: spark.DataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])
+                                  (implicit context: ActionPipelineContext): Unit = {
+    assert(partitionValues.isEmpty, s"($id) SnowflakeTableDataObject can not handle partitions for now")
+    validateSchemaMin(SparkSchema(df.schema), role = "write")
+    implicit val helper = SparkSubFeed
+    var finalSaveMode: SDLSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
+
+    // TODO: merge mode not yet implemented
+    assert(finalSaveMode != SDLSaveMode.Merge, "($id) SaveMode.Merge not implemented for writeSparkDataFrame")
+
+    // Handle overwrite partitions: delete partitions data and then append data
+    //if (partitionValues.nonEmpty && finalSaveMode == SDLSaveMode.Overwrite) {
+    //  val deleteCondition = PartitionValues.createFilterExpr(partitionValues).exprSql
+    //  snowparkSession.sql(s"delete from $fullyQualifiedTableName where $deleteCondition")
+    //  finalSaveMode = SDLSaveMode.Append
+    //}
 
     df.write
       .format(SNOWFLAKE_SOURCE_NAME)
       .options(connection.getSnowflakeOptions(table.db.get))
-      .options(Map("dbtable" -> (connection.database + "." + table.fullName)))
-      .mode(finalSaveMode.asSparkSaveMode)
+      .options(Map("dbtable" -> fullyQualifiedTableName))
+      .mode(SparkSaveMode.from(finalSaveMode))
       .save()
 
     if (comment.isDefined) {
@@ -97,6 +123,39 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
       connection.execSnowflakeStatement(sql)
     }
   }
+
+  override def init(df: GenericDataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
+    df match {
+      // TODO: initSparkDataFrame has empty implementation
+      case sparkDf: SparkDataFrame => initSparkDataFrame(sparkDf.inner, partitionValues, saveModeOptions)
+      case sparkDf: SnowparkDataFrame => Unit
+      case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method init")
+    }
+  }
+
+  override private[smartdatalake] def getSubFeed(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    if (subFeedType =:= typeOf[SparkSubFeed]) SparkSubFeed(Some(SparkDataFrame(getSparkDataFrame(partitionValues))), id, partitionValues)
+    else if (subFeedType =:= typeOf[SnowparkSubFeed]) SnowparkSubFeed(Some(SnowparkDataFrame(getSnowparkDataFrame(partitionValues))), id, partitionValues)
+    else throw new IllegalStateException(s"($id) Unknown subFeedType ${subFeedType.typeSymbol.name}")
+  }
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type)(implicit context: ActionPipelineContext) : GenericDataFrame = {
+    if (subFeedType =:= typeOf[SparkSubFeed]) SparkDataFrame(getSparkDataFrame(partitionValues))
+    else if (subFeedType =:= typeOf[SnowparkSubFeed]) SnowparkDataFrame(getSnowparkDataFrame(partitionValues))
+    else throw new IllegalStateException(s"($id) Unknown subFeedType ${subFeedType.typeSymbol.name}")
+  }
+  private[smartdatalake] override def getSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SnowparkSubFeed], typeOf[SparkSubFeed]) // order matters... if possible Snowpark is preferred to Spark
+
+  private[smartdatalake] override def writeSubFeed(subFeed: DataFrameSubFeed, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): Unit = {
+    writeDataFrame(subFeed.dataFrame.get, partitionValues, isRecursiveInput, saveModeOptions)
+  }
+  override def writeDataFrame(df: GenericDataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): Unit = {
+    df match {
+      case sparkDf: SparkDataFrame => writeSparkDataFrame(sparkDf.inner, partitionValues, isRecursiveInput, saveModeOptions)
+      case snowparkDf: SnowparkDataFrame => writeSnowparkDataFrame(snowparkDf.inner, partitionValues, isRecursiveInput, saveModeOptions)
+      case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method writeDataFrame")
+    }
+  }
+  private[smartdatalake] override def writeSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SnowparkSubFeed], typeOf[SparkSubFeed]) // order matters... if possible Snowpark is preferred to Spark
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
     val sql = s"SHOW DATABASES LIKE '${connection.database}'"
@@ -108,19 +167,33 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     connection.execSnowflakeStatement(sql).next()
   }
 
-  override def dropTable(implicit context: ActionPipelineContext): Unit = throw new NotImplementedError()
+  override def dropTable(implicit context: ActionPipelineContext): Unit = {
+    val sql = s"DROP TABLE IF EXISTS $fullyQualifiedTableName"
+    connection.execSnowflakeStatement(sql).next()
+  }
 
   override def factory: FromConfigFactory[DataObject] = SnowflakeTableDataObject
 
-  // Read the contents of a table as a Snowpark DataFrame
-  override def getSnowparkDataFrame()(implicit context: ActionPipelineContext): SnowparkDataFrame = {
-    this.session.table(table.fullName)
+  /**
+   * Read the contents of a table as a Snowpark DataFrame
+   */
+  def getSnowparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): snowpark.DataFrame = {
+    //val helper: DataFrameSubFeedCompanion = SnowparkSubFeed
+    this.snowparkSession.table(fullyQualifiedTableName)
   }
 
-  // Write a Snowpark DataFrame to Snowflake, used in Snowpark actions
-  def writeSnowparkDataFrame(df: SnowparkDataFrame, isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
+  /**
+   * Write a Snowpark DataFrame to Snowflake, used in Snowpark actions
+   */
+  def writeSnowparkDataFrame(df: snowpark.DataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                             (implicit context: ActionPipelineContext): Unit = {
-    df.write.saveAsTable(table.fullName)
+    assert(partitionValues.isEmpty, s"($id) SnowflakeTableDataObject can not handle partitions for now")
+
+    // TODO: what to do with isRecursiveInput...
+    // TODO: merge mode not yet implemented
+    assert(saveMode != SDLSaveMode.Merge, "($id) SaveMode.Merge not implemented for writeSparkDataFrame")
+
+    df.write.mode(SnowparkSaveMode.from(saveMode)).saveAsTable(table.fullName)
   }
 }
 
@@ -131,13 +204,17 @@ object SnowflakeTableDataObject extends FromConfigFactory[DataObject] {
   }
 }
 
-private[smartdatalake] trait CanCreateSnowparkDataFrame {
-  def getSnowparkDataFrame()(implicit context: ActionPipelineContext): SnowparkDataFrame
-}
-
-private[smartdatalake] trait CanWriteSnowparkDataFrame {
-  def writeSnowparkDataFrame(df: SnowparkDataFrame,
-                             isRecursiveInput: Boolean = false,
-                             saveModeOptions: Option[SaveModeOptions] = None)
-                            (implicit context: ActionPipelineContext): Unit
+/**
+ * Mapping to Spark SaveMode
+ * This is one-to-one except custom modes as OverwritePreserveDirectories
+ */
+object SnowparkSaveMode {
+  def from(mode: SDLSaveMode): SaveMode = mode match {
+    case Overwrite => SaveMode.Overwrite
+    case Append => SaveMode.Append
+    case ErrorIfExists => SaveMode.ErrorIfExists
+    case Ignore => SaveMode.Ignore
+    case OverwritePreserveDirectories => SaveMode.Append // Append with spark, but delete files before with hadoop
+    case OverwriteOptimized => SaveMode.Append // Append with spark, but delete partitions before with hadoop
+  }
 }

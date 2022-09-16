@@ -20,11 +20,8 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.{Environment, SDLSaveMode}
-import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.dataobject._
-import org.apache.spark.sql.SparkSession
 
 /**
  * Implementation of logic needed to use FileSubFeeds with only one input and one output SubFeed.
@@ -62,6 +59,8 @@ abstract class FileOneToOneActionImpl extends ActionSubFeedsImpl[FileSubFeed] {
     assert(output.saveMode!=SDLSaveMode.OverwriteOptimized, s"($id) saveMode OverwriteOptimized not supported for now.")
   }
 
+  private[smartdatalake] override def subFeedConverter: SubFeedConverter[FileSubFeed] = FileSubFeed
+
   /**
    * Transform a [[SparkSubFeed]].
    * To be implemented by subclasses.
@@ -86,5 +85,4 @@ abstract class FileOneToOneActionImpl extends ActionSubFeedsImpl[FileSubFeed] {
       subFeed.copy(fileRefs = Some(input.getFileRefs(subFeed.partitionValues)))
     } else subFeed
   }
-
 }

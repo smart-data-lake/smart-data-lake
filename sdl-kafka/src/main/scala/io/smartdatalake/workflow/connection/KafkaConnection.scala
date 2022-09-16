@@ -26,7 +26,7 @@ import io.smartdatalake.definitions.{AuthMode, SASLSCRAMAuthMode, SSLCertsAuthMo
 import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig}
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.config.SslConfigs
-import org.apache.spark.sql.avro.confluent.ConfluentClient
+import org.apache.spark.sql.confluent.ConfluentClient
 
 import java.util.Properties
 import scala.collection.JavaConverters._
@@ -54,8 +54,6 @@ case class KafkaConnection(override val id: ConnectionId,
     authProps.asScala.foreach { case (k, v) => props.put(k, v) }
     AdminClient.create(props)
   }
-
-  @transient lazy val confluentHelper: Option[ConfluentClient] = schemaRegistry.map(new ConfluentClient(_))
 
   private[smartdatalake] val KafkaConfigOptionPrefix = "kafka."
   private val KafkaSSLSecurityProtocol = "SSL"
@@ -100,7 +98,7 @@ case class KafkaConnection(override val id: ConnectionId,
 
   def testSchemaRegistry(): Unit = {
     try {
-      confluentHelper.foreach(_.test())
+      schemaRegistry.foreach(new ConfluentClient(_).test)
     } catch {
       case e:Exception => throw ConfigurationException(s"($id) Can not connect to schema registry (${schemaRegistry.get})", None, e)
     }

@@ -25,18 +25,19 @@ import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.json.DefaultFlatteningParser
-import io.smartdatalake.util.misc.DataFrameUtil.DataFrameReaderUtils
-import io.smartdatalake.util.misc.{AclDef, DataFrameUtil}
+import io.smartdatalake.util.misc.AclDef
+import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.DataFrameUtil.DataFrameReaderUtils
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.{input_file_name, lit}
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, DataFrameReader, SparkSession}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
- * A [[io.smartdatalake.workflow.dataobject.DataObject]] backed by an XML data source.
+ * A [[DataObject]] backed by an XML data source.
  *
- * It manages read and write access and configurations required for [[io.smartdatalake.workflow.action.Action]]s to
+ * It manages read and write access and configurations required for [[Action]]s to
  * work on XML formatted files.
  *
  * Reading and writing details are delegated to Apache Spark [[org.apache.spark.sql.DataFrameReader]]
@@ -45,7 +46,11 @@ import org.apache.spark.sql.{DataFrame, DataFrameReader, SparkSession}
  * Note that writing XML-file partitioned is not supported by spark-xml.
  *
  * @param xmlOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
- * @param schema An optional data object schema. If defined, any automatic schema inference is avoided. As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
+ * @param schema An optional data object schema. If defined, any automatic schema inference is avoided.
+ *               As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
+ *               Define the schema by using one of the schema providers DDL, jsonSchemaFile, xsdFile or caseClassName.
+ *               The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
+ *               A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
@@ -61,8 +66,8 @@ case class XmlFileDataObject(override val id: DataObjectId,
                              rowTag: Option[String] = None, // this is for backward compatibility, it can also be given in xmlOptions
                              xmlOptions: Option[Map[String,String]] = None,
                              override val partitions: Seq[String] = Seq(),
-                             override val schema: Option[StructType] = None,
-                             override val schemaMin: Option[StructType] = None,
+                             override val schema: Option[GenericSchema] = None,
+                             override val schemaMin: Option[GenericSchema] = None,
                              override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                              override val sparkRepartition: Option[SparkRepartitionDef] = None,
                              flatten: Boolean = false,
@@ -73,7 +78,7 @@ case class XmlFileDataObject(override val id: DataObjectId,
                              override val housekeepingMode: Option[HousekeepingMode] = None,
                              override val metadata: Option[DataObjectMetadata] = None)
                             (@transient implicit override val instanceRegistry: InstanceRegistry)
-  extends SparkFileDataObject with CanCreateDataFrame with CanWriteDataFrame {
+  extends SparkFileDataObject {
 
   override val format = "com.databricks.spark.xml"
 
@@ -96,25 +101,23 @@ case class XmlFileDataObject(override val id: DataObjectId,
    *   .load("partitionedDataObjectPath")
    *   .show
    */
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     implicit val session: SparkSession = context.sparkSession
-    import io.smartdatalake.util.misc.DataFrameUtil.DfSDL
+    import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 
     val wrongPartitionValues = PartitionValues.checkWrongPartitionValues(partitionValues, partitions)
     assert(wrongPartitionValues.isEmpty, s"getDataFrame got request with PartitionValues keys ${wrongPartitionValues.mkString(",")} not included in $id partition columns ${partitions.mkString(", ")}")
     assert(partitionValues.forall(pv => partitions.toSet.diff(pv.keys).isEmpty), "PartitionValues must include values for all partitions when reading XML-Data")
 
-    val filesExists = checkFilesExisting
-    if (!filesExists) {
+    val schemaOpt = getSchema.map(_.inner)
+    if (!(schemaOpt.isDefined || checkFilesExisting)) {
       //without either schema or data, no data frame can be created
       require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined if there are no existing files.")
-
-      // Schema exists so an empty data frame can be created
-      // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
-      filesystem.mkdirs(hadoopPath)
     }
 
-    val schemaOpt = getSchema(filesExists)
+    // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
+    if (!filesystem.exists(hadoopPath)) filesystem.mkdirs(hadoopPath)
+
     val dfContent = if (partitions.isEmpty) {
       session.read
         .format(format)
@@ -157,7 +160,7 @@ case class XmlFileDataObject(override val id: DataObjectId,
     } else dfSuper
   }
 
-  override def writeDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
+  override def writeDataFrameToPath(df: GenericDataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
     assert(partitions.isEmpty, "writing XML-Files with partitions is not supported by spark-xml")
     super.writeDataFrameToPath(df, path, finalSaveMode)
   }

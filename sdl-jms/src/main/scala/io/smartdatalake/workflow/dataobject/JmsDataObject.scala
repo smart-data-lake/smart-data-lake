@@ -22,10 +22,11 @@ import java.util.concurrent.TimeUnit
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.definitions.{AuthMode, BasicAuthMode}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.jms.{JmsQueueConsumerFactory, SynchronousJmsReceiver, TextMessageHandler}
-import io.smartdatalake.util.misc.DataFrameUtil
+import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
@@ -46,7 +47,7 @@ import scala.concurrent.duration.Duration
 case class JmsDataObject(override val id: DataObjectId,
                          jndiContextFactory: String,
                          jndiProviderUrl: String,
-                         override val schemaMin: Option[StructType],
+                         override val schemaMin: Option[GenericSchema],
                          authMode: AuthMode,
                          batchSize: Int,
                          maxWaitSec: Int,
@@ -56,7 +57,7 @@ case class JmsDataObject(override val id: DataObjectId,
                          queue: String,
                          override val metadata: Option[DataObjectMetadata] = None)
                         (implicit instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateDataFrame with SchemaValidation {
+  extends DataObject with CanCreateSparkDataFrame with SchemaValidation {
 
   // Allow only supported authentication modes
   private val supportedAuths = Seq(classOf[BasicAuthMode])
@@ -65,7 +66,7 @@ case class JmsDataObject(override val id: DataObjectId,
 
   if(schemaMin.isDefined) logger.warn("SchemaMin ignored, for JmsDataObject is always fixed to payload:string")
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     implicit val session: SparkSession = context.sparkSession
     val consumerFactory = new JmsQueueConsumerFactory(jndiContextFactory, jndiProviderUrl, basicAuthMode.user, basicAuthMode.password, connectionFactory, queue)
     val receiver = new SynchronousJmsReceiver[String](consumerFactory,

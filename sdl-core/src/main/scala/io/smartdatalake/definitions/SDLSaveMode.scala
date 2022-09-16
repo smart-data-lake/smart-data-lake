@@ -20,9 +20,8 @@ package io.smartdatalake.definitions
 
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import org.apache.spark.sql.functions.expr
-import org.apache.spark.sql.{Column, DataFrame, SaveMode}
+import org.apache.spark.sql.{DataFrame, SaveMode}
 
-import java.time.LocalDateTime
 import scala.language.implicitConversions
 
 /**
@@ -50,6 +49,7 @@ object SDLSaveMode extends Enumeration {
   val Ignore: Value = Value("Ignore")
 
   /**
+   * Spark only optimization.
    * This is like SDLSaveMode.Overwrite but doesnt delete the directory of the DataObject and its partition, but only the files
    * inside. Then it uses Sparks append mode to add the new files.
    * Like that ACLs set on the base directory are preserved.
@@ -63,6 +63,7 @@ object SDLSaveMode extends Enumeration {
   val OverwritePreserveDirectories: Value = Value("OverwritePreserveDirectories")
 
   /**
+   * Spark only optimization.
    * This is like SDLSaveMode.Overwrite but processed partitions are manually deleted instead of using dynamic partitioning mode.
    * Then it uses Sparks append mode to add the new partitions.
    * This helps if there are performance problems when using dynamic partitioning mode with hive tables and many partitions.
@@ -83,23 +84,6 @@ object SDLSaveMode extends Enumeration {
    * Note that only few DataObjects are able to merge new data, e.g. DeltaLakeTableDataObject and JdbcTableDataObject
    */
   val Merge: Value = Value("Merge")
-
-  /* add implicit methods to enumeration, e.g. asSparkSaveMode */
-  class SDLSaveModeValue(mode: Value) {
-    /**
-     * Mapping to Spark SaveMode
-     * This is one-to-one except custom modes as OverwritePreserveDirectories
-     */
-    def asSparkSaveMode: SaveMode = mode match {
-      case Overwrite => SaveMode.Overwrite
-      case Append => SaveMode.Append
-      case ErrorIfExists => SaveMode.ErrorIfExists
-      case Ignore => SaveMode.Ignore
-      case OverwritePreserveDirectories => SaveMode.Append // Append with spark, but delete files before with hadoop
-      case OverwriteOptimized => SaveMode.Append // Append with spark, but delete partitions before with hadoop
-    }
-  }
-  implicit def value2SparkSaveMode(mode: Value): SDLSaveModeValue = new SDLSaveModeValue(mode)
 
 }
 
@@ -125,13 +109,22 @@ case class SaveModeGenericOptions(override val saveMode: SDLSaveMode) extends Sa
  * @param updateColumns List of column names to update in update clause. If empty all columns (except primary keys) are updated (default)
  * @param insertCondition A condition to control if unmatched records are inserted. If no condition is given all unmatched records are inserted (default).
  * @param insertColumnsToIgnore List of column names to ignore in insert clause. If empty all columns are inserted (default).
+ * @param insertValuesOverride Optional Map of column name and value expression to override value on insert. Value expressions have to be a sql expression string, e.g. true or 'abc'.
  * @param additionalMergePredicate To optimize performance for SDLSaveMode.Merge it might be interesting to limit the records read from the existing table data, e.g. merge operation might use only the last 7 days.
  */
-case class SaveModeMergeOptions(deleteCondition: Option[String] = None, updateCondition: Option[String] = None, updateColumns: Seq[String] = Seq(), insertCondition: Option[String] = None, insertColumnsToIgnore: Seq[String] = Seq(), additionalMergePredicate: Option[String] = None) extends SaveModeOptions {
+case class SaveModeMergeOptions(deleteCondition: Option[String] = None,
+                                updateCondition: Option[String] = None,
+                                updateColumns: Seq[String] = Seq(),
+                                insertCondition: Option[String] = None,
+                                insertColumnsToIgnore: Seq[String] = Seq(),
+                                insertValuesOverride: Map[String, String] = Map(),
+                                additionalMergePredicate: Option[String] = None
+                               ) extends SaveModeOptions {
   override private[smartdatalake] val saveMode = SDLSaveMode.Merge
   private[smartdatalake] val deleteConditionExpr = deleteCondition.map(expr)
   private[smartdatalake] val updateConditionExpr = updateCondition.map(expr)
   private[smartdatalake] val insertConditionExpr = insertCondition.map(expr)
+  private[smartdatalake] val insertValuesOverrideExpr = insertValuesOverride.mapValues(expr)
   private[smartdatalake] val additionalMergePredicateExpr = additionalMergePredicate.map(expr)
   private[smartdatalake] val updateColumnsOpt = if (updateColumns.nonEmpty) Some(updateColumns) else None
   override private[smartdatalake] def convertToTargetSchema(df: DataFrame) = insertColumnsToIgnore.foldLeft(df){
