@@ -7,16 +7,18 @@ DataObjects are the core element of Smart data Lake Builder. These objects defin
 
 Furthermore, a section with metadata can be used. 
 
-For a list of features please see the [Schema Viewer](http://smartdatalake.ch/json-schema-viewer/index.html).
+All available DataObjects and their parameters are listed in the [Schema Viewer](http://smartdatalake.ch/json-schema-viewer/index.html).
 
 ## Object Types
-Smart Data Lake Builder supports beside a list of file types, database objects and general connectors. 
+Smart Data Lake Builder supports beside a list of file types also database objects and general connectors. 
 
 Examples: 
 
 * file based: CSV, JSON, XML, Parquet, ...
-* database based: JDBC, DeltaLake, ...
-* connectors: Airbyte, sFTP
+* database based: JDBC, DeltaLake, Hive ...
+* connectors: Airbyte, sFTP, Webservice, ...
+
+If necessary, additional formats can be implemented by providing an own DataObject implementation (Java/Scala), or implementing an Airbyte connector (Python).
 
 ## Schema
 SDLB requires a schema for data object that can create DataFrames, if they are used as starting point of a DAG. The schema can be
