@@ -37,11 +37,11 @@ dataObjects {
 ## Expectations
 Expectations can be defined on DataObjects to monitor and validate a dataset after it has been written to the DataObject. An expectation collects a custom metric and compares its result against a given expectation condition. If the condition fails a warning can be logged or an error created which stops further processing. 
 
-Using the type=SQLExpectation a simple aggregation SQL expression is evaluated over the dataset. Further an arbitrary SQL expression can be configured as expectation condition, which is compared against the metric value. If no expectation condition is given, the custom metric value is just logged in the `finished writing to DataObject~xyz:...` log message, see example in previous section.
+Using the `type = SQLExpectation`, a simple aggregation SQL expression is evaluated over the dataset. Further, an arbitrary SQL expression can be configured as expectation condition, which is compared against the metric value. If no expectation condition is given, the custom metric value is just logged in the `finished writing to DataObject~xyz:...` log message, see example in [Metrics](#metrics) section.
 
 SDLB supports other expectation types, see [Schema Viewer](http://smartdatalake.ch/json-schema-viewer/index.html) for a list.
 
-By default the expectation is evaluated against the currently processed dataset (scope=Job), but the scope can be adapted to do the calculation against the processed partitions (scope=JobPartition), or all data in the output DataObject (scope=All). Note that expectations with scope!=Job need reading the data from the output again after it has been written, while expectations with scope=Job can be calculated on the fly when using Spark as execution engine.
+By default, the expectation is evaluated against the currently processed dataset (scope=Job), which may consist of multiple partition values. Using the option `scope=JobPartition`, the scope can be changed to evalute against *each* partition value. The option `scope=All` would take all data in the output DataObject into account. Note that expectations with scope!=Job need reading the data from the output again after it has been written, while expectations with scope=Job can be calculated on the fly when using Spark as execution engine.
 
 
 ```
