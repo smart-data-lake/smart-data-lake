@@ -106,7 +106,7 @@ dataObjects {
   }
 
   stg-airports {
-    type = CsvDataObject
+    type = CsvFileDataObject
     path = "~{id}"
     metadata {
       name = "Staging file of Airport location data"
