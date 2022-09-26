@@ -51,7 +51,8 @@ case class Table(
  *
  * @param db target database, if not defined it is assumed to be the same as the table owning the foreign key
  * @param table referenced target table name
- * @param columns mapping of source column(s) to referenced target table column(s)
+ * @param columns mapping of source column(s) to referenced target table column(s). The map is given
+ * as a list of objects with the following syntax: {"local_column_name" : "external_column_name"}
  * @param name optional name for foreign key, e.g to depict it's role
  */
 case class ForeignKey(
