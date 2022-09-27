@@ -47,7 +47,25 @@ case class Table(
 }
 
 /**
- * Foreign key definition
+ * Foreign key definition. Foreign keys in .conf files are to be defined like the following example 
+ (here two foreign key objects): 
+    foreignKeys = [
+        {
+          db = "OPTIONAL_DB_name"
+          table = "table_id"
+          columns = {
+            "local_column_name": "external_column_name"
+            }
+          name = "OPTIONAL_key_name"
+        },
+        {
+          table = "another_table_id"
+          columns = {
+            "another_local_column_name": "another_external_column_name"
+          }
+          name = "another_OPTIONAL_key_name"
+        }
+      ]
  *
  * @param db target database, if not defined it is assumed to be the same as the table owning the foreign key
  * @param table referenced target table name
