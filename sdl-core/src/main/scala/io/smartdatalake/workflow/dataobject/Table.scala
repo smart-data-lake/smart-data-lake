@@ -29,6 +29,20 @@ package io.smartdatalake.workflow.dataobject
  * @param primaryKey  optional sequence of primary key columns
  * @param foreignKeys optional sequence of foreign key definitions.
  *                    This is used as metadata for a data catalog.
+ * Each foreign key in the .conf files is an object with the following properties: 
+ * {db: string, table: string , name: string map: Map[String]}, whereas a Map[String] is simply 
+ * a further object of the type {<local_column_name>:string, <external_column_name>:string}. For example: 
+ *   foreignKeys = [
+ *       {
+ *         db = "OPTIONAL_DB_name" 
+ *         table = "table_id" 
+ *         columns = { 
+ *           "local_column_name": "external_column_name" 
+ *           } 
+ *         name = "OPTIONAL_key_name" 
+ *       } 
+ *     ] 
+ * 
  * @param options
  */
 case class Table(
