@@ -4229,19 +4229,19 @@
                   "additionalProperties" : {
                     "type" : "string"
                   },
-                  "description" : "mapping of source column(s) to referenced target table column(s)"
+                  "description" : "mapping of source column(s) to referenced target table column(s). The map is given\nas a list of objects with the following syntax: {\\\"local_column_name\\\" : \\\"external_column_name\\\"}"
                 },
                 "name" : {
                   "type" : "string",
-                  "description" : "optional name for foreign key, e.g to depict it\\'s role"
+                  "description" : "optional name for foreign key, e.g to depict it\\'s role.\n\n\nForeign keys in .conf files are to be defined like the following example \n(here two foreign key objects): \nforeignKeys = [\n{\ndb = \\\"OPTIONAL_DB_name\\\"\ntable = \\\"table_id\\\"\ncolumns = {\n\\\"local_column_name\\\": \\\"external_column_name\\\"\n}\nname = \\\"OPTIONAL_key_name\\\"\n},\n{\ntable = \\\"another_table_id\\\"\ncolumns = {\n\\\"another_local_column_name\\\": \\\"another_external_column_name\\\"\n}\nname = \\\"another_OPTIONAL_key_name\\\"\n}\n]"
                 }
               },
               "title" : "ForeignKey",
               "required" : [ "table", "columns" ],
               "additionalProperties" : false,
-              "description" : "Foreign key definition"
+              "description" : "Foreign key definition."
             },
-            "description" : "optional sequence of foreign key definitions.\nThis is used as metadata for a data catalog."
+            "description" : "optional sequence of foreign key definitions.\nThis is used as metadata for a data catalog.\nEach foreign key in the .conf files is an object with the following properties: \n{db: string, table: string , name: string map: Map[String]}, whereas a Map[String] is simply \na further object of the type {<local_column_name>:string, <external_column_name>:string}. For example: \nforeignKeys = [\n{\ndb = \\\"OPTIONAL_DB_name\\\" \ntable = \\\"table_id\\\" \ncolumns = { \n\\\"local_column_name\\\": \\\"external_column_name\\\" \n} \nname = \\\"OPTIONAL_key_name\\\" \n} \n]"
           },
           "options" : {
             "type" : "object",
@@ -5068,7 +5068,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "BlacklistTransformer"
+                  "const" : "WhitelistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -5078,18 +5078,18 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnBlacklist" : {
+                "columnWhitelist" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
                   },
-                  "description" : "List of columns to exclude from DataFrame"
+                  "description" : "List of columns to keep from DataFrame"
                 }
               },
-              "title" : "BlacklistTransformer",
-              "required" : [ "columnBlacklist", "type" ],
+              "title" : "WhitelistTransformer",
+              "required" : [ "columnWhitelist", "type" ],
               "additionalProperties" : false,
-              "description" : "Apply a column blacklist to a DataFrame."
+              "description" : "Apply a column whitelist to a DataFrame."
             }, {
               "type" : "object",
               "properties" : {
@@ -5527,17 +5527,6 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "OptionsGenericDfTransformer"
-                }
-              },
-              "title" : "OptionsGenericDfTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
                   "const" : "FilterTransformer"
                 },
                 "name" : {
@@ -5561,6 +5550,17 @@
               "required" : [ "filterClause", "type" ],
               "additionalProperties" : false,
               "description" : "Apply a filter condition to a DataFrame."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "OptionsGenericDfTransformer"
+                }
+              },
+              "title" : "OptionsGenericDfTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
             }, {
               "type" : "object",
               "properties" : {
@@ -5598,7 +5598,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "WhitelistTransformer"
+                  "const" : "BlacklistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -5608,18 +5608,18 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnWhitelist" : {
+                "columnBlacklist" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
                   },
-                  "description" : "List of columns to keep from DataFrame"
+                  "description" : "List of columns to exclude from DataFrame"
                 }
               },
-              "title" : "WhitelistTransformer",
-              "required" : [ "columnWhitelist", "type" ],
+              "title" : "BlacklistTransformer",
+              "required" : [ "columnBlacklist", "type" ],
               "additionalProperties" : false,
-              "description" : "Apply a column whitelist to a DataFrame."
+              "description" : "Apply a column blacklist to a DataFrame."
             } ],
             "description" : "Configuration for a GenericDfTransformerDef to be applied"
           },
