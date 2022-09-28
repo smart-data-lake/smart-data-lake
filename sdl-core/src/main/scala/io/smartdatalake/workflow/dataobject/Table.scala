@@ -29,6 +29,20 @@ package io.smartdatalake.workflow.dataobject
  * @param primaryKey  optional sequence of primary key columns
  * @param foreignKeys optional sequence of foreign key definitions.
  *                    This is used as metadata for a data catalog.
+ * Each foreign key in the .conf files is an object with the following properties: 
+ * {db: string, table: string , name: string map: Map[String]}, whereas a Map[String] is simply 
+ * a further object of the type {<local_column_name>:string, <external_column_name>:string}. For example: 
+ *   foreignKeys = [
+ *       {
+ *         db = "OPTIONAL_DB_name" 
+ *         table = "table_id" 
+ *         columns = { 
+ *           "local_column_name": "external_column_name" 
+ *           } 
+ *         name = "OPTIONAL_key_name" 
+ *       } 
+ *     ] 
+ * 
  * @param options
  */
 case class Table(
@@ -47,12 +61,34 @@ case class Table(
 }
 
 /**
- * Foreign key definition
+ * Foreign key definition.
  *
  * @param db target database, if not defined it is assumed to be the same as the table owning the foreign key
  * @param table referenced target table name
- * @param columns mapping of source column(s) to referenced target table column(s)
- * @param name optional name for foreign key, e.g to depict it's role
+ * @param columns mapping of source column(s) to referenced target table column(s). The map is given
+ * as a list of objects with the following syntax: {"local_column_name" : "external_column_name"}
+ * @param name optional name for foreign key, e.g to depict it's role.
+ * 
+ * 
+ * Foreign keys in .conf files are to be defined like the following example 
+ * (here two foreign key objects): 
+ *   foreignKeys = [
+ *       {
+ *         db = "OPTIONAL_DB_name"
+ *         table = "table_id"
+ *         columns = {
+ *           "local_column_name": "external_column_name"
+ *           }
+ *         name = "OPTIONAL_key_name"
+ *       },
+ *       {
+ *         table = "another_table_id"
+ *         columns = {
+ *           "another_local_column_name": "another_external_column_name"
+ *         }
+ *         name = "another_OPTIONAL_key_name"
+ *       }
+ *     ]
  */
 case class ForeignKey(
                        db: Option[String],
