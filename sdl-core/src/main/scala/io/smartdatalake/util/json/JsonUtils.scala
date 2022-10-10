@@ -23,7 +23,7 @@ object JsonUtils {
   /**
    * Convert a Hocon config to a Json String
    */
-  def configToJsonString(config: Config)(implicit formats: Formats): String = {
+  def configToJsonString(config: Config): String = {
     config.root().render(ConfigRenderOptions.concise())
   }
 
