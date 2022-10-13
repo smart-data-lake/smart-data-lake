@@ -19,8 +19,8 @@
 
 package io.smartdatalake.workflow.action.generic.transformer
 
-import io.smartdatalake.config.ParsableFromConfig
 import io.smartdatalake.config.SdlConfigObject.ActionId
+import io.smartdatalake.config.{ConfigHolder, ParsableFromConfig}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame

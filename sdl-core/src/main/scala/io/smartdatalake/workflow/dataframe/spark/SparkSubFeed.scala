@@ -230,11 +230,17 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
+
   override def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
     SparkDataFrame(context.sparkSession.sql(query))
   }
+
   override def createSchema(fields: Seq[GenericField]): GenericSchema = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, fields)
     SparkSchema(StructType(fields.map(_.asInstanceOf[SparkField].inner)))
+  }
+
+  def apply(dataFrame: SparkDataFrame, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues]): SparkSubFeed = {
+    SparkSubFeed(Some(dataFrame), dataObjectId: DataObjectId, partitionValues)
   }
 }

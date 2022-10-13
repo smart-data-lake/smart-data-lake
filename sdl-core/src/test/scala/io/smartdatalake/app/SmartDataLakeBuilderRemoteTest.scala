@@ -26,7 +26,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.action.{Action, CopyAction}
-import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -43,16 +43,17 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
   test("Test Config Parsing") {
     val feedName = "test"
     val sdlb = new DefaultSmartDataLakeBuilder()
-    // setup input DataObject
-    val srcDO = CsvFileDataObject("src1", "target/src1")(sdlb.instanceRegistry)
-    val dfSrc1 = Seq("testData").toDF("testColumn")
-    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+
+    val srcDO1 = SparkSubFeed(SparkDataFrame(
+      Seq(("testData"))
+        .toDF("testColumn")
+    ), DataObjectId("src1"), Nil)
 
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
       getClass.getResource("/configremote/application.conf").getPath))
     )
     //Run SDLB
-    sdlb.run(sdlConfig)
+    sdlb.startSimulationWithConfigFile(sdlConfig, Seq(srcDO1))(session)
 
     val actionToSerialize = sdlb.instanceRegistry.getActions.head.asInstanceOf[CopyAction]
 
@@ -73,7 +74,7 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
       .map { case (id, config) => (ActionId(id), parseConfigObjectWithId[Action](id, config)) }
     instanceRegistry.register(actions)
 
-    //Contents of the action and objects should match the contents of /configremote/application.conf
+    //Contents of the action and objects generated out of the serialized hocon string should match the contents of /configremote/application.conf
     assert(dataObjects.contains("src1") && dataObjects.contains("tgt1") && actions.contains("a"))
   }
   test("sdlb run with agent: Test starting remote action from sdlb to agentserver") {
