@@ -96,7 +96,8 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
     if (remoteActionConfig.isDefined && context.phase == ExecutionPhase.Exec) {
       println("Arrived here")
       val agentClient = AgentClient(remoteActionConfig.get)
-      agentClient.sendAction(this)
+      val hoconInstructions = AgentClient.prepareHoconInstructions(this, context.instanceRegistry.getConnections)
+      agentClient.sendInstructions(hoconInstructions)
 
       while (agentClient.socket.actionStillRunning) {
         Thread.sleep(1000)

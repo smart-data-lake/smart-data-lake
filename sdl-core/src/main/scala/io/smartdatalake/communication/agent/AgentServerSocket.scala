@@ -16,11 +16,12 @@ package io.smartdatalake.communication.agent
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigSyntax}
 import io.smartdatalake.app.GlobalConfig
 import io.smartdatalake.communication.statusinfo.websocket.SDLMessageType.EndConnection
-import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getDataObjectConfigMap, parseConfigObjectWithId}
+import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getConnectionConfigMap, getDataObjectConfigMap, parseConfigObjectWithId}
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.{Action, CopyAction, SDLExecutionId}
+import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataobject.DataObject
 import org.eclipse.jetty.websocket.api.{Session, StatusCode, WebSocketAdapter}
 
@@ -45,6 +46,10 @@ class AgentServerSocket(config: AgentServerConfig, agentController: AgentControl
     instanceRegistry.clear()
 
     val configFromString = ConfigFactory.parseString(message, ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF))
+
+    val connections: Map[ConnectionId, Connection] = getConnectionConfigMap(configFromString)
+      .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
+    instanceRegistry.register(connections)
 
     val dataObjects: Map[DataObjectId, DataObject] = getDataObjectConfigMap(configFromString)
       .map { case (id, config) => (DataObjectId(id), parseConfigObjectWithId[DataObject](id, config)) }

@@ -20,12 +20,13 @@
 package io.smartdatalake.app
 
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigSyntax}
-import io.smartdatalake.communication.agent.{AgentController, AgentServer, AgentServerConfig, SerializedConfig}
-import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getDataObjectConfigMap, parseConfigObjectWithId}
+import io.smartdatalake.communication.agent.{AgentClient, AgentController, AgentServer, AgentServerConfig}
+import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getConnectionConfigMap, getDataObjectConfigMap, parseConfigObjectWithId}
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.workflow.action.{Action, CopyAction}
+import io.smartdatalake.workflow.action.Action
+import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
@@ -39,7 +40,6 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
 
   import session.implicits._
-
   test("Test Config Parsing") {
     val feedName = "test"
     val sdlb = new DefaultSmartDataLakeBuilder()
@@ -52,30 +52,25 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
       getClass.getResource("/configremote/application.conf").getPath))
     )
-    //Run SDLB
+    //Run simlutation of SDLB to parse config file and populate instanceregistry
     sdlb.startSimulationWithConfigFile(sdlConfig, Seq(srcDO1))(session)
 
-    val actionToSerialize = sdlb.instanceRegistry.getActions.head.asInstanceOf[CopyAction]
+    implicit val instanceRegistry = sdlb.instanceRegistry
 
-    val serializedConfig = SerializedConfig(inputDataObjects = actionToSerialize.inputs.map(_._config.get)
-      , outputDataObjects = actionToSerialize.outputs.map(_._config.get), action = actionToSerialize._config.get)
-
-    //Serialize the Action and it s input and output dataobjects to HOCON Format
-    val hoconString = serializedConfig.asHoconString
-    implicit val instanceRegistry = new InstanceRegistry
-
+    val hoconString = AgentClient.prepareHoconInstructions(sdlb.instanceRegistry.getActions.head, sdlb.instanceRegistry.getConnections)
     val configFromString = ConfigFactory.parseString(hoconString, ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF))
 
     val dataObjects: Map[DataObjectId, DataObject] = getDataObjectConfigMap(configFromString)
       .map { case (id, config) => (DataObjectId(id), parseConfigObjectWithId[DataObject](id, config)) }
-    instanceRegistry.register(dataObjects)
 
     val actions: Map[ActionId, Action] = getActionConfigMap(configFromString)
       .map { case (id, config) => (ActionId(id), parseConfigObjectWithId[Action](id, config)) }
-    instanceRegistry.register(actions)
+
+    val connections: Map[ConnectionId, Connection] = getConnectionConfigMap(configFromString)
+      .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
 
     //Contents of the action and objects generated out of the serialized hocon string should match the contents of /configremote/application.conf
-    assert(dataObjects.contains("src1") && dataObjects.contains("tgt1") && actions.contains("a"))
+    assert(dataObjects.contains("src1") && dataObjects.contains("tgt1") && connections.contains("localSql"))
   }
   test("sdlb run with agent: Test starting remote action from sdlb to agentserver") {
 

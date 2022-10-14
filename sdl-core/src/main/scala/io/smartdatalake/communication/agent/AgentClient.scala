@@ -19,14 +19,47 @@
 
 package io.smartdatalake.communication.agent
 
+import com.typesafe.config.{ConfigObject, ConfigRenderOptions, ConfigValueFactory}
+import io.smartdatalake.config.ConfigParser.{CONFIG_SECTION_ACTIONS, CONFIG_SECTION_CONNECTIONS, CONFIG_SECTION_DATAOBJECTS}
 import io.smartdatalake.workflow.action.{Action, RemoteActionConfig}
+import io.smartdatalake.workflow.connection.Connection
 import org.eclipse.jetty.websocket.client.WebSocketClient
 
 import java.net.URI
+import scala.collection.JavaConverters._
 
+object AgentClient {
+  def prepareHoconInstructions(actionToSerialize: Action, connectionsToSerialize: Seq[Connection]): String = {
+    val allConnectedDataObjects = actionToSerialize.inputs ++ actionToSerialize.outputs
+    val allConnectionIds = allConnectedDataObjects.map(_._config.get).filter(_.hasPath("connectionId")).map(_.getValue("connectionId").render(ConfigRenderOptions.concise().setJson(false)))
+    val relevantConnections: Seq[Connection] = connectionsToSerialize.filter(connectionId => allConnectionIds.contains(connectionId.id.id))
+
+    val hoconConfigToSend: ConfigObject = ConfigValueFactory.fromMap(
+      Map(CONFIG_SECTION_ACTIONS ->
+        ConfigValueFactory.fromMap(
+          Map(actionToSerialize.id.id ->
+            ConfigValueFactory.fromAnyRef(actionToSerialize._config.get.root())).asJava)
+        ,
+        CONFIG_SECTION_DATAOBJECTS ->
+          ConfigValueFactory.fromMap(
+            allConnectedDataObjects.map(dataObject =>
+              dataObject.id.id -> ConfigValueFactory.fromAnyRef(dataObject._config.get.root())).toMap
+              .asJava),
+
+        CONFIG_SECTION_CONNECTIONS ->
+          ConfigValueFactory.fromMap(
+            relevantConnections.map(connection =>
+              connection.id.id -> ConfigValueFactory.fromAnyRef(connection._config.get.root())).toMap
+              .asJava)).asJava
+    )
+    val hoconString = hoconConfigToSend.render(ConfigRenderOptions.concise().setJson(false))
+    hoconString
+  }
+}
 case class AgentClient(remoteActionConfig: RemoteActionConfig) {
   val socket = new AgentClientSocket()
-  def sendAction(actionToSerialize: Action): Unit = {
+
+  def sendInstructions(instructions: String): Unit = {
     val uri = URI.create(remoteActionConfig.remoteAgentURL)
     val client = new WebSocketClient
 
@@ -35,11 +68,6 @@ case class AgentClient(remoteActionConfig: RemoteActionConfig) {
     val fut = client.connect(socket, uri)
     // Wait for Connect
     val session = fut.get
-
-    val serializedConfig = SerializedConfig(inputDataObjects = actionToSerialize.inputs.map(_._config.get)
-      , outputDataObjects = actionToSerialize.outputs.map(_._config.get), action = actionToSerialize._config.get)
-
-    val hoconString = serializedConfig.asHoconString
-    session.getRemote.sendString(hoconString)
+    session.getRemote.sendString(instructions)
   }
 }
