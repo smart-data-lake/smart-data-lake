@@ -15,31 +15,30 @@ package io.smartdatalake.communication.agent
 
 import io.smartdatalake.communication.statusinfo.websocket.SDLMessageType.EndConnection
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import org.eclipse.jetty.websocket.api.{Session, WebSocketAdapter}
+import org.eclipse.jetty.websocket.api.{Session, StatusCode, WebSocketAdapter}
 
 class AgentClientSocket() extends WebSocketAdapter with SmartDataLakeLogger {
 
   var actionStillRunning = true
 
   override def onWebSocketConnect(sess: Session): Unit = {
-
+    super.onWebSocketConnect(sess)
   }
 
   override def onWebSocketText(message: String): Unit = {
-    super.onWebSocketText(message)
     logger.info("Received TEXT message: " + message)
+    super.onWebSocketText(message)
 
     if (message.contains(EndConnection.toString)) {
-      println("Closing the connection from the client now since EndCOnnection received")
+      logger.info(this + ": received EndConnection request, closing connection")
       actionStillRunning = false
-      //TODO throws nullpointerexception, need to find out why
-      //getSession.close(StatusCode.NORMAL, "Connection closed by Server")
+      getSession.close(StatusCode.NORMAL, "Connection closed by " + this)
     }
   }
 
   override def onWebSocketClose(statusCode: Int, reason: String): Unit = {
     super.onWebSocketClose(statusCode, reason)
-    logger.info("Socket Closed: [" + statusCode + "] " + reason)
+    logger.info(this + ": Socket Closed: [" + statusCode + "] " + reason)
 
   }
 

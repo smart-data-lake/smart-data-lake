@@ -20,7 +20,7 @@ import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getConnectionCo
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.action.{Action, CopyAction, SDLExecutionId}
+import io.smartdatalake.workflow.action.{Action, SDLExecutionId}
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataobject.DataObject
 import org.eclipse.jetty.websocket.api.{Session, StatusCode, WebSocketAdapter}
@@ -59,28 +59,23 @@ class AgentServerSocket(config: AgentServerConfig, agentController: AgentControl
 
     val actions: Map[ActionId, Action] = getActionConfigMap(configFromString)
       .map { case (id, config) => (ActionId(id), parseConfigObjectWithId[Action](id, config)) }
-    val actions2 = actions.map { //TODO generalize
-      case (id, action: CopyAction) => (id, action.copy(remoteActionConfig = None)) //Remote Instances of SDLB should execute the action locally
-    }
 
-    instanceRegistry.register(actions2)
-
+    instanceRegistry.register(actions)
 
     //TODO replace here config.sdlConfig.test with dry run for init phase
     agentController.sdlb.exec(config.sdlConfig, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), Seq(), None, Seq(), simulation = false, globalConfig = GlobalConfig())(agentController.instanceRegistry)
 
-    println("ER HAT ES GESCHAFFT")
-
     getSession.getRemote.sendString(EndConnection.toString)
 
     if (message.contains(EndConnection)) {
-      getSession.close(StatusCode.NORMAL, "Connection closed by client")
+      logger.info(this + ": received EndConnection request, closing connection")
+      getSession.close(StatusCode.NORMAL, "Connection closed by " + this)
     }
   }
 
   override def onWebSocketClose(statusCode: Int, reason: String): Unit = {
     super.onWebSocketClose(statusCode, reason)
-    logger.info("Socket Closed: [" + statusCode + "] " + reason)
+    logger.info("Server says: Socket Closed: [" + statusCode + "] " + reason)
 
   }
 

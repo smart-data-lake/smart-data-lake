@@ -18,11 +18,10 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.communication.agent.AgentClient
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformerDef, SQLDfTransformer}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SubFeed}
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 
@@ -92,21 +91,6 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
   protected def applyTransformers(transformers: Seq[GenericDfTransformerDef], inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     val duplicateTransformerNames = transformers.groupBy(_.name).values.filter(_.size > 1).map(_.head.name)
     assert(!transformers.exists(_.isInstanceOf[SQLDfTransformer]) || duplicateTransformerNames.isEmpty, s"($id) transformers.name must be unique if SQLDfTransformer is used, but duplicate (default?) names ${duplicateTransformerNames.mkString(", ")} where detected")
-
-    if (remoteActionConfig.isDefined && context.phase != ExecutionPhase.Exec) {
-      //TODO how to start prepare / init phases on remote sblb?
-    }
-
-    if (remoteActionConfig.isDefined && context.phase == ExecutionPhase.Exec) {
-      val agentClient = AgentClient(remoteActionConfig.get)
-      val hoconInstructions = AgentClient.prepareHoconInstructions(this, context.instanceRegistry.getConnections)
-      agentClient.sendInstructions(hoconInstructions)
-
-      while (agentClient.socket.actionStillRunning) {
-        Thread.sleep(1000)
-        println("waiting...")
-      }
-    }
 
     val (transformedSubFeed, _) = transformers.foldLeft((inputSubFeed, Option.empty[String])) {
       case ((subFeed, previousTransformerName), transformer) => (transformer.applyTransformation(id, subFeed, previousTransformerName), Some(transformer.name))

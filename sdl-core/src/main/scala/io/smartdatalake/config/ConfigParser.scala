@@ -23,7 +23,7 @@ import configs.syntax._
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
-import io.smartdatalake.workflow.action.Action
+import io.smartdatalake.workflow.action.{Action, ProxyAction}
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataobject.DataObject
 import org.reflections.Reflections
@@ -57,7 +57,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
     registry.register(dataObjects)
 
     val actions: Map[ActionId, Action] = getActionConfigMap(config)
-      .map{ case (id, config) => (ActionId(id), parseConfigObjectWithId[Action](id, config))}
+      .map { case (id, config) => (ActionId(id), parseActionWithId(id, config)) }
     registry.register(actions)
 
     registry
@@ -135,8 +135,18 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   } catch {
     case e: Exception => throw enrichExceptionMessageConfigPath(enrichExceptionMessageClassName(e), configPath)
   }
+
   def parseConfigObjectWithId[A <: ParsableFromConfig[A] : TypeTag](id: String, config: Config)(implicit registry: InstanceRegistry): A = {
     parseConfigObject[A](config, Some(getIdWithClassNamePrefixed[A](id)), Map("id" -> id))
+  }
+
+  def parseActionWithId(id: String, config: Config)(implicit registry: InstanceRegistry): Action = {
+    val parsedAction = parseConfigObjectWithId[Action](id, config)
+    if (parsedAction.remoteActionConfig.isDefined) {
+      ProxyAction(parsedAction, parsedAction.id)
+    } else {
+      parsedAction
+    }
   }
 
   /**
@@ -147,6 +157,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
     def getRootCause(cause: Throwable): Throwable = {
       Option(cause.getCause).map(getRootCause).getOrElse(cause)
     }
+
     val rootCause = getRootCause(e)
     if (!rootCause.isInstanceOf[ConfigException]) {
       val rootCauseClassName = rootCause.getClass.getSimpleName
