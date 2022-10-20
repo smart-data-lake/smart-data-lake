@@ -42,14 +42,16 @@ class AgentServerSocket(config: AgentServerConfig, agentController: AgentControl
     super.onWebSocketText(message)
     logger.info("Received TEXT message: " + message)
     implicit val instanceRegistry: InstanceRegistry = agentController.instanceRegistry
-
-    instanceRegistry.clear()
+    val agentConnectionIds = instanceRegistry.getConnections.map(_.id.id)
 
     val configFromString = ConfigFactory.parseString(message, ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF))
 
-    val connections: Map[ConnectionId, Connection] = getConnectionConfigMap(configFromString)
+    val connectionsToRegister: Map[ConnectionId, Connection] = getConnectionConfigMap(configFromString)
+      //Connections defined by the agent should not get overwritten by the connections in the instructions
+      .filterNot { case (id, _) => agentConnectionIds.contains(id) }
       .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
-    instanceRegistry.register(connections)
+
+    instanceRegistry.register(connectionsToRegister)
 
     val dataObjects: Map[DataObjectId, DataObject] = getDataObjectConfigMap(configFromString)
       .map { case (id, config) => (DataObjectId(id), parseConfigObjectWithId[DataObject](id, config)) }
@@ -57,13 +59,14 @@ class AgentServerSocket(config: AgentServerConfig, agentController: AgentControl
 
     val actions: Map[ActionId, Action] = getActionConfigMap(configFromString)
       .map { case (id, config) => (ActionId(id), parseConfigObjectWithId[Action](id, config)) }
-    val actions2 = actions.map {
-      case (id, action: CopyAction) => (id, action.copy(remoteActionConfig = None))
+    val actions2 = actions.map { //TODO generalize
+      case (id, action: CopyAction) => (id, action.copy(remoteActionConfig = None)) //Remote Instances of SDLB should execute the action locally
     }
-
 
     instanceRegistry.register(actions2)
 
+
+    //TODO replace here config.sdlConfig.test with dry run for init phase
     agentController.sdlb.exec(config.sdlConfig, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), Seq(), None, Seq(), simulation = false, globalConfig = GlobalConfig())(agentController.instanceRegistry)
 
     println("ER HAT ES GESCHAFFT")

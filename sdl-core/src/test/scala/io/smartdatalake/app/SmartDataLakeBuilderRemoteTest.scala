@@ -22,7 +22,7 @@ package io.smartdatalake.app
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigSyntax}
 import io.smartdatalake.communication.agent.{AgentClient, AgentController, AgentServer, AgentServerConfig}
 import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getConnectionConfigMap, getDataObjectConfigMap, parseConfigObjectWithId}
-import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.config.ConfigToolbox.loadAndParseConfig
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.action.Action
@@ -32,6 +32,8 @@ import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
+import java.nio.file.Paths
+
 /**
  * This tests use configuration test/resources/application.conf
  */
@@ -40,6 +42,7 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
 
   import session.implicits._
+
   test("Test Config Parsing") {
     val feedName = "test"
     val sdlb = new DefaultSmartDataLakeBuilder()
@@ -70,7 +73,7 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
       .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
 
     //Contents of the action and objects generated out of the serialized hocon string should match the contents of /configremote/application.conf
-    assert(dataObjects.contains("src1") && dataObjects.contains("tgt1") && connections.contains("localSql"))
+    assert(dataObjects.contains("src1") && dataObjects.contains("tgt1") && connections.contains("localSql") && actions.contains("a"))
   }
   test("sdlb run with agent: Test starting remote action from sdlb to agentserver") {
 
@@ -82,20 +85,29 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
     val dfSrc1 = Seq("testData").toDF("testColumn")
     srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
+
+    val agentConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
+      getClass.getResource("/configremote/application-remote.conf").getPath))
+    )
+
+    val remoteSDLB = new DefaultSmartDataLakeBuilder()
+    val (instanceRegistry, _) = loadAndParseConfig(Seq(getClass.getResource("/configremote/application-remote.conf").getPath))
+    val agentController: AgentController = AgentController(instanceRegistry, remoteSDLB)
+    AgentServer.start(AgentServerConfig(sdlConfig = agentConfig), agentController)
+
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
       getClass.getResource("/configremote/application.conf").getPath))
     )
-
-    val sdlb2 = new DefaultSmartDataLakeBuilder()
-
-    val sdl2Config = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = None)
-    val agentController: AgentController = AgentController(new InstanceRegistry, sdlb2)
-    AgentServer.start(AgentServerConfig(sdlConfig = sdl2Config), agentController)
-
-    //Run SDLB
+    //Run SDLB Main Instance
     sdlb.run(sdlConfig)
 
+    //When main instance is done, remote SDLB should have created tgt file
+    val remoteAction = instanceRegistry.getActions.head
+    assert(remoteAction.id.id == "a")
+    assert(remoteAction.outputs.head.id.id == "tgt1")
+    assert(Paths.get(System.getProperty("user.dir"), "target/agent_dummy_connection", "tgt1").toFile.exists())
 
+    println("blubv")
   }
 }
 

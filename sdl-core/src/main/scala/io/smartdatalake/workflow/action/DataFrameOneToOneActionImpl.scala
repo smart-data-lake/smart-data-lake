@@ -77,7 +77,7 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
     assert(outputSubFeeds.size == 1, s"($id) Only one outputSubFeed allowed")
     if (isAsynchronousProcessStarted) return
     super.postExec(inputSubFeeds, outputSubFeeds)
-    postExecSubFeed(inputSubFeeds.head, outputSubFeeds.head)
+    postExecSubFeed(inputSubFeeds.head, outputSubFeeds.head) //TODO use this to sync remote data object when remote instance is finished?
   }
 
   /**
@@ -93,8 +93,11 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
     val duplicateTransformerNames = transformers.groupBy(_.name).values.filter(_.size > 1).map(_.head.name)
     assert(!transformers.exists(_.isInstanceOf[SQLDfTransformer]) || duplicateTransformerNames.isEmpty, s"($id) transformers.name must be unique if SQLDfTransformer is used, but duplicate (default?) names ${duplicateTransformerNames.mkString(", ")} where detected")
 
+    if (remoteActionConfig.isDefined && context.phase != ExecutionPhase.Exec) {
+      //TODO how to start prepare / init phases on remote sblb?
+    }
+
     if (remoteActionConfig.isDefined && context.phase == ExecutionPhase.Exec) {
-      println("Arrived here")
       val agentClient = AgentClient(remoteActionConfig.get)
       val hoconInstructions = AgentClient.prepareHoconInstructions(this, context.instanceRegistry.getConnections)
       agentClient.sendInstructions(hoconInstructions)
