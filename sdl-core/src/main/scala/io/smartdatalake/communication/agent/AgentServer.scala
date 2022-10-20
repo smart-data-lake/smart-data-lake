@@ -59,7 +59,6 @@ object AgentServer extends SmartDataLakeLogger {
     val webSocketHandler = new WebSocketHandler() {
       override def configure(factory: WebSocketServletFactory): Unit = {
         factory.setCreator(webSocketcreator)
-
       }
     }
 

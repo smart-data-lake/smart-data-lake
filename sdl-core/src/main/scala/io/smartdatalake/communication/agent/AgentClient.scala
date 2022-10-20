@@ -20,16 +20,20 @@
 package io.smartdatalake.communication.agent
 
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions, ConfigValueFactory}
+import io.smartdatalake.communication.message.{AgentInstruction, SDLMessage, SDLMessageType}
 import io.smartdatalake.config.ConfigParser.{CONFIG_SECTION_ACTIONS, CONFIG_SECTION_CONNECTIONS, CONFIG_SECTION_DATAOBJECTS}
 import io.smartdatalake.workflow.action.{Action, RemoteActionConfig}
 import io.smartdatalake.workflow.connection.Connection
+import io.smartdatalake.workflow.{ActionDAGRunState, ExecutionPhase}
 import org.eclipse.jetty.websocket.client.WebSocketClient
+import org.json4s.ext.EnumNameSerializer
+import org.json4s.jackson.Serialization.writePretty
 
 import java.net.URI
 import scala.collection.JavaConverters._
 
 object AgentClient {
-  def prepareHoconInstructions(actionToSerialize: Action, connectionsToSerialize: Seq[Connection]): String = {
+  def prepareHoconInstructions(actionToSerialize: Action, connectionsToSerialize: Seq[Connection]): SDLMessage = {
     val allConnectedDataObjects = actionToSerialize.inputs ++ actionToSerialize.outputs
     val allConnectionIds = allConnectedDataObjects.map(_._config.get).filter(_.hasPath("connectionId")).map(_.getValue("connectionId").render(ConfigRenderOptions.concise().setJson(false)))
     val relevantConnections: Seq[Connection] = connectionsToSerialize.filter(connectionId => allConnectionIds.contains(connectionId.id.id))
@@ -53,13 +57,13 @@ object AgentClient {
               .asJava)).asJava
     )
     val hoconString = hoconConfigToSend.render(ConfigRenderOptions.concise().setJson(false))
-    hoconString
+    SDLMessage(msgType = SDLMessageType.AgentInstruction, agentInstruction = Some(AgentInstruction(actionToSerialize.id.id, ExecutionPhase.Exec, hoconString)))
   }
 }
 case class AgentClient(remoteActionConfig: RemoteActionConfig) {
   val socket = new AgentClientSocket()
 
-  def sendInstructions(instructions: String): Unit = {
+  def sendSDLMessage(message: SDLMessage): Unit = {
     val uri = URI.create(remoteActionConfig.remoteAgentURL)
     val client = new WebSocketClient
 
@@ -68,6 +72,8 @@ case class AgentClient(remoteActionConfig: RemoteActionConfig) {
     val fut = client.connect(socket, uri)
     // Wait for Connect
     val session = fut.get
-    session.getRemote.sendString(instructions)
+
+    session.getRemote.sendString(writePretty(message)(ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)))
+
   }
 }

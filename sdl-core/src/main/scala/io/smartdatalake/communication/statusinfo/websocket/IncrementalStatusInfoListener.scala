@@ -19,6 +19,7 @@
 package io.smartdatalake.communication.statusinfo.websocket
 
 import io.smartdatalake.app.StateListener
+import io.smartdatalake.communication.message.{SDLMessage, SDLMessageType, StatusUpdate}
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, ExecutionPhase}
@@ -36,7 +37,7 @@ class IncrementalStatusInfoListener extends StateListener with SmartDataLakeLogg
 
   override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId: Option[ActionId]): Unit = {
 
-    val updateJSON =
+    val updateJSON: SDLMessage =
       if (changedActionId.isDefined) {
         val changedActions = state.actionsState.filter(_._1 == changedActionId.get)
 

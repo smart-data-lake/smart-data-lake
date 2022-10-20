@@ -60,8 +60,8 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
 
     implicit val instanceRegistry = sdlb.instanceRegistry
 
-    val hoconString = AgentClient.prepareHoconInstructions(sdlb.instanceRegistry.getActions.head, sdlb.instanceRegistry.getConnections)
-    val configFromString = ConfigFactory.parseString(hoconString, ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF))
+    val sdlMessage = AgentClient.prepareHoconInstructions(sdlb.instanceRegistry.getActions.head, sdlb.instanceRegistry.getConnections)
+    val configFromString = ConfigFactory.parseString(sdlMessage.agentInstruction.get.hoconConfig, ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF))
 
     val dataObjects: Map[DataObjectId, DataObject] = getDataObjectConfigMap(configFromString)
       .map { case (id, config) => (DataObjectId(id), parseConfigObjectWithId[DataObject](id, config)) }

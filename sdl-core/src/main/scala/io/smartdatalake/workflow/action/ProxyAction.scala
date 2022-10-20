@@ -33,10 +33,8 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
     val agentClient = AgentClient(wrappedAction.remoteActionConfig.get)
     //TODO change when refactoring config file to include agents sections
 
-    // val actionWithoutAgentConfig = wrappedAction.copy(remoteActionConfig = None) //Remote Instances of SDLB should execute the action locally
-
     val hoconInstructions = AgentClient.prepareHoconInstructions(wrappedAction, context.instanceRegistry.getConnections)
-    agentClient.sendInstructions(hoconInstructions)
+    agentClient.sendSDLMessage(hoconInstructions)
 
     while (agentClient.socket.actionStillRunning) {
       Thread.sleep(1000)

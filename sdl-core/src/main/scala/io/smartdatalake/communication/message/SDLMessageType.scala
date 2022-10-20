@@ -17,10 +17,13 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.communication.statusinfo.websocket
+package io.smartdatalake.communication.message
 
-import io.smartdatalake.config.SdlConfigObject.ActionId
+object SDLMessageType extends Enumeration {
+  type SDLMessageType = Value
 
-import java.time.LocalDateTime
-
-case class ActionLog(actionId: Option[ActionId], level: String, timestamp: LocalDateTime, message: String)
+  val Log: Value = Value("Log")
+  val StatusUpdate: Value = Value("StatusUpdate")
+  val EndConnection: Value = Value("EndConnection")
+  val AgentInstruction: Value = Value("AgentInstruction")
+}

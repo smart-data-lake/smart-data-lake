@@ -13,19 +13,14 @@
 
 package io.smartdatalake.communication.agent
 
-import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigSyntax}
-import io.smartdatalake.app.GlobalConfig
-import io.smartdatalake.communication.statusinfo.websocket.SDLMessageType.EndConnection
-import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getConnectionConfigMap, getDataObjectConfigMap, parseConfigObjectWithId}
-import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
+import io.smartdatalake.communication.message.SDLMessageType.EndConnection
+import io.smartdatalake.communication.message.{SDLMessage, SDLMessageType}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.action.{Action, SDLExecutionId}
-import io.smartdatalake.workflow.connection.Connection
-import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.{ActionDAGRunState, ExecutionPhase}
 import org.eclipse.jetty.websocket.api.{Session, StatusCode, WebSocketAdapter}
-
-import java.time.LocalDateTime
+import org.json4s.Formats
+import org.json4s.ext.EnumNameSerializer
+import org.json4s.jackson.Serialization.read
 
 class AgentServerSocket(config: AgentServerConfig, agentController: AgentController) extends WebSocketAdapter with SmartDataLakeLogger {
 
@@ -41,29 +36,10 @@ class AgentServerSocket(config: AgentServerConfig, agentController: AgentControl
   override def onWebSocketText(message: String): Unit = {
     super.onWebSocketText(message)
     logger.info("Received TEXT message: " + message)
-    implicit val instanceRegistry: InstanceRegistry = agentController.instanceRegistry
-    val agentConnectionIds = instanceRegistry.getConnections.map(_.id.id)
+    implicit val format: Formats = ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)
+    val sdlMessage = read[SDLMessage](message)
 
-    val configFromString = ConfigFactory.parseString(message, ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF))
-
-    val connectionsToRegister: Map[ConnectionId, Connection] = getConnectionConfigMap(configFromString)
-      //Connections defined by the agent should not get overwritten by the connections in the instructions
-      .filterNot { case (id, _) => agentConnectionIds.contains(id) }
-      .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
-
-    instanceRegistry.register(connectionsToRegister)
-
-    val dataObjects: Map[DataObjectId, DataObject] = getDataObjectConfigMap(configFromString)
-      .map { case (id, config) => (DataObjectId(id), parseConfigObjectWithId[DataObject](id, config)) }
-    instanceRegistry.register(dataObjects)
-
-    val actions: Map[ActionId, Action] = getActionConfigMap(configFromString)
-      .map { case (id, config) => (ActionId(id), parseConfigObjectWithId[Action](id, config)) }
-
-    instanceRegistry.register(actions)
-
-    //TODO replace here config.sdlConfig.test with dry run for init phase
-    agentController.sdlb.exec(config.sdlConfig, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), Seq(), None, Seq(), simulation = false, globalConfig = GlobalConfig())(agentController.instanceRegistry)
+    agentController.handle(sdlMessage, config)
 
     getSession.getRemote.sendString(EndConnection.toString)
 
