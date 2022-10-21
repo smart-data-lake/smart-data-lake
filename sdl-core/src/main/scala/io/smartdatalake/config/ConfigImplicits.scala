@@ -26,6 +26,7 @@ import io.smartdatalake.util.secrets.SecretProviderConfig
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
 import io.smartdatalake.workflow.action.spark.customlogic._
+import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.spark.sql.streaming.OutputMode
@@ -92,19 +93,24 @@ trait ConfigImplicits {
   implicit val saveModeOptionsReader: ConfigReader[SaveModeOptions] = ConfigReader.derive[SaveModeOptions]
   // --------------------------------------------------------------------------------
 
-  implicit def mapDataObjectIdStringReader(implicit mapReader: ConfigReader[Map[String,String]]): ConfigReader[Map[DataObjectId, String]] = {
-    ConfigReader.fromConfig { c => mapReader.extract(c).map(_.map{ case (k,v) => (DataObjectId(k), v)})}
+  implicit def mapDataObjectIdStringReader(implicit mapReader: ConfigReader[Map[String, String]]): ConfigReader[Map[DataObjectId, String]] = {
+    ConfigReader.fromConfig { c => mapReader.extract(c).map(_.map { case (k, v) => (DataObjectId(k), v) }) }
   }
+  //TODO Add this maybe if needed
+  /*
+    implicit def mapConnectionIdStringReader(implicit mapReader: ConfigReader[Map[String,String]]): ConfigReader[Map[ConnectionId, String]] = {
+      ConfigReader.fromConfig { c => mapReader.extract(c).map(_.map{ case (k,v) => (ConnectionId(k), v)})}
+    }*/
 
   /**
    * A reader that reads [[ConnectionId]] values.
    */
-  implicit val connectionIdReader: ConfigReader[ConnectionId] = ConfigReader.fromTry { (c, p) => ConnectionId(c.getString(p))}
+  implicit val connectionIdReader: ConfigReader[ConnectionId] = ConfigReader.fromTry { (c, p) => ConnectionId(c.getString(p)) }
 
   /**
    * A reader that reads [[DataObjectId]] values.
    */
-  implicit val dataObjectIdReader: ConfigReader[DataObjectId] = ConfigReader.fromTry { (c, p) => DataObjectId(c.getString(p))}
+  implicit val dataObjectIdReader: ConfigReader[DataObjectId] = ConfigReader.fromTry { (c, p) => DataObjectId(c.getString(p)) }
 
   /**
    * A reader that reads [[ActionId]] values.
@@ -136,5 +142,14 @@ trait ConfigImplicits {
   implicit val scriptDefReader: ConfigReader[ParsableScriptDef] = ConfigReader.fromTry { (c, p) =>
     implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
     ConfigParser.parseConfigObject[ParsableScriptDef](c.getConfig(p))
+  }
+
+  /**
+   * A reader that reads [[Connection]] values inside [[Agent]].
+   * Note that Connection must be parsed according to it's 'type' attribute by using SDL ConfigParser.
+   */
+  implicit val connectionDefReader: ConfigReader[Connection] = ConfigReader.fromTry { (c, p) =>
+    implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
+    ConfigParser.parseConfigObject[Connection](c.getConfig(p))
   }
 }

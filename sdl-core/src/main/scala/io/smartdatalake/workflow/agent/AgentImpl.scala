@@ -17,14 +17,22 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.communication.message
+package io.smartdatalake.workflow.agent
 
-object SDLMessageType extends Enumeration {
-  type SDLMessageType = Value
+import com.typesafe.config.Config
+import io.smartdatalake.config.SdlConfigObject.AgentId
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.workflow.connection.Connection
 
-  val Log: Value = Value("Log")
-  val StatusUpdate: Value = Value("StatusUpdate")
-  val EndConnection: Value = Value("EndConnection")
-  val AgentInstruction: Value = Value("AgentInstruction")
-  val AgentResult: Value = Value("AgentResult")
+case class AgentImpl(override val id: AgentId, url: String, connections: Map[String, Connection]) extends Agent {
+
+  override def factory: FromConfigFactory[Agent] = AgentImpl
 }
+
+object AgentImpl extends FromConfigFactory[Agent] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): AgentImpl = {
+    extract[AgentImpl](config)
+  }
+}
+
+

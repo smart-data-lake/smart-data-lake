@@ -44,11 +44,15 @@ object SdlConfigObject {
     def id: String
   }
 
+  case class AgentId(override val id: String) extends AnyVal with ConfigObjectId {
+    override def toString: String = "Agent~" + id
+  }
+
   /**
    * Value class for connection identifiers.
    */
   case class ConnectionId(override val id: String) extends AnyVal with ConfigObjectId {
-    override def toString: String = "Connection~"+id
+    override def toString: String = "Connection~" + id
   }
 
   /**

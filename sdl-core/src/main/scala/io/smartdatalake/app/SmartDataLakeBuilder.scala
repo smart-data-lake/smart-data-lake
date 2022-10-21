@@ -29,6 +29,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.{DAGException, ExceptionSeverity}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SerializableHadoopConfiguration, SmartDataLakeLogger}
+import io.smartdatalake.workflow.ExecutionPhase.{Exec, ExecutionPhase, Init, Prepare}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{Action, DataFrameActionImpl, RuntimeInfo, SDLExecutionId}
@@ -351,6 +352,28 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       StatusInfoServer.start(snapshotListener, incrementalListener, Environment._globalConfig.statusInfo.get)
     }
     exec(appConfig, executionId, runStartTime, attemptStartTime, actionsToSkip, initialSubFeeds, dataObjectsState, stateStore, stateListeners, simulation, globalConfig)(instanceRegistry)
+  }
+
+  private[smartdatalake] def agentExec(appConfig: SmartDataLakeBuilderConfig, phase: ExecutionPhase, executionId: SDLExecutionId, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime, initialSubFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener], simulation: Boolean, globalConfig: GlobalConfig)(implicit instanceRegistry: InstanceRegistry): Seq[SubFeed] = {
+    // create and execute DAG
+    val actionsToExecute = instanceRegistry.getActions
+    logger.info(s"starting agentExecution ${appConfig.appName} runId=${executionId.runId} attemptId=${executionId.attemptId}")
+    val serializableHadoopConf = new SerializableHadoopConfiguration(globalConfig.getHadoopConfiguration)
+    val context = ActionPipelineContext(appConfig.feedSel, appConfig.appName, executionId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig, runStartTime, attemptStartTime, simulation, actionsSelected = actionsToExecute.map(_.id), actionsSkipped = Nil, serializableHadoopConf = serializableHadoopConf, globalConfig = globalConfig)
+    val actionDAGRun = ActionDAGRun(actionsToExecute, Map(), appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(context)
+
+    phase match {
+      case Prepare =>
+        actionDAGRun.prepare(context)
+        Nil
+      case Init =>
+        actionDAGRun.prepare(context)
+        actionDAGRun.init(context)
+      case Exec =>
+        actionDAGRun.prepare(context)
+        actionDAGRun.init(context)
+        actionDAGRun.exec(context)
+    }
   }
 
   private[smartdatalake] def exec(appConfig: SmartDataLakeBuilderConfig, executionId: SDLExecutionId, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime, actionsToSkip: Map[ActionId, RuntimeInfo], initialSubFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener], simulation: Boolean, globalConfig: GlobalConfig)(implicit instanceRegistry: InstanceRegistry): (Seq[SubFeed], Map[RuntimeEventState, Int]) = {

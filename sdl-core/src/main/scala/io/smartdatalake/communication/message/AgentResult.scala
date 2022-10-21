@@ -19,20 +19,7 @@
 
 package io.smartdatalake.communication.message
 
-import io.smartdatalake.communication.message.SDLMessageType.SDLMessageType
+import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 
-/**
- * Represents a message that can be sent from a Smart Datalake Builder Instance
- *
- * @param msgType      The type of the message. For message type Log, log must be filled.
- *                     For message type StatusUpdate, statusUpdate must be filled.
- * @param statusUpdate Status update sent to the web frontend
- * @param log          Log message sent to the web frontend
- */
-case class SDLMessage(msgType: SDLMessageType,
-                      statusUpdate: Option[StatusUpdate] = None,
-                      log: Option[ActionLog] = None,
-                      agentInstruction: Option[AgentInstruction] = None,
-                      agentResult: Option[AgentResult] = None
-                     )
+case class AgentResult(actionId: String, phase: ExecutionPhase, dataObjectIdToSchema: Map[String, String])
 

@@ -20,10 +20,11 @@ package io.smartdatalake.config
 
 import com.typesafe.config.{Config, ConfigException, ConfigValueFactory, ConfigValueType}
 import configs.syntax._
-import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.{Action, ProxyAction}
+import io.smartdatalake.workflow.agent.Agent
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataobject.DataObject
 import org.reflections.Reflections
@@ -38,22 +39,29 @@ import scala.util.matching.Regex
  */
 private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
 
+  final val CONFIG_SECTION_AGENTS = "agents"
+
   /**
    * Parses the supplied config and returns a populated [[InstanceRegistry]].
    *
-   * @param config  the configuration to parse.
+   * @param config           the configuration to parse.
    * @param instanceRegistry instance registry to use, default is to create a new instance.
-   * @return  instance registry populated with all [[Action]]s and [[DataObject]]s defined in the configuration.
+   * @return instance registry populated with all [[Action]]s and [[DataObject]]s defined in the configuration.
    */
   def parse(config: Config, instanceRegistry: InstanceRegistry = new InstanceRegistry): InstanceRegistry = {
     implicit val registry: InstanceRegistry = instanceRegistry
 
+
+    val agents: Map[AgentId, Agent] = getAgentConfigMap(config)
+      .map { case (id, config) => (AgentId(id), parseConfigObjectWithId[Agent](id, config)) }
+    registry.register(agents)
+
     val connections: Map[ConnectionId, Connection] = getConnectionConfigMap(config)
-      .map{ case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config))}
+      .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
     registry.register(connections)
 
     val dataObjects: Map[DataObjectId, DataObject] = getDataObjectConfigMap(config)
-      .map{ case (id, config) => (DataObjectId(id), parseConfigObjectWithId[DataObject](id, config))}
+      .map { case (id, config) => (DataObjectId(id), parseConfigObjectWithId[DataObject](id, config)) }
     registry.register(dataObjects)
 
     val actions: Map[ActionId, Action] = getActionConfigMap(config)
@@ -66,16 +74,26 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   final val CONFIG_SECTION_CONNECTIONS = "connections"
   final val CONFIG_SECTION_DATAOBJECTS = "dataObjects"
   final val CONFIG_SECTION_ACTIONS = "actions"
+
   def getConnectionEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_CONNECTIONS)
+
   def getDataObjectsEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_DATAOBJECTS)
+
   def getActionsEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_ACTIONS)
+
   def extractConfigKeys(config: Config, entry: String): Seq[String] = {
     if (config.hasPath(entry)) config.getObject(entry).keySet().asScala.toSeq
     else Seq()
   }
+
+  def getAgentConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, CONFIG_SECTION_AGENTS)
+
   def getConnectionConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, CONFIG_SECTION_CONNECTIONS)
+
   def getDataObjectConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, CONFIG_SECTION_DATAOBJECTS)
+
   def getActionConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, CONFIG_SECTION_ACTIONS)
+
   def extractConfigMap(config: Config, entry: String): Map[String, Config] = {
     if (config.hasPath(entry)) {
       config.get[Map[String, Config]](entry)

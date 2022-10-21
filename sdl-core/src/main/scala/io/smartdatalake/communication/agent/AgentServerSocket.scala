@@ -20,7 +20,7 @@ import io.smartdatalake.workflow.{ActionDAGRunState, ExecutionPhase}
 import org.eclipse.jetty.websocket.api.{Session, StatusCode, WebSocketAdapter}
 import org.json4s.Formats
 import org.json4s.ext.EnumNameSerializer
-import org.json4s.jackson.Serialization.read
+import org.json4s.jackson.Serialization.{read, writePretty}
 
 class AgentServerSocket(config: AgentServerConfig, agentController: AgentController) extends WebSocketAdapter with SmartDataLakeLogger {
 
@@ -39,9 +39,12 @@ class AgentServerSocket(config: AgentServerConfig, agentController: AgentControl
     implicit val format: Formats = ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)
     val sdlMessage = read[SDLMessage](message)
 
-    agentController.handle(sdlMessage, config)
+    val responseMessage = agentController.handle(sdlMessage, config)
+
+    val outputString = (writePretty(responseMessage)(ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)))
 
     getSession.getRemote.sendString(EndConnection.toString)
+    //  getSession.getRemote.sendString(outputString)
 
     if (message.contains(EndConnection)) {
       logger.info(this + ": received EndConnection request, closing connection")

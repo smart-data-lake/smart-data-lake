@@ -17,14 +17,21 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.communication.message
+package io.smartdatalake.workflow.agent
 
-object SDLMessageType extends Enumeration {
-  type SDLMessageType = Value
+import io.smartdatalake.config.SdlConfigObject.AgentId
+import io.smartdatalake.config.{ParsableFromConfig, SdlConfigObject}
+import io.smartdatalake.workflow.AtlasExportable
 
-  val Log: Value = Value("Log")
-  val StatusUpdate: Value = Value("StatusUpdate")
-  val EndConnection: Value = Value("EndConnection")
-  val AgentInstruction: Value = Value("AgentInstruction")
-  val AgentResult: Value = Value("AgentResult")
+private[smartdatalake] trait Agent extends SdlConfigObject with ParsableFromConfig[Agent] with AtlasExportable {
+  /**
+   * A unique identifier for this instance.
+   */
+  override val id: AgentId
+
+  def toStringShort: String = {
+    s"$id[${this.getClass.getSimpleName}]"
+  }
+
+  override def atlasName: String = id.id
 }

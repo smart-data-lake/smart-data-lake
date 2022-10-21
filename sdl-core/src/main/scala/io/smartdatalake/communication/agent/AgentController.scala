@@ -21,15 +21,14 @@ package io.smartdatalake.communication.agent
 
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigSyntax}
 import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilder}
-import io.smartdatalake.communication.message.{SDLMessage, SDLMessageType, StatusUpdate}
+import io.smartdatalake.communication.message.{AgentResult, SDLMessage, SDLMessageType}
 import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getConnectionConfigMap, getDataObjectConfigMap, parseConfigObjectWithId}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
-import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{Action, SDLExecutionId}
 import io.smartdatalake.workflow.connection.Connection
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.DataObject
-import io.smartdatalake.workflow.{ExecutionPhase, SubFeed}
 
 import java.time.LocalDateTime
 
@@ -39,7 +38,7 @@ case class AgentController(
                           ) {
   def handle(message: SDLMessage, agentServerConfig: AgentServerConfig): SDLMessage = {
     message match {
-      case SDLMessage(SDLMessageType.AgentInstruction, None, None, agentInstructionOpt) => agentInstructionOpt match {
+      case SDLMessage(SDLMessageType.AgentInstruction, None, None, agentInstructionOpt, None) => agentInstructionOpt match {
         case Some(agentInstruction) => {
           implicit val instanceRegistryImplicit: InstanceRegistry = instanceRegistry
           val agentConnectionIds = instanceRegistryImplicit.getConnections.map(_.id.id)
@@ -62,12 +61,11 @@ case class AgentController(
 
           instanceRegistryImplicit.register(actions)
 
-          val isSimulation = agentInstruction.phase != ExecutionPhase.Exec
+          val resultingSubfeeds = sdlb.agentExec(agentServerConfig.sdlConfig, agentInstruction.phase, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Seq(), Seq(), None, Seq(), simulation = false, globalConfig = GlobalConfig())(instanceRegistryImplicit)
 
-          val (x: Seq[SubFeed], y: Map[RuntimeEventState, Int]) = sdlb.exec(agentServerConfig.sdlConfig, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), Seq(), None, Seq(), simulation = isSimulation, globalConfig = GlobalConfig())(instanceRegistryImplicit)
+          val resultingDataObjectIdToSchema = resultingSubfeeds.map(subfeed => subfeed.dataObjectId.id -> subfeed.asInstanceOf[SparkSubFeed].dataFrame.get.inner.schema.json).toMap
 
-
-          SDLMessage(SDLMessageType.StatusUpdate, Some(StatusUpdate(actionId = Some(agentInstruction.actionId), runtimeInfo = None, phase = agentInstruction.phase, finalState = None)))
+          SDLMessage(SDLMessageType.AgentResult, agentResult = Some(AgentResult(actionId = agentInstruction.actionId, phase = agentInstruction.phase, dataObjectIdToSchema = resultingDataObjectIdToSchema)))
         }
       }
     }
