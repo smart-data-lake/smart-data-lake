@@ -23,17 +23,18 @@ import io.smartdatalake.communication.agent.AgentClient
 import io.smartdatalake.config.{FromConfigFactory, SdlConfigObject}
 import io.smartdatalake.definitions.{Condition, ExecutionMode}
 import io.smartdatalake.util.dag.DAGHelper.NodeId
+import io.smartdatalake.workflow.agent.Agent
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
 
-case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.ActionId) extends Action {
+case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.ActionId, agent: Agent) extends Action {
 
   override def exec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = {
 
-    val agentClient = AgentClient(wrappedAction.remoteActionConfig.get)
+    val agentClient = AgentClient(agent)
     //TODO change when refactoring config file to include agents sections
 
-    val hoconInstructions = AgentClient.prepareHoconInstructions(wrappedAction, context.instanceRegistry.getConnections)
+    val hoconInstructions = AgentClient.prepareHoconInstructions(wrappedAction, context.instanceRegistry.getConnections, agent)
     agentClient.sendSDLMessage(hoconInstructions)
 
     while (agentClient.socket.actionStillRunning) {

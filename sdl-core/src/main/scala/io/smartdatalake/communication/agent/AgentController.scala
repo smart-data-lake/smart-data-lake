@@ -47,7 +47,7 @@ case class AgentController(
 
           val connectionsToRegister: Map[ConnectionId, Connection] = getConnectionConfigMap(configFromString)
             //Connections defined by the agent should not get overwritten by the connections in the instructions
-            .filterNot { case (id, _) => agentConnectionIds.contains(id) }
+            //       .filterNot { case (id, _) => agentConnectionIds.contains(id) }
             .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
 
           instanceRegistryImplicit.register(connectionsToRegister)

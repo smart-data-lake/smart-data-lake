@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.dag.{DAGNode, TaskSkippedDontStopWarning}
@@ -109,7 +109,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
 
   private[smartdatalake] def isAsynchronousProcessStarted: Boolean = false
 
-  def remoteActionConfig: Option[RemoteActionConfig] = None
+  def agentId: Option[AgentId] = None
 
 
   /**

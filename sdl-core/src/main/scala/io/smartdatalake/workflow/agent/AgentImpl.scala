@@ -24,7 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.AgentId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.workflow.connection.Connection
 
-case class AgentImpl(override val id: AgentId, url: String, connections: Map[String, Connection]) extends Agent {
+case class AgentImpl(override val id: AgentId, override val url: String, override val connections: Map[String, Connection]) extends Agent {
 
   override def factory: FromConfigFactory[Agent] = AgentImpl
 }

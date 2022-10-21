@@ -58,8 +58,7 @@ case class CopyAction(override val id: ActionId,
                       override val executionCondition: Option[Condition] = None,
                       override val metricsFailCondition: Option[String] = None,
                       override val saveModeOptions: Option[SaveModeOptions] = None,
-                      override val metadata: Option[ActionMetadata] = None,
-                      override val remoteActionConfig: Option[RemoteActionConfig] = None
+                      override val metadata: Option[ActionMetadata] = None
                      )(implicit instanceRegistry: InstanceRegistry) extends DataFrameOneToOneActionImpl {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)

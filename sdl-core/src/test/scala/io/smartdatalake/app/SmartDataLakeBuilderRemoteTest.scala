@@ -22,10 +22,10 @@ package io.smartdatalake.app
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigSyntax}
 import io.smartdatalake.communication.agent.{AgentClient, AgentController, AgentServer, AgentServerConfig}
 import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getConnectionConfigMap, getDataObjectConfigMap, parseConfigObjectWithId}
-import io.smartdatalake.config.ConfigToolbox.loadAndParseConfig
-import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, ConnectionId, DataObjectId}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.action.Action
+import io.smartdatalake.workflow.agent.AgentImpl
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
@@ -60,7 +60,7 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
 
     implicit val instanceRegistry = sdlb.instanceRegistry
 
-    val sdlMessage = AgentClient.prepareHoconInstructions(sdlb.instanceRegistry.getActions.head, sdlb.instanceRegistry.getConnections)
+    val sdlMessage = AgentClient.prepareHoconInstructions(sdlb.instanceRegistry.getActions.head, Nil, AgentImpl(AgentId("dummyId"), "dummyUrl", sdlb.instanceRegistry.getConnections.map(connection => (connection.id.id -> connection)).toMap))
     val configFromString = ConfigFactory.parseString(sdlMessage.agentInstruction.get.hoconConfig, ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF))
 
     val dataObjects: Map[DataObjectId, DataObject] = getDataObjectConfigMap(configFromString)
@@ -86,13 +86,10 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
     srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
 
-    val agentConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
-      getClass.getResource("/configremote/application-remote.conf").getPath))
-    )
+    val agentConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = None)
 
     val remoteSDLB = new DefaultSmartDataLakeBuilder()
-    val (instanceRegistry, _) = loadAndParseConfig(Seq(getClass.getResource("/configremote/application-remote.conf").getPath))
-    val agentController: AgentController = AgentController(instanceRegistry, remoteSDLB)
+    val agentController: AgentController = AgentController(sdlb.instanceRegistry, remoteSDLB)
     AgentServer.start(AgentServerConfig(sdlConfig = agentConfig), agentController)
 
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
@@ -102,7 +99,7 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
     sdlb.run(sdlConfig)
 
     //When main instance is done, remote SDLB should have created tgt file
-    val remoteAction = instanceRegistry.getActions.head
+    val remoteAction = sdlb.instanceRegistry.getActions.head
     assert(remoteAction.id.id == "a")
     assert(remoteAction.outputs.head.id.id == "tgt1")
     assert(Paths.get(System.getProperty("user.dir"), "target/agent_dummy_connection", "tgt1").toFile.exists())

@@ -160,8 +160,9 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
 
   def parseActionWithId(id: String, config: Config)(implicit registry: InstanceRegistry): Action = {
     val parsedAction = parseConfigObjectWithId[Action](id, config)
-    if (parsedAction.remoteActionConfig.isDefined) {
-      ProxyAction(parsedAction, parsedAction.id)
+    if (parsedAction.agentId.isDefined) {
+      val agent = registry.get[Agent](parsedAction.agentId.get)
+      ProxyAction(parsedAction, parsedAction.id, agent)
     } else {
       parsedAction
     }

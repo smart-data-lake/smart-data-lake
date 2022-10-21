@@ -22,7 +22,8 @@ package io.smartdatalake.communication.agent
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions, ConfigValueFactory}
 import io.smartdatalake.communication.message.{AgentInstruction, SDLMessage, SDLMessageType}
 import io.smartdatalake.config.ConfigParser.{CONFIG_SECTION_ACTIONS, CONFIG_SECTION_CONNECTIONS, CONFIG_SECTION_DATAOBJECTS}
-import io.smartdatalake.workflow.action.{Action, RemoteActionConfig}
+import io.smartdatalake.workflow.action.Action
+import io.smartdatalake.workflow.agent.Agent
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.{ActionDAGRunState, ExecutionPhase}
 import org.eclipse.jetty.websocket.client.WebSocketClient
@@ -33,10 +34,13 @@ import java.net.URI
 import scala.collection.JavaConverters._
 
 object AgentClient {
-  def prepareHoconInstructions(actionToSerialize: Action, connectionsToSerialize: Seq[Connection]): SDLMessage = {
+  def prepareHoconInstructions(actionToSerialize: Action, connectionsToSerialize: Seq[Connection], agent: Agent): SDLMessage = {
     val allConnectedDataObjects = actionToSerialize.inputs ++ actionToSerialize.outputs
     val allConnectionIds = allConnectedDataObjects.map(_._config.get).filter(_.hasPath("connectionId")).map(_.getValue("connectionId").render(ConfigRenderOptions.concise().setJson(false)))
-    val relevantConnections: Seq[Connection] = connectionsToSerialize.filter(connectionId => allConnectionIds.contains(connectionId.id.id))
+    val relevantTopLevelConnections: Seq[Connection] =
+      connectionsToSerialize.filter(connectionId => allConnectionIds.contains(connectionId.id.id) && !agent.connections.contains(connectionId.id.id))
+
+    val relevantConnections = relevantTopLevelConnections ++ agent.connections.values
 
     val hoconConfigToSend: ConfigObject = ConfigValueFactory.fromMap(
       Map(CONFIG_SECTION_ACTIONS ->
@@ -60,11 +64,12 @@ object AgentClient {
     SDLMessage(msgType = SDLMessageType.AgentInstruction, agentInstruction = Some(AgentInstruction(actionToSerialize.id.id, ExecutionPhase.Exec, hoconString)))
   }
 }
-case class AgentClient(remoteActionConfig: RemoteActionConfig) {
+
+case class AgentClient(agent: Agent) {
   val socket = new AgentClientSocket()
 
   def sendSDLMessage(message: SDLMessage): Unit = {
-    val uri = URI.create(remoteActionConfig.remoteAgentURL)
+    val uri = URI.create(agent.url)
     val client = new WebSocketClient
 
     client.start()
