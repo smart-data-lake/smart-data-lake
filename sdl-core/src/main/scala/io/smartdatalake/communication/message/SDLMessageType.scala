@@ -24,6 +24,7 @@ object SDLMessageType extends Enumeration {
 
   val Log: Value = Value("Log")
   val StatusUpdate: Value = Value("StatusUpdate")
+  val StartConnection: Value = Value("StartConnection")
   val EndConnection: Value = Value("EndConnection")
   val AgentInstruction: Value = Value("AgentInstruction")
   val AgentResult: Value = Value("AgentResult")

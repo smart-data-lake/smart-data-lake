@@ -14,12 +14,22 @@
 package io.smartdatalake.communication.agent
 
 import io.smartdatalake.communication.message.SDLMessageType.EndConnection
+import io.smartdatalake.communication.message.{SDLMessage, SDLMessageType}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.{ActionDAGRunState, ExecutionPhase}
 import org.eclipse.jetty.websocket.api.{Session, StatusCode, WebSocketAdapter}
+import org.json4s.Formats
+import org.json4s.ext.EnumNameSerializer
+import org.json4s.jackson.Serialization.{read, writePretty}
+
+import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.Map
 
 class AgentClientSocket() extends WebSocketAdapter with SmartDataLakeLogger {
 
   var actionStillRunning = true
+  val pendingResults = new mutable.HashMap[String, SDLMessage]()
 
   override def onWebSocketConnect(sess: Session): Unit = {
     super.onWebSocketConnect(sess)
@@ -28,7 +38,14 @@ class AgentClientSocket() extends WebSocketAdapter with SmartDataLakeLogger {
   override def onWebSocketText(message: String): Unit = {
     logger.info("Received TEXT message: " + message)
     super.onWebSocketText(message)
-
+    implicit val format: Formats = ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)
+    val sdlMessage = read[SDLMessage](message)
+    sdlMessage.msgType match {
+      case SDLMessageType.AgentResult =>
+        pendingResults.put(sdlMessage.agentResult.get.instructionId, sdlMessage)
+      case _ =>
+    }
+    //TODO TIMO Cleanup endConnection
     if (message.contains(EndConnection.toString)) {
       logger.info(this + ": received EndConnection request, closing connection")
       actionStillRunning = false

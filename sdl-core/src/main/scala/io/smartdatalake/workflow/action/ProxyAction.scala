@@ -20,35 +20,23 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.communication.agent.AgentClient
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, SdlConfigObject}
 import io.smartdatalake.definitions.{Condition, ExecutionMode}
 import io.smartdatalake.util.dag.DAGHelper.NodeId
+import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.agent.Agent
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.DataObject
-import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SubFeed}
+import org.apache.spark.sql.types.StructType
 
 case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.ActionId, agent: Agent) extends Action {
 
   override def exec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = {
-
-    val agentClient = AgentClient(agent)
-    //TODO change when refactoring config file to include agents sections
-
-    val hoconInstructions = AgentClient.prepareHoconInstructions(wrappedAction, context.instanceRegistry.getConnections, agent)
-    agentClient.sendSDLMessage(hoconInstructions)
-
-    while (agentClient.socket.actionStillRunning) {
-      Thread.sleep(1000)
-      println("waiting...")
-    }
-
-    wrappedAction.exec(subFeeds)
+    common(subFeeds, ExecutionPhase.Exec)
   }
-
-  /**
-   * A unique identifier for this instance.
-   */
-  //override def id: SdlConfigObject.ConfigObjectId = ProxyActionId(action.id.id, action.remoteActionConfig.get.remoteAgentURL)
 
   override def factory: FromConfigFactory[Action] = wrappedAction.factory
 
@@ -68,5 +56,32 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
 
   override def metricsFailCondition: Option[String] = wrappedAction.metricsFailCondition
 
-  override def init(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = wrappedAction.init(subFeeds)
+  override def init(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = {
+    common(subFeeds, ExecutionPhase.Init)
+  }
+
+  def common(subFeeds: Seq[SubFeed], executionPhase: ExecutionPhase)(implicit context: ActionPipelineContext): Seq[SubFeed] = {
+    val agentClient = AgentClient(agent)
+    val hoconInstructions = AgentClient.prepareHoconInstructions(wrappedAction, context.instanceRegistry.getConnections, agent, executionPhase)
+    agentClient.sendSDLMessage(hoconInstructions)
+
+    val instructionId = hoconInstructions.agentInstruction.get.instructionId
+
+    while (!agentClient.socket.pendingResults.contains(instructionId)) {
+      Thread.sleep(1000)
+      println("waiting...")
+    }
+    val response = agentClient.socket.pendingResults.get(instructionId)
+    agentClient.socket.pendingResults.remove(instructionId)
+
+    val outputDO = response.get.agentResult.get.dataObjectIdToSchema.head
+
+    val requiredType = StructType.fromDDL(outputDO._2)
+
+    val emptyDF = DataFrameUtil.getEmptyDataFrame(requiredType)(context.sparkSession)
+    val subFeed = SparkSubFeed(dataFrame = Some(SparkDataFrame(emptyDF)), dataObjectId = DataObjectId(outputDO._1), partitionValues = Nil,
+      isDummy = true, filter = None)
+    logger.info(response.toString)
+    Seq(subFeed)
+  }
 }

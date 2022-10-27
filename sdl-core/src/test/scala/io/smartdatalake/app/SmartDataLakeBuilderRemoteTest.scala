@@ -20,19 +20,27 @@
 package io.smartdatalake.app
 
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigSyntax}
-import io.smartdatalake.communication.agent.{AgentClient, AgentController, AgentServer, AgentServerConfig}
+import io.smartdatalake.communication.agent.{AgentClient, AgentServer, AgentServerConfig, AgentServerController}
 import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getConnectionConfigMap, getDataObjectConfigMap, parseConfigObjectWithId}
+import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, ConnectionId, DataObjectId}
 import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.workflow.ExecutionPhase
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.agent.AgentImpl
 import io.smartdatalake.workflow.connection.Connection
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{Row, SparkSession}
+import org.apache.spark.sql.avro.SchemaConverters
+import org.apache.spark.sql.catalyst.parser.LegacyTypeStringParser
+import org.apache.spark.sql.functions.lit
+import org.apache.spark.sql.types.{DataType, StructType}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import java.nio.file.Paths
+import scala.util.Try
 
 /**
  * This tests use configuration test/resources/application.conf
@@ -48,7 +56,7 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
     val sdlb = new DefaultSmartDataLakeBuilder()
 
     val srcDO1 = SparkSubFeed(SparkDataFrame(
-      Seq(("testData"))
+      Seq("testData")
         .toDF("testColumn")
     ), DataObjectId("src1"), Nil)
 
@@ -58,9 +66,9 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
     //Run simlutation of SDLB to parse config file and populate instanceregistry
     sdlb.startSimulationWithConfigFile(sdlConfig, Seq(srcDO1))(session)
 
-    implicit val instanceRegistry = sdlb.instanceRegistry
+    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
 
-    val sdlMessage = AgentClient.prepareHoconInstructions(sdlb.instanceRegistry.getActions.head, Nil, AgentImpl(AgentId("dummyId"), "dummyUrl", sdlb.instanceRegistry.getConnections.map(connection => (connection.id.id -> connection)).toMap))
+    val sdlMessage = AgentClient.prepareHoconInstructions(sdlb.instanceRegistry.getActions.head, Nil, AgentImpl(AgentId("dummyId"), "dummyUrl", sdlb.instanceRegistry.getConnections.map(connection => connection.id.id -> connection).toMap), ExecutionPhase.Exec)
     val configFromString = ConfigFactory.parseString(sdlMessage.agentInstruction.get.hoconConfig, ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF))
 
     val dataObjects: Map[DataObjectId, DataObject] = getDataObjectConfigMap(configFromString)
@@ -89,7 +97,7 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
     val agentConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = None)
 
     val remoteSDLB = new DefaultSmartDataLakeBuilder()
-    val agentController: AgentController = AgentController(sdlb.instanceRegistry, remoteSDLB)
+    val agentController: AgentServerController = AgentServerController(sdlb.instanceRegistry, remoteSDLB)
     AgentServer.start(AgentServerConfig(sdlConfig = agentConfig), agentController)
 
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
@@ -105,6 +113,28 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
     assert(Paths.get(System.getProperty("user.dir"), "target/agent_dummy_connection", "tgt1").toFile.exists())
 
     println("blubv")
+  }
+
+  test("sdfsdf"){
+    import org.apache.avro.Schema
+    import org.apache.spark.sql.types.StructType
+
+
+    import org.apache.spark.sql.Dataset
+    import org.apache.spark.sql.catalyst.parser.LegacyTypeStringParser
+
+    val ddl = "testcolumn STRING, other_column INT"
+    val requiredType = StructType.fromDDL(ddl)
+val test = DataFrameUtil.getEmptyDataFrame(requiredType)
+
+    val resultingDF = session.emptyDataFrame
+
+    val dfWithCols =
+    requiredType.fields.foldLeft(resultingDF){
+      case (df,colType) => df.withColumn(colType.name, lit(null).cast(colType.dataType))
+    }
+    //val resultingDF = session.read.json(Seq(structStr).toDS)
+    println(dfWithCols.schema)
   }
 }
 

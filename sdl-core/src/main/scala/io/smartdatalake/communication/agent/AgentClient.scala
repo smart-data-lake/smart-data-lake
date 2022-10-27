@@ -22,6 +22,7 @@ package io.smartdatalake.communication.agent
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions, ConfigValueFactory}
 import io.smartdatalake.communication.message.{AgentInstruction, SDLMessage, SDLMessageType}
 import io.smartdatalake.config.ConfigParser.{CONFIG_SECTION_ACTIONS, CONFIG_SECTION_CONNECTIONS, CONFIG_SECTION_DATAOBJECTS}
+import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.agent.Agent
 import io.smartdatalake.workflow.connection.Connection
@@ -34,7 +35,7 @@ import java.net.URI
 import scala.collection.JavaConverters._
 
 object AgentClient {
-  def prepareHoconInstructions(actionToSerialize: Action, connectionsToSerialize: Seq[Connection], agent: Agent): SDLMessage = {
+  def prepareHoconInstructions(actionToSerialize: Action, connectionsToSerialize: Seq[Connection], agent: Agent, executionPhase: ExecutionPhase): SDLMessage = {
     val allConnectedDataObjects = actionToSerialize.inputs ++ actionToSerialize.outputs
     val allConnectionIds = allConnectedDataObjects.map(_._config.get).filter(_.hasPath("connectionId")).map(_.getValue("connectionId").render(ConfigRenderOptions.concise().setJson(false)))
     val relevantTopLevelConnections: Seq[Connection] =
@@ -61,7 +62,7 @@ object AgentClient {
               .asJava)).asJava
     )
     val hoconString = hoconConfigToSend.render(ConfigRenderOptions.concise().setJson(false))
-    SDLMessage(msgType = SDLMessageType.AgentInstruction, agentInstruction = Some(AgentInstruction(actionToSerialize.id.id, ExecutionPhase.Exec, hoconString)))
+    SDLMessage(msgType = SDLMessageType.AgentInstruction, agentInstruction = Some(AgentInstruction(actionToSerialize.id.id, executionPhase, hoconString)))
   }
 }
 

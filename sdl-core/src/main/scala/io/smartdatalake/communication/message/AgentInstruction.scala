@@ -21,5 +21,5 @@ package io.smartdatalake.communication.message
 
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 
-case class AgentInstruction(actionId: String, phase: ExecutionPhase, hoconConfig: String)
+case class AgentInstruction(instructionId: String, phase: ExecutionPhase, hoconConfig: String)
 

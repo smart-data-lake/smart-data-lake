@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{Condition, ExecutionMode, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -52,6 +52,7 @@ case class CopyAction(override val id: ActionId,
                       @Deprecated @deprecated("Use transformers instead.", "2.0.5")
                       transformer: Option[CustomDfTransformerConfig] = None,
                       transformers: Seq[GenericDfTransformer] = Seq(),
+                      override val agentId: Option[AgentId] = None,
                       override val breakDataFrameLineage: Boolean = false,
                       override val persist: Boolean = false,
                       override val executionMode: Option[ExecutionMode] = None,
@@ -83,10 +84,10 @@ case class CopyAction(override val id: ActionId,
   override def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = {
     if (deleteDataAfterRead) input match {
       // delete input partitions if applicable
-      case (partitionInput: CanHandlePartitions) if partitionInput.partitions.nonEmpty && inputSubFeed.partitionValues.nonEmpty =>
+      case partitionInput: CanHandlePartitions if partitionInput.partitions.nonEmpty && inputSubFeed.partitionValues.nonEmpty =>
         partitionInput.deletePartitions(inputSubFeed.partitionValues)
       // otherwise delete all
-      case (fileInput: FileRefDataObject) =>
+      case fileInput: FileRefDataObject =>
         fileInput.deleteAll
       case x => throw new IllegalStateException(s"($id) input ${input.id} doesn't support deleting data")
     }

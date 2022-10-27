@@ -32,6 +32,7 @@ import io.smartdatalake.communication.message.SDLMessageType.SDLMessageType
 case class SDLMessage(msgType: SDLMessageType,
                       statusUpdate: Option[StatusUpdate] = None,
                       log: Option[ActionLog] = None,
+                      messageMetadata: Option[SDLMessageMetadata] = None,
                       agentInstruction: Option[AgentInstruction] = None,
                       agentResult: Option[AgentResult] = None
                      )

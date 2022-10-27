@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.app
 
-import io.smartdatalake.communication.agent.{AgentController, AgentServer, AgentServerConfig}
+import io.smartdatalake.communication.agent.{AgentServerController, AgentServer, AgentServerConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.workflow.action.SDLExecutionId
 import org.apache.hadoop.conf.Configuration
@@ -73,7 +73,7 @@ object LocalAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
       statePath = sys.env.get("SDL_STATE_PATH")
     )
 
-    val agentController: AgentController = AgentController(new InstanceRegistry, this)
+    val agentController: AgentServerController = AgentServerController(new InstanceRegistry, this)
     AgentServer.start(AgentServerConfig(sdlConfig = envconfig), agentController)
 
     val result = exec(envconfig, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), Seq(), None, Seq(), simulation = false, globalConfig = GlobalConfig())(agentController.instanceRegistry)

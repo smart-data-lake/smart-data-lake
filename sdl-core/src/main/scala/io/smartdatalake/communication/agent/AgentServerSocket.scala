@@ -13,8 +13,9 @@
 
 package io.smartdatalake.communication.agent
 
+import com.sun.xml.internal.ws.api.message.MessageMetadata
 import io.smartdatalake.communication.message.SDLMessageType.EndConnection
-import io.smartdatalake.communication.message.{SDLMessage, SDLMessageType}
+import io.smartdatalake.communication.message.{SDLMessage, SDLMessageType, SDLMessageMetadata}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.{ActionDAGRunState, ExecutionPhase}
 import org.eclipse.jetty.websocket.api.{Session, StatusCode, WebSocketAdapter}
@@ -22,13 +23,21 @@ import org.json4s.Formats
 import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.Serialization.{read, writePretty}
 
-class AgentServerSocket(config: AgentServerConfig, agentController: AgentController) extends WebSocketAdapter with SmartDataLakeLogger {
+
+class AgentServerSocket(config: AgentServerConfig, agentController: AgentServerController) extends WebSocketAdapter with SmartDataLakeLogger {
+  implicit val format: Formats = ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)
 
   override def onWebSocketConnect(sess: Session): Unit = {
 
     super.onWebSocketConnect(sess)
     logger.info(s"Socket $this Connected")
-    sess.getRemote.sendString("Hello from " + this)
+    val outputString = writePretty {
+      SDLMessage(
+        msgType = SDLMessageType.StartConnection,
+        messageMetadata = Some(SDLMessageMetadata(this.toString, sess.getRemoteAddress.toString))
+      )
+    }
+    sess.getRemote.sendString(outputString)
     sess.getPolicy.setMaxTextMessageBufferSize(1000000)
   }
 
@@ -36,16 +45,15 @@ class AgentServerSocket(config: AgentServerConfig, agentController: AgentControl
   override def onWebSocketText(message: String): Unit = {
     super.onWebSocketText(message)
     logger.info("Received TEXT message: " + message)
-    implicit val format: Formats = ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)
     val sdlMessage = read[SDLMessage](message)
 
     val responseMessage = agentController.handle(sdlMessage, config)
 
-    val outputString = (writePretty(responseMessage)(ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)))
+    val outputString = writePretty(responseMessage)
+   // getSession.getRemote.sendString(EndConnection.toString)
+      getSession.getRemote.sendString(outputString)
 
-    getSession.getRemote.sendString(EndConnection.toString)
-    //  getSession.getRemote.sendString(outputString)
-
+    //TODO TIMO cleanup end connection
     if (message.contains(EndConnection)) {
       logger.info(this + ": received EndConnection request, closing connection")
       getSession.close(StatusCode.NORMAL, "Connection closed by " + this)
