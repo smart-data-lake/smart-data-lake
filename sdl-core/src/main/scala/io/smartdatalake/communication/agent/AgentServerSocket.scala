@@ -13,9 +13,7 @@
 
 package io.smartdatalake.communication.agent
 
-import com.sun.xml.internal.ws.api.message.MessageMetadata
-import io.smartdatalake.communication.message.SDLMessageType.EndConnection
-import io.smartdatalake.communication.message.{SDLMessage, SDLMessageType, SDLMessageMetadata}
+import io.smartdatalake.communication.message.{SDLMessage, SDLMessageMetadata, SDLMessageType}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.{ActionDAGRunState, ExecutionPhase}
 import org.eclipse.jetty.websocket.api.{Session, StatusCode, WebSocketAdapter}
