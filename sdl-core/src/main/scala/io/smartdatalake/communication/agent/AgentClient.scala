@@ -71,21 +71,22 @@ object AgentClient {
 
 case class AgentClient(agent: Agent) {
   val socket = new AgentClientSocket()
+  val client = new WebSocketClient
 
   def sendSDLMessage(message: SDLMessage): Unit = {
     val uri = URI.create(agent.url)
-    val client = new WebSocketClient
+
 
     client.start()
 
     val fut = client.connect(socket, uri)
     // Wait for Connect
     val session = fut.get
-
     session.getRemote.sendString(writePretty(message)(ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)))
   }
 
- // def closeConnection
+  def closeConnection(): Unit = {
+    client.stop()
+  }
 
-  //todo close connection
 }

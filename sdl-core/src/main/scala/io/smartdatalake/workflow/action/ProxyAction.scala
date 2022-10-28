@@ -61,7 +61,6 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
   override def metricsFailCondition: Option[String] = wrappedAction.metricsFailCondition
 
   override def init(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = {
-
     common( ExecutionPhase.Init)
   }
 
@@ -77,8 +76,8 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
       println("waiting...")
     }
     val response = agentClient.socket.pendingResults.get(instructionId)
-    logger.info("Received response" +  response.toString)
     agentClient.socket.pendingResults.remove(instructionId)
+    agentClient.closeConnection()
 
     response.get.agentResult.get.dataObjectIdToSchema.map {
       case(dataObjectId: DataObjectId, schema: String) => convertToEmptySparkSubFeed(dataObjectId, schema)(context.sparkSession)
