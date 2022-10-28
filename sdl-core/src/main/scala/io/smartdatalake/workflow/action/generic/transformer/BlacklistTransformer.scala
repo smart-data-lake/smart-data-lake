@@ -23,6 +23,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
@@ -32,11 +33,24 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * @param description  Optional description of the transformer
  * @param columnBlacklist List of columns to exclude from DataFrame
  */
-case class BlacklistTransformer(override val name: String = "blacklist", override val description: Option[String] = None, columnBlacklist: Seq[String]) extends GenericDfTransformer {
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
+case class BlacklistTransformer(override val name: String = "blacklist", override val description: Option[String] = None, columnBlacklist: Seq[String])
+  extends GenericDfTransformer with SmartDataLakeLogger {
+
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId,
+                         previousTransformerName: Option[String], executionModeResultOptions: Map[String, String])
+                        (implicit context: ActionPipelineContext): GenericDataFrame = {
     val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
-    val colsToSelect = df.schema.columns.filter(colName => !columnBlacklist.contains(colName.toLowerCase))
+
+    val lowerCaseColumns = df.schema.columns.map(_.toLowerCase())
+
+    val nonExistingColumns = columnBlacklist.toSet.diff(lowerCaseColumns.toSet)
+    if (nonExistingColumns.nonEmpty) {
+      logger.warn(s"The blacklisted columns [${nonExistingColumns.mkString(", ")}] do not exist in dataframe. " +
+                  s"Available columns are [${lowerCaseColumns.mkString(", ")}]. Note that column names are case sensitive.")
+    }
+
+    val colsToSelect = lowerCaseColumns.filter(colName => !columnBlacklist.contains(colName))
     df.select(colsToSelect.map(col))
   }
   override def factory: FromConfigFactory[GenericDfTransformer] = BlacklistTransformer
