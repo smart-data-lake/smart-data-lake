@@ -46,18 +46,19 @@ class AgentServerSocket(config: AgentServerConfig, agentController: AgentServerC
     super.onWebSocketText(message)
     logger.info("Received TEXT message: " + message)
     val sdlMessage = read[SDLMessage](message)
+    val responseMessageOpt = agentController.handle(sdlMessage, config)
+    if(responseMessageOpt.isDefined) sendSDLMessage(responseMessageOpt.get)
+    else closeConnection()
+  }
 
-    val responseMessage = agentController.handle(sdlMessage, config)
+  def sendSDLMessage(sdlMessage: SDLMessage): Unit = {
+    val outputString = writePretty(sdlMessage)
+    getSession.getRemote.sendString(outputString)
+  }
 
-    val outputString = writePretty(responseMessage)
-   // getSession.getRemote.sendString(EndConnection.toString)
-      getSession.getRemote.sendString(outputString)
-
-    //TODO TIMO cleanup end connection
-    if (message.contains(EndConnection)) {
-      logger.info(this + ": received EndConnection request, closing connection")
-      getSession.close(StatusCode.NORMAL, "Connection closed by " + this)
-    }
+  def closeConnection(): Unit = {
+    logger.info(this + ": received EndConnection request, closing connection")
+    getSession.close(StatusCode.NORMAL, "Connection closed by " + this)
   }
 
   override def onWebSocketClose(statusCode: Int, reason: String): Unit = {

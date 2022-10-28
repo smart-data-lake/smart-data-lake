@@ -62,7 +62,10 @@ object AgentClient {
               .asJava)).asJava
     )
     val hoconString = hoconConfigToSend.render(ConfigRenderOptions.concise().setJson(false))
-    SDLMessage(msgType = SDLMessageType.AgentInstruction, agentInstruction = Some(AgentInstruction(actionToSerialize.id.id, executionPhase, hoconString)))
+
+    val instructionId = actionToSerialize.id.id + "@" + System.currentTimeMillis()
+
+    SDLMessage(msgType = SDLMessageType.AgentInstruction, agentInstruction = Some(AgentInstruction(instructionId, executionPhase, hoconString)))
   }
 }
 
@@ -80,6 +83,9 @@ case class AgentClient(agent: Agent) {
     val session = fut.get
 
     session.getRemote.sendString(writePretty(message)(ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)))
-
   }
+
+ // def closeConnection
+
+  //todo close connection
 }

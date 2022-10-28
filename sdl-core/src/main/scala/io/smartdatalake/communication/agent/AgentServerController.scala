@@ -36,17 +36,14 @@ case class AgentServerController(
                             instanceRegistry: InstanceRegistry,
                             sdlb: SmartDataLakeBuilder
                           ) {
-  def handle(message: SDLMessage, agentServerConfig: AgentServerConfig): SDLMessage = message match {
+  def handle(message: SDLMessage, agentServerConfig: AgentServerConfig): Option[SDLMessage] = message match {
+    case SDLMessage(SDLMessageType.EndConnection, _ ,_,_,_,_) => None
     case SDLMessage(SDLMessageType.AgentInstruction, None, None, None, agentInstructionOpt, None) => agentInstructionOpt match {
       case Some(agentInstruction) =>
         implicit val instanceRegistryImplicit: InstanceRegistry = instanceRegistry
-        val agentConnectionIds = instanceRegistryImplicit.getConnections.map(_.id.id)
-
         val configFromString = ConfigFactory.parseString(agentInstruction.hoconConfig, ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF))
 
         val connectionsToRegister: Map[ConnectionId, Connection] = getConnectionConfigMap(configFromString)
-          //Connections defined by the agent should not get overwritten by the connections in the instructions
-          //       .filterNot { case (id, _) => agentConnectionIds.contains(id) }
           .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
 
         instanceRegistryImplicit.register(connectionsToRegister)
@@ -62,9 +59,10 @@ case class AgentServerController(
 
         val resultingSubfeeds = sdlb.agentExec(agentServerConfig.sdlConfig, agentInstruction.phase, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Seq(), Seq(), None, Seq(), simulation = false, globalConfig = GlobalConfig())(instanceRegistryImplicit)
 
-        val resultingDataObjectIdToSchema = resultingSubfeeds.map(subfeed => subfeed.dataObjectId.id -> subfeed.asInstanceOf[SparkSubFeed].dataFrame.get.inner.schema.toDDL).toMap
+        //TODO support other subfeed types than SparkSubFeed
+        val resultingDataObjectIdToSchema = resultingSubfeeds.map(subFeed => DataObjectId(subFeed.dataObjectId.id) -> subFeed.asInstanceOf[SparkSubFeed].dataFrame.get.inner.schema.toDDL).toMap
 
-        SDLMessage(SDLMessageType.AgentResult, agentResult = Some(AgentResult(instructionId = agentInstruction.instructionId, phase = agentInstruction.phase, dataObjectIdToSchema = resultingDataObjectIdToSchema)))
+        Some(SDLMessage(SDLMessageType.AgentResult, agentResult = Some(AgentResult(instructionId = agentInstruction.instructionId, phase = agentInstruction.phase, dataObjectIdToSchema = resultingDataObjectIdToSchema))))
     }
   }
 

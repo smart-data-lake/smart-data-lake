@@ -19,7 +19,8 @@
 
 package io.smartdatalake.communication.message
 
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 
-case class AgentResult(instructionId: String, phase: ExecutionPhase, dataObjectIdToSchema: Map[String, String])
+case class AgentResult(instructionId: String, phase: ExecutionPhase, dataObjectIdToSchema: Map[DataObjectId, String])
 

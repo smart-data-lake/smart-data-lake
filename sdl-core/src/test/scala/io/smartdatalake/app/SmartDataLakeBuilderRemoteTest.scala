@@ -32,6 +32,7 @@ import io.smartdatalake.workflow.agent.AgentImpl
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
+import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.avro.SchemaConverters
 import org.apache.spark.sql.catalyst.parser.LegacyTypeStringParser
@@ -86,10 +87,11 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
   test("sdlb run with agent: Test starting remote action from sdlb to agentserver") {
 
     val feedName = "test"
-
+    FileUtils.deleteDirectory(Paths.get(System.getProperty("user.dir"), "target/agent_dummy_connection").toFile)
+    FileUtils.deleteDirectory(Paths.get(System.getProperty("user.dir"), "target/dummy_cloud_connection").toFile)
     val sdlb = new DefaultSmartDataLakeBuilder()
     // setup input DataObject
-    val srcDO = CsvFileDataObject("src1", "target/src1")(sdlb.instanceRegistry)
+    val srcDO = CsvFileDataObject("src1", "target/agent_dummy_connection/remote-file")(sdlb.instanceRegistry)
     val dfSrc1 = Seq("testData").toDF("testColumn")
     srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
@@ -97,7 +99,7 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
     val agentConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = None)
 
     val remoteSDLB = new DefaultSmartDataLakeBuilder()
-    val agentController: AgentServerController = AgentServerController(sdlb.instanceRegistry, remoteSDLB)
+    val agentController: AgentServerController = AgentServerController(remoteSDLB.instanceRegistry, remoteSDLB)
     AgentServer.start(AgentServerConfig(sdlConfig = agentConfig), agentController)
 
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
@@ -106,35 +108,17 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
     //Run SDLB Main Instance
     sdlb.run(sdlConfig)
 
-    //When main instance is done, remote SDLB should have created tgt file
-    val remoteAction = sdlb.instanceRegistry.getActions.head
-    assert(remoteAction.id.id == "a")
-    assert(remoteAction.outputs.head.id.id == "tgt1")
-    assert(Paths.get(System.getProperty("user.dir"), "target/agent_dummy_connection", "tgt1").toFile.exists())
+    //remoteSDLB should have executed exactly one action: the remoteAction
+    assert(remoteSDLB.instanceRegistry.getActions.size == 1)
+    val remoteAction = remoteSDLB.instanceRegistry.getActions.head
+    assert(remoteAction.id.id == "remote-to-cloud")
+    assert(remoteAction.outputs.head.id.id == "cloud-file1")
 
-    println("blubv")
-  }
+    //Main Instance of SDLB was not using remoteFile connection from connection list
+    assert(!Paths.get(System.getProperty("user.dir"), "target","dummy_connection").toFile.exists())
 
-  test("sdfsdf"){
-    import org.apache.avro.Schema
-    import org.apache.spark.sql.types.StructType
-
-
-    import org.apache.spark.sql.Dataset
-    import org.apache.spark.sql.catalyst.parser.LegacyTypeStringParser
-
-    val ddl = "testcolumn STRING, other_column INT"
-    val requiredType = StructType.fromDDL(ddl)
-val test = DataFrameUtil.getEmptyDataFrame(requiredType)
-
-    val resultingDF = session.emptyDataFrame
-
-    val dfWithCols =
-    requiredType.fields.foldLeft(resultingDF){
-      case (df,colType) => df.withColumn(colType.name, lit(null).cast(colType.dataType))
-    }
-    //val resultingDF = session.read.json(Seq(structStr).toDS)
-    println(dfWithCols.schema)
+    //Main Instance of SDLB was able to execute action cloud-to-cloud by using data provided from the Agent
+    assert(Paths.get(System.getProperty("user.dir"), "target", "dummy_cloud_connection", "cloud-file2").toFile.exists())
   }
 }
 

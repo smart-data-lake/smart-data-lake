@@ -28,7 +28,6 @@ import scala.collection.mutable.Map
 
 class AgentClientSocket() extends WebSocketAdapter with SmartDataLakeLogger {
 
-  var actionStillRunning = true
   val pendingResults = new mutable.HashMap[String, SDLMessage]()
 
   override def onWebSocketConnect(sess: Session): Unit = {
@@ -43,13 +42,10 @@ class AgentClientSocket() extends WebSocketAdapter with SmartDataLakeLogger {
     sdlMessage.msgType match {
       case SDLMessageType.AgentResult =>
         pendingResults.put(sdlMessage.agentResult.get.instructionId, sdlMessage)
+      case SDLMessageType.EndConnection =>
+        logger.info(this + ": received EndConnection request, closing connection")
+        getSession.close(StatusCode.NORMAL, "Connection closed by " + this)
       case _ =>
-    }
-    //TODO TIMO Cleanup endConnection
-    if (message.contains(EndConnection.toString)) {
-      logger.info(this + ": received EndConnection request, closing connection")
-      actionStillRunning = false
-      getSession.close(StatusCode.NORMAL, "Connection closed by " + this)
     }
   }
 

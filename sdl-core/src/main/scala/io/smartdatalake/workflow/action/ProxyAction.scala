@@ -29,13 +29,17 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.agent.Agent
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.DataObject
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed, SubFeed}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.types.StructType
 
 case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.ActionId, agent: Agent) extends Action {
 
   override def exec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = {
-    common(subFeeds, ExecutionPhase.Exec)
+    val result = common( ExecutionPhase.Exec)
+   // agentClient
+
+    result
   }
 
   override def factory: FromConfigFactory[Action] = wrappedAction.factory
@@ -57,10 +61,11 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
   override def metricsFailCondition: Option[String] = wrappedAction.metricsFailCondition
 
   override def init(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = {
-    common(subFeeds, ExecutionPhase.Init)
+
+    common( ExecutionPhase.Init)
   }
 
-  def common(subFeeds: Seq[SubFeed], executionPhase: ExecutionPhase)(implicit context: ActionPipelineContext): Seq[SubFeed] = {
+  def common(executionPhase: ExecutionPhase)(implicit context: ActionPipelineContext): Seq[SubFeed] = {
     val agentClient = AgentClient(agent)
     val hoconInstructions = AgentClient.prepareHoconInstructions(wrappedAction, context.instanceRegistry.getConnections, agent, executionPhase)
     agentClient.sendSDLMessage(hoconInstructions)
@@ -72,16 +77,19 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
       println("waiting...")
     }
     val response = agentClient.socket.pendingResults.get(instructionId)
+    logger.info("Received response" +  response.toString)
     agentClient.socket.pendingResults.remove(instructionId)
 
-    val outputDO = response.get.agentResult.get.dataObjectIdToSchema.head
+    response.get.agentResult.get.dataObjectIdToSchema.map {
+      case(dataObjectId: DataObjectId, schema: String) => convertToEmptySparkSubFeed(dataObjectId, schema)(context.sparkSession)
+    }.toSeq
+  }
 
-    val requiredType = StructType.fromDDL(outputDO._2)
+  def convertToEmptySparkSubFeed(dataObjectId: DataObjectId, schema: String)(implicit session: SparkSession): SubFeed = {
+    val requiredType = StructType.fromDDL(schema)
 
-    val emptyDF = DataFrameUtil.getEmptyDataFrame(requiredType)(context.sparkSession)
-    val subFeed = SparkSubFeed(dataFrame = Some(SparkDataFrame(emptyDF)), dataObjectId = DataObjectId(outputDO._1), partitionValues = Nil,
+    val emptyDF = DataFrameUtil.getEmptyDataFrame(requiredType)(session)
+    SparkSubFeed(dataFrame = Some(SparkDataFrame(emptyDF)), dataObjectId = dataObjectId, partitionValues = Nil,
       isDummy = true, filter = None)
-    logger.info(response.toString)
-    Seq(subFeed)
   }
 }
