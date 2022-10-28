@@ -32,7 +32,7 @@ import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SerializableHadoopConfi
 import io.smartdatalake.workflow.ExecutionPhase.{Exec, ExecutionPhase, Init, Prepare}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
-import io.smartdatalake.workflow.action.{Action, DataFrameActionImpl, RuntimeInfo, SDLExecutionId}
+import io.smartdatalake.workflow.action.{Action, ActionSubFeedsImpl, DataFrameActionImpl, ProxyAction, RuntimeInfo, SDLExecutionId}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.SparkSession
@@ -301,9 +301,13 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * Starts a simulation run and registers all SDL first class objects that are defined in the config file which path is defined in parameter appConfig
    */
   def startSimulationWithConfigFile(appConfig: SmartDataLakeBuilderConfig, initialSubFeeds: Seq[SparkSubFeed], dataObjectsState: Seq[DataObjectState] = Seq())(session: SparkSession): (Seq[SparkSubFeed], Map[RuntimeEventState, Int]) = {
+    loadConfigIntoInstanceRegistry(appConfig, session)
+    startSimulation(appConfig, initialSubFeeds, dataObjectsState)(this.instanceRegistry, session)
+  }
+
+  def loadConfigIntoInstanceRegistry(appConfig: SmartDataLakeBuilderConfig, session: SparkSession): Unit = {
     val config = ConfigLoader.loadConfigFromFilesystem(appConfig.configuration.get, session.sparkContext.hadoopConfiguration)
     ConfigParser.parse(config, this.instanceRegistry)
-    startSimulation(appConfig, initialSubFeeds, dataObjectsState)(this.instanceRegistry, session)
   }
 
   /**
@@ -404,7 +408,11 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     val actionDAGRun = ActionDAGRun(actionsToExec, actionsToSkip, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(context)
     val finalSubFeeds = try {
       if (simulation) {
-        require(actionsToExec.forall(_.isInstanceOf[DataFrameActionImpl]), s"Simulation needs all selected actions to be instances of DataFrameActionImpl. This is not the case for ${actionsToExec.filterNot(_.isInstanceOf[DataFrameActionImpl]).map(_.id).mkString(", ")}")
+        require(actionsToExec.forall {
+          case actionSubFeedsImpl: ActionSubFeedsImpl[_] => actionSubFeedsImpl.isInstanceOf[DataFrameActionImpl]
+          case ProxyAction(wrappedAction, _, _) => wrappedAction.isInstanceOf[DataFrameActionImpl]
+          case _ => false
+        }, s"Simulation needs all selected actions to be instances of DataFrameActionImpl. This is not the case for ${actionsToExec.filterNot(_.isInstanceOf[DataFrameActionImpl]).map(_.id).mkString(", ")}")
         actionDAGRun.init(context)
       } else {
         actionDAGRun.prepare(context)

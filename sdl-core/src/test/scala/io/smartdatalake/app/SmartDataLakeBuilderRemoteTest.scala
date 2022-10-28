@@ -27,7 +27,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, ConnectionId,
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.ExecutionPhase
-import io.smartdatalake.workflow.action.Action
+import io.smartdatalake.workflow.action.{Action, ProxyAction}
 import io.smartdatalake.workflow.agent.AgentImpl
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
@@ -59,17 +59,19 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
     val srcDO1 = SparkSubFeed(SparkDataFrame(
       Seq("testData")
         .toDF("testColumn")
-    ), DataObjectId("src1"), Nil)
+    ), DataObjectId("remote-file"), Nil)
 
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
       getClass.getResource("/configremote/application.conf").getPath))
     )
     //Run simlutation of SDLB to parse config file and populate instanceregistry
-    sdlb.startSimulationWithConfigFile(sdlConfig, Seq(srcDO1))(session)
+    sdlb.loadConfigIntoInstanceRegistry(sdlConfig, session)
 
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
 
-    val sdlMessage = AgentClient.prepareHoconInstructions(sdlb.instanceRegistry.getActions.head, Nil, AgentImpl(AgentId("dummyId"), "dummyUrl", sdlb.instanceRegistry.getConnections.map(connection => connection.id.id -> connection).toMap), ExecutionPhase.Exec)
+    val actionToSend = sdlb.instanceRegistry.getActions.filter(_.id.id == "remote-to-cloud").head.asInstanceOf[ProxyAction].wrappedAction
+
+    val sdlMessage = AgentClient.prepareHoconInstructions(actionToSend, Nil, AgentImpl(AgentId("dummyId"), "dummyUrl", sdlb.instanceRegistry.getConnections.map(connection => connection.id.id -> connection).toMap), ExecutionPhase.Exec)
     val configFromString = ConfigFactory.parseString(sdlMessage.agentInstruction.get.hoconConfig, ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF))
 
     val dataObjects: Map[DataObjectId, DataObject] = getDataObjectConfigMap(configFromString)
@@ -82,7 +84,7 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
       .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
 
     //Contents of the action and objects generated out of the serialized hocon string should match the contents of /configremote/application.conf
-    assert(dataObjects.contains("src1") && dataObjects.contains("tgt1") && connections.contains("localSql") && actions.contains("a"))
+    assert(dataObjects.contains("remote-file") && dataObjects.contains("cloud-file1") && connections.contains("remoteFile") && actions.contains("remote-to-cloud"))
   }
   test("sdlb run with agent: Test starting remote action from sdlb to agentserver") {
 
