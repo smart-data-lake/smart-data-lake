@@ -53,12 +53,12 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   def parse(config: Config, instanceRegistry: InstanceRegistry = new InstanceRegistry): InstanceRegistry = {
     implicit val registry: InstanceRegistry = instanceRegistry
 
-    val  (agents, t1) =
+    val  (agents, t0) =
       PerformanceUtils.measureTime {
         getAgentConfigMap(config)
           .map { case (id, config) => (AgentId(id), parseConfigObjectWithId[Agent](id, config)) }
       }
-    logger.debug(s"Parsed ${agents.size} agents in $t1 seconds")
+    logger.debug(s"Parsed ${agents.size} agents in $t0 seconds")
     registry.register(agents)
 
     val (connections, t1) = PerformanceUtils.measureTime {
@@ -77,7 +77,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
 
     val (actions,t3) = PerformanceUtils.measureTime {
       getActionConfigMap(config)
-        .map { case (id, config) => (ActionId(id), parseConfigObjectWithId[Action](id, config)) }
+        .map { case (id, config) => (ActionId(id), parseActionWithId(id, config)) }
     }
     logger.debug(s"Parsed ${actions.size} actions in $t3 seconds")
     registry.register(actions)

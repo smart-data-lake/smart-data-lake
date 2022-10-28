@@ -52,12 +52,12 @@ import org.apache.spark.util.PrivateAccessor
  *                                                          but not for expression evaluation.
  * @param secretProviders                                   Define SecretProvider's to be registered.
  * @param allowOverwriteAllPartitionsWithoutPartitionValues Configure a list of exceptions for partitioned DataObject id's,
- *                       which are allowed to overwrite the all partitions of a table if no partition values are set.
- *                       This is used to override/avoid a protective error when using SDLSaveMode.OverwriteOptimized|OverwritePreserveDirectories.
- *                       Define it as a list of DataObject id's.
- * @param synchronousStreamingTriggerIntervalSec Trigger interval for synchronous actions in streaming mode in seconds (default = 60 seconds)
- *                       The synchronous actions of the DAG will be executed with this interval if possile.
- *                       Note that for asynchronous actions there are separate settings, e.g. SparkStreamingMode.triggerInterval.
+ *                                                          which are allowed to overwrite the all partitions of a table if no partition values are set.
+ *                                                          This is used to override/avoid a protective error when using SDLSaveMode.OverwriteOptimized|OverwritePreserveDirectories.
+ *                                                          Define it as a list of DataObject id's.
+ * @param synchronousStreamingTriggerIntervalSec            Trigger interval for synchronous actions in streaming mode in seconds (default = 60 seconds)
+ *                                                          The synchronous actions of the DAG will be executed with this interval if possile.
+ *                                                          Note that for asynchronous actions there are separate settings, e.g. SparkStreamingMode.triggerInterval.
  */
 case class GlobalConfig(kryoClasses: Option[Seq[String]] = None
                         , sparkOptions: Option[Map[String, String]] = None
@@ -72,7 +72,7 @@ case class GlobalConfig(kryoClasses: Option[Seq[String]] = None
                         , allowOverwriteAllPartitionsWithoutPartitionValues: Seq[DataObjectId] = Seq()
                         , synchronousStreamingTriggerIntervalSec: Int = 60
                        )
-extends SmartDataLakeLogger {
+  extends SmartDataLakeLogger {
 
   // start memory logger, else log memory once
   if (memoryLogTimer.isDefined) {
@@ -141,19 +141,19 @@ extends SmartDataLakeLogger {
    */
   def hasSparkSession: Boolean = _sparkSession.isDefined
 
-  private[smartdatalake] def setSparkOptions(session:SparkSession): Unit = {
-    sparkOptions.getOrElse(Map()).foreach{ case (k,v) => session.conf.set(k,v)}
+  private[smartdatalake] def setSparkOptions(session: SparkSession): Unit = {
+    sparkOptions.getOrElse(Map()).foreach { case (k, v) => session.conf.set(k, v) }
   }
 
   private[smartdatalake] def registerUdf(session: SparkSession): Unit = {
-    sparkUDFs.getOrElse(Map()).foreach { case (name,config) =>
+    sparkUDFs.getOrElse(Map()).foreach { case (name, config) =>
       val udf = config.getUDF
       // register in SDL spark session
       session.udf.register(name, udf)
       // register for use in expression evaluation
       ExpressionEvaluator.registerUdf(name, udf)
     }
-    pythonUDFs.getOrElse(Map()).foreach { case (name,config) =>
+    pythonUDFs.getOrElse(Map()).foreach { case (name, config) =>
       // register in SDL spark session
       config.registerUDF(name, session)
     }
@@ -162,21 +162,23 @@ extends SmartDataLakeLogger {
   /**
    * When merging Spark options special care must be taken for properties which are comma separated lists.
    */
-  private def mergeSparkOptions(m1: Map[String,String], m2: Map[String,String]): Map[String,String] = {
+  private def mergeSparkOptions(m1: Map[String, String], m2: Map[String, String]): Map[String, String] = {
     val listOptions = Seq("spark.plugins", "spark.executor.plugins", "spark.sql.extensions")
     m2.foldLeft(m1) {
-      case (m, (k,v)) =>
+      case (m, (k, v)) =>
         val mergedV = if (listOptions.contains(k)) (m.getOrElse(k, "").split(',') ++ v.split(',')).distinct.mkString(",") else v
         m.updated(k, mergedV)
     }
   }
 }
+
 object GlobalConfig extends ConfigImplicits {
   private[smartdatalake] def from(config: Config): GlobalConfig = {
     implicit val customStateListenerConfig: ConfigReader[StateListenerConfig] = ConfigReader.derive[StateListenerConfig]
     globalConfig = Some(config.get[Option[GlobalConfig]]("global").value.getOrElse(GlobalConfig()))
     globalConfig.get
   }
+
   // store global config to be used in MemoryLoggerExecutorPlugin
   var globalConfig: Option[GlobalConfig] = None
 }

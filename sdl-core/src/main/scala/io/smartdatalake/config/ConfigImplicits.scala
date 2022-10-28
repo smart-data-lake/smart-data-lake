@@ -28,6 +28,7 @@ import io.smartdatalake.util.secrets.SecretProviderConfig
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
 import io.smartdatalake.workflow.action.spark.customlogic._
+import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.Expectation

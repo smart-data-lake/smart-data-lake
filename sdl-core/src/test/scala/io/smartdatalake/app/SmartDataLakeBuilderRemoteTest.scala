@@ -56,15 +56,10 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
     val feedName = "test"
     val sdlb = new DefaultSmartDataLakeBuilder()
 
-    val srcDO1 = SparkSubFeed(SparkDataFrame(
-      Seq("testData")
-        .toDF("testColumn")
-    ), DataObjectId("remote-file"), Nil)
-
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
       getClass.getResource("/configremote/application.conf").getPath))
     )
-    //Run simlutation of SDLB to parse config file and populate instanceregistry
+
     sdlb.loadConfigIntoInstanceRegistry(sdlConfig, session)
 
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
