@@ -159,7 +159,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     assert(superfluousSubFeeds.isEmpty && missingSubFeeds.isEmpty, s"($id) input SubFeeds must match input DataObjects: superfluous=${superfluousSubFeeds.mkString(",")} missing=${missingSubFeeds.mkString(",")})")
   }
 
-  override final def init(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = {
+  override final def init(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = try {
     validateInputSubFeeds(subFeeds)
     // prepare
     var (inputSubFeeds, outputSubFeeds) = prepareInputSubFeeds(subFeeds)
@@ -169,9 +169,14 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds)
     // return
     outputSubFeeds
+  } catch {
+    // throw exception with skipped output subfeeds if "no data"
+    case ex: NoDataToProcessWarning if ex.results.isEmpty =>
+      logger.warn(s"($id) throwing NoDataToProcessWarning in init phase is not a good practice as it prevents checking schema for subsequent actions")
+      throw ex.copy(results = Some(ActionHelper.createSkippedSubFeeds(outputs)))
   }
 
-  override final def exec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = {
+  override final def exec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = try {
     validateInputSubFeeds(subFeeds)
     if (isAsynchronousProcessStarted) return outputs.map(output => SparkSubFeed(None, output.id, Seq())) // empty output subfeeds if asynchronous action started
     // prepare
@@ -184,6 +189,9 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     outputSubFeeds = writeOutputSubFeeds(outputSubFeeds)
     // return
     outputSubFeeds
+  } catch {
+    // throw exception with skipped output subfeeds if "no data"
+    case ex: NoDataToProcessWarning if ex.results.isEmpty => throw ex.copy(results = Some(ActionHelper.createSkippedSubFeeds(outputs)))
   }
 
   override def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
