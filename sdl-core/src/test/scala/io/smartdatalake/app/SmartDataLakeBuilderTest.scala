@@ -410,6 +410,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.clear
 
     // setup DataObjects
     val srcTable = Table(Some("default"), "ap_input")
@@ -504,6 +505,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.clear
 
     // setup DataObjects
     val srcDO1 = TestIncrementalDataObject("src1")
@@ -569,6 +571,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.clear
 
     // setup DataObjects
     val srcTable = Table(Some("default"), "ap_input")
@@ -605,10 +608,10 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     assert(stats == Map(RuntimeEventState.INITIALIZED -> 2))
     assert(finalSubFeeds.head.dataFrame.get.select(dfSrc1.columns.map(SparkSubFeed.col)).symmetricDifference(SparkDataFrame(dfSrc1)).isEmpty)
   }
+
   test("sdlb run converting col names to lower case") {
-    val feedName = "test"
+
     val sdlb = new DefaultSmartDataLakeBuilder()
-    //implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
 
     val config = ConfigFactory.parseString(
       """
@@ -646,7 +649,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // Run SDLB
     sdlb.startSimulation(sdlConfig, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc)), srcDO.id, Seq())))
-    //sdlb.run(sdlConfig)
 
     // check result
     val tgt = instanceRegistry.get[CsvFileDataObject]("tgt")
@@ -657,9 +659,8 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
 
   test("sdlb run converting column names to lower without additional options") {
-    val feedName = "test"
+
     val sdlb = new DefaultSmartDataLakeBuilder()
-    //implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
 
     val config = ConfigFactory.parseString(
       """
@@ -700,7 +701,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // Run SDLB
     sdlb.startSimulation(sdlConfig, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc)), srcDO.id, Seq())))
-    //sdlb.run(sdlConfig)
 
     // check result
     val tgt = instanceRegistry.get[CsvFileDataObject]("tgt")
@@ -715,11 +715,13 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val feedName = "test"
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.clear
 
     // setup input DataObject
     val srcDO = MockDataObject("src1").register
     val dfSrc1 = Seq("testData").toDF("testColumn")
-    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())
 
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
       getClass.getResource("/configState/WithFinalStateWriter.conf").getPath)) )
