@@ -23,6 +23,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
@@ -33,11 +34,22 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * @param columnWhitelist List of columns to keep from DataFrame
  */
 
-case class WhitelistTransformer(override val name: String = "whitelist", override val description: Option[String] = None, columnWhitelist: Seq[String]) extends GenericDfTransformer {
+case class WhitelistTransformer(override val name: String = "whitelist", override val description: Option[String] = None, columnWhitelist: Seq[String])
+  extends GenericDfTransformer with SmartDataLakeLogger {
+
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
-    val colsToSelect = df.schema.columns.filter(colName => columnWhitelist.contains(colName.toLowerCase))
+
+    val lowerCaseColumns = df.schema.columns.map(_.toLowerCase())
+
+    val nonExistingColumns = columnWhitelist.toSet.diff(lowerCaseColumns.toSet)
+    if (nonExistingColumns.nonEmpty) {
+      logger.warn(s"The whitelisted columns [${nonExistingColumns.mkString(", ")}] do not exist in dataframe. " +
+        s"Available columns are [${lowerCaseColumns.mkString(", ")}]. Note that column names are case sensitive.")
+    }
+
+    val colsToSelect = lowerCaseColumns.filter(colName => columnWhitelist.contains(colName))
     df.select(colsToSelect.map(col))
   }
   override def factory: FromConfigFactory[GenericDfTransformer] = WhitelistTransformer
