@@ -44,7 +44,9 @@ import org.apache.spark.sql.DataFrame
  *                    [[org.apache.spark.sql.DataFrameWriter]].
  * @param schema An optional data object schema. If defined, any automatic schema inference is avoided.
  *               As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
- *               Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
+ *               Define the schema by using one of the schema providers DDL, jsonSchemaFile, xsdFile or caseClassName.
+ *               The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
+ *               A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false

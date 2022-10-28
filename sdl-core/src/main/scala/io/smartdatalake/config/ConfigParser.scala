@@ -22,6 +22,8 @@ import com.typesafe.config.{Config, ConfigException, ConfigValueFactory, ConfigV
 import configs.syntax._
 import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.misc.{PerformanceUtils, ReflectionUtil, SmartDataLakeLogger}
+import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.{Action, ProxyAction}
 import io.smartdatalake.workflow.agent.Agent
@@ -44,28 +46,40 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   /**
    * Parses the supplied config and returns a populated [[InstanceRegistry]].
    *
-   * @param config           the configuration to parse.
+   * @param config  the configuration to parse.
    * @param instanceRegistry instance registry to use, default is to create a new instance.
-   * @return instance registry populated with all [[Action]]s and [[DataObject]]s defined in the configuration.
+   * @return  instance registry populated with all [[Action]]s, [[DataObject]]s, [[Connections]]s and [[Agents]]s defined in the configuration.
    */
   def parse(config: Config, instanceRegistry: InstanceRegistry = new InstanceRegistry): InstanceRegistry = {
     implicit val registry: InstanceRegistry = instanceRegistry
 
-
-    val agents: Map[AgentId, Agent] = getAgentConfigMap(config)
-      .map { case (id, config) => (AgentId(id), parseConfigObjectWithId[Agent](id, config)) }
+    val  (agents, t1) =
+      PerformanceUtils.measureTime {
+        getAgentConfigMap(config)
+          .map { case (id, config) => (AgentId(id), parseConfigObjectWithId[Agent](id, config)) }
+      }
+    logger.debug(s"Parsed ${agents.size} agents in $t1 seconds")
     registry.register(agents)
 
-    val connections: Map[ConnectionId, Connection] = getConnectionConfigMap(config)
-      .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
+    val (connections, t1) = PerformanceUtils.measureTime {
+      getConnectionConfigMap(config)
+        .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
+    }
+    logger.debug(s"Parsed ${connections.size} connections in $t1 seconds")
     registry.register(connections)
 
-    val dataObjects: Map[DataObjectId, DataObject] = getDataObjectConfigMap(config)
-      .map { case (id, config) => (DataObjectId(id), parseConfigObjectWithId[DataObject](id, config)) }
+    val (dataObjects, t2) = PerformanceUtils.measureTime {
+      getDataObjectConfigMap(config)
+        .map { case (id, config) => (DataObjectId(id), parseConfigObjectWithId[DataObject](id, config)) }
+    }
+    logger.debug(s"Parsed ${dataObjects.size} dataObjects in $t2 seconds")
     registry.register(dataObjects)
 
-    val actions: Map[ActionId, Action] = getActionConfigMap(config)
-      .map { case (id, config) => (ActionId(id), parseActionWithId(id, config)) }
+    val (actions,t3) = PerformanceUtils.measureTime {
+      getActionConfigMap(config)
+        .map { case (id, config) => (ActionId(id), parseConfigObjectWithId[Action](id, config)) }
+    }
+    logger.debug(s"Parsed ${actions.size} actions in $t3 seconds")
     registry.register(actions)
 
     registry
@@ -74,13 +88,9 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   final val CONFIG_SECTION_CONNECTIONS = "connections"
   final val CONFIG_SECTION_DATAOBJECTS = "dataObjects"
   final val CONFIG_SECTION_ACTIONS = "actions"
-
   def getConnectionEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_CONNECTIONS)
-
   def getDataObjectsEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_DATAOBJECTS)
-
   def getActionsEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_ACTIONS)
-
   def extractConfigKeys(config: Config, entry: String): Seq[String] = {
     if (config.hasPath(entry)) config.getObject(entry).keySet().asScala.toSeq
     else Seq()
@@ -89,11 +99,8 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   def getAgentConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, CONFIG_SECTION_AGENTS)
 
   def getConnectionConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, CONFIG_SECTION_CONNECTIONS)
-
   def getDataObjectConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, CONFIG_SECTION_DATAOBJECTS)
-
   def getActionConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, CONFIG_SECTION_ACTIONS)
-
   def extractConfigMap(config: Config, entry: String): Map[String, Config] = {
     if (config.hasPath(entry)) {
       config.get[Map[String, Config]](entry)
@@ -153,7 +160,6 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   } catch {
     case e: Exception => throw enrichExceptionMessageConfigPath(enrichExceptionMessageClassName(e), configPath)
   }
-
   def parseConfigObjectWithId[A <: ParsableFromConfig[A] : TypeTag](id: String, config: Config)(implicit registry: InstanceRegistry): A = {
     parseConfigObject[A](config, Some(getIdWithClassNamePrefixed[A](id)), Map("id" -> id))
   }
@@ -176,7 +182,6 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
     def getRootCause(cause: Throwable): Throwable = {
       Option(cause.getCause).map(getRootCause).getOrElse(cause)
     }
-
     val rootCause = getRootCause(e)
     if (!rootCause.isInstanceOf[ConfigException]) {
       val rootCauseClassName = rootCause.getClass.getSimpleName

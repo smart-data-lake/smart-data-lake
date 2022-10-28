@@ -212,21 +212,27 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // setup DataObjects
     val feed = "actionpipeline"
-    val srcTableA = Table(Some("default"), "ap_input")
-    val srcDO = HiveTableDataObject( "A", Some(tempPath+s"/${srcTableA.fullName}"), table = srcTableA, numInitialHdfsPartitions = 1, partitions = Seq("lastname"))
-    srcDO.dropTable
-    instanceRegistry.register(srcDO)
-    val tgtATable = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
+    val srcTableA = Table(Some("default"), "input_a")
+    val srcADO = HiveTableDataObject( "src_A", Some(tempPath+s"/${srcTableA.fullName}"), table = srcTableA, numInitialHdfsPartitions = 1, partitions = Seq("lastname"))
+    srcADO.dropTable
+    instanceRegistry.register(srcADO)
+
+    val srcTableB = Table(Some("default"), "input_b")
+    val srcBDO = HiveTableDataObject( "src_B", Some(tempPath+s"/${srcTableB.fullName}"), table = srcTableB, numInitialHdfsPartitions = 1, partitions = Seq("lastname"))
+    srcBDO.dropTable
+    instanceRegistry.register(srcBDO)
+
+    val tgtATable = Table(Some("default"), "tgt_a", None, Some(Seq("lastname","firstname")))
     val tgtADO = TickTockHiveTableDataObject("tgt_A", Some(tempPath+s"/${tgtATable.fullName}"), table = tgtATable, numInitialHdfsPartitions = 1, partitions = Seq("lastname"))
     tgtADO.dropTable
     instanceRegistry.register(tgtADO)
 
-    val tgtBTable = Table(Some("default"), "ap_copy1", None, Some(Seq("lastname","firstname")))
+    val tgtBTable = Table(Some("default"), "tgt_b", None, Some(Seq("lastname","firstname")))
     val tgtBDO = HiveTableDataObject( "tgt_B", Some(tempPath+s"/${tgtBTable.fullName}"), table = tgtBTable, numInitialHdfsPartitions = 1, partitions = Seq("lastname"))
     tgtBDO.dropTable
     instanceRegistry.register(tgtBDO)
 
-    val tgtCTable = Table(Some("default"), "ap_copy2", None, Some(Seq("lastname","firstname")))
+    val tgtCTable = Table(Some("default"), "tgt_c", None, Some(Seq("lastname","firstname")))
     val tgtCDO = HiveTableDataObject( "tgt_C", Some(tempPath+s"/${tgtCTable.fullName}"), table = tgtCTable, numInitialHdfsPartitions = 1, partitions = Seq("lastname"))
     tgtCDO.dropTable
     instanceRegistry.register(tgtCDO)
@@ -237,13 +243,19 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDDO)
 
     // prepare DAG
-    val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
-    srcDO.writeSparkDataFrame(l1, Seq())
-    tgtDDO.writeSparkDataFrame(l1, Seq()) // we populate tgtD so there should be no partitions to process
-    instanceRegistry.register(DeduplicateAction("a", srcDO.id, tgtADO.id, executionMode = Some(PartitionDiffMode()), metadata = Some(ActionMetadata(feed = Some(feed)))))
-    instanceRegistry.register(CopyAction("b", tgtADO.id, tgtBDO.id, executionMode = Some(FailIfNoPartitionValuesMode()), metadata = Some(ActionMetadata(feed = Some(feed)))))
+    val dataA = Seq(("doe","john",5),("dau","bob",3)).toDF("lastname", "firstname", "rating")
+    val dataB = Seq(("doe","john",10),("dau","bob",6)).toDF("lastname", "firstname", "rating")
+    srcADO.writeSparkDataFrame(dataA, Seq())
+    srcBDO.writeSparkDataFrame(dataB, Seq())
+    tgtADO.writeSparkDataFrame(dataA.where($"lastname"==="doe").withColumn("dl_ts_captured", current_timestamp()), Seq()) // populate tgtA with "doe", so there should be only 1 partition to process (dau)
+    tgtDDO.writeSparkDataFrame(dataA, Seq()) // populate tgtD so there should be no partitions left to process
+    instanceRegistry.register(DeduplicateAction("a", srcADO.id, tgtADO.id, executionMode = Some(PartitionDiffMode()), metadata = Some(ActionMetadata(feed = Some(feed)))))
+    // srcB should be filtered with partition values received from tgtA. Transformer selects records from srcB, so "doe, bob, 6" should be inserted in tgtB, but "doe, john, 3" should remain.
+    instanceRegistry.register(CustomDataFrameAction("b", Seq(tgtADO.id,srcBDO.id), Seq(tgtBDO.id), executionMode = Some(FailIfNoPartitionValuesMode()), metadata = Some(ActionMetadata(feed = Some(feed))),
+      transformers = Seq(SQLDfsTransformer(code = Map(tgtBDO.id.id -> "select * from src_B"))), mainInputId = Some(tgtADO.id)
+    ))
     instanceRegistry.register(CopyAction("c", tgtADO.id, tgtCDO.id, metadata = Some(ActionMetadata(feed = Some(feed)))))
-    instanceRegistry.register(CopyAction("d", srcDO.id, tgtDDO.id, executionMode = Some(PartitionDiffMode()), metadata = Some(ActionMetadata(feed = Some(feed)))))
+    instanceRegistry.register(CopyAction("d", srcADO.id, tgtDDO.id, executionMode = Some(PartitionDiffMode()), metadata = Some(ActionMetadata(feed = Some(feed)))))
 
     // exec dag
     val sdlb = new DefaultSmartDataLakeBuilder
@@ -253,20 +265,17 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val r1 = tgtBDO.getSparkDataFrame()
       .select($"rating")
       .as[Int].collect.toSeq
-    assert(r1.size == 1)
-    assert(r1.head == 5)
+    assert(r1.toSet == Set(6))
 
     val r2 = tgtCDO.getSparkDataFrame()
       .select($"rating")
       .as[Int].collect.toSeq
-    assert(r2.size == 1)
-    assert(r2.head == 5)
+    assert(r2.toSet == Set(3))
 
     val r3 = tgtDDO.getSparkDataFrame()
       .select($"rating")
       .as[Int].collect.toSeq
-    assert(r3.size == 1)
-    assert(r3.head == 5)
+    assert(r3.toSet == Set(3,5))
   }
 
   test("action dag where first actions has multiple input subfeeds, one should ignore filters") {
@@ -482,7 +491,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(recordsTgt2.head == 5)
   }
 
-  test("action dag file ingest - from file to dataframe") {
+  test("action dag file ingest - from file to dataframe with schema inference") {
 
     val feed = "actiondag"
     val srcDir = "testSrc"
@@ -498,8 +507,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(srcDO)
 
     // setup tgt1 CSV DataObject
-    val srcSchema = srcDO.getSparkDataFrame().head.schema // infer schema from original CSV
-    val tgt1DO = new CsvFileDataObject( "tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","), schema = Some(SparkSchema(srcSchema)))
+    val tgt1DO = new CsvFileDataObject( "tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","))
     instanceRegistry.register(tgt1DO)
 
     // setup tgt2 Hive DataObject
@@ -548,12 +556,11 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgt1DO)
 
     // setup tgt2 CSV DataObject
-    val srcSchema = srcDO.getSparkDataFrame().head.schema // infer schema from original CSV
-    val tgt2DO = new CsvFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","), schema = Some(SparkSchema(srcSchema)))
+    val tgt2DO = new CsvFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","))
     instanceRegistry.register(tgt2DO)
 
     // setup tgt3 CSV DataObject
-    val tgt3DO = new CsvFileDataObject( "tgt3", tempDir.resolve("tgt3").toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","), schema = Some(SparkSchema(srcSchema)))
+    val tgt3DO = new CsvFileDataObject( "tgt3", tempDir.resolve("tgt3").toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","))
     instanceRegistry.register(tgt3DO)
 
     // prepare ActionPipeline
@@ -1086,7 +1093,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // check metrics
     val action2MainMetrics = action2.runtimeData.getFinalMetrics(action2.outputIds.head).get.getMainInfos
-    assert(action2MainMetrics("records_written")==0)
+    assert(action2MainMetrics("records_written")==0 && action2MainMetrics("no_data")==true)
   }
 
   test("action dag with 2 actions in sequence, first is executionMode=DataFrameIncrementalMode, second with executionCondition=true and ProcessAll mode") {

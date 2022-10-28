@@ -59,7 +59,7 @@ abstract class FileOneToOneActionImpl extends ActionSubFeedsImpl[FileSubFeed] {
     assert(output.saveMode!=SDLSaveMode.OverwriteOptimized, s"($id) saveMode OverwriteOptimized not supported for now.")
   }
 
-  private[smartdatalake] override def subFeedConverter(): SubFeedConverter[FileSubFeed] = FileSubFeed
+  private[smartdatalake] override def subFeedConverter: SubFeedConverter[FileSubFeed] = FileSubFeed
 
   /**
    * Transform a [[SparkSubFeed]].

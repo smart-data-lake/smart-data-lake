@@ -24,16 +24,18 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SchemaUtil
+import io.smartdatalake.util.misc.{ProductUtil, SchemaUtil}
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.sql.functions.col
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.custom.ExpressionEvaluator
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
 import java.sql.{ResultSet, ResultSetMetaData}
@@ -72,6 +74,11 @@ import scala.util.Try
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
  *                                    Default is to expect all partitions to exist.
+ * @param incrementalOutputExpr Optional expression to use for creating incremental output with DataObjectStateIncrementalMode.
+ *                              The expression is used to get the high-water-mark for the incremental update state.
+ *                              Normally this can be just a column name, e.g. an id or updated timestamp which is continually increasing.
+ * @param constraints List of row-level [[Constraint]]s to enforce when writing to this data object.
+ * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
  */
 case class JdbcTableDataObject(override val id: DataObjectId,
                                createSql: Option[String] = None,
@@ -81,6 +88,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                postWriteSql: Option[String] = None,
                                override val schemaMin: Option[GenericSchema] = None,
                                override var table: Table,
+                               override val constraints: Seq[Constraint] = Seq(),
+                               override val expectations: Seq[Expectation] = Seq(),
                                jdbcFetchSize: Int = 1000,
                                saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                override val allowSchemaEvolution: Boolean = false,
@@ -88,9 +97,11 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                jdbcOptions: Map[String, String] = Map(),
                                virtualPartitions: Seq[String] = Seq(),
                                override val expectedPartitionsCondition: Option[String] = None,
+                               incrementalOutputExpr: Option[String] = None,
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject with CanHandlePartitions with CanEvolveSchema with CanMergeDataFrame {
+  extends TransactionalSparkTableDataObject with CanHandlePartitions with CanEvolveSchema with CanMergeDataFrame
+    with CanCreateIncrementalOutput with ExpectationValidation {
 
   /**
    * Connection defines driver, url and db in central location
@@ -106,6 +117,10 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
   // Define partition columns
   override val partitions: Seq[String] = if (SchemaUtil.isSparkCaseSensitive) virtualPartitions else virtualPartitions.map(_.toLowerCase)
+
+  // TODO: Spark jdbc data source does not execute Spark observations, e.g. CopyWithMergeModeActionTest fails...
+  // Using generic observations is forced therefore.
+  override val forceGenericObservation = true
 
   // prepare final table
   table = table.overrideDb(connection.db)
@@ -147,13 +162,63 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     val queryOrTable = Map(table.query.map(q => ("query",q)).getOrElse("dbtable"->table.fullName))
-    val df = context.sparkSession.read.format("jdbc")
+    var df = context.sparkSession.read.format("jdbc")
       .options(options)
       .options(connection.getAuthModeSparkOptions)
       .options(queryOrTable)
       .load()
+    incrementalOutputState.foreach { case (lastExpr, lastHighWatermark)  =>
+      assert(incrementalOutputExpr.isDefined, s"($id) incrementalOutputExpr must be set to use DataObjectStateIncrementalMode")
+      if (lastExpr != incrementalOutputExpr.get) logger.warn(s"($id) incrementalOutputState has different column as incrementalOutputExpr ($lastExpr != ${incrementalOutputExpr.get}")
+      val resolvedExpr = ExpressionEvaluator.resolveExpression(expr(incrementalOutputExpr.get), df.schema, caseSensitive = false)
+      // check if expression is fully resolved
+      if (!resolvedExpr.resolved) {
+        val attrs = ExpressionEvaluator.findUnresolvedAttributes(resolvedExpr).map(_.name)
+        throw new IllegalStateException(s"($id) incrementalOutputExpr can not be resolved" + (if (attrs.nonEmpty) s", unresolved attributes are ${attrs.mkString(", ")}" else ""))
+      }
+      val newDataType = resolvedExpr.dataType
+      if (context.phase == ExecutionPhase.Exec) {
+        val newHighWatermarkValue = Option(df.agg(max(expr(incrementalOutputExpr.get))).head.get(0))
+          .getOrElse(throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode."))
+        incrementalOutputState = Some((incrementalOutputExpr.get, Some((newHighWatermarkValue.toString, newDataType))))
+        logger.info(s"($id) incremental output selected records with '${incrementalOutputExpr.get} > '${lastHighWatermark.map(_._1).getOrElse("none")}' and <= '${newHighWatermarkValue}'")
+        df = df.where(expr(incrementalOutputExpr.get) <= lit(newHighWatermarkValue).cast(newDataType))
+        lastHighWatermark.foreach { case (value, dataType) =>
+          if (value == newHighWatermarkValue.toString) {
+            throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode. High watermark is $newHighWatermarkValue")
+          }
+          df = df.where(expr(lastExpr) > lit(value).cast(dataType))
+        }
+      }
+    }
     validateSchemaMin(SparkSchema(df.schema), "read")
     df.colNamesLowercase
+  }
+
+  // Store incremental output state. It is stored as tuple of incrementalOutputExpr, lastHighWatermarkValue, dataType
+  private var incrementalOutputState: Option[(String,Option[(String,DataType)])] = None
+
+  /**
+   * Set state for incremental output.
+   */
+  override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
+    incrementalOutputState = state.map { s =>
+      Try {
+        s.split(';') match {
+          case Array(column, lastHighWatermarkVal, dataType) => (column, Some((lastHighWatermarkVal, DataType.fromDDL(dataType))))
+          case Array(column) => (column, None)
+        }
+      }.getOrElse(throw new IllegalStateException(s"($id) Cannot parse state '$s' into format <incrementalOutputExpr>;<lastHighWatermark>;<dataType>"))
+    }.orElse{
+      assert(incrementalOutputExpr.isDefined, s"($id) incrementalOutputExpr must be set to use DataObjectStateIncrementalMode")
+      Some((incrementalOutputExpr.get, None))
+    }
+  }
+  override def getState: Option[String] = {
+    incrementalOutputState.map{
+      case (column, Some((lastHighWatermarkVal, dataType))) => s"$column;$lastHighWatermarkVal;${dataType.sql}"
+      case (column, None) => s"$column"
+    }
   }
 
   override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
@@ -298,6 +363,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
         | WHEN NOT MATCHED $insertConditionStr THEN INSERT ($insertSpecStr) VALUES ($insertValueSpecStr)
         """.stripMargin
       // execute
+      logger.info(s"($id) executing merge statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1+"="+e._2).mkString(" ")}")
       connection.execJdbcStatement(mergeStmt, doCommit = true)
     } finally {
       // cleanup temp table

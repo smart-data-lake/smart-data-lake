@@ -194,6 +194,45 @@ object Environment {
       .map(_.toBoolean).getOrElse(true)
   }
 
+  /**
+   * If enabled, the sample data file for SparkFileDataObject is updated on every load from a file-based Action, otherwise it's just updated if it's missing.
+   * The advantage of updating the sample file on every load is to enable automatic schema evolution.
+   * This is disabled by default, as it might have performance impact if file size is big. It can be enabled on demand by setting the corresponding java property or environment variable.
+   */
+  var updateSparkFileDataObjectSampleDataFile: Boolean = {
+    EnvironmentUtil.getSdlParameter("updateSparkFileDataObjectSampleDataFile")
+      .map(_.toBoolean).getOrElse(false)
+  }
+
+  /**
+   * If enabled, SparkFileDataObject checks in execution plan if there are files available during Exec phase.
+   * NoDataToProcessWarning is thrown if there are no files found in the execution plan.
+   */
+  var enableSparkFileDataObjectNoDataCheck: Boolean = {
+    EnvironmentUtil.getSdlParameter("enableSparkFileDataObjectNoDataCheck")
+      .map(_.toBoolean).getOrElse(true)
+  }
+
+  /**
+   * Maximal line length for DAG graph log, before switching to list mode.
+   */
+  var dagGraphLogMaxLineLength: Int = {
+    val nb = EnvironmentUtil.getSdlParameter("dagGraphLogMaxLineLength")
+      .map(_.toInt).getOrElse(250)
+    // return
+    nb
+  }
+
+  /**
+   * If enabled, the schema file for SparkFileDataObject is updated on every load from a DataFrame-based Action, otherwise it's just updated if it's missing.
+   * The advantage of updating the sample file on every load is to enable automatic schema evolution.
+   * This is enabled by default, as it has not big impact on performance.
+   */
+  var updateSparkFileDataObjectSchemaFile: Boolean = {
+    EnvironmentUtil.getSdlParameter("updateSparkFileDataObjectSchemaFile")
+      .map(_.toBoolean).getOrElse(true)
+  }
+
   // static configurations
   val configPathsForLocalSubstitution: Seq[String] = Seq(
       "path", "table.name"
@@ -202,7 +241,7 @@ object Environment {
   val runIdPartitionColumnName = "run_id"
 
   // instantiate sdl plugin if configured
-  private[smartdatalake] lazy val sdlPlugin: Option[SDLPlugin] = {
+  private[smartdatalake] var sdlPlugin: Option[SDLPlugin] = {
     EnvironmentUtil.getSdlParameter("pluginClassName")
       .map(CustomCodeUtil.getClassInstanceByName[SDLPlugin])
   }

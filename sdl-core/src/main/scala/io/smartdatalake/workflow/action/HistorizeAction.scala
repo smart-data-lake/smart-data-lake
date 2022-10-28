@@ -39,9 +39,11 @@ import scala.reflect.runtime.universe.Type
 import scala.util.{Failure, Success, Try}
 
 /**
- * [[Action]] to historize a subfeed.
+ * This [[Action]] historizes data between an input and output DataObject using DataFrames.
  * Historization creates a technical history of data by creating valid-from/to columns.
- * It needs a transactional table as output with defined primary keys.
+ * The DataFrame might be transformed using SQL or DataFrame transformations. These transformations are applied before the deduplication.
+ *
+ * HistorizeAction needs a transactional table (e.g. implementation of [[TransactionalSparkTableDataObject]]) as output with defined primary keys.
  *
  * Normal historization join new with all existing data, and rewrites all data in output table. This is not optimal from
  * a performance perspective.
@@ -69,14 +71,18 @@ import scala.util.{Failure, Success, Try}
  *                        Output DataObject must implement [[CanMergeDataFrame]] if enabled (default = false).
  *                        Incremental historization will add an additional "dl_hash" column which is used for change detection between
  *                        existing and new data.
+ *                        Note that enabling mergeMode on an existing HistorizeAction will create a new version for every
+ *                        new record in the output table, as "dl_hash" column is initially null.
  * @param mergeModeAdditionalJoinPredicate To optimize performance it might be interesting to limit the records read from the existing table data, e.g. it might be sufficient to use only the last 7 days.
  *                                         Specify a condition to select existing data to be used in transformation as Spark SQL expression.
  *                                         Use table alias 'existing' to reference columns of the existing table data.
- * @param mergeModeCDCColumn Optional colum holding the CDC operation to replay. If this information is available from the source
+ * @param mergeModeCDCColumn Optional colum holding the CDC operation to replay to enable mergeModeCDC. If CDC information is available from the source
  *                           incremental historization can be further optimized, as the join with existing data can be omitted.
+ *                           Note that this should be enabled only, if input data contains just inserted, updated and deleted records.
+ *                           HistorizeAction in mergeModeCDC will make *no* change detection on its own, and create a new version for every inserted/updated record it receives!
  *                           You will also need to specify parameter mergeModeCDCDeletedValue to use this and mergeModeEnable=true.
  *                           Increment CDC historization will add an additional column "dl_dummy" to the target table,
- *                           which is used to work around limitations of SQL merge statement, but "dl_hash" column is no longer needed.
+ *                           which is used to work around limitations of SQL merge statement, but "dl_hash" column from mergeMode is no longer needed.
  * @param mergeModeCDCDeletedValue Optional value of mergeModeCDCColumn that marks a record as deleted.
  * @param executionMode optional execution mode for this Action
  * @param executionCondition optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
@@ -164,6 +170,9 @@ case class HistorizeAction(
   override val recursiveInputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
 
   private[smartdatalake] override val handleRecursiveInputsAsSubFeeds: Boolean = false
+
+  // DataFrame created by HistorizeAction should not be passed on to the next Action, but must be recreated from the DataObject.
+  override val breakDataFrameOutputLineage: Boolean = true
 
   // historize black/white list
   require(historizeWhitelist.isEmpty || historizeBlacklist.isEmpty, s"(${id}) HistorizeWhitelist and historizeBlacklist mustn't be used at the same time")

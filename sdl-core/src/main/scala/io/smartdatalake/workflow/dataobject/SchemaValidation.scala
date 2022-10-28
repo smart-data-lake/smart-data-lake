@@ -58,9 +58,9 @@ private[smartdatalake] trait SchemaValidation { this: DataObject =>
       missingCols.foreach { missing =>
         throw new SchemaViolationException(
           s"""($id) DataFrame does not fulfil schemaMin on $role:
-             |- missingCols=${missing.columns.mkString(", ")}
-             |- schemaMin: ${schemaExpected.sql}
-             |- schema: ${schema.sql}""".stripMargin)
+             | - missingCols=${missing.columns.mkString(", ")}
+             | - schemaMin: ${schemaExpected.sql}
+             | - schema: ${schema.sql}""".stripMargin)
       }
     }
   }
@@ -79,10 +79,10 @@ private[smartdatalake] trait SchemaValidation { this: DataObject =>
     if (missingCols.isDefined || superfluousCols.isDefined) {
       throw new SchemaViolationException(
         s"""($id) Schema does not match schema defined on $role:
-           |- missingCols=${missingCols.map(_.columns).getOrElse(Seq()).mkString(", ")}
-           |- superfluousCols=${superfluousCols.map(_.columns).getOrElse(Seq()).mkString(", ")}
-           |- schemaExpected: ${schemaExpected.sql}
-           |- schema: ${schema.sql.mkString(", ")}""".stripMargin)
+           | - missingCols=${missingCols.map(_.columns).getOrElse(Seq()).mkString(", ")}
+           | - superfluousCols=${superfluousCols.map(_.columns).getOrElse(Seq()).mkString(", ")}
+           | - schemaExpected: ${schemaExpected.sql}
+           | - schema: ${schema.sql}""".stripMargin)
     }
   }
 }

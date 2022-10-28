@@ -95,6 +95,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
 
   // execution mode is evaluated in init phase and result must be stored for exec phase
   protected var executionModeResult: Option[Try[Option[ExecutionModeResult]]] = None
+  def getExecutionModeResultOptions: Map[String,String] = executionModeResult.flatMap(_.get.map(_.options)).getOrElse(Map())
 
   /**
    * Spark SQL condition evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
@@ -159,20 +160,8 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * In this step execution condition is evaluated and Action init is skipped if result is false.
    */
   def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit context: ActionPipelineContext): Unit = {
-    // initialize dataObjectsState
-    val unrelatedStateDataObjectIds = dataObjectsState.map(_.dataObjectId).diff(inputs.map(_.id))
-    assert(unrelatedStateDataObjectIds.isEmpty, s"($id) Got state for unrelated DataObjects ${unrelatedStateDataObjectIds.mkString(", ")}")
-    if (executionMode.exists(_.isInstanceOf[DataObjectStateIncrementalMode])) {
-      // assert SDL is started with state
-      assert(context.appConfig.statePath.isDefined, s"($id) SmartDataLakeBuilder must be started with state path set. Please specify location of state with parameter '--state-path'.")
-      // set DataObjects state
-      inputs.foreach {
-        case input: CanCreateIncrementalOutput => input.setState(dataObjectsState.find(_.dataObjectId == input.id).map(_.state))
-        case input => throw new ConfigurationException(s"($id) DataObjectStateIncrementalMode needs input data objects that implement CanCreateIncrementalOutput, but ${input.id} does not.")
-      }
-    } else {
-      assert(dataObjectsState.isEmpty, s"($id) Got dataObjectsState but executionMode not ${classOf[DataObjectStateIncrementalMode].getSimpleName}")
-    }
+    // call execution mode hook
+    executionMode.foreach(_.preInit(subFeeds,dataObjectsState))
     // check execution condition
     checkExecutionCondition(subFeeds)
   }
@@ -190,7 +179,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
         val data = SubFeedsExpressionData.fromSubFeeds(subFeeds)
         if (!c.evaluate(id, Some("executionCondition"), data)) {
           val descriptionText = c.description.map(d => s""""$d" """).getOrElse("")
-          val msg = s"""($id) execution skipped because of failed executionCondition ${descriptionText}expression="${c.expression}" $data"""
+          val msg = s"""($id) execution skipped because of failed executionCondition ${descriptionText} expression="${c.expression}" $data"""
           (false, Some(msg))
         } else (true, None)
       }.getOrElse {
@@ -283,13 +272,6 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
     // process postRead/Write hooks
     inputs.foreach( input => input.postRead(findSubFeedPartitionValues(input.id, inputSubFeeds)))
     outputs.foreach( output => output.postWrite(findSubFeedPartitionValues(output.id, outputSubFeeds)))
-    // update DataObjects incremental state in DataObjectStateIncrementalMode
-    if (executionMode.exists(_.isInstanceOf[DataObjectStateIncrementalMode])) {
-      inputs.foreach {
-        case input: CanCreateIncrementalOutput => input.setState(input.getState)
-        case _ => Unit
-      }
-    }
   }
 
   /**

@@ -18,8 +18,6 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.io.{InputStream, OutputStream}
-
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
@@ -30,9 +28,10 @@ import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.SftpFileRefConnection
-import net.schmizz.sshj.sftp.SFTPClient
-import org.apache.spark.sql.{SaveMode, SparkSession}
+import net.schmizz.sshj.sftp.SFTPException
 
+import java.io.{InputStream, OutputStream}
+import java.nio.file.FileAlreadyExistsException
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -87,13 +86,19 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
     }
   }
 
-  override def deleteFileRefs(fileRefs: Seq[FileRef])(implicit context: ActionPipelineContext): Unit = {
-    // delete given files on hdfs
+  override def deleteFile(file: String)(implicit context: ActionPipelineContext): Unit = {
     connection.execWithSFtpClient {
-      sftp =>
-        fileRefs.foreach { fileRef =>
-          sftp.rm(fileRef.fullPath)
-        }
+      sftp => sftp.rm(file)
+    }
+  }
+
+  override def renameFile(file: String, newFile: String)(implicit context: ActionPipelineContext): Unit = {
+    connection.execWithSFtpClient {
+      sftp => try {
+        sftp.rename(file, newFile)
+      } catch {
+        case e: SFTPException if e.getMessage == "File/Directory already exists" => throw new FileAlreadyExistsException(e.getMessage)
+      }
     }
   }
 

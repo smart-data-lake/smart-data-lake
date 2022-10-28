@@ -47,7 +47,11 @@ case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, 
     actionsState.filter(_._2.executionId.isInstanceOf[SDLExecutionId]).forall(_._2.state == RuntimeEventState.SKIPPED)
 
   def getDataObjectsState: Seq[DataObjectState] = {
-    actionsState.flatMap { case (actionId, info) => info.dataObjectsState }.toSeq
+    val dataObjectsState = actionsState.toSeq.flatMap { case (actionId, info) => info.dataObjectsState }
+    val duplicateDataObjectState = dataObjectsState.groupBy(_.dataObjectId).filter(_._2.size > 1)
+    assert(duplicateDataObjectState.isEmpty, s"${duplicateDataObjectState.mkString(", ")} is read from multiple Actions with DataObjectStateIncrementalMode. This is not supported.")
+    // return
+    dataObjectsState
   }
 
   def finalState: Option[RuntimeEventState] =

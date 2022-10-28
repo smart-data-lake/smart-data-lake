@@ -35,7 +35,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  *
  * Example:
  * {{{
- * ```dataObjects = {
+ * dataObjects = {
  *  ...
  *  dataobject-exporter {
  *    type = DataObjectsExporterDataObject

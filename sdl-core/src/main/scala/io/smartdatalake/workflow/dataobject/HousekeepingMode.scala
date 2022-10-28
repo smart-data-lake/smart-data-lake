@@ -120,11 +120,15 @@ case class PartitionArchiveCompactionMode(archivePartitionExpression: Option[Str
             .filter(pvs => !pvsToArchive.contains(pvs)) // filter out partitions to archive, as they dont need compaction anymore
         ).getOrElse(Seq())
         // archive
-        partitionedDataObject.movePartitions(pvsToArchiveMapping)
-        logger.info(s"(${dataObject.id}) Housekeeping archived partitions ${pvsToArchive.mkString(", ")}" )
+        if (pvsToArchiveMapping.nonEmpty) {
+          partitionedDataObject.movePartitions(pvsToArchiveMapping)
+          logger.info(s"(${dataObject.id}) Housekeeping archived partitions ${pvsToArchive.mkString(", ")}" )
+        }
         // compact
-        partitionedDataObject.compactPartitions(pvsToCompact)
-        logger.info(s"(${dataObject.id}) Housekeeping compacted partitions ${pvsToCompact.mkString(", ")}" )
+        if (pvsToCompact.nonEmpty) {
+          partitionedDataObject.compactPartitions(pvsToCompact)
+          logger.info(s"(${dataObject.id}) Housekeeping compacted partitions ${pvsToCompact.mkString(", ")}")
+        }
     }
   }
 }

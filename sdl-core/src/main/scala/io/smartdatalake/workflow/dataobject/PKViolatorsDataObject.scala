@@ -38,7 +38,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  *
  * Example:
  * {{{
- * ```dataObjects = {
+ * dataObjects = {
  *  ...
  *  primarykey-violations {
  *    type = PKViolatorsDataObject

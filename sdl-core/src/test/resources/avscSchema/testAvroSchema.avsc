@@ -1,0 +1,63 @@
+{
+  "type": "record",
+  "name": "User",
+  "namespace": "com.example.avro",
+  "doc": "This is a user record in a fictitious to-do-list management app. It supports arbitrary grouping and nesting of items, and allows you to add items by email or by tweeting.\n\nNote this app doesn't actually exist. The schema is just a demo for [Avrodoc](https://github.com/ept/avrodoc)!",
+  "fields": [
+    {
+      "name": "id",
+      "doc": "System-assigned numeric user ID. Cannot be changed by the user.",
+      "type": "int"
+    },
+    {
+      "name": "username",
+      "doc": "The username chosen by the user. Can be changed by the user.",
+      "type": "string"
+    },
+    {
+      "name": "passwordHash",
+      "doc": "The user's password, hashed using [scrypt](http://www.tarsnap.com/scrypt.html).",
+      "type": "string"
+    },
+    {
+      "name": "signupDate",
+      "doc": "Timestamp (milliseconds since epoch) when the user signed up",
+      "type": "long"
+    },
+    {
+      "name": "emailAddresses",
+      "doc": "All email addresses on the user's account",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "EmailAddress",
+          "doc": "Stores details about an email address that a user has associated with their account.",
+          "fields": [
+            {
+              "name": "address",
+              "doc": "The email address, e.g. `foo@example.com`",
+              "type": "string"
+            },
+            {
+              "name": "verified",
+              "doc": "true if the user has clicked the link in a confirmation email to this address.",
+              "type": "boolean",
+              "default": false
+            },
+            {
+              "name": "dateAdded",
+              "doc": "Timestamp (milliseconds since epoch) when the email address was added to the account.",
+              "type": "long"
+            },
+            {
+              "name": "dateBounced",
+              "doc": "Timestamp (milliseconds since epoch) when an email sent to this address last bounced. Reset to null when the address no longer bounces.",
+              "type": ["null", "long"]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

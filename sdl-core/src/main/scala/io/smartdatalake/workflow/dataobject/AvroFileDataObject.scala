@@ -42,7 +42,9 @@ import io.smartdatalake.workflow.dataframe.GenericSchema
  * @param schema An optional schema for the spark data frame to be validated on read and write. Note: Existing Avro files
  *               contain a source schema. Therefore, this schema is ignored when reading from existing Avro files.
  *               As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
- *               Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
+ *               Define the schema by using one of the schema providers DDL, jsonSchemaFile, avroSchemaFile, xsdFile or caseClassName.
+ *               The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
+ *               A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false

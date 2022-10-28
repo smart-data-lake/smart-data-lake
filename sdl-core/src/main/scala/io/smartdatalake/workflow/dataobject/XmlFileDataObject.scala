@@ -21,23 +21,23 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.json.DefaultFlatteningParser
-import io.smartdatalake.util.spark.DataFrameUtil.DataFrameReaderUtils
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.DataFrameUtil.DataFrameReaderUtils
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.{input_file_name, lit}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
- * A [[io.smartdatalake.workflow.dataobject.DataObject]] backed by an XML data source.
+ * A [[DataObject]] backed by an XML data source.
  *
- * It manages read and write access and configurations required for [[io.smartdatalake.workflow.action.Action]]s to
+ * It manages read and write access and configurations required for [[Action]]s to
  * work on XML formatted files.
  *
  * Reading and writing details are delegated to Apache Spark [[org.apache.spark.sql.DataFrameReader]]
@@ -48,7 +48,9 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param xmlOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
  * @param schema An optional data object schema. If defined, any automatic schema inference is avoided.
  *               As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
- *               Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
+ *               Define the schema by using one of the schema providers DDL, jsonSchemaFile, xsdFile or caseClassName.
+ *               The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
+ *               A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
@@ -107,17 +109,15 @@ case class XmlFileDataObject(override val id: DataObjectId,
     assert(wrongPartitionValues.isEmpty, s"getDataFrame got request with PartitionValues keys ${wrongPartitionValues.mkString(",")} not included in $id partition columns ${partitions.mkString(", ")}")
     assert(partitionValues.forall(pv => partitions.toSet.diff(pv.keys).isEmpty), "PartitionValues must include values for all partitions when reading XML-Data")
 
-    val filesExists = checkFilesExisting
-    if (!filesExists) {
+    val schemaOpt = getSchema.map(_.inner)
+    if (!(schemaOpt.isDefined || checkFilesExisting)) {
       //without either schema or data, no data frame can be created
       require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined if there are no existing files.")
-
-      // Schema exists so an empty data frame can be created
-      // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
-      filesystem.mkdirs(hadoopPath)
     }
 
-    val schemaOpt = getSchema(filesExists).map(_.inner)
+    // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
+    if (!filesystem.exists(hadoopPath)) filesystem.mkdirs(hadoopPath)
+
     val dfContent = if (partitions.isEmpty) {
       session.read
         .format(format)

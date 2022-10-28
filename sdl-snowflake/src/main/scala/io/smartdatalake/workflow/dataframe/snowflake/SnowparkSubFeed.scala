@@ -37,7 +37,8 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
                            override val isDAGStart: Boolean = false,
                            override val isSkipped: Boolean = false,
                            override val isDummy: Boolean = false,
-                           override val filter: Option[String] = None
+                           override val filter: Option[String] = None,
+                           @transient override val observation: Option[Observation] = None
                           )
   extends DataFrameSubFeed {
   @transient
@@ -79,8 +80,8 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
     // if filter is removed, normally also the DataFrame must be removed so that the next action get's a fresh unfiltered DataFrame with all data of this DataObject
     if (breakLineageOnChange && filter.isDefined) {
       logger.info(s"($dataObjectId) breakLineage called for SubFeed from clearFilter")
-      this.copy(filter = None).breakLineage
-    } else this.copy(filter = None)
+      this.copy(filter = None, observation = None).breakLineage
+    } else this.copy(filter = None, observation = None)
   }
 
   override def persist: SnowparkSubFeed = {
@@ -112,6 +113,7 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
     this.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false, dataFrame = None)
   }
   override def withDataFrame(dataFrame: Option[GenericDataFrame]): SnowparkSubFeed = this.copy(dataFrame = dataFrame.map(_.asInstanceOf[SnowparkDataFrame]))
+  override def withObservation(observation: Option[Observation]): SnowparkSubFeed = this.copy(observation = observation)
   override def withPartitionValues(partitionValues: Seq[PartitionValues]): DataFrameSubFeed = this.copy(partitionValues = partitionValues)
   override def asDummy(): SnowparkSubFeed = this.copy(isDummy = true)
   override def withFilter(partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed = {
@@ -143,6 +145,12 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion {
   override def lit(value: Any): SnowparkColumn = {
     SnowparkColumn(functions.lit(value))
   }
+  override def min(column: GenericColumn): SnowparkColumn = {
+    column match {
+      case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.min(snowparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
   override def max(column: GenericColumn): SnowparkColumn = {
     column match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.max(snowparkColumn.inner))
@@ -152,6 +160,12 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion {
   override def count(column: GenericColumn): SnowparkColumn = {
     column match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.count(snowparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def size(column: GenericColumn): GenericColumn = {
+    column match {
+      case sparkColumn: SnowparkColumn => SnowparkColumn(functions.array_size(sparkColumn.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
@@ -213,6 +227,25 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion {
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
+  override def concat(exprs: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, exprs.toSeq)
+    SnowparkColumn(functions.concat(exprs.map(_.asInstanceOf[SnowparkColumn].inner):_*))
+  }
+  override def regexp_extract(column: GenericColumn, pattern: String, groupIdx: Int): GenericColumn = {
+    column match {
+      // must be implemented as sql expression, as function regexp_substr doesn't yet exist in snowpark
+      case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.sqlExpr(s"regexp_substr(${snowparkColumn.inner.getName}, $pattern, 1, 1, 'c', $groupIdx)"))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def raise_error(column: GenericColumn): GenericColumn = {
+    val udfRaiseError = functions.udf((msg: String) => throw new RuntimeException(msg)) // Spark raise_error functions also creates a RuntimeException
+    column match {
+      case snowparkColumn: SnowparkColumn => SnowparkColumn(udfRaiseError(snowparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+
   override def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): SnowparkDataFrame = {
     val dataObject = context.instanceRegistry.get[SnowflakeTableDataObject](dataObjectId)
     SnowparkDataFrame(dataObject.snowparkSession.sql(query))

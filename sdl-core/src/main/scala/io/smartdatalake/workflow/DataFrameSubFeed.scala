@@ -36,6 +36,7 @@ trait DataFrameSubFeed extends SubFeed  {
   def tpe: Type // concrete type of this DataFrameSubFeed
   implicit lazy val companion: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(tpe)
   def dataFrame: Option[GenericDataFrame]
+  def observation: Option[Observation]
   def persist: DataFrameSubFeed
   def unpersist: DataFrameSubFeed
   def schema: Option[GenericSchema] = dataFrame.map(_.schema)
@@ -50,6 +51,7 @@ trait DataFrameSubFeed extends SubFeed  {
   override def clearSkipped(): DataFrameSubFeed
   def isStreaming: Option[Boolean]
   def withDataFrame(dataFrame: Option[GenericDataFrame]): DataFrameSubFeed
+  def withObservation(observation: Option[Observation]): DataFrameSubFeed
   def withPartitionValues(partitionValues: Seq[PartitionValues]): DataFrameSubFeed
   def withFilter(partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed
   def applyFilter: DataFrameSubFeed = {
@@ -110,6 +112,7 @@ object DataFrameSubFeed {
    * Get implementation of generic DataFrameFunctions.
    */
   def getFunctions(tpe: Type): DataFrameFunctions = getCompanion(tpe) // down cast to reduce interface
+  private[smartdatalake] def getFunctions(fullTpeName: String): DataFrameFunctions = ScalaUtil.companionOf[DataFrameFunctions](fullTpeName)
 
   /**
    * Helper method to throw exception for wrong subfeed type including method name of caller

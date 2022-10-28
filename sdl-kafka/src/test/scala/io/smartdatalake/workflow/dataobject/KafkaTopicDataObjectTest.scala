@@ -18,17 +18,20 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.github.embeddedkafka.EmbeddedKafka
+import io.confluent.kafka.serializers.{KafkaJsonDeserializer, KafkaJsonDeserializerConfig, KafkaJsonSerializer}
+import io.github.embeddedkafka.schemaregistry.{EmbeddedKafka => EmbeddedKafkaWithSchemaRegistry}
 import io.smartdatalake.testutils.DataObjectTestSuite
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.connection.KafkaConnection
-import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import org.apache.kafka.common.serialization.StringSerializer
+import org.apache.spark.sql.functions.{lit, struct}
 import org.apache.spark.sql.streaming.Trigger
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 
 import java.nio.file.Files
 import java.time.temporal.ChronoUnit
+
 
 /**
  * Note about EmbeddedKafka compatibility:
@@ -37,16 +40,20 @@ import java.time.temporal.ChronoUnit
  * "java.nio.channels.UnresolvedAddressException: Session 0x0 for server localhost/<unresolved>:6001, unexpected error, closing socket connection and attempting reconnect"
  * see also https://www.oracle.com/java/technologies/javase/14all-relnotes.html#JDK-8225499
  */
-class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with BeforeAndAfter with EmbeddedKafka with DataObjectTestSuite with SmartDataLakeLogger {
+class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with BeforeAndAfter with EmbeddedKafkaWithSchemaRegistry with DataObjectTestSuite with SmartDataLakeLogger {
 
   import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
   import session.implicits._
 
-  private val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6001")
+  private val kafkaConnection = KafkaConnection("kafkaCon1", brokers = "localhost:6001", schemaRegistry = Some("http://localhost:6002"))
 
-  private lazy val kafka = EmbeddedKafka.start()
+  private lazy val kafka = {
+    EmbeddedKafkaWithSchemaRegistry.start()
+  }
+
   override def beforeAll() {
     kafka // initialize lazy variable
+    Thread.sleep(1000)
   }
 
   override def afterAll(): Unit = {
@@ -54,7 +61,6 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
   }
 
   test("Can read and write from Kafka") {
-    Thread.sleep(1000)
     createCustomTopic("topic", Map(), 1, 1)
     publishStringMessageToKafka("topic", "message")
     assert(consumeFirstStringMessageFrom("topic")=="message", "Whoops - couldn't read message")
@@ -151,5 +157,86 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
     // list and check partitions
     val partitions2 = dataObject2.listPartitions
     assert(partitions2.size == 1) // current partition is included
+  }
+
+  test("Can read and write Json from Kafka") {
+    createCustomTopic("topic", Map(), 1, 1)
+
+    // write json record using KafkaJsonSerializer
+    implicit val jsonSerializer = new KafkaJsonSerializer[User]
+    jsonSerializer.configure(new java.util.HashMap[String,String](), false)
+    val test = new User
+    test.setUserId(1)
+    test.setLastName("hello")
+    publishToKafka("topic", test)
+
+    // read json record using KafkaJsonDeserializer
+    implicit val jsonDeserializer = new KafkaJsonDeserializer[User]
+    val deserializerConfig = new java.util.HashMap[String,Any]
+    deserializerConfig.put(KafkaJsonDeserializerConfig.JSON_VALUE_TYPE, classOf[User])
+    jsonDeserializer.configure(deserializerConfig, false)
+    val t = consumeFirstMessageFrom("topic")
+    logger.info("Message read: " + t)
+  }
+
+  test("SDL can parse messages written with KafkaJsonSerializer") {
+    createCustomTopic("topicJsonRead", Map(), 1, 1)
+
+    // write json record using KafkaJsonSerializer
+    implicit val jsonSerializer: KafkaJsonSerializer[User] = new KafkaJsonSerializer[User]
+    jsonSerializer.configure(new java.util.HashMap[String,String](), false)
+    val expected = new User
+    expected.setUserId(1)
+    expected.setLastName("hello")
+    publishToKafka("topicJsonRead", expected)
+
+    // parse json record with spark
+    instanceRegistry.register(kafkaConnection)
+    val userSchema = SchemaUtil.getSchemaFromJavaBean(classOf[User])
+    val dataObject = KafkaTopicDataObject("kafka1", topicName = "topicJsonRead", connectionId = "kafkaCon1", valueType = KafkaColumnType.Json, valueSchema = Some(SparkSchema(userSchema)))
+    val df = dataObject.getSparkDataFrame()
+      .select($"value.*")
+    val (actFirstName, actLastName, actUserId) = df.as[(String,String,Long)].head
+    assert(actFirstName == expected.getFirstName && actLastName == expected.getLastName && actUserId == expected.getUserId)
+  }
+
+  test("read and write json with schema registry") {
+    createCustomTopic("topicJson", Map(), 1, 1)
+
+    instanceRegistry.register(kafkaConnection)
+    val dataObject = KafkaTopicDataObject("kafka1", topicName = "topicJson", connectionId = "kafkaCon1", valueType = KafkaColumnType.JsonSchemaRegistry)
+    val expected = Seq(("hello", 1L))
+
+    // write json message incl. schema
+    val dfExp = expected.toDF("txt","num")
+      .select(lit(1).as("key"), struct("*").as("value"))
+    dataObject.writeSparkDataFrame(dfExp)
+
+    // read again
+    val dfAct = dataObject.getSparkDataFrame()
+      .select($"value.*")
+
+    val actual = dfAct.as[(String,Long)].collect
+    assert(actual.toSeq == expected)
+  }
+
+  test("read and write avro with schema registry") {
+    createCustomTopic("topicAvro", Map(), 1, 1)
+
+    instanceRegistry.register(kafkaConnection)
+    val dataObject = KafkaTopicDataObject("kafka1", topicName = "topicAvro", connectionId = "kafkaCon1", valueType = KafkaColumnType.AvroSchemaRegistry)
+    val expected = Seq(("hello", 1L))
+
+    // write json message incl. schema
+    val dfExp = expected.toDF("txt","num")
+      .select(lit(1).as("key"), struct("*").as("value"))
+    dataObject.writeSparkDataFrame(dfExp)
+
+    // read again
+    val dfAct = dataObject.getSparkDataFrame()
+      .select($"value.*")
+
+    val actual = dfAct.as[(String,Long)].collect
+    assert(actual.toSeq == expected)
   }
 }

@@ -26,6 +26,7 @@ import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
 
+import java.text.Normalizer
 import scala.collection.JavaConverters._
 
 /**
@@ -123,6 +124,13 @@ private[smartdatalake] object DataFrameUtil {
      * @return transformed [[DataFrame]]
      */
     def colNamesLowercase: DataFrame = df.select(df.columns.map(c => col(c).as(c.toLowerCase)): _*)
+
+    /**
+     * Transforms column names of [[DataFrame]] to lowercase, Camel case to lower case with underscores.
+     *
+     * @return transformed [[DataFrame]]
+     */
+    def colCamelNamesLowercase: DataFrame = df.select(df.columns.map(c => col(c).as(strCamelCase2LowerCaseWithUnderscores(c.toString))): _*)
 
     /**
      * Checks whether the specified columns contain nulls
@@ -340,8 +348,33 @@ private[smartdatalake] object DataFrameUtil {
    * @return transformed [[String]]
    */
   def strCamelCase2LowerCaseWithUnderscores(x: String): String = {
-    "([A-Z]+|^|_)[a-z\\d]*".r.findAllMatchIn(x).map(_.group(0).toLowerCase.filter(_ != '_'))
+    "([A-Z]+[^A-Z_]*)|[^A-Z_]+".r.findAllMatchIn(x).map(_.group(0).toLowerCase.filter(_ != '_'))
       .filter(_.nonEmpty).mkString("_")
+  }
+
+  /**
+   * Transform a string with UTF8 chars (e.g. diacritics, umlauts) to ASCII chars (best effort)
+   */
+  def normalizeToAscii(x: String): String = {
+    // replace umlauts
+    val normalizedUmlauts = x
+      .replace("Ä", "Ae")
+      .replace("Ö", "Oe")
+      .replace("Ü", "Ue")
+      .replace("ä", "ae")
+      .replace("ö", "oe")
+      .replace("ü", "ue")
+    // decompose diacritics (e.g. accents) into separate UTF characters
+    val normalizedUtf = Normalizer.normalize(normalizedUmlauts, Normalizer.Form.NFD)
+    // remove all non-ascii characters
+    normalizedUtf.replaceAll("[^\\p{ASCII}]","")
+  }
+
+  /**
+   * Remove all chars from a string which dont belong to lowercase SQL standard naming characters
+   */
+  def removeNonStandardSQLNameChars(x: String): String = {
+    x.toLowerCase.replaceAll("[^a-z0-9_]", "")
   }
 
   def getEmptyDataFrame(schema: StructType)(implicit session: SparkSession): DataFrame = {

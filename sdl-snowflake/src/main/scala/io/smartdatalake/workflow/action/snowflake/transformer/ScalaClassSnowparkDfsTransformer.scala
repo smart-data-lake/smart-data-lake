@@ -30,7 +30,7 @@ import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, OptionsGenericDfsTransformer}
 import io.smartdatalake.workflow.action.snowflake.customlogic.CustomSnowparkDfsTransformer
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
-import io.smartdatalake.workflow.dataframe.snowflake.SnowparkDataFrame
+import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkDataFrame, SnowparkSubFeed}
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
 
@@ -67,7 +67,7 @@ case class ScalaClassSnowparkDfsTransformer(name: String = "snowparkScalaTransfo
       .mapValues(SnowparkDataFrame)
   }
 
-  override def getSubFeedSupportedType: Type = typeOf[SnowparkDataFrame]
+  override def getSubFeedSupportedType: Type = typeOf[SnowparkSubFeed]
 
   override def factory: FromConfigFactory[GenericDfsTransformer] = ScalaClassSnowparkDfsTransformer
 }

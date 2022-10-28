@@ -28,22 +28,29 @@ import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 /**
- * Add additional columns to the DataFrame by extracting information from the context.
+ * Add additional columns to the DataFrame by extracting information from the context or derived from input columns.
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
  * @param additionalColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
- *                          The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
+ *                          The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]] and added to the DataFrame as literal columns.
+ *                          [[DefaultExpressionData]] contains informations from the context of the SDLB job, like runId or feed name.
+ * @param additionalDerivedColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
+ *                                 The spark sql expressions are evaluated against the input DataFrame and added to the DataFrame as derived columns.
  */
-case class AdditionalColumnsTransformer(override val name: String = "additionalColumns", override val description: Option[String] = None, additionalColumns: Map[String,String]) extends GenericDfTransformer {
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
+case class AdditionalColumnsTransformer(override val name: String = "additionalColumns", override val description: Option[String] = None, additionalColumns: Map[String,String] = Map(), additionalDerivedColumns: Map[String,String] = Map()) extends GenericDfTransformer {
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
     val data = DefaultExpressionData.from(context, partitionValues)
-    additionalColumns.foldLeft(df){
-      case (df, (colName, expr)) =>
-        val value = SparkExpressionUtil.evaluate[DefaultExpressionData,Any](actionId, Some(name), expr, data)
+    val dfLit = additionalColumns.foldLeft(df){
+      case (df, (colName, litExpr)) =>
+        val value = SparkExpressionUtil.evaluate[DefaultExpressionData,Any](actionId, Some(name), litExpr, data)
         df.withColumn(colName, lit(value.orNull))
     }
+    val dfDerived = additionalDerivedColumns.foldLeft(dfLit){
+      case (df, (colName, deriveExpr)) => df.withColumn(colName, expr(deriveExpr))
+    }
+    dfDerived
   }
   override def factory: FromConfigFactory[GenericDfTransformer] = AdditionalColumnsTransformer
 }

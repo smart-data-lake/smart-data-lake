@@ -31,12 +31,10 @@ private[smartdatalake] object Partition {
     assert(partitionCol.matches(regexStr), "partition column name $partitionCol doesn't match the regex $regexStr")
   }
 }
-
 /**
  * A partition is defined by values for its partition columns.
  * It can be represented by a Map. The key of the Map are the partition column names.
  */
-@DeveloperApi
 case class PartitionValues(elements: Map[String, Any]) {
   private[smartdatalake] def getPartitionString(partitionLayout: String): String= {
     PartitionLayout.replaceTokens(partitionLayout, this)
@@ -60,7 +58,7 @@ case class PartitionValues(elements: Map[String, Any]) {
   def getMapString: Map[String,String] = elements.mapValues(_.toString)
 }
 
-private[smartdatalake] object PartitionValues {
+object PartitionValues {
   val singleColFormat = "<partitionColName>=<partitionValue>[,<partitionValue>,...]"
   val multiColFormat = "<partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>[;(<partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>;...]"
 
@@ -154,7 +152,8 @@ private[smartdatalake] object PartitionValues {
    * Create a generic filter column expression for a list of partition values
    */
   def createFilterExpr(partitionValues: Seq[PartitionValues])(implicit helper: DataFrameSubFeedCompanion): GenericColumn = {
-    partitionValues.map(_.getFilterExpr).reduce(_ or _)
+    if (partitionValues.nonEmpty) partitionValues.map(_.getFilterExpr).reduce(_ or _)
+    else helper.lit(true)
   }
 
   def oneToOneMapping(partitionValues: Seq[PartitionValues]): Map[PartitionValues,PartitionValues] = partitionValues.map(x => (x,x)).toMap

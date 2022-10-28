@@ -22,13 +22,15 @@ import configs.{ConfigError, ConfigKeyNaming, ConfigReader, Result}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
+import io.smartdatalake.util.misc.SchemaProviderType.SchemaProviderType
+import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.secrets.SecretProviderConfig
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
 import io.smartdatalake.workflow.action.spark.customlogic._
-import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.dataobject.Expectation
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
 
@@ -46,19 +48,22 @@ trait ConfigImplicits {
   /**
    * A [[ConfigReader]] reader that reads [[StructType]] values.
    *
-   * This reader parses a [[StructType]] from a DDL string.
+   * This reader parses a Spark [[StructType]] by using the desired schema provider.
+   * The schema provider is included in the configuration value as prefix terminated by '#'.
+   * See [[SchemaProviderType]] for available providers.
    */
   implicit val structTypeReader: ConfigReader[StructType] = ConfigReader.fromTry { (c, p) =>
-    StructType.fromDDL(c.getString(p))
+    SchemaUtil.readSchemaFromConfigValue(c.getString(p))
   }
 
   /**
    * A [[ConfigReader]] reader that reads [[GenericSchema]] values.
    *
-   * This reader parses a Spark [[StructType]] from a DDL string and creates a SparkSchema.
+   * This reader parses a Spark [[StructType]] by using the desired schema provider.
+   * The schema provider is included in the configuration value as prefix terminated by '#'.
    */
   implicit val genericSchemaReader: ConfigReader[GenericSchema] = ConfigReader.fromTry { (c, p) =>
-    SparkSchema(StructType.fromDDL(c.getString(p)))
+    SparkSchema(SchemaUtil.readSchemaFromConfigValue(c.getString(p)))
   }
 
   /**
@@ -93,24 +98,19 @@ trait ConfigImplicits {
   implicit val saveModeOptionsReader: ConfigReader[SaveModeOptions] = ConfigReader.derive[SaveModeOptions]
   // --------------------------------------------------------------------------------
 
-  implicit def mapDataObjectIdStringReader(implicit mapReader: ConfigReader[Map[String, String]]): ConfigReader[Map[DataObjectId, String]] = {
-    ConfigReader.fromConfig { c => mapReader.extract(c).map(_.map { case (k, v) => (DataObjectId(k), v) }) }
+  implicit def mapDataObjectIdStringReader(implicit mapReader: ConfigReader[Map[String,String]]): ConfigReader[Map[DataObjectId, String]] = {
+    ConfigReader.fromConfig { c => mapReader.extract(c).map(_.map{ case (k,v) => (DataObjectId(k), v)})}
   }
-  //TODO Add this maybe if needed
-  /*
-    implicit def mapConnectionIdStringReader(implicit mapReader: ConfigReader[Map[String,String]]): ConfigReader[Map[ConnectionId, String]] = {
-      ConfigReader.fromConfig { c => mapReader.extract(c).map(_.map{ case (k,v) => (ConnectionId(k), v)})}
-    }*/
 
   /**
    * A reader that reads [[ConnectionId]] values.
    */
-  implicit val connectionIdReader: ConfigReader[ConnectionId] = ConfigReader.fromTry { (c, p) => ConnectionId(c.getString(p)) }
+  implicit val connectionIdReader: ConfigReader[ConnectionId] = ConfigReader.fromTry { (c, p) => ConnectionId(c.getString(p))}
 
   /**
    * A reader that reads [[DataObjectId]] values.
    */
-  implicit val dataObjectIdReader: ConfigReader[DataObjectId] = ConfigReader.fromTry { (c, p) => DataObjectId(c.getString(p)) }
+  implicit val dataObjectIdReader: ConfigReader[DataObjectId] = ConfigReader.fromTry { (c, p) => DataObjectId(c.getString(p))}
 
   /**
    * A reader that reads [[ActionId]] values.
@@ -142,6 +142,15 @@ trait ConfigImplicits {
   implicit val scriptDefReader: ConfigReader[ParsableScriptDef] = ConfigReader.fromTry { (c, p) =>
     implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
     ConfigParser.parseConfigObject[ParsableScriptDef](c.getConfig(p))
+  }
+
+  /**
+   * A reader that reads [[Expectation]] values.
+   * Note that Expectation must be parsed according to it's 'type' attribute by using SDL ConfigParser.
+   */
+  implicit val expectationReader: ConfigReader[Expectation] = ConfigReader.fromTry { (c, p) =>
+    implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
+    ConfigParser.parseConfigObject[Expectation](c.getConfig(p))
   }
 
   /**

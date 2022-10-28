@@ -32,6 +32,7 @@ import org.apache.spark.sql.{DataFrame, Row}
 import org.scalatest.BeforeAndAfterAll
 
 import java.io.{File, FileOutputStream}
+import java.nio.file.Files
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.util.{Date, Locale}
@@ -136,13 +137,14 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
   }
 
   private def createTempFile(workbook: Workbook, suffix: String): String = {
-    val tempFile = File.createTempFile("tmp_bd-util-etl_ActionInputExcelTest", suffix)
+    val tempDir = Files.createTempDirectory(suffix)
+    val tempFile = Files.createTempFile(tempDir, "test", suffix).toFile
     tempFile.deleteOnExit()
     val tempOutputStream = new FileOutputStream(tempFile)
     try {
       workbook.write(tempOutputStream)
     } finally {
-      IOUtils.closeQuietly(tempOutputStream)
+      IOUtils.close(tempOutputStream)
     }
     tempFile.getPath
   }

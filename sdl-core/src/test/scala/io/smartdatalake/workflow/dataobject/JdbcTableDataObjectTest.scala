@@ -244,4 +244,37 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     if (!resultat2) TestUtil.printFailedTestResult("SaveMode merge",Seq())(actual2)(expected2)
     assert(resultat2)
   }
+
+  test("incremental output mode") {
+
+    // create data object
+    instanceRegistry.register(jdbcConnection)
+    val targetTable = Table(db = Some("public"), name = "test_inc")
+    val targetDO = JdbcTableDataObject( "jdbcDO1", table = targetTable, connectionId = "jdbcCon1", incrementalOutputExpr = Some("id + 1"), saveMode = SDLSaveMode.Append)
+    targetDO.dropTable
+
+    // write test data 1
+    val df1 = Seq((1,"A",1),(2,"A",2),(3,"B",3),(4,"B",4)).toDF("id", "p", "value")
+    targetDO.prepare
+    targetDO.initSparkDataFrame(df1, Seq())
+    targetDO.writeSparkDataFrame(df1)
+
+    // test 1
+    targetDO.setState(None) // initialize incremental output with empty state
+    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 4
+    val newState1 = targetDO.getState
+
+    // append test data 2
+    val df2 = Seq((5,"B",5)).toDF("id", "p", "value")
+    targetDO.writeSparkDataFrame(df2)
+
+    // test 2
+    targetDO.setState(newState1)
+    val df2result = targetDO.getSparkDataFrame()(contextExec)
+    df2result.count shouldEqual 1
+    val newState2 = targetDO.getState
+    assert(newState1.get < newState2.get)
+
+    targetDO.getSparkDataFrame()(contextInit).count shouldEqual 5
+  }
 }

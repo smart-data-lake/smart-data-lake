@@ -28,7 +28,7 @@ import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Column, DataFrame, RelationalGroupedDataset, Row}
+import org.apache.spark.sql._
 
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.typeOf
@@ -90,6 +90,25 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   }
   override def isEmpty: Boolean = inner.isEmpty
   override def count: Long = inner.count()
+  override def cache: GenericDataFrame = SparkDataFrame(inner.cache)
+  override def uncache: GenericDataFrame = SparkDataFrame(inner.unpersist)
+  override def log(msg: String, loggerFunc: String => Unit): Unit = {
+    loggerFunc(msg + System.lineSeparator() + DatasetHelper.showString(inner, truncate = 0))
+  }
+  override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, Observation) = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, aggregateColumns)
+    // Some Spark data sources dont execute observations, e.g. jdbc. The generic observation can be forced for these cases.
+    if (forceGenericObservation) {
+      val observation = GenericCalculatedObservation(this, aggregateColumns:_*)
+      // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.
+      (this.cache, observation)
+    } else {
+      val observation = new SparkObservation(name)
+      val sparkAggregatedColumns = aggregateColumns.map(_.asInstanceOf[SparkColumn].inner)
+      val dfObserved = observation.on(inner, isExecPhase, sparkAggregatedColumns: _*)
+      (SparkDataFrame(dfObserved), observation)
+    }
+  }
 }
 
 case class SparkGroupedDataFrame(inner: RelationalGroupedDataset) extends GenericGroupedDataFrame {
@@ -230,11 +249,13 @@ trait SparkDataType extends GenericDataType {
   override def makeNullable: SparkDataType
   override def toLowerCase: SparkDataType
   override def removeMetadata: SparkDataType
+  override def isSimpleType: Boolean = false
 }
 case class SparkSimpleDataType(inner: DataType) extends SparkDataType {
   override def makeNullable: SparkDataType = this
   override def toLowerCase: SparkDataType = this
   override def removeMetadata: SparkDataType = this
+  override def isSimpleType: Boolean = true
 }
 case class SparkStructDataType(override val inner: StructType) extends SparkDataType with GenericStructDataType {
   override def makeNullable: SparkDataType = SparkStructDataType(SparkSchema(inner).makeNullable.inner)
@@ -293,5 +314,6 @@ object SparkDataType {
 case class SparkRow(inner: Row) extends GenericRow {
   override def subFeedType: universe.Type = typeOf[SparkSubFeed]
   override def get(index: Int): Any = inner.get(index)
-  override def getAs[T](index: Int): T = get(index).asInstanceOf[T]
+  override def getAs[T](index: Int): T = inner.getAs[T](index)
+  override def toSeq: Seq[Any] = inner.toSeq
 }

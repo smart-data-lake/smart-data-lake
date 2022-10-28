@@ -26,16 +26,18 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.KafkaConnection
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType
 import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.spark.sql._
-import org.apache.spark.sql.avro.confluent.SubjectType
-import org.apache.spark.sql.avro.confluent.SubjectType.SubjectType
-import org.apache.spark.sql.functions.{col, udf}
+import org.apache.spark.sql.confluent.SubjectType.SubjectType
+import org.apache.spark.sql.confluent.avro.{AvroSchemaConverter, ConfluentAvroConnector}
+import org.apache.spark.sql.confluent.json.ConfluentJsonConnector
+import org.apache.spark.sql.confluent.{ConfluentConnector, SubjectType}
+import org.apache.spark.sql.functions.{col, from_json, to_json, udf}
 import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 import org.apache.spark.sql.types._
 
@@ -91,9 +93,20 @@ private object TemporalQueries {
  * Provides details to an action to read from Kafka Topics using either
  * [[org.apache.spark.sql.DataFrameReader]] or [[org.apache.spark.sql.streaming.DataStreamReader]]
  *
+ * Key & value schema can be automatically read from and written to confluent schema registry for Json and Avro.
+ * Json and Avro can also be parsed with a fixed schema.
+ *
  * @param topicName The name of the topic to read
- * @param keyType    Optional type the key column should be converted to. If none is given it will remain a bytearray / binary.
- * @param valueType  Optional type the value column should be converted to. If none is given it will remain a bytearray / binary.
+ * @param keyType    Optional type the key column should be converted to. If none is given it will be interpreted as string.
+ * @param keySchema  An optional schema for parsing the key column. This can be used if keyType = Json or Avro to parse the corresponding content.
+ *                   Define the schema by using one of the schema providers DDL, jsonSchemaFile, avroSchemaFile, xsdFile or caseClassName.
+ *                   The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
+ *                   A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
+ * @param valueType  Optional type the value column should be converted to. If none is given it will be interpreted as string.
+ * @param valueSchema An optional schema for parsing the value column. This has to be specified if valueType = Json or Avro to parse the corresponding content.
+ *                    Define the schema by using one of the schema providers DDL, jsonSchemaFile, avroSchemaFile, xsdFile or caseClassName.
+ *                    The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
+ *                    A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param schemaMin  An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
  *                   Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param selectCols Columns to be selected when reading the DataFrame. Available columns are key, value, topic,
@@ -111,7 +124,9 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                                 topicName: String,
                                 connectionId: ConnectionId,
                                 keyType: KafkaColumnType = KafkaColumnType.String,
+                                keySchema: Option[GenericSchema] = None,
                                 valueType: KafkaColumnType = KafkaColumnType.String,
+                                valueSchema: Option[GenericSchema] = None,
                                 override val schemaMin: Option[GenericSchema] = None,
                                 selectCols: Seq[String] = Seq("key", "value"),
                                 datePartitionCol: Option[DatePartitionColumnDef] = None,
@@ -128,9 +143,25 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
 
   private val connection = getConnection[KafkaConnection](connectionId)
 
-  require((keyType!=KafkaColumnType.AvroSchemaRegistry && valueType!=KafkaColumnType.AvroSchemaRegistry) || connection.schemaRegistry.nonEmpty, s"($id) If key or value is of type AvroSchemaRegistry, the schemaRegistry must be defined in the connection")
+  if (keyType==KafkaColumnType.JsonSchemaRegistry || valueType==KafkaColumnType.JsonSchemaRegistry) assert(connection.schemaRegistry.nonEmpty, s"($id) If key or value is of type JsonSchemaRegistry, the schemaRegistry must be defined in the connection")
+  if (keyType==KafkaColumnType.AvroSchemaRegistry || valueType==KafkaColumnType.AvroSchemaRegistry) assert(connection.schemaRegistry.nonEmpty, s"($id) If key or value is of type AvroSchemaRegistry, the schemaRegistry must be defined in the connection")
+  if (keyType==KafkaColumnType.Json || keyType==KafkaColumnType.Avro) assert(keySchema.nonEmpty, s"($id) If key type is Json or Avro, a keySchema must be specified")
+  else if (keySchema.isDefined) logger.warn(s"($id) keySchema is ignored if keyType = $keyType")
+  if (valueType==KafkaColumnType.Json || valueType==KafkaColumnType.Avro) assert(valueSchema.nonEmpty, s"($id) If value type is Json or Avro, a valueSchema must be specified")
+  else if (valueSchema.isDefined) logger.warn(s"($id) valueSchema is ignored if valueType = $valueType")
   require(batchReadMaxOffsetsPerTask.isEmpty || batchReadMaxOffsetsPerTask.exists(_>0), s"($id) batchReadMaxOffsetsPerTask must be greater than 0")
 
+  @transient lazy val keyConfluentConnector: Option[ConfluentConnector] = keyType match {
+    case KafkaColumnType.JsonSchemaRegistry => connection.schemaRegistry.map(ConfluentJsonConnector(_))
+    case KafkaColumnType.AvroSchemaRegistry => connection.schemaRegistry.map(ConfluentAvroConnector(_))
+    case _ => None
+  }
+
+  @transient lazy val valueConfluentConnector: Option[ConfluentConnector] = valueType match {
+    case KafkaColumnType.JsonSchemaRegistry => connection.schemaRegistry.map(ConfluentJsonConnector(_))
+    case KafkaColumnType.AvroSchemaRegistry => connection.schemaRegistry.map(ConfluentAvroConnector(_))
+    case _ => None
+  }
   private val instanceOptions = connection.sparkOptions ++ options
 
   // consumer for reading topic metadata
@@ -159,8 +190,8 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
     // check schema compatibility
     require(df.columns.toSet == Set("key","value"), s"($id) Expects columns key, value in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
-    convertToKafka(keyType, df("key"), SubjectType.key, eagerCheck = true)
-    convertToKafka(valueType, df("value"), SubjectType.value, eagerCheck = true)
+    convertToKafka(keyType, df("key"), SubjectType.key, keySchema, eagerCheck = true)
+    convertToKafka(valueType, df("value"), SubjectType.value, valueSchema, eagerCheck = true)
   }
 
   override def getStreamingDataFrame(options: Map[String,String], schema: Option[StructType])(implicit context: ActionPipelineContext): DataFrame = {
@@ -179,8 +210,8 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     // convert key & value
     val colsToSelect = ((if (selectCols.nonEmpty) selectCols else Seq("kafka.*")) ++ partitions).distinct.map(col)
     val df = dfRaw
-      .withColumn("key", convertFromKafka(keyType, col("key"), SubjectType.key))
-      .withColumn("value", convertFromKafka(valueType, col("value"), SubjectType.value))
+      .withColumn("key", convertFromKafka(keyType, col("key"), SubjectType.key, keySchema))
+      .withColumn("value", convertFromKafka(valueType, col("value"), SubjectType.value, valueSchema))
       .as("kafka")
       .withOptionalColumn(datePartitionCol.map(_.colName), udfFormatPartition(col("timestamp")))
       .select(colsToSelect:_*)
@@ -272,8 +303,8 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   private def convertToWriteDataFrame(df: DataFrame): DataFrame = {
     require(df.columns.toSet == Set("key","value"), s"(${id}) Expects columns key, value in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
     df.select(
-      convertToKafka(keyType, col("key"), SubjectType.key).as("key"),
-      convertToKafka(valueType, col("value"), SubjectType.value).as("value")
+      convertToKafka(keyType, col("key"), SubjectType.key, keySchema).as("key"),
+      convertToKafka(valueType, col("value"), SubjectType.value, valueSchema).as("value")
     )
   }
 
@@ -310,19 +341,44 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     consumer.offsetsForTimes(topicPartitionsStart).asScala.toSeq.sortBy(_._1.partition)
   }
 
-  private def convertFromKafka(colType: KafkaColumnType, col: Column, subjectType: SubjectType): Column = {
+  private def convertFromKafka(colType: KafkaColumnType, dataCol: Column, subjectType: SubjectType, schema: Option[GenericSchema]): Column = {
     colType match {
-      case KafkaColumnType.Binary => col // default is that we get a byte array -> binary from kafka
-      case KafkaColumnType.String => col.cast(StringType)
-      case KafkaColumnType.AvroSchemaRegistry => connection.confluentHelper.get.from_confluent_avro(col, topicName, subjectType)
+      case KafkaColumnType.Binary => dataCol // default is that we get a byte array -> binary from kafka
+      case KafkaColumnType.String => dataCol.cast(StringType)
+      case KafkaColumnType.Json =>
+        // reading is done with the specified schema.
+        val sparkSchema = schema.getOrElse(throw new IllegalStateException(s"($id) schema not defined in convertFromKafka")).convert(SparkSubFeed.subFeedType).asInstanceOf[SparkSchema].inner
+        from_json(dataCol.cast(StringType), sparkSchema)
+      case KafkaColumnType.Avro =>
+        import org.apache.spark.sql.avro.functions.from_avro
+        // reading is done with the specified schema. It needs to be converted to an avro schema for from_avro.
+        val sparkSchema = schema.getOrElse(throw new IllegalStateException(s"($id) schema not defined in convertFromKafka")).convert(SparkSubFeed.subFeedType).asInstanceOf[SparkSchema].inner
+        val avroSchema = AvroSchemaConverter.toAvroType(sparkSchema)
+        from_avro(dataCol, avroSchema.toString)
+      case KafkaColumnType.JsonSchemaRegistry | KafkaColumnType.AvroSchemaRegistry =>
+        subjectType match {
+          case SubjectType.key => keyConfluentConnector.get.from_confluent(dataCol, topicName, subjectType)
+          case SubjectType.value => valueConfluentConnector.get.from_confluent(dataCol, topicName, subjectType)
+        }
     }
   }
 
-  private def convertToKafka(colType: KafkaColumnType, col: Column, subjectType: SubjectType, eagerCheck: Boolean = false): Column = {
+  private def convertToKafka(colType: KafkaColumnType, dataCol: Column, subjectType: SubjectType, schema: Option[GenericSchema], eagerCheck: Boolean = false): Column = {
     colType match {
-      case KafkaColumnType.Binary => col // we let spark/kafka convert the column to binary
-      case KafkaColumnType.String => col.cast(StringType)
-      case KafkaColumnType.AvroSchemaRegistry => connection.confluentHelper.get.to_confluent_avro(col, topicName, subjectType, eagerCheck = eagerCheck)
+      case KafkaColumnType.Binary => dataCol // we let spark/kafka convert the column to binary
+      case KafkaColumnType.String => dataCol.cast(StringType)
+      case KafkaColumnType.Json => to_json(dataCol)
+      case KafkaColumnType.Avro =>
+        import org.apache.spark.sql.avro.functions.to_avro
+        // writing is done with the specified schema. It needs to be converted to an avro schema for to_avro.
+        val sparkSchema = schema.getOrElse(throw new IllegalStateException(s"($id) schema not defined in convertFromKafka")).convert(SparkSubFeed.subFeedType).asInstanceOf[SparkSchema].inner
+        val avroSchema = AvroSchemaConverter.toAvroType(sparkSchema)
+        to_avro(dataCol, avroSchema.toString)
+      case KafkaColumnType.JsonSchemaRegistry | KafkaColumnType.AvroSchemaRegistry =>
+        subjectType match {
+          case SubjectType.key => keyConfluentConnector.get.to_confluent(dataCol, topicName, subjectType, eagerCheck = eagerCheck)
+          case SubjectType.value => valueConfluentConnector.get.to_confluent(dataCol, topicName, subjectType, eagerCheck = eagerCheck)
+        }
     }
   }
 
@@ -396,7 +452,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
 object KafkaColumnType extends Enumeration {
   type KafkaColumnType = Value
   // TODO: implement fixed AvroSchema
-  val AvroSchemaRegistry, Binary, String = Value
+  val AvroSchemaRegistry, JsonSchemaRegistry, Avro, Json, Binary, String = Value
 }
 
 /**

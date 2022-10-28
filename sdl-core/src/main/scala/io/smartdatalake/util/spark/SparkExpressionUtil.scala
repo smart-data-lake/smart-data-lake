@@ -23,6 +23,7 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
+import org.apache.spark.sql.Column
 import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions.expr
 
@@ -86,14 +87,27 @@ private[smartdatalake] object SparkExpressionUtil {
    * Evaluate an expression against a given case class instance
    * @param id id of the config object for meaningful exception text
    * @param configName optional configuration name for meaningful exception text
-   * @param expression expression to be evaluated
+   * @param expression expression to be evaluated as String
    * @param data case class instance
    * @tparam T class of object the expression should be evaluated on
    * @tparam R class of expressions expected return type
    */
   def evaluate[T <: Product : TypeTag, R : TypeTag : ClassTag](id: ConfigObjectId, configName: Option[String], expression: String, data: T): Option[R] = {
+    evaluate[T,R](id, configName, expr(expression), data)
+  }
+
+  /**
+   * Evaluate an expression against a given case class instance
+   * @param id id of the config object for meaningful exception text
+   * @param configName optional configuration name for meaningful exception text
+   * @param expression expression to be evaluated as Spark column
+   * @param data case class instance
+   * @tparam T class of object the expression should be evaluated on
+   * @tparam R class of expressions expected return type
+   */
+  def evaluate[T <: Product : TypeTag, R : TypeTag : ClassTag](id: ConfigObjectId, configName: Option[String], expression: Column, data: T): Option[R] = {
     try {
-      val evaluator = new ExpressionEvaluator[T,R](expr(expression))
+      val evaluator = new ExpressionEvaluator[T,R](expression)
       Option(evaluator(data))
     } catch {
       case e: Exception =>
@@ -153,6 +167,9 @@ private[smartdatalake] object SparkExpressionUtil {
   private def getConfigNameMsg(configName: Option[String]) = configName.map(" from config "+_).getOrElse("")
 }
 
+/**
+ * DefaultExpressionData presents information from the context of the SDLB job for evaluation by Spark expressions in various places of the configuration.
+ */
 case class DefaultExpressionData( feed: String, application: String, runId: Int, attemptId: Int, executionPhase:String, referenceTimestamp: Option[Timestamp]
                                   , runStartTime: Timestamp, attemptStartTime: Timestamp, partitionValues: Seq[Map[String,String]])
 object DefaultExpressionData {

@@ -33,7 +33,6 @@ import org.apache.spark.sql.types.StructType
 
 import java.nio.file
 import java.nio.file.{Files, Paths, StandardOpenOption}
-import scala.util.Try
 
 class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogger {
   import session.implicits._
@@ -62,7 +61,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     dataObject.getSparkDataFrame().count shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
     partitionValuesCreated1.toSet shouldEqual dataObject.listPartitions.toSet
 
-    Try(FileUtils.deleteDirectory(tempDir.toFile))
+    FileUtils.deleteQuietly(tempDir.toFile)
   }
 
   test("create and list partition one level") {
@@ -79,7 +78,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     val partitionValuesListed = dataObject.listPartitions
     partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
 
-    Try(FileUtils.deleteDirectory(tempDir.toFile))
+    FileUtils.deleteQuietly(tempDir.toFile)
   }
 
   test("create and list partition multi level") {
@@ -97,7 +96,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     val partitionValuesListed = dataObject.listPartitions
     partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
 
-    Try(FileUtils.deleteDirectory(tempDir.toFile))
+    FileUtils.deleteQuietly(tempDir.toFile)
   }
 
   test("create empty partition") {
@@ -114,7 +113,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     val partitionValuesListed = dataObject.listPartitions
     partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
 
-    Try(FileUtils.deleteDirectory(tempDir.toFile))
+    FileUtils.deleteQuietly(tempDir.toFile)
   }
 
   test("read partitioned data and filter expected partitions") {
@@ -136,7 +135,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // test expected partitions
     assert( dataObject.filterExpectedPartitionValues(partitionValuesCreated) == Seq(PartitionValues(Map("p"->"B"))))
 
-    FileUtils.deleteDirectory(tempDir.toFile)
+    FileUtils.deleteQuietly(tempDir.toFile)
   }
 
   test("overwrite partitioned data") {
@@ -162,7 +161,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     assert( result == Seq(("A",1),("A",2),("B",7),("B",8)))
     assert( dataObject.listPartitions.map(pv => pv("p").toString).sorted == Seq("A","B","C"))
 
-    FileUtils.deleteDirectory(tempDir.toFile)
+    FileUtils.deleteQuietly(tempDir.toFile)
   }
 
   test("overwrite all") {
@@ -185,7 +184,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
       .as[(String,Int)].collect.toSeq.sorted
     assert( result == Seq(("B",3),("B",4)))
 
-    FileUtils.deleteDirectory(tempDir.toFile)
+    FileUtils.deleteQuietly(tempDir.toFile)
   }
 
   test("overwrite all empty") {
@@ -205,7 +204,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // test reading data
     assert(dataObject.getSparkDataFrame().isEmpty)
 
-    FileUtils.deleteDirectory(tempDir.toFile)
+    FileUtils.deleteQuietly(tempDir.toFile)
   }
 
   test("overwrite all preserve directory") {
@@ -228,7 +227,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
       .as[(String,Int)].collect.toSeq.sorted
     assert( result == Seq(("B",3),("B",4)))
 
-    FileUtils.deleteDirectory(tempDir.toFile)
+    FileUtils.deleteQuietly(tempDir.toFile)
   }
 
   test("append filename") {
@@ -257,7 +256,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // test if it could be written again
     dataObject.initSparkDataFrame(df.drop(sourceFileColName), Seq())
 
-    FileUtils.deleteDirectory(tempDir.toFile)
+    FileUtils.deleteQuietly(tempDir.toFile)
   }
 
   test("get concrete paths") {
@@ -316,7 +315,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     assert(dataObject.filesystem.isDirectory(dataObject.hadoopPath))
     assert(dataObject.filesystem.isDirectory(new Path(dataObject.hadoopPath,"p=A")))
 
-    FileUtils.deleteDirectory(tempDir.toFile)
+    FileUtils.deleteQuietly(tempDir.toFile)
   }
 
   test("OverwriteOptimized without partition values not allowed for partitioned DataObject") {
@@ -400,6 +399,40 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     val specialFiles2 = dataObject.filesystem.globStatus(new Path(tempDir.toString, s"*/_SDL*"))
     val compactedTstmp2 = specialFiles.find(_.getPath.getName.endsWith("COMPACTED")).get.getModificationTime
     assert(compactedTstmp == compactedTstmp2)
+  }
+
+
+  test("incremental output mode") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = ParquetFileDataObject(id = "partitionTest", path = tempDir.toString, saveMode = SDLSaveMode.Append)
+
+    // write test data 1
+    val df1 = Seq(("A",1),("A",2),("B",3),("B",4)).toDF("p", "value")
+    dataObject.writeSparkDataFrame(df1)
+    Thread.sleep(1) // sleep 1 millisecond as file modified date is stored in milliseconds and we need the created file in the next increment
+
+    // test 1
+    dataObject.setState(None) // initialize incremental output with empty state
+    dataObject.getSparkDataFrame()(contextExec).count shouldEqual 4
+    val newState1 = dataObject.getState
+
+    // append test data 2
+    val df2 = Seq(("B",5)).toDF("p", "value")
+    dataObject.writeSparkDataFrame(df2)
+    Thread.sleep(1) // sleep 1 millisecond as file modified date is stored in milliseconds and we need the created file in the next increment
+
+    // test 2
+    dataObject.setState(newState1)
+    val df2result = dataObject.getSparkDataFrame()(contextExec)
+    df2result.count shouldEqual 1
+    val newState2 = dataObject.getState
+    assert(newState1.get < newState2.get)
+
+    dataObject.getSparkDataFrame()(contextInit).count shouldEqual 5
+
+    FileUtils.deleteQuietly(tempDir.toFile)
   }
 
 }

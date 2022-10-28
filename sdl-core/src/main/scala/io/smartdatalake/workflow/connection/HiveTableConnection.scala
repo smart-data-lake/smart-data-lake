@@ -28,13 +28,13 @@ import io.smartdatalake.util.misc.AclDef
  *
  * @param id unique id of this connection
  * @param db hive db
- * @param pathPrefix schema, authority and base path for tables directory on hadoop
+ * @param pathPrefix optional schema, authority and base path for tables directory on hadoop.
  * @param acl permissions for files created with this connection
  * @param metadata
  */
 case class HiveTableConnection( override val id: ConnectionId,
                                 db: String,
-                                pathPrefix: String,
+                                pathPrefix: Option[String] = None,
                                 acl: Option[AclDef] = None,
                                 override val metadata: Option[ConnectionMetadata] = None
                                ) extends Connection {

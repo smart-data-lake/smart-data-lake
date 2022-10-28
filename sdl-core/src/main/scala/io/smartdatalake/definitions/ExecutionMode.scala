@@ -30,7 +30,9 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.ActionHelper.{getOptionalDataFrame, searchCommonInits}
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.streaming.{OutputMode, Trigger}
 
 import java.sql.Timestamp
@@ -40,7 +42,7 @@ import scala.reflect.runtime.universe.TypeTag
  * Result of execution mode application
  */
 case class ExecutionModeResult( inputPartitionValues: Seq[PartitionValues] = Seq(), outputPartitionValues: Seq[PartitionValues] = Seq()
-                              , filter: Option[String] = None, fileRefs: Option[Seq[FileRef]] = None)
+                              , filter: Option[String] = None, fileRefs: Option[Seq[FileRef]] = None, options: Map[String,String] = Map())
 
 /**
  * Execution mode defines how data is selected when running a data pipeline.
@@ -61,6 +63,10 @@ sealed trait ExecutionMode extends SmartDataLakeLogger {
     // validate apply conditions
     applyConditionsDef.foreach(_.syntaxCheck[DefaultExecutionModeExpressionData](actionId, Some("applyCondition")))
   }
+  /**
+   * Called in init phase before initialization. Can be used to initialize dataObjectsState, e.g. for DataObjectStateIncrementalMode
+   */
+  private[smartdatalake] def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit context: ActionPipelineContext): Unit = Unit
   /**
    * Called in init phase to apply execution mode. Result is stored and re-used in execution phase.
    */
@@ -373,7 +379,30 @@ case class DataFrameIncrementalMode(compareCol: String
 /**
  * An execution mode for incremental processing by remembering DataObjects state from last increment.
  */
-case class DataObjectStateIncrementalMode() extends ExecutionMode
+case class DataObjectStateIncrementalMode() extends ExecutionMode {
+  private var inputsWithIncrementalOutput: Seq[DataObject with CanCreateIncrementalOutput] = Seq()
+  override def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit context: ActionPipelineContext): Unit = {
+    // initialize dataObjectsState
+    val unrelatedStateDataObjectIds = dataObjectsState.map(_.dataObjectId).diff(subFeeds.map(_.dataObjectId))
+    assert(unrelatedStateDataObjectIds.isEmpty, s"Got state for unrelated DataObjects ${unrelatedStateDataObjectIds.mkString(", ")}")
+    // assert SDL is started with state
+    assert(context.appConfig.statePath.isDefined, s"SmartDataLakeBuilder must be started with state path set. Please specify location of state with parameter '--state-path'.")
+    // set DataObjects state
+    inputsWithIncrementalOutput = subFeeds.map(s => context.instanceRegistry.get[DataObject](s.dataObjectId)).flatMap {
+      case input: DataObject with CanCreateIncrementalOutput =>
+        input.setState(dataObjectsState.find(_.dataObjectId == input.id).map(_.state))
+        Some(input)
+      case _ => None
+    }
+    assert(inputsWithIncrementalOutput.nonEmpty, s"DataObjectStateIncrementalMode needs at least one input DataObject implementing CanCreateIncrementalOutput")
+  }
+  override def postExec(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, mainInputSubFeed: SubFeed, mainOutputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = {
+    // update DataObjects incremental state in DataObjectStateIncrementalMode if streaming
+    if (context.appConfig.streaming) {
+      inputsWithIncrementalOutput.foreach(i => i.setState(i.getState))
+    }
+  }
+}
 
 /**
  * An execution mode which just validates that partition values are given.
@@ -437,11 +466,47 @@ trait CustomPartitionModeLogic {
 }
 
 /**
- * Execution mode to incrementally process file-based DataObjects.
- * It takes all existing files in the input DataObject and removes (deletes) them after processing.
- * Input partition values are applied when searching for files and also used as output partition values.
+ * Execution mode to create custom execution mode logic.
+ * Define a function which receives main input&output DataObject and returns execution mode result
+ *
+ * @param className class name implementing trait [[CustomModeLogic]]
+ * @param alternativeOutputId optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
+ *                            It can be used to ensure processing over multiple actions in case of errors.
+ * @param options Options specified in the configuration for this execution mode
  */
-case class FileIncrementalMoveMode() extends ExecutionMode {
+case class CustomMode(className: String, override val alternativeOutputId: Option[DataObjectId] = None, options: Option[Map[String,String]] = None)
+  extends ExecutionMode with ExecutionModeWithMainInputOutput {
+  private[smartdatalake] override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
+  private val impl = CustomCodeUtil.getClassInstanceByName[CustomModeLogic](className)
+  private[smartdatalake] override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
+                                            , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
+                                           (implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
+    val output = alternativeOutput.getOrElse(mainOutput)
+    impl.apply(options.getOrElse(Map()), actionId, mainInput, output, subFeed.partitionValues.map(_.getMapString), context)
+  }
+}
+trait CustomModeLogic {
+  def apply(options: Map[String,String], actionId: ActionId, input: DataObject, output: DataObject, givenPartitionValues: Seq[Map[String,String]], context: ActionPipelineContext): Option[ExecutionModeResult]
+}
+
+/**
+ * Execution mode to incrementally process file-based DataObjects, e.g. FileRefDataObjects and SparkFileDataObjects.
+ * For FileRefDataObjects:
+ * - All existing files in the input DataObject are processed and removed (deleted or archived) after processing
+ * - Input partition values are applied to search for files and also used as output partition values
+ * For SparkFileDataObjects:
+ * - Files processed are read from the DataFrames execution plan and removed (deleted or archived) after processing.
+ *   Note that is only correct if no additional filters are applied in the DataFrame.
+ *   A better implementation would be to observe files by a custom metric. Unfortunately there is a problem in Spark with that, see also [[CollectSetDeterministic]]
+ * - Partition values preserved.
+ * @param archivePath if an archive directory is configured, files are moved into that directory instead of deleted, preserving partition layout.
+ *                    If this is a relative path, e.g. "_archive", it is appended after the path of the DataObject.
+ *                    If this is an absolute path it replaces the path of the DataObject.
+ */
+case class FileIncrementalMoveMode(archivePath: Option[String] = None) extends ExecutionMode {
+  assert(archivePath.forall(_.nonEmpty)) // empty string not allowed
+
+  private var sparkFilesObserver: Option[FilesSparkObservation] = None
 
   /**
    * Check for files in input data object.
@@ -455,25 +520,64 @@ case class FileIncrementalMoveMode() extends ExecutionMode {
         // search FileRefs if not present from previous actions
         val fileRefs = inputSubFeed.fileRefs.getOrElse(inputDataObject.getFileRefs(inputSubFeed.partitionValues))
         // skip processing if no new data
-        val warnMsg = if (fileRefs.isEmpty) {
-          Some(s"($actionId) No files to process found for ${inputDataObject.id}, partitionValues=${inputSubFeed.partitionValues.mkString(", ")}")
-        } else None
-        warnMsg.foreach(msg => throw NoDataToProcessWarning(actionId.id, msg))
+        if (fileRefs.isEmpty) throw NoDataToProcessWarning(actionId.id,s"($actionId) No files to process found for ${inputDataObject.id}, partitionValues=${inputSubFeed.partitionValues.mkString(", ")}")
         Some(ExecutionModeResult(fileRefs = Some(fileRefs), inputPartitionValues = inputSubFeed.partitionValues, outputPartitionValues = inputSubFeed.partitionValues))
-      case _ => throw ConfigurationException(s"($actionId) FileIncrementalMoveMode needs FileRefDataObject and FileSubFeed as input")
+      case (inputDataObject: SparkFileDataObject, inputSubFeed: SparkSubFeed) =>
+        if (!inputDataObject.checkFilesExisting) throw NoDataToProcessWarning(actionId.id, s"($actionId) No files to process found for ${mainInput.id} by FileIncrementalMoveMode.")
+        // setup observation of files processed
+        sparkFilesObserver = Some(inputDataObject.setupFilesObserver(actionId))
+        Some(ExecutionModeResult(inputPartitionValues = inputSubFeed.partitionValues, outputPartitionValues = inputSubFeed.partitionValues))
+      case _ => throw ConfigurationException(s"($actionId) FileIncrementalMoveMode needs FileRefDataObject with FileSubFeed or SparkFileDataObject with SparkSubFeed as input")
     }
   }
 
   /**
-   * Delete data after read
+   * Remove/archive files after read
    */
   private[smartdatalake] override def postExec(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, mainInputSubFeed: SubFeed, mainOutputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = {
     (mainInput, mainOutputSubFeed) match {
       case (fileRefInput: FileRefDataObject, fileSubFeed: FileSubFeed) =>
-        fileSubFeed.fileRefMapping.foreach(fileRefs => fileRefInput.deleteFileRefs(fileRefs.map(_.src)))
-      case x => throw ConfigurationException(s"($actionId) FileIncrementalMoveMode needs FileRefDataObject and FileSubFeed as input")
+        fileSubFeed.fileRefMapping.foreach {
+          fileRefs =>
+            logger.info(s"Cleaning up ${fileRefs.size} processed input files")
+            val inputFiles = fileRefs.map(_.src.fullPath)
+            if (archivePath.isDefined) {
+              val newBasePath = if (fileRefInput.isAbsolutePath(archivePath.get)) archivePath.get
+              else fileRefInput.concatPath(fileRefInput.getPath, archivePath.get)
+              inputFiles.foreach{ file =>
+                val archiveFile = fileRefInput.concatPath(newBasePath, fileRefInput.relativizePath(file))
+                fileRefInput.renameFileHandleAlreadyExisting(file, archiveFile)
+              }
+            } else {
+              inputFiles.foreach(file => fileRefInput.deleteFile(file))
+            }
+        }
+      case (sparkDataObject: SparkFileDataObject, sparkSubFeed: SparkSubFeed) =>
+        val files = sparkFilesObserver
+          .getOrElse(throw new IllegalStateException(s"($actionId) FilesObserver not setup for ${mainInput.id}"))
+          .getFilesProcessed
+        if (files.isEmpty) throw NoDataToProcessWarning(actionId.id, s"($actionId) No files to process found for ${mainInput.id} by FileIncrementalMoveMode.")
+        logger.info(s"Cleaning up ${files.size} processed input files")
+        if (archivePath.isDefined) {
+          val archiveHadoopPath = new Path(archivePath.get)
+          val newBasePath = if (archiveHadoopPath.isAbsolute) archiveHadoopPath
+          else new Path(sparkDataObject.hadoopPath, archiveHadoopPath)
+          // create archive file names
+          val filePairs = files.map(file => (file, new Path(newBasePath, sparkDataObject.relativizePath(file))))
+          // create directories if not existing (otherwise hadoop rename fails)
+          filePairs.map(_._2).map(_.getParent).distinct
+            .foreach(p => if (!sparkDataObject.filesystem.exists(p)) sparkDataObject.filesystem.mkdirs(p))
+          // rename files
+          filePairs.foreach { case (file,newFile) =>
+            sparkDataObject.renameFileHandleAlreadyExisting(file, newFile.toString)
+          }
+        } else {
+          files.foreach(sparkDataObject.deleteFile)
+        }
+      case _ => throw ConfigurationException(s"($actionId) FileIncrementalMoveMode needs FileRefDataObject with FileSubFeed or SparkFileDataObject with SparkSubFeed as input")
     }
   }
+
 }
 
 /**
