@@ -249,9 +249,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     } catch {
       case e: Exception =>
         // try shutdown but catch potential exception
-        try {
-          shutdown
-        }
+        shutdown
         // throw original exception
         throw e
     }

@@ -177,7 +177,6 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     // prepare
     var (inputSubFeeds, outputSubFeeds) = prepareInputSubFeeds(subFeeds)
     // transform
-    //TODO move agent code here?
     outputSubFeeds = transform(inputSubFeeds, outputSubFeeds)
     // check and adapt output SubFeeds
     outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds)

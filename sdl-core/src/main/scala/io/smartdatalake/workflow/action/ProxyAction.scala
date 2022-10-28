@@ -36,10 +36,7 @@ import org.apache.spark.sql.types.StructType
 case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.ActionId, agent: Agent) extends Action {
 
   override def exec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = {
-    val result = common( ExecutionPhase.Exec)
-   // agentClient
-
-    result
+    common( ExecutionPhase.Exec)
   }
 
   override def factory: FromConfigFactory[Action] = wrappedAction.factory

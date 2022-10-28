@@ -112,7 +112,6 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
 
   def agentId: Option[AgentId] = None
 
-
   /**
    * Validate configuration.
    * Put validation logic here which will run on class instantiation. It has to be put into a separate method because like that
@@ -257,7 +256,6 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * @param subFeeds [[SparkSubFeed]]'s to be processed
    * @return processed [[SparkSubFeed]]'s
    */
-  //TODO should Remote/Non Remote Logic happen here?
   def exec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed]
 
   /**
