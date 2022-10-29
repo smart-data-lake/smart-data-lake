@@ -37,37 +37,39 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
    * Additionally a separate file with the mapping of first class config objects to source code origin is created.
    */
   def main(args: Array[String]): Unit = {
-    val config = ConfigJsonExporterConfig()
+    val exporterConfig = ConfigJsonExporterConfig()
     // Parse all command line arguments
-    parser.parse(args, config) match {
-      case Some(config) =>
+    parser.parse(args, exporterConfig) match {
+      case Some(exporterConfig) =>
 
         // create json
-        val configAsJson = exportConfigJson(config)
+        val configAsJson = exportConfigJson(exporterConfig)
 
         // write file
-        logger.info(s"Writing config json to file ${config.filename}")
-        Files.write(Paths.get(config.filename), configAsJson.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+        logger.info(s"Writing config json to file ${exporterConfig.filename}")
+        Files.write(Paths.get(exporterConfig.filename), configAsJson.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
 
       case None =>
         logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
     }
   }
 
-  def exportConfigJson(config: ConfigJsonExporterConfig): String = {
+  def exportConfigJson(exporterConfig: ConfigJsonExporterConfig): String = {
     val defaultHadoopConf: Configuration = new Configuration()
-    val sdlConfig = ConfigLoader.loadConfigFromFilesystem(config.configPaths, defaultHadoopConf)
+    val sdlConfig = ConfigLoader.loadConfigFromFilesystem(exporterConfig.configPaths, defaultHadoopConf)
     // remove additional config paths introduced by system properties...
     val configKeysToRemove = sdlConfig.root.keySet().asScala.diff(Set(ConfigParser.CONFIG_SECTION_ACTIONS, ConfigParser.CONFIG_SECTION_CONNECTIONS, ConfigParser.CONFIG_SECTION_DATAOBJECTS, ConfigParser.CONFIG_SECTION_GLOBAL))
     val reducedSdlConfig = configKeysToRemove.foldLeft(sdlConfig)((config,key) => config.withoutPath(key))
     // enrich origin of first class config objects
     val descriptionRegex = "(.*): ([0-9]+)(-[0-9]+)?".r
-    val enrichedSdlConfig = reducedSdlConfig.root().keySet().asScala.diff(Set(ConfigParser.CONFIG_SECTION_GLOBAL)).foldLeft(reducedSdlConfig){
+    val configSectionsToEnrich =  Set(ConfigParser.CONFIG_SECTION_ACTIONS, ConfigParser.CONFIG_SECTION_CONNECTIONS, ConfigParser.CONFIG_SECTION_DATAOBJECTS)
+    val enrichedSdlConfig = configSectionsToEnrich.foldLeft(reducedSdlConfig){
       case (config,sectionKey) =>
         config.getConfig(sectionKey).root.keySet().asScala.foldLeft(config) {
           case (config,objectKey) =>
             val objectConfig = config.getConfig(s"$sectionKey.$objectKey")
             // parse origins description, as we can not access the detailed private properties
+            // note that currently endLineNumber is not filled by Hocon parser, even though it is foreseen in the code.
             val (path, lineNumber, endLineNumber) = objectConfig.origin.description match {
               case descriptionRegex(path, lineNumber, endLineNumber) =>
                 (path, lineNumber.toInt, Option(endLineNumber).map(_.toInt))
@@ -80,6 +82,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
         }
     }
     // render config as json
-    (if (config.enrichOrigin) enrichedSdlConfig else reducedSdlConfig).root.render(ConfigRenderOptions.concise())
+    val sdlConfigToExport = if (exporterConfig.enrichOrigin) enrichedSdlConfig else reducedSdlConfig
+    sdlConfigToExport.root.render(ConfigRenderOptions.concise())
   }
 }
