@@ -716,15 +716,15 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    instanceRegistry.clear
 
-    // setup input DataObject
-    val srcDO = MockDataObject("src1").register
+    // write csv data to target/src1, which is defined in "/configState/WithFinalStateWriter.conf"
+    val dummySrcDO = CsvFileDataObject("dummysrc1", "target/src1")
     val dfSrc1 = Seq("testData").toDF("testColumn")
-    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())
+    dummySrcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())
 
+    // load data from configuration file
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
-      getClass.getResource("/configState/WithFinalStateWriter.conf").getPath)) )
+      getClass.getResource("/configState/WithFinalStateWriter.conf").getPath)))
 
     // Run SDLB
     sdlb.run(sdlConfig)
