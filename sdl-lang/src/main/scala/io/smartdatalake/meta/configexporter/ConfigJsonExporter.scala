@@ -63,7 +63,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
     // enrich origin of first class config objects
     val descriptionRegex = "(.*): ([0-9]+)(-[0-9]+)?".r
     val configSectionsToEnrich =  Set(ConfigParser.CONFIG_SECTION_ACTIONS, ConfigParser.CONFIG_SECTION_CONNECTIONS, ConfigParser.CONFIG_SECTION_DATAOBJECTS)
-    val enrichedSdlConfig = configSectionsToEnrich.foldLeft(reducedSdlConfig){
+    val enrichedSdlConfig = configSectionsToEnrich.filter(reducedSdlConfig.hasPath).foldLeft(reducedSdlConfig){
       case (config,sectionKey) =>
         config.getConfig(sectionKey).root.keySet().asScala.foldLeft(config) {
           case (config,objectKey) =>
