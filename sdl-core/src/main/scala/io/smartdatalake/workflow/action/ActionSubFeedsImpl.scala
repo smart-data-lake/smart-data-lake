@@ -277,7 +277,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
 
   protected def validatePartitionValuesExisting(dataObject: DataObject with CanHandlePartitions, subFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = {
     // Existing partitions can only be checked if Action is at start of the DAG or if we are in Exec phase (previous Actions have been executed)
-    if (subFeed.partitionValues.nonEmpty && (context.phase == ExecutionPhase.Exec || subFeed.isDAGStart)) {
+    if (subFeed.partitionValues.nonEmpty && (context.phase == ExecutionPhase.Exec || subFeed.isDAGStart) && !subFeed.isSkipped) {
       // filter partition value with keys that are a valid init of partition columns -> otherwise it can not be checked if the partition exists
       val inits = dataObject.partitions.inits.map(_.toSet)
       val validInitPartitionValues = subFeed.partitionValues.filter(pv => inits.contains(pv.keys))
