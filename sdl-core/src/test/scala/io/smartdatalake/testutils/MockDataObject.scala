@@ -88,7 +88,7 @@ case class MockDataObject(override val id: DataObjectId, override val partitions
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
     partitionValuesMock = Seq()
-    dataFrameMock = null
+    dataFrameMock = None
   }
 
   private implicit val subFeedCompanion: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(SparkSubFeed.subFeedType)

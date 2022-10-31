@@ -25,7 +25,7 @@ import io.smartdatalake.workflow.SubFeed
 import org.apache.spark.annotation.DeveloperApi
 
 /**
- * Execution modes can throw this exception to indicate that there is no data to process.
+ * Execution modes and DataObjects preparing DataFrames can throw this exception to indicate that there is no data to process.
  * @param results SDL might add fake results to this exception to allow further execution of DAG. When creating the exception result should be set to None.
  */
 @DeveloperApi
