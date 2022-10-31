@@ -255,9 +255,10 @@ object Environment {
   def globalConfig: GlobalConfig = _globalConfig
   private [smartdatalake] var _globalConfig: GlobalConfig = _
 
-  // this class loader is needed to find custom classes in some environments (e.g. Polynote)
+  // this class loader needs to be overridden to find custom classes in some environments (e.g. Polynote)
   def classLoader: ClassLoader = _classLoader
-  private [smartdatalake] var _classLoader: ClassLoader = this.getClass.getClassLoader // initialize with default classloader
+  private [smartdatalake] var _classLoader: ClassLoader = Option(this.getClass.getClassLoader)
+    .getOrElse(ClassLoader.getSystemClassLoader()) // initialize with default classloader
 
   // flag to gracefully stop repeated execution of DAG in streaming mode
   var stopStreamingGracefully: Boolean = false
