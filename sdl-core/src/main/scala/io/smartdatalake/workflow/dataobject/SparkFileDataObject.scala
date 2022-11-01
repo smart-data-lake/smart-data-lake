@@ -204,16 +204,22 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
       val df = if (pathsToRead.nonEmpty) Some(reader.load(pathsToRead:_*)) else None
       df.filter(df => schemaOpt.isDefined || partitions.diff(df.columns).isEmpty) // filter DataFrames without partition columns as they are empty (this might happen if there is no schema specified and the partition is empty)
         .getOrElse {
-          // if there are no paths to read then an empty DataFrame is created
-          require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")
-          DataFrameUtil.getEmptyDataFrame(schemaOpt.get)
+          // if there are no paths to read for given partition values, handle no data
+          if (context.phase == ExecutionPhase.Exec) {
+            // skip action in exec phase
+            throw NoDataToProcessWarning(id.id, s"($id) No existing files found for partition values ${partitionValues.mkString(", ")}.")
+          } else {
+            // create empty data frame in init phase
+            require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")
+            DataFrameUtil.getEmptyDataFrame(schemaOpt.get)
+          }
         }
     }
 
     // early check for no data to process.
     // This also prevents an error on Databricks when using filesObserver if there are no files to process. See also [[CollectSetDeterministic]].
     if (context.phase == ExecutionPhase.Exec && Environment.enableSparkFileDataObjectNoDataCheck && SparkFileDataObject.getFilesProcessedFromSparkPlan(id.id, dfContent).isEmpty)
-      throw NoDataToProcessWarning("-", s"($id) No files to process found in execution plan")
+      throw NoDataToProcessWarning(id.id, s"($id) No files to process found in execution plan")
 
     // add filename column
     var df = dfContent.withOptionalColumn(filenameColumn, input_file_name)
