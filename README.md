@@ -1,5 +1,5 @@
 # Smart Data Lake
-![Build Status](https://github.com/smart-data-lake/smart-data-lake/workflows/Smart%20Data%20Lake/badge.svg)
+![Build Status](https://github.com/smart-data-lake/smart-data-lake/actions/workflows/snapshot_builds.yml/badge.svg)
  
 Smart Data Lake Builder is a data lake automation framework that makes loading and transforming data a breeze. 
 It is implemented in Scala and builds on top of open-source big data technologies like [Apache Hadoop](https://hadoop.apache.org/) and [Apache Spark](https://spark.apache.org/), including connectors for diverse data sources (HadoopFS, Hive, DeltaLake, JDBC, Splunk,  Webservice, SFTP, JMS, Excel, Access) and file formats.
@@ -33,7 +33,7 @@ See [Features](https://github.com/smart-data-lake/smart-data-lake/blob/documenta
 ## How it works
 The following diagram shows the core concepts:
 
-![How it works](docs/images/feed.png)
+![How it works](https://github.com/smart-data-lake/smart-data-lake/blob/documentation/docs/images/feed.png)
 
 ### Data object
 A data object defines the location and format of data. 
@@ -57,10 +57,10 @@ The file format used is [HOCON](https://github.com/lightbend/config/blob/master/
 To see how all this works in action, head over to the [Getting Started](https://smartdatalake.ch/docs/getting-started/setup) page.
 
 # Major Contributors
-![SBB](docs/images/SBB_logo.png)  
+![SBB](https://github.com/smart-data-lake/smart-data-lake/blob/documentation/docs/images/SBB_logo.png)  
 [www.sbb.ch](http://www.sbb.ch) : Provided the previously developed software as a foundation for the open source project   
 
-![ELCA](docs/images/ELCA_logo.png)  
+![ELCA](https://github.com/smart-data-lake/smart-data-lake/blob/documentation/docs/images/ELCA_logo.png)  
 [www.elca.ch](http://www.elca.ch) : Did the comprehensive revision and provision as open source project 
 
 # Additional Documentation

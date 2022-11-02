@@ -35,6 +35,16 @@ import java.net.URI
  */
 object Environment {
 
+  // this class loader needs to be overridden to find custom classes in some environments (e.g. Polynote)
+  def classLoader(): ClassLoader = {
+    if (_classLoader.isEmpty) {
+      _classLoader = Option(this.getClass.getClassLoader)
+        .orElse(Option(ClassLoader.getSystemClassLoader))
+    }
+    _classLoader.get
+  }
+  var _classLoader: Option[ClassLoader] = None
+
   /**
    * List of hadoop authorities for which acls must be configured
    * The environment parameter can contain multiple authorities separated by comma.
@@ -241,10 +251,15 @@ object Environment {
   val runIdPartitionColumnName = "run_id"
 
   // instantiate sdl plugin if configured
-  private[smartdatalake] var sdlPlugin: Option[SDLPlugin] = {
-    EnvironmentUtil.getSdlParameter("pluginClassName")
-      .map(CustomCodeUtil.getClassInstanceByName[SDLPlugin])
+  private[smartdatalake] def sdlPlugin: Option[SDLPlugin] = {
+    if (_sdlPlugin.isEmpty) {
+      _sdlPlugin = Some(EnvironmentUtil.getSdlParameter("pluginClassName")
+        .map(CustomCodeUtil.getClassInstanceByName[SDLPlugin]))
+
+    }
+    _sdlPlugin.get
   }
+  private[smartdatalake] var _sdlPlugin: Option[Option[SDLPlugin]] = None
 
   // dynamically shared environment for custom code (see also #106)
   // attention: if JVM is shared between different SDL jobs (e.g. Databricks cluster), these variables will be overwritten by the current job. Therefore they should not been used in SDL code, but might be used in custom code on your own risk.
@@ -254,10 +269,6 @@ object Environment {
   private [smartdatalake] var _instanceRegistry: InstanceRegistry = _
   def globalConfig: GlobalConfig = _globalConfig
   private [smartdatalake] var _globalConfig: GlobalConfig = _
-
-  // this class loader is needed to find custom classes in some environments (e.g. Polynote)
-  def classLoader: ClassLoader = _classLoader
-  private [smartdatalake] var _classLoader: ClassLoader = this.getClass.getClassLoader // initialize with default classloader
 
   // flag to gracefully stop repeated execution of DAG in streaming mode
   var stopStreamingGracefully: Boolean = false

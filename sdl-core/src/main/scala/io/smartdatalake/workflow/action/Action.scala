@@ -190,8 +190,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
     }
     // check execution condition result
     if (!executionConditionResult.get._1 && !context.appConfig.isDryRun) {
-      val outputSubFeeds = outputs.map(output => InitSubFeed(dataObjectId = output.id, partitionValues = Seq(), isSkipped = true))
-      throw new TaskSkippedDontStopWarning(id.id, executionConditionResult.get._2.get, Some(outputSubFeeds))
+      throw new TaskSkippedDontStopWarning(id.id, executionConditionResult.get._2.get, Some(ActionHelper.createSkippedSubFeeds(outputs)))
     }
   }
 
@@ -204,12 +203,8 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
     executionModeResult = Some(Try(
       executionMode.flatMap(_.apply(id, mainInput, mainOutput, subFeed, partitionValuesTransform))
     ).recover {
-      // return skipped output subfeeds if "no data"
-      case ex: NoDataToProcessWarning =>
-        // create fake results (subFeeds with isSkipped=true)
-        val outputSubFeeds = outputs.map(output => InitSubFeed(dataObjectId = output.id, partitionValues = Seq(), isSkipped = true))
-        // Add fake results to exception. The DAG will pass the fake results to further actions, which can decide if the want to stop if input subFeeds are skipped by defining an executionCondition.
-        throw NoDataToProcessWarning(ex.actionId, ex.msg, results = Some(outputSubFeeds))
+      // throw exception with skipped output subfeeds if "no data"
+      case ex: NoDataToProcessWarning if ex.results.isEmpty => throw ex.copy(results = Some(ActionHelper.createSkippedSubFeeds(outputs)))
     })
   }
 
@@ -234,7 +229,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   def preExec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
     if (isAsynchronousProcessStarted) return
     // reset execution condition if not start Action in pipeline, because input for execution results could change between init and exec phase
-    val isStartAction = subFeeds.exists(_.isInstanceOf[InitSubFeed])
+    val isStartAction = subFeeds.exists(subFeed => subFeed.isInstanceOf[InitSubFeed] && !subFeed.isSkipped)
     if (!isStartAction) resetExecutionResult()
     // check execution condition
     checkExecutionCondition(subFeeds)

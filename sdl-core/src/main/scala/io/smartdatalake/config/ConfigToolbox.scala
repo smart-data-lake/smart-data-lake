@@ -42,7 +42,7 @@ object ConfigToolbox {
    */
   def loadAndParseConfig(locations: Seq[String], userClassLoader: Option[ClassLoader] = None): (InstanceRegistry, GlobalConfig) = {
     // override classloader if given
-    userClassLoader.foreach(Environment._classLoader = _)
+    userClassLoader.foreach(classLoader => Environment._classLoader = Some(classLoader))
     // load config
     val defaultHadoopConf: Configuration = new Configuration()
     val config = ConfigLoader.loadConfigFromFilesystem(locations, defaultHadoopConf)

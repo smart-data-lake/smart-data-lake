@@ -32,7 +32,7 @@ import io.smartdatalake.util.secrets.SecretProvider
  * global = {
  *   secretProviders = {
  *     AZKV = {
- *       className: io.smartdatalake.utils.azure.AzureKeyVaultSecretProvider
+ *       className: io.smartdatalake.util.azure.AzureKeyVaultSecretProvider
  *       options = {
  *         keyVaultName: <azure-key-vault-name>
  *       }
