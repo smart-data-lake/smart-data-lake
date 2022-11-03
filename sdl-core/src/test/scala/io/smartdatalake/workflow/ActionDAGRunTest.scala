@@ -19,16 +19,15 @@
 
 package io.smartdatalake.workflow
 
+import java.time.{Duration, LocalDateTime}
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.SdlConfigObject._
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.{ResultRuntimeInfo, RuntimeEventState, RuntimeInfo, SDLExecutionId}
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.FunSuite
-
-import java.time.{Duration, LocalDateTime}
 
 class ActionDAGRunTest extends FunSuite {
 

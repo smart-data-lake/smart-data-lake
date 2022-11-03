@@ -19,8 +19,8 @@
 
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.workflow.SchemaViolationException
 import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.SchemaViolationException
 
 /**
  * A [[DataObject]] that allows for optional schema validation on read and on write.

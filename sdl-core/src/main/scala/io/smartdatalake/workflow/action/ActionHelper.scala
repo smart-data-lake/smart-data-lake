@@ -20,9 +20,9 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SubFeed}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
-import io.smartdatalake.workflow.dataobject.CanCreateDataFrame
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.TimestampType
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, SparkSession}

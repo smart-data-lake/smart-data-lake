@@ -18,9 +18,8 @@
  */
 package io.smartdatalake.util.hdfs
 
-import io.smartdatalake.workflow.DataFrameSubFeedCompanion
 import io.smartdatalake.workflow.dataframe.GenericColumn
-import org.apache.spark.annotation.DeveloperApi
+import io.smartdatalake.workflow.DataFrameSubFeedCompanion
 import org.apache.spark.sql.DataFrame
 
 import scala.util.matching.Regex

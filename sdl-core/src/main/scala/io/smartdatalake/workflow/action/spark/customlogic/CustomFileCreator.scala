@@ -19,13 +19,12 @@
 
 package io.smartdatalake.workflow.action.spark.customlogic
 
+import java.io.{ByteArrayInputStream, InputStream}
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.SparkSession
-
-import java.io.{ByteArrayInputStream, InputStream}
 
 trait CustomFileCreator extends Serializable {
 

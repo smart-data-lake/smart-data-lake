@@ -18,6 +18,11 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import java.time.Duration.ofMinutes
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeFormatter.ofPattern
+import java.time.{Duration, LocalDateTime}
+
 import com.splunk._
 import com.typesafe.config.Config
 import configs.ConfigReader
@@ -30,14 +35,9 @@ import io.smartdatalake.workflow.connection.SplunkConnection
 import io.smartdatalake.workflow.dataobject.SplunkFormatter.{fromSplunkStringFormat, toSplunkStringFormat}
 import org.apache.spark.sql._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
-
-import java.time.Duration.ofMinutes
-import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeFormatter.ofPattern
-import java.time.{Duration, LocalDateTime}
+import scala.util.Using
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
-import scala.util.Using
 
 
 /**

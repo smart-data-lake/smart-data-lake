@@ -19,22 +19,22 @@
 
 package io.smartdatalake.workflow.dataobject
 
-import com.snowflake.snowpark
-import com.snowflake.snowpark.SaveMode
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.definitions.SDLSaveMode._
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.connection.SnowflakeConnection
-import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkDataFrame, SnowparkSubFeed}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
-import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import net.snowflake.spark.snowflake.Utils.SNOWFLAKE_SOURCE_NAME
 import org.apache.spark.{sql => spark}
+import com.snowflake.snowpark
+import com.snowflake.snowpark.SaveMode
+import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkDataFrame, SnowparkSubFeed}
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 

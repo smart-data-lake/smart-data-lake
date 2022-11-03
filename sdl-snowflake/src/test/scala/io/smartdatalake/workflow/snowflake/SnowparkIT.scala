@@ -25,6 +25,7 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.dataobject.{SnowflakeTableDataObject, Table}
 import org.scalatest.Matchers.intercept
 
+
 /**
  * This is an integration test to check implementations of Snowpark.
  */

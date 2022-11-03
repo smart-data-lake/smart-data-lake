@@ -22,8 +22,8 @@ package io.smartdatalake.config
 import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SerializableHadoopConfiguration
-import io.smartdatalake.workflow.action.SDLExecutionId
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
+import io.smartdatalake.workflow.action.SDLExecutionId
 import org.apache.hadoop.conf.Configuration
 
 import java.time.LocalDateTime

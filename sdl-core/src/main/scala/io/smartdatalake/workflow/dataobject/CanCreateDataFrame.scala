@@ -18,8 +18,8 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericDataType, GenericSchema}
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import scala.reflect.runtime.universe.Type

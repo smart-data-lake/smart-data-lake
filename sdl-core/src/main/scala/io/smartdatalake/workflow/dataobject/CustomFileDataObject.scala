@@ -19,6 +19,7 @@
 
 package io.smartdatalake.workflow.dataobject
 
+import java.io.InputStream
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
@@ -28,7 +29,6 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.spark.customlogic.CustomFileCreatorConfig
 
-import java.io.InputStream
 
 case class CustomFileDataObject(override val id: DataObjectId,
                                 creator: CustomFileCreatorConfig,

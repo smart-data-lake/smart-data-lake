@@ -171,14 +171,12 @@ case class GlobalConfig(kryoClasses: Option[Seq[String]] = None
     }
   }
 }
-
 object GlobalConfig extends ConfigImplicits {
   private[smartdatalake] def from(config: Config): GlobalConfig = {
     implicit val customStateListenerConfig: ConfigReader[StateListenerConfig] = ConfigReader.derive[StateListenerConfig]
     globalConfig = Some(config.get[Option[GlobalConfig]]("global").value.getOrElse(GlobalConfig()))
     globalConfig.get
   }
-
   // store global config to be used in MemoryLoggerExecutorPlugin
   var globalConfig: Option[GlobalConfig] = None
 }

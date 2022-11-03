@@ -18,16 +18,15 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import java.io._
+import java.nio.file.Files
 import com.typesafe.config.ConfigFactory
-import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.testutils.DataObjectTestSuite
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types._
-
-import java.io._
-import java.nio.file.Files
 
 class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjectSchemaBehavior {
 

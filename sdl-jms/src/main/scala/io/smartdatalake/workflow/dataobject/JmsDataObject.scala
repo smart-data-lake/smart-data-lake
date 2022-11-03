@@ -18,19 +18,19 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import java.util.concurrent.TimeUnit
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.definitions.{AuthMode, BasicAuthMode}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.jms.{JmsQueueConsumerFactory, SynchronousJmsReceiver, TextMessageHandler}
 import io.smartdatalake.util.spark.DataFrameUtil
-import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.Duration
 
 /**

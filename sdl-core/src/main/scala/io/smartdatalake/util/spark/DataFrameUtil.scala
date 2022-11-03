@@ -19,11 +19,11 @@
 
 package io.smartdatalake.util.spark
 
-import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
-import org.apache.spark.sql._
+import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types._
+import org.apache.spark.sql._
 import org.apache.spark.storage.StorageLevel
 
 import java.text.Normalizer

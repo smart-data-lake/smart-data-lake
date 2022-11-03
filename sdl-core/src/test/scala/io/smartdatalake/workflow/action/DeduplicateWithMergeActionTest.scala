@@ -19,11 +19,11 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.ExecutionPhase
 import io.smartdatalake.workflow.connection.JdbcTableConnection
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, JdbcTableDataObject, Table}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}

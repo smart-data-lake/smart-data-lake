@@ -21,10 +21,10 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
-import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.DataFrame

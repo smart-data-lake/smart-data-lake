@@ -19,11 +19,11 @@
 
 package io.smartdatalake.workflow.snowflake
 
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import org.scalatest.FunSuite
+import org.apache.spark.sql.{types => spark}
 import com.snowflake.snowpark.{types => snowpark}
 import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkSchema, SnowparkSubFeed}
-import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
-import org.apache.spark.sql.{types => spark}
-import org.scalatest.FunSuite
 
 import scala.reflect.runtime.universe.typeOf
 

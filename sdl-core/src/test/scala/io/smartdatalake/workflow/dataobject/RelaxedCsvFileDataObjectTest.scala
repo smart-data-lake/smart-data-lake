@@ -1,8 +1,8 @@
 package io.smartdatalake.workflow.dataobject
 
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.spark.SparkException
 import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.types.{StringType, StructType}

@@ -24,11 +24,11 @@ import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderCo
 import io.smartdatalake.config.ConfigToolbox
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.DataFrameSubFeed
+import io.smartdatalake.workflow.action.{CopyAction, CustomDataFrameAction}
 import io.smartdatalake.workflow.action.generic.customlogic.CustomGenericDfTransformer
-import io.smartdatalake.workflow.action.generic.transformer._
+import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer, SQLDfsTransformer, ScalaClassGenericDfTransformer}
 import io.smartdatalake.workflow.action.snowflake.customlogic.CustomSnowparkDfTransformer
 import io.smartdatalake.workflow.action.snowflake.transformer.ScalaClassSnowparkDfTransformer
-import io.smartdatalake.workflow.action.{CopyAction, CustomDataFrameAction}
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, SnowflakeTableDataObject, Table}
 
