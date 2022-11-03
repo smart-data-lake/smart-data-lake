@@ -218,10 +218,10 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    *
    * @param appConfig Application configuration (parsed from command line).
    */
-  def run(appConfig: SmartDataLakeBuilderConfig): Map[RuntimeEventState, Int] = {
+  def run(appConfig: SmartDataLakeBuilderConfig): Map[RuntimeEventState,Int] = {
+    // invoke SDLPlugin if configured
+    Environment.sdlPlugin.foreach(_.startup())
     val stats = try {
-      // invoke SDLPlugin if configured
-      Environment.sdlPlugin.foreach(_.startup())
       // create default hadoop configuration, as we did not yet load custom spark/hadoop properties
       implicit val defaultHadoopConf: Configuration = new Configuration()
       // handle state if defined

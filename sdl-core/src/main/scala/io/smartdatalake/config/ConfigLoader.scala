@@ -18,7 +18,8 @@
  */
 package io.smartdatalake.config
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.impl.Parseable
+import com.typesafe.config.{Config, ConfigFactory, ConfigOrigin, ConfigParseOptions}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.HdfsUtil
@@ -27,7 +28,7 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
-import java.io.InputStreamReader
+import java.io.{InputStreamReader, Reader}
 import scala.util.{Failure, Success, Try}
 
 object ConfigLoader extends SmartDataLakeLogger {
@@ -152,9 +153,8 @@ object ConfigLoader extends SmartDataLakeLogger {
    * @return parsed [[Config]] object
    */
   private def parseConfig(file: ConfigFile): Config = {
-    val reader = file.getReader
     try {
-      val parsedConfig = ConfigFactory.parseReader(reader)
+      val parsedConfig = file.parse.toConfig
       if (parsedConfig.isEmpty) {
         logger.warn(s"Config parsed from ${file.toString} is empty!")
       }
@@ -162,8 +162,6 @@ object ConfigLoader extends SmartDataLakeLogger {
     } catch {
       case exception: Throwable =>
         throw ConfigurationException(s"Failed to parse config from ${file.toString}", None, exception)
-    } finally {
-      reader.close()
     }
   }
 
@@ -205,10 +203,12 @@ object ConfigLoader extends SmartDataLakeLogger {
 
   // Helper classes to handle different location types
   private case class HadoopConfigFile(override val path: Path)(implicit val fs: FileSystem) extends ConfigFile {
-    override def getReader = new InputStreamReader(fs.open(path))
+    postConstruct(ConfigParseOptions.defaults())
+    override def reader(): Reader = new InputStreamReader(fs.open(path))
   }
   private case class ClasspathConfigFile(override val path: Path) extends ConfigFile {
-    override def getReader: InputStreamReader = {
+    postConstruct(ConfigParseOptions.defaults())
+    override def reader: InputStreamReader = {
       val resource = path.toUri.getPath
       val inputStream = Option(getClass.getResourceAsStream(resource))
         .getOrElse(throw ConfigurationException(s"Could not find resource $resource in classpath"))
@@ -218,11 +218,17 @@ object ConfigLoader extends SmartDataLakeLogger {
   private object ClasspathConfigFile {
     def canHandleScheme(path: Path): Boolean = path.toUri.getScheme == "cp"
   }
-  private trait ConfigFile {
+  private trait ConfigFile extends Parseable {
     def path: Path
     lazy val extension: String = ConfigFile.getExtension(path)
     if (!ConfigFile.canHandleExtension(extension)) throw ConfigurationException(s"Cannot parse file with unknown extension $path. Allowed extensions are ${configFileExtensions.mkString(", ")}")
-    def getReader: InputStreamReader
+    override def createOrigin(): ConfigOrigin = {
+      // SimpleConfigOrigin is not public available :-(
+      val clazz = Class.forName("com.typesafe.config.impl.SimpleConfigOrigin")
+      val method = clazz.getDeclaredMethod("newSimple", classOf[String])
+      method.setAccessible(true)
+      method.invoke(null, path.toString).asInstanceOf[ConfigOrigin]
+    }
   }
   private object ConfigFile {
     def canHandleExtension(extension: String): Boolean = configFileExtensions.contains(extension)

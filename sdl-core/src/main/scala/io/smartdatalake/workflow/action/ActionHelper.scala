@@ -142,6 +142,13 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
     sql.replaceAll("\\s"+inputViewName.stripSuffix(ActionHelper.TEMP_VIEW_POSTFIX)+"(\\s|\\.|$)", s" $inputViewName" + "$1")
   }
 
+  /**
+   * Create results for skipped actions, e.g. InitSubFeeds with isSkipped = true
+   */
+  def createSkippedSubFeeds(outputs: Seq[DataObject]): Seq[SubFeed] = {
+    outputs.map(output => InitSubFeed(dataObjectId = output.id, partitionValues = Seq(), isSkipped = true))
+  }
+
   val TEMP_VIEW_POSTFIX = "_sdltemp"
 }
 

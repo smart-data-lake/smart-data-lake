@@ -88,6 +88,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   final val CONFIG_SECTION_CONNECTIONS = "connections"
   final val CONFIG_SECTION_DATAOBJECTS = "dataObjects"
   final val CONFIG_SECTION_ACTIONS = "actions"
+  final val CONFIG_SECTION_GLOBAL = "global"
   def getConnectionEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_CONNECTIONS)
   def getDataObjectsEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_DATAOBJECTS)
   def getActionsEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_ACTIONS)
