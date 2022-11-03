@@ -18,10 +18,12 @@
  */
 package io.smartdatalake.app
 
-import io.smartdatalake.communication.agent.{AgentServerController, AgentServer, AgentServerConfig}
-import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.app.LocalSmartDataLakeBuilder.{appType, logAndThrowException}
+import io.smartdatalake.communication.agent.{AgentServer, AgentServerConfig, AgentServerController}
+import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
 import io.smartdatalake.workflow.action.SDLExecutionId
 import org.apache.hadoop.conf.Configuration
+import scopt.OptionParser
 
 import java.io.File
 import java.time.LocalDateTime
@@ -34,26 +36,17 @@ import java.time.LocalDateTime
  */
 object LocalAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
-  // optional master and deploy-mode settings to override defaults local[*] / client. Note that using something different than master=local is experimental.
-  parser.opt[String]('m', "master")
-    .action((arg, config) => config.copy(master = Some(arg)))
-    .text("The Spark master URL passed to SparkContext (default=local[*], yarn, spark://HOST:PORT, mesos://HOST:PORT, k8s://HOST:PORT).")
-  parser.opt[String]('x', "deploy-mode")
-    .action((arg, config) => config.copy(deployMode = Some(arg)))
-    .text("The Spark deploy mode passed to SparkContext (default=client, cluster).")
+  val agentParser : OptionParser[AgentServerConfig] = new OptionParser[AgentServerConfig](appType) {
+    override def showUsageOnError: Option[Boolean] = Some(true)
 
-  // optional kerberos authentication parameters for local mode
-  parser.opt[String]('d', "kerberos-domain")
-    .action((arg, config) => config.copy(kerberosDomain = Some(arg)))
-    .text("Kerberos-Domain for authentication (USERNAME@KERBEROS-DOMAIN) in local mode.")
-  parser.opt[String]('u', "username")
-    .action((arg, config) => config.copy(username = Some(arg)))
-    .text("Kerberos username for authentication (USERNAME@KERBEROS-DOMAIN) in local mode.")
-  parser.opt[File]('k', "keytab-path")
-    .action((arg, config) => config.copy(keytabPath = Some(arg)))
-    .text("Path to the Kerberos keytab file for authentication in local mode.")
+    head(appType, s"$appVersion")
 
-  /**
+    parser.opt[Int]('p', "port")
+      .action((arg, config) => config.copy(agentPort = Some(arg)))
+      .text(s"Port that this agent listens to. Default is ${AgentServerConfig.DefaultPort}")
+  }
+
+   /**
    * Entry-Point of the application.
    *
    * @param args Command-line arguments.
@@ -65,34 +58,17 @@ object LocalAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
     val envconfig = initConfigFromEnvironment.copy(
       master = sys.env.get("SDL_SPARK_MASTER_URL").orElse(Some("local[*]")),
       deployMode = sys.env.get("SDL_SPARK_DEPLOY_MODE").orElse(Some("client")),
-      username = sys.env.get("SDL_KERBEROS_USER"),
-      kerberosDomain = sys.env.get("SDL_KERBEROS_DOMAIN"),
-      keytabPath = sys.env.get("SDL_KEYTAB_PATH").map(new File(_)),
       configuration = sys.env.get("SDL_CONFIGURATION").map(_.split(',')),
       parallelism = sys.env.get("SDL_PARALELLISM").map(_.toInt).getOrElse(1),
-      statePath = sys.env.get("SDL_STATE_PATH")
+      statePath = sys.env.get("SDL_STATE_PATH"),
+      applicationName = Some("agent")
     )
 
-    val agentController: AgentServerController = AgentServerController(new InstanceRegistry, this)
-    AgentServer.start(AgentServerConfig(sdlConfig = envconfig), agentController)
-
-    val result = exec(envconfig, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), Seq(), None, Seq(), simulation = false, globalConfig = GlobalConfig())(agentController.instanceRegistry)
-
-
-    // start
-    //1. Start Websocket
-    //2. Start some sleep-loop waiting for instructions
-    //When receving info from websocket write special hocon conf file to execute
-    implicit val defaultHadoopConf: Configuration = new Configuration()
-    //TODO manipulate config with input from websocket eg change file path
-    //    val configToRun = config.copy(configuration = Some(Seq("theConfigPathSavedByWebsocket")))
-
-    //Create dataobjects and action, add to instanceRegistry like in
-    // test("action dag with 2 dependent actions from same predecessor, PartitionDiffMode and another action with no data to process") {
-    //
-
-
+    agentParser.parse(args, AgentServerConfig(sdlConfig = envconfig)) match {
+      case Some(agentServerConfig) =>
+        val agentController: AgentServerController = AgentServerController(new InstanceRegistry, this)
+        AgentServer.start(agentServerConfig, agentController)
+      case None => logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
+    }
   }
-
-
 }

@@ -1,11 +1,10 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="SmartDataLakeBuilder" type="Application" factoryName="Application">
-    <option name="ALTERNATIVE_JRE_PATH" value="1.8 (1)" />
+    <option name="ALTERNATIVE_JRE_PATH" value="15" />
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
     <option name="INCLUDE_PROVIDED_SCOPE" value="true" />
-    <option name="MAIN_CLASS_NAME" value="io.smartdatalake.app.LocalSmartDataLakeBuilder" />
+    <option name="MAIN_CLASS_NAME" value="io.smartdatalake.app.DefaultSmartDataLakeBuilder" />
     <module name="sdl-core" />
-    <option name="PROGRAM_PARAMETERS" value="-f .*" />
     <option name="WORKING_DIRECTORY" value="$ProjectFileDir$" />
     <method v="2">
       <option name="Make" enabled="true" />

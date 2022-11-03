@@ -96,8 +96,9 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
     val agentConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = None)
 
     val remoteSDLB = new DefaultSmartDataLakeBuilder()
-    val agentController: AgentServerController = AgentServerController(remoteSDLB.instanceRegistry, remoteSDLB)
-    AgentServer.start(AgentServerConfig(sdlConfig = agentConfig), agentController)
+    LocalAgentSmartDataLakeBuilder.main(Array())
+//    val agentController: AgentServerController = AgentServerController(remoteSDLB.instanceRegistry, remoteSDLB)
+ //   AgentServer.start(AgentServerConfig(sdlConfig = agentConfig), agentController)
 
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
       getClass.getResource("/configremote/application.conf").getPath))
