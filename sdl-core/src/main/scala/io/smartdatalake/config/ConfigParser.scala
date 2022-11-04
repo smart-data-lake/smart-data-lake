@@ -71,7 +71,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
         .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
     }
     logger.debug(s"Parsed ${connections.size} connections in $t1 seconds")
-    registry.register(connections ++ connectionMapFromAgents)
+    registry.register(connectionMapFromAgents ++ connections)
 
     val (dataObjects, t2) = PerformanceUtils.measureTime {
       getDataObjectConfigMap(config)
