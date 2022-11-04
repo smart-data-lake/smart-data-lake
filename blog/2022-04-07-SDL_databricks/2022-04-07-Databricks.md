@@ -37,7 +37,7 @@ Let's get started:
     - typesafe library version correction script: the workspace currently includes version 1.2.1 from com.typesafe:config java library. 
       SDLB relies on functions of a newer version (>1.3.0) of this library. 
       Thus, we provide a newer version of the com.typesafe:config java library in an initialization script: *Advanced options* -> *Init Scripts* specify `dbfs:/databricks/scripts/config-install.sh`
-        + Further, the script needs to be created and uploaded. You can use the following script in a local terminal or in a Databricks notebook:
+        + Further, the script needs to be created and uploaded. You can use the following script in a local terminal:
         ```
         cat << EOF >> ./config-install.sh
         #!/bin/bash
@@ -46,12 +46,24 @@ Let's get started:
         databricks fs mkdirs dbfs:/databricks/scripts
         databricks fs cp ./config-install.sh dbfs:/databricks/scripts/
         ```
+		
+		Alternatively, you can also use a Databricks notebook for the script upload by executing the following cell:
+		```
+		%sh
+		cat << EOF >> ./config-install.sh
+		#!/bin/bash
+		wget -O /databricks/jars/-----config-1.4.1.jar https://repo1.maven.org/maven2/com/typesafe/config/1.4.1/config-1.4.1.jar
+		EOF
+		mkdir /dbfs/databricks/scripts
+		cp ./config-install.sh /dbfs/databricks/scripts/
+		```
+
         Note: to double-check the library version I ran `grep typesafe pom.xml` in the [SmartDataLake](https://github.com/smart-data-lake/smart-data-lake.git) source
 
         Note: the added `-----` will ensure that this `.jar` is preferred before the default Workspace Spark version (which starts with `----`). 
         If you are curious you could double-check e.g. with a Workspace Shell Notebook running `ls /databricks/jars/*config*`
 
-1. **fat-jar**:
+2. **fat-jar**:
        We need to provide the SDLB sources and all required libraries. Therefore, we compile and pack the Scala code into a Jar including the dependencies. We use the [getting-started](https://github.com/smart-data-lake/getting-started.git) as dummy project, which itself pulls the SDLB sources. 
     - download the [getting-started](https://github.com/smart-data-lake/getting-started.git) source and build it with the `-P fat-jar` profile
     ```
@@ -61,7 +73,7 @@ Let's get started:
     Therewith, the file `target/getting-started-1.0-jar-with-dependencies.jar` is created. 
     The *fat-jar* profile will include all required dependencies. The profile is defined in the [smart-data-lake](https://github.com/smart-data-lake/smart-data-lake) pom.xml.
 
-1. upload files
+3. upload files
 	- JAR: in the "Workspace" -> your user -> create a directory `jars` and "import" the library using the link in "(To import a library, such as a jar or egg, click here)" and select the above created fat-jar to upload. As a result the jar will be listed in the Workspace directory. 
 	- **SDLB application**: As an example a dataset from Airbnb NYC will be downloaded from Github, first written into a CSV file and later partially ported into a table. Therefore, the pipeline is defined first locally in a new file `application.conf`:
 	```
