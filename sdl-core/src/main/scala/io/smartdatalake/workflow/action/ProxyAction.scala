@@ -35,10 +35,6 @@ import org.apache.spark.sql.types.StructType
 
 case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.ActionId, agent: Agent) extends Action {
 
-  override def exec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = {
-    common( ExecutionPhase.Exec)
-  }
-
   override def factory: FromConfigFactory[Action] = wrappedAction.factory
 
   override def nodeId: NodeId = wrappedAction.nodeId
@@ -57,20 +53,31 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
 
   override def metricsFailCondition: Option[String] = wrappedAction.metricsFailCondition
 
-  override def init(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = {
-    common( ExecutionPhase.Init)
+   override def prepare(implicit context: ActionPipelineContext): Unit = {
+     runOnAgent( ExecutionPhase.Prepare)
   }
 
-  def common(executionPhase: ExecutionPhase)(implicit context: ActionPipelineContext): Seq[SubFeed] = {
+  override def init(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = {
+    runOnAgent( ExecutionPhase.Init)
+  }
+
+  override def exec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = {
+    runOnAgent(ExecutionPhase.Exec)
+  }
+
+  def runOnAgent(executionPhase: ExecutionPhase)(implicit context: ActionPipelineContext): Seq[SubFeed] = {
     val agentClient = AgentClient(agent)
     val hoconInstructions = AgentClient.prepareHoconInstructions(wrappedAction, context.instanceRegistry.getConnections, agent, executionPhase)
     agentClient.sendSDLMessage(hoconInstructions)
 
     val instructionId = hoconInstructions.agentInstruction.get.instructionId
 
-    while (!agentClient.socket.pendingResults.contains(instructionId)) {
+    while (agentClient.socket.isConnected && !agentClient.socket.pendingResults.contains(instructionId)) {
       Thread.sleep(1000)
-      println("waiting...")
+      println(s"Waiting for ${agent.id.id} to finish $instructionId...")
+    }
+    if(!agentClient.socket.isConnected){
+      throw new RuntimeException(s"Lost connection to ${agent.id.id}!")
     }
     val response = agentClient.socket.pendingResults.get(instructionId)
     agentClient.socket.pendingResults.remove(instructionId)
