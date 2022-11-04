@@ -126,6 +126,9 @@
 		</profile>
 		<profile>
 			<id>fat-jar-with-spark</id>
+			<properties>
+				<jetty.deps.scope>compile</jetty.deps.scope>
+			</properties>
 			<build>
 				<plugins>
 					<!-- Builds executable fat-jar that includes all dependencies -->
@@ -276,6 +279,7 @@
 		<orc.deps.scope>compile</orc.deps.scope>
 		<parquet.deps.scope>compile</parquet.deps.scope>
 		<parquet.test.deps.scope>test</parquet.test.deps.scope>
+		<jetty.deps.scope>provided</jetty.deps.scope>
 
 		<scala.minor.version>2.12</scala.minor.version>
 		<scala.version>${scala.minor.version}.15</scala.version>
@@ -857,59 +861,67 @@
 				<groupId>org.eclipse.jetty</groupId>
 				<artifactId>jetty-http</artifactId>
 				<version>${jetty.version}</version>
+				<scope>${jetty.deps.scope}</scope>
 			</dependency>
 			<dependency>
 				<groupId>org.eclipse.jetty</groupId>
 				<artifactId>jetty-continuation</artifactId>
 				<version>${jetty.version}</version>
-				</dependency>
+				<scope>${jetty.deps.scope}</scope>
+			</dependency>
 			<dependency>
 				<groupId>org.eclipse.jetty</groupId>
 				<artifactId>jetty-servlet</artifactId>
 				<version>${jetty.version}</version>
+				<scope>${jetty.deps.scope}</scope>
 			</dependency>
 			<dependency>
 				<groupId>org.eclipse.jetty</groupId>
 				<artifactId>jetty-servlets</artifactId>
 				<version>${jetty.version}</version>
+				<scope>${jetty.deps.scope}</scope>
 			</dependency>
 			<dependency>
 				<groupId>org.eclipse.jetty</groupId>
 				<artifactId>jetty-proxy</artifactId>
 				<version>${jetty.version}</version>
+				<scope>${jetty.deps.scope}</scope>
 			</dependency>
 			<dependency>
 				<groupId>org.eclipse.jetty</groupId>
 				<artifactId>jetty-client</artifactId>
 				<version>${jetty.version}</version>
+				<scope>${jetty.deps.scope}</scope>
 			</dependency>
 			<dependency>
 				<groupId>org.eclipse.jetty</groupId>
 				<artifactId>jetty-util</artifactId>
 				<version>${jetty.version}</version>
+				<scope>${jetty.deps.scope}</scope>
 			</dependency>
 			<dependency>
 				<groupId>org.eclipse.jetty</groupId>
 				<artifactId>jetty-security</artifactId>
 				<version>${jetty.version}</version>
-
+				<scope>${jetty.deps.scope}</scope>
 			</dependency>
 			<dependency>
 				<groupId>org.eclipse.jetty</groupId>
 				<artifactId>jetty-plus</artifactId>
 				<version>${jetty.version}</version>
-				<scope>provided</scope>
+				<scope>${jetty.deps.scope}</scope>
 			</dependency>
 			<dependency>
 				<groupId>org.eclipse.jetty</groupId>
 				<artifactId>jetty-server</artifactId>
 				<version>${jetty.version}</version>
+				<scope>${jetty.deps.scope}</scope>
 			</dependency>
 			<dependency>
 				<groupId>org.eclipse.jetty</groupId>
 				<artifactId>jetty-webapp</artifactId>
 				<version>${jetty.version}</version>
-				<scope>provided</scope>
+				<scope>${jetty.deps.scope}</scope>
 			</dependency>
 			<dependency>
 				<groupId>com.google.guava</groupId>
