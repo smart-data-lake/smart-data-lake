@@ -46,18 +46,23 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   /**
    * Parses the supplied config and returns a populated [[InstanceRegistry]].
    *
-   * @param config  the configuration to parse.
+   * @param config           the configuration to parse.
    * @param instanceRegistry instance registry to use, default is to create a new instance.
-   * @return  instance registry populated with all [[Action]]s, [[DataObject]]s, [[Connections]]s and [[Agents]]s defined in the configuration.
+   * @return instance registry populated with all [[Action]]s, [[DataObject]]s, [[Connections]]s and [[Agents]]s defined in the configuration.
    */
   def parse(config: Config, instanceRegistry: InstanceRegistry = new InstanceRegistry): InstanceRegistry = {
     implicit val registry: InstanceRegistry = instanceRegistry
 
-    val  (agents, t0) =
+    val (agents, t0) = {
       PerformanceUtils.measureTime {
         getAgentConfigMap(config)
           .map { case (id, config) => (AgentId(id), parseConfigObjectWithId[Agent](id, config)) }
       }
+    }
+    val connectionMapFromAgents = agents.flatMap(_._2.connections).map {
+        case (idString, connection) => (ConnectionId(idString), connection)
+      }
+
     logger.debug(s"Parsed ${agents.size} agents in $t0 seconds")
     registry.register(agents)
 
@@ -66,7 +71,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
         .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
     }
     logger.debug(s"Parsed ${connections.size} connections in $t1 seconds")
-    registry.register(connections)
+    registry.register(connections ++ connectionMapFromAgents)
 
     val (dataObjects, t2) = PerformanceUtils.measureTime {
       getDataObjectConfigMap(config)
@@ -75,7 +80,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
     logger.debug(s"Parsed ${dataObjects.size} dataObjects in $t2 seconds")
     registry.register(dataObjects)
 
-    val (actions,t3) = PerformanceUtils.measureTime {
+    val (actions, t3) = PerformanceUtils.measureTime {
       getActionConfigMap(config)
         .map { case (id, config) => (ActionId(id), parseActionWithId(id, config)) }
     }
@@ -89,9 +94,13 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   final val CONFIG_SECTION_DATAOBJECTS = "dataObjects"
   final val CONFIG_SECTION_ACTIONS = "actions"
   final val CONFIG_SECTION_GLOBAL = "global"
+
   def getConnectionEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_CONNECTIONS)
+
   def getDataObjectsEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_DATAOBJECTS)
+
   def getActionsEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_ACTIONS)
+
   def extractConfigKeys(config: Config, entry: String): Seq[String] = {
     if (config.hasPath(entry)) config.getObject(entry).keySet().asScala.toSeq
     else Seq()
@@ -100,8 +109,11 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   def getAgentConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, CONFIG_SECTION_AGENTS)
 
   def getConnectionConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, CONFIG_SECTION_CONNECTIONS)
+
   def getDataObjectConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, CONFIG_SECTION_DATAOBJECTS)
+
   def getActionConfigMap(config: Config): Map[String, Config] = extractConfigMap(config, CONFIG_SECTION_ACTIONS)
+
   def extractConfigMap(config: Config, entry: String): Map[String, Config] = {
     if (config.hasPath(entry)) {
       config.get[Map[String, Config]](entry)
@@ -114,14 +126,14 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
    *
    * The config is expected to contain only the settings for this instance.
    *
-   * @param config    the "local" config specifying this [[SdlConfigObject]].
-   * @param configPath the current path in the configuration. Note that this is only used for error messages.
+   * @param config                 the "local" config specifying this [[SdlConfigObject]].
+   * @param configPath             the current path in the configuration. Note that this is only used for error messages.
    * @param additionalConfigValues additional configuration values to add to the config before parsing.
-   * @param registry  the [[InstanceRegistry]] to pass to the [[SdlConfigObject]] instance.
-   * @tparam A        the abstract type this object, i.e.: [[Action]] or [[DataObject]]
-   * @return          a new instance of this [[SdlConfigObject]].
+   * @param registry               the [[InstanceRegistry]] to pass to the [[SdlConfigObject]] instance.
+   * @tparam A the abstract type this object, i.e.: [[Action]] or [[DataObject]]
+   * @return a new instance of this [[SdlConfigObject]].
    */
-  def parseConfigObject[A <: ParsableFromConfig[A] : TypeTag](config: Config, configPath: Option[String] = None, additionalConfigValues : Map[String,AnyRef] = Map())
+  def parseConfigObject[A <: ParsableFromConfig[A] : TypeTag](config: Config, configPath: Option[String] = None, additionalConfigValues: Map[String, AnyRef] = Map())
                                                              (implicit registry: InstanceRegistry): A = try {
     // get class & module
     val configuredType = config.get[String]("type")
@@ -138,16 +150,16 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
     val factoryMethod: FactoryMethod[A] = new FactoryMethod(companionObjectSymbol, FactoryMethodExtractor.extract(companionObjectSymbol))
 
     // prepare refined config
-    val configExtended = additionalConfigValues.foldLeft(config){
-      case (config, (key,value)) => config.withValue(key, ConfigValueFactory.fromAnyRef(value))
+    val configExtended = additionalConfigValues.foldLeft(config) {
+      case (config, (key, value)) => config.withValue(key, ConfigValueFactory.fromAnyRef(value))
     }
-    .withoutPath("type")
+      .withoutPath("type")
     val configSubstituted = Environment.configPathsForLocalSubstitution.foldLeft(configExtended) {
       case (config, path) => try {
-          localSubstitution(config, path)
-        } catch {
-          case e: ConfigurationException => throw ConfigurationException(s"Error in local config substitution for path='$path': ${e.message}", Some(s"$configPath.$path"), e)
-        }
+        localSubstitution(config, path)
+      } catch {
+        case e: ConfigurationException => throw ConfigurationException(s"Error in local config substitution for path='$path': ${e.message}", Some(s"$configPath.$path"), e)
+      }
     }
 
     // create object
@@ -161,6 +173,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   } catch {
     case e: Exception => throw enrichExceptionMessageConfigPath(enrichExceptionMessageClassName(e), configPath)
   }
+
   def parseConfigObjectWithId[A <: ParsableFromConfig[A] : TypeTag](id: String, config: Config)(implicit registry: InstanceRegistry): A = {
     parseConfigObject[A](config, Some(getIdWithClassNamePrefixed[A](id)), Map("id" -> id))
   }
@@ -183,6 +196,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
     def getRootCause(cause: Throwable): Throwable = {
       Option(cause.getCause).map(getRootCause).getOrElse(cause)
     }
+
     val rootCause = getRootCause(e)
     if (!rootCause.isInstanceOf[ConfigException]) {
       val rootCauseClassName = rootCause.getClass.getSimpleName
@@ -207,7 +221,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
    * Adds the class name to a given Id as prefix.
    * This is mainly used for error messages.
    */
-  def getIdWithClassNamePrefixed[A : TypeTag](id: String): String = {
+  def getIdWithClassNamePrefixed[A: TypeTag](id: String): String = {
     val configObjectType = typeOf[A]
     configObjectType.typeSymbol.name.toString + "~" + id
   }
@@ -219,8 +233,8 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
    * of the abstract type inside package "io.smartdatalake.workflow".
    *
    * @param configuredType type attribute from configuration.
-   * @tparam A            the abstract type of this object, i.e.: [[Action]] or [[DataObject]]
-   * @return              the fully qualified class name of this class.
+   * @tparam A the abstract type of this object, i.e.: [[Action]] or [[DataObject]]
+   * @return the fully qualified class name of this class.
    */
   private def className[A <: ParsableFromConfig[_] : TypeTag](configuredType: String): String = {
     // if no package name is given, we search for an implementation with simple class name <configuredType> of the abstract type [A] inside package "io.smartdatalake.workflow"
@@ -230,7 +244,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
         .filter(_.getSimpleName == configuredType)
       val abstractSymbol = symbolOf[A]
       if (implClasses.isEmpty) throw new ClassNotFoundException(s"Implementation $configuredType of interface ${abstractSymbol.name} not found")
-      if (implClasses.size>1) throw new IllegalStateException(s"Multiple implementation named $configuredType for interface ${abstractSymbol.name} found: ${implClasses.map(_.getName).mkString(", ")}")
+      if (implClasses.size > 1) throw new IllegalStateException(s"Multiple implementation named $configuredType for interface ${abstractSymbol.name} found: ${implClasses.map(_.getName).mkString(", ")}")
       implClasses.head.getName
     } else configuredType
   }
@@ -240,7 +254,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
    * Token for substitution is "~{replacementPath}"
    *
    * @param config configuration object for local substitution
-   * @param path path to search for local substitution tokens and execute substitution
+   * @param path   path to search for local substitution tokens and execute substitution
    * @return config with local substitution executed on path
    */
   def localSubstitution(config: Config, path: String): Config = {
@@ -249,7 +263,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
       val replacementPath = regMatch.group(1)
       if (config.hasPath(replacementPath)) {
         if (config.getValue(replacementPath).valueType() == ConfigValueType.STRING
-          ||config.getValue(replacementPath).valueType() == ConfigValueType.NUMBER) config.getString(replacementPath)
+          || config.getValue(replacementPath).valueType() == ConfigValueType.NUMBER) config.getString(replacementPath)
         else throw ConfigurationException(s"local substitution path '$replacementPath' in path '$path' is not a string")
       } else throw ConfigurationException(s"local substitution path '$replacementPath' in path '$path' does not exist")
     }
