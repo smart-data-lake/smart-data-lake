@@ -23,11 +23,13 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.shaded.com.nimbusds.jose.util.StandardCharset
 import org.apache.parquet.crypto.keytools.KmsClient;
 
+// ATTENTION, this is only a dummy and does no proper key handling
+//TODO still need proper implementation of a KMS
 class DummyKms extends KmsClient {
   override def initialize(configuration: Configuration, s: String, s1: String, s2: String): Unit = {}
 
   override def wrapKey(key: Array[Byte], masterKeyIdentifier: String): String = {
-    masterKeyIdentifier
+    "Idonttellyouanykey"
   }
 
   override def unwrapKey(wrappedKey: String, masterKeyIdentifier: String): Array[Byte] = {
