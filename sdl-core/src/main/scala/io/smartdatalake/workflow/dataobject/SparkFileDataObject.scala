@@ -31,6 +31,7 @@ import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkObservation, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
+import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.FileSourceScanExec
 import org.apache.spark.sql.execution.datasources.FileScanRDD
@@ -48,7 +49,8 @@ import scala.util.Try
  *
  * Delegates read and write operations to Apache Spark [[DataFrameReader]] and [[DataFrameWriter]] respectively.
  */
-private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
+@DeveloperApi
+trait SparkFileDataObject extends HadoopFileDataObject
   with CanCreateSparkDataFrame with CanCreateStreamingDataFrame
   with CanWriteSparkDataFrame with CanCreateIncrementalOutput
   with UserDefinedSchema with SchemaValidation {
@@ -272,7 +274,7 @@ private[smartdatalake] trait SparkFileDataObject extends HadoopFileDataObject
   }
 
   // Store files observation object between call to setupFilesObserver until it is used in getSparkDataFrame.
-  private val filesObservers: mutable.Map[ActionId, FilesSparkObservation] = mutable.Map()
+  @transient private val filesObservers: mutable.Map[ActionId, FilesSparkObservation] = mutable.Map()
 
   /**
    * Setup an observation of files processed through custom metrics.
