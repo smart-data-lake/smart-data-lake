@@ -89,7 +89,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
 
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
     assert(srcDO != None)
-    val dfSrc = Seq(("testData", "Foo", "ice"), ("bar", "Space", "water")).toDF("c1", "c2", "c3")
+    val dfSrc = Seq(("testData", "Foo", "ice"), ("bar", "Space", "water"), ("gogo", "Space", "water")).toDF("c1", "c2", "c3")
     srcDO.writeDataFrame(SparkDataFrame(dfSrc), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
     // Run SDLB
@@ -157,7 +157,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
     val tgt = instanceRegistry.get[ParquetFileDataObject]("tgt")
     val dfTgt = tgt.getSparkDataFrame()
     val testCol = dfTgt.select("c2").map(f=>f.getString(0)).collect.toList
-    assert(testCol == Seq("Foo", "Space"))
+    assert(testCol == Seq("Foo", "Space", "Space"))
   }
 
 }
