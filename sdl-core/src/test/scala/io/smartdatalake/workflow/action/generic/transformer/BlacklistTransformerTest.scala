@@ -35,13 +35,22 @@ class BlacklistTransformerTest extends FunSuite {
   implicit val instanceRegistry = new InstanceRegistry()
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
-  test("only columns where the names exactly match are removed") {
-    val blacklistTransformer = BlacklistTransformer(columnBlacklist = Seq("column1", "Column2"))
+  test("only columns where the names match are removed") {
+    val blacklistTransformer = BlacklistTransformer(columnBlacklist = Seq("column1", "column3"))
     val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "column2"))
 
     val transformed = blacklistTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
 
     assert(transformed.schema.columns == Seq("column2"))
+  }
+
+  test("column blacklisting is case insensitive") {
+    val blacklistTransformer = BlacklistTransformer(columnBlacklist = Seq("ColumN1"))
+    val df = SparkDataFrame(Seq(1, 2).toDF("column1"))
+
+    val transformed = blacklistTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
+
+    assert(transformed.schema.columns.isEmpty)
   }
 
 }

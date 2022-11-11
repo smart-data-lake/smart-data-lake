@@ -42,15 +42,15 @@ case class BlacklistTransformer(override val name: String = "blacklist", overrid
     val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
 
-    val lowerCaseColumns = df.schema.columns.map(_.toLowerCase())
-
-    val nonExistingColumns = columnBlacklist.toSet.diff(lowerCaseColumns.toSet)
+    val lowerCaseSchemaColumns = df.schema.columns.map(_.toLowerCase()).toSet
+    val nonExistingColumns = columnBlacklist.filter(colName => !lowerCaseSchemaColumns.contains(colName.toLowerCase()))
     if (nonExistingColumns.nonEmpty) {
       logger.warn(s"The blacklisted columns [${nonExistingColumns.mkString(", ")}] do not exist in dataframe. " +
-                  s"Available columns are [${lowerCaseColumns.mkString(", ")}]. Note that column names are case sensitive.")
+        s"Available columns are [${df.schema.columns.mkString(", ")}].")
     }
 
-    val colsToSelect = lowerCaseColumns.filter(colName => !columnBlacklist.contains(colName))
+    val lowerCaseBlacklistColumns = columnBlacklist.map(_.toLowerCase()).toSet
+    val colsToSelect = df.schema.columns.filter(colName => !lowerCaseBlacklistColumns.contains(colName.toLowerCase()))
     df.select(colsToSelect.map(col))
   }
   override def factory: FromConfigFactory[GenericDfTransformer] = BlacklistTransformer

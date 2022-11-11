@@ -35,9 +35,18 @@ class WhitelistTransformerTest extends FunSuite {
   implicit val instanceRegistry = new InstanceRegistry()
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
-  test("only columns where the names exactly match are whitelisted") {
-    val whitelistTransformer = WhitelistTransformer(columnWhitelist = Seq("column1", "Column2"))
+  test("only columns where the names match are whitelisted") {
+    val whitelistTransformer = WhitelistTransformer(columnWhitelist = Seq("column1", "column3"))
     val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "column2"))
+
+    val transformed = whitelistTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
+
+    assert(transformed.schema.columns == Seq("column1"))
+  }
+
+  test("column whitelisting is case insensitive") {
+    val whitelistTransformer = WhitelistTransformer(columnWhitelist = Seq("coLumn1"))
+    val df = SparkDataFrame(Seq(1, 2).toDF("column1"))
 
     val transformed = whitelistTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
 
