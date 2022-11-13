@@ -237,7 +237,7 @@ class RelaxedParser( fileSchema:StructType, tgtSchema: StructType, parserOptions
       else fileRow.map(row => row.getAs[Any](name)).orNull
     }
     val resultRow = Row.fromSeq(values)
-    if (logger.isDebugEnabled) logger.debug(s"fileRow=$fileRow resultRow=$resultRow")
+    if (logger.isTraceEnabled) logger.trace(s"fileRow=$fileRow resultRow=$resultRow")
     resultRow
   }
 }
