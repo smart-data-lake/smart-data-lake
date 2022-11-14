@@ -143,12 +143,12 @@ case class XmlFileDataObject(override val id: DataObjectId,
     } else dfSuper
   }
 
-  override def writeDataFrameToPath(df: GenericDataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
+  override def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
     assert(partitions.isEmpty, "writing XML-Files with partitions is not supported by spark-xml")
-    super.writeDataFrameToPath(df, path, finalSaveMode)
+    super.writeSparkDataFrameToPath(df, path, finalSaveMode)
     // add file extension to files, as spark-xml does not out-of-the-box
     filesystem.globStatus(new Path(path, "part-*"), (path: Path) => !path.getName.contains("."))
-      .foreach(f => filesystem.rename(f.getPath, f.getPath.suffix(fileName.replace("*",""))))
+      .foreach(f => filesystem.rename(f.getPath, f.getPath.suffix(fileName.replace("*", ""))))
   }
 
   override def factory: FromConfigFactory[DataObject] = XmlFileDataObject

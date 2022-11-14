@@ -34,8 +34,9 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.FileSourceScanExec
-import org.apache.spark.sql.execution.datasources.FileScanRDD
+import org.apache.spark.sql.execution.datasources.{DataSource, FileScanRDD}
 import org.apache.spark.sql.functions.{col, input_file_name}
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import java.time.format.DateTimeFormatter
@@ -323,17 +324,17 @@ trait SparkFileDataObject extends HadoopFileDataObject
   }
 
   // Store files observation object between call to setupFilesObserver until it is used in getSparkDataFrame.
-  @transient private val filesObservers: mutable.Map[ActionId, FilesSparkObservation] = mutable.Map()
+  @transient private val filesObservers: mutable.Map[ActionId, ExecutionPlanSparkFilenameObservation[Row]] = mutable.Map()
 
   /**
    * Setup an observation of files processed through custom metrics.
    * This is used for incremental processing to keep track of files processed.
    * Note that filenameColumn needs to be configured for the DataObject in order for this to work.
    */
-  def setupFilesObserver(actionId: ActionId): FilesSparkObservation = {
+  def setupFilesObserver(actionId: ActionId): SparkFilenameObservation[Row] = {
     logger.debug(s"($id) setting up files observer for $actionId")
     // return existing observation for this action if existing, otherwise create a new one.
-    filesObservers.getOrElseUpdate(actionId, new FilesSparkObservation(actionId.id + "/" + id.id))
+    filesObservers.getOrElseUpdate(actionId, new ExecutionPlanSparkFilenameObservation(actionId.id + "/" + id.id))
   }
 
   override def getStreamingDataFrame(options: Map[String, String], pipelineSchema: Option[StructType])(implicit context: ActionPipelineContext): DataFrame = {
@@ -364,7 +365,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
     validateSchemaMin(SparkSchema(df.schema), "write")
     schema.foreach(schemaExpected => validateSchema(SparkSchema(df.schema), schemaExpected, "write"))
     // update current schema storage - this is to avoid schema inference and remember the schema if there is no data.
-    createSchemaFile(df)
+    if (!schema.isDefined) createSchemaFile(df)
   }
 
   private def createSchemaFile(df: DataFrame)(implicit context: ActionPipelineContext): Unit = {
@@ -471,6 +472,13 @@ trait SparkFileDataObject extends HadoopFileDataObject
     CompactionUtil.compactHadoopStandardPartitions(this, partitionValues)
   }
 
+  /**
+   * Check is this DataObject implements reading data using a Spark V2 DataSource.
+   */
+  def isV2ReadDataSource(implicit context: ActionPipelineContext): Boolean = {
+    DataSource.lookupDataSourceV2(readFormat, context.sparkSession.sessionState.conf).isDefined
+  }
+
 }
 
 object SparkFileDataObject extends SmartDataLakeLogger {
@@ -492,33 +500,55 @@ object SparkFileDataObject extends SmartDataLakeLogger {
 }
 
 /**
- * Observation of files processed using custom metrics.
+ * An interface to implement observing filenames processed.
  */
-private[smartdatalake] class FilesSparkObservation(name: String) extends SparkObservation(name) with SmartDataLakeLogger {
-
-  var filesInExecutionPlan: Option[Seq[String]] = None
+private[smartdatalake] abstract class SparkFilenameObservation[T](name: String) extends SparkObservation(name) with SmartDataLakeLogger {
 
   /**
    * Setup observation of custom metric on Dataset.
    */
-  def on[T](ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
-    logger.debug(s"($name) add files observation to Dataset")
-    // Note: There is a Spark problem (NullPointerException with TypedImperativeAggregate (like CollectSetDeterministic) in observe if there is no data, but sometimes also occurs otherwise on prod...
-    // see also https://issues.apache.org/jira/browse/SPARK-39044
-    //on(ds, collect_set_deterministic(col(filenameColumnName)).as("filesProcessed"))
-
-    // Workaround - get files processed from DataFrames execution plan. Note that this might be incorrect if there are additional filters applied.
-    filesInExecutionPlan = Some(SparkFileDataObject.getFilesProcessedFromSparkPlan(name, ds))
-    ds
-  }
+  def on[T](ds: Dataset[T], filenameColumnName: String): Dataset[T]
 
   /**
    * Get processed files observation result.
    * Note that this blocks until the query finished successfully. Call only after Spark action was started on observed Dataset.
    */
+  def getFilesProcessed: Seq[String]
+}
+
+
+/**
+ * Get files processed by using Spark observer on filename column
+ * Note: There is a Spark problem - NullPointerException with TypedImperativeAggregate (like CollectSetDeterministic) in observe if there is no data, but sometimes also occurs otherwise on prod...
+ * see also https://issues.apache.org/jira/browse/SPARK-39044
+ */
+private[smartdatalake] class ObserverSparkFilenameObservation[T](name: String) extends SparkFilenameObservation[T](name) {
+  def on[T](ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
+    logger.debug(s"($name) add files observation to Dataset")
+    on(ds, true, collect_set_deterministic(col(filenameColumnName)).as("filesProcessed"))
+  }
+
   def getFilesProcessed: Seq[String] = {
-    //val files = waitFor().getOrElse("filesProcessed", throw new IllegalStateException(s"($name) Did not receive filesProcessed observation!"))
-    //  .asInstanceOf[Seq[String]]
+    waitFor().getOrElse("filesProcessed", throw new IllegalStateException(s"($name) Did not receive filesProcessed observation!"))
+      .asInstanceOf[Seq[String]]
+  }
+}
+
+/**
+ * Workaround for bug in ObserverSparkFilenameObservation - get files processed from DataFrames execution plan.
+ * Note that this might be incorrect if there are additional filters applied.
+ */
+private[smartdatalake] class ExecutionPlanSparkFilenameObservation[T](name: String) extends SparkFilenameObservation[T](name) {
+
+  private var filesInExecutionPlan: Option[Seq[String]] = None
+
+  def on[T](ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
+    logger.debug(s"($name) add files observation to Dataset")
+    filesInExecutionPlan = Some(SparkFileDataObject.getFilesProcessedFromSparkPlan(name, ds))
+    ds
+  }
+
+  override def getFilesProcessed: Seq[String] = {
     val files = filesInExecutionPlan.getOrElse(throw new IllegalStateException(s"($name) filesInExecutionPlan is empty!"))
     if (logger.isDebugEnabled()) logger.debug(s"($name) files processed: ${files.mkString(", ")}")
     files

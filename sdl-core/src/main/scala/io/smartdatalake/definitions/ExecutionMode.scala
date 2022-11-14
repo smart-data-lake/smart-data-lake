@@ -33,6 +33,8 @@ import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
 import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.Row
+import org.apache.spark.sql.execution.datasources.{DataSource, DataSourceUtils}
 import org.apache.spark.sql.streaming.{OutputMode, Trigger}
 
 import java.sql.Timestamp
@@ -506,7 +508,7 @@ trait CustomModeLogic {
 case class FileIncrementalMoveMode(archivePath: Option[String] = None) extends ExecutionMode {
   assert(archivePath.forall(_.nonEmpty)) // empty string not allowed
 
-  private var sparkFilesObserver: Option[FilesSparkObservation] = None
+  private var sparkFilesObserver: Option[SparkFilenameObservation[Row]] = None
 
   /**
    * Check for files in input data object.
@@ -524,8 +526,10 @@ case class FileIncrementalMoveMode(archivePath: Option[String] = None) extends E
         Some(ExecutionModeResult(fileRefs = Some(fileRefs), inputPartitionValues = inputSubFeed.partitionValues, outputPartitionValues = inputSubFeed.partitionValues))
       case (inputDataObject: SparkFileDataObject, inputSubFeed: SparkSubFeed) =>
         if (!inputDataObject.checkFilesExisting) throw NoDataToProcessWarning(actionId.id, s"($actionId) No files to process found for ${mainInput.id} by FileIncrementalMoveMode.")
-        // setup observation of files processed
-        sparkFilesObserver = Some(inputDataObject.setupFilesObserver(actionId))
+        if (inputDataObject.isV2ReadDataSource) { // for V1 DataSources this needs to be implemented in postExec
+          // setup observation of files processed
+          sparkFilesObserver = Some(inputDataObject.setupFilesObserver(actionId))
+        }
         Some(ExecutionModeResult(inputPartitionValues = inputSubFeed.partitionValues, outputPartitionValues = inputSubFeed.partitionValues))
       case _ => throw ConfigurationException(s"($actionId) FileIncrementalMoveMode needs FileRefDataObject with FileSubFeed or SparkFileDataObject with SparkSubFeed as input")
     }
@@ -553,9 +557,14 @@ case class FileIncrementalMoveMode(archivePath: Option[String] = None) extends E
             }
         }
       case (sparkDataObject: SparkFileDataObject, sparkSubFeed: SparkSubFeed) =>
-        val files = sparkFilesObserver
-          .getOrElse(throw new IllegalStateException(s"($actionId) FilesObserver not setup for ${mainInput.id}"))
-          .getFilesProcessed
+        val files = if (sparkDataObject.isV2ReadDataSource) {
+          sparkFilesObserver
+            .getOrElse(throw new IllegalStateException(s"($actionId) FilesObserver not setup for ${mainInput.id}"))
+            .getFilesProcessed
+        } else {
+          sparkDataObject.getFileRefs(sparkSubFeed.partitionValues)
+            .map(_.fullPath)
+        }
         if (files.isEmpty) throw NoDataToProcessWarning(actionId.id, s"($actionId) No files to process found for ${mainInput.id} by FileIncrementalMoveMode.")
         logger.info(s"Cleaning up ${files.size} processed input files")
         if (archivePath.isDefined) {
