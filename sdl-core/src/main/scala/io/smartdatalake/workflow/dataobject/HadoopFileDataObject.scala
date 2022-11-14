@@ -64,15 +64,6 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     c => getConnectionReg[HadoopFileConnection](c, instanceRegistry())
   }
 
-
-  /**
-   * Configure whether [[io.smartdatalake.workflow.action.Action]]s should fail if the input file(s) are missing
-   * on the file system.
-   *
-   * Default is false.
-   */
-  def failIfFilesMissing: Boolean = false
-
   // these variables are not serializable
   @transient private var hadoopPathHolder: Path = _
   def hadoopPath(implicit context: ActionPipelineContext): Path = {
@@ -86,14 +77,10 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
 
   /**
    * Check if the input files exist.
-   *
-   * @throws IllegalArgumentException if `failIfFilesMissing` = true and no files found at `path`.
    */
   private[smartdatalake] def checkFilesExisting(implicit context: ActionPipelineContext): Boolean = {
-    if (!filesystem.exists(hadoopPath) || filesystem.listStatus(hadoopPath).isEmpty) {
-      require(!failIfFilesMissing, s"($id) failIfFilesMissing is enabled and no files to process have been found in $hadoopPath.")
-      false
-    } else true
+    if (!filesystem.exists(hadoopPath) || filesystem.globStatus(new Path(hadoopPath, fileName)).isEmpty) false
+    else true
   }
 
   override def deleteFile(file: String)(implicit context: ActionPipelineContext): Unit = {

@@ -57,6 +57,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     dataObj.writeDataFrameToPath(SparkDataFrame(df1.where($"h1"==="B")), new Path(dataObj.hadoopPath, "h1=B"), SDLSaveMode.Overwrite)
 
     val dataObjPartitioned = dataObj.copy(partitions = Seq("h1"))
+    assert(dataObjPartitioned.getFileRefs(pv1).size == 2)
 
     // read with list of partition values
     val dfResult1 = dataObjPartitioned.getSparkDataFrame(pv1).cache
@@ -88,6 +89,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
       schema = Some(SparkSchema(schema)),
       rowTag = Some("entry"),
     )
+    assert(dataObj.getFileRefs(Seq()).size == 1)
 
     // read
     val dfResult2 = dataObj.getSparkDataFrame()

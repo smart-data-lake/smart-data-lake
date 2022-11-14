@@ -201,7 +201,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
 
     // early check for no data to process.
     // This also prevents an error on Databricks when using filesObserver if there are no files to process. See also [[CollectSetDeterministic]].
-    if (context.phase == ExecutionPhase.Exec && Environment.enableSparkFileDataObjectNoDataCheck && SparkFileDataObject.getFilesProcessedFromSparkPlan(id.id, df).isEmpty)
+    if (context.phase == ExecutionPhase.Exec && Environment.enableSparkFileDataObjectNoDataCheck && SparkFileDataObject.tryGetFilesProcessedFromSparkPlan(id.id, df).exists(_.isEmpty))
       throw NoDataToProcessWarning(id.id, s"($id) No files to process found in execution plan")
 
     // add filename column
@@ -473,14 +473,21 @@ trait SparkFileDataObject extends HadoopFileDataObject
 
 }
 
-object SparkFileDataObject {
+object SparkFileDataObject extends SmartDataLakeLogger {
   /**
    * This method is searching for files processed by a given DataFrame by looking at its execution plan.
    */
   private[smartdatalake] def getFilesProcessedFromSparkPlan(id: String, df: Dataset[_]): Seq[String] = {
-    df.queryExecution.executedPlan.collectFirst { case x: FileSourceScanExec => x }
-      .getOrElse(throw new IllegalStateException(s"($id) No FileSourceScanExec found in execution plan to check if there is data to process"))
-      .inputRDD.asInstanceOf[FileScanRDD].filePartitions.flatMap(_.files).map(_.filePath)
+    val fileSources = df.queryExecution.executedPlan.collect { case x: FileSourceScanExec => x }
+    if (fileSources.isEmpty) throw new IllegalStateException(s"($id) No FileSourceScanExec found in execution plan to check if there is data to process")
+    fileSources.flatMap(_.inputRDD.asInstanceOf[FileScanRDD].filePartitions.flatMap(_.files).map(_.filePath))
+  }
+  private[smartdatalake] def tryGetFilesProcessedFromSparkPlan(id: String, df: Dataset[_]): Option[Seq[String]] = try {
+    Some(getFilesProcessedFromSparkPlan(id, df))
+  } catch {
+    case x: IllegalStateException =>
+      logger.warn(x.getMessage)
+      None
   }
 }
 
