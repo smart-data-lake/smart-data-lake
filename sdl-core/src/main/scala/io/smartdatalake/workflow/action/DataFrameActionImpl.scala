@@ -193,9 +193,14 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
             }
             // recreate DataFrame from DataObject if not skipped
             if (!subFeed.isSkipped && (!isRecursive || isDataExisting)) {
-              logger.info(s"($id) getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
-              input.getSubFeed(subFeed.partitionValues, subFeedType) // get SubFeed of specified type with fresh DataFrame
-                .withFilter(subFeed.partitionValues, subFeed.filter)
+              try {
+                logger.info(s"($id) getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
+                input.getSubFeed(subFeed.partitionValues, subFeedType) // get SubFeed of specified type with fresh DataFrame
+                  .withFilter(subFeed.partitionValues, subFeed.filter)
+              } catch {
+                // if there is no data, but it's an action with multiple inputs, we need to avoid that that the action gets skipped because of the thrown NoDataToProcessWarning
+                case _: NoDataToProcessWarning if inputs.size > 1 => subFeed.withDataFrame(Some(createEmptyDataFrame(input)))
+              }
             } else {
               // if skipped create empty DataFrame
               subFeed.withDataFrame(Some(createEmptyDataFrame(input)))
