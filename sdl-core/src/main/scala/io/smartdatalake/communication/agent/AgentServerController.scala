@@ -36,7 +36,7 @@ case class AgentServerController(
                             instanceRegistry: InstanceRegistry,
                             sdlb: SmartDataLakeBuilder
                           ) {
-  def handle(message: SDLMessage, agentServerConfig: AgentServerConfig): Option[SDLMessage] = message match {
+  def handle(message: SDLMessage, agentServerConfig: JettyAgentServerConfig): Option[SDLMessage] = message match {
     case SDLMessage(SDLMessageType.EndConnection, _ ,_,_,_,_) => None
     case SDLMessage(SDLMessageType.AgentInstruction, None, None, None, agentInstructionOpt, None) => agentInstructionOpt match {
       case Some(agentInstruction) =>

@@ -19,7 +19,7 @@
 
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.communication.agent.AgentClient
+import io.smartdatalake.communication.agent.{AgentClient, AzureRelayAgentClient, JettyAgentClient}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, SdlConfigObject}
 import io.smartdatalake.definitions.{Condition, ExecutionMode}
@@ -66,22 +66,9 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
   }
 
   def runOnAgent(executionPhase: ExecutionPhase)(implicit context: ActionPipelineContext): Seq[SubFeed] = {
-    val agentClient = AgentClient(agent)
+    val agentClient = AzureRelayAgentClient()
     val hoconInstructions = AgentClient.prepareHoconInstructions(wrappedAction, context.instanceRegistry.getConnections, agent, executionPhase)
-    agentClient.sendSDLMessage(hoconInstructions)
-
-    val instructionId = hoconInstructions.agentInstruction.get.instructionId
-
-    while (agentClient.socket.isConnected && !agentClient.socket.pendingResults.contains(instructionId)) {
-      Thread.sleep(1000)
-      println(s"Waiting for ${agent.id.id} to finish $instructionId...")
-    }
-    if(!agentClient.socket.isConnected){
-      throw new RuntimeException(s"Lost connection to ${agent.id.id}!")
-    }
-    val response = agentClient.socket.pendingResults.get(instructionId)
-    agentClient.socket.pendingResults.remove(instructionId)
-    agentClient.closeConnection()
+    val response = agentClient.sendSDLMessage(hoconInstructions)
 
     response.get.agentResult.get.dataObjectIdToSchema.map {
       case(dataObjectId: DataObjectId, schema: String) => convertToEmptySparkSubFeed(dataObjectId, schema)(context.sparkSession)

@@ -20,7 +20,7 @@
 package io.smartdatalake.app
 
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigSyntax}
-import io.smartdatalake.communication.agent.{AgentClient, AgentServer, AgentServerConfig, AgentServerController}
+import io.smartdatalake.communication.agent.{AgentClient, AgentServerController, AzureRelayAgentServer, JettyAgentClient, JettyAgentServer, JettyAgentServerConfig}
 import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getConnectionConfigMap, getDataObjectConfigMap, parseConfigObjectWithId}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, ConnectionId, DataObjectId}
@@ -42,6 +42,9 @@ import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import java.nio.file.Paths
 import scala.util.Try
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{Future, future}
 
 /**
  * This tests use configuration test/resources/application.conf
@@ -97,8 +100,9 @@ class SmartDataLakeBuilderRemoteTest extends FunSuite with BeforeAndAfter {
 
     val remoteSDLB = new DefaultSmartDataLakeBuilder()
     val agentController: AgentServerController = AgentServerController(remoteSDLB.instanceRegistry, remoteSDLB)
-    AgentServer.start(AgentServerConfig(sdlConfig = agentConfig), agentController)
-
+    Future {
+      AzureRelayAgentServer.start(JettyAgentServerConfig(sdlConfig = agentConfig), agentController)
+    }
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
       getClass.getResource("/configremote/application.conf").getPath))
     )

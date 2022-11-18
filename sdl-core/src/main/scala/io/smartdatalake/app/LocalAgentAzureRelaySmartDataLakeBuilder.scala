@@ -18,15 +18,9 @@
  */
 package io.smartdatalake.app
 
-import io.smartdatalake.app.LocalSmartDataLakeBuilder.{appType, logAndThrowException}
-import io.smartdatalake.communication.agent.{JettyAgentServer, JettyAgentServerConfig, AgentServerController}
+import io.smartdatalake.communication.agent.{AgentServerController, AzureRelayAgentServer, JettyAgentServer, JettyAgentServerConfig}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
-import io.smartdatalake.workflow.action.SDLExecutionId
-import org.apache.hadoop.conf.Configuration
 import scopt.OptionParser
-
-import java.io.File
-import java.time.LocalDateTime
 
 /**
  * Smart Data Lake Builder application for agent mode.
@@ -34,7 +28,7 @@ import java.time.LocalDateTime
  * Sets master to local[*] and deployMode to client by default.
  * //TODO Build the same for non local?
  */
-object LocalAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
+object LocalAgentAzureRelaySmartDataLakeBuilder extends SmartDataLakeBuilder {
 
   val agentParser : OptionParser[JettyAgentServerConfig] = new OptionParser[JettyAgentServerConfig](appType) {
     override def showUsageOnError: Option[Boolean] = Some(true)
@@ -67,7 +61,7 @@ object LocalAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
     agentParser.parse(args, JettyAgentServerConfig(sdlConfig = envconfig)) match {
       case Some(agentServerConfig) =>
         val agentController: AgentServerController = AgentServerController(new InstanceRegistry, this)
-        JettyAgentServer.start(agentServerConfig, agentController)
+        AzureRelayAgentServer.start(agentServerConfig, agentController)
       case None => logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
     }
   }

@@ -26,13 +26,13 @@
 
 	<modules>
 		<module>sdl-core</module>
-		<module>sdl-kafka</module>
+<!--		<module>sdl-kafka</module>
 		<module>sdl-splunk</module>
 		<module>sdl-jms</module>
 		<module>sdl-deltalake</module>
 		<module>sdl-snowflake</module>
 		<module>sdl-azure</module>
-		<module>sdl-lang</module>
+		<module>sdl-lang</module>-->
 	</modules>
 
 	<licenses>
@@ -310,7 +310,7 @@
 		<derby.version>10.14.2.0</derby.version>
 		<parquet.version>1.12.1</parquet.version>
 		<orc.version>1.6.11</orc.version>
-		<jetty.version>9.4.43.v20210629</jetty.version>
+		<jetty.version>9.4.44.v20210927</jetty.version>
 		<jakartaservlet.version>4.0.3</jakartaservlet.version>
 		<chill.version>0.10.0</chill.version>
 		<ivy.version>2.5.0</ivy.version>
@@ -897,7 +897,7 @@
 				<groupId>org.eclipse.jetty</groupId>
 				<artifactId>jetty-util</artifactId>
 				<version>${jetty.version}</version>
-				<scope>${jetty.deps.scope}</scope>
+				<scope>compile</scope>
 			</dependency>
 			<dependency>
 				<groupId>org.eclipse.jetty</groupId>

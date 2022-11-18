@@ -22,7 +22,7 @@ import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.Serialization.{read, writePretty}
 
 
-class AgentServerSocket(config: AgentServerConfig, agentController: AgentServerController) extends WebSocketAdapter with SmartDataLakeLogger {
+class JettyAgentServerSocket(config: JettyAgentServerConfig, agentController: AgentServerController) extends WebSocketAdapter with SmartDataLakeLogger {
   implicit val format: Formats = ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)
 
   override def onWebSocketConnect(sess: Session): Unit = {

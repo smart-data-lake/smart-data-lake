@@ -19,9 +19,9 @@
 package io.smartdatalake.communication.agent
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
-import io.smartdatalake.communication.agent.AgentServerConfig.{DefaultPort, MaxPortRetries}
+import io.smartdatalake.communication.agent.JettyAgentServerConfig.{DefaultPort, MaxPortRetries}
 
-object AgentServerConfig {
+object JettyAgentServerConfig {
   val DefaultPort = 4441
   val MaxPortRetries = 10
 }
@@ -33,4 +33,4 @@ object AgentServerConfig {
  *                       maxPortRetries describes how many times this should be attempted. If set to 0 it will not be attempted.
  *                       Values below 0 are not allowed.
  */
-case class AgentServerConfig(port: Int = DefaultPort, maxPortRetries: Int = MaxPortRetries, sdlConfig: SmartDataLakeBuilderConfig)
+case class JettyAgentServerConfig(port: Int = DefaultPort, maxPortRetries: Int = MaxPortRetries, sdlConfig: SmartDataLakeBuilderConfig)

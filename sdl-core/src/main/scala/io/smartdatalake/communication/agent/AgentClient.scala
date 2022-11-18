@@ -26,6 +26,13 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.agent.Agent
 import io.smartdatalake.workflow.connection.Connection
+import com.typesafe.config.{ConfigObject, ConfigRenderOptions, ConfigValueFactory}
+import io.smartdatalake.communication.message.{AgentInstruction, SDLMessage, SDLMessageType}
+import io.smartdatalake.config.ConfigParser.{CONFIG_SECTION_ACTIONS, CONFIG_SECTION_CONNECTIONS, CONFIG_SECTION_DATAOBJECTS}
+import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
+import io.smartdatalake.workflow.action.Action
+import io.smartdatalake.workflow.agent.Agent
+import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.{ActionDAGRunState, ExecutionPhase}
 import org.eclipse.jetty.websocket.client.WebSocketClient
 import org.json4s.ext.EnumNameSerializer
@@ -69,24 +76,7 @@ object AgentClient {
   }
 }
 
-case class AgentClient(agent: Agent) {
-  val socket = new AgentClientSocket()
-  val client = new WebSocketClient
-
-  def sendSDLMessage(message: SDLMessage): Unit = {
-    val uri = URI.create(agent.url)
-
-
-    client.start()
-
-    val fut = client.connect(socket, uri)
-    // Wait for Connect
-    val session = fut.get
-    session.getRemote.sendString(writePretty(message)(ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)))
-  }
-
-  def closeConnection(): Unit = {
-    client.stop()
-  }
+trait AgentClient {
+  def sendSDLMessage(message: SDLMessage): Option[SDLMessage]
 
 }

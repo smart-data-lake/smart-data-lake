@@ -26,14 +26,13 @@ import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.Map
 
-class AgentClientSocket() extends WebSocketAdapter with SmartDataLakeLogger {
+class JettyAgentClientSocket() extends WebSocketAdapter with SmartDataLakeLogger {
 
   val pendingResults = new mutable.HashMap[String, SDLMessage]()
 
   override def onWebSocketConnect(sess: Session): Unit = {
     super.onWebSocketConnect(sess)
   }
-
   override def onWebSocketText(message: String): Unit = {
     logger.info("Received TEXT message: " + message)
     super.onWebSocketText(message)
