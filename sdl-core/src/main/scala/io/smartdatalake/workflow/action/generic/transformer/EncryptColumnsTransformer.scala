@@ -34,57 +34,86 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.secrets.SecretsUtil
 import io.smartdatalake.workflow.ActionPipelineContext
+
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.UserDefinedFunction
 
-import javax.crypto.Cipher
-import javax.crypto.spec.{IvParameterSpec, SecretKeySpec}
-import java.security.MessageDigest
-import java.util
+import java.security.SecureRandom
+import java.util.Base64
+import javax.crypto.spec.{GCMParameterSpec, SecretKeySpec}
+import javax.crypto.{Cipher, KeyGenerator, SecretKey}
 import org.apache.spark.sql.functions.{col, lit, udf}
 
 trait EncryptDecrypt {
+  val key_byte: Array[Byte] = "test234".getBytes
   val cryptUDF: UserDefinedFunction = udf(encrypt _)
-  val cur_algorithm: String = "AES/ECB/PKCS5Padding"
+  private val ALGORITHM_STRING: String = "AES/GCM/PKCS5Padding"
+  private val ALGO: String = "AES"
+  private val AES_KEY_SIZE = 256
+  private val AES_KEY_SIZE_IN_BYTE = AES_KEY_SIZE / 8
+  private val IV_SIZE = 128
+  private val TAG_BIT_LENGTH = 128
 
-  def process(df: DataFrame, encryptColumns: Seq[String], key: String): DataFrame = {
+  private val secureRandom = new SecureRandom()
 
+  def process(df: DataFrame, encryptColumns: Seq[String]): DataFrame = {
+    //TODO remove
+    print("##### key: ", Base64.getEncoder().encodeToString(key_byte))
     var df_enc = df
     for (colName <- encryptColumns) {
-      df_enc = df_enc.withColumn(colName, cryptUDF(lit(key), col(colName)))
-      df_enc = df_enc.drop(colName.concat("key"))
+      df_enc = df_enc.withColumn(colName, cryptUDF(col(colName)))
     }
     df_enc
   }
 
-  def encrypt(key: String, value: String): String = {
-    val cipher: Cipher = Cipher.getInstance(cur_algorithm)
-    cipher.init(Cipher.ENCRYPT_MODE, keyToSpec(key), keyToIv(key))
-    org.apache.commons.codec.binary.Base64.encodeBase64String(cipher.doFinal(value.getBytes("UTF-8")))
+  def encrypt(message: String): String = {
+    val aesKey: SecretKey = generateAesKey()
+    val gcmParameterSpec = generateGcmParameterSpec()
+
+    val cipher = Cipher.getInstance(ALGORITHM_STRING)
+    cipher.init(Cipher.ENCRYPT_MODE, aesKey, gcmParameterSpec, new SecureRandom())
+    cipher.updateAAD(key_byte)
+
+    val encryptedMessage = cipher.doFinal(message.getBytes)
+    encodeData(aesKey, gcmParameterSpec, encryptedMessage)
   }
 
-  def decrypt(key: String, encryptedValue: String): String = {
-    val cipher: Cipher = Cipher.getInstance(cur_algorithm)
-    cipher.init(Cipher.DECRYPT_MODE, keyToSpec(key), keyToIv(key))
-    new String(cipher.doFinal(org.apache.commons.codec.binary.Base64.decodeBase64(encryptedValue)))
+  def decrypt(encryptedDataString: String): String = {
+    val (aesKey, gcmParameterSpec, encryptedMessage) = decodeData(encryptedDataString)
+
+    val cipher = Cipher.getInstance(ALGORITHM_STRING)
+    cipher.init(Cipher.DECRYPT_MODE, aesKey, gcmParameterSpec, new SecureRandom())
+    cipher.updateAAD(key_byte)
+
+    val message = cipher.doFinal(encryptedMessage)
+    new String(message)
   }
 
-  def keyToSpec(key: String): SecretKeySpec = {
-    var keyBytes: Array[Byte] = key.getBytes("UTF-8")
-    val sha: MessageDigest = MessageDigest.getInstance("SHA-1")
-    keyBytes = sha.digest(keyBytes)
-    keyBytes = util.Arrays.copyOf(keyBytes, 16)
-    new SecretKeySpec(keyBytes, "AES")
+  private def generateAesKey(): SecretKey = {
+    val keygen = KeyGenerator.getInstance(ALGO)
+    keygen.init(AES_KEY_SIZE)
+    keygen.generateKey
   }
 
-  def keyToIv(key:String): IvParameterSpec = {
-    var keyBytes: Array[Byte] = key.getBytes("UTF-8")
-    val sha: MessageDigest = MessageDigest.getInstance("SHA-1") // TODO do we need incease?
-    keyBytes = sha.digest(keyBytes)
-    keyBytes = util.Arrays.copyOf(keyBytes, 16) // TODO do we need incease?
-    new IvParameterSpec(keyBytes) //TODO , 42, 1024)
+  private def generateGcmParameterSpec(): GCMParameterSpec = {
+    val iv = new Array[Byte](IV_SIZE)
+    secureRandom.nextBytes(iv)
+    new GCMParameterSpec(TAG_BIT_LENGTH, iv)
   }
 
+  private def encodeData(aesKey: SecretKey, gcmParameterSpec: GCMParameterSpec, encryptedMessage: Array[Byte]): String = {
+    val data = aesKey.getEncoded ++ gcmParameterSpec.getIV ++ encryptedMessage
+    Base64.getEncoder.encodeToString(data)
+  }
+
+  private def decodeData(encodedData: String): (SecretKeySpec, GCMParameterSpec, Array[Byte]) = {
+    val data = Base64.getDecoder.decode(encodedData)
+    val aesKey = new SecretKeySpec(data.take(AES_KEY_SIZE_IN_BYTE), ALGO)
+    val iv = data.slice(AES_KEY_SIZE_IN_BYTE, AES_KEY_SIZE_IN_BYTE + IV_SIZE)
+    val gcmParameterSpec = new GCMParameterSpec(TAG_BIT_LENGTH, iv)
+    val encryptedMessage = data.drop(AES_KEY_SIZE_IN_BYTE + IV_SIZE)
+    (aesKey, gcmParameterSpec, encryptedMessage)
+  }
 }
 
 //TODO add more details to the description
@@ -95,22 +124,20 @@ trait EncryptDecrypt {
  * @param encryptColumns List of [columnA, columnB] to be encrypted
  * @param keyVariable contains the id of the provider and the name of the secret with format <PROVIDERID>#<SECRETNAME>,
  *                          e.g. ENV#<ENV_VARIABLE_NAME> to get a secret from an environment variable OR CLEAR#mYsEcReTkeY
- * @param algorithm Optional specifies the type of encryption algorithm, default: "AES/ECB/PKCS5Padding"
  */
 case class EncryptColumnsTransformer(override val name: String = "encryptColumns",
                                      override val description: Option[String] = None,
                                      encryptColumns: Seq[String],
                                      keyVariable: String,
-                                     algorithm: String = "AES/CBC/PKCS5Padding"
                                      )
   extends SparkDfTransformer with EncryptDecrypt {
   private[smartdatalake] val key: String = SecretsUtil.getSecret(keyVariable)
 
+  override val key_byte = key.getBytes
   override val cryptUDF: UserDefinedFunction = udf(encrypt _)
-  override val cur_algorithm: String = algorithm
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
-    process(df, encryptColumns, key)
+    process(df, encryptColumns)
   }
   override def factory: FromConfigFactory[GenericDfTransformer] = EncryptColumnsTransformer
 }
@@ -138,11 +165,11 @@ case class DecryptColumnsTransformer(override val name: String = "encryptColumns
   extends SparkDfTransformer with EncryptDecrypt {
   private[smartdatalake] val key: String = SecretsUtil.getSecret(keyVariable)
 
+  override val key_byte = key.getBytes
   override val cryptUDF: UserDefinedFunction = udf(decrypt _)
-  override val cur_algorithm: String = algorithm
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
-    process(df, decryptColumns, key)
+    process(df, decryptColumns)
   }
   override def factory: FromConfigFactory[GenericDfTransformer] = DecryptColumnsTransformer
 }
