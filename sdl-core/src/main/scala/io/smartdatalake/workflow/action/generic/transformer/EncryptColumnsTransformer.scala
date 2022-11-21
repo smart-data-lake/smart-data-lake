@@ -17,15 +17,6 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* General aspects:
- * There are various algorithms available. The most common and considered secure is:
- * AES with
- * Cipher Block Chaining (ECB is discouraged)
- * The Key should be large enough
- * e.g. see https://www.europeanpaymentscouncil.eu/sites/default/files/kb/file/2022-03/EPC342-08%20v11.0%20Guidelines%20on%20Cryptographic%20Algorithms%20Usage%20and%20Key%20Management.pdf
- */
-
-
 package io.smartdatalake.workflow.action.generic.transformer
 
 import com.typesafe.config.Config
@@ -45,7 +36,7 @@ import javax.crypto.{Cipher, KeyGenerator, SecretKey}
 import org.apache.spark.sql.functions.{col, lit, udf}
 
 trait EncryptDecrypt {
-  val key_byte: Array[Byte] = "test234".getBytes
+  val key: Array[Byte] = "test234".getBytes
   val cryptUDF: UserDefinedFunction = udf(encrypt _)
   private val ALGORITHM_STRING: String = "AES/GCM/PKCS5Padding"
   private val ALGO: String = "AES"
@@ -57,8 +48,6 @@ trait EncryptDecrypt {
   private val secureRandom = new SecureRandom()
 
   def process(df: DataFrame, encryptColumns: Seq[String]): DataFrame = {
-    //TODO remove
-    print("##### key: ", Base64.getEncoder().encodeToString(key_byte))
     var df_enc = df
     for (colName <- encryptColumns) {
       df_enc = df_enc.withColumn(colName, cryptUDF(col(colName)))
@@ -72,7 +61,7 @@ trait EncryptDecrypt {
 
     val cipher = Cipher.getInstance(ALGORITHM_STRING)
     cipher.init(Cipher.ENCRYPT_MODE, aesKey, gcmParameterSpec, new SecureRandom())
-    cipher.updateAAD(key_byte)
+    cipher.updateAAD(key)
 
     val encryptedMessage = cipher.doFinal(message.getBytes)
     encodeData(aesKey, gcmParameterSpec, encryptedMessage)
@@ -83,7 +72,7 @@ trait EncryptDecrypt {
 
     val cipher = Cipher.getInstance(ALGORITHM_STRING)
     cipher.init(Cipher.DECRYPT_MODE, aesKey, gcmParameterSpec, new SecureRandom())
-    cipher.updateAAD(key_byte)
+    cipher.updateAAD(key)
 
     val message = cipher.doFinal(encryptedMessage)
     new String(message)
@@ -131,9 +120,9 @@ case class EncryptColumnsTransformer(override val name: String = "encryptColumns
                                      keyVariable: String,
                                      )
   extends SparkDfTransformer with EncryptDecrypt {
-  private[smartdatalake] val key: String = SecretsUtil.getSecret(keyVariable)
+  private[smartdatalake] val cur_key: String = SecretsUtil.getSecret(keyVariable)
 
-  override val key_byte = key.getBytes
+  override val key = cur_key.getBytes
   override val cryptUDF: UserDefinedFunction = udf(encrypt _)
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
@@ -163,9 +152,9 @@ case class DecryptColumnsTransformer(override val name: String = "encryptColumns
                                      algorithm: String = "AES/CBC/PKCS5Padding"
                                     )
   extends SparkDfTransformer with EncryptDecrypt {
-  private[smartdatalake] val key: String = SecretsUtil.getSecret(keyVariable)
+  private[smartdatalake] val cur_key: String = SecretsUtil.getSecret(keyVariable)
 
-  override val key_byte = key.getBytes
+  override val key = cur_key.getBytes
   override val cryptUDF: UserDefinedFunction = udf(decrypt _)
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {

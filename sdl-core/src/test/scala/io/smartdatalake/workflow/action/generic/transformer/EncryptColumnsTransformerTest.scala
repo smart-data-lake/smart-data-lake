@@ -62,8 +62,8 @@ class EncryptColumnsTransformerTest extends FunSuite {
         |     transformers = [{
         |       type = EncryptColumnsTransformer
         |       encryptColumns = ["c2","c3"]
-        |       #keyVariable = "CLEAR#keyblabla123456789123456789gerg;lkndfkgjnbq34tnafegnql5k3naklefnjqk35jnbhaefnlkq3n'akfnblkq3n4h'lkanblkwqn5h'lkne'lbknq5'lhkna'lkbnql5k3hn"
-        |       keyVariable = "CLEAR#keyblabla"
+        |       keyVariable = "CLEAR#keyblabla123456789123456789gerg;lkndfkgjnbq34tnafegnql5k3naklefnjqk35jnbhaefnlkq3n'akfnblkq3n4h'lkanblkwqn5h'lkne'lbknq5'lhkna'lkbnql5k3hn"
+        |       #keyVariable = "CLEAR#keyblabla"
         |     }]
         |   }
         |}
@@ -122,8 +122,8 @@ class EncryptColumnsTransformerTest extends FunSuite {
         |     transformers = [{
         |       type = DecryptColumnsTransformer
         |       decryptColumns = ["c2","c3"]
-        |       #keyVariable = "CLEAR#keyblabla123456789123456789gerg;lkndfkgjnbq34tnafegnql5k3naklefnjqk35jnbhaefnlkq3n'akfnblkq3n4h'lkanblkwqn5h'lkne'lbknq5'lhkna'lkbnql5k3hn"
-        |       keyVariable = "CLEAR#keyblabla"
+        |       keyVariable = "CLEAR#keyblabla123456789123456789gerg;lkndfkgjnbq34tnafegnql5k3naklefnjqk35jnbhaefnlkq3n'akfnblkq3n4h'lkanblkwqn5h'lkne'lbknq5'lhkna'lkbnql5k3hn"
+        |       #keyVariable = "CLEAR#keyblabla"
         |     }]
         |   }
         |}
