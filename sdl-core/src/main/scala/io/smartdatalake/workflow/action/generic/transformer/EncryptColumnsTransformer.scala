@@ -48,11 +48,11 @@ trait EncryptDecrypt {
   private val secureRandom = new SecureRandom()
 
   def process(df: DataFrame, encryptColumns: Seq[String]): DataFrame = {
-    var df_enc = df
+    var dfEnc = df
     for (colName <- encryptColumns) {
-      df_enc = df_enc.withColumn(colName, cryptUDF(col(colName)))
+      dfEnc = dfEnc.withColumn(colName, cryptUDF(col(colName)))
     }
-    df_enc
+    dfEnc
   }
 
   def encrypt(message: String): String = {
@@ -105,13 +105,12 @@ trait EncryptDecrypt {
   }
 }
 
-//TODO add more details to the description
 /**
- * Encrypt specified columns of the DataFrame using javax.crypto.cipther algorithm.
- * @param name         name of the transformer
- * @param description  Optional description of the transformer
- * @param encryptColumns List of [columnA, columnB] to be encrypted
- * @param keyVariable contains the id of the provider and the name of the secret with format <PROVIDERID>#<SECRETNAME>,
+ * Encryption of specified columns using AES/GCM algorithm.
+ * @param name           name of the transformer
+ * @param description    Optional description of the transformer
+ * @param encryptColumns List of columns [columnA, columnB] to be encrypted
+ * @param keyVariable    contains the id of the provider and the name of the secret with format <PROVIDERID>#<SECRETNAME>,
  *                          e.g. ENV#<ENV_VARIABLE_NAME> to get a secret from an environment variable OR CLEAR#mYsEcReTkeY
  */
 case class EncryptColumnsTransformer(override val name: String = "encryptColumns",
@@ -138,11 +137,11 @@ object EncryptColumnsTransformer extends FromConfigFactory[GenericDfTransformer]
 }
 
 /**
- * Decrypt specified columns of the DataFrame using javax.crypto.cipther algorithm.
- * @param name         name of the transformer
- * @param description  Optional description of the transformer
- * @param decryptColumns List of [columnA, columnB] to be decrypted
- * @param keyVariable contains the id of the provider and the name of the secret with format <PROVIDERID>#<SECRETNAME>,
+ * Decryption of specified columns using AES/GCM algorithm.
+ * @param name           name of the transformer
+ * @param description    Optional description of the transformer
+ * @param decryptColumns List of columns [columnA, columnB] to be encrypted
+ * @param keyVariable    contains the id of the provider and the name of the secret with format <PROVIDERID>#<SECRETNAME>,
  *                          e.g. ENV#<ENV_VARIABLE_NAME> to get a secret from an environment variable OR CLEAR#mYsEcReTkeY
  */
 case class DecryptColumnsTransformer(override val name: String = "encryptColumns",
