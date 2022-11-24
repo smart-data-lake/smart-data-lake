@@ -45,14 +45,12 @@ object AzureRelayAgentServer extends AgentServer with SmartDataLakeLogger {
     val listener = new HybridConnectionListener(new URI(connectionParams.getEndpoint.toString + connectionParams.getEntityPath), tokenProvider)
 
     listener.openAsync.join
-    System.out.println("Listener is online. Press ENTER to terminate this program.")
+    logger.info("Listener is online.")
 
-
-    def doStuff(connection: HybridConnectionChannel): Unit =
-    {
+    def handleConnection(connection: HybridConnectionChannel): Unit = {
       // connection may be null if the listener is closed before receiving a connection
       if (connection != null) {
-        System.out.println("New session connected.")
+        logger.info("New session connected.")
         while ( {
           connection.isOpen
         }) {
@@ -72,10 +70,10 @@ object AzureRelayAgentServer extends AgentServer with SmartDataLakeLogger {
         logger.info("Connection is null!")
       }
     }
-/*    while ( {
+    while ( {
       listener.isOnline
-    }) */{ // If listener closes, then listener.acceptConnectionAsync() will complete with null after closing down
-      listener.acceptConnectionAsync().thenAccept(doStuff).join
+    }) { // If listener closes, then listener.acceptConnectionAsync() will complete with null after closing down
+      listener.acceptConnectionAsync().thenAccept(handleConnection).join
 
       logger.info("Reached end of AzureRelayAgentServer.start")
     }
@@ -83,6 +81,7 @@ object AzureRelayAgentServer extends AgentServer with SmartDataLakeLogger {
 
   def sendSDLMessage(sdlMessage: SDLMessage, connection: HybridConnectionChannel): Unit = {
     val outputString = writePretty(sdlMessage)
+    logger.info("Sending " + outputString)
     val msgToSend = ByteBuffer.wrap(outputString.getBytes)
     connection.writeAsync(msgToSend)
   }

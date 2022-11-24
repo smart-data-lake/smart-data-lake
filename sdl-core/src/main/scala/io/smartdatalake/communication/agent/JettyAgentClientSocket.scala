@@ -28,7 +28,7 @@ import scala.collection.mutable.Map
 
 class JettyAgentClientSocket() extends WebSocketAdapter with SmartDataLakeLogger {
 
-  val pendingResults = new mutable.HashMap[String, SDLMessage]()
+  var agentServerResponse: Option[SDLMessage] = Option.empty[SDLMessage]
 
   override def onWebSocketConnect(sess: Session): Unit = {
     super.onWebSocketConnect(sess)
@@ -40,7 +40,7 @@ class JettyAgentClientSocket() extends WebSocketAdapter with SmartDataLakeLogger
     val sdlMessage = read[SDLMessage](message)
     sdlMessage.msgType match {
       case SDLMessageType.AgentResult =>
-        pendingResults.put(sdlMessage.agentResult.get.instructionId, sdlMessage)
+        agentServerResponse = Some(sdlMessage)
       case SDLMessageType.EndConnection =>
         logger.info(this + ": received EndConnection request, closing connection")
         getSession.close(StatusCode.NORMAL, "Connection closed by " + this)

@@ -57,7 +57,7 @@ case class AgentServerController(
 
         instanceRegistryImplicit.register(actions)
 
-        val resultingSubfeeds = sdlb.agentExec(agentServerConfig.sdlConfig, agentInstruction.phase, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Seq(), Seq(), None, Seq(), simulation = false, globalConfig = GlobalConfig())(instanceRegistryImplicit)
+        val resultingSubfeeds = sdlb.agentExec(appConfig = agentServerConfig.sdlConfig, phase = agentInstruction.phase)(instanceRegistryImplicit)
 
         //TODO support other subfeed types than SparkSubFeed
         val resultingDataObjectIdToSchema = resultingSubfeeds.map(subFeed => DataObjectId(subFeed.dataObjectId.id) -> subFeed.asInstanceOf[SparkSubFeed].dataFrame.get.inner.schema.toDDL).toMap

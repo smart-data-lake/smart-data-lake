@@ -24,6 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, SdlConfigObject}
 import io.smartdatalake.definitions.{Condition, ExecutionMode}
 import io.smartdatalake.util.dag.DAGHelper.NodeId
+import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.agent.Agent
@@ -53,12 +54,12 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
 
   override def metricsFailCondition: Option[String] = wrappedAction.metricsFailCondition
 
-   override def prepare(implicit context: ActionPipelineContext): Unit = {
-     runOnAgent( ExecutionPhase.Prepare)
+  override def prepare(implicit context: ActionPipelineContext): Unit = {
+    runOnAgent(ExecutionPhase.Prepare)
   }
 
   override def init(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = {
-    runOnAgent( ExecutionPhase.Init)
+    runOnAgent(ExecutionPhase.Init)
   }
 
   override def exec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = {
@@ -66,12 +67,13 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
   }
 
   def runOnAgent(executionPhase: ExecutionPhase)(implicit context: ActionPipelineContext): Seq[SubFeed] = {
-    val agentClient = AzureRelayAgentClient()
+    val agentClient = CustomCodeUtil.getClassInstanceByName[AgentClient](agent.agentClientClassName)
+
     val hoconInstructions = AgentClient.prepareHoconInstructions(wrappedAction, context.instanceRegistry.getConnections, agent, executionPhase)
-    val response = agentClient.sendSDLMessage(hoconInstructions)
+    val response = agentClient.sendSDLMessage(hoconInstructions, agent)
 
     response.get.agentResult.get.dataObjectIdToSchema.map {
-      case(dataObjectId: DataObjectId, schema: String) => convertToEmptySparkSubFeed(dataObjectId, schema)(context.sparkSession)
+      case (dataObjectId: DataObjectId, schema: String) => convertToEmptySparkSubFeed(dataObjectId, schema)(context.sparkSession)
     }.toSeq
   }
 

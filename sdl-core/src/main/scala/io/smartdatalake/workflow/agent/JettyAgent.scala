@@ -20,18 +20,21 @@
 package io.smartdatalake.workflow.agent
 
 import com.typesafe.config.Config
+import io.smartdatalake.communication.agent.{AgentClient, JettyAgentClient}
 import io.smartdatalake.config.SdlConfigObject.AgentId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.workflow.connection.Connection
 
-case class AgentImpl(override val id: AgentId, override val url: String, override val connections: Map[String, Connection]) extends Agent {
+case class JettyAgent(override val id: AgentId, override val url: String, override val connections: Map[String, Connection]) extends Agent {
 
-  override def factory: FromConfigFactory[Agent] = AgentImpl
+  override def factory: FromConfigFactory[Agent] = JettyAgent
+
+  override val agentClientClassName = "io.smartdatalake.communication.agent.JettyAgentClient"
 }
 
-object AgentImpl extends FromConfigFactory[Agent] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): AgentImpl = {
-    extract[AgentImpl](config)
+object JettyAgent extends FromConfigFactory[Agent] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): JettyAgent = {
+    extract[JettyAgent](config)
   }
 }
 

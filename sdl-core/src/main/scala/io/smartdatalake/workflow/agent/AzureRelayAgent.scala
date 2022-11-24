@@ -19,27 +19,22 @@
 
 package io.smartdatalake.workflow.agent
 
-import io.smartdatalake.communication.agent.AgentClient
+import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.AgentId
-import io.smartdatalake.config.{ParsableFromConfig, SdlConfigObject}
-import io.smartdatalake.workflow.AtlasExportable
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.workflow.connection.Connection
 
-private[smartdatalake] trait Agent extends SdlConfigObject with ParsableFromConfig[Agent] with AtlasExportable {
-  /**
-   * A unique identifier for this instance.
-   */
-  override val id: AgentId
+case class AzureRelayAgent(override val id: AgentId, override val url: String, override val connections: Map[String, Connection]) extends Agent {
 
-  val url: String
+  override def factory: FromConfigFactory[Agent] = AzureRelayAgent
 
-  val connections: Map[String, Connection]
-
-  val agentClientClassName : String
-
-  def toStringShort: String = {
-    s"$id[${this.getClass.getSimpleName}]"
-  }
-
-  override def atlasName: String = id.id
+  override val agentClientClassName = "io.smartdatalake.communication.agent.AzureRelayAgentClient"
 }
+
+object AzureRelayAgent extends FromConfigFactory[Agent] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): AzureRelayAgent = {
+    extract[AzureRelayAgent](config)
+  }
+}
+
+
