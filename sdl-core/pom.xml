@@ -42,6 +42,12 @@
 	</dependencyManagement>
 
 	<dependencies>
+
+		<dependency>
+			<groupId>com.microsoft.azure</groupId>
+			<artifactId>azure-relay</artifactId>
+			<version>0.0.4</version>
+		</dependency>
 		<dependency>
 			<groupId>com.databricks</groupId>
 			<artifactId>dbutils-api_2.11</artifactId>
@@ -292,11 +298,7 @@
 			<version>${fasterxml.jackson.version}</version>
 		</dependency>-->
 
-		<dependency>
-			<groupId>com.microsoft.azure</groupId>
-			<artifactId>azure-relay</artifactId>
-			<version>0.0.4</version>
-		</dependency>
+
 
 		<!-- TEST dependencies -->
 		<dependency>
