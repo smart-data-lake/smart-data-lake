@@ -219,9 +219,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * @param appConfig Application configuration (parsed from command line).
    */
   def run(appConfig: SmartDataLakeBuilderConfig): Map[RuntimeEventState,Int] = {
-    // invoke SDLPlugin if configured
-    Environment.sdlPlugin.foreach(_.startup())
     val stats = try {
+      // invoke SDLPlugin if configured
+      Environment.sdlPlugin.foreach(_.startup())
       // create default hadoop configuration, as we did not yet load custom spark/hadoop properties
       implicit val defaultHadoopConf: Configuration = new Configuration()
       // handle state if defined
@@ -250,7 +250,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     } catch {
       case e: Exception =>
         // try shutdown but catch potential exception
-        shutdown
+        try {
+          shutdown
+        }
         // throw original exception
         throw e
     }
@@ -326,10 +328,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     ConfigParser.parse(config, this.instanceRegistry)
   }
 
-
   /**
    * Start run.
-   *
    * @return tuple of list of final subfeeds and statistics (action count per RuntimeEventState)
    */
   private[smartdatalake] def startRun(appConfig: SmartDataLakeBuilderConfig, executionId: SDLExecutionId = SDLExecutionId.executionId1, runStartTime: LocalDateTime = LocalDateTime.now, attemptStartTime: LocalDateTime = LocalDateTime.now, actionsToSkip: Map[ActionId, RuntimeInfo] = Map(), initialSubFeeds: Seq[SubFeed] = Seq(), dataObjectsState: Seq[DataObjectState] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, simulation: Boolean = false)(implicit hadoopConf: Configuration): (Seq[SubFeed], Map[RuntimeEventState, Int]) = {

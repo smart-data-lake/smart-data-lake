@@ -227,31 +227,6 @@
 			<artifactId>monix-execution_${scala.minor.version}</artifactId>
 			<version>${monix.version}</version>
 		</dependency>
-		<dependency>
-			<groupId>com.fasterxml.jackson.core</groupId>
-			<artifactId>jackson-annotations</artifactId>
-			<version>2.12.5</version>
-		</dependency>
-		<dependency>
-			<groupId>com.fasterxml.jackson.core</groupId>
-			<artifactId>jackson-core</artifactId>
-			<version>2.12.5</version>
-		</dependency>
-		<dependency>
-			<groupId>com.fasterxml.jackson.core</groupId>
-			<artifactId>jackson-databind</artifactId>
-			<version>2.12.5</version>
-		</dependency>
-		<dependency>
-			<groupId>org.ow2.asm</groupId>
-			<artifactId>asm</artifactId>
-			<version>9.1</version>
-		</dependency>
-		<dependency>
-			<groupId>com.fasterxml.jackson.module</groupId>
-			<artifactId>jackson-module-jaxb-annotations</artifactId>
-			<version>2.12.5</version>
-		</dependency>
 
 		<dependency>
 			<groupId>com.github.mutcianm</groupId>
@@ -292,13 +267,11 @@
 			<artifactId>json-schema-validator</artifactId>
 			<version>1.0.42</version>
 		</dependency>
-<!--		<dependency>
+		<dependency>
 			<groupId>com.fasterxml.jackson.datatype</groupId>
 			<artifactId>jackson-datatype-jsr310</artifactId>
 			<version>${fasterxml.jackson.version}</version>
-		</dependency>-->
-
-
+		</dependency>
 
 		<!-- TEST dependencies -->
 		<dependency>
@@ -379,17 +352,11 @@
 			<version>${jetty.version}</version>
 		</dependency>
 		<!-- Needed to serialize Requests for StatusInfoRestApi-->
-<!--		<dependency>
+		<dependency>
 			<groupId>org.glassfish.jersey.media</groupId>
 			<artifactId>jersey-media-json-jackson</artifactId>
 			<version>${jersey.version}</version>
-			<exclusions>
-				<exclusion>
-					<artifactId>jackson-module-jaxb-annotations</artifactId>
-					<groupId>com.fasterxml.jackson.module</groupId>
-				</exclusion>
-			</exclusions>
-		</dependency>-->
+		</dependency>
 
 		<!--Jetty Websocket server side dependencies start here -->
 		<dependency>

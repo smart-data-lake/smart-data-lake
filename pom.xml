@@ -126,9 +126,6 @@
 		</profile>
 		<profile>
 			<id>fat-jar-with-spark</id>
-			<properties>
-				<jetty.deps.scope>compile</jetty.deps.scope>
-			</properties>
 			<build>
 				<plugins>
 					<!-- Builds executable fat-jar that includes all dependencies -->
@@ -279,7 +276,6 @@
 		<orc.deps.scope>compile</orc.deps.scope>
 		<parquet.deps.scope>compile</parquet.deps.scope>
 		<parquet.test.deps.scope>test</parquet.test.deps.scope>
-		<jetty.deps.scope>provided</jetty.deps.scope>
 
 		<scala.minor.version>2.12</scala.minor.version>
 		<scala.version>${scala.minor.version}.15</scala.version>
@@ -897,7 +893,7 @@
 				<groupId>org.eclipse.jetty</groupId>
 				<artifactId>jetty-util</artifactId>
 				<version>${jetty.version}</version>
-				<scope>compile</scope>
+				<scope>${jetty.deps.scope}</scope>
 			</dependency>
 			<dependency>
 				<groupId>org.eclipse.jetty</groupId>
