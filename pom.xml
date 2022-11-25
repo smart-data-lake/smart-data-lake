@@ -126,6 +126,9 @@
 		</profile>
 		<profile>
 			<id>fat-jar-with-spark</id>
+			<properties>
+				<jetty.deps.scope>compile</jetty.deps.scope>
+			</properties>
 			<build>
 				<plugins>
 					<!-- Builds executable fat-jar that includes all dependencies -->
