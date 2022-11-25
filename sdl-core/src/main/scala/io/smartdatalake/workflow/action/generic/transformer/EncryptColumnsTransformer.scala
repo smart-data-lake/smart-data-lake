@@ -36,7 +36,7 @@ import javax.crypto.{Cipher, SecretKey}
 import org.apache.spark.sql.functions.{col, udf}
 
 trait EncryptDecrypt {
-  val key: Array[Byte] = "test234".getBytes
+  def key: Array[Byte] //= "test234".getBytes
   val cryptUDF: UserDefinedFunction = udf(encrypt _)
   private val ALGORITHM_STRING: String = "AES/GCM/PKCS5Padding"
   private val IV_SIZE = 128
@@ -115,7 +115,7 @@ case class EncryptColumnsTransformer(override val name: String = "encryptColumns
   extends SparkDfTransformer with EncryptDecrypt {
   private[smartdatalake] val cur_key: String = SecretsUtil.getSecret(keyVariable)
 
-  override val key: Array[Byte] = cur_key.getBytes
+  override def key: Array[Byte] = cur_key.getBytes
   override val cryptUDF: UserDefinedFunction = udf(encrypt _)
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
@@ -147,7 +147,7 @@ case class DecryptColumnsTransformer(override val name: String = "encryptColumns
   extends SparkDfTransformer with EncryptDecrypt {
   private[smartdatalake] val cur_key: String = SecretsUtil.getSecret(keyVariable)
 
-  override val key: Array[Byte] = cur_key.getBytes
+  override def key: Array[Byte] = cur_key.getBytes
   override val cryptUDF: UserDefinedFunction = udf(decrypt _)
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
