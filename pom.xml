@@ -279,7 +279,7 @@
 		<orc.deps.scope>compile</orc.deps.scope>
 		<parquet.deps.scope>compile</parquet.deps.scope>
 		<parquet.test.deps.scope>test</parquet.test.deps.scope>
-
+		<jetty.deps.scope>provided</jetty.deps.scope>
 		<scala.minor.version>2.12</scala.minor.version>
 		<scala.version>${scala.minor.version}.15</scala.version>
 
