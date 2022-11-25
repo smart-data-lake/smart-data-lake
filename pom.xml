@@ -282,7 +282,6 @@
 		<jetty.deps.scope>provided</jetty.deps.scope>
 		<scala.minor.version>2.12</scala.minor.version>
 		<scala.version>${scala.minor.version}.15</scala.version>
-
 		<spark.version>3.2.2</spark.version>
 		<spark-extensions.version>3.2.3</spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
 		<spark.minor.version>3.2</spark.minor.version> <!-- this is used in sdl-snowflake -->

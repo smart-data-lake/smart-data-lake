@@ -118,7 +118,7 @@ class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter {
     assert(Paths.get(System.getProperty("user.dir"), "target", "jetty_dummy_cloud_connection", "cloud-file2").toFile.exists())
   }
 
-  test("sdlb run with AzureRelayAgentServer: Test starting remote action from sdlb to agentserver") {
+  ignore("sdlb run with AzureRelayAgentServer: Test starting remote action from sdlb to agentserver") {
 
     val feedName = "test"
     FileUtils.deleteDirectory(Paths.get(System.getProperty("user.dir"), "target/relay_agent_dummy_connection").toFile)
