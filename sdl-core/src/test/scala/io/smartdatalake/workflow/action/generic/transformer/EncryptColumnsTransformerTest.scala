@@ -21,13 +21,13 @@ package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.testutils.TestUtil
 import org.apache.spark.sql.SparkSession
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.FunSuite
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.stringToDataObjectId
 import io.smartdatalake.config.{ConfigParser, InstanceRegistry}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
-import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
+import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.testutils.TestUtil.sparkSessionBuilder
@@ -40,13 +40,11 @@ import java.time.LocalDateTime
 
 class EncryptColumnsTransformerTest extends FunSuite {
   private val tempDir = Files.createTempDirectory("test")
-  private val tempPath = tempDir.toAbsolutePath.toString
 
   val statePath = "target/stateTest/"
   implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithDefaultConf(new Path(statePath))
 
   test("test column encryption") {
-    val feedName = "test"
     val sdlb = new DefaultSmartDataLakeBuilder()
 
     val config = ConfigFactory.parseString(
@@ -62,7 +60,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
         |     transformers = [{
         |       type = EncryptColumnsTransformer
         |       encryptColumns = ["c2","c3"]
-        |       keyVariable = "CLEAR#keyblabla123456789123456789gerg;lkndfkgjnbq34tnafegnql5k3naklefnjqk35jnbhaefnlkq3n'akfnblkq3n4h'lkanblkwqn5h'lkne'lbknq5'lhkna'lkbnql5k3hn"
+        |       keyVariable = "CLEAR#A%D*G-KaPdSgVkYp"
         |       #keyVariable = "CLEAR#keyblabla"
         |     }]
         |   }
@@ -122,7 +120,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
         |     transformers = [{
         |       type = DecryptColumnsTransformer
         |       decryptColumns = ["c2","c3"]
-        |       keyVariable = "CLEAR#keyblabla123456789123456789gerg;lkndfkgjnbq34tnafegnql5k3naklefnjqk35jnbhaefnlkq3n'akfnblkq3n4h'lkanblkwqn5h'lkne'lbknq5'lhkna'lkbnql5k3hn"
+        |       keyVariable = "CLEAR#A%D*G-KaPdSgVkYp"
         |       #keyVariable = "CLEAR#keyblabla"
         |     }]
         |   }
@@ -158,6 +156,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
     // check result
     val tgt = instanceRegistry.get[ParquetFileDataObject]("tgt")
     val dfTgt = tgt.getSparkDataFrame()
+    dfTgt.show()
     val testCol = dfTgt.select("c2").map(f=>f.getString(0)).collect.toList
     assert(testCol == Seq("Foo", "Space", "Space"))
   }
