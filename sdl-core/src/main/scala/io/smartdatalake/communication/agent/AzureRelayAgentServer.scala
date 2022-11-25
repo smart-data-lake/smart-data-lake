@@ -27,20 +27,19 @@ import java.nio.ByteBuffer
 import java.util.Scanner
 import java.util.concurrent.CompletableFuture
 import com.microsoft.azure.relay.{HybridConnectionChannel, HybridConnectionListener, RelayConnectionStringBuilder, TokenProvider}
+import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.communication.message.{SDLMessage, SDLMessageType}
 import io.smartdatalake.workflow.{ActionDAGRunState, ExecutionPhase}
 import org.json4s.Formats
 import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.Serialization.{read, writePretty}
 
-object AzureRelayAgentServer extends AgentServer with SmartDataLakeLogger {
+object AzureRelayAgentServer extends SmartDataLakeLogger {
   implicit val format: Formats = ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)
 
-  val connectionParams =
-    new RelayConnectionStringBuilder (
-      "Endpoint=sb://relay-tbb-test.servicebus.windows.net/;EntityPath=relay-tbb-test-connection;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=" + System.getenv("SharedAccessKey"))
+  def start(config: AzureRelayAgentServerConfig, agentController: AgentServerController): Unit = {
+    val connectionParams = new RelayConnectionStringBuilder(config.url + System.getenv("SharedAccessKey"))
 
-  override def start(config: JettyAgentServerConfig, agentController: AgentServerController): Unit = {
     val tokenProvider = TokenProvider.createSharedAccessSignatureTokenProvider(connectionParams.getSharedAccessKeyName, connectionParams.getSharedAccessKey)
     val listener = new HybridConnectionListener(new URI(connectionParams.getEndpoint.toString + connectionParams.getEntityPath), tokenProvider)
 
@@ -58,14 +57,14 @@ object AzureRelayAgentServer extends AgentServer with SmartDataLakeLogger {
           // If the read operation is still pending when connection closes, the read result as null.
           if (bytesReceived.remaining > 0) {
             val message = new String(bytesReceived.array, bytesReceived.arrayOffset, bytesReceived.remaining)
-            logger.info("Received TEXT message: " + message)
+            logger.info("Received " + message)
             val sdlMessage = read[SDLMessage](message)
-            val responseMessageOpt = agentController.handle(sdlMessage, config)
+            val responseMessageOpt = agentController.handle(sdlMessage, config.sdlConfig)
             if (responseMessageOpt.isDefined) sendSDLMessage(responseMessageOpt.get, connection)
             else closeConnection(connection)
           }
         }
-        System.out.println("Session disconnected.")
+        logger.info("Session disconnected.")
       } else {
         logger.info("Connection is null!")
       }
@@ -74,19 +73,17 @@ object AzureRelayAgentServer extends AgentServer with SmartDataLakeLogger {
       listener.isOnline
     }) { // If listener closes, then listener.acceptConnectionAsync() will complete with null after closing down
       listener.acceptConnectionAsync().thenAccept(handleConnection).join
-
-      logger.info("Reached end of AzureRelayAgentServer.start")
     }
   }
 
-  def sendSDLMessage(sdlMessage: SDLMessage, connection: HybridConnectionChannel): Unit = {
+  private def sendSDLMessage(sdlMessage: SDLMessage, connection: HybridConnectionChannel): Unit = {
     val outputString = writePretty(sdlMessage)
     logger.info("Sending " + outputString)
     val msgToSend = ByteBuffer.wrap(outputString.getBytes)
     connection.writeAsync(msgToSend)
   }
 
-  def closeConnection(connection: HybridConnectionChannel): Unit = {
+  private def closeConnection(connection: HybridConnectionChannel): Unit = {
     logger.info(this + ": received EndConnection request, closing connection")
     connection.close()
   }

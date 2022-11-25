@@ -19,7 +19,6 @@
 
 package io.smartdatalake.communication.agent
 
-abstract class AgentServer {
-  def start(config: JettyAgentServerConfig, serverController: AgentServerController): Unit
+import io.smartdatalake.app.SmartDataLakeBuilderConfig
 
-}
+case class AzureRelayAgentServerConfig(url: String = "", sdlConfig: SmartDataLakeBuilderConfig)

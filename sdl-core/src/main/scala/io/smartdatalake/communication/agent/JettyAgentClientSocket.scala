@@ -34,16 +34,13 @@ class JettyAgentClientSocket() extends WebSocketAdapter with SmartDataLakeLogger
     super.onWebSocketConnect(sess)
   }
   override def onWebSocketText(message: String): Unit = {
-    logger.info("Received TEXT message: " + message)
+    logger.info("Received " + message)
     super.onWebSocketText(message)
     implicit val format: Formats = ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)
     val sdlMessage = read[SDLMessage](message)
     sdlMessage.msgType match {
       case SDLMessageType.AgentResult =>
         agentServerResponse = Some(sdlMessage)
-      case SDLMessageType.EndConnection =>
-        logger.info(this + ": received EndConnection request, closing connection")
-        getSession.close(StatusCode.NORMAL, "Connection closed by " + this)
       case _ =>
     }
   }

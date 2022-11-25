@@ -42,15 +42,16 @@ class JettyAgentServerSocket(config: JettyAgentServerConfig, agentController: Ag
 
   override def onWebSocketText(message: String): Unit = {
     super.onWebSocketText(message)
-    logger.info("Received TEXT message: " + message)
+    logger.info("Received " + message)
     val sdlMessage = read[SDLMessage](message)
-    val responseMessageOpt = agentController.handle(sdlMessage, config)
+    val responseMessageOpt = agentController.handle(sdlMessage, config.sdlConfig)
     if(responseMessageOpt.isDefined) sendSDLMessage(responseMessageOpt.get)
     else closeConnection()
   }
 
   def sendSDLMessage(sdlMessage: SDLMessage): Unit = {
     val outputString = writePretty(sdlMessage)
+    logger.info("Sending" + outputString)
     getSession.getRemote.sendString(outputString)
   }
 

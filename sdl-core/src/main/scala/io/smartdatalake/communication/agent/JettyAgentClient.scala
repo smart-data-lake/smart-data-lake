@@ -20,6 +20,7 @@
 package io.smartdatalake.communication.agent
 
 import io.smartdatalake.communication.message.{SDLMessage, SDLMessageType}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.agent.Agent
 import io.smartdatalake.workflow.{ActionDAGRunState, ExecutionPhase}
 import org.eclipse.jetty.websocket.client.WebSocketClient
@@ -28,7 +29,7 @@ import org.json4s.jackson.Serialization.writePretty
 
 import java.net.URI
 
-case class JettyAgentClient() extends AgentClient {
+case class JettyAgentClient() extends AgentClient with SmartDataLakeLogger {
   def sendSDLMessage(message: SDLMessage, agent: Agent): Option[SDLMessage] = {
     val socket = new JettyAgentClientSocket()
     val client = new WebSocketClient
@@ -36,11 +37,13 @@ case class JettyAgentClient() extends AgentClient {
     client.start()
 
     val session = client.connect(socket, uri).get
-    session.getRemote.sendString(writePretty(message)(ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)))
+    val messageStr = writePretty(message)(ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase))
+    logger.info("Sending " + messageStr)
+    session.getRemote.sendString(messageStr)
     val instructionId = message.agentInstruction.get.instructionId
     while (socket.isConnected && socket.agentServerResponse.isEmpty) {
       Thread.sleep(1000)
-      println(s"Waiting for ${agent.id.id} to finish $instructionId...")
+      logger.info(s"Waiting for ${agent.id.id} to finish $instructionId...")
     }
     if (!socket.isConnected) {
       throw new RuntimeException(s"Lost connection to ${agent.id.id}!")

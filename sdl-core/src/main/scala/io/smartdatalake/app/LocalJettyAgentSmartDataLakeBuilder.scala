@@ -32,9 +32,8 @@ import java.time.LocalDateTime
  * Smart Data Lake Builder application for agent mode.
  *
  * Sets master to local[*] and deployMode to client by default.
- * //TODO Build the same for non local?
  */
-object LocalAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
+object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
   val agentParser : OptionParser[JettyAgentServerConfig] = new OptionParser[JettyAgentServerConfig](appType) {
     override def showUsageOnError: Option[Boolean] = Some(true)

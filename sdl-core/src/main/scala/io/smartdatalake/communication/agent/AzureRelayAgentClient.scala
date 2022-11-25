@@ -47,7 +47,7 @@ case class AzureRelayAgentClient() extends AgentClient with SmartDataLakeLogger 
     // If the read operation is still pending when connection closes, the read result returns null.
     val response = if (byteBuffer != null) {
         val response = new String(byteBuffer.array, byteBuffer.arrayOffset, byteBuffer.remaining)
-        logger.info("Received TEXT message: " + response)
+        logger.info("Received " + response)
         val sdlMessage = read[SDLMessage](response)
         require(sdlMessage.msgType == SDLMessageType.AgentResult, "AgentServer must respond with AgentResult")
         Some(sdlMessage)

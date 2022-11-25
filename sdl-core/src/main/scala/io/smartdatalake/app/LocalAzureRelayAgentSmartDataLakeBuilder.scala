@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.app
 
-import io.smartdatalake.communication.agent.{AgentServerController, AzureRelayAgentServer, JettyAgentServer, JettyAgentServerConfig}
+import io.smartdatalake.communication.agent.{AgentServerController, AzureRelayAgentServer, AzureRelayAgentServerConfig, JettyAgentServer, JettyAgentServerConfig}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
 import scopt.OptionParser
 
@@ -26,18 +26,17 @@ import scopt.OptionParser
  * Smart Data Lake Builder application for agent mode.
  *
  * Sets master to local[*] and deployMode to client by default.
- * //TODO Build the same for non local?
  */
-object LocalAgentAzureRelaySmartDataLakeBuilder extends SmartDataLakeBuilder {
+object LocalAzureRelayAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
-  val agentParser : OptionParser[JettyAgentServerConfig] = new OptionParser[JettyAgentServerConfig](appType) {
+  val agentParser: OptionParser[AzureRelayAgentServerConfig] = new OptionParser[AzureRelayAgentServerConfig](appType) {
     override def showUsageOnError: Option[Boolean] = Some(true)
 
     head(appType, s"$appVersion")
 
-    parser.opt[Int]('p', "port")
-      .action((arg, config) => config.copy(agentPort = Some(arg)))
-      .text(s"Port that this agent listens to. Default is ${JettyAgentServerConfig.DefaultPort}")
+    parser.opt[String]('u', "url")
+      .action((arg, config) => config.copy(azureRelayURL = Some(arg)))
+      .text(s"Uri of the Azure Relay Hybrid Connection that this Server should connect to")
   }
 
    /**
@@ -58,7 +57,7 @@ object LocalAgentAzureRelaySmartDataLakeBuilder extends SmartDataLakeBuilder {
       applicationName = Some("agent")
     )
 
-    agentParser.parse(args, JettyAgentServerConfig(sdlConfig = envconfig)) match {
+    agentParser.parse(args, AzureRelayAgentServerConfig(sdlConfig = envconfig)) match {
       case Some(agentServerConfig) =>
         val agentController: AgentServerController = AgentServerController(new InstanceRegistry, this)
         AzureRelayAgentServer.start(agentServerConfig, agentController)

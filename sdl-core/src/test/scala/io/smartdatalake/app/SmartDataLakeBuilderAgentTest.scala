@@ -20,31 +20,22 @@
 package io.smartdatalake.app
 
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigSyntax}
-import io.smartdatalake.communication.agent.{AgentClient, AgentServerController, AzureRelayAgentServer, JettyAgentClient, JettyAgentServer, JettyAgentServerConfig}
+import io.smartdatalake.communication.agent.{AgentClient, AgentServerController, JettyAgentServer, JettyAgentServerConfig}
 import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getConnectionConfigMap, getDataObjectConfigMap, parseConfigObjectWithId}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, ConnectionId, DataObjectId}
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.ExecutionPhase
 import io.smartdatalake.workflow.action.{Action, ProxyAction}
 import io.smartdatalake.workflow.agent.AzureRelayAgent
 import io.smartdatalake.workflow.connection.Connection
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject._
 import org.apache.commons.io.FileUtils
-import org.apache.spark.sql.{Row, SparkSession}
-import org.apache.spark.sql.avro.SchemaConverters
-import org.apache.spark.sql.catalyst.parser.LegacyTypeStringParser
-import org.apache.spark.sql.functions.lit
-import org.apache.spark.sql.types.{DataType, StructType}
+import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import java.nio.file.Paths
-import scala.util.Try
-import scala.concurrent.duration._
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Future, future}
 
 class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter {
 
@@ -116,45 +107,6 @@ class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter {
 
     //Main Instance of SDLB was able to execute action cloud-to-cloud by using data provided from the Agent
     assert(Paths.get(System.getProperty("user.dir"), "target", "jetty_dummy_cloud_connection", "cloud-file2").toFile.exists())
-  }
-
-  ignore("sdlb run with AzureRelayAgentServer: Test starting remote action from sdlb to agentserver") {
-
-    val feedName = "test"
-    FileUtils.deleteDirectory(Paths.get(System.getProperty("user.dir"), "target/relay_agent_dummy_connection").toFile)
-    FileUtils.deleteDirectory(Paths.get(System.getProperty("user.dir"), "target/relay_dummy_cloud_connection").toFile)
-    val sdlb = new DefaultSmartDataLakeBuilder()
-    // setup input DataObject
-    val srcDO = CsvFileDataObject("src1", "target/relay_agent_dummy_connection/remote-file")(sdlb.instanceRegistry)
-    val dfSrc1 = Seq("testData").toDF("testColumn")
-    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
-
-
-    val agentConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = None)
-
-    val remoteSDLB = new DefaultSmartDataLakeBuilder()
-    val agentController: AgentServerController = AgentServerController(remoteSDLB.instanceRegistry, remoteSDLB)
-    Future {
-      AzureRelayAgentServer.start(JettyAgentServerConfig(sdlConfig = agentConfig), agentController)
-    }
-    Thread.sleep(5000)
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
-      getClass.getResource("/configAgents/application-azureRelayAgent.conf").getPath))
-    )
-    //Run SDLB Main Instance
-    sdlb.run(sdlConfig)
-
-    //remoteSDLB should have executed exactly one action: the remoteAction
-    assert(remoteSDLB.instanceRegistry.getActions.size == 1)
-    val remoteAction = remoteSDLB.instanceRegistry.getActions.head
-    assert(remoteAction.id.id == "remote-to-cloud")
-    assert(remoteAction.outputs.head.id.id == "cloud-file1")
-
-    //Main Instance of SDLB was not using remoteFile connection from connection list
-    assert(!Paths.get(System.getProperty("user.dir"), "target", "relay_dummy_connection").toFile.exists())
-
-    //Main Instance of SDLB was able to execute action cloud-to-cloud by using data provided from the Agent
-    assert(Paths.get(System.getProperty("user.dir"), "target", "relay_dummy_cloud_connection", "cloud-file2").toFile.exists())
   }
 }
 

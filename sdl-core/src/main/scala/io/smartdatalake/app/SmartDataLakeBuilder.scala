@@ -74,7 +74,8 @@ case class SmartDataLakeBuilderConfig(feedSel: String = null,
                                       overrideJars: Option[Seq[String]] = None,
                                       test: Option[TestMode.Value] = None,
                                       streaming: Boolean = false,
-                                      agentPort: Option[Int] = None
+                                      agentPort: Option[Int] = None,
+                                      azureRelayURL: Option[String] = None
                                      ) {
   def validate(): Unit = {
     assert(!applicationName.exists(_.contains({

@@ -20,7 +20,7 @@
 package io.smartdatalake.communication.agent
 
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigSyntax}
-import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilder}
+import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilder, SmartDataLakeBuilderConfig}
 import io.smartdatalake.communication.message.{AgentResult, SDLMessage, SDLMessageType}
 import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getConnectionConfigMap, getDataObjectConfigMap, parseConfigObjectWithId}
 import io.smartdatalake.config.InstanceRegistry
@@ -36,7 +36,7 @@ case class AgentServerController(
                             instanceRegistry: InstanceRegistry,
                             sdlb: SmartDataLakeBuilder
                           ) {
-  def handle(message: SDLMessage, agentServerConfig: JettyAgentServerConfig): Option[SDLMessage] = message match {
+  def handle(message: SDLMessage, agentServerSDLBConfig: SmartDataLakeBuilderConfig): Option[SDLMessage] = message match {
     case SDLMessage(SDLMessageType.EndConnection, _ ,_,_,_,_) => None
     case SDLMessage(SDLMessageType.AgentInstruction, None, None, None, agentInstructionOpt, None) => agentInstructionOpt match {
       case Some(agentInstruction) =>
@@ -57,7 +57,7 @@ case class AgentServerController(
 
         instanceRegistryImplicit.register(actions)
 
-        val resultingSubfeeds = sdlb.agentExec(appConfig = agentServerConfig.sdlConfig, phase = agentInstruction.phase)(instanceRegistryImplicit)
+        val resultingSubfeeds = sdlb.agentExec(appConfig = agentServerSDLBConfig, phase = agentInstruction.phase)(instanceRegistryImplicit)
 
         //TODO support other subfeed types than SparkSubFeed
         val resultingDataObjectIdToSchema = resultingSubfeeds.map(subFeed => DataObjectId(subFeed.dataObjectId.id) -> subFeed.asInstanceOf[SparkSubFeed].dataFrame.get.inner.schema.toDDL).toMap

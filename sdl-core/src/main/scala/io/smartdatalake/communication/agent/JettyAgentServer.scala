@@ -29,7 +29,7 @@ import org.eclipse.jetty.websocket.servlet.{ServletUpgradeRequest, ServletUpgrad
 /**
  * Methods for starting and stopping the Status Info Server
  */
-object JettyAgentServer extends AgentServer with SmartDataLakeLogger {
+object JettyAgentServer extends SmartDataLakeLogger {
 
   private val pool = new QueuedThreadPool(200)
   private val server = new Server(pool)

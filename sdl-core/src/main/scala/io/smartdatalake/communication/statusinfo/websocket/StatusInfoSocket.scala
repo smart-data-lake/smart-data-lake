@@ -30,7 +30,7 @@ class StatusInfoSocket(stateListener: IncrementalStatusInfoListener) extends Web
 
     override def onWebSocketText(message: String): Unit = {
         super.onWebSocketText(message)
-        logger.info("Received TEXT message: " + message)
+        logger.info("Received " + message)
 
         if (message.toLowerCase(Locale.US).contains(EndConnection)) {
             getSession.close(StatusCode.NORMAL, "Connection closed by client")
