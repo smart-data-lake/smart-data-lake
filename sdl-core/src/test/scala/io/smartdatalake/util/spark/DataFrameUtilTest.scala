@@ -30,6 +30,8 @@ class DataFrameUtilTest extends FunSuite {
     assert(strCamelCase2LowerCaseWithUnderscores("aBc_d0") == "a_bc_d0")
     assert(strCamelCase2LowerCaseWithUnderscores("aBC0") == "a_bc0")
     assert(strCamelCase2LowerCaseWithUnderscores("AbcABc_aBC0") == "abc_abc_a_bc0")
+    assert(strCamelCase2LowerCaseWithUnderscores("_AbcABc_aBC0") == "_abc_abc_a_bc0")
+    assert(strCamelCase2LowerCaseWithUnderscores("__abcABc_aBC0") == "__abc_abc_a_bc0")
   }
 
   test("normalize UTF8 to ASCII") {
