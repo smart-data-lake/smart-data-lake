@@ -43,11 +43,7 @@
 
 	<dependencies>
 
-		<dependency>
-			<groupId>com.microsoft.azure</groupId>
-			<artifactId>azure-relay</artifactId>
-			<version>0.0.4</version>
-		</dependency>
+
 		<dependency>
 			<groupId>com.databricks</groupId>
 			<artifactId>dbutils-api_2.11</artifactId>
@@ -84,6 +80,13 @@
 		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-hive_${scala.minor.version}</artifactId>
+			<!--Exclude for conflict with json library used in azure-relay-->
+			<exclusions>
+				<exclusion>
+					<artifactId>json</artifactId>
+					<groupId>com.tdunning</groupId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 
 		<dependency>
@@ -271,6 +274,11 @@
 			<groupId>com.fasterxml.jackson.datatype</groupId>
 			<artifactId>jackson-datatype-jsr310</artifactId>
 			<version>${fasterxml.jackson.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.microsoft.azure</groupId>
+			<artifactId>azure-relay</artifactId>
+			<version>0.0.4</version>
 		</dependency>
 
 		<!-- TEST dependencies -->
