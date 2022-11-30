@@ -37,6 +37,7 @@ import org.apache.spark.sql.functions.{col, udf}
 
 trait EncryptDecrypt {
   def key: Array[Byte]
+
   val cryptUDF: UserDefinedFunction = udf(encrypt _)
   private val ALGORITHM_STRING: String = "AES/GCM/PKCS5Padding"
   private val IV_SIZE = 128
@@ -46,10 +47,10 @@ trait EncryptDecrypt {
 
 
   def process(df: DataFrame, encryptColumns: Seq[String]): DataFrame = {
-   
-   encryptColumns.foldLeft(df){
-   case (dfTemp, colName) => dfTemp.withColumn(colName, cryptUDF(col(colName)))
-   }
+
+    encryptColumns.foldLeft(df) {
+      case (dfTemp, colName) => dfTemp.withColumn(colName, cryptUDF(col(colName)))
+    }
   }
 
   private def generateAesKey(keyBytes: Array[Byte]): SecretKey = {
@@ -100,26 +101,29 @@ trait EncryptDecrypt {
 
 /**
  * Encryption of specified columns using AES/GCM algorithm.
+ *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
  * @param encryptColumns List of columns [columnA, columnB] to be encrypted
  * @param keyVariable    contains the id of the provider and the name of the secret with format <PROVIDERID>#<SECRETNAME>,
- *                          e.g. ENV#<ENV_VARIABLE_NAME> to get a secret from an environment variable OR CLEAR#mYsEcReTkeY
+ *                       e.g. ENV#<ENV_VARIABLE_NAME> to get a secret from an environment variable OR CLEAR#mYsEcReTkeY
  */
 case class EncryptColumnsTransformer(override val name: String = "encryptColumns",
                                      override val description: Option[String] = None,
                                      encryptColumns: Seq[String],
                                      keyVariable: String,
-                                     )
+                                    )
   extends SparkDfTransformer with EncryptDecrypt {
   private[smartdatalake] val cur_key: String = SecretsUtil.getSecret(keyVariable)
 
   override def key: Array[Byte] = cur_key.getBytes
+
   override val cryptUDF: UserDefinedFunction = udf(encrypt _)
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
     process(df, encryptColumns)
   }
+
   override def factory: FromConfigFactory[GenericDfTransformer] = EncryptColumnsTransformer
 }
 
@@ -131,11 +135,12 @@ object EncryptColumnsTransformer extends FromConfigFactory[GenericDfTransformer]
 
 /**
  * Decryption of specified columns using AES/GCM algorithm.
+ *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
  * @param decryptColumns List of columns [columnA, columnB] to be encrypted
  * @param keyVariable    contains the id of the provider and the name of the secret with format <PROVIDERID>#<SECRETNAME>,
- *                          e.g. ENV#<ENV_VARIABLE_NAME> to get a secret from an environment variable OR CLEAR#mYsEcReTkeY
+ *                       e.g. ENV#<ENV_VARIABLE_NAME> to get a secret from an environment variable OR CLEAR#mYsEcReTkeY
  */
 case class DecryptColumnsTransformer(override val name: String = "encryptColumns",
                                      override val description: Option[String] = None,
@@ -147,11 +152,13 @@ case class DecryptColumnsTransformer(override val name: String = "encryptColumns
   private[smartdatalake] val cur_key: String = SecretsUtil.getSecret(keyVariable)
 
   override def key: Array[Byte] = cur_key.getBytes
+
   override val cryptUDF: UserDefinedFunction = udf(decrypt _)
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
     process(df, decryptColumns)
   }
+
   override def factory: FromConfigFactory[GenericDfTransformer] = DecryptColumnsTransformer
 }
 

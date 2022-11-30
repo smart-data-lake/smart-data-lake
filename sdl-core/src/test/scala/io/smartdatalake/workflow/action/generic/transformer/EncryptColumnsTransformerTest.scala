@@ -74,7 +74,6 @@ class EncryptColumnsTransformerTest extends FunSuite {
         |       type = DecryptColumnsTransformer
         |       decryptColumns = ["c2","c3"]
         |       keyVariable = "CLEAR#A%D*G-KaPdSgVkYp"
-        |       #keyVariable = "CLEAR#keyblabla"
         |     }]
         |   }
         |}
