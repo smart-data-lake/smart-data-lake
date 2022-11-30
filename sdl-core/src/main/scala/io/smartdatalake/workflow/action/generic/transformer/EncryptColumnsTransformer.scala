@@ -46,11 +46,10 @@ trait EncryptDecrypt {
 
 
   def process(df: DataFrame, encryptColumns: Seq[String]): DataFrame = {
-    var dfEnc = df
-    for (colName <- encryptColumns) {
-      dfEnc = dfEnc.withColumn(colName, cryptUDF(col(colName)))
-    }
-    dfEnc
+   
+   encryptColumns.foldLeft(df){
+   case (dfTemp, colName) => dfTemp.withColumn(colName, cryptUDF(col(colName)))
+   }
   }
 
   private def generateAesKey(keyBytes: Array[Byte]): SecretKey = {
