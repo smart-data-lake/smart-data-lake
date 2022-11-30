@@ -36,7 +36,7 @@ import javax.crypto.{Cipher, SecretKey}
 import org.apache.spark.sql.functions.{col, udf}
 
 trait EncryptDecrypt {
-  def key: Array[Byte] //= "test234".getBytes
+  def key: Array[Byte]
   val cryptUDF: UserDefinedFunction = udf(encrypt _)
   private val ALGORITHM_STRING: String = "AES/GCM/PKCS5Padding"
   private val IV_SIZE = 128

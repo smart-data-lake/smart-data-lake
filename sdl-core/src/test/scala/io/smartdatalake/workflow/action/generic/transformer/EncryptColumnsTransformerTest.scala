@@ -44,16 +44,16 @@ class EncryptColumnsTransformerTest extends FunSuite {
   val statePath = "target/stateTest/"
   implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithDefaultConf(new Path(statePath))
 
-  test("test column encryption") {
+  test("test column encryption and decryption") {
     val sdlb = new DefaultSmartDataLakeBuilder()
 
     val config = ConfigFactory.parseString(
       """
         |actions = {
-        |   act = {
+        |   actenc = {
         |     type = CopyAction
         |     inputId = src
-        |     outputId = tgt
+        |     outputId = enc
         |     metadata {
         |       feed = test_run
         |     }
@@ -61,59 +61,12 @@ class EncryptColumnsTransformerTest extends FunSuite {
         |       type = EncryptColumnsTransformer
         |       encryptColumns = ["c2","c3"]
         |       keyVariable = "CLEAR#A%D*G-KaPdSgVkYp"
-        |       #keyVariable = "CLEAR#keyblabla"
         |     }]
         |   }
-        |}
-        |dataObjects {
-        |  src {
-        |    #id = ~{id}
-        |    type = CsvFileDataObject
-        |    path = "target/raw"
-        |  }
-        |  tgt {
-        |    type = ParquetFileDataObject
-        |    path = "target/column_encrypted"
-        |  }
-        |}
-        |""".stripMargin).resolve
-
-    val globalConfig = GlobalConfig.from(config)
-    implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
-    implicit val session: SparkSession = sparkSessionBuilder(withHive = true, globalConfig.sparkOptions.getOrElse(Map())).getOrCreate()
-    import session.implicits._
-
-    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "ids:act")
-
-    val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
-    assert(srcDO != None)
-    val dfSrc = Seq(("testData", "Foo", "ice"), ("bar", "Space", "water"), ("gogo", "Space", "water")).toDF("c1", "c2", "c3")
-    srcDO.writeDataFrame(SparkDataFrame(dfSrc), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
-
-    // Run SDLB
-    implicit val hadoopConf: Configuration = session.sparkContext.hadoopConfiguration
-    val initialSubFeeds: Seq[SparkSubFeed] = Seq(SparkSubFeed(None, srcDO.id, Seq()))
-    val (subFeeds, stats) = sdlb.exec(sdlConfig, SDLExecutionId.executionId1, runStartTime = LocalDateTime.now, attemptStartTime = LocalDateTime.now, actionsToSkip = Map(), initialSubFeeds = initialSubFeeds, dataObjectsState = Seq(), stateStore = None, stateListeners = Seq(), simulation = false, globalConfig = globalConfig)
-
-    // check result
-    val tgt = instanceRegistry.get[ParquetFileDataObject]("tgt")
-    val dfTgt = tgt.getSparkDataFrame()
-    val colName = dfTgt.columns
-    //assert(colName.toSeq == Seq("testcolumn", "secondcolumn", "thirdcolumn"))
-  }
-
-  test("test column decryption") {
-    val feedName = "test"
-    val sdlb = new DefaultSmartDataLakeBuilder()
-
-    val config = ConfigFactory.parseString(
-      """
-        |actions = {
-        |   act = {
+        |   actdec = {
         |     type = CopyAction
-        |     inputId = src
-        |     outputId = tgt
+        |     inputId = enc
+        |     outputId = dec
         |     metadata {
         |       feed = test_run
         |     }
@@ -128,10 +81,14 @@ class EncryptColumnsTransformerTest extends FunSuite {
         |dataObjects {
         |  src {
         |    #id = ~{id}
+        |    type = CsvFileDataObject
+        |    path = "target/raw"
+        |  }
+        |  enc {
         |    type = ParquetFileDataObject
         |    path = "target/column_encrypted"
         |  }
-        |  tgt {
+        |  dec {
         |    type = ParquetFileDataObject
         |    path = "target/decrypted"
         |  }
@@ -144,9 +101,12 @@ class EncryptColumnsTransformerTest extends FunSuite {
     import session.implicits._
 
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "ids:act")
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "ids:actenc,ids:actdec")
 
-    val srcDO = instanceRegistry.get[ParquetFileDataObject]("src")
+    val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
+    assert(srcDO != None)
+    val dfSrc = Seq(("testData", "Foo", "ice"), ("bar", "Space", "water"), ("gogo", "Space", "water")).toDF("c1", "c2", "c3")
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
     // Run SDLB
     implicit val hadoopConf: Configuration = session.sparkContext.hadoopConfiguration
@@ -154,11 +114,20 @@ class EncryptColumnsTransformerTest extends FunSuite {
     val (subFeeds, stats) = sdlb.exec(sdlConfig, SDLExecutionId.executionId1, runStartTime = LocalDateTime.now, attemptStartTime = LocalDateTime.now, actionsToSkip = Map(), initialSubFeeds = initialSubFeeds, dataObjectsState = Seq(), stateStore = None, stateListeners = Seq(), simulation = false, globalConfig = globalConfig)
 
     // check result
-    val tgt = instanceRegistry.get[ParquetFileDataObject]("tgt")
-    val dfTgt = tgt.getSparkDataFrame()
-    dfTgt.show()
-    val testCol = dfTgt.select("c2").map(f=>f.getString(0)).collect.toList
-    assert(testCol == Seq("Foo", "Space", "Space"))
-  }
+    // first check the encoded dataFrame
+    val enc = instanceRegistry.get[ParquetFileDataObject]("enc")
+    val dfEnc = enc.getSparkDataFrame()
+    val colName = dfEnc.columns
+    assert(colName.toSeq == Seq("c1", "c2", "c3"))
+    val testCol = dfEnc.select("c2").map(f => f.getString(0)).collect.toList
+    assert(testCol != Seq("Foo", "Space", "Space"))
 
+    // check the decoded DataFrame
+    val dec = instanceRegistry.get[ParquetFileDataObject]("dec")
+    val dfDec = dec.getSparkDataFrame()
+    val colDecName = dfDec.columns
+    assert(colDecName.toSeq == Seq("c1", "c2", "c3"))
+    val testDecCol = dfDec.select("c2").map(f => f.getString(0)).collect.toList
+    assert(testDecCol == Seq("Foo", "Space", "Space"))
+  }
 }
