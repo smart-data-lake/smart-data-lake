@@ -206,7 +206,7 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
         p.typeSignature.typeArgs.head
       } else p.typeSignature
       val description = paramDescriptions.get(p.name.toString)
-        .orElse(superTypeMethodsWithoutParameters.map(s => extractScalaDoc(s.annotations).map(formatScaladoc(_))).find(_.isDefined).flatten) // use Scaladoc from first overridden method
+        .orElse(overriddenMethods.map(m => extractScalaDoc(m.annotations).map(formatScaladoc(_))).find(_.isDefined).flatten) // use Scaladoc from first overridden method
       GenericAttributeDef(p.name.encodedName.toString, tpe, description, isRequired = !isOptional && !hasDefaultValue, isOverride = isOverride, isDeprecated = isDeprecated)
     })
   }
