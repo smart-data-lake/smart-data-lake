@@ -225,7 +225,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
       // Comparison of modifiedAfter and modifiedBefore are both exclusive on Microsecond level, but file timestamps maximum detail is milliseconds.
       // Actually comparison of one operator should be inclusive to avoid reading files in edge cases.
       // Current timestamp is also at millisecond level. If we subtract one microsecond from current timestamp we can avoid the problems because of exclusive comparison.
-      val incrementalOutputState = Some(LocalDateTime.now.minusNanos(1000))
+      incrementalOutputState = Some(LocalDateTime.now.minusNanos(1000))
       val dateFormatter = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSSSSS")
       logger.info(s"($id) incremental output selected files with modification date greater than ${dateFormatter.format(previousOutputState)} and smaller than ${dateFormatter.format(incrementalOutputState.get)}")
       Map(

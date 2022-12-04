@@ -27,7 +27,7 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.HadoopFileConnection
 import org.apache.hadoop.fs.{FileAlreadyExistsException, FileSystem, Path}
 
-import java.io.{InputStream, OutputStream}
+import java.io.{FileNotFoundException, InputStream, OutputStream}
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -77,10 +77,18 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
 
   /**
    * Check if the input files exist.
+   * Note that hadoopDir can be a specific file or a directory.
    */
   private[smartdatalake] def checkFilesExisting(implicit context: ActionPipelineContext): Boolean = {
-    if (!filesystem.exists(hadoopPath) || filesystem.globStatus(new Path(hadoopPath, fileName)).isEmpty) false
-    else true
+    val status = try {
+      filesystem.getFileStatus(hadoopPath)
+    } catch {
+      case _:FileNotFoundException => return false
+    }
+    status.isFile || {
+      val globPath = if (partitions.nonEmpty) new Path(hadoopPath, "**") else hadoopPath
+      status.isDirectory && filesystem.globStatus(new Path(globPath, fileName)).exists(_.isFile)
+    }
   }
 
   override def deleteFile(file: String)(implicit context: ActionPipelineContext): Unit = {
