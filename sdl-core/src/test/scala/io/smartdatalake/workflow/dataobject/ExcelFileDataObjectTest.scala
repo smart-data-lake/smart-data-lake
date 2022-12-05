@@ -33,6 +33,7 @@ import org.scalatest.BeforeAndAfterAll
 
 import java.io.{File, FileOutputStream}
 import java.nio.file.Files
+import java.nio.file.{Path => NioPath}
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.util.{Date, Locale}
@@ -43,11 +44,12 @@ import scala.reflect.runtime.universe._
  */
 class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll with SparkFileDataObjectSchemaBehavior {
 
-  private val XslSuffix = ".xsl"
-  private val XslxSuffix = ".xslx"
+  private val XlsSuffix = ".xls"
+  private val XlsxSuffix = ".xlsx"
 
-  private var xslTempFilePath: String = _
-  private var xslxTempFilePath: String = _
+  private var xlsTempFilePath: String = _
+  private var xlsxTempFilePath: String = _
+  private var xlsxTempDir: NioPath = _
 
   private final val sampleDate: Date = new Date(0L)
 
@@ -58,7 +60,7 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
     s"""
        |{
        | id = src1
-       | path = "${escapedFilePath(xslxTempFilePath)}"
+       | path = "${escapedFilePath(xlsxTempFilePath)}"
        | excel-options {
        |   sheet-name = "sheet number 1"
        |   useHeader = true
@@ -93,7 +95,7 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
       s"""
          |{
          | id = src1
-         | path = "${escapedFilePath(xslTempFilePath)}"
+         | path = "${escapedFilePath(xlsTempFilePath)}"
          | excel-options {
          |   useHeader = true
          |   num-lines-to-skip = 0
@@ -120,24 +122,54 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
     datum.getAs[String]("e") shouldEqual "Lorem Ipsum"
   }
 
-  testsFor(readNonExistingSources(createDataObject(ExcelOptions(sheetName = Some("testSheet"))), ".xslx"))
+  test("reading multiple XSSF excel sheet from a folder") {
+
+    val testConfig = ConfigFactory.parseString(
+      s"""
+         |{
+         | id = src1
+         | path = "${escapedFilePath(xlsxTempDir.toString)}"
+         | excel-options {
+         |   useHeader = true
+         |   num-lines-to-skip = 0
+         |   start-column = A
+         |   end-column = E
+         | }
+         |}
+         """.stripMargin)
+
+    // prepare
+    val actionInputExcel = ExcelFileDataObject.fromConfig(testConfig)
+
+    // run
+    val df = actionInputExcel.getSparkDataFrame()
+
+    // check
+    val data = df.collect().toList
+    data should have size 6
+  }
+
+  testsFor(readNonExistingSources(createDataObject(ExcelOptions(sheetName = Some("testSheet"))), ".xlsx"))
   // read empty file with spark-excel results in "java.util.NoSuchElementException: head of empty list" on df.show
-  //testsFor(readEmptySources(createDataObject(ExcelOptions(useHeader = false)), ".xslx"))
-  testsFor(validateSchemaMinOnWrite(createDataObjectWithSchemaMin(ExcelOptions(sheetName = Some("testSheet"), useHeader = false)), ".xslx"))
-  testsFor(validateSchemaMinOnRead(createDataObjectWithSchemaMin(ExcelOptions(sheetName = Some("testSheet"), useHeader = false)), ".xslx"))
+  //testsFor(readEmptySources(createDataObject(ExcelOptions(useHeader = false)), ".xlsx"))
+  testsFor(validateSchemaMinOnWrite(createDataObjectWithSchemaMin(ExcelOptions(sheetName = Some("testSheet"), useHeader = false)), ".xlsx"))
+  testsFor(validateSchemaMinOnRead(createDataObjectWithSchemaMin(ExcelOptions(sheetName = Some("testSheet"), useHeader = false)), ".xlsx"))
 
   override def beforeAll() {
-    xslxTempFilePath = createTempFile(createXSSFWorkbook, XslxSuffix)
-    xslTempFilePath = createTempFile(createHSSFWorkbook, XslSuffix)
+    xlsxTempFilePath = createTempFile(createXSSFWorkbook(), XlsxSuffix)
+    xlsTempFilePath = createTempFile(createHSSFWorkbook(), XlsSuffix)
+    xlsxTempDir = createTempDir
+    createTempFile(createXSSFWorkbook(3, 20), XlsxSuffix, Some(xlsxTempDir))
+    createTempFile(createXSSFWorkbook(3, 21), XlsxSuffix, Some(xlsxTempDir))
   }
 
   override def afterAll(): Unit = {
-    FileUtils.forceDelete(new File(xslTempFilePath))
-    FileUtils.forceDelete(new File(xslxTempFilePath))
+    FileUtils.forceDelete(new File(xlsTempFilePath))
+    FileUtils.forceDelete(new File(xlsxTempFilePath))
   }
 
-  private def createTempFile(workbook: Workbook, suffix: String): String = {
-    val tempDir = Files.createTempDirectory(suffix)
+  private def createTempFile(workbook: Workbook, suffix: String, dir: Option[NioPath] = None): String = {
+    val tempDir = dir.getOrElse(Files.createTempDirectory(suffix))
     val tempFile = Files.createTempFile(tempDir, "test", suffix).toFile
     tempFile.deleteOnExit()
     val tempOutputStream = new FileOutputStream(tempFile)
@@ -158,9 +190,9 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
     createValue(sheet, 0, 4, Some("E"))
   }
 
-  private def createRow(rowNum: Int, sheet: usermodel.Sheet, workbook: Workbook): Unit = {
+  private def createRow(rowNum: Int, sheet: usermodel.Sheet, workbook: Workbook, v: Option[Int] = Some(42)): Unit = {
     val row = sheet.createRow(rowNum)
-    createValue(sheet, rowNum, 0, Some(42))
+    createValue(sheet, rowNum, 0, v)
     createValue(sheet, rowNum, 1, Some(true))
     createValue(sheet, rowNum, 2, Some(sampleDate))
     val cell3 = row.createCell(3)
@@ -186,22 +218,19 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
     }
   }
 
-  private def createXSSFWorkbook: XSSFWorkbook = {
+  private def createXSSFWorkbook(nbOfRows: Int = 3, v: Int = 42): XSSFWorkbook = {
     val workbook = new XSSFWorkbook
     val sheet = workbook.createSheet("sheet number 1")
     createHeaderRow(sheet)
-    createRow(1, sheet, workbook)
-    createRow(2, sheet, workbook)
-    createRow(3, sheet, workbook)
+    (1 to nbOfRows).foreach(createRow(_, sheet, workbook, Some(v)))
     workbook
   }
 
-  private def createHSSFWorkbook: HSSFWorkbook = {
+  private def createHSSFWorkbook(nbOfRows: Int = 2, v: Int = 42): HSSFWorkbook = {
     val workbook = new HSSFWorkbook()
     val sheet = workbook.createSheet("sheet number 1")
     createHeaderRow(sheet)
-    createRow(1, sheet, workbook)
-    createRow(2, sheet, workbook)
+    (1 to nbOfRows).foreach(createRow(_, sheet, workbook, Some(v)))
     workbook
   }
 

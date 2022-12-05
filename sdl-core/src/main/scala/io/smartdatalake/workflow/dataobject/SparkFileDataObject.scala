@@ -35,7 +35,7 @@ import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.FileSourceScanExec
 import org.apache.spark.sql.execution.datasources.{DataSource, FileScanRDD}
-import org.apache.spark.sql.functions.{col, input_file_name}
+import org.apache.spark.sql.functions.{col, input_file_name, lit}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DataType, StructType}
 
@@ -163,6 +163,11 @@ trait SparkFileDataObject extends HadoopFileDataObject
    */
   protected def ignoreSchemaForReader: Boolean = false
 
+  /**
+   * Hook for subclasses to switch to reading files one by one with Spark, as some DataSources dont support reading folders, e.g. spark-excel.
+   */
+  protected def handleFilesOneByOne: Boolean = false
+
   override def options: Map[String, String] = Map() // override options because of conflicting definitions in CanCreateSparkDataFrame and CanWriteSparkDataFrame
 
   /**
@@ -197,7 +202,9 @@ trait SparkFileDataObject extends HadoopFileDataObject
     else Map[String,String]()
 
     // get and customize content
-    var df = getContent(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
+    var df = if (handleFilesOneByOne) getContentFilesOneByOne(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
+    else if (isV2ReadDataSource) getContentV2(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
+    else getContentV1(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
     df = customizeContent(df)
 
     // early check for no data to process.
@@ -241,9 +248,10 @@ trait SparkFileDataObject extends HadoopFileDataObject
   protected def customizeContent(df: DataFrame)(implicit context: ActionPipelineContext) = df
 
   /**
-   * Prepares the DataFrame with the content when reading
+   * Prepares the DataFrame with the content when reading.
+   * Uses Spark DataSource V2 interface.
    */
-  protected def getContent(partitionValues: Seq[PartitionValues], schema: Option[StructType], incrementalOutputOptions: Map[String,String])(implicit context: ActionPipelineContext): DataFrame = {
+  protected def getContentV2(partitionValues: Seq[PartitionValues], schema: Option[StructType], incrementalOutputOptions: Map[String,String])(implicit context: ActionPipelineContext): DataFrame = {
     implicit val session: SparkSession = context.sparkSession
     if (partitions.isEmpty || partitionValues.isEmpty) {
       session.read
@@ -271,6 +279,96 @@ trait SparkFileDataObject extends HadoopFileDataObject
             DataFrameUtil.getEmptyDataFrame(schema.get)
           }
         }
+    }
+  }
+
+  /**
+   * Prepares the DataFrame with the content when reading.
+   * Uses Spark DataSource V1 interface. V1 interface has limited support for reading partitioned data.
+   * getContentV1 implements an approach to query a DataFrame per partition, adding partition columns and union all DataFrames.
+   */
+  protected def getContentV1(partitionValues: Seq[PartitionValues], schema: Option[StructType], incrementalOutputOptions: Map[String,String])(implicit context: ActionPipelineContext): DataFrame = {
+    implicit val session: SparkSession = context.sparkSession
+    if (partitions.isEmpty) {
+      session.read
+        .format(readFormat)
+        .options(readOptions ++ incrementalOutputOptions)
+        .optionalSchema(schema)
+        .option("path", hadoopPath.toString) // spark-xml is a V1 source and only supports one path, which must be given as option...
+        .load()
+    } else {
+      val reader = session.read
+        .format(readFormat)
+        .options(readOptions ++ incrementalOutputOptions)
+        .optionalSchema(schema)
+      val partitionValuesToRead = if (partitionValues.nonEmpty) partitionValues else listPartitions
+      val pathsToRead = partitionValuesToRead.flatMap(pv => getConcretePaths(pv).map(path => (pv, path.toString)))
+        .filter{case (_,path) => filesystem.globStatus(new Path(path,fileName)).nonEmpty} // filter empty path to avoid NullPointerException in DataFrame
+      val df = if (pathsToRead.nonEmpty) Some(
+        pathsToRead.map { case (pv, path) =>
+          partitions.foldLeft(reader.option("path", path).load()) { // spark-xml is a V1 source and only supports one path, which must be given as option...
+            case (df, partition) => df.withColumn(partition, lit(pv(partition).toString))
+          }
+        }.reduce(_ unionByName _)
+      ) else None
+      df.filter(df => schema.isDefined || partitions.diff(df.columns).isEmpty) // filter DataFrames without partition columns as they are empty (this might happen if there is no schema specified and the partition is empty)
+        .getOrElse {
+          // if there are no paths to read for given partition values, handle no data
+          if (context.phase == ExecutionPhase.Exec) {
+            // skip action in exec phase
+            throw NoDataToProcessWarning(id.id, s"($id) No existing files found for partition values ${partitionValues.mkString(", ")}.")
+          } else {
+            // create empty data frame in init phase
+            require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")
+            DataFrameUtil.getEmptyDataFrame(schema.get)
+          }
+        }
+    }
+  }
+
+  /**
+   * Prepares the DataFrame with the content when reading.
+   * There are some DataSources which dont support reading multiple files, e.g. ExcelFileDataObject.
+   * getContentFilesOneByOne implements an approach to query a DataFrame per file, adding partition columns and union all DataFrames.
+   */
+  protected def getContentFilesOneByOne(partitionValues: Seq[PartitionValues], schema: Option[StructType], incrementalOutputOptions: Map[String,String])(implicit context: ActionPipelineContext): DataFrame = {
+    implicit val session: SparkSession = context.sparkSession
+    // search files to be read
+    val files = if (filesystem.getFileStatus(hadoopPath).isFile) Seq((hadoopPath, PartitionValues(Map())))
+    else  if (partitions.isEmpty) {
+      filesystem.globStatus(new Path(hadoopPath,fileName)).toSeq
+        .filter(_.isFile).map(fs => (fs.getPath, PartitionValues(Map())))
+    } else if (partitionValues.isEmpty) {
+      val children = partitions.map(_ => "*") :+ fileName
+      filesystem.globStatus(children.foldLeft(hadoopPath)((path, child) => new Path(path, child))).toSeq
+        .filter(_.isFile).map(fs => (fs.getPath, extractPartitionValuesFromPath(fs.getPath.toString)))
+    } else { // partitions with given partition values
+      val paths = partitionValues.flatMap(pv => getConcretePaths(pv).map(p => (p,pv)))
+      paths.flatMap{case (p,pv) => filesystem.globStatus(new Path(p, fileName)).map(p => (p,pv))}
+        .filter(_._1.isFile).map{ case (fs,pv) => (fs.getPath, pv)}
+    }
+    // get and union DataFrames per File
+    val reader = session.read
+      .format(readFormat)
+      .options(readOptions ++ incrementalOutputOptions)
+      .optionalSchema(schema)
+    val df = if (files.nonEmpty) Some(
+      files.map { case (p, pv) =>
+        partitions.foldLeft(reader.option("path", p.toString).load()) {
+          case (df, partition) => df.withColumn(partition, lit(pv(partition).toString))
+        }
+      }.reduce(_ unionByName _)
+    ) else None
+    df.getOrElse {
+      // if there are no paths to read for given partition values, handle no data
+      if (context.phase == ExecutionPhase.Exec) {
+        // skip action in exec phase
+        throw NoDataToProcessWarning(id.id, s"($id) No existing files found for partition values ${partitionValues.mkString(", ")}.")
+      } else {
+        // create empty data frame in init phase
+        require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")
+        DataFrameUtil.getEmptyDataFrame(schema.get)
+      }
     }
   }
 
@@ -473,7 +571,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
   }
 
   /**
-   * Check is this DataObject implements reading data using a Spark V2 DataSource.
+   * Check if this DataObject implements reading data using a Spark V2 DataSource.
    */
   def isV2ReadDataSource(implicit context: ActionPipelineContext): Boolean = {
     DataSource.lookupDataSourceV2(readFormat, context.sparkSession.sessionState.conf).isDefined

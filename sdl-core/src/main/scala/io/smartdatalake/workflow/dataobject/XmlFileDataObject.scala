@@ -89,52 +89,6 @@ case class XmlFileDataObject(override val id: DataObjectId,
 
   override val options: Map[String, String] = xmlOptions.getOrElse(Map()) ++ Seq(rowTag.map("rowTag" -> _)).flatten
 
-  /**
-   * Constructs an Apache Spark [[DataFrame]] from the underlying file content.
-   *
-   * As spark-xml is a V1 DataSource. It doesnt support load(path) method.
-   * Additionally it doesn't support reading partitions, SDL needs to handle partitions on its own.
-   * This method overwrites standard getContent method of SparkFileDataObject for this purpose.
-   */
-  override protected def getContent(partitionValues: Seq[PartitionValues], schema: Option[StructType], incrementalOutputOptions: Map[String, String])(implicit context: ActionPipelineContext): DataFrame = {
-    implicit val session: SparkSession = context.sparkSession
-    if (partitions.isEmpty) {
-      session.read
-        .format(readFormat)
-        .options(readOptions)
-        .optionalSchema(schema)
-        .option("path", hadoopPath.toString) // spark-xml is a V1 source and only supports one path, which must be given as option...
-        .load()
-    } else {
-      val reader = session.read
-        .format(readFormat)
-        .options(readOptions ++ incrementalOutputOptions)
-        .optionalSchema(schema)
-      val partitionValuesToRead = if (partitionValues.nonEmpty) partitionValues else listPartitions
-      val pathsToRead = partitionValuesToRead.flatMap(pv => getConcretePaths(pv).map(path => (pv, path.toString)))
-        .filter{case (_,path) => filesystem.globStatus(new Path(path,fileName)).nonEmpty} // filter empty path to avoid NullPointerException in DataFrame
-      val df = if (pathsToRead.nonEmpty) Some(
-        pathsToRead.map { case (pv, path) =>
-          partitions.foldLeft(reader.option("path", path).load()) { // spark-xml is a V1 source and only supports one path, which must be given as option...
-            case (df, partition) => df.withColumn(partition, lit(pv(partition).toString))
-          }
-        }.reduce(_ unionByName _)
-      ) else None
-      df.filter(df => schema.isDefined || partitions.diff(df.columns).isEmpty) // filter DataFrames without partition columns as they are empty (this might happen if there is no schema specified and the partition is empty)
-        .getOrElse {
-          // if there are no paths to read for given partition values, handle no data
-          if (context.phase == ExecutionPhase.Exec) {
-            // skip action in exec phase
-            throw NoDataToProcessWarning(id.id, s"($id) No existing files found for partition values ${partitionValues.mkString(", ")}.")
-          } else {
-            // create empty data frame in init phase
-            require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")
-            DataFrameUtil.getEmptyDataFrame(schema.get)
-          }
-        }
-    }
-  }
-
   override def afterRead(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame  = {
     val dfSuper = super.afterRead(df)
     if (flatten) {
