@@ -156,8 +156,7 @@
             "description" : "Condition to decide if execution mode should be applied or not. Define a spark sql expression working with attributes of[[DefaultExecutionModeExpressionData]] returning a boolean.\nDefault is to apply the execution mode if given partition values (partition values from command line or passed from previous action) are not empty."
           },
           "failCondition" : {
-            "type" : "string",
-            "description" : "If this execution mode should be run as asynchronous streaming process"
+            "type" : "string"
           },
           "failConditions" : {
             "type" : "array",
@@ -242,7 +241,6 @@
           },
           "outputMode" : {
             "type" : "string",
-            "description" : "If this execution mode should be run as asynchronous streaming process",
             "enum" : [ "Append", "Complete", "Update" ]
           }
         },
@@ -332,8 +330,7 @@
             "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
           },
           "checkDeltaLakeSparkOptions" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
+            "type" : "string"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/ConnectionMetadata"
@@ -571,8 +568,7 @@
               "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/TokenAuthMode"
-            } ],
-            "description" : "A unique identifier for this instance."
+            } ]
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/ConnectionMetadata"
@@ -797,15 +793,14 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
+            "description" : "A unique identifier for this instance."
           },
           "path" : {
-            "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
+            "type" : "string"
           },
           "schemaMin" : {
             "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "table" : {
             "$ref" : "#/definitions/Others/Table"
@@ -827,11 +822,10 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
+            "description" : "A unique identifier for this instance."
           },
           "config" : {
-            "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
+            "type" : "string"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -897,18 +891,18 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "A unique identifier for this instance."
           },
           "path" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "The root path of the files that are handled by this DataObject."
           },
           "partitions" : {
             "type" : "array",
             "items" : {
               "type" : "string"
             },
-            "description" : "The Spark-Format provider to be used"
+            "description" : "Definition of partition columns"
           },
           "avroOptions" : {
             "type" : "object",
@@ -923,11 +917,11 @@
           },
           "schemaMin" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "saveMode" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used",
+            "description" : "Overwrite or Append new data.\nWhen writing partitioned data, this applies only to partitions concerned.",
             "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
           },
           "sparkRepartition" : {
@@ -1001,11 +995,11 @@
           },
           "connectionId" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "Return the connection id.\n\nConnection defines path prefix (scheme, authority, base path) and ACL\\'s in central location."
           },
           "filenameColumn" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "The name of the (optional) additional column containing the source filename"
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
@@ -1036,11 +1030,11 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "A unique identifier for this instance."
           },
           "path" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "The root path of the files that are handled by this DataObject."
           },
           "csvOptions" : {
             "type" : "object",
@@ -1054,7 +1048,7 @@
             "items" : {
               "type" : "string"
             },
-            "description" : "The Spark-Format provider to be used"
+            "description" : "Definition of partition columns"
           },
           "schema" : {
             "type" : "string",
@@ -1062,7 +1056,7 @@
           },
           "schemaMin" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "dateColumnType" : {
             "type" : "string",
@@ -1071,7 +1065,7 @@
           },
           "saveMode" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used",
+            "description" : "Overwrite or Append new data.\nWhen writing partitioned data, this applies only to partitions concerned.",
             "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
           },
           "sparkRepartition" : {
@@ -1145,11 +1139,11 @@
           },
           "connectionId" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "Return the connection id.\n\nConnection defines path prefix (scheme, authority, base path) and ACL\\'s in central location."
           },
           "filenameColumn" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "The name of the (optional) additional column containing the source filename"
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
@@ -1180,7 +1174,7 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
+            "description" : "A unique identifier for this instance."
           },
           "creator" : {
             "type" : "object",
@@ -1230,7 +1224,7 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "Definition of partition layout\nuse %<partitionColName>% as placeholder and * for globs in layout\nNote: if you have globs in partition layout, it\\'s not possible to write files to this DataObject\nNote: if this is a directory, you must add a final backslash to the partition layout"
+            "description" : "A unique identifier for this instance."
           },
           "creator" : {
             "type" : "object",
@@ -1270,11 +1264,10 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
+            "description" : "A unique identifier for this instance."
           },
           "config" : {
-            "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
+            "type" : "string"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -1359,6 +1352,104 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "aggExpression" : {
+                    "type" : "string",
+                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "SQLExpectation",
+                "required" : [ "name", "aggExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "CountExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLFractionExpectation"
                   },
                   "name" : {
@@ -1367,7 +1458,7 @@
                   },
                   "description" : {
                     "type" : "string",
-                    "description" : "The name of the expectation"
+                    "description" : "Optional detailed description of the expectation"
                   },
                   "countConditionExpression" : {
                     "type" : "string",
@@ -1388,7 +1479,7 @@
                   },
                   "failedSeverity" : {
                     "type" : "string",
-                    "description" : "The name of the expectation",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
                     "enum" : [ "Warn ", "Error " ]
                   }
                 },
@@ -1396,104 +1487,6 @@
                 "required" : [ "name", "countConditionExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "SQLExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "aggExpression" : {
-                    "type" : "string",
-                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "SQLExpectation",
-                "required" : [ "name", "aggExpression", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               } ]
             },
             "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
@@ -1582,11 +1575,11 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "A unique identifier for this instance."
           },
           "path" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "The root path of the files that are handled by this DataObject."
           },
           "excelOptions" : {
             "type" : "object",
@@ -1649,7 +1642,7 @@
             "items" : {
               "type" : "string"
             },
-            "description" : "The Spark-Format provider to be used"
+            "description" : "Definition of partition columns"
           },
           "schema" : {
             "type" : "string",
@@ -1657,11 +1650,11 @@
           },
           "schemaMin" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "saveMode" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used",
+            "description" : "Overwrite or Append new data.\nWhen writing partitioned data, this applies only to partitions concerned.",
             "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
           },
           "sparkRepartition" : {
@@ -1735,11 +1728,11 @@
           },
           "connectionId" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "Return the connection id.\n\nConnection defines path prefix (scheme, authority, base path) and ACL\\'s in central location."
           },
           "filenameColumn" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "The name of the (optional) additional column containing the source filename"
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
@@ -1838,6 +1831,104 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "aggExpression" : {
+                    "type" : "string",
+                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "SQLExpectation",
+                "required" : [ "name", "aggExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "CountExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLFractionExpectation"
                   },
                   "name" : {
@@ -1846,7 +1937,7 @@
                   },
                   "description" : {
                     "type" : "string",
-                    "description" : "The name of the expectation"
+                    "description" : "Optional detailed description of the expectation"
                   },
                   "countConditionExpression" : {
                     "type" : "string",
@@ -1867,7 +1958,7 @@
                   },
                   "failedSeverity" : {
                     "type" : "string",
-                    "description" : "The name of the expectation",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
                     "enum" : [ "Warn ", "Error " ]
                   }
                 },
@@ -1875,104 +1966,6 @@
                 "required" : [ "name", "countConditionExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "SQLExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "aggExpression" : {
-                    "type" : "string",
-                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "SQLExpectation",
-                "required" : [ "name", "aggExpression", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               } ]
             },
             "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
@@ -2125,6 +2118,104 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "aggExpression" : {
+                    "type" : "string",
+                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "SQLExpectation",
+                "required" : [ "name", "aggExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "CountExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLFractionExpectation"
                   },
                   "name" : {
@@ -2133,7 +2224,7 @@
                   },
                   "description" : {
                     "type" : "string",
-                    "description" : "The name of the expectation"
+                    "description" : "Optional detailed description of the expectation"
                   },
                   "countConditionExpression" : {
                     "type" : "string",
@@ -2154,7 +2245,7 @@
                   },
                   "failedSeverity" : {
                     "type" : "string",
-                    "description" : "The name of the expectation",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
                     "enum" : [ "Warn ", "Error " ]
                   }
                 },
@@ -2162,104 +2253,6 @@
                 "required" : [ "name", "countConditionExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "SQLExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "aggExpression" : {
-                    "type" : "string",
-                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "SQLExpectation",
-                "required" : [ "name", "aggExpression", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               } ]
             },
             "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
@@ -2320,7 +2313,7 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
+            "description" : "A unique identifier for this instance."
           },
           "jndiContextFactory" : {
             "type" : "string",
@@ -2359,16 +2352,13 @@
             "description" : "JMS batch size"
           },
           "maxWaitSec" : {
-            "type" : "integer",
-            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
+            "type" : "integer"
           },
           "maxBatchAgeSec" : {
-            "type" : "integer",
-            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
+            "type" : "integer"
           },
           "txBatchSize" : {
-            "type" : "integer",
-            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
+            "type" : "integer"
           },
           "connectionFactory" : {
             "type" : "string",
@@ -2395,11 +2385,11 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "A unique identifier for this instance."
           },
           "path" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "The root path of the files that are handled by this DataObject."
           },
           "jsonOptions" : {
             "type" : "object",
@@ -2413,7 +2403,7 @@
             "items" : {
               "type" : "string"
             },
-            "description" : "The Spark-Format provider to be used"
+            "description" : "Definition of partition columns"
           },
           "schema" : {
             "type" : "string",
@@ -2421,11 +2411,11 @@
           },
           "schemaMin" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "saveMode" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used",
+            "description" : "Overwrite or Append new data.\nWhen writing partitioned data, this applies only to partitions concerned.",
             "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
           },
           "sparkRepartition" : {
@@ -2503,11 +2493,11 @@
           },
           "connectionId" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "Return the connection id.\n\nConnection defines path prefix (scheme, authority, base path) and ACL\\'s in central location."
           },
           "filenameColumn" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "The name of the (optional) additional column containing the source filename"
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
@@ -2538,15 +2528,14 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
+            "description" : "A unique identifier for this instance."
           },
           "topicName" : {
             "type" : "string",
             "description" : "The name of the topic to read"
           },
           "connectionId" : {
-            "type" : "string",
-            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
+            "type" : "string"
           },
           "keyType" : {
             "type" : "string",
@@ -2638,7 +2627,7 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "Declare supported Language for getting DataFrame"
+            "description" : "A unique identifier for this instance."
           },
           "config" : {
             "type" : "string",
@@ -2691,7 +2680,7 @@
           },
           "schemaMin" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "saveMode" : {
             "type" : "string",
@@ -2773,7 +2762,7 @@
           },
           "filenameColumn" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "The name of the (optional) additional column containing the source filename"
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
@@ -2804,11 +2793,11 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "A unique identifier for this instance."
           },
           "path" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "The root path of the files that are handled by this DataObject."
           },
           "customFormat" : {
             "type" : "string",
@@ -2830,15 +2819,15 @@
             "items" : {
               "type" : "string"
             },
-            "description" : "The Spark-Format provider to be used"
+            "description" : "Definition of partition columns"
           },
           "schema" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "An optional[[DataObject]]user-defined schema definition.\n\nSome[[DataObject]]s support optional schema inference.\nSpecifying this attribute disables automatic schema inference. When the wrapped data source contains a source\nschema, this`schema`attribute is ignored.\n\nNote: This is only used by the functionality defined in[[CanCreateDataFrame]], that is,\nwhen reading Spark data frames from the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that bypass Spark data frames ignore the`schema` attribute\nif it is defined."
           },
           "schemaMin" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "saveMode" : {
             "type" : "string",
@@ -2916,11 +2905,11 @@
           },
           "connectionId" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "Return the connection id.\n\nConnection defines path prefix (scheme, authority, base path) and ACL\\'s in central location."
           },
           "filenameColumn" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "The name of the (optional) additional column containing the source filename"
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
@@ -2951,11 +2940,11 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "A unique identifier for this instance."
           },
           "path" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "The root path of the files that are handled by this DataObject."
           },
           "csvOptions" : {
             "type" : "object",
@@ -2969,7 +2958,7 @@
             "items" : {
               "type" : "string"
             },
-            "description" : "The Spark-Format provider to be used"
+            "description" : "Definition of partition columns"
           },
           "schema" : {
             "type" : "string",
@@ -2977,7 +2966,7 @@
           },
           "schemaMin" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "dateColumnType" : {
             "type" : "string",
@@ -2994,7 +2983,7 @@
           },
           "saveMode" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used",
+            "description" : "Overwrite or Append new data.\nWhen writing partitioned data, this applies only to partitions concerned.",
             "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
           },
           "sparkRepartition" : {
@@ -3068,11 +3057,11 @@
           },
           "connectionId" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "Return the connection id.\n\nConnection defines path prefix (scheme, authority, base path) and ACL\\'s in central location."
           },
           "filenameColumn" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "The name of the (optional) additional column containing the source filename"
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
@@ -3103,22 +3092,21 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "Definition of partition layout\nuse %<partitionColName>% as placeholder and * for globs in layout\nNote: if you have globs in partition layout, it\\'s not possible to write files to this DataObject\nNote: if this is a directory, you must add a final backslash to the partition layout"
+            "description" : "A unique identifier for this instance."
           },
           "path" : {
             "type" : "string",
-            "description" : "Definition of partition layout\nuse %<partitionColName>% as placeholder and * for globs in layout\nNote: if you have globs in partition layout, it\\'s not possible to write files to this DataObject\nNote: if this is a directory, you must add a final backslash to the partition layout"
+            "description" : "The root path of the files that are handled by this DataObject."
           },
           "connectionId" : {
-            "type" : "string",
-            "description" : "Definition of partition layout\nuse %<partitionColName>% as placeholder and * for globs in layout\nNote: if you have globs in partition layout, it\\'s not possible to write files to this DataObject\nNote: if this is a directory, you must add a final backslash to the partition layout"
+            "type" : "string"
           },
           "partitions" : {
             "type" : "array",
             "items" : {
               "type" : "string"
             },
-            "description" : "Definition of partition layout\nuse %<partitionColName>% as placeholder and * for globs in layout\nNote: if you have globs in partition layout, it\\'s not possible to write files to this DataObject\nNote: if this is a directory, you must add a final backslash to the partition layout"
+            "description" : "Definition of partition columns"
           },
           "partitionLayout" : {
             "type" : "string",
@@ -3157,7 +3145,7 @@
           },
           "schemaMin" : {
             "type" : "string",
-            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "constraints" : {
             "type" : "array",
@@ -3198,6 +3186,104 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "aggExpression" : {
+                    "type" : "string",
+                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "SQLExpectation",
+                "required" : [ "name", "aggExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "CountExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLFractionExpectation"
                   },
                   "name" : {
@@ -3206,7 +3292,7 @@
                   },
                   "description" : {
                     "type" : "string",
-                    "description" : "The name of the expectation"
+                    "description" : "Optional detailed description of the expectation"
                   },
                   "countConditionExpression" : {
                     "type" : "string",
@@ -3227,7 +3313,7 @@
                   },
                   "failedSeverity" : {
                     "type" : "string",
-                    "description" : "The name of the expectation",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
                     "enum" : [ "Warn ", "Error " ]
                   }
                 },
@@ -3235,104 +3321,6 @@
                 "required" : [ "name", "countConditionExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "SQLExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "aggExpression" : {
-                    "type" : "string",
-                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "SQLExpectation",
-                "required" : [ "name", "aggExpression", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               } ]
             },
             "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
@@ -3367,7 +3355,7 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
+            "description" : "A unique identifier for this instance."
           },
           "params" : {
             "type" : "object",
@@ -3402,8 +3390,7 @@
             "additionalProperties" : false
           },
           "connectionId" : {
-            "type" : "string",
-            "description" : "Configured options for the Spark[[DataFrameReader]]/[[DataFrameWriter]] .\n\nSEE: [[DataFrameReader]]\n\nSEE: [[DataFrameWriter]]"
+            "type" : "string"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -3422,31 +3409,28 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+            "description" : "A unique identifier for this instance."
           },
           "path" : {
-            "type" : "string",
-            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+            "type" : "string"
           },
           "partitions" : {
             "type" : "array",
             "items" : {
               "type" : "string"
             },
-            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+            "description" : "Definition of partition columns"
           },
           "analyzeTableAfterWrite" : {
-            "type" : "string",
-            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+            "type" : "string"
           },
           "dateColumnType" : {
             "type" : "string",
-            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject.",
             "enum" : [ "Default ", "String ", "Date " ]
           },
           "schemaMin" : {
             "type" : "string",
-            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "table" : {
             "$ref" : "#/definitions/Others/Table"
@@ -3490,6 +3474,104 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "aggExpression" : {
+                    "type" : "string",
+                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "SQLExpectation",
+                "required" : [ "name", "aggExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "CountExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLFractionExpectation"
                   },
                   "name" : {
@@ -3498,7 +3580,7 @@
                   },
                   "description" : {
                     "type" : "string",
-                    "description" : "The name of the expectation"
+                    "description" : "Optional detailed description of the expectation"
                   },
                   "countConditionExpression" : {
                     "type" : "string",
@@ -3519,7 +3601,7 @@
                   },
                   "failedSeverity" : {
                     "type" : "string",
-                    "description" : "The name of the expectation",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
                     "enum" : [ "Warn ", "Error " ]
                   }
                 },
@@ -3527,115 +3609,15 @@
                 "required" : [ "name", "countConditionExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "SQLExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "aggExpression" : {
-                    "type" : "string",
-                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "SQLExpectation",
-                "required" : [ "name", "aggExpression", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               } ]
             },
-            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+            "description" : "Map of expectation name and definition to evaluate on write, see[[Expectation]] for details.\nExpectations are aggregation expressions defined on dataset-level and evaluated on every write.\nBy default their result is logged with level info (ok) and error (failed), but this can be customized to be logged as warning.\nIn case of failed expectations logged as error, an exceptions is thrown and further processing is stopped.\nNote that the exception is thrown after writing to the DataObject is finished.\n\nThe following expectations names are reserved to create default metrics and should not be used:\n- count"
           },
           "numInitialHdfsPartitions" : {
-            "type" : "integer",
-            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+            "type" : "integer"
           },
           "saveMode" : {
             "type" : "string",
-            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject.",
             "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
           },
           "acl" : {
@@ -3677,12 +3659,11 @@
             "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
           },
           "connectionId" : {
-            "type" : "string",
-            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+            "type" : "string"
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
-            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+            "description" : "Definition of partitions that are expected to exists.\nThis is used to validate that partitions being read exists and don\\'t return no data.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nexample: \\\"elements[\\'yourColName\\'] > 2017\\\"\n\nOTHERTAG: true if partition is expected to exist."
           },
           "housekeepingMode" : {
             "oneOf" : [ {
@@ -3690,7 +3671,7 @@
             }, {
               "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
             } ],
-            "description" : "List of constraint definitions to validate on write, see[[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn\\'t need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+            "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\nDefault is None."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -3708,18 +3689,16 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "Definition of partition layout\nuse %<partitionColName>% as placeholder and * for globs in layout\nNote: if you have globs in partition layout, it\\'s not possible to write files to this DataObject\nNote: if this is a directory, you must add a final backslash to the partition layout"
+            "description" : "A unique identifier for this instance."
           },
           "url" : {
-            "type" : "string",
-            "description" : "Definition of partition layout\nuse %<partitionColName>% as placeholder and * for globs in layout\nNote: if you have globs in partition layout, it\\'s not possible to write files to this DataObject\nNote: if this is a directory, you must add a final backslash to the partition layout"
+            "type" : "string"
           },
           "additionalHeaders" : {
             "type" : "object",
             "additionalProperties" : {
               "type" : "string"
-            },
-            "description" : "Definition of partition layout\nuse %<partitionColName>% as placeholder and * for globs in layout\nNote: if you have globs in partition layout, it\\'s not possible to write files to this DataObject\nNote: if this is a directory, you must add a final backslash to the partition layout"
+            }
           },
           "timeouts" : {
             "type" : "object",
@@ -3736,8 +3715,7 @@
             "additionalProperties" : false
           },
           "readTimeoutMs" : {
-            "type" : "integer",
-            "description" : "Definition of partition layout\nuse %<partitionColName>% as placeholder and * for globs in layout\nNote: if you have globs in partition layout, it\\'s not possible to write files to this DataObject\nNote: if this is a directory, you must add a final backslash to the partition layout"
+            "type" : "integer"
           },
           "authMode" : {
             "oneOf" : [ {
@@ -3756,16 +3734,13 @@
               "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/TokenAuthMode"
-            } ],
-            "description" : "Definition of partition layout\nuse %<partitionColName>% as placeholder and * for globs in layout\nNote: if you have globs in partition layout, it\\'s not possible to write files to this DataObject\nNote: if this is a directory, you must add a final backslash to the partition layout"
+            } ]
           },
           "mimeType" : {
-            "type" : "string",
-            "description" : "Definition of partition layout\nuse %<partitionColName>% as placeholder and * for globs in layout\nNote: if you have globs in partition layout, it\\'s not possible to write files to this DataObject\nNote: if this is a directory, you must add a final backslash to the partition layout"
+            "type" : "string"
           },
           "writeMethod" : {
             "type" : "string",
-            "description" : "Definition of partition layout\nuse %<partitionColName>% as placeholder and * for globs in layout\nNote: if you have globs in partition layout, it\\'s not possible to write files to this DataObject\nNote: if this is a directory, you must add a final backslash to the partition layout",
             "enum" : [ "Delete ", "Put ", "Post ", "Get " ]
           },
           "proxy" : {
@@ -3783,8 +3758,7 @@
             "additionalProperties" : false
           },
           "followRedirects" : {
-            "type" : "string",
-            "description" : "Definition of partition layout\nuse %<partitionColName>% as placeholder and * for globs in layout\nNote: if you have globs in partition layout, it\\'s not possible to write files to this DataObject\nNote: if this is a directory, you must add a final backslash to the partition layout"
+            "type" : "string"
           },
           "partitionDefs" : {
             "type" : "array",
@@ -3828,15 +3802,14 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "A unique identifier for this instance."
           },
           "path" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "The root path of the files that are handled by this DataObject."
           },
           "rowTag" : {
-            "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "type" : "string"
           },
           "xmlOptions" : {
             "type" : "object",
@@ -3850,7 +3823,7 @@
             "items" : {
               "type" : "string"
             },
-            "description" : "The Spark-Format provider to be used"
+            "description" : "Definition of partition columns"
           },
           "schema" : {
             "type" : "string",
@@ -3858,11 +3831,11 @@
           },
           "schemaMin" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
           },
           "saveMode" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used",
+            "description" : "Overwrite or Append new data.\nWhen writing partitioned data, this applies only to partitions concerned.",
             "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
           },
           "sparkRepartition" : {
@@ -3897,8 +3870,7 @@
             "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\n\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\n\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file."
           },
           "flatten" : {
-            "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "type" : "string"
           },
           "acl" : {
             "type" : "object",
@@ -3940,11 +3912,11 @@
           },
           "connectionId" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "Return the connection id.\n\nConnection defines path prefix (scheme, authority, base path) and ACL\\'s in central location."
           },
           "filenameColumn" : {
             "type" : "string",
-            "description" : "The Spark-Format provider to be used"
+            "description" : "The name of the (optional) additional column containing the source filename"
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
@@ -4352,6 +4324,71 @@
         "required" : [ "rules" ],
         "additionalProperties" : false,
         "description" : "Apply validation rules to a DataFrame and collect potential violation error messages in a new column."
+      },
+      "DecryptColumnsTransformer" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "DecryptColumnsTransformer"
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "name of the transformer"
+          },
+          "description" : {
+            "type" : "string",
+            "description" : "Optional description of the transformer"
+          },
+          "decryptColumns" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "List of columns [columnA, columnB] to be encrypted"
+          },
+          "keyVariable" : {
+            "type" : "string",
+            "description" : "contains the id of the provider and the name of the secret with format <PROVIDERID>#<SECRETNAME>,\ne.g. ENV#<ENV_VARIABLE_NAME> to get a secret from an environment variable OR CLEAR#mYsEcReTkeY"
+          },
+          "algorithm" : {
+            "type" : "string"
+          }
+        },
+        "title" : "DecryptColumnsTransformer",
+        "required" : [ "decryptColumns", "keyVariable" ],
+        "additionalProperties" : false,
+        "description" : "Decryption of specified columns using AES/GCM algorithm."
+      },
+      "EncryptColumnsTransformer" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "EncryptColumnsTransformer"
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "name of the transformer"
+          },
+          "description" : {
+            "type" : "string",
+            "description" : "Optional description of the transformer"
+          },
+          "encryptColumns" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "List of columns [columnA, columnB] to be encrypted"
+          },
+          "keyVariable" : {
+            "type" : "string",
+            "description" : "contains the id of the provider and the name of the secret with format <PROVIDERID>#<SECRETNAME>,\ne.g. ENV#<ENV_VARIABLE_NAME> to get a secret from an environment variable OR CLEAR#mYsEcReTkeY"
+          }
+        },
+        "title" : "EncryptColumnsTransformer",
+        "required" : [ "encryptColumns", "keyVariable" ],
+        "additionalProperties" : false,
+        "description" : "Encryption of specified columns using AES/GCM algorithm."
       },
       "FilterTransformer" : {
         "type" : "object",
@@ -4832,12 +4869,10 @@
             "const" : "AuthHeaderMode"
           },
           "headerName" : {
-            "type" : "string",
-            "description" : "Return additional headers to add/overwrite in http request."
+            "type" : "string"
           },
           "secretVariable" : {
-            "type" : "string",
-            "description" : "Return additional headers to add/overwrite in http request."
+            "type" : "string"
           }
         },
         "title" : "AuthHeaderMode",
@@ -4852,12 +4887,10 @@
             "const" : "BasicAuthMode"
           },
           "userVariable" : {
-            "type" : "string",
-            "description" : "This method is called in prepare phase through the data object.\nIt allows the check configuration and setup variables."
+            "type" : "string"
           },
           "passwordVariable" : {
-            "type" : "string",
-            "description" : "This method is called in prepare phase through the data object.\nIt allows the check configuration and setup variables."
+            "type" : "string"
           }
         },
         "title" : "BasicAuthMode",
@@ -4895,24 +4928,19 @@
             "const" : "KeycloakClientSecretAuthMode"
           },
           "ssoServer" : {
-            "type" : "string",
-            "description" : "Return additional headers to add/overwrite in http request."
+            "type" : "string"
           },
           "ssoRealm" : {
-            "type" : "string",
-            "description" : "Return additional headers to add/overwrite in http request."
+            "type" : "string"
           },
           "ssoGrantType" : {
-            "type" : "string",
-            "description" : "Return additional headers to add/overwrite in http request."
+            "type" : "string"
           },
           "clientIdVariable" : {
-            "type" : "string",
-            "description" : "Return additional headers to add/overwrite in http request."
+            "type" : "string"
           },
           "clientSecretVariable" : {
-            "type" : "string",
-            "description" : "Return additional headers to add/overwrite in http request."
+            "type" : "string"
           }
         },
         "title" : "KeycloakClientSecretAuthMode",
@@ -4927,8 +4955,7 @@
             "const" : "PublicKeyAuthMode"
           },
           "userVariable" : {
-            "type" : "string",
-            "description" : "This method is called in prepare phase through the data object.\nIt allows the check configuration and setup variables."
+            "type" : "string"
           }
         },
         "title" : "PublicKeyAuthMode",
@@ -4943,28 +4970,22 @@
             "const" : "SASLSCRAMAuthMode"
           },
           "username" : {
-            "type" : "string",
-            "description" : "This method is called in prepare phase through the data object.\nIt allows the check configuration and setup variables."
+            "type" : "string"
           },
           "passwordVariable" : {
-            "type" : "string",
-            "description" : "This method is called in prepare phase through the data object.\nIt allows the check configuration and setup variables."
+            "type" : "string"
           },
           "sslMechanism" : {
-            "type" : "string",
-            "description" : "This method is called in prepare phase through the data object.\nIt allows the check configuration and setup variables."
+            "type" : "string"
           },
           "truststorePath" : {
-            "type" : "string",
-            "description" : "This method is called in prepare phase through the data object.\nIt allows the check configuration and setup variables."
+            "type" : "string"
           },
           "truststoreType" : {
-            "type" : "string",
-            "description" : "This method is called in prepare phase through the data object.\nIt allows the check configuration and setup variables."
+            "type" : "string"
           },
           "truststorePassVariable" : {
-            "type" : "string",
-            "description" : "This method is called in prepare phase through the data object.\nIt allows the check configuration and setup variables."
+            "type" : "string"
           }
         },
         "title" : "SASLSCRAMAuthMode",
@@ -4979,28 +5000,22 @@
             "const" : "SSLCertsAuthMode"
           },
           "keystorePath" : {
-            "type" : "string",
-            "description" : "This method is called in prepare phase through the data object.\nIt allows the check configuration and setup variables."
+            "type" : "string"
           },
           "keystoreType" : {
-            "type" : "string",
-            "description" : "This method is called in prepare phase through the data object.\nIt allows the check configuration and setup variables."
+            "type" : "string"
           },
           "keystorePassVariable" : {
-            "type" : "string",
-            "description" : "This method is called in prepare phase through the data object.\nIt allows the check configuration and setup variables."
+            "type" : "string"
           },
           "truststorePath" : {
-            "type" : "string",
-            "description" : "This method is called in prepare phase through the data object.\nIt allows the check configuration and setup variables."
+            "type" : "string"
           },
           "truststoreType" : {
-            "type" : "string",
-            "description" : "This method is called in prepare phase through the data object.\nIt allows the check configuration and setup variables."
+            "type" : "string"
           },
           "truststorePassVariable" : {
-            "type" : "string",
-            "description" : "This method is called in prepare phase through the data object.\nIt allows the check configuration and setup variables."
+            "type" : "string"
           }
         },
         "title" : "SSLCertsAuthMode",
@@ -5015,8 +5030,7 @@
             "const" : "TokenAuthMode"
           },
           "tokenVariable" : {
-            "type" : "string",
-            "description" : "Return additional headers to add/overwrite in http request."
+            "type" : "string"
           }
         },
         "title" : "TokenAuthMode",
@@ -5037,7 +5051,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "WhitelistTransformer"
+                  "const" : "BlacklistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -5047,18 +5061,18 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnWhitelist" : {
+                "columnBlacklist" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
                   },
-                  "description" : "List of columns to keep from DataFrame"
+                  "description" : "List of columns to exclude from DataFrame"
                 }
               },
-              "title" : "WhitelistTransformer",
-              "required" : [ "columnWhitelist", "type" ],
+              "title" : "BlacklistTransformer",
+              "required" : [ "columnBlacklist", "type" ],
               "additionalProperties" : false,
-              "description" : "Apply a column whitelist to a DataFrame."
+              "description" : "Apply a column blacklist to a DataFrame."
             }, {
               "type" : "object",
               "properties" : {
@@ -5124,6 +5138,39 @@
               "required" : [ "rules", "type" ],
               "additionalProperties" : false,
               "description" : "Apply validation rules to a DataFrame and collect potential violation error messages in a new column."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "DecryptColumnsTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "decryptColumns" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  },
+                  "description" : "List of columns [columnA, columnB] to be encrypted"
+                },
+                "keyVariable" : {
+                  "type" : "string",
+                  "description" : "contains the id of the provider and the name of the secret with format <PROVIDERID>#<SECRETNAME>,\ne.g. ENV#<ENV_VARIABLE_NAME> to get a secret from an environment variable OR CLEAR#mYsEcReTkeY"
+                },
+                "algorithm" : {
+                  "type" : "string"
+                }
+              },
+              "title" : "DecryptColumnsTransformer",
+              "required" : [ "decryptColumns", "keyVariable", "type" ],
+              "additionalProperties" : false,
+              "description" : "Decryption of specified columns using AES/GCM algorithm."
             }, {
               "type" : "object",
               "properties" : {
@@ -5244,6 +5291,36 @@
               "required" : [ "url", "functionName", "type" ],
               "additionalProperties" : false,
               "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Scala code which is compiled at runtime.\nThe code is loaded from a Notebook. It should define a transform function with a configurable name, which receives a DataObjectId, a DataFrame\nand a map of options and has to return a DataFrame, see also ([[fnTransformType]] ).\nNotebook-cells starting with \\\"//!IGNORE\\\" will be ignored."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "EncryptColumnsTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "encryptColumns" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  },
+                  "description" : "List of columns [columnA, columnB] to be encrypted"
+                },
+                "keyVariable" : {
+                  "type" : "string",
+                  "description" : "contains the id of the provider and the name of the secret with format <PROVIDERID>#<SECRETNAME>,\ne.g. ENV#<ENV_VARIABLE_NAME> to get a secret from an environment variable OR CLEAR#mYsEcReTkeY"
+                }
+              },
+              "title" : "EncryptColumnsTransformer",
+              "required" : [ "encryptColumns", "keyVariable", "type" ],
+              "additionalProperties" : false,
+              "description" : "Encryption of specified columns using AES/GCM algorithm."
             }, {
               "type" : "object",
               "properties" : {
@@ -5527,6 +5604,17 @@
               "type" : "object",
               "properties" : {
                 "type" : {
+                  "const" : "OptionsGenericDfTransformer"
+                }
+              },
+              "title" : "OptionsGenericDfTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
                   "const" : "FilterTransformer"
                 },
                 "name" : {
@@ -5550,17 +5638,6 @@
               "required" : [ "filterClause", "type" ],
               "additionalProperties" : false,
               "description" : "Apply a filter condition to a DataFrame."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
-                  "const" : "OptionsGenericDfTransformer"
-                }
-              },
-              "title" : "OptionsGenericDfTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
             }, {
               "type" : "object",
               "properties" : {
@@ -5598,7 +5675,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "BlacklistTransformer"
+                  "const" : "WhitelistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -5608,18 +5685,18 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnBlacklist" : {
+                "columnWhitelist" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
                   },
-                  "description" : "List of columns to exclude from DataFrame"
+                  "description" : "List of columns to keep from DataFrame"
                 }
               },
-              "title" : "BlacklistTransformer",
-              "required" : [ "columnBlacklist", "type" ],
+              "title" : "WhitelistTransformer",
+              "required" : [ "columnWhitelist", "type" ],
               "additionalProperties" : false,
-              "description" : "Apply a column blacklist to a DataFrame."
+              "description" : "Apply a column whitelist to a DataFrame."
             } ],
             "description" : "Configuration for a GenericDfTransformerDef to be applied"
           },
@@ -5901,7 +5978,7 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "Input[[DataObject]] which can CanCreateDataFrame"
+            "description" : "A unique identifier for this instance."
           },
           "inputId" : {
             "type" : "string",
@@ -5971,6 +6048,10 @@
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DataValidationTransformer"
               }, {
+                "$ref" : "#/definitions/GenericDfTransformer/DecryptColumnsTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/EncryptColumnsTransformer"
+              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/FilterTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/PythonCodeDfTransformer"
@@ -6002,11 +6083,11 @@
           },
           "breakDataFrameLineage" : {
             "type" : "string",
-            "description" : "Input[[DataObject]] which can CanCreateDataFrame"
+            "description" : "Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject.\nThis can help to save memory and performance if the input DataFrame includes many transformations from previous Actions.\nThe new DataFrame will be initialized according to the SubFeed\\'s partitionValues."
           },
           "persist" : {
             "type" : "string",
-            "description" : "Input[[DataObject]] which can CanCreateDataFrame"
+            "description" : "Force persisting input DataFrame\\'s on Disk.\nThis improves performance if dataFrame is used multiple times in the transformation and can serve as a recovery point\nin case a task get\\'s lost.\nNote that DataFrames are persisted automatically by the previous Action if later Actions need the same data. To avoid this\nbehaviour set breakDataFrameLineage=false."
           },
           "executionMode" : {
             "oneOf" : [ {
@@ -6076,7 +6157,7 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject.\nThis can help to save memory and performance if the input DataFrame includes many transformations from previous Actions.\nThe new DataFrame will be initialized according to the SubFeed\\'s partitionValues."
+            "description" : "A unique identifier for this instance."
           },
           "inputIds" : {
             "type" : "array",
@@ -6160,7 +6241,7 @@
           },
           "persist" : {
             "type" : "string",
-            "description" : "Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject.\nThis can help to save memory and performance if the input DataFrame includes many transformations from previous Actions.\nThe new DataFrame will be initialized according to the SubFeed\\'s partitionValues."
+            "description" : "Force persisting input DataFrame\\'s on Disk.\nThis improves performance if dataFrame is used multiple times in the transformation and can serve as a recovery point\nin case a task get\\'s lost.\nNote that DataFrames are persisted automatically by the previous Action if later Actions need the same data. To avoid this\nbehaviour set breakDataFrameLineage=false."
           },
           "mainInputId" : {
             "type" : "string",
@@ -6244,7 +6325,7 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "Input[[FileRefDataObject]] which can CanCreateInputStream"
+            "description" : "A unique identifier for this instance."
           },
           "inputId" : {
             "type" : "string",
@@ -6287,7 +6368,7 @@
           },
           "breakFileRefLineage" : {
             "type" : "string",
-            "description" : "Input[[FileRefDataObject]] which can CanCreateInputStream"
+            "description" : "Stop propagating input FileRefs through action and instead get new FileRefs from DataObject according to the SubFeed\\'s partitionValue.\nThis is needed to reprocess all files of a path/partition instead of the FileRef\\'s passed from the previous Action."
           },
           "executionMode" : {
             "oneOf" : [ {
@@ -6349,7 +6430,7 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "put configuration validation checks here"
+            "description" : "A unique identifier for this instance."
           },
           "inputIds" : {
             "type" : "array",
@@ -6410,7 +6491,7 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "Input[[DataObject]] which can CanCreateDataFrame"
+            "description" : "A unique identifier for this instance."
           },
           "inputId" : {
             "type" : "string",
@@ -6476,6 +6557,10 @@
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DataValidationTransformer"
               }, {
+                "$ref" : "#/definitions/GenericDfTransformer/DecryptColumnsTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/EncryptColumnsTransformer"
+              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/FilterTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/PythonCodeDfTransformer"
@@ -6527,11 +6612,11 @@
           },
           "breakDataFrameLineage" : {
             "type" : "string",
-            "description" : "Input[[DataObject]] which can CanCreateDataFrame"
+            "description" : "Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject.\nThis can help to save memory and performance if the input DataFrame includes many transformations from previous Actions.\nThe new DataFrame will be initialized according to the SubFeed\\'s partitionValues."
           },
           "persist" : {
             "type" : "string",
-            "description" : "Input[[DataObject]] which can CanCreateDataFrame"
+            "description" : "Force persisting input DataFrame\\'s on Disk.\nThis improves performance if dataFrame is used multiple times in the transformation and can serve as a recovery point\nin case a task get\\'s lost.\nNote that DataFrames are persisted automatically by the previous Action if later Actions need the same data. To avoid this\nbehaviour set breakDataFrameLineage=false."
           },
           "executionMode" : {
             "oneOf" : [ {
@@ -6593,7 +6678,7 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "Input[[FileRefDataObject]] which can CanCreateInputStream"
+            "description" : "A unique identifier for this instance."
           },
           "inputId" : {
             "type" : "string",
@@ -6604,8 +6689,7 @@
             "description" : "output DataObject"
           },
           "overwrite" : {
-            "type" : "string",
-            "description" : "Input[[FileRefDataObject]] which can CanCreateInputStream"
+            "type" : "string"
           },
           "breakFileRefLineage" : {
             "type" : "string",
@@ -6671,7 +6755,7 @@
           },
           "id" : {
             "type" : "string",
-            "description" : "Input[[DataObject]] which can CanCreateDataFrame"
+            "description" : "A unique identifier for this instance."
           },
           "inputId" : {
             "type" : "string",
@@ -6736,6 +6820,10 @@
                 "$ref" : "#/definitions/GenericDfTransformer/BlacklistTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DataValidationTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/DecryptColumnsTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/EncryptColumnsTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/FilterTransformer"
               }, {
@@ -6810,11 +6898,11 @@
           },
           "breakDataFrameLineage" : {
             "type" : "string",
-            "description" : "Input[[DataObject]] which can CanCreateDataFrame"
+            "description" : "Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject.\nThis can help to save memory and performance if the input DataFrame includes many transformations from previous Actions.\nThe new DataFrame will be initialized according to the SubFeed\\'s partitionValues."
           },
           "persist" : {
             "type" : "string",
-            "description" : "Input[[DataObject]] which can CanCreateDataFrame"
+            "description" : "Force persisting input DataFrame\\'s on Disk.\nThis improves performance if dataFrame is used multiple times in the transformation and can serve as a recovery point\nin case a task get\\'s lost.\nNote that DataFrames are persisted automatically by the previous Action if later Actions need the same data. To avoid this\nbehaviour set breakDataFrameLineage=false."
           },
           "executionMode" : {
             "oneOf" : [ {
