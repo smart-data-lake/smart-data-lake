@@ -21,7 +21,7 @@ package io.smartdatalake.meta.jsonschema
 
 import io.smartdatalake.app.GlobalConfig
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
-import io.smartdatalake.config.{ParsableFromConfig, SdlConfigObject}
+import io.smartdatalake.config.{ParsableFromConfig}
 import io.smartdatalake.meta.{GenericAttributeDef, GenericTypeDef, GenericTypeUtil, jsonschema}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.Action
@@ -105,7 +105,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
       val typeProperty = if(typeDef.baseTpe.isDefined) Seq(("type", JsonConstDef(typeDef.name))) else Seq()
       val jsonAttributes = typeProperty ++ typeDef.attributes.map(a => (a.name, convertToJsonType(a)))
       val properties = ListMap(jsonAttributes:_*)
-      val required = typeDef.attributes.filter(_.isRequired).map(_.name)
+      val required = typeProperty.map(_._1) ++ typeDef.attributes.filter(_.isRequired).map(_.name)
       jsonschema.JsonObjectDef(properties, required = required, title = typeDef.name, description = typeDef.description)
     }
 
