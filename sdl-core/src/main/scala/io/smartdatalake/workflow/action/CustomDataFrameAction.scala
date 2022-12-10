@@ -85,6 +85,11 @@ case class CustomDataFrameAction(override val id: ActionId,
     applyTransformers(transformers ++ transformer.map(_.impl), partitionValues, inputSubFeeds, outputSubFeeds)
   }
 
+  override def prepare(implicit context: ActionPipelineContext): Unit = {
+    super.prepare
+    transformerDefs.foreach(_.prepare(id))
+  }
+
   override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
     applyTransformers(transformers ++ transformer.map(_.impl).toSeq, partitionValues)
   }

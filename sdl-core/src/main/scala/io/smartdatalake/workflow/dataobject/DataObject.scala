@@ -29,6 +29,7 @@ import org.apache.spark.sql.SparkSession
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
+import scala.util.Try
 
 /**
  * This is the root trait for every DataObject.
@@ -59,6 +60,22 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
    */
   private[smartdatalake] def prepare(implicit context: ActionPipelineContext): Unit = {
     housekeepingMode.foreach(_.prepare(this))
+    // check lazy parsed schema
+    this match {
+      case x: UserDefinedSchema => try {
+        x.schema.foreach(_.columns)
+      } catch {
+        case e: Exception => throw ConfigurationException.fromException(s"($id) error parsing 'schema'", "schema", e)
+      }
+    }
+    // check lazy parsed schemaMin
+    this match {
+      case x: SchemaValidation => try{
+        x.schemaMin.foreach(_.columns)
+      } catch {
+        case e: Exception => throw ConfigurationException.fromException(s"($id) error parsing 'schemaMin'", "schemaMin", e)
+      }
+    }
   }
 
   /**

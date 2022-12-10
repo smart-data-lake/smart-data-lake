@@ -130,6 +130,11 @@ case class DeduplicateAction(override val id: ActionId,
 
   validateConfig()
 
+  override def prepare(implicit context: ActionPipelineContext): Unit = {
+    super.prepare
+    transformerDefs.foreach(_.prepare(id))
+  }
+
   private def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
     val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
 

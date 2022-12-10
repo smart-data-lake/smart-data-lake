@@ -710,7 +710,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
   }
 
 
-  test("sdlb run with external state file using FinalStateWriter") {
+  test("sdlb run with external state file using FinalStateWriter and Environment setting override from config") {
 
     val feedName = "test"
     val sdlb = new DefaultSmartDataLakeBuilder()
@@ -728,6 +728,9 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // Run SDLB
     sdlb.run(sdlConfig)
+
+    // check override of environment setting from global config
+    assert(Environment.dagGraphLogMaxLineLength == 100)
 
     // check result
     val fileResult = filesystem.exists(new Path("ext-state/state-test"))
