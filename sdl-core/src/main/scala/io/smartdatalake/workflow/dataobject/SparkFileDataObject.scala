@@ -265,7 +265,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
         .options(readOptions ++ incrementalOutputOptions)
         .optionalSchema(schema)
         .option("basePath", hadoopPath.toString) // this is needed for partitioned tables when subdirectories are read directly; it then keeps the partition columns from the subdirectory path in the dataframe
-      val pathsToRead = partitionValues.flatMap(getConcretePaths).map(_.toString)
+      val pathsToRead = partitionValues.flatMap(getConcreteInitPaths).map(_.toString)
       val df = if (pathsToRead.nonEmpty) Some(reader.load(pathsToRead: _*)) else None
       df.filter(df => schema.isDefined || partitions.diff(df.columns).isEmpty) // filter DataFrames without partition columns as they are empty (this might happen if there is no schema specified and the partition is empty)
         .getOrElse {
@@ -297,16 +297,17 @@ trait SparkFileDataObject extends HadoopFileDataObject
         .option("path", hadoopPath.toString) // spark-xml is a V1 source and only supports one path, which must be given as option...
         .load()
     } else {
+      val schemaWithoutPartitions = schema.map(s => StructType(s.filterNot(f => partitions.contains(f.name))))
       val reader = session.read
         .format(readFormat)
         .options(readOptions ++ incrementalOutputOptions)
-        .optionalSchema(schema)
+        .optionalSchema(schemaWithoutPartitions)
       val partitionValuesToRead = if (partitionValues.nonEmpty) partitionValues else listPartitions
-      val pathsToRead = partitionValuesToRead.flatMap(pv => getConcretePaths(pv).map(path => (pv, path.toString)))
+      val pathsToRead = partitionValuesToRead.flatMap(pv => getConcreteFullPaths(pv).map(p => (extractPartitionValuesFromDirPath(p.toString), p)))
         .filter{case (_,path) => filesystem.globStatus(new Path(path,fileName)).nonEmpty} // filter empty path to avoid NullPointerException in DataFrame
       val df = if (pathsToRead.nonEmpty) Some(
         pathsToRead.map { case (pv, path) =>
-          partitions.foldLeft(reader.option("path", path).load()) { // spark-xml is a V1 source and only supports one path, which must be given as option...
+          partitions.foldLeft(reader.option("path", path.toString).load()) { // spark-xml is a V1 source and only supports one path, which must be given as option...
             case (df, partition) => df.withColumn(partition, lit(pv(partition).toString))
           }
         }.reduce(_ unionByName _)
@@ -334,26 +335,21 @@ trait SparkFileDataObject extends HadoopFileDataObject
   protected def getContentFilesOneByOne(partitionValues: Seq[PartitionValues], schema: Option[StructType], incrementalOutputOptions: Map[String,String])(implicit context: ActionPipelineContext): DataFrame = {
     implicit val session: SparkSession = context.sparkSession
     // search files to be read
-    val files = if (filesystem.getFileStatus(hadoopPath).isFile) Seq((hadoopPath, PartitionValues(Map())))
+    val files = if (filesystem.getFileStatus(hadoopPath).isFile) Seq((PartitionValues(Map()),hadoopPath))
     else  if (partitions.isEmpty) {
       filesystem.globStatus(new Path(hadoopPath,fileName)).toSeq
-        .filter(_.isFile).map(fs => (fs.getPath, PartitionValues(Map())))
-    } else if (partitionValues.isEmpty) {
-      val children = partitions.map(_ => "*") :+ fileName
-      filesystem.globStatus(children.foldLeft(hadoopPath)((path, child) => new Path(path, child))).toSeq
-        .filter(_.isFile).map(fs => (fs.getPath, extractPartitionValuesFromPath(fs.getPath.toString)))
-    } else { // partitions with given partition values
-      val paths = partitionValues.flatMap(pv => getConcretePaths(pv).map(p => (p,pv)))
-      paths.flatMap{case (p,pv) => filesystem.globStatus(new Path(p, fileName)).map(p => (p,pv))}
-        .filter(_._1.isFile).map{ case (fs,pv) => (fs.getPath, pv)}
+        .filter(_.isFile).map(fs => (PartitionValues(Map()),fs.getPath))
+    } else {
+      partitionValues.flatMap(pv => getConcreteFullPaths(pv, returnFiles = true).map(p => (extractPartitionValuesFromFilePath(p.toString),p)))
     }
     // get and union DataFrames per File
+    val schemaWithoutPartitions = schema.map(s => StructType(s.filterNot(f => partitions.contains(f.name))))
     val reader = session.read
       .format(readFormat)
       .options(readOptions ++ incrementalOutputOptions)
-      .optionalSchema(schema)
+      .optionalSchema(schemaWithoutPartitions)
     val df = if (files.nonEmpty) Some(
-      files.map { case (p, pv) =>
+      files.map { case (pv,p) =>
         partitions.foldLeft(reader.option("path", p.toString).load()) {
           case (df, partition) => df.withColumn(partition, lit(pv(partition).toString))
         }

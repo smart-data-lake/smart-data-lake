@@ -78,7 +78,7 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
           SshUtil.sftpListFiles(p)(sftp)
           .map{ f =>
             // check if we have to extract partition values from file path
-            val pVs = if (v.keys != partitions.toSet) extractPartitionValuesFromPath(f)
+            val pVs = if (v.keys != partitions.toSet) extractPartitionValuesFromFilePath(f)
             else v
             FileRef(f, f.reverse.takeWhile(_ != separator).reverse, pVs)
           }
@@ -151,7 +151,7 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
             val pattern = PartitionLayout.replaceTokens(partitionLayout, PartitionValues(Map()))
             // list directories and extract partition values
             SshUtil.sftpListFiles(path + separator + pattern)(sftp)
-              .map( f => PartitionLayout.extractPartitionValues(partitionLayout, "", relativizePath(f) + separator))
+              .map( f => PartitionLayout.extractPartitionValues(partitionLayout, relativizePath(f) + separator))
         }
     }.getOrElse(Seq())
   }

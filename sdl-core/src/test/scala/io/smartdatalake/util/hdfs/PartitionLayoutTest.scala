@@ -42,7 +42,7 @@ class PartitionLayoutTest extends FunSuite {
     val delimiter = PartitionLayout.delimiter
     val testLayout = s"abc/date${delimiter}date:[0-9]+-[0-9]+-[0-9]+$delimiter-${delimiter}type$delimiter-"
     val partitionString = "abc/date2000-01-01-ZZ-test.csv"
-    val partitionValues = PartitionLayout.extractPartitionValues(testLayout, "*.csv", partitionString)
+    val partitionValues = PartitionLayout.extractPartitionValues(testLayout + "*.csv", partitionString)
     assert(partitionValues == PartitionValues(Map("date" -> "2000-01-01", "type" -> "ZZ")))
   }
 
@@ -50,7 +50,7 @@ class PartitionLayoutTest extends FunSuite {
     val delimiter = PartitionLayout.delimiter
     val testLayout = HdfsUtil.getHadoopPartitionLayout(Seq("a","b"))
     val partitionString = "a=1/b=2/test.csv"
-    val partitionValues = PartitionLayout.extractPartitionValues(testLayout, "*.csv", partitionString)
+    val partitionValues = PartitionLayout.extractPartitionValues(testLayout + "*.csv", partitionString)
     assert(partitionValues == PartitionValues(Map("a" -> "1", "b" -> "2")))
   }
 
@@ -58,6 +58,6 @@ class PartitionLayoutTest extends FunSuite {
     val delimiter = PartitionLayout.delimiter
     val testLayout = HdfsUtil.getHadoopPartitionLayout(Seq("a","b"))
     val partitionString = "test/a=1/b=2/test.csv"
-    intercept[RuntimeException](PartitionLayout.extractPartitionValues(testLayout, "*.csv", partitionString))
+    intercept[RuntimeException](PartitionLayout.extractPartitionValues(testLayout + "*.csv", partitionString))
   }
 }

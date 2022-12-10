@@ -617,7 +617,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitions)
       // list directories and extract partition values
       session.sql(s"show partitions ${table.fullName}").as[String].collect.toSeq
-        .map( path => PartitionLayout.extractPartitionValues(partitionLayout, "", path + Path.SEPARATOR))
+        .map( path => PartitionLayout.extractPartitionValues(partitionLayout, path + Path.SEPARATOR))
     } else Seq()
   }
 
