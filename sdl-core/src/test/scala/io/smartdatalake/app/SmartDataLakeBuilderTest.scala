@@ -722,6 +722,9 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val dfSrc1 = Seq("testData").toDF("testColumn")
     dummySrcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())
 
+    // reset environment setting to check
+    Environment._dagGraphLogMaxLineLength = None
+
     // load data from configuration file
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
       getClass.getResource("/configState/WithFinalStateWriter.conf").getPath)))
@@ -730,6 +733,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     sdlb.run(sdlConfig)
 
     // check override of environment setting from global config
+    // NOTE: this might fail with parallel test execution, because Environment is shared between all Tests...
     assert(Environment.dagGraphLogMaxLineLength == 100)
 
     // check result

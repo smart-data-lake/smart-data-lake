@@ -67,14 +67,16 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
       } catch {
         case e: Exception => throw ConfigurationException.fromException(s"($id) error parsing 'schema'", "schema", e)
       }
+      case _ => Unit
     }
-    // check lazy parsed schemaMin
+    // check lazy parsed schemaMin (note that it can match schema and schemaMin, an we need therefore two match statements)
     this match {
       case x: SchemaValidation => try{
         x.schemaMin.foreach(_.columns)
       } catch {
         case e: Exception => throw ConfigurationException.fromException(s"($id) error parsing 'schemaMin'", "schemaMin", e)
       }
+      case _ => Unit
     }
   }
 
