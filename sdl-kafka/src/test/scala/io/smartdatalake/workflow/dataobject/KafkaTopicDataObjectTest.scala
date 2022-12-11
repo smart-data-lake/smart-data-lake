@@ -20,7 +20,6 @@ package io.smartdatalake.workflow.dataobject
 
 import io.confluent.kafka.serializers.{KafkaJsonDeserializer, KafkaJsonDeserializerConfig, KafkaJsonSerializer}
 import io.github.embeddedkafka.schemaregistry.{EmbeddedKafka => EmbeddedKafkaWithSchemaRegistry}
-import io.smartdatalake.testutil.KafkaTestUtil
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.connection.KafkaConnection
@@ -29,8 +28,7 @@ import org.apache.kafka.common.serialization.StringSerializer
 import org.apache.spark.sql.confluent.IncompatibleSchemaException
 import org.apache.spark.sql.functions.{lit, struct}
 import org.apache.spark.sql.streaming.Trigger
-import org.apache.spark.sql.types.{StructField, StructType}
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 
 import java.nio.file.Files
 import java.sql.Timestamp
@@ -38,14 +36,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 
-/**
- * Note about EmbeddedKafka compatibility:
- * The currently used version 2.4.1 (in sync with the kafka version of sparks parent pom) is not compatible with JDK14+
- * because of a change of InetSocketAddress::toString. Zookeeper doesn't start because of
- * "java.nio.channels.UnresolvedAddressException: Session 0x0 for server localhost/<unresolved>:6001, unexpected error, closing socket connection and attempting reconnect"
- * see also https://www.oracle.com/java/technologies/javase/14all-relnotes.html#JDK-8225499
- */
-class KafkaTopicDataObjectTest extends FunSuite with  BeforeAndAfter with EmbeddedKafkaWithSchemaRegistry with DataObjectTestSuite with SmartDataLakeLogger {
+class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with BeforeAndAfter with EmbeddedKafkaWithSchemaRegistry with DataObjectTestSuite with SmartDataLakeLogger {
 
   import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
   import session.implicits._
