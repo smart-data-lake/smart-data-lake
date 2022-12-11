@@ -33,13 +33,6 @@ import java.nio.file.Files
 import java.time.temporal.ChronoUnit
 
 
-/**
- * Note about EmbeddedKafka compatibility:
- * The currently used version 2.4.1 (in sync with the kafka version of sparks parent pom) is not compatible with JDK14+
- * because of a change of InetSocketAddress::toString. Zookeeper doesn't start because of
- * "java.nio.channels.UnresolvedAddressException: Session 0x0 for server localhost/<unresolved>:6001, unexpected error, closing socket connection and attempting reconnect"
- * see also https://www.oracle.com/java/technologies/javase/14all-relnotes.html#JDK-8225499
- */
 class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with BeforeAndAfter with EmbeddedKafkaWithSchemaRegistry with DataObjectTestSuite with SmartDataLakeLogger {
 
   import io.smartdatalake.util.spark.DataFrameUtil.DfSDL

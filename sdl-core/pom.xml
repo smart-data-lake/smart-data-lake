@@ -22,7 +22,7 @@
 	<parent>
 		<groupId>io.smartdatalake</groupId>
 		<artifactId>sdl-parent</artifactId>
-		<version>2.3.3-SNAPSHOT</version>
+		<version>2.4.0-SNAPSHOT</version>
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
@@ -119,12 +119,13 @@
 			<version>${commons-io.version}</version>
 		</dependency>
 
-		<dependency>
+		<!--TODO: unbelievable whats shaded into this jar.. scala, log4j, apache commons... causing much runtim conflicts! -->
+		<!--dependency>
 			<groupId>com.crealytics</groupId>
 			<artifactId>spark-excel_${scala.minor.version}</artifactId>
 			<version>${spark.excel.version}</version>
-			<scope>compile</scope>
-		</dependency>
+			<scope>runtime</scope>
+		</dependency-->
 		<dependency>
 			<groupId>org.apache.poi</groupId>
 			<artifactId>poi</artifactId>
@@ -285,9 +286,9 @@
 		</dependency>
 		<!-- Log4j is used in some unit tests to disable some exception logging, but also indirectly from SmartDataLakeLogger. Thats why we should not put scope=test-->
 		<dependency>
-			<groupId>log4j</groupId>
-			<artifactId>log4j</artifactId>
-			<!--scope>test</scope-->
+			<groupId>org.apache.logging.log4j</groupId>
+			<artifactId>log4j-api</artifactId>
+			<scope>test</scope>
 		</dependency>
 
 		<dependency>

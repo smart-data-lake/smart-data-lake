@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.dataframe.spark
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.dataframe.Observation
+import io.smartdatalake.workflow.dataframe.DataFrameObservation
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.util.QueryExecutionListener
@@ -34,7 +34,7 @@ import java.util.UUID
  *
  * Note: the name is used to make metrics unique across parallel queries in the same Spark session
  */
-private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().toString) extends Observation with SmartDataLakeLogger {
+private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().toString) extends DataFrameObservation with SmartDataLakeLogger {
 
   private val listener: SparkObservationListener = SparkObservationListener(this)
 

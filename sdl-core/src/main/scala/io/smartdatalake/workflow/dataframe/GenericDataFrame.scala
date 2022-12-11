@@ -90,7 +90,7 @@ trait GenericDataFrame extends GenericTypedObject {
    * @param aggregateColumns aggregate columns to observe on the DataFrame
    * @return an Observation object which can return observed metrics after execution
    */
-  def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, Observation)
+  def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, DataFrameObservation)
 
   /**
    * returns data frame which consists of those rows which contain at least a null in the specified columns
