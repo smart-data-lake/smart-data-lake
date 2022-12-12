@@ -9,7 +9,6 @@ import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode}
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.{AclDef, SmartDataLakeLogger}
-import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.util.spark.DataFrameUtil._
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -21,7 +20,6 @@ import org.apache.spark.sql.catalyst.expressions.ExprUtils
 import org.apache.spark.sql.catalyst.util._
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.execution.datasources.csv.CSVUtils
-import org.apache.spark.sql.functions.input_file_name
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DateType, StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
@@ -96,7 +94,11 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
   // convert schema to spark schema
   private val sparkParserSchema = parserSchema.convert(typeOf[SparkSubFeed]).asInstanceOf[SparkSchema].inner
 
-  override val format = "csv" // this is overriden with "text" for reading
+  override val format = "csv"
+  override val readFormat = "text"// read with Spark as text and then parse csv with custom logic
+  override val ignoreSchemaForReader = true // schema will be applied in customizeContent and not by SparkFileDataObject
+
+  override val readOptions: Map[String, String] = Map("wholetext" -> "true") // options for Spark text DataSource
 
   // this is only needed for FileRef actions
   override val fileName: String = "*.csv*"
@@ -121,69 +123,21 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
   ExprUtils.verifyColumnNameOfCorruptRecord(sparkParserSchema, parserOptions.columnNameOfCorruptRecord)
 
   /**
-   * This is mostly the same as with SparkFileDataObject
+   * parse CSV from DataFrame prepared by Sparks "text" DataSource
    */
-  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext) : DataFrame = {
+  override def customizeContent(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
     implicit val session: SparkSession = context.sparkSession
-    import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
-
-    val wrongPartitionValues = PartitionValues.checkWrongPartitionValues(partitionValues, partitions)
-    assert(wrongPartitionValues.isEmpty, s"getDataFrame got request with PartitionValues keys ${wrongPartitionValues.mkString(",")} not included in $id partition columns ${partitions.mkString(", ")}")
-
-    if (!filesystem.exists(hadoopPath)) {
-      // Schema exists so an empty data frame can be created
-      // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
-      filesystem.mkdirs(hadoopPath)
-    }
-
-    // Attention: If partition path has no files, text DataSource doesn't know about partition columns as there is no schema
-    //   given to the reader. In that case the final DataFrame is missing the partition columns!
-    // Workaround: we filter DataFrames with missing partition columns. This is ok as the DataFrame is empty! If there is no
-    //   DataFrame left we create an empty DataFrame.
-    val dfsContent = if (partitions.isEmpty || partitionValues.isEmpty) {
-      Seq(
-        session.read
-        .format("text")
-        .option("wholetext", "true")
-        .load(hadoopPath.toString)
-      )
-    } else {
-      val reader = session.read
-        .format("text")
-        .option("wholetext", "true")
-        .option("basePath", hadoopPath.toString) // this is needed for partitioned tables when subdirectories are read directly; it then keeps the partition columns from the subdirectory path in the dataframe
-      // create data frame for every partition value
-      val pathsToRead = partitionValues.flatMap(getConcretePaths).map(_.toString)
-      pathsToRead.map(reader.load)
-    }
-    // build union of all partitions DataFrames
-    val dfContent = dfsContent
-      .filter(df => partitions.diff(df.columns).isEmpty) // filter DataFrames without partition columns as they are empty
-      .reduceOption(_ union _)
-      .getOrElse {
-        // if there is no DataFrame left, an empty DataFrame is created
-        require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")
-        val textSourceSchema = StructType(Seq(StructField("value", StringType)) ++ partitions.map(p => StructField(p, StringType)))
-        DataFrameUtil.getEmptyDataFrame(textSourceSchema)
-      }
-
     // parse csv files content
-    assert(dfContent.columns.head == "value") // reading format=text should give schema "value: string" (+ partition columns)
-    val dfParsed = dfContent
+    assert(df.columns.head == "value") // reading format=text should give schema "value: string" (+ partition columns)
+    df
       .flatMap { csvContentRow =>
         if (csvContentRow.isNullAt(0)) Iterator[Row]()
         else parseCsvContent(csvContentRow.getString(0), parserOptions)
           .map { parsedRow =>
             val values = parsedRow.toSeq ++ csvContentRow.toSeq.drop(1) // add partition column values
-            Row(values :_*)
+            Row(values: _*)
           }
-      }(RowEncoder.apply(StructType(sparkParserSchema ++ dfContent.schema.drop(1)))) // add partition cols
-
-    val df = dfParsed
-      .withOptionalColumn(filenameColumn, input_file_name)
-
-    // finalize & return DataFrame
-    afterRead(df)
+      }(RowEncoder.apply(StructType(sparkParserSchema ++ df.schema.drop(1)))) // add partition cols
   }
 
   private def parseCsvContent(csvContent: String, parserOptions: CSVOptions)(implicit session: SparkSession): Iterator[Row] = {
@@ -199,6 +153,7 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
       .map(_.trim) // remove spaces from all column names and potential CR from last column name
     val headerNormalized = if (caseSensitive) header else header.map(_.toLowerCase)
     val schemaNormalizedMap = sparkParserSchema.map(field => (if (caseSensitive) field.name else field.name.toLowerCase, field)).toMap
+    assert(headerNormalized.intersect(schemaNormalizedMap.keys.toSeq).nonEmpty, s"No column names match between header and schema. Please check CSV has header (header line: ${headerLine.trim})")
 
     // parse to row with file schema
     val fileSchema = StructType(headerNormalized.map(name => schemaNormalizedMap.getOrElse(name, StructField(name, StringType))))
@@ -282,7 +237,7 @@ class RelaxedParser( fileSchema:StructType, tgtSchema: StructType, parserOptions
       else fileRow.map(row => row.getAs[Any](name)).orNull
     }
     val resultRow = Row.fromSeq(values)
-    if (logger.isDebugEnabled) logger.debug(s"fileRow=$fileRow resultRow=$resultRow")
+    if (logger.isTraceEnabled) logger.trace(s"fileRow=$fileRow resultRow=$resultRow")
     resultRow
   }
 }

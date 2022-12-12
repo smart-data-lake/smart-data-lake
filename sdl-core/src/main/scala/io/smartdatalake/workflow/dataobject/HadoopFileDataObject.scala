@@ -27,7 +27,7 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.HadoopFileConnection
 import org.apache.hadoop.fs.{FileAlreadyExistsException, FileSystem, Path}
 
-import java.io.{InputStream, OutputStream}
+import java.io.{FileNotFoundException, InputStream, OutputStream}
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -60,21 +60,14 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    * Connection defines path prefix (scheme, authority, base path) and ACL's in central location.
    */
   def connectionId(): Option[ConnectionId]
+
   protected val connection: Option[HadoopFileConnection] = connectionId().map {
     c => getConnectionReg[HadoopFileConnection](c, instanceRegistry())
   }
 
-
-  /**
-   * Configure whether [[io.smartdatalake.workflow.action.Action]]s should fail if the input file(s) are missing
-   * on the file system.
-   *
-   * Default is false.
-   */
-  def failIfFilesMissing: Boolean = false
-
   // these variables are not serializable
   @transient private var hadoopPathHolder: Path = _
+
   def hadoopPath(implicit context: ActionPipelineContext): Path = {
     if (hadoopPathHolder == null) { // avoid null-pointer on executors...
       hadoopPathHolder = HdfsUtil.prefixHadoopPath(path, connection.map(_.pathPrefix))
@@ -86,14 +79,18 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
 
   /**
    * Check if the input files exist.
-   *
-   * @throws IllegalArgumentException if `failIfFilesMissing` = true and no files found at `path`.
+   * Note that hadoopDir can be a specific file or a directory.
    */
   private[smartdatalake] def checkFilesExisting(implicit context: ActionPipelineContext): Boolean = {
-    if (!filesystem.exists(hadoopPath) || filesystem.listStatus(hadoopPath).isEmpty) {
-      require(!failIfFilesMissing, s"($id) failIfFilesMissing is enabled and no files to process have been found in $hadoopPath.")
-      false
-    } else true
+    val status = try {
+      filesystem.getFileStatus(hadoopPath)
+    } catch {
+      case _: FileNotFoundException => return false
+    }
+    status.isFile || {
+      val globPath = if (partitions.nonEmpty) new Path(hadoopPath, PartitionValues(Map()).getPartitionString(partitionLayout().get)) else hadoopPath
+      status.isDirectory && filesystem.globStatus(new Path(globPath, fileName)).exists(_.isFile)
+    }
   }
 
   override def deleteFile(file: String)(implicit context: ActionPipelineContext): Unit = {
@@ -125,7 +122,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     assert(partitions.nonEmpty, s"deletePartitions called but no partition columns are defined for $id")
 
     // delete given partitions on hdfs
-    val pathsToDelete = partitionValues.flatMap(getConcretePaths)
+    val pathsToDelete = partitionValues.flatMap(getConcreteInitPaths)
     pathsToDelete.foreach(filesystem.delete(_, /*recursive*/ true))
   }
 
@@ -138,30 +135,51 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     assert(partitions.nonEmpty, s"deletePartitions called but no partition columns are defined for $id")
 
     // delete files for given partitions on hdfs
-    val pathsToDelete = partitionValues.flatMap(getConcretePaths)
+    val pathsToDelete = partitionValues.flatMap(getConcreteInitPaths)
     pathsToDelete.foreach(deleteAllFiles)
   }
 
   /**
-   * Generate all paths for given partition values exploding undefined partitions before the last given partition value.
-   * Use case: Reading all files from a given path with spark cannot contain wildcards.
+   * Generate all "init"-paths for given partition values exploding undefined partitions.
+   * An "init"-path contains only the partitions before the last defined partition value.
+   * Use case: Reading all files from a given path with Sparks DataFrameReader, the path can not contain wildcards.
    * If there are partitions without given partition value before the last partition value given, they must be searched with globs.
    */
-  def getConcretePaths(pv: PartitionValues)(implicit context: ActionPipelineContext): Seq[Path] = {
+  def getConcreteInitPaths(pv: PartitionValues)(implicit context: ActionPipelineContext): Seq[Path] = {
     assert(partitions.nonEmpty)
-    // check if valid init of partitions -> then we can read all at once, otherwise we need to search with globs as load doesnt support wildcards
-    if (partitions.inits.map(_.toSet).contains(pv.keys)) {
+    // check if valid init of partitions -> then we can read all at once, otherwise we need to search with globs as DataFrameReader.load doesnt support wildcards
+    if (pv.isInitOf(partitions)) {
       val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitions.filter(pv.isDefinedAt))
       Seq(new Path(hadoopPath, pv.getPartitionString(partitionLayout)))
     } else {
-      // get all partition columns until last given partition value
-      val givenPartitions = pv.keys
-      val initPartitions = partitions.reverse.dropWhile(!givenPartitions.contains(_)).reverse
+      // prepare partitions to include in path search
+      val partitionsToInclude = partitions.reverse.dropWhile(!pv.keys.contains(_)).reverse // get all partition columns until last given partition value
       // create path with wildcards
-      val partitionLayout = HdfsUtil.getHadoopPartitionLayout(initPartitions)
+      val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitionsToInclude)
       val globPartitionPath = new Path(hadoopPath, pv.getPartitionString(partitionLayout))
-      logger.info(s"($id) getConcretePaths with globs needed because ${pv.keys.mkString(",")} is not an init of partition columns ${partitions.mkString(",")}, path = $globPartitionPath")
-      filesystem.globStatus(globPartitionPath).map(_.getPath)
+      logger.info(s"($id) getConcretePaths with globs needed because ${pv.keys.mkString(",")} is not an init of partition columns ${partitions.mkString(",")}")
+      filesystem.globStatus(globPartitionPath).filter(_.isDirectory).map(_.getPath)
+    }
+  }
+
+  /**
+   * Generate all paths for given partition values exploding undefined partitions.
+   * In contrast to getConcreteInitPaths this method explodes the values for all partitions.
+   * If returnFiles is set, it will return files matching partition directories + filename instead of the partition directories.
+   */
+  def getConcreteFullPaths(pv: PartitionValues, returnFiles: Boolean = false)(implicit context: ActionPipelineContext): Seq[Path] = {
+    assert(partitions.nonEmpty)
+    // check partitions completely defined -> then we can read all at once, otherwise we need to search with globs as DataFrameReader.load doesnt support wildcards
+    if (pv.isComplete(partitions)) {
+      val path = new Path(hadoopPath, pv.getPartitionString(partitionLayout().get))
+      if (returnFiles) filesystem.globStatus(new Path(path, fileName)).filter(_.isFile).map(_.getPath).toSeq
+      else Seq(path)
+    } else {
+      // create path with wildcards
+      val globPartitionPath = new Path(hadoopPath, pv.getPartitionString(partitionLayout().get))
+      logger.info(s"($id) getConcretePaths with globs needed because ${pv.keys.mkString(",")} does not define all partition columns ${partitions.mkString(",")}")
+      if (returnFiles) filesystem.globStatus(new Path(globPartitionPath, fileName)).filter(_.isFile).map(_.getPath)
+      else filesystem.globStatus(globPartitionPath).filter(_.isDirectory).map(_.getPath)
     }
   }
 
@@ -176,14 +194,14 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
         // list directories and extract partition values
         filesystem.globStatus(new Path(hadoopPath, pattern))
           .filter { fs => fs.isDirectory }
-          .map(path => PartitionLayout.extractPartitionValues(partitionLayout, "", relativizePath(path.getPath.toString) + separator))
+          .map(path => extractPartitionValuesFromDirPath(path.getPath.toString))
           .toSeq
     }.getOrElse(Seq())
   }
 
   override def relativizePath(path: String)(implicit context: ActionPipelineContext): String = {
     val normalizedPath = new Path(path).toString
-    val pathPrefix = (".*"+hadoopPath.toString).r // ignore any absolute path prefix up and including hadoop path
+    val pathPrefix = (".*" + hadoopPath.toString).r // ignore any absolute path prefix up and including hadoop path
     pathPrefix.replaceFirstIn(normalizedPath, "").stripPrefix(Path.SEPARATOR)
   }
 
@@ -197,7 +215,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
 
   override def createEmptyPartition(partitionValues: PartitionValues)(implicit context: ActionPipelineContext): Unit = {
     // check if valid init of partitions -> otherwise we can not create empty partition as path is not fully defined
-    if (partitions.inits.map(_.toSet).contains(partitionValues.keys)) {
+    if (partitionValues.isInitOf(partitions)) {
       val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitions.filter(partitionValues.isDefinedAt))
       val partitionPath = new Path(hadoopPath, partitionValues.getPartitionString(partitionLayout))
       filesystem.mkdirs(partitionPath)
@@ -221,7 +239,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
       filesystem.globStatus(new Path(p))
         .map { f =>
           // check if we have to extract partition values from file path
-          val pVs = if (v.keys != partitions.toSet) extractPartitionValuesFromPath(f.getPath.toString)
+          val pVs = if (!v.isComplete(partitions)) extractPartitionValuesFromFilePath(f.getPath.toString)
           else v
           FileRef(f.getPath.toString, f.getPath.getName, pVs)
         }
@@ -294,5 +312,9 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   protected[workflow] def applyAcls(implicit context: ActionPipelineContext): Unit = {
     val aclToApply = acl().orElse(connection.flatMap(_.acl))
     if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
+  }
+
+  protected def extractPartitionValuesFromDirPath(dirPath: String)(implicit context: ActionPipelineContext): PartitionValues = {
+    PartitionLayout.extractPartitionValues(partitionLayout().get, relativizePath(dirPath) + separator)
   }
 }

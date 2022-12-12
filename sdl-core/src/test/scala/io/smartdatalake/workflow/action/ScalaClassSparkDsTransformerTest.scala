@@ -95,7 +95,7 @@ class ScalaClassSparkDsTransformerTest extends FunSuite with BeforeAndAfter {
 
     val sdlb = new DefaultSmartDataLakeBuilder()
     // setup input data
-    val srcDO = CsvFileDataObject("src1DS", "target/src1DS", partitions = Seq(),
+    val srcDO = CsvFileDataObject("src1DS", "target/src1DS",
       schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
 
     // fill src with first files
@@ -108,7 +108,7 @@ class ScalaClassSparkDsTransformerTest extends FunSuite with BeforeAndAfter {
     //Run SDLB
     sdlb.run(sdlConfig)
 
-    val tgt1DO = CsvFileDataObject("tgt1DS", "target/tgt1DS", partitions = Seq("name")
+    val tgt1DO = CsvFileDataObject("tgt1DS", "target/tgt1DS"
       , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int, doubled_rating int"))))
     val actual = tgt1DO.getSparkDataFrame().as[OutputDataSet].head()
     assert(actual.doubled_rating == 10)

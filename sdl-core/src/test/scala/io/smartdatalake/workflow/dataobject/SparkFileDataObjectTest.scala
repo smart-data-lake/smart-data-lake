@@ -261,7 +261,9 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
 
   test("get concrete paths") {
     val tempDir = Files.createTempDirectory("concretePaths")
-    tempDir.resolve("a=1").resolve("b=1").resolve("c=1").toFile.mkdirs()
+    val dir111 = tempDir.resolve("a=1").resolve("b=1").resolve("c=1")
+    dir111.toFile.mkdirs()
+    dir111.resolve("abc.test").toFile.createNewFile()
     tempDir.resolve("a=1").resolve("b=1").resolve("c=2").toFile.mkdirs()
     tempDir.resolve("a=1").resolve("b=2").resolve("c=1").toFile.mkdirs()
     tempDir.resolve("a=1").resolve("b=2").resolve("c=2").toFile.mkdirs()
@@ -272,19 +274,29 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     tempDir.resolve("a=2").resolve("b=2").resolve("c=1").toFile.mkdirs()
     tempDir.resolve("a=2").resolve("b=2").resolve("c=2").toFile.mkdirs()
     tempDir.resolve("a=2").resolve("b=3").resolve("c=1").toFile.mkdirs()
-    tempDir.resolve("a=2").resolve("b=3").resolve("c=2").toFile.mkdirs()
+    val dir232 = tempDir.resolve("a=2").resolve("b=3").resolve("c=2")
+    dir232.toFile.mkdirs()
+    dir232.resolve("abc.test").toFile.createNewFile()
 
-    val do1 = RawFileDataObject("testDO", tempDir.toString, partitions = Seq("a","b","c"))
+
+    val do1 = RawFileDataObject("testDO", tempDir.toString, partitions = Seq("a","b","c"), fileName = "*.test")
     def removeDOBase(p: String) = p.replaceFirst(".*concretePaths.*?/", "")
-    def getPaths(pv: PartitionValues) = do1.getConcretePaths(pv).map(p => removeDOBase(p.toString))
+    def getInitPaths(pv: PartitionValues) = do1.getConcreteInitPaths(pv).map(p => removeDOBase(p.toString)).toSet
+    def getFullPaths(pv: PartitionValues, returnFiles: Boolean = false) = do1.getConcreteFullPaths(pv,returnFiles).map(p => removeDOBase(p.toString)).toSet
     // inits
-    assert(getPaths(PartitionValues(Map("a" -> 1))).sorted == Seq("a=1"))
-    assert(getPaths(PartitionValues(Map("a" -> 1, "b" -> 1))).sorted == Seq("a=1/b=1"))
-    assert(getPaths(PartitionValues(Map("a" -> 1, "b" -> 1, "c" -> 1))).sorted == Seq("a=1/b=1/c=1"))
+    assert(getInitPaths(PartitionValues(Map("a" -> 1))) == Set("a=1"))
+    assert(getInitPaths(PartitionValues(Map("a" -> 1, "b" -> 1))) == Set("a=1/b=1"))
+    assert(getInitPaths(PartitionValues(Map("a" -> 1, "b" -> 1, "c" -> 1))) == Set("a=1/b=1/c=1"))
     // no inits
-    assert(getPaths(PartitionValues(Map("b" -> 1))).sorted == Seq("a=1/b=1","a=2/b=1"))
-    assert(getPaths(PartitionValues(Map("c" -> 1))).sorted == Seq("a=1/b=1/c=1","a=1/b=2/c=1","a=1/b=3/c=1","a=2/b=1/c=1","a=2/b=2/c=1","a=2/b=3/c=1"))
-    assert(getPaths(PartitionValues(Map("b" -> 1, "c" -> 1))).sorted == Seq("a=1/b=1/c=1","a=2/b=1/c=1"))
+    assert(getInitPaths(PartitionValues(Map("b" -> 1))) == Set("a=1/b=1","a=2/b=1"))
+    assert(getInitPaths(PartitionValues(Map("c" -> 1))) == Set("a=1/b=1/c=1","a=1/b=2/c=1","a=1/b=3/c=1","a=2/b=1/c=1","a=2/b=2/c=1","a=2/b=3/c=1"))
+    assert(getInitPaths(PartitionValues(Map("b" -> 1, "c" -> 1))) == Set("a=1/b=1/c=1","a=2/b=1/c=1"))
+    // full directories
+    assert(getFullPaths(PartitionValues(Map("b" -> 1))) == Set("a=1/b=1/c=1","a=2/b=1/c=1","a=1/b=1/c=2","a=2/b=1/c=2"))
+    assert(getFullPaths(PartitionValues(Map("c" -> 1))) == Set("a=1/b=1/c=1","a=1/b=2/c=1","a=2/b=1/c=1","a=2/b=2/c=1","a=1/b=3/c=1","a=2/b=3/c=1"))
+    assert(getFullPaths(PartitionValues(Map("b" -> 1, "c" -> 1))) == Set("a=1/b=1/c=1","a=2/b=1/c=1"))
+    // files
+    assert(getFullPaths(PartitionValues(Map("b" -> 1)), true) == Set("a=1/b=1/c=1/abc.test"))
   }
 
 
