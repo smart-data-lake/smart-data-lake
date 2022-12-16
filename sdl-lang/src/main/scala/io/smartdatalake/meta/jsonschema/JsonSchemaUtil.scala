@@ -103,10 +103,20 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
 
     def fromGenericTypeDef(typeDef: GenericTypeDef): JsonObjectDef = {
       val typeProperty = if(typeDef.baseTpe.isDefined) Seq(("type", JsonConstDef(typeDef.name))) else Seq()
-      val jsonAttributes = typeProperty ++ typeDef.attributes.map(a => (a.name, convertToJsonType(a)))
+      val attributes = getTypeAttributesForJsonSchema(typeDef)
+      val jsonAttributes = typeProperty ++ attributes.map(a => (a.name, convertToJsonType(a)))
       val properties = ListMap(jsonAttributes:_*)
-      val required = typeDef.attributes.filter(_.isRequired).map(_.name)
+      val required = typeProperty.map(_._1) ++ attributes.filter(_.isRequired).map(_.name)
       jsonschema.JsonObjectDef(properties, required = required, title = typeDef.name, description = typeDef.description)
+    }
+
+    private def getTypeAttributesForJsonSchema(typeDef: GenericTypeDef): Seq[GenericAttributeDef] = {
+      if (typeDef.tpe <:< typeOf[SdlConfigObject]) {
+        // In this case the id is not needed in the JSON schema because it is inferred from the key of the objects in the config file and not from an attribute.
+        typeDef.attributes.filterNot(_.name == "id")
+      } else {
+        typeDef.attributes
+      }
     }
 
     def fromCaseClass(cls: ClassSymbol): JsonObjectDef = {
