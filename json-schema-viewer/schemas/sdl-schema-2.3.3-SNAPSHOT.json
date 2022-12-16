@@ -28,7 +28,7 @@
           }
         },
         "title" : "CustomMode",
-        "required" : [ "className" ],
+        "required" : [ "type", "className" ],
         "additionalProperties" : false,
         "description" : "Execution mode to create custom execution mode logic.\nDefine a function which receives main input&output DataObject and returns execution mode result"
       },
@@ -55,7 +55,7 @@
           }
         },
         "title" : "CustomPartitionMode",
-        "required" : [ "className" ],
+        "required" : [ "type", "className" ],
         "additionalProperties" : false,
         "description" : "Execution mode to create custom partition execution mode logic.\nDefine a function which receives main input&output DataObject and returns partition values to process as Seq[Map[String,String]\\\\]"
       },
@@ -92,7 +92,7 @@
           }
         },
         "title" : "DataFrameIncrementalMode",
-        "required" : [ "compareCol" ],
+        "required" : [ "type", "compareCol" ],
         "additionalProperties" : false,
         "description" : "Compares max entry in \\\"compare column\\\" between mainOutput and mainInput and incrementally loads the delta.\nThis mode works only with SparkSubFeeds. The filter is not propagated to following actions."
       },
@@ -104,6 +104,7 @@
           }
         },
         "title" : "DataObjectStateIncrementalMode",
+        "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "An execution mode for incremental processing by remembering DataObjects state from last increment."
       },
@@ -115,6 +116,7 @@
           }
         },
         "title" : "FailIfNoPartitionValuesMode",
+        "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "An execution mode which just validates that partition values are given.\nNote: For start nodes of the DAG partition values can be defined by command line, for subsequent nodes partition values are passed on from previous nodes."
       },
@@ -130,6 +132,7 @@
           }
         },
         "title" : "FileIncrementalMoveMode",
+        "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "Execution mode to incrementally process file-based DataObjects, e.g. FileRefDataObjects and SparkFileDataObjects.\nFor FileRefDataObjects:\n- All existing files in the input DataObject are processed and removed (deleted or archived) after processing\n- Input partition values are applied to search for files and also used as output partition values\nFor SparkFileDataObjects:\n- Files processed are read from the DataFrames execution plan and removed (deleted or archived) after processing.\nNote that is only correct if no additional filters are applied in the DataFrame.\nA better implementation would be to observe files by a custom metric. Unfortunately there is a problem in Spark with that, see also[[CollectSetDeterministic]] \n- Partition values preserved."
       },
@@ -193,6 +196,7 @@
           }
         },
         "title" : "PartitionDiffMode",
+        "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "Partition difference execution mode lists partitions on mainInput & mainOutput DataObject and starts loading all missing partitions.\nPartition columns to be used for comparision need to be a common \\'init\\' of input and output partition columns.\nThis mode needs mainInput/Output DataObjects which CanHandlePartitions to list partitions.\nPartition values are passed to following actions for partition columns which they have in common."
       },
@@ -204,6 +208,7 @@
           }
         },
         "title" : "ProcessAllMode",
+        "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "An execution mode which forces processing all data from it\\'s inputs."
       },
@@ -245,7 +250,7 @@
           }
         },
         "title" : "SparkStreamingMode",
-        "required" : [ "checkpointLocation" ],
+        "required" : [ "type", "checkpointLocation" ],
         "additionalProperties" : false,
         "description" : "Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads and keep track of processed data.\nThis mode needs a DataObject implementing CanCreateStreamingDataFrame and works only with SparkSubFeeds.\nThis mode can be executed synchronously in the DAG by using triggerType=Once, or asynchronously as Streaming Query with triggerType = ProcessingTime or Continuous."
       }
@@ -267,7 +272,7 @@
           }
         },
         "title" : "RowLevelValidationRule",
-        "required" : [ "condition" ],
+        "required" : [ "type", "condition" ],
         "additionalProperties" : false,
         "description" : "Definition for a row level data validation rule."
       }
@@ -278,10 +283,6 @@
         "properties" : {
           "type" : {
             "const" : "DeltaLakeTableConnection"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "unique id of this connection"
           },
           "db" : {
             "type" : "string",
@@ -337,7 +338,7 @@
           }
         },
         "title" : "DeltaLakeTableConnection",
-        "required" : [ "id", "db", "pathPrefix" ],
+        "required" : [ "type", "db", "pathPrefix" ],
         "additionalProperties" : false,
         "description" : "Connection information for DeltaLake tables"
       },
@@ -346,10 +347,6 @@
         "properties" : {
           "type" : {
             "const" : "HadoopFileConnection"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "unique id of this connection"
           },
           "pathPrefix" : {
             "type" : "string",
@@ -398,7 +395,7 @@
           }
         },
         "title" : "HadoopFileConnection",
-        "required" : [ "id", "pathPrefix" ],
+        "required" : [ "type", "pathPrefix" ],
         "additionalProperties" : false,
         "description" : "Connection information for files on hadoop"
       },
@@ -407,10 +404,6 @@
         "properties" : {
           "type" : {
             "const" : "HiveTableConnection"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "unique id of this connection"
           },
           "db" : {
             "type" : "string",
@@ -463,7 +456,7 @@
           }
         },
         "title" : "HiveTableConnection",
-        "required" : [ "id", "db" ],
+        "required" : [ "type", "db" ],
         "additionalProperties" : false,
         "description" : "Connection information for hive tables"
       },
@@ -472,10 +465,6 @@
         "properties" : {
           "type" : {
             "const" : "JdbcTableConnection"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "unique id of this connection"
           },
           "url" : {
             "type" : "string",
@@ -522,7 +511,7 @@
           }
         },
         "title" : "JdbcTableConnection",
-        "required" : [ "id", "url", "driver" ],
+        "required" : [ "type", "url", "driver" ],
         "additionalProperties" : false,
         "description" : "Connection information for jdbc tables.\nIf authentication is needed, user and password must be provided."
       },
@@ -531,10 +520,6 @@
         "properties" : {
           "type" : {
             "const" : "KafkaConnection"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "unique id of this connection"
           },
           "brokers" : {
             "type" : "string",
@@ -575,7 +560,7 @@
           }
         },
         "title" : "KafkaConnection",
-        "required" : [ "id", "brokers" ],
+        "required" : [ "type", "brokers" ],
         "additionalProperties" : false,
         "description" : "Connection information for kafka"
       },
@@ -584,10 +569,6 @@
         "properties" : {
           "type" : {
             "const" : "SftpFileRefConnection"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "unique id of this connection"
           },
           "host" : {
             "type" : "string",
@@ -634,7 +615,7 @@
           }
         },
         "title" : "SftpFileRefConnection",
-        "required" : [ "id", "host", "authMode" ],
+        "required" : [ "type", "host", "authMode" ],
         "additionalProperties" : false,
         "description" : "SFTP Connection information"
       },
@@ -643,10 +624,6 @@
         "properties" : {
           "type" : {
             "const" : "SnowflakeConnection"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "unique id of this connection"
           },
           "url" : {
             "type" : "string",
@@ -689,7 +666,7 @@
           }
         },
         "title" : "SnowflakeConnection",
-        "required" : [ "id", "url", "warehouse", "database", "role", "authMode" ],
+        "required" : [ "type", "url", "warehouse", "database", "role", "authMode" ],
         "additionalProperties" : false,
         "description" : "Connection information for Snowflake databases.\nThe connection can be used for SnowflakeTableDataObjects\nIf multiple SnowflakeTableDataObjects share a connection, they share the same Snowpark session"
       },
@@ -698,10 +675,6 @@
         "properties" : {
           "type" : {
             "const" : "SplunkConnection"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "unique id of this connection"
           },
           "host" : {
             "type" : "string",
@@ -736,7 +709,7 @@
           }
         },
         "title" : "SplunkConnection",
-        "required" : [ "id", "host", "port", "authMode" ],
+        "required" : [ "type", "host", "port", "authMode" ],
         "additionalProperties" : false,
         "description" : "Connection information for splunk queries"
       }
@@ -761,6 +734,7 @@
           }
         },
         "title" : "PartitionArchiveCompactionMode",
+        "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "Archive and compact old partitions:\nArchive partition reduces the number of partitions in the past by moving older partitions into special \\\"archive partitions\\\".\nCompact partition reduces the number of files in a partition by rewriting them with Spark.\nExample: archive and compact a table with partition layout run_id=<integer>\n- archive partitions after 1000 partitions into \\\"archive partition\\\" equal to floor(run_id/1000)\n- compact \\\"archive partition\\\" when full\n\n```\nhousekeepingMode = {\ntype = PartitionArchiveCompactionMode\narchivePartitionExpression = \\\"if( elements[\\'run_id\\'] < runId - 1000, map(\\'run_id\\', elements[\\'run_id\\'] div 1000), elements)\\\"\ncompactPartitionExpression = \\\"elements[\\'run_id\\'] % 1000 = 0 and elements[\\'run_id\\'] <= runId - 2000\\\"\n}\n```"
       },
@@ -779,7 +753,7 @@
           }
         },
         "title" : "PartitionRetentionMode",
-        "required" : [ "retentionCondition" ],
+        "required" : [ "type", "retentionCondition" ],
         "additionalProperties" : false,
         "description" : "Keep partitions while retention condition is fulfilled, delete other partitions.\nExample: cleanup partitions with partition layout dt=<yyyymmdd> after 90 days:\n\n```\nhousekeepingMode = {\ntype = PartitionRetentionMode\nretentionCondition = \\\"datediff(now(), to_date(elements[\\'dt\\'], \\'yyyyMMdd\\')) <= 90\\\"\n}\n```"
       }
@@ -790,10 +764,6 @@
         "properties" : {
           "type" : {
             "const" : "AccessTableDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "path" : {
             "type" : "string"
@@ -810,7 +780,7 @@
           }
         },
         "title" : "AccessTableDataObject",
-        "required" : [ "id", "path", "table" ],
+        "required" : [ "type", "path", "table" ],
         "additionalProperties" : false,
         "description" : "[[DataObject]]of type JDBC / Access.\nProvides access to a Access DB to an Action. The functionality is handled seperately from[[JdbcTableDataObject]] \nto avoid problems with net.ucanaccess.jdbc.UcanaccessDriver"
       },
@@ -820,10 +790,6 @@
           "type" : {
             "const" : "ActionsExporterDataObject"
           },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
-          },
           "config" : {
             "type" : "string"
           },
@@ -832,7 +798,7 @@
           }
         },
         "title" : "ActionsExporterDataObject",
-        "required" : [ "id" ],
+        "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "Exports a util[[DataFrame]]that contains properties and metadata extracted from all[[io.smartdatalake.workflow.action.Action]]s\nthat are registered in the current[[InstanceRegistry]].\n\nAlternatively, it can export the properties and metadata of all[[io.smartdatalake.workflow.action.Action]]s defined in config files. For this, the\nconfiguration \\\"config\\\" has to be set to the location of the config.\n\nExample:\n\n```\ndataObjects = {\n...\nactions-exporter {\ntype = ActionsExporterDataObject\nconfig = path/to/myconfiguration.conf\n}\n...\n}\n```\n\n\nThe config value can point to a configuration file or a directory containing configuration files.\n\nSEE: Refer to[[ConfigLoader.loadConfigFromFilesystem()]] for details about the configuration loading."
       },
@@ -841,10 +807,6 @@
         "properties" : {
           "type" : {
             "const" : "AirbyteDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "DataObject identifier"
           },
           "config" : {
             "type" : "string",
@@ -879,7 +841,7 @@
           }
         },
         "title" : "AirbyteDataObject",
-        "required" : [ "id", "config", "streamName", "cmd" ],
+        "required" : [ "type", "config", "streamName", "cmd" ],
         "additionalProperties" : false,
         "description" : "Limitations: Connectors have only access to locally mounted directories"
       },
@@ -888,10 +850,6 @@
         "properties" : {
           "type" : {
             "const" : "AvroFileDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "path" : {
             "type" : "string",
@@ -1018,7 +976,7 @@
           }
         },
         "title" : "AvroFileDataObject",
-        "required" : [ "id", "path" ],
+        "required" : [ "type", "path" ],
         "additionalProperties" : false,
         "description" : "A[[io.smartdatalake.workflow.dataobject.DataObject]]backed by an Avro data source.\n\nIt manages read and write access and configurations required for[[io.smartdatalake.workflow.action.Action]]s to\nwork on Avro formatted files.\n\nReading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]]respectively. The reader and writer implementations are provided by\nthe[[https://github.com/databricks/spark-avro databricks spark-avro]] project.\n\nSEE: [[org.apache.spark.sql.DataFrameReader]]\n\nSEE: [[org.apache.spark.sql.DataFrameWriter]]"
       },
@@ -1027,10 +985,6 @@
         "properties" : {
           "type" : {
             "const" : "CsvFileDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "path" : {
             "type" : "string",
@@ -1162,7 +1116,7 @@
           }
         },
         "title" : "CsvFileDataObject",
-        "required" : [ "id", "path" ],
+        "required" : [ "type", "path" ],
         "additionalProperties" : false,
         "description" : "A[[DataObject]]backed by a comma-separated value (CSV) data source.\n\nIt manages read and write access and configurations required for[[io.smartdatalake.workflow.action.Action]]s to\nwork on CSV formatted files.\n\nCSV reading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]]respectively.\n\nRead Schema specifications:\n\nIf a data object schema is not defined via the`schema`attribute (default) and`inferSchema`option is\ndisabled (default) in`csvOptions`, then all column types are set to String and the first row of the CSV file is read\nto determine the column names and the number of fields.\n\nIf the`header`option is disabled (default) in`csvOptions`, then the header is defined as \\\"_c#\\\" for each column\nwhere \\\"#\\\" is the column index.\nOtherwise the first row of the CSV file is not included in the DataFrame content and its entries\nare used as the column names for the schema.\n\nIf a data object schema is not defined via the`schema`attribute and`inferSchema`is enabled in`csvOptions`, then\nthe`samplingRatio`(default: 1.0) option in`csvOptions` is used to extract a sample from the CSV file in order to\ndetermine the input schema automatically.\n\nNOTE: This data object sets the following default values for`csvOptions`: delimiter = \\\"|\\\", quote = null, header = false, and inferSchema = false.\nAll other`csvOption` default to the values defined by Apache Spark.\n\nSEE: [[org.apache.spark.sql.DataFrameReader]]\n\nSEE: [[org.apache.spark.sql.DataFrameWriter]]"
       },
@@ -1171,10 +1125,6 @@
         "properties" : {
           "type" : {
             "const" : "CustomDfDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "creator" : {
             "type" : "object",
@@ -1212,7 +1162,7 @@
           }
         },
         "title" : "CustomDfDataObject",
-        "required" : [ "id", "creator" ],
+        "required" : [ "type", "creator" ],
         "additionalProperties" : false,
         "description" : "Generic[[DataObject]] containing a config object.\nE.g. used to implement a CustomAction that reads a Webservice."
       },
@@ -1221,10 +1171,6 @@
         "properties" : {
           "type" : {
             "const" : "CustomFileDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "creator" : {
             "type" : "object",
@@ -1253,7 +1199,7 @@
           }
         },
         "title" : "CustomFileDataObject",
-        "required" : [ "id", "creator" ],
+        "required" : [ "type", "creator" ],
         "additionalProperties" : false
       },
       "DataObjectsExporterDataObject" : {
@@ -1261,10 +1207,6 @@
         "properties" : {
           "type" : {
             "const" : "DataObjectsExporterDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "config" : {
             "type" : "string"
@@ -1274,7 +1216,7 @@
           }
         },
         "title" : "DataObjectsExporterDataObject",
-        "required" : [ "id" ],
+        "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "Exports a util[[DataFrame]]that contains properties and metadata extracted from all[[DataObject]]s\nthat are registered in the current[[InstanceRegistry]].\n\nAlternatively, it can export the properties and metadata of all[[DataObject]]s defined in config files. For this, the\nconfiguration \\\"config\\\" has to be set to the location of the config.\n\nExample:\n\n```\ndataObjects = {\n...\ndataobject-exporter {\ntype = DataObjectsExporterDataObject\nconfig = path/to/myconfiguration.conf\n}\n...\n}\n```\n\n\nThe config value can point to a configuration file or a directory containing configuration files.\n\nSEE: Refer to[[ConfigLoader.loadConfigFromFilesystem()]] for details about the configuration loading."
       },
@@ -1283,10 +1225,6 @@
         "properties" : {
           "type" : {
             "const" : "DeltaLakeTableDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "unique name of this data object"
           },
           "path" : {
             "type" : "string",
@@ -1352,6 +1290,34 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLExpectation"
                   },
                   "name" : {
@@ -1385,34 +1351,6 @@
                 "required" : [ "name", "aggExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -1563,7 +1501,7 @@
           }
         },
         "title" : "DeltaLakeTableDataObject",
-        "required" : [ "id", "table" ],
+        "required" : [ "type", "table" ],
         "additionalProperties" : false,
         "description" : "[[DataObject]] of type DeltaLakeTableDataObject.\nProvides details to access Tables in delta format to an Action.\n\nDelta format maintains a transaction log in a separate _delta_log subfolder.\nThe schema is registered in Metastore by DeltaLakeTableDataObject.\n\nThe following anomalies might occur:\n- table is registered in metastore but path does not exist -> table is dropped from metastore\n- table is registered in metastore but path is empty -> error is thrown. Delete the path to clean up\n- table is registered and path contains parquet files, but _delta_log subfolder is missing -> path is converted to delta format\n- table is not registered but path contains parquet files and _delta_log subfolder -> Table is registered\n- table is not registered but path contains parquet files without _delta_log subfolder -> path is converted to delta format and table is registered\n- table is not registered and path does not exists -> table is created on write"
       },
@@ -1572,10 +1510,6 @@
         "properties" : {
           "type" : {
             "const" : "ExcelFileDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "path" : {
             "type" : "string",
@@ -1751,7 +1685,7 @@
           }
         },
         "title" : "ExcelFileDataObject",
-        "required" : [ "id", "path" ],
+        "required" : [ "type", "path" ],
         "additionalProperties" : false,
         "description" : "A[[DataObject]]backed by an Microsoft Excel data source.\n\nIt manages read and write access and configurations required for[[io.smartdatalake.workflow.action.Action]]s to\nwork on Microsoft Excel (.xslx) formatted files.\n\nReading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]]respectively. The reader and writer implementation is provided by the\n[[https://github.com/crealytics/spark-excel Crealytics spark-excel]]project.\n\nRead Schema:\n\nWhen`useHeader`is set to true (default), the reader will use the first row of the Excel sheet as column names for\nthe schema and not include the first row as data values. Otherwise the column names are taken from the schema.\nIf the schema is not provided or inferred, then each column name is defined as \\\"_c#\\\" where \\\"#\\\" is the column index.\n\nWhen a data object schema is provided, it is used as the schema for the DataFrame. Otherwise if`inferSchema`is\nenabled (default), then the data types of the columns are inferred based on the first`excerptSize`rows\n(excluding the first).\nWhen no schema is provided and`inferSchema` is disabled, all columns are assumed to be of string type."
       },
@@ -1760,10 +1694,6 @@
         "properties" : {
           "type" : {
             "const" : "HiveTableDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "unique name of this data object"
           },
           "path" : {
             "type" : "string",
@@ -1831,6 +1761,34 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLExpectation"
                   },
                   "name" : {
@@ -1864,34 +1822,6 @@
                 "required" : [ "name", "aggExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -2038,7 +1968,7 @@
           }
         },
         "title" : "HiveTableDataObject",
-        "required" : [ "id", "table" ],
+        "required" : [ "type", "table" ],
         "additionalProperties" : false,
         "description" : "[[DataObject]] of type Hive.\nProvides details to access Hive tables to an Action"
       },
@@ -2047,10 +1977,6 @@
         "properties" : {
           "type" : {
             "const" : "JdbcTableDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "unique name of this data object"
           },
           "createSql" : {
             "type" : "string",
@@ -2118,6 +2044,34 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLExpectation"
                   },
                   "name" : {
@@ -2151,34 +2105,6 @@
                 "required" : [ "name", "aggExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -2301,7 +2227,7 @@
           }
         },
         "title" : "JdbcTableDataObject",
-        "required" : [ "id", "table", "connectionId" ],
+        "required" : [ "type", "table", "connectionId" ],
         "additionalProperties" : false,
         "description" : "[[DataObject]] of type JDBC.\nProvides details for an action to read and write tables in a database through JDBC.\nNote that writing into a table is done as one transaction. This is implemented by writing to a temporary-table with Spark,\nthen using a separate \\\"insert into ... select\\\" statement to copy data into the final table."
       },
@@ -2310,10 +2236,6 @@
         "properties" : {
           "type" : {
             "const" : "JmsDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "jndiContextFactory" : {
             "type" : "string",
@@ -2373,7 +2295,7 @@
           }
         },
         "title" : "JmsDataObject",
-        "required" : [ "id", "jndiContextFactory", "jndiProviderUrl", "authMode", "batchSize", "maxWaitSec", "maxBatchAgeSec", "txBatchSize", "connectionFactory", "queue" ],
+        "required" : [ "type", "jndiContextFactory", "jndiProviderUrl", "authMode", "batchSize", "maxWaitSec", "maxBatchAgeSec", "txBatchSize", "connectionFactory", "queue" ],
         "additionalProperties" : false,
         "description" : "[[DataObject]] of type JMS queue.\nProvides details to an Action to access JMS queues."
       },
@@ -2382,10 +2304,6 @@
         "properties" : {
           "type" : {
             "const" : "JsonFileDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "path" : {
             "type" : "string",
@@ -2516,7 +2434,7 @@
           }
         },
         "title" : "JsonFileDataObject",
-        "required" : [ "id", "path" ],
+        "required" : [ "type", "path" ],
         "additionalProperties" : false,
         "description" : "A[[io.smartdatalake.workflow.dataobject.DataObject]]backed by a JSON data source.\n\nIt manages read and write access and configurations required for[[io.smartdatalake.workflow.action.Action]]s to\nwork on JSON formatted files.\n\nReading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]] respectively.\n\nNOTE: By default, the JSON option`multiline` is enabled.\n\nSEE: [[org.apache.spark.sql.DataFrameReader]]\n\nSEE: [[org.apache.spark.sql.DataFrameWriter]]"
       },
@@ -2525,10 +2443,6 @@
         "properties" : {
           "type" : {
             "const" : "KafkaTopicDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "topicName" : {
             "type" : "string",
@@ -2615,7 +2529,7 @@
           }
         },
         "title" : "KafkaTopicDataObject",
-        "required" : [ "id", "topicName", "connectionId" ],
+        "required" : [ "type", "topicName", "connectionId" ],
         "additionalProperties" : false,
         "description" : "[[DataObject]]of type KafkaTopic.\nProvides details to an action to read from Kafka Topics using either\n[[org.apache.spark.sql.DataFrameReader]]or[[org.apache.spark.sql.streaming.DataStreamReader]] \n\nKey & value schema can be automatically read from and written to confluent schema registry for Json and Avro.\nJson and Avro can also be parsed with a fixed schema."
       },
@@ -2624,10 +2538,6 @@
         "properties" : {
           "type" : {
             "const" : "PKViolatorsDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "config" : {
             "type" : "string",
@@ -2642,7 +2552,7 @@
           }
         },
         "title" : "PKViolatorsDataObject",
-        "required" : [ "id" ],
+        "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "Checks for Primary Key violations for all[[DataObject]]s with Primary Keys defined that are registered in the current[[InstanceRegistry]].\nReturns the DataFrame of Primary Key violations.\n\nAlternatively, it can check for Primary Key violations of all[[DataObject]]s defined in config files. For this, the\nconfiguration \\\"config\\\" has to be set to the location of the config.\n\nExample:\n\n```\ndataObjects = {\n...\nprimarykey-violations {\ntype = PKViolatorsDataObject\nconfig = path/to/myconfiguration.conf\n}\n...\n}\n```\n\nSEE: Refer to[[ConfigLoader.loadConfigFromFilesystem()]] for details about the configuration loading."
       },
@@ -2651,10 +2561,6 @@
         "properties" : {
           "type" : {
             "const" : "ParquetFileDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "unique name of this data object"
           },
           "path" : {
             "type" : "string",
@@ -2781,7 +2687,7 @@
           }
         },
         "title" : "ParquetFileDataObject",
-        "required" : [ "id", "path" ],
+        "required" : [ "type", "path" ],
         "additionalProperties" : false,
         "description" : "A[[io.smartdatalake.workflow.dataobject.DataObject]]backed by an Apache Hive data source.\n\nIt manages read and write access and configurations required for[[io.smartdatalake.workflow.action.Action]]s to\nwork on Parquet formatted files.\n\nReading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]] respectively.\n\nSEE: [[org.apache.spark.sql.DataFrameReader]]\n\nSEE: [[org.apache.spark.sql.DataFrameWriter]]"
       },
@@ -2790,10 +2696,6 @@
         "properties" : {
           "type" : {
             "const" : "RawFileDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "path" : {
             "type" : "string",
@@ -2928,7 +2830,7 @@
           }
         },
         "title" : "RawFileDataObject",
-        "required" : [ "id", "path" ],
+        "required" : [ "type", "path" ],
         "additionalProperties" : false,
         "description" : "DataObject of type raw for files with unknown content.\nProvides details to an Action to access raw files.\nBy specifying format you can custom Spark data formats"
       },
@@ -2937,10 +2839,6 @@
         "properties" : {
           "type" : {
             "const" : "RelaxedCsvFileDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "path" : {
             "type" : "string",
@@ -3080,7 +2978,7 @@
           }
         },
         "title" : "RelaxedCsvFileDataObject",
-        "required" : [ "id", "path" ],
+        "required" : [ "type", "path" ],
         "additionalProperties" : false,
         "description" : "A[[DataObject]] which allows for more flexible CSV parsing.\nThe standard CsvFileDataObject doesnt support reading multiple CSV-Files with different column order, missing columns\nor additional columns.\nRelaxCsvFileDataObject works more like reading JSON-Files. You need to define a schema, then it tries to read every file\nwith that schema independently of the column order, adding missing columns and removing superfluous ones.\n\nCSV files are read by Spark as whole text files and then parsed manually with Sparks CSV parser class. You can therefore use the\nnormal CSV options of spark, but some properties are fixed, e.g. header=true, inferSchema=false, enforceSchema (ignored).\n\nNOTE: This data object sets the following default values for`csvOptions`: delimiter = \\\",\\\", quote = null\nAll other`csvOption` default to the values defined by Apache Spark.\n\nSEE: [[org.apache.spark.sql.DataFrameReader]]\n\nSEE: [[org.apache.spark.sql.DataFrameWriter]] \n\nIf mode is permissive you can retrieve the corrupt input record by adding <options.columnNameOfCorruptRecord> as field to the schema.\nRelaxCsvFileDataObject also supports getting an error msg by adding \\\"<options.columnNameOfCorruptRecord>_msg\\\" as field to the schema."
       },
@@ -3089,10 +2987,6 @@
         "properties" : {
           "type" : {
             "const" : "SFtpFileRefDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "path" : {
             "type" : "string",
@@ -3126,7 +3020,7 @@
           }
         },
         "title" : "SFtpFileRefDataObject",
-        "required" : [ "id", "path", "connectionId" ],
+        "required" : [ "type", "path", "connectionId" ],
         "additionalProperties" : false,
         "description" : "Connects to SFtp files\nNeeds java library \\\"com.hieronymus % sshj % 0.21.1\\\"\nThe following authentication mechanisms are supported\n-> public/private-key: private key must be saved in ~/.ssh, public key must be registered on server.\n-> user/pwd authentication: user and password is taken from two variables set as parameters.\nThese variables could come from clear text (CLEAR), a file (FILE) or an environment variable (ENV)"
       },
@@ -3135,10 +3029,6 @@
         "properties" : {
           "type" : {
             "const" : "SnowflakeTableDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "unique name of this data object"
           },
           "table" : {
             "$ref" : "#/definitions/Others/Table"
@@ -3186,6 +3076,34 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLExpectation"
                   },
                   "name" : {
@@ -3219,34 +3137,6 @@
                 "required" : [ "name", "aggExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -3343,7 +3233,7 @@
           }
         },
         "title" : "SnowflakeTableDataObject",
-        "required" : [ "id", "table", "connectionId" ],
+        "required" : [ "type", "table", "connectionId" ],
         "additionalProperties" : false,
         "description" : "[[DataObject]] of type SnowflakeTableDataObject.\nProvides details to access Snowflake tables via an action\nCan be used both for interacting with Snowflake through Spark with JDBC,\nas well as for actions written in the Snowpark API that run directly on Snowflake"
       },
@@ -3352,10 +3242,6 @@
         "properties" : {
           "type" : {
             "const" : "SplunkDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "params" : {
             "type" : "object",
@@ -3397,7 +3283,7 @@
           }
         },
         "title" : "SplunkDataObject",
-        "required" : [ "id", "params", "connectionId" ],
+        "required" : [ "type", "params", "connectionId" ],
         "additionalProperties" : false,
         "description" : "[[DataObject]] of type Splunk.\nProvides details to an action to access Splunk logs."
       },
@@ -3406,10 +3292,6 @@
         "properties" : {
           "type" : {
             "const" : "TickTockHiveTableDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "path" : {
             "type" : "string"
@@ -3474,6 +3356,34 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLExpectation"
                   },
                   "name" : {
@@ -3507,34 +3417,6 @@
                 "required" : [ "name", "aggExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -3678,7 +3560,7 @@
           }
         },
         "title" : "TickTockHiveTableDataObject",
-        "required" : [ "id", "table" ],
+        "required" : [ "type", "table" ],
         "additionalProperties" : false
       },
       "WebserviceFileDataObject" : {
@@ -3686,10 +3568,6 @@
         "properties" : {
           "type" : {
             "const" : "WebserviceFileDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "url" : {
             "type" : "string"
@@ -3790,7 +3668,7 @@
           }
         },
         "title" : "WebserviceFileDataObject",
-        "required" : [ "id", "url" ],
+        "required" : [ "type", "url" ],
         "additionalProperties" : false,
         "description" : "[[DataObject]] to call webservice and return response as InputStream\nThis is implemented as FileRefDataObject because the response is treated as some file content.\nFileRefDataObjects support partitioned data. For a WebserviceFileDataObject partitions are mapped as query parameters to create query string.\nAll possible query parameter values must be given in configuration."
       },
@@ -3799,10 +3677,6 @@
         "properties" : {
           "type" : {
             "const" : "XmlFileDataObject"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "path" : {
             "type" : "string",
@@ -3935,7 +3809,7 @@
           }
         },
         "title" : "XmlFileDataObject",
-        "required" : [ "id", "path" ],
+        "required" : [ "type", "path" ],
         "additionalProperties" : false,
         "description" : "A[[DataObject]]backed by an XML data source.\n\nIt manages read and write access and configurations required for[[Action]]s to\nwork on XML formatted files.\n\nReading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]]respectively. The reader and writer implementations are provided by\nthe[[https://github.com/databricks/spark-xml databricks spark-xml]] project.\nNote that writing XML-file partitioned is not supported by spark-xml.\n\nSEE: [[org.apache.spark.sql.DataFrameReader]]\n\nSEE: [[org.apache.spark.sql.DataFrameWriter]]"
       }
@@ -3953,7 +3827,7 @@
           }
         },
         "title" : "SaveModeGenericOptions",
-        "required" : [ "saveMode" ],
+        "required" : [ "type", "saveMode" ],
         "additionalProperties" : false,
         "description" : "This class can be used to override save mode without further special parameters."
       },
@@ -4002,6 +3876,7 @@
           }
         },
         "title" : "SaveModeMergeOptions",
+        "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "Options to control detailed behaviour of SaveMode.Merge.\nIn Spark expressions use table alias \\'existing\\' to reference columns of the existing table data, and table alias \\'new\\' to reference columns of new data set."
       }
@@ -4031,6 +3906,7 @@
           }
         },
         "title" : "CmdScript",
+        "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "Execute a command on the command line and get its std output\nCommand can be different for windows and linux operating systems, but it must be defined for at least one of them.\n\nIf return value is not zero an exception is thrown.\n\nNote about internal implementation: on execution value of parameter map entries where key starts with\n- \\'param\\' will be added as parameter after the docker run command, sorted by key.\nThis allows to customize execution behaviour through Actions or DataObjects using CmdScript."
       },
@@ -4066,7 +3942,7 @@
           }
         },
         "title" : "DockerRunScript",
-        "required" : [ "image" ],
+        "required" : [ "type", "image" ],
         "additionalProperties" : false,
         "description" : "Run a docker image and get its std output.\n\nIf return value is not zero an exception is thrown.\n\nNote about internal implementation: on execution value of parameter map entries where key starts with\n- \\'runParam\\' will be added as parameter after the docker run command, sorted by their key.\n- \\'dockerParam\\' will be added as parameter for the docker command, e.g. before the image name in the docker run command, sorted by their key.\nThis allows to customize execution behaviour through Actions or DataObjects using CmdScript."
       }
@@ -4260,6 +4136,7 @@
           }
         },
         "title" : "AdditionalColumnsTransformer",
+        "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "Add additional columns to the DataFrame by extracting information from the context or derived from input columns."
       },
@@ -4286,7 +4163,7 @@
           }
         },
         "title" : "BlacklistTransformer",
-        "required" : [ "columnBlacklist" ],
+        "required" : [ "type", "columnBlacklist" ],
         "additionalProperties" : false,
         "description" : "Apply a column blacklist to a DataFrame."
       },
@@ -4321,7 +4198,7 @@
           }
         },
         "title" : "DataValidationTransformer",
-        "required" : [ "rules" ],
+        "required" : [ "type", "rules" ],
         "additionalProperties" : false,
         "description" : "Apply validation rules to a DataFrame and collect potential violation error messages in a new column."
       },
@@ -4355,7 +4232,7 @@
           }
         },
         "title" : "DecryptColumnsTransformer",
-        "required" : [ "decryptColumns", "keyVariable" ],
+        "required" : [ "type", "decryptColumns", "keyVariable" ],
         "additionalProperties" : false,
         "description" : "Decryption of specified columns using AES/GCM algorithm."
       },
@@ -4386,7 +4263,7 @@
           }
         },
         "title" : "EncryptColumnsTransformer",
-        "required" : [ "encryptColumns", "keyVariable" ],
+        "required" : [ "type", "encryptColumns", "keyVariable" ],
         "additionalProperties" : false,
         "description" : "Encryption of specified columns using AES/GCM algorithm."
       },
@@ -4414,7 +4291,7 @@
           }
         },
         "title" : "FilterTransformer",
-        "required" : [ "filterClause" ],
+        "required" : [ "type", "filterClause" ],
         "additionalProperties" : false,
         "description" : "Apply a filter condition to a DataFrame."
       },
@@ -4456,6 +4333,7 @@
           }
         },
         "title" : "PythonCodeDfTransformer",
+        "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Python/PySpark code.\nNote that this transformer needs a Python and PySpark environment installed.\nPySpark session is initialize and available under variables`sc`,`session`,`sqlContext`.\nOther variables available are\n-`inputDf`: Input DataFrame\n-`options`: Transformation options as Map[String,String]\n-`dataObjectId`: Id of input dataObject as String\nOutput DataFrame must be set with`setOutputDf(df)` ."
       },
@@ -4493,7 +4371,7 @@
           }
         },
         "title" : "SQLDfTransformer",
-        "required" : [ "code" ],
+        "required" : [ "type", "code" ],
         "additionalProperties" : false,
         "description" : "Configuration of a custom GenericDataFrame transformation between one input and one output (1:1) as SQL code.\nThe input data is available as temporary view in SQL. The inputs name is either the name of the DataObject,\nor the name of the previous transformation, if this is not the first transformation of the chain. Also note that to create\nthe name of temporary view, special characters are replaced by underscores and a postfix \\\"_sdltemp\\\" is added.\nIt is therefore recommended to use special token %{inputViewName} or ${inputViewName_<input name>} that will be\nreplaced with the name of the temporary view at runtime."
       },
@@ -4531,7 +4409,7 @@
           }
         },
         "title" : "ScalaClassGenericDfTransformer",
-        "required" : [ "className" ],
+        "required" : [ "type", "className" ],
         "additionalProperties" : false,
         "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The Java/Scala class has to implement interface[[CustomGenericDfTransformer]] ."
       },
@@ -4569,7 +4447,7 @@
           }
         },
         "title" : "ScalaClassSnowparkDfTransformer",
-        "required" : [ "className" ],
+        "required" : [ "type", "className" ],
         "additionalProperties" : false,
         "description" : "Configuration of a custom Snowpark-DataFrame transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The Java/Scala class has to implement interface[[CustomSnowparkDfTransformer]] ."
       },
@@ -4607,7 +4485,7 @@
           }
         },
         "title" : "ScalaClassSparkDfTransformer",
-        "required" : [ "className" ],
+        "required" : [ "type", "className" ],
         "additionalProperties" : false,
         "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The Java/Scala class has to implement interface[[CustomDfTransformer]] ."
       },
@@ -4645,7 +4523,7 @@
           }
         },
         "title" : "ScalaClassSparkDsTransformer",
-        "required" : [ "transformerClassName" ],
+        "required" : [ "type", "transformerClassName" ],
         "additionalProperties" : false,
         "description" : "Configuration of a custom Spark-Dataset transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a SparkSession, a Dataset and a map of options and has to return a Dataset.\nThe Java/Scala class has to implement interface[[CustomDsTransformer]] ."
       },
@@ -4687,6 +4565,7 @@
           }
         },
         "title" : "ScalaCodeSparkDfTransformer",
+        "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Scala code which is compiled at runtime.\nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The scala code has to implement a function of type[[fnTransformType]] ."
       },
@@ -4748,7 +4627,7 @@
           }
         },
         "title" : "ScalaNotebookSparkDfTransformer",
-        "required" : [ "url", "functionName" ],
+        "required" : [ "type", "url", "functionName" ],
         "additionalProperties" : false,
         "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Scala code which is compiled at runtime.\nThe code is loaded from a Notebook. It should define a transform function with a configurable name, which receives a DataObjectId, a DataFrame\nand a map of options and has to return a DataFrame, see also ([[fnTransformType]] ).\nNotebook-cells starting with \\\"//!IGNORE\\\" will be ignored."
       },
@@ -4779,7 +4658,7 @@
           }
         },
         "title" : "SparkRepartitionTransformer",
-        "required" : [ "numberOfTasksPerPartition" ],
+        "required" : [ "type", "numberOfTasksPerPartition" ],
         "additionalProperties" : false,
         "description" : "Repartition DataFrame\nFor detailled description about repartitioning DataFrames see also[[SparkRepartitionDef]]"
       },
@@ -4811,6 +4690,7 @@
           }
         },
         "title" : "StandardizeColNamesTransformer",
+        "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "Standardizes column names to be used without quoting by using camelCase to lower_case_with_underscore rule (default), and further cleanup rules for special characters (default).\nParameters below can be used to disable specific rules if needed."
       },
@@ -4830,6 +4710,7 @@
           }
         },
         "title" : "StandardizeSparkDatatypesTransformer",
+        "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "Standardize datatypes of a Spark-DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype"
       },
@@ -4856,7 +4737,7 @@
           }
         },
         "title" : "WhitelistTransformer",
-        "required" : [ "columnWhitelist" ],
+        "required" : [ "type", "columnWhitelist" ],
         "additionalProperties" : false,
         "description" : "Apply a column whitelist to a DataFrame."
       }
@@ -4876,7 +4757,7 @@
           }
         },
         "title" : "AuthHeaderMode",
-        "required" : [ "secretVariable" ],
+        "required" : [ "type", "secretVariable" ],
         "additionalProperties" : false,
         "description" : "Connect by custom authorization header"
       },
@@ -4894,7 +4775,7 @@
           }
         },
         "title" : "BasicAuthMode",
-        "required" : [ "userVariable", "passwordVariable" ],
+        "required" : [ "type", "userVariable", "passwordVariable" ],
         "additionalProperties" : false,
         "description" : "Connect by basic authentication"
       },
@@ -4917,7 +4798,7 @@
           }
         },
         "title" : "CustomHttpAuthMode",
-        "required" : [ "className", "options" ],
+        "required" : [ "type", "className", "options" ],
         "additionalProperties" : false,
         "description" : "Connect with custom HTTP authentication"
       },
@@ -4944,7 +4825,7 @@
           }
         },
         "title" : "KeycloakClientSecretAuthMode",
-        "required" : [ "ssoServer", "ssoRealm", "ssoGrantType", "clientIdVariable", "clientSecretVariable" ],
+        "required" : [ "type", "ssoServer", "ssoRealm", "ssoGrantType", "clientIdVariable", "clientSecretVariable" ],
         "additionalProperties" : false,
         "description" : "Connect by using Keycloak to manage token and token refresh giving clientId/secret as information.\nFor HTTP Connection this is used as Bearer token in Authorization header."
       },
@@ -4959,7 +4840,7 @@
           }
         },
         "title" : "PublicKeyAuthMode",
-        "required" : [ "userVariable" ],
+        "required" : [ "type", "userVariable" ],
         "additionalProperties" : false,
         "description" : "Validate by user and private/public key\nPrivate key is read from .ssh"
       },
@@ -4989,7 +4870,7 @@
           }
         },
         "title" : "SASLSCRAMAuthMode",
-        "required" : [ "username", "passwordVariable", "sslMechanism", "truststorePath", "truststorePassVariable" ],
+        "required" : [ "type", "username", "passwordVariable", "sslMechanism", "truststorePath", "truststorePassVariable" ],
         "additionalProperties" : false,
         "description" : "Validate by SASL_SSL Authentication : user / password and truststore"
       },
@@ -5019,7 +4900,7 @@
           }
         },
         "title" : "SSLCertsAuthMode",
-        "required" : [ "keystorePath", "keystorePassVariable", "truststorePath", "truststorePassVariable" ],
+        "required" : [ "type", "keystorePath", "keystorePassVariable", "truststorePath", "truststorePassVariable" ],
         "additionalProperties" : false,
         "description" : "Validate by SSL Certificates : Only location an credentials. Additional attributes should be\nsupplied via options map"
       },
@@ -5034,7 +4915,7 @@
           }
         },
         "title" : "TokenAuthMode",
-        "required" : [ "tokenVariable" ],
+        "required" : [ "type", "tokenVariable" ],
         "additionalProperties" : false,
         "description" : "Connect by token\nFor HTTP Connection this is used as Bearer token in Authorization header."
       }
@@ -5709,7 +5590,7 @@
           }
         },
         "title" : "DfTransformerWrapperDfsTransformer",
-        "required" : [ "transformer", "subFeedsToApply" ],
+        "required" : [ "type", "transformer", "subFeedsToApply" ],
         "additionalProperties" : false,
         "description" : "A Transformer to use single DataFrame Transformers as multiple DataFrame Transformers.\nThis works by selecting the SubFeeds (DataFrames) the single DataFrame Transformer should be applied to.\nAll other SubFeeds will be passed through without transformation."
       },
@@ -5750,7 +5631,7 @@
           }
         },
         "title" : "SQLDfsTransformer",
-        "required" : [ "code" ],
+        "required" : [ "type", "code" ],
         "additionalProperties" : false,
         "description" : "Configuration of a custom GenericDataFrame transformation between many inputs and many outputs (n:m) as SQL code.\nThe input data is available as temporary views in SQL. As name for the temporary views the input DataObjectId is used\n(special characters are replaces by underscores).\nThe input data is available as temporary view in SQL. The input name is either an id of the input DataObject,\nor the name of an output of the previous transformation if this is not the first transformation of the chain.\nAlso note that to create the name of temporary view, special characters are replaced by underscores and a postfix \\\"_sdltemp\\\" is added.\nIt is therefore recommended to use the special token ${inputViewName_<input name>}, that will be replaced with the name\nof the temporary view at runtime.\n\nNote that you can access arbitrary tables from the metastore in the SQL code, but this is against the principle of SDLB\nto access data through DataObjects. Accessing tables directly in SQL code has a negative impact on the maintainability of the project."
       },
@@ -5788,7 +5669,7 @@
           }
         },
         "title" : "ScalaClassGenericDfsTransformer",
-        "required" : [ "className" ],
+        "required" : [ "type", "className" ],
         "additionalProperties" : false,
         "description" : "Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m)\nDefine a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and as\nto return a map of output DataObjectIds with DataFrames, see also trait[[CustomGenericDfsTransformer]] ."
       },
@@ -5826,7 +5707,7 @@
           }
         },
         "title" : "ScalaClassSnowparkDfsTransformer",
-        "required" : [ "className" ],
+        "required" : [ "type", "className" ],
         "additionalProperties" : false,
         "description" : "Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m)\nDefine a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and as\nto return a map of output DataObjectIds with DataFrames, see also trait[[CustomSnowparkDfsTransformer]] ."
       },
@@ -5864,7 +5745,7 @@
           }
         },
         "title" : "ScalaClassSparkDfsTransformer",
-        "required" : [ "className" ],
+        "required" : [ "type", "className" ],
         "additionalProperties" : false,
         "description" : "Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m)\nDefine a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and as\nto return a map of output DataObjectIds with DataFrames, see also trait[[CustomDfsTransformer]] ."
       },
@@ -5923,7 +5804,7 @@
           }
         },
         "title" : "ScalaClassSparkDsNTo1Transformer",
-        "required" : [ "className" ],
+        "required" : [ "type", "className" ],
         "additionalProperties" : false,
         "description" : "Configuration of a custom Spark-Dataset transformation between N inputs and 1 outputs (N:1) as Java/Scala Class\nDefine a transform function that receives a SparkSession, a map of options and as many DataSets as you want, and that has to return one Dataset.\nThe Java/Scala class has to implement interface[[CustomDsNto1Transformer]] ."
       },
@@ -5965,6 +5846,7 @@
           }
         },
         "title" : "ScalaCodeSparkDfsTransformer",
+        "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m) as Scala code which is compiled at runtime.\nDefine a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and has\nto return a map of output DataObjectIds with DataFrames. The scala code has to implement a function of type[[fnTransformType]] ."
       }
@@ -5975,10 +5857,6 @@
         "properties" : {
           "type" : {
             "const" : "CopyAction"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "inputId" : {
             "type" : "string",
@@ -6145,7 +6023,7 @@
           }
         },
         "title" : "CopyAction",
-        "required" : [ "id", "inputId", "outputId" ],
+        "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
         "description" : "This[[Action]] copies data between an input and output DataObject using DataFrames.\nThe input DataObject reads the data and converts it to a DataFrame according to its definition.\nThe DataFrame might be transformed using SQL or DataFrame transformations.\nThen the output DataObjects writes the DataFrame to the output according to its definition."
       },
@@ -6154,10 +6032,6 @@
         "properties" : {
           "type" : {
             "const" : "CustomDataFrameAction"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "inputIds" : {
             "type" : "array",
@@ -6313,7 +6187,7 @@
           }
         },
         "title" : "CustomDataFrameAction",
-        "required" : [ "id", "inputIds", "outputIds" ],
+        "required" : [ "type", "inputIds", "outputIds" ],
         "additionalProperties" : false,
         "description" : "This[[Action]] transforms data between many input and output DataObjects using DataFrames.\nCustomDataFrameAction allows to define transformations between n input DataObjects and m output DataObjects,\nbut is is recommended to implement n:1 or 1:m transformations, as otherwise dependencies between DataObjects might not be accurate anymore.\nThe input DataFrames might be transformed using SQL or DataFrame transformations.\nWhen chaining multiple transformers, output DataFrames of previous transformers are available as input DataFrames for later transformers by their corresponding name."
       },
@@ -6322,10 +6196,6 @@
         "properties" : {
           "type" : {
             "const" : "CustomFileAction"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "inputId" : {
             "type" : "string",
@@ -6418,7 +6288,7 @@
           }
         },
         "title" : "CustomFileAction",
-        "required" : [ "id", "inputId", "outputId", "transformer" ],
+        "required" : [ "type", "inputId", "outputId", "transformer" ],
         "additionalProperties" : false,
         "description" : "[[Action]] to transform files between two Hadoop Data Objects.\nThe transformation is executed in distributed mode on the Spark executors.\nA custom file transformer must be given, which reads a file from Hadoop and writes it back to Hadoop."
       },
@@ -6427,10 +6297,6 @@
         "properties" : {
           "type" : {
             "const" : "CustomScriptAction"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "inputIds" : {
             "type" : "array",
@@ -6479,7 +6345,7 @@
           }
         },
         "title" : "CustomScriptAction",
-        "required" : [ "id", "inputIds", "outputIds" ],
+        "required" : [ "type", "inputIds", "outputIds" ],
         "additionalProperties" : false,
         "description" : "[[Action]] execute script after multiple input DataObjects are ready, notifying multiple output DataObjects when script succeeded.\n\nNote that this action can also be used to give your data pipeline additional structure, e.g. adding a decision point after several actions have been executed."
       },
@@ -6488,10 +6354,6 @@
         "properties" : {
           "type" : {
             "const" : "DeduplicateAction"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "inputId" : {
             "type" : "string",
@@ -6666,7 +6528,7 @@
           }
         },
         "title" : "DeduplicateAction",
-        "required" : [ "id", "inputId", "outputId" ],
+        "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
         "description" : "This[[Action]]copies and deduplicates data between an input and output DataObject using DataFrames.\nDeduplication keeps the last record for every key, also after it has been deleted in the source.\nThe DataFrame might be transformed using SQL or DataFrame transformations. These transformations are applied before the deduplication.\n\nDeduplicateAction adds an additional Column[[TechnicalTableColumn.captured]]. It contains the timestamp of the last occurrence of the record in the source.\nThis creates lots of updates. Especially when using saveMode.Merge it is better to set[[TechnicalTableColumn.captured]]to the last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to enable this optimization.\n\nDeduplicateAction needs a transactional table (e.g.[[TransactionalSparkTableDataObject]]) as output with defined primary keys.\nIf output implements[[CanMergeDataFrame]] , saveMode.Merge can be enabled by setting mergeModeEnable = true. This allows for much better performance."
       },
@@ -6675,10 +6537,6 @@
         "properties" : {
           "type" : {
             "const" : "FileTransferAction"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "inputId" : {
             "type" : "string",
@@ -6743,7 +6601,7 @@
           }
         },
         "title" : "FileTransferAction",
-        "required" : [ "id", "inputId", "outputId" ],
+        "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
         "description" : "[[Action]] to transfer files between SFtp, Hadoop and local Fs."
       },
@@ -6752,10 +6610,6 @@
         "properties" : {
           "type" : {
             "const" : "HistorizeAction"
-          },
-          "id" : {
-            "type" : "string",
-            "description" : "A unique identifier for this instance."
           },
           "inputId" : {
             "type" : "string",
@@ -6952,7 +6806,7 @@
           }
         },
         "title" : "HistorizeAction",
-        "required" : [ "id", "inputId", "outputId" ],
+        "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
         "description" : "This[[Action]]historizes data between an input and output DataObject using DataFrames.\nHistorization creates a technical history of data by creating valid-from/to columns.\nThe DataFrame might be transformed using SQL or DataFrame transformations. These transformations are applied before the deduplication.\n\nHistorizeAction needs a transactional table (e.g. implementation of[[TransactionalSparkTableDataObject]]) as output with defined primary keys.\n\nNormal historization join new with all existing data, and rewrites all data in output table. This is not optimal from\na performance perspective.\nIt can be optimized if output object supports[[CanMergeDataFrame]] . In that case you can\nset mergeModeEnable=true to use incremental historization, which does not rewrite all data in output table. It still needs to\njoin new data with all existing data, but uses hash values to minimize data transfer.\nIf you have change-data-capture (CDC) information available to identify deleted records, you can set\nmergeModeCDCColumn and mergeModeCDCDeletedValue to even avoid the join between new and existing data. This is optimal from\na performance perspective."
       }
