@@ -284,11 +284,11 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(action3.copy())
     // action4 is cancelled because action3 is cancelled (cancelled has higher prio than skipped from action1)
     val action4 = CustomDataFrameAction("d", Seq(tgt1DO.id, tgt3DO.id), Seq(tgt4DO.id), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfsTransformer(code = Map(tgt4DO.id.id -> "select * from c"))))
+      , transformers = Seq(SQLDfsTransformer(code = Map(tgt4DO.id.id -> "select * from tgt1"))))
     instanceRegistry.register(action4.copy())
     // action5 is skipped because action1 is skipped
     val action5 = CustomDataFrameAction("e", Seq(tgt1DO.id), Seq(tgt4DO.id), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfsTransformer(code = Map(tgt4DO.id.id -> "select * from c"))))
+      , transformers = Seq(SQLDfsTransformer(code = Map(tgt4DO.id.id -> "select * from tgt1"))))
     instanceRegistry.register(action5.copy())
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
     intercept[TaskFailedException](sdlb.run(sdlConfig))
@@ -398,6 +398,64 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       )
       assert(resultActionsState == expectedActionsState)
     }
+  }
+
+  test("sdlb run incremental chain") {
+
+    // init sdlb
+    val appName = "sdlb-incremental"
+    val feedName = "test"
+
+    HdfsUtil.deleteFiles(new Path(statePath), false)
+    val sdlb = new DefaultSmartDataLakeBuilder()
+    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+
+    // setup DataObjects
+    val src1DO = MockDataObject("src1").register
+    val src2DO = MockDataObject("src2").register
+    val tgt1DO = MockDataObject("tgt1").register
+    val tgt2DO = MockDataObject("tgt2").register
+    val tgt3DO = MockDataObject("tgt3").register
+    val tgt4DO = MockDataObject("tgt4").register
+
+    // prepare data
+    val dfSrc1 = Seq((1,"20180101", "person", "doe","john",5), (2,"20190101", "company", "olmo","-",10))
+      .toDF("id", "dt", "type", "lastname", "firstname", "rating")
+    src1DO.writeSparkDataFrame(dfSrc1, Seq())
+    val dfSrc2 = Seq((1,"abc"))
+      .toDF("id", "comment")
+    src2DO.writeSparkDataFrame(dfSrc2, Seq())
+
+    // start first dag run -> fail
+    // action1 has data
+    val action1 = CopyAction("a", src1DO.id, tgt1DO.id, metadata = Some(ActionMetadata(feed = Some(feedName)))
+    , executionMode = Some(DataFrameIncrementalMode("id"))
+    )
+    instanceRegistry.register(action1.copy())
+    // action2 is skipped in init phase as data is not yet there, but should execute in exec phase
+    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , executionMode = Some(DataFrameIncrementalMode("id"))
+    )
+    instanceRegistry.register(action2.copy())
+    // action3 is skipped in init phase as data is not yet there, but should execute in exec phase
+    val action3 = CopyAction("c", tgt2DO.id, tgt3DO.id, metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , executionMode = Some(DataFrameIncrementalMode("id"))
+    )
+    instanceRegistry.register(action3.copy())
+    // action4 is skipped in init phase as data is not yet there, but should execute in exec phase
+    val action4 = CustomDataFrameAction("d", Seq(tgt3DO.id,src2DO.id), Seq(tgt4DO.id), metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , executionMode = Some(DataFrameIncrementalMode("id"))
+      , transformers = Seq(SQLDfsTransformer(code = Map("tgt4" -> "select dt, type, lastname, firstname, udfAddX(rating) rating from tgt3")))
+    )
+    instanceRegistry.register(action4.copy())
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
+
+    // start dag run
+    sdlb.run(sdlConfig)
+
+    // check results
+    assert(tgt4DO.getSparkDataFrame(Seq()).count == 2)
   }
 
   test("sdlb run with executionMode=PartitionDiffMode, increase runId on second run, state listener") {

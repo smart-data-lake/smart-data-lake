@@ -63,7 +63,7 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
     val (dfJobExpectations, observation) = {
       implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
       val expectationColumns = (defaultExpectations ++ jobExpectations).flatMap(_.getAggExpressionColumns(this.id))
-      setupObservation(dfConstraints, expectationColumns, context.phase == ExecutionPhase.Exec)
+      setupObservation(dfConstraints, expectationColumns, context.isExecPhase)
     }
     // setup add caching if there are expectations with scope != job
     if (expectations.exists(_.scope != ExpectationScope.Job)) (dfJobExpectations.cache, observation)

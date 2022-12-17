@@ -89,6 +89,8 @@ case class ActionPipelineContext (
     }
   }
 
+  def isExecPhase = phase == ExecutionPhase.Exec
+
   // manage executionId
   private[smartdatalake] def incrementRunId = this.copy(executionId = this.executionId.incrementRunId, runStartTime = LocalDateTime.now, attemptStartTime = LocalDateTime.now)
 

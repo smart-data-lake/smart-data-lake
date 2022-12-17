@@ -92,7 +92,7 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
     val duplicateTransformerNames = transformers.groupBy(_.name).values.filter(_.size>1).map(_.head.name)
     assert(!transformers.exists(_.isInstanceOf[SQLDfTransformer]) || duplicateTransformerNames.isEmpty, s"($id) transformers.name must be unique if SQLDfTransformer is used, but duplicate (default?) names ${duplicateTransformerNames.mkString(", ")} where detected")
     val (transformedSubFeed, _) = transformers.foldLeft((inputSubFeed,Option.empty[String])){
-      case ((subFeed,previousTransformerName), transformer) => (transformer.applyTransformation(id, subFeed, previousTransformerName, getExecutionModeResultOptions), Some(transformer.name))
+      case ((subFeed,previousTransformerName), transformer) => (transformer.applyTransformation(id, subFeed, previousTransformerName, executionModeResultOptions), Some(transformer.name))
     }
     // Note that transformed partition values are set by execution mode.
     outputSubFeed.withDataFrame(transformedSubFeed.dataFrame)
