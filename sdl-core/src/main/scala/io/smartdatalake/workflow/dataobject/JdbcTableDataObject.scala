@@ -177,7 +177,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
         throw new IllegalStateException(s"($id) incrementalOutputExpr can not be resolved" + (if (attrs.nonEmpty) s", unresolved attributes are ${attrs.mkString(", ")}" else ""))
       }
       val newDataType = resolvedExpr.dataType
-      if (context.phase == ExecutionPhase.Exec) {
+      if (context.isExecPhase) {
         val newHighWatermarkValue = Option(df.agg(max(expr(incrementalOutputExpr.get))).head.get(0))
           .getOrElse(throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode."))
         incrementalOutputState = Some((incrementalOutputExpr.get, Some((newHighWatermarkValue.toString, newDataType))))

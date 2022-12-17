@@ -198,7 +198,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
     if (!filesystem.exists(hadoopPath)) filesystem.mkdirs(hadoopPath)
 
     // Prepare incremental output in exec phase
-    val incrementalOutputOptions = if (context.phase == ExecutionPhase.Exec) getIncrementalOutputOptions
+    val incrementalOutputOptions = if (context.isExecPhase) getIncrementalOutputOptions
     else Map[String,String]()
 
     // get and customize content
@@ -209,14 +209,14 @@ trait SparkFileDataObject extends HadoopFileDataObject
 
     // early check for no data to process.
     // This also prevents an error on Databricks when using filesObserver if there are no files to process. See also [[CollectSetDeterministic]].
-    if (context.phase == ExecutionPhase.Exec && Environment.enableSparkFileDataObjectNoDataCheck && SparkFileDataObject.tryGetFilesProcessedFromSparkPlan(id.id, df).exists(_.isEmpty))
+    if (context.isExecPhase && Environment.enableSparkFileDataObjectNoDataCheck && SparkFileDataObject.tryGetFilesProcessedFromSparkPlan(id.id, df).exists(_.isEmpty))
       throw NoDataToProcessWarning(id.id, s"($id) No files to process found in execution plan")
 
     // add filename column
     df = df.withOptionalColumn(filenameColumn, input_file_name)
 
     // configure observer to get files processed for incremental execution mode
-    if (filesObservers.nonEmpty && context.phase == ExecutionPhase.Exec) {
+    if (filesObservers.nonEmpty && context.isExecPhase) {
       df = configureObservers(df)
     }
 
@@ -270,7 +270,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
       df.filter(df => schema.isDefined || partitions.diff(df.columns).isEmpty) // filter DataFrames without partition columns as they are empty (this might happen if there is no schema specified and the partition is empty)
         .getOrElse {
           // if there are no paths to read for given partition values, handle no data
-          if (context.phase == ExecutionPhase.Exec) {
+          if (context.isExecPhase) {
             // skip action in exec phase
             throw NoDataToProcessWarning(id.id, s"($id) No existing files found for partition values ${partitionValues.mkString(", ")}.")
           } else {
@@ -315,7 +315,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
       df.filter(df => schema.isDefined || partitions.diff(df.columns).isEmpty) // filter DataFrames without partition columns as they are empty (this might happen if there is no schema specified and the partition is empty)
         .getOrElse {
           // if there are no paths to read for given partition values, handle no data
-          if (context.phase == ExecutionPhase.Exec) {
+          if (context.isExecPhase) {
             // skip action in exec phase
             throw NoDataToProcessWarning(id.id, s"($id) No existing files found for partition values ${partitionValues.mkString(", ")}.")
           } else {
@@ -357,7 +357,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
     ) else None
     df.getOrElse {
       // if there are no paths to read for given partition values, handle no data
-      if (context.phase == ExecutionPhase.Exec) {
+      if (context.isExecPhase) {
         // skip action in exec phase
         throw NoDataToProcessWarning(id.id, s"($id) No existing files found for partition values ${partitionValues.mkString(", ")}.")
       } else {
