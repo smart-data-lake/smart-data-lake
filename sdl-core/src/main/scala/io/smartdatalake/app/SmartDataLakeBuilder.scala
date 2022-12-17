@@ -40,6 +40,7 @@ import scopt.OptionParser
 import java.io.File
 import java.time.{Duration, LocalDateTime}
 import scala.annotation.tailrec
+import scala.util.Try
 
 /**
  * This case class represents a default configuration for the App.
@@ -241,9 +242,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     } catch {
       case e: Exception =>
         // try shutdown but catch potential exception
-        try {
-          shutdown
-        }
+        Try(shutdown)
         // throw original exception
         throw e
     }
@@ -460,8 +459,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
               logger.info(s"As all actions of run_id ${context.executionId.runId} are skipped, run_id is not incremented for next execution")
               context
             }
-            // reset execution result before new execution
-            actionsSelected.foreach(_.resetExecutionResult())
             // remove spark caches so that new data is read in next iteration
             //TODO: in the future it might be interesting to keep some DataFrames cached for performance reason...
             if (context.hasSparkSession) context.sparkSession.sqlContext.clearCache()
