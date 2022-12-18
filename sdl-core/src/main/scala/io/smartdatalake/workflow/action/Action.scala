@@ -152,13 +152,11 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit context: ActionPipelineContext): Unit = {
     // call execution mode hook
     executionMode.foreach(_.preInit(subFeeds,dataObjectsState))
-    // check execution condition
-    //checkExecutionCondition(subFeeds)
   }
 
   /**
-   * Evaluate and check the executionCondition
-   * @throws TaskSkippedDontStopWarning if no data to process
+   * Evaluate and check the executionCondition in exec phase
+   * @throws TaskSkippedDontStopWarning if task is skipped
    */
   private def checkExecutionCondition(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
     //noinspection MapGetOrElseBoolean
@@ -167,7 +165,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
       val data = SubFeedsExpressionData.fromSubFeeds(subFeeds)
       if (!c.evaluate(id, Some("executionCondition"), data)) {
         val descriptionText = c.description.map(d => s""""$d" """).getOrElse("")
-        Some(s"""($id) execution skipped because of failed executionCondition ${descriptionText} expression="${c.expression}" $data""")
+        Some(s"""($id) execution skipped because of failed executionCondition ${descriptionText}expression="${c.expression}" $data""")
       } else None
     }.getOrElse {
       // default behaviour: if no executionCondition is defined, Action is executed if no input subFeed is skipped.
@@ -177,9 +175,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
       } else None
     }
     // check execution condition result
-    if (skipMsg.nonEmpty && !context.appConfig.isDryRun) {
-      throw new TaskSkippedDontStopWarning(id.id, skipMsg.get, Some(ActionHelper.createSkippedSubFeeds(outputs)))
-    }
+    if (skipMsg.nonEmpty) throw new TaskSkippedDontStopWarning(id.id, skipMsg.get, Some(ActionHelper.createSkippedSubFeeds(outputs)))
   }
 
   /**
