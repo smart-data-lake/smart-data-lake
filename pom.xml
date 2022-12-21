@@ -363,7 +363,6 @@
         <snowflake-snowpark.version>1.6.2</snowflake-snowpark.version>
         <keycloak.version>20.0.1</keycloak.version>
         <delta.version>2.2.0</delta.version>
-        <poi.version>5.2.3</poi.version>
 
         <json4s.version>3.7.0-M11</json4s.version>
 
@@ -2817,18 +2816,6 @@
                 <groupId>org.antlr</groupId>
                 <artifactId>antlr-runtime</artifactId>
                 <version>3.4</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.poi</groupId>
-                <artifactId>poi</artifactId>
-                <version>${poi.version}</version>
-                <scope>runtime</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.poi</groupId>
-                <artifactId>poi-ooxml</artifactId>
-                <version>${poi.version}</version>
-                <scope>runtime</scope>
             </dependency>
             <dependency>
                 <groupId>io.smartdatalake</groupId>
