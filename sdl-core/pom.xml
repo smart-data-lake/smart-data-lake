@@ -119,20 +119,10 @@
 			<version>${commons-io.version}</version>
 		</dependency>
 
-		<!--TODO: unbelievable whats shaded into this jar.. scala, log4j, apache commons... causing much runtim conflicts! -->
-		<!--dependency>
+		<dependency>
 			<groupId>com.crealytics</groupId>
 			<artifactId>spark-excel_${scala.minor.version}</artifactId>
 			<version>${spark.excel.version}</version>
-			<scope>runtime</scope>
-		</dependency-->
-		<dependency>
-			<groupId>org.apache.poi</groupId>
-			<artifactId>poi</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.poi</groupId>
-			<artifactId>poi-ooxml</artifactId>
 		</dependency>
 
 		<dependency>
