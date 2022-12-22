@@ -30,7 +30,7 @@
         <!-- INFO level for SDLB -->
         <logger name="io.smartdatalake" level="INFO"/>
         <!-- ERROR level to ignore some warnings -->
-        <logger name="org.reflections.Reflections" level="ERROR"><AppenderRef ref="Console"/>
+        <logger name="org.reflections.Reflections" level="ERROR"/>
         <logger name="org.apache.hadoop.hive.conf.HiveConf" level="ERROR"/>
         <logger name="org.apache.spark.sql.catalyst.analysis.SimpleFunctionRegistry" level="ERROR"/>
         <logger name="org.apache.spark.sql.catalyst.util.package" level="ERROR"/>
