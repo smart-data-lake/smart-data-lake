@@ -28,6 +28,7 @@ import io.smartdatalake.util.misc.ScalaUtil
 import io.smartdatalake.util.spark.DummyStreamProvider
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
+import io.smartdatalake.workflow.action.executionMode.{CustomMode, CustomPartitionMode, DataFrameIncrementalMode, DataObjectStateIncrementalMode, FailIfNoPartitionValuesMode, FileIncrementalMoveMode, PartitionDiffMode, ProcessAllMode, SparkStreamingMode}
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformerDef, PartitionValueTransformer}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}

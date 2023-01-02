@@ -22,9 +22,10 @@ import java.nio.file.Files
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.{BasicAuthMode, FileIncrementalMoveMode, SDLSaveMode}
+import io.smartdatalake.definitions.{BasicAuthMode, SDLSaveMode}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.executionMode.FileIncrementalMoveMode
 import io.smartdatalake.workflow.connection.SftpFileRefConnection
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}

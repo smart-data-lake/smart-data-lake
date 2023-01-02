@@ -23,7 +23,8 @@ import io.smartdatalake.config.ConfigParser.localSubstitution
 import io.smartdatalake.config.{ConfigParser, InstanceRegistry, SdlConfigObject}
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.objects.{TestAction, TestConnection, TestDataObject}
-import io.smartdatalake.definitions.{Environment, PartitionDiffMode, SDLSaveMode}
+import io.smartdatalake.definitions.{Environment, SDLSaveMode}
+import io.smartdatalake.workflow.action.executionMode.PartitionDiffMode
 import io.smartdatalake.workflow.action.{Action, FileTransferAction}
 import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, DataObject, DataObjectMetadata, RawFileDataObject}
 import org.apache.spark.sql.types.StructType
