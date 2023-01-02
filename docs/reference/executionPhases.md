@@ -8,18 +8,18 @@ Execution of a SmartDataLakeBuilder run is designed with "early validation" in m
 
 The following phases are involved during each execution:
 1. **Parse configuration**:   
-Parses and validates your configuration files    
+Parses and validates your configuration files.
 This step fails if there is anything wrong with your configuration, i.e. if a required attribute is missing or a whole block like `actions {}` is missing or misspelled.
 There's also a neat feature that will warn you of typos and will suggest spelling corrections if it can.
 2. **DAG prepare:**  
-Preconditions are validated  
+Preconditions are validated.
 This includes testing Connections and DataObject structures that must exists.
 3. **DAG init:**  
-Creates and validates the whole lineage of Actions according to the DAG  
+Creates and validates the whole lineage of Actions according to the DAG.
 For Spark Actions this involves the validation of the DataFrame lineage. 
 A column which doesn't exist but is referenced in a later Action will fail the execution.
 4. **DAG exec**:    
-Execution of Actions     
+Apply [Execution Modes](executionMode.md) to select data and execute Actions.
 Data is effectively transferred in this phase (and only in this phase!).
 
 ### Implications
