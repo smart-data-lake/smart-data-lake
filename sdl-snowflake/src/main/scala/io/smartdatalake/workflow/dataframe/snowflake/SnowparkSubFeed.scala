@@ -22,8 +22,8 @@ package io.smartdatalake.workflow.dataframe.snowflake
 import com.snowflake.snowpark.types.{ArrayType, StringType, StructField, StructType}
 import com.snowflake.snowpark.{Column, functions}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.ExecutionModeResult
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion, SubFeed}

@@ -25,6 +25,7 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action._
+import io.smartdatalake.workflow.action.executionMode.{DataFrameIncrementalMode, ExecutionModeFailedException, FailIfNoPartitionValuesMode, PartitionDiffMode, ProcessAllMode, SparkStreamingMode}
 import io.smartdatalake.workflow.action.generic.transformer.{SQLDfTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
