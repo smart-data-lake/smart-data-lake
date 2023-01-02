@@ -19,7 +19,7 @@ Creates and validates the whole lineage of Actions according to the DAG.
 For Spark Actions this involves the validation of the DataFrame lineage. 
 A column which doesn't exist but is referenced in a later Action will fail the execution.
 4. **DAG exec**:    
-Apply [Execution Modes](executionMode.md) to select data and execute Actions.
+Apply [Execution Modes](executionModes.md) to select data and execute Actions.
 Data is effectively transferred in this phase (and only in this phase!).
 
 ### Implications
