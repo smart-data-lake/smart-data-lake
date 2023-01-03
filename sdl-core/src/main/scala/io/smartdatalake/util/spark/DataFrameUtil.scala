@@ -348,8 +348,10 @@ private[smartdatalake] object DataFrameUtil {
    * @return transformed [[String]]
    */
   def strCamelCase2LowerCaseWithUnderscores(x: String): String = {
-    "([A-Z]+[^A-Z_]*)|[^A-Z_]+".r.findAllMatchIn(x).map(_.group(0).toLowerCase.filter(_ != '_'))
+    val normalized = "([A-Z]+[^A-Z_]*)|[^A-Z_]+".r.findAllMatchIn(x).map(_.group(0).toLowerCase.filter(_ != '_'))
       .filter(_.nonEmpty).mkString("_")
+    // preserve leading underscores
+    x.takeWhile(_ == '_') + normalized
   }
 
   /**

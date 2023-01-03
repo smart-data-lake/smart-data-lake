@@ -34,7 +34,8 @@ class GenericTypeUtilTest extends FunSuite {
       ("scalaDeprecated",true,false,false), // scala annotations are *not* kept for runtime and will not be reflected in type def...
       ("optional",false,false,false),
       ("default",false,false,false),
-      ("overrideTest",true,false,true)
+      ("overrideTestFirstMethod",true,false,true),
+      ("overrideTestSecondMethod",true,false,true)
     )
     assert(testObjectTypeDef.attributes.map(a => (a.name,a.isRequired,a.isDeprecated,a.isOverride)) == attrsExpected)
   }
@@ -44,7 +45,8 @@ class GenericTypeUtilTest extends FunSuite {
     assert(testObjectTypeDef.name == "TestObject")
     assert(testObjectTypeDef.description.contains("ScalaDoc on case class\n\nTest line break\n\nSEE: [[OverrideTest]] for details"))
     assert(testObjectTypeDef.attributes.find(_.name == "id").get.description.contains("parameter test"))
-    assert(testObjectTypeDef.attributes.find(_.name == "overrideTest").get.description.contains("method override test"))
+    assert(testObjectTypeDef.attributes.find(_.name == "overrideTestFirstMethod").get.description.contains("override test first method"))
+    assert(testObjectTypeDef.attributes.find(_.name == "overrideTestSecondMethod").get.description.contains("override test second method"))
   }
 
 }
@@ -63,13 +65,20 @@ case class TestObject (
                        @Deprecated javaDeprecated: String,
                        @deprecated scalaDeprecated: String, // scala annotations are *not* kept for runtime and will not be reflected in type def...
                        optional: Option[String], default: String = "",
-                       override val overrideTest: String
+                       override val overrideTestFirstMethod: String,
+                       override val overrideTestSecondMethod: String
                      ) extends OverrideTest
 
 trait OverrideTest {
   /**
-   * method override test
+   * override test first method
+    */
+  def overrideTestFirstMethod: String
+
+  /**
+   * override test second method
    */
-  def overrideTest: String
+  def overrideTestSecondMethod: String
+
   def methodTest(): String = ""
 }

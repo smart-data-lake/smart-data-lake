@@ -130,7 +130,7 @@ private[smartdatalake] trait ExecutionModeWithMainInputOutput {
  *                                  It can be used to ensure processing all partitions over multiple actions in case of errors.
  * @param nbOfPartitionValuesPerRun optional restriction of the number of partition values per run.
  * @param applyCondition            Condition to decide if execution mode should be applied or not. Define a spark sql expression working with attributes of [[DefaultExecutionModeExpressionData]] returning a boolean.
- *                                  Default is to apply the execution mode if given partition values (partition values from command line or passed from previous action) are not empty.
+ *                                  Default is to apply the execution mode if given partition values (partition values from command line or passed from previous action) are empty.
  * @param failConditions            List of conditions to fail application of execution mode if true. Define as spark sql expressions working with attributes of [[PartitionDiffModeExpressionData]] returning a boolean.
  *                                  Default is that the application of the PartitionDiffMode does not fail the action. If there is no data to process, the following actions are skipped.
  *                                  Multiple conditions are evaluated individually and every condition may fail the execution mode (or-logic)
@@ -307,7 +307,7 @@ case class SparkStreamingMode(checkpointLocation: String, triggerType: String = 
  * @param alternativeOutputId optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
  *                            It can be used to ensure processing all partitions over multiple actions in case of errors.
  * @param applyCondition Condition to decide if execution mode should be applied or not. Define a spark sql expression working with attributes of [[DefaultExecutionModeExpressionData]] returning a boolean.
- *                       Default is to apply the execution mode if given partition values (partition values from command line or passed from previous action) are not empty.
+ *                       Default is to apply the execution mode.
  */
 case class DataFrameIncrementalMode(compareCol: String
                                     , override val alternativeOutputId: Option[DataObjectId] = None
