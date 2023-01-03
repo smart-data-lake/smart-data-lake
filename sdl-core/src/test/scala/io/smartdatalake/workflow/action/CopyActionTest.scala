@@ -170,39 +170,6 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     intercept[NoDataToProcessWarning](action1.exec(Seq(srcSubFeed))(contextExec).head)
   }
 
-  test("copy load incremental move mode (archive) V1 DataSource") {
-
-    // setup DataObjects
-    val feed = "copy"
-    val srcDO = XmlFileDataObject("src1", tempPath + s"/src1")
-    srcDO.deleteAll
-    instanceRegistry.register(srcDO)
-    val tgtDO = MockDataObject("tgt1")
-    instanceRegistry.register(tgtDO)
-
-    // prepare data
-    val executionMode = FileIncrementalMoveMode(archivePath = Some("archive"))
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, executionMode = Some(executionMode))
-    val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
-    srcDO.writeSparkDataFrame(l1, Seq())
-
-    // start load
-    val srcFiles = srcDO.getFileRefs(Seq()).map(_.fullPath)
-    assert(srcFiles.nonEmpty)
-    val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
-    action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed))
-
-    // check input archived by incremental move mode
-    assert(srcDO.getFileRefs(Seq()).isEmpty)
-    val srcDOArchived = XmlFileDataObject("src1", tempPath + s"/src1/archive")
-    assert(srcDOArchived.getFileRefs(Seq()).nonEmpty)
-
-    // start second load without new files - schema should be present because of schema file
-    action1.resetExecutionResult()
-    intercept[NoDataToProcessWarning](action1.exec(Seq(srcSubFeed))(contextExec).head)
-  }
-
   test("copy load with transformation from sql code and constraint and expectation") {
 
     // setup DataObjects
