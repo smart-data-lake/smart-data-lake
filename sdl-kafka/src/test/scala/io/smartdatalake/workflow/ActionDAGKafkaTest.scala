@@ -20,6 +20,7 @@ package io.smartdatalake.workflow
 
 import io.github.embeddedkafka.EmbeddedKafka
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.testutil.KafkaTestUtil
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
@@ -50,14 +51,7 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
-  private lazy val kafka = EmbeddedKafka.start()
-  override def beforeAll() {
-    kafka // initialize lazy variable
-  }
-
-  override def afterAll(): Unit = {
-    kafka.stop(true)
-  }
+  KafkaTestUtil.start
 
   before {
     instanceRegistry.clear()

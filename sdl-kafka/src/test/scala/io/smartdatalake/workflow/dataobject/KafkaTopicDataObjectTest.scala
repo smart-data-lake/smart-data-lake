@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import io.confluent.kafka.serializers.{KafkaJsonDeserializer, KafkaJsonDeserializerConfig, KafkaJsonSerializer}
 import io.github.embeddedkafka.schemaregistry.{EmbeddedKafka => EmbeddedKafkaWithSchemaRegistry}
+import io.smartdatalake.testutil.KafkaTestUtil
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.connection.KafkaConnection
@@ -40,25 +41,14 @@ import java.time.temporal.ChronoUnit
  * "java.nio.channels.UnresolvedAddressException: Session 0x0 for server localhost/<unresolved>:6001, unexpected error, closing socket connection and attempting reconnect"
  * see also https://www.oracle.com/java/technologies/javase/14all-relnotes.html#JDK-8225499
  */
-class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with BeforeAndAfter with EmbeddedKafkaWithSchemaRegistry with DataObjectTestSuite with SmartDataLakeLogger {
+class KafkaTopicDataObjectTest extends FunSuite with  BeforeAndAfter with EmbeddedKafkaWithSchemaRegistry with DataObjectTestSuite with SmartDataLakeLogger {
 
   import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
   import session.implicits._
 
   private val kafkaConnection = KafkaConnection("kafkaCon1", brokers = "localhost:6001", schemaRegistry = Some("http://localhost:6002"))
 
-  private lazy val kafka = {
-    EmbeddedKafkaWithSchemaRegistry.start()
-  }
-
-  override def beforeAll() {
-    kafka // initialize lazy variable
-    Thread.sleep(1000)
-  }
-
-  override def afterAll(): Unit = {
-    kafka.stop(true)
-  }
+  KafkaTestUtil.start
 
   test("Can read and write from Kafka") {
     createCustomTopic("topic", Map(), 1, 1)
@@ -238,5 +228,41 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
 
     val actual = dfAct.as[(String,Long)].collect
     assert(actual.toSeq == expected)
+  }
+
+
+  test("incremental output mode") {
+
+    // create data object
+    instanceRegistry.register(kafkaConnection)
+    val targetDO = KafkaTopicDataObject("kafka1", topicName = "topicIncremental", connectionId = "kafkaCon1", valueType = KafkaColumnType.AvroSchemaRegistry)
+
+    // write test data 1
+    val df1 = Seq((1, ("A", 1)), (2, ("A", 2)), (3, ("B", 3)), (4, ("B", 4))).toDF("key", "value")
+    targetDO.writeSparkDataFrame(df1)
+
+    // test 1
+    targetDO.setState(None) // initialize incremental output with empty state
+    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 4
+    val newState1 = targetDO.getState
+
+    // append test data 2
+    val df2 = Seq((5, ("B", 5))).toDF("key", "value")
+    targetDO.writeSparkDataFrame(df2)
+
+    // test 2
+    targetDO.setState(newState1)
+    val df2result = targetDO.getSparkDataFrame()(contextExec)
+    df2result.count shouldEqual 1
+    val newState2 = targetDO.getState
+
+    // test 3
+    targetDO.setState(newState2)
+    val df3result = targetDO.getSparkDataFrame()(contextExec)
+    df3result.count shouldEqual 0
+    val newState3 = targetDO.getState
+    assert(newState3 == newState2)
+
+    targetDO.getSparkDataFrame()(contextInit).count shouldEqual 5
   }
 }
