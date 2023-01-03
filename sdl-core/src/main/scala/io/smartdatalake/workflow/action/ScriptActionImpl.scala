@@ -43,7 +43,7 @@ abstract class ScriptActionImpl extends ActionSubFeedsImpl[ScriptSubFeed] {
 
   override protected def transform(inputSubFeeds: Seq[ScriptSubFeed], outputSubFeeds: Seq[ScriptSubFeed])(implicit context: ActionPipelineContext): Seq[ScriptSubFeed] = {
     // execute scripts in exec phase
-    if (context.phase == ExecutionPhase.Exec) {
+    if (context.isExecPhase) {
       execScript(inputSubFeeds, outputSubFeeds)
     } else outputSubFeeds
   }

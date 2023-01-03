@@ -121,6 +121,7 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
   } catch {
     case e: IllegalArgumentException if e.getMessage.contains("DataObject schema is undefined") => None
     case e: AnalysisException if e.getMessage.contains("Table or view not found") => None
+    case _: NoDataToProcessWarning => None
   }
 
   /**

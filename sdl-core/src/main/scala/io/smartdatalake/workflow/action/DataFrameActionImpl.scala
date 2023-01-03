@@ -193,9 +193,14 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
             }
             // recreate DataFrame from DataObject if not skipped
             if (!subFeed.isSkipped && (!isRecursive || isDataExisting)) {
-              logger.info(s"($id) getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
-              input.getSubFeed(subFeed.partitionValues, subFeedType) // get SubFeed of specified type with fresh DataFrame
-                .withFilter(subFeed.partitionValues, subFeed.filter)
+              try {
+                logger.info(s"($id) getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
+                input.getSubFeed(subFeed.partitionValues, subFeedType) // get SubFeed of specified type with fresh DataFrame
+                  .withFilter(subFeed.partitionValues, subFeed.filter)
+              } catch {
+                // if there is no data, but it's an action with multiple inputs, we need to avoid that that the action gets skipped because of the thrown NoDataToProcessWarning
+                case _: NoDataToProcessWarning if inputs.size > 1 => subFeed.withDataFrame(Some(createEmptyDataFrame(input)))
+              }
             } else {
               // if skipped create empty DataFrame
               subFeed.withDataFrame(Some(createEmptyDataFrame(input)))
@@ -375,7 +380,7 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
     val inputDfsMap = inputSubFeeds.map(subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap
     val (outputDfsMap, _) = transformers.foldLeft((inputDfsMap,inputPartitionValues)){
       case ((inputDfsMap, inputPartitionValues), transformer) =>
-        val (outputDfsMap, outputPartitionValues) = transformer.applyTransformation(id, inputPartitionValues, inputDfsMap, getExecutionModeResultOptions)
+        val (outputDfsMap, outputPartitionValues) = transformer.applyTransformation(id, inputPartitionValues, inputDfsMap, executionModeResultOptions)
         (inputDfsMap ++ outputDfsMap, outputPartitionValues)
     }
     // create output subfeeds from transformed dataframes
@@ -390,7 +395,7 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
    */
   protected def applyTransformers(transformers: Seq[PartitionValueTransformer], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
     transformers.foldLeft(PartitionValues.oneToOneMapping(partitionValues)){
-      case (partitionValuesMap, transformer) => transformer.applyTransformation(id, partitionValuesMap, getExecutionModeResultOptions)
+      case (partitionValuesMap, transformer) => transformer.applyTransformation(id, partitionValuesMap, executionModeResultOptions)
     }
   }
 
