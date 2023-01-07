@@ -265,4 +265,35 @@ class KafkaTopicDataObjectTest extends FunSuite with  BeforeAndAfter with Embedd
 
     targetDO.getSparkDataFrame()(contextInit).count shouldEqual 5
   }
+
+  test("kafka incremental mode") {
+
+    // create data object
+    instanceRegistry.register(kafkaConnection)
+    val targetDO = KafkaTopicDataObject("kafka1", topicName = "topicKafkaIncremental", connectionId = "kafkaCon1",
+      valueType = KafkaColumnType.AvroSchemaRegistry, options = Map("groupIdPrefix" -> "sdlb-testIncMode"))
+
+    // write test data 1
+    val df1 = Seq((1, ("A", 1)), (2, ("A", 2)), (3, ("B", 3)), (4, ("B", 4))).toDF("key", "value")
+    targetDO.writeSparkDataFrame(df1)
+
+    // test 1
+    targetDO.enableKafkaStateIncrementalMode
+    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 4
+    targetDO.commitIncrementalOutputState
+
+    // append test data 2
+    val df2 = Seq((5, ("B", 5))).toDF("key", "value")
+    targetDO.writeSparkDataFrame(df2)
+
+    // test 2
+    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 1
+    targetDO.commitIncrementalOutputState
+
+    // test 3
+    val df3result = targetDO.getSparkDataFrame()(contextExec)
+    df3result.count shouldEqual 0
+
+    targetDO.getSparkDataFrame()(contextInit).count shouldEqual 5
+  }
 }
