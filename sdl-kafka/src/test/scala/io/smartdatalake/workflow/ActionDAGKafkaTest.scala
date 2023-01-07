@@ -67,10 +67,10 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
     instanceRegistry.register(kafkaConnection)
     val srcDO = MockDataObject( "src1").register
     createCustomTopic("topic1", Map(), 1, 1)
-    val tgt1DO = KafkaTopicDataObject("kafka1", topicName = "topic1", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"), schemaMin = Some(SparkSchema(StructType(Seq(StructField("timestamp", TimestampType))))))
+    val tgt1DO = KafkaTopicDataObject("kafka1", topicName = "topic1", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"))
     instanceRegistry.register(tgt1DO)
     createCustomTopic("topic2", Map(), 1, 1)
-    val tgt2DO = KafkaTopicDataObject("kafka2", topicName = "topic2", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"), schemaMin = Some(SparkSchema(StructType(Seq(StructField("timestamp", TimestampType))))))
+    val tgt2DO = KafkaTopicDataObject("kafka2", topicName = "topic2", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"))
     instanceRegistry.register(tgt2DO)
 
     // prepare DAG

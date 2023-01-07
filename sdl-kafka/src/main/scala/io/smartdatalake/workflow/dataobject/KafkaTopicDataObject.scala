@@ -134,7 +134,6 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                                 keySchema: Option[GenericSchema] = None,
                                 valueType: KafkaColumnType = KafkaColumnType.String,
                                 valueSchema: Option[GenericSchema] = None,
-                                override val schemaMin: Option[GenericSchema] = None,
                                 selectCols: Seq[String] = Seq("key", "value"),
                                 datePartitionCol: Option[DatePartitionColumnDef] = None,
                                 batchReadConsecutivePartitionsAsRanges: Boolean = false,
@@ -147,6 +146,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   override val partitions: Seq[String] = datePartitionCol.map(_.colName).toSeq
   override val expectedPartitionsCondition: Option[String] = None // expect all partitions to exist
   private val udfFormatPartition = udf((ts:Timestamp) => ts.toLocalDateTime.truncatedTo(datePartitionCol.get.chronoUnit).format(datePartitionCol.get.formatter))
+  override val schemaMin: Option[GenericSchema] = None // schemaMin not meaningful for Kafka topic, as there is always a schema.
 
   private val connection = getConnection[KafkaConnection](connectionId)
 
