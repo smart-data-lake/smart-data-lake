@@ -23,9 +23,9 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.executionMode.{ExecutionMode, ExecutionModeResult}
+import io.smartdatalake.workflow.dataobject.{DataObject, KafkaTopicDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataObjectState, SubFeed}
-import io.smartdatalake.workflow.action.executionMode.{DataObjectStateIncrementalMode, ExecutionMode, ExecutionModeResult, ProcessAllMode}
-import io.smartdatalake.workflow.dataobject.{CanCreateIncrementalOutput, DataObject, KafkaTopicDataObject}
 
 /**
  * A special incremental execution mode for Kafka Inputs, remembering the state from the last increment through the Kafka Consumer, e.g. committed offsets.
@@ -38,7 +38,7 @@ case class KafkaStateIncrementalMode() extends ExecutionMode {
     kafkaInputs = subFeeds.map(s => context.instanceRegistry.get[DataObject](s.dataObjectId))
       .collect { case input: KafkaTopicDataObject => input }
     assert(kafkaInputs.nonEmpty, s"KafkaStateIncrementalMode needs at least one KafkaTopicDataObject as input")
-    kafkaInputs.foreach(_.enableKafkaStateIncrementalMode) // enable kafka incremental mode
+    kafkaInputs.foreach(_.enableKafkaStateIncrementalMode()) // enable kafka incremental mode
   }
 
   override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {

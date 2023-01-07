@@ -46,7 +46,6 @@ import java.sql.Timestamp
 import java.time._
 import java.time.format.DateTimeFormatter
 import java.time.temporal.{ChronoUnit, TemporalAccessor, TemporalQuery}
-import java.util
 import java.util.Properties
 import scala.collection.JavaConverters._
 
@@ -79,15 +78,9 @@ case class DatePartitionColumnDef(colName: String, timeFormat: String = "yyyyMMd
 }
 
 private object TemporalQueries {
-  val LocalDateTimeQuery: TemporalQuery[LocalDateTime] = new TemporalQuery[LocalDateTime] {
-    override def queryFrom(temporal: TemporalAccessor): LocalDateTime = LocalDateTime.from(temporal)
-  }
-  val LocalDateQuery: TemporalQuery[LocalDate] = new TemporalQuery[LocalDate] {
-    override def queryFrom(temporal: TemporalAccessor): LocalDate = LocalDate.from(temporal)
-  }
-  val LocalYearMonthQuery: TemporalQuery[YearMonth] = new TemporalQuery[YearMonth] {
-    override def queryFrom(temporal: TemporalAccessor): YearMonth = YearMonth.from(temporal)
-  }
+  val LocalDateTimeQuery: TemporalQuery[LocalDateTime] = (temporal: TemporalAccessor) => LocalDateTime.from(temporal)
+  val LocalDateQuery: TemporalQuery[LocalDate] = (temporal: TemporalAccessor) => LocalDate.from(temporal)
+  val LocalYearMonthQuery: TemporalQuery[YearMonth] = (temporal: TemporalAccessor) => YearMonth.from(temporal)
 }
 
 /**
@@ -114,8 +107,6 @@ private object TemporalQueries {
  *                    Define the schema by using one of the schema providers DDL, jsonSchemaFile, avroSchemaFile, xsdFile or caseClassName.
  *                    The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
  *                    A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
- * @param schemaMin  An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
- *                   Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param selectCols Columns to be selected when reading the DataFrame. Available columns are key, value, topic,
  *                   partition, offset, timestamp, timestampType. If key/valueType is AvroSchemaRegistry the key/value column are
  *                   convert to a complex type according to the avro schema. To expand it select "value.*".
@@ -335,14 +326,14 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       case (tpos,idx) =>
         val startingOffsets = tpos.sortBy(_.topicPartition.partition).map(_.getStartOffsetForSpark).mkString(",")
         val endingOffsets = tpos.sortBy(_.topicPartition.partition).map(_.getEndOffsetForSpark).mkString(",")
-        logger.info(s"($id) creating data frame $idx for ${logInfo} of topic $topicName: startingOffsets=$startingOffsets, endingOffsets=$endingOffsets")
+        logger.info(s"($id) creating data frame $idx for $logInfo of topic $topicName: startingOffsets=$startingOffsets, endingOffsets=$endingOffsets")
         createSparkDataFrameInternal(s"""{"$topicName":{$startingOffsets}}""", s"""{"$topicName":{$endingOffsets}}""")
     }
     dfs.reduce(_ union _)
   }
 
   private def convertToWriteDataFrame(df: DataFrame): DataFrame = {
-    require(df.columns.toSet == Set("key","value"), s"(${id}) Expects columns key, value in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
+    require(df.columns.toSet == Set("key","value"), s"($id) Expects columns key, value in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
     df.select(
       convertToKafka(keyType, col("key"), SubjectType.key, keySchema).as("key"),
       convertToKafka(valueType, col("value"), SubjectType.value, valueSchema).as("value")
@@ -437,7 +428,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
-    require(datePartitionCol.isDefined, s"(${id}) datePartitionCol column must be defined for listing partition values")
+    require(datePartitionCol.isDefined, s"($id) datePartitionCol column must be defined for listing partition values")
     val maxEmptyConsecutive: Int = 10 // number of empty partitions to stop searching for partitions
     val pctChronoUnitWaitToComplete = 0.02 // percentage of one chrono unit to wait after partition end date until the partition is assumed to be complete. This is to handle kafka late data.
     val partitions = consumer.partitionsFor(topicName)
@@ -517,7 +508,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
    * Enable kafka incremental mode, e.g. storing state via Kafka Consumer as comitted offsets.
    * This is controlled by execution mode KafkaStateIncrementalMode.
    */
-  private[workflow] def enableKafkaStateIncrementalMode: Unit = {
+  private[workflow] def enableKafkaStateIncrementalMode(): Unit = {
     assert(options.isDefinedAt("groupIdPrefix"), s"($id) option groupIdPrefix must be set for KafkaTopicDataObject in order to use KafkaStateIncrementalMode. groupIdPrefix is used as prefix for kafka consumer group identifiers.")
     _kafkaStateIncrementalModeEnabled = true
   }
@@ -584,7 +575,7 @@ private object TopicPartitionOffsets {
    */
   def getOffsetForSpark(partition: Int, offset: Option[Long], defaultOffset: Int): String = {
     // if partition is empty we get no offset, but we have to define one for spark. Define defaultOffset for this.
-    s""""${partition}":${offset.getOrElse(defaultOffset)}"""
+    s""""$partition":${offset.getOrElse(defaultOffset)}"""
   }
 
   /**
@@ -605,7 +596,7 @@ private object TopicPartitionOffsets {
     assert(startingOffsets.size == endingOffsets.size)
     val endingOffsetsLkp = endingOffsets.toMap
     startingOffsets.map { s =>
-      val e = endingOffsets(s._1)
+      val e = endingOffsetsLkp(s._1)
       TopicPartitionOffsets(new TopicPartition(topic, s._1), s._2, e._2)
     }
   }
