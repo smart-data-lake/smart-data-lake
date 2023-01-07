@@ -351,7 +351,7 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
         if (noData) logger.info(s"($id) no data to process for ${output.id} in streaming mode")
         // return
         Some(noData)
-      case None | Some(_: DataObjectStateIncrementalMode) | Some(_: PartitionDiffMode) | Some(_: DataFrameIncrementalMode) | Some(_: FailIfNoPartitionValuesMode) | Some(_: CustomPartitionMode) | Some(_: CustomMode) | Some(_: ProcessAllMode) | Some(_: FileIncrementalMoveMode) =>
+      case _ =>
         // Auto persist if dataFrame is reused later
         val preparedSubFeed = if (context.dataFrameReuseStatistics.contains((output.id, subFeed.partitionValues))) {
           val partitionValuesStr = if (subFeed.partitionValues.nonEmpty) s" and partitionValues ${subFeed.partitionValues.mkString(", ")}" else ""
@@ -365,7 +365,6 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
         output.writeDataFrame(preparedSubFeed.dataFrame.get, preparedSubFeed.partitionValues, isRecursiveInput, saveModeOptions)
         // return
         None // unknown
-      case x => throw new IllegalStateException( s"($id) ExecutionMode $x is not supported")
     }
   }
   private def getStreamingQueryName(dataObjectId: DataObjectId)(implicit context: ActionPipelineContext) = {

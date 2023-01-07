@@ -30,7 +30,7 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, S
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType
 import io.smartdatalake.workflow.dataobject.TopicPartitionOffsets.getOffsetForSpark
-import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer}
+import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer, OffsetAndMetadata}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.spark.sql._
@@ -171,19 +171,24 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
   private val instanceOptions = connection.sparkOptions ++ options
 
-  // consumer for reading topic metadata
-  @transient private lazy val consumer = {
-    val props = new Properties()
-    props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, connection.brokers)
-    // consumer is only used for reading topic metadata; auto commit is never needed and de/serializers are not relevant
-    props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false")
-    props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, classOf[ByteArrayDeserializer].getName)
-    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, classOf[ByteArrayDeserializer].getName)
-    instanceOptions
-      .filter{ case (k,v) => k.startsWith(connection.KafkaConfigOptionPrefix)} // only kafka specific options
-      .foreach{ case (k,v) => props.put(k.stripPrefix(connection.KafkaConfigOptionPrefix),v)}
-    new KafkaConsumer(props)
+  // consumer for reading topic metadata and committing offsets wiht KafkaStateIncrementalMode
+  private def consumer(implicit context: ActionPipelineContext) = {
+    if (_consumer.isEmpty) {
+      val props = new Properties()
+      props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, connection.brokers)
+      // consumer is only used for reading topic metadata; auto commit is never needed and de/serializers are not relevant
+      props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false")
+      props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, classOf[ByteArrayDeserializer].getName)
+      props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, classOf[ByteArrayDeserializer].getName)
+      options.get("groupIdPrefix").foreach(prefix => props.put(ConsumerConfig.GROUP_ID_CONFIG, prefix + context.application))
+      instanceOptions
+        .filter { case (k,v) => k.startsWith(connection.KafkaConfigOptionPrefix)} // only kafka specific options
+        .foreach { case (k,v) => props.put(k.stripPrefix(connection.KafkaConfigOptionPrefix),v)}
+      _consumer = Some(new KafkaConsumer(props))
+    }
+    _consumer.get
   }
+  @transient private var _consumer: Option[KafkaConsumer[_,_]] = None
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
@@ -231,7 +236,14 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     implicit val session: SparkSession = context.sparkSession
 
     // get DataFrame from topic
-    val dfRaw = if (incrementalOutputState.nonEmpty && context.isExecPhase) {
+    val dfRaw = if (_kafkaStateIncrementalModeEnabled && context.isExecPhase) {
+      val partitions = consumer.partitionsFor(topicName)
+      val committedOffsets = getCommittedOffsets(partitions.asScala.map(p => new TopicPartition(topicName, p.partition)))
+      val currentOffsets = getCurrentOffsets(partitions.asScala.map(p => new TopicPartition(topicName, p.partition)))
+      incrementalOutputState = Some(currentOffsets)
+      logger.info(s"($id) incremental state current offsets are: ${currentOffsets.mkString(",")}")
+      createDataFrameForTopicPartitionOffsets(TopicPartitionOffsets.fromOffsets(topicName, committedOffsets, currentOffsets), s"increment (kafka state)")
+    } else  if (incrementalOutputState.nonEmpty && context.isExecPhase) {
       val lastOffsets = incrementalOutputState.get
       val partitions = consumer.partitionsFor(topicName)
       assert(lastOffsets.map(_._1).sorted == partitions.asScala.map(_.partition).sorted, s"($id) last incremental state kafka partitions are different from current kafak topics partitions: ${lastOffsets.map(_._1).sorted.mkString(",")} != ${partitions.asScala.map(_.partition).sorted.mkString(",")}")
@@ -293,7 +305,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       .load()
   }
 
-  private def getPartitionOffsetsForTimePeriod(startTimeIncl: LocalDateTime, endTimeExcl: LocalDateTime): Seq[TopicPartitionOffsets] = {
+  private def getPartitionOffsetsForTimePeriod(startTimeIncl: LocalDateTime, endTimeExcl: LocalDateTime)(implicit context: ActionPipelineContext): Seq[TopicPartitionOffsets] = {
     val partitions = consumer.partitionsFor(topicName)
     require(partitions!=null, s"($id) topic $topicName doesn't exist")
     val topicPartitions = partitions.asScala.map(p => new TopicPartition(topicName, p.partition))
@@ -366,11 +378,19 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     }
   }
 
-  private def getCurrentOffsets(partitions: Seq[TopicPartition]) = {
-    consumer.endOffsets(partitions.asJava).asScala.map(o => (o._1.partition, Option(o._2).map(_.toLong))).toSeq
+  private def getCommittedOffsets(partitions: Seq[TopicPartition])(implicit context: ActionPipelineContext) = {
+    consumer.committed(partitions.toSet.asJava).asScala.map {
+      case (topicPartition, offsetMeta) => (topicPartition.partition, Option(offsetMeta).flatMap(o => Option(o.offset)))
+    }.toSeq
   }
 
-  private def getTopicPartitionsAtTstmp(topicPartitions: Seq[TopicPartition], localDateTime: LocalDateTime) = {
+  private def getCurrentOffsets(partitions: Seq[TopicPartition])(implicit context: ActionPipelineContext) = {
+    consumer.endOffsets(partitions.asJava).asScala.map {
+      case (topicPartition, offset) => (topicPartition.partition, Option(offset).map(_.toLong))
+    }.toSeq
+  }
+
+  private def getTopicPartitionsAtTstmp(topicPartitions: Seq[TopicPartition], localDateTime: LocalDateTime)(implicit context: ActionPipelineContext) = {
     val topicPartitionsStart = topicPartitions.map( p => (p, java.lang.Long.valueOf(localDateTime.atZone(datePartitionCol.get.zoneId).toInstant.toEpochMilli))).toMap.asJava
     consumer.offsetsForTimes(topicPartitionsStart).asScala.toSeq.sortBy(_._1.partition)
   }
@@ -494,8 +514,31 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   /**
-   * @inheritdoc
+   * Enable kafka incremental mode, e.g. storing state via Kafka Consumer as comitted offsets.
+   * This is controlled by execution mode KafkaStateIncrementalMode.
    */
+  private[workflow] def enableKafkaStateIncrementalMode: Unit = {
+    assert(options.isDefinedAt("groupIdPrefix"), s"($id) option groupIdPrefix must be set for KafkaTopicDataObject in order to use KafkaStateIncrementalMode. groupIdPrefix is used as prefix for kafka consumer group identifiers.")
+    _kafkaStateIncrementalModeEnabled = true
+  }
+  private var _kafkaStateIncrementalModeEnabled = false
+
+  /**
+   * Commits incremental output state current offsets to Kafka for execution mode KafkaStateIncrementalMode.
+   * Incremental output state is set by getSparkDataFrame.
+   */
+  private[workflow] def commitIncrementalOutputState(implicit context: ActionPipelineContext): Unit = {
+    assert(incrementalOutputState.nonEmpty, s"($id) commitIncrementalOutputState called but incrementalOutputState is not defined")
+    assert(_kafkaStateIncrementalModeEnabled, s"($id) commitIncrementalOutputState called but enableKafkaStateIncrementalMode is not enabled")
+    val offsetsToCommit = incrementalOutputState.get
+      .filter(_._2.nonEmpty) // dont commit empty offset
+      .map {
+        case (partition, offset) => (new TopicPartition(topicName, partition), new OffsetAndMetadata(offset.get))
+      }
+    consumer.commitSync(offsetsToCommit.toMap.asJava)
+    logger.info(s"($id) committed offsets: ${incrementalOutputState.get.mkString(",")}")
+  }
+
   override def factory: FromConfigFactory[DataObject] = KafkaTopicDataObject
 }
 
@@ -532,8 +575,8 @@ private case class TopicPartitionOffsets(topicPartition: TopicPartition, startOf
 }
 private object TopicPartitionOffsets {
   // default offset definitions according to spark
-  val defaultOffsetEarliest = -2
-  val defaultOffsetLatest = -1
+  val defaultOffsetEarliest: Int = -2
+  val defaultOffsetLatest: Int = -1
 
   /**
    * Create string to use as starting/endingOffset option for Spark Kafka data source
