@@ -22,6 +22,7 @@ import io.github.embeddedkafka.EmbeddedKafka
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutil.KafkaTestUtil
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.connection.KafkaConnection
@@ -29,7 +30,7 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.executionMode.KafkaStateIncrementalMode
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.types.{StructField, StructType, TimestampType}
+import org.apache.spark.sql.types.StructType
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 
 import java.nio.file.Files
@@ -41,11 +42,9 @@ import java.nio.file.Files
  * "java.nio.channels.UnresolvedAddressException: Session 0x0 for server localhost/<unresolved>:6001, unexpected error, closing socket connection and attempting reconnect"
  * see also https://www.oracle.com/java/technologies/javase/14all-relnotes.html#JDK-8225499
  */
-class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndAfter with EmbeddedKafka {
+class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndAfter with EmbeddedKafka with SmartDataLakeLogger {
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
   import session.implicits._
-
-  private val tempDir = Files.createTempDirectory("test")
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
@@ -106,7 +105,7 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
     val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6001")
     instanceRegistry.register(kafkaConnection)
     val schema = StructType.fromDDL("lastname string, firstname string, rating int")
-    createCustomTopic("topicInc1", Map(), 1, 1)
+    createCustomTopic("topicIncSrc", Map(), 1, 1)
     val srcDO = KafkaTopicDataObject("kafkaSrc", topicName = "topicIncSrc", connectionId = "kafkaCon1", valueType = KafkaColumnType.Json, valueSchema = Some(SparkSchema(schema)), options = optionsGroupIdPrefix)
     instanceRegistry.register(srcDO)
     createCustomTopic("topicInc1", Map(), 1, 1)
@@ -167,6 +166,54 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
     // note: metrics don't work for Kafka sink in Spark 2.4
     //val action2MainMetrics = action2.runtimeData.getFinalMetrics(action2.outputId).get.getMainInfos
     //assert(action2MainMetrics("records_written") == 1)
+  }
+
+  test("action dag with 1 action, executionMode=KafkaStateIncrementalMode and delayedMaxTimestamp") {
+
+    // setup DataObjects
+    val optionsGroupIdPrefix = Map("groupIdPrefix" -> "sdlb-testDagIncMode")
+    val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6001")
+    instanceRegistry.register(kafkaConnection)
+    val schema = StructType.fromDDL("lastname string, firstname string, rating int")
+    createCustomTopic("topicIncDelaySrc", Map(), 1, 1)
+    val srcDO = KafkaTopicDataObject("kafkaSrc", topicName = "topicIncDelaySrc", connectionId = "kafkaCon1", valueType = KafkaColumnType.Json, valueSchema = Some(SparkSchema(schema)), options = optionsGroupIdPrefix)
+    instanceRegistry.register(srcDO)
+    createCustomTopic("topicIncDelay1", Map(), 1, 1)
+    val tgt1DO = KafkaTopicDataObject("kafka1", topicName = "topicIncDelay1", connectionId = "kafkaCon1", valueType = KafkaColumnType.Json, valueSchema = Some(SparkSchema(schema)), options = optionsGroupIdPrefix)
+    instanceRegistry.register(tgt1DO)
+
+    // prepare DAG
+    val df1 = Seq(("r1", TestPerson("doe", "john", 5))).toDF("key", "value")
+    logger.info("Prepare data")
+    srcDO.writeSparkDataFrame(df1, Seq())
+
+    val delaySecs = 10
+    val action1Delay10s = CopyAction("a", srcDO.id, tgt1DO.id,
+      executionMode = Some(KafkaStateIncrementalMode(delayedMaxTimestampExpr = Some(s"timestamp_seconds(unix_seconds(now()) - 10)"))))
+
+    // first dag run
+    {
+      val dag: ActionDAGRun = ActionDAGRun(Seq(action1Delay10s))
+      dag.prepare
+      dag.init
+      dag.exec(contextExec)
+    }
+
+    // check there is no data because of delay not yet over.
+    assert(tgt1DO.getSparkDataFrame().count == 0)
+
+    // second dag run
+    {
+      val action1Delay1s = action1Delay10s.copy(
+        executionMode = Some(KafkaStateIncrementalMode(delayedMaxTimestampExpr = Some(s"timestamp_seconds(unix_seconds(now()) - 1)"))))
+      val dag: ActionDAGRun = ActionDAGRun(Seq(action1Delay1s))
+      dag.prepare
+      dag.init
+      dag.exec(contextExec)
+    }
+
+    // check data now written to tgt1
+    assert(tgt1DO.getSparkDataFrame().count == 1)
   }
 
 }
