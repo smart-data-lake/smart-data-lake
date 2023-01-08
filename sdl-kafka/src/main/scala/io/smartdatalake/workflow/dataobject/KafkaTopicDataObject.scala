@@ -218,7 +218,6 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       .as("kafka")
       .withOptionalColumn(datePartitionCol.map(_.colName), udfFormatPartition(col("timestamp")))
       .select(colsToSelect:_*)
-    validateSchemaMin(SparkSchema(df.schema), "read")
     // return
     df
   }
@@ -229,12 +228,18 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     // get DataFrame from topic
     val dfRaw = if (_kafkaStateIncrementalModeEnabled && context.isExecPhase) {
       val partitions = consumer.partitionsFor(topicName)
+      val topicPartitions = partitions.asScala.map(p => new TopicPartition(topicName, p.partition))
       val committedOffsets = getCommittedOffsets(partitions.asScala.map(p => new TopicPartition(topicName, p.partition)))
-      val currentOffsets = getCurrentOffsets(partitions.asScala.map(p => new TopicPartition(topicName, p.partition)))
-      incrementalOutputState = Some(currentOffsets)
-      logger.info(s"($id) incremental state current offsets are: ${currentOffsets.mkString(",")}")
-      createDataFrameForTopicPartitionOffsets(TopicPartitionOffsets.fromOffsets(topicName, committedOffsets, currentOffsets), s"increment (kafka state)")
-    } else  if (incrementalOutputState.nonEmpty && context.isExecPhase) {
+      val currentOffsets = getCurrentOffsets(topicPartitions)
+      val currentOffsetsLkp = getCurrentOffsets(topicPartitions).toMap
+      val endingOffsets = if (_delayedMaxTimestamp.isDefined) {
+        getTopicPartitionsAtTstmp(topicPartitions, _delayedMaxTimestamp.get.toLocalDateTime)
+          .map { case (p, o) => (p.partition, Option(o).map(_.offset).orElse(currentOffsetsLkp(p.partition)).orElse(Some(0L))) }
+      } else currentOffsets
+      incrementalOutputState = Some(endingOffsets)
+      logger.debug(s"($id) incremental state current offsets are: ${endingOffsets.mkString(",")}")
+      createDataFrameForTopicPartitionOffsets(TopicPartitionOffsets.fromOffsets(topicName, committedOffsets, endingOffsets), s"increment (kafka state)")
+    } else if (incrementalOutputState.nonEmpty && context.isExecPhase) {
       val lastOffsets = incrementalOutputState.get
       val partitions = consumer.partitionsFor(topicName)
       assert(lastOffsets.map(_._1).sorted == partitions.asScala.map(_.partition).sorted, s"($id) last incremental state kafka partitions are different from current kafak topics partitions: ${lastOffsets.map(_._1).sorted.mkString(",")} != ${partitions.asScala.map(_.partition).sorted.mkString(",")}")
@@ -382,7 +387,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   private def getTopicPartitionsAtTstmp(topicPartitions: Seq[TopicPartition], localDateTime: LocalDateTime)(implicit context: ActionPipelineContext) = {
-    val topicPartitionsStart = topicPartitions.map( p => (p, java.lang.Long.valueOf(localDateTime.atZone(datePartitionCol.get.zoneId).toInstant.toEpochMilli))).toMap.asJava
+    val topicPartitionsStart = topicPartitions.map( p => (p, java.lang.Long.valueOf(localDateTime.atZone(datePartitionCol.map(_.zoneId).getOrElse(ZoneId.systemDefault)).toInstant.toEpochMilli))).toMap.asJava
     consumer.offsetsForTimes(topicPartitionsStart).asScala.toSeq.sortBy(_._1.partition)
   }
 
@@ -507,12 +512,15 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   /**
    * Enable kafka incremental mode, e.g. storing state via Kafka Consumer as comitted offsets.
    * This is controlled by execution mode KafkaStateIncrementalMode.
+   * TODO: this method and the two variables can be removed once execution mode result options are passed through the Action to the DataObject.
    */
-  private[workflow] def enableKafkaStateIncrementalMode(): Unit = {
+  private[workflow] def enableKafkaStateIncrementalMode(delayedMaxTimestamp: Option[Timestamp] = None): Unit = {
     assert(options.isDefinedAt("groupIdPrefix"), s"($id) option groupIdPrefix must be set for KafkaTopicDataObject in order to use KafkaStateIncrementalMode. groupIdPrefix is used as prefix for kafka consumer group identifiers.")
     _kafkaStateIncrementalModeEnabled = true
+    _delayedMaxTimestamp = delayedMaxTimestamp
   }
   private var _kafkaStateIncrementalModeEnabled = false
+  private var _delayedMaxTimestamp: Option[Timestamp] = None
 
   /**
    * Commits incremental output state current offsets to Kafka for execution mode KafkaStateIncrementalMode.
@@ -595,10 +603,7 @@ private object TopicPartitionOffsets {
   def fromOffsets(topic: String, startingOffsets: Seq[(Int,Option[Long])], endingOffsets: Seq[(Int,Option[Long])]): Seq[TopicPartitionOffsets] = {
     assert(startingOffsets.size == endingOffsets.size)
     val endingOffsetsLkp = endingOffsets.toMap
-    startingOffsets.map { s =>
-      val e = endingOffsetsLkp(s._1)
-      TopicPartitionOffsets(new TopicPartition(topic, s._1), s._2, e._2)
-    }
+    startingOffsets.map(s => TopicPartitionOffsets(new TopicPartition(topic, s._1), s._2, endingOffsetsLkp(s._1)))
   }
 }
 
@@ -606,4 +611,5 @@ object KafkaTopicDataObject extends FromConfigFactory[DataObject] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): KafkaTopicDataObject = {
     extract[KafkaTopicDataObject](config)
   }
+  final val delayedMaxTimestampOption = "delayedMaxTimestamp"
 }

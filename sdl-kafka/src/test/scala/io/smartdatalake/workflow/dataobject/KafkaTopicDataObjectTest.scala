@@ -28,9 +28,11 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import org.apache.kafka.common.serialization.StringSerializer
 import org.apache.spark.sql.functions.{lit, struct}
 import org.apache.spark.sql.streaming.Trigger
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
+import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import java.nio.file.Files
+import java.sql.Timestamp
+import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 
@@ -231,7 +233,7 @@ class KafkaTopicDataObjectTest extends FunSuite with  BeforeAndAfter with Embedd
   }
 
 
-  test("incremental output mode") {
+  test("incremental output mode with schema registry") {
 
     // create data object
     instanceRegistry.register(kafkaConnection)
@@ -271,29 +273,60 @@ class KafkaTopicDataObjectTest extends FunSuite with  BeforeAndAfter with Embedd
     // create data object
     instanceRegistry.register(kafkaConnection)
     val targetDO = KafkaTopicDataObject("kafka1", topicName = "topicKafkaIncremental", connectionId = "kafkaCon1",
-      valueType = KafkaColumnType.AvroSchemaRegistry, options = Map("groupIdPrefix" -> "sdlb-testIncMode"))
+      valueType = KafkaColumnType.String, options = Map("groupIdPrefix" -> "sdlb-testIncMode"))
+
+    // test 0a - read empty topic with delayedMaxTimestamp=now
+    targetDO.enableKafkaStateIncrementalMode(Some(Timestamp.from(Instant.now())))
+    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 0
+    targetDO.commitIncrementalOutputState
+
+    // test 0b - read empty topic
+    targetDO.enableKafkaStateIncrementalMode()
+    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 0
+    targetDO.commitIncrementalOutputState
 
     // write test data 1
-    val df1 = Seq((1, ("A", 1)), (2, ("A", 2)), (3, ("B", 3)), (4, ("B", 4))).toDF("key", "value")
+    val df1 = Seq((1, "A"), (2, "A"), (3, "B"), (4, "B")).toDF("key", "value")
     targetDO.writeSparkDataFrame(df1)
 
-    // test 1
-    targetDO.enableKafkaStateIncrementalMode
+    // test 1 - read first batch
     targetDO.getSparkDataFrame()(contextExec).count shouldEqual 4
     targetDO.commitIncrementalOutputState
 
     // append test data 2
-    val df2 = Seq((5, ("B", 5))).toDF("key", "value")
+    val df2 = Seq((5, "B")).toDF("key", "value")
     targetDO.writeSparkDataFrame(df2)
 
-    // test 2
+    // test 2 - get new data
     targetDO.getSparkDataFrame()(contextExec).count shouldEqual 1
     targetDO.commitIncrementalOutputState
 
-    // test 3
-    val df3result = targetDO.getSparkDataFrame()(contextExec)
-    df3result.count shouldEqual 0
+    // test 3 - no data
+    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 0
+    targetDO.commitIncrementalOutputState
 
-    targetDO.getSparkDataFrame()(contextInit).count shouldEqual 5
+    // save current time to test delayedMaxTimestamp feature
+    val tstmpBeforeData3 = Timestamp.from(Instant.now())
+
+    // append test data 3
+    val df3 = Seq((6, "C")).toDF("key", "value")
+    targetDO.writeSparkDataFrame(df2)
+
+    // test 4 - no new data with delayedMaxTimestamp=tstmpBeforeData3
+    targetDO.enableKafkaStateIncrementalMode(Some(tstmpBeforeData3))
+    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 0
+    targetDO.commitIncrementalOutputState
+
+    // test 5 - new data with delayedMaxTimestamp=now
+    targetDO.enableKafkaStateIncrementalMode(Some(Timestamp.from(Instant.now())))
+    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 1
+    targetDO.commitIncrementalOutputState
+
+    // test 4 - no new data without delayedMaxTimestamp
+    targetDO.enableKafkaStateIncrementalMode()
+    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 0
+
+    // all data without incremental mode
+    targetDO.getSparkDataFrame()(contextInit).count shouldEqual 6
   }
 }

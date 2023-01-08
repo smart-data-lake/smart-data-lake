@@ -125,6 +125,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   }
 
   // Keep execution mode result in a variable for now.
+  // TODO: this should be a property of the SubFeed. Like that it is passed to the Action and its Input/Output DataObjects.
   protected var executionModeResultOptions: Map[String,String] = Map()
 
   def postprocessOutputSubFeeds(subFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S] = {

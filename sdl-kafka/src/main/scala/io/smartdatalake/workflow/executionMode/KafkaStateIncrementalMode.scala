@@ -23,26 +23,44 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.action.executionMode.{ExecutionMode, ExecutionModeResult}
 import io.smartdatalake.workflow.dataobject.{DataObject, KafkaTopicDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataObjectState, SubFeed}
 
+import java.sql.Timestamp
+
 /**
  * A special incremental execution mode for Kafka Inputs, remembering the state from the last increment through the Kafka Consumer, e.g. committed offsets.
+ * @param delayedMaxTimestampExpr Optional expression to define a delay to read latest offsets from Kafka. The expression has to return a timestamp which is used to select ending offsets to read from Kafka.
+ *                                Define a spark sql expression working with the attributes of [[DefaultExpressionData]] returning a timestamp.
+ *                                Default is to read latest offsets existing in Kafka.
  */
-case class KafkaStateIncrementalMode() extends ExecutionMode {
+case class KafkaStateIncrementalMode(delayedMaxTimestampExpr: Option[String] = None) extends ExecutionMode {
   private var kafkaInputs: Seq[KafkaTopicDataObject] = Seq()
+
+  override def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = {
+    // validate delayedMaxTimestampExpr expression
+    delayedMaxTimestampExpr.foreach(expression => SparkExpressionUtil.syntaxCheck[DefaultExpressionData, Timestamp](actionId, Some("delayedMaxTimestampExpr"), expression))
+  }
 
   override def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit context: ActionPipelineContext): Unit = {
     // check that there is at least one kafka input DataObject
     kafkaInputs = subFeeds.map(s => context.instanceRegistry.get[DataObject](s.dataObjectId))
       .collect { case input: KafkaTopicDataObject => input }
     assert(kafkaInputs.nonEmpty, s"KafkaStateIncrementalMode needs at least one KafkaTopicDataObject as input")
-    kafkaInputs.foreach(_.enableKafkaStateIncrementalMode()) // enable kafka incremental mode
   }
 
   override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
-    Some(ExecutionModeResult()) // Some() must be returned to apply the execution mode and force break DataFrame lineage.
+    // prepare options
+    val delayedMaxTimestamp = delayedMaxTimestampExpr.flatMap(expr => SparkExpressionUtil.evaluate[DefaultExpressionData, Timestamp](actionId, Some("delayedMaxTimestampExpr"), expr, DefaultExpressionData.from(context, Seq())))
+    val options = Map(
+      KafkaTopicDataObject.delayedMaxTimestampOption -> delayedMaxTimestamp.map(_.toString)
+    ).collect { case (key, Some(value)) => key -> value } // remove keys with empty values
+    // enable kafka incremental mode
+    kafkaInputs.foreach(_.enableKafkaStateIncrementalMode(delayedMaxTimestamp))
+    // return execution mode
+    Some(ExecutionModeResult(options = options))
   }
   override def postExec(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, mainInputSubFeed: SubFeed, mainOutputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = {
     // commit offsets read to Kafka
