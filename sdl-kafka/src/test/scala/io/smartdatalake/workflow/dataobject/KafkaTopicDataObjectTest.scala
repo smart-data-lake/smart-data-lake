@@ -26,8 +26,10 @@ import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import org.apache.kafka.common.serialization.StringSerializer
+import org.apache.spark.sql.confluent.IncompatibleSchemaException
 import org.apache.spark.sql.functions.{lit, struct}
 import org.apache.spark.sql.streaming.Trigger
+import org.apache.spark.sql.types.{StructField, StructType}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import java.nio.file.Files
@@ -328,5 +330,59 @@ class KafkaTopicDataObjectTest extends FunSuite with  BeforeAndAfter with Embedd
 
     // all data without incremental mode
     targetDO.getSparkDataFrame()(contextInit).count shouldEqual 6
+  }
+
+  test("json schema evolution") {
+
+    // create data object
+    instanceRegistry.register(kafkaConnection)
+    val dataObject = KafkaTopicDataObject("kafka1", topicName = "topicJson", connectionId = "kafkaCon1", valueType = KafkaColumnType.JsonSchemaRegistry)
+    val dataObjectAllowSchemaEvo = dataObject.copy(allowSchemaEvolution = true)
+
+    // write json message incl. schema
+    val dfExp = Seq(("hello", 1L)).toDF("txt", "num")
+      .select(lit(1).as("key"), struct("*").as("value"))
+    dataObject.writeSparkDataFrame(dfExp)
+
+    // prepare data with updated schema (new column)
+    val dfExp1 = Seq(("hello", 1L, "test")).toDF("txt", "num", "test")
+      .select(lit(1).as("key"), struct("*").as("value"))
+
+    // check schema evolution disabled
+    intercept[IncompatibleSchemaException](dataObject.initSparkDataFrame(dfExp1,Seq()))
+    intercept[IncompatibleSchemaException](dataObject.writeSparkDataFrame(dfExp1))
+
+    dataObjectAllowSchemaEvo.initSparkDataFrame(dfExp1, Seq())
+    dataObjectAllowSchemaEvo.writeSparkDataFrame(dfExp1)
+
+    assert(dataObjectAllowSchemaEvo.getSparkDataFrame().select($"value.*").columns.toSeq == Seq("txt", "num", "test"))
+  }
+
+  test("avro schema evolution") {
+
+    // create data object
+    instanceRegistry.register(kafkaConnection)
+    val dataObject = KafkaTopicDataObject("kafka1", topicName = "topicJson", connectionId = "kafkaCon1", valueType = KafkaColumnType.AvroSchemaRegistry)
+    val dataObjectAllowSchemaEvo = dataObject.copy(allowSchemaEvolution = true)
+
+    // write json message incl. schema
+    val dfExp = Seq(("hello", 1L)).toDF("txt", "num")
+      .select(lit(1).as("key"), struct("*").as("value"))
+    dataObject.writeSparkDataFrame(dfExp)
+
+    // prepare data with updated schema (new nullable column)
+    val dfExp1 = Seq(("hello", 1L, Some("test"))).toDF("txt", "num", "test")
+      .select(lit(1).as("key"), struct("*").as("value"))
+
+    dfExp1.printSchema
+
+    // check schema evolution disabled
+    intercept[IncompatibleSchemaException](dataObject.initSparkDataFrame(dfExp1, Seq()))
+    intercept[IncompatibleSchemaException](dataObject.writeSparkDataFrame(dfExp1))
+
+    dataObjectAllowSchemaEvo.initSparkDataFrame(dfExp1, Seq())
+    dataObjectAllowSchemaEvo.writeSparkDataFrame(dfExp1)
+
+    assert(dataObjectAllowSchemaEvo.getSparkDataFrame().select($"value.*").columns.toSeq == Seq("txt", "num", "test"))
   }
 }
