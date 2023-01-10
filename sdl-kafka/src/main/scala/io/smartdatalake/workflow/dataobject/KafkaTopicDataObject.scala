@@ -28,7 +28,7 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
-import io.smartdatalake.workflow.dataobject.KafkaColumnType.KafkaColumnType
+import io.smartdatalake.workflow.dataobject.KafkaColumnType.{AvroSchemaRegistry, JsonSchemaRegistry, KafkaColumnType}
 import io.smartdatalake.workflow.dataobject.TopicPartitionOffsets.getOffsetForSpark
 import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer, OffsetAndMetadata}
 import org.apache.kafka.common.TopicPartition
@@ -107,6 +107,9 @@ private object TemporalQueries {
  *                    Define the schema by using one of the schema providers DDL, jsonSchemaFile, avroSchemaFile, xsdFile or caseClassName.
  *                    The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
  *                    A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
+ * @param allowSchemaEvolution If set to true schema evolution within schema registry will automatically occur when writing to this DataObject with different key or value schema, otherwise SDL will stop with error.
+ *                             This only applies if keyType or valueType is set to Json/AvroSchemaRegistry.
+ *                             Kafka Schema Evolution implementation will update schema if existing records with old schema can be read with new schema (backward compatible). Otherwise an IncompatibleSchemaException is thrown.
  * @param selectCols Columns to be selected when reading the DataFrame. Available columns are key, value, topic,
  *                   partition, offset, timestamp, timestampType. If key/valueType is AvroSchemaRegistry the key/value column are
  *                   convert to a complex type according to the avro schema. To expand it select "value.*".
@@ -125,6 +128,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                                 keySchema: Option[GenericSchema] = None,
                                 valueType: KafkaColumnType = KafkaColumnType.String,
                                 valueSchema: Option[GenericSchema] = None,
+                                override val allowSchemaEvolution: Boolean = false,
                                 selectCols: Seq[String] = Seq("key", "value"),
                                 datePartitionCol: Option[DatePartitionColumnDef] = None,
                                 batchReadConsecutivePartitionsAsRanges: Boolean = false,
@@ -132,12 +136,13 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                                 override val options: Map[String, String] = Map(),
                                 override val metadata: Option[DataObjectMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateIncrementalOutput with CanCreateSparkDataFrame with CanCreateStreamingDataFrame with CanWriteSparkDataFrame with CanHandlePartitions with SchemaValidation {
+  extends DataObject with CanCreateIncrementalOutput with CanCreateSparkDataFrame with CanCreateStreamingDataFrame with CanWriteSparkDataFrame with CanHandlePartitions with SchemaValidation with CanEvolveSchema {
 
   override val partitions: Seq[String] = datePartitionCol.map(_.colName).toSeq
   override val expectedPartitionsCondition: Option[String] = None // expect all partitions to exist
   private val udfFormatPartition = udf((ts:Timestamp) => ts.toLocalDateTime.truncatedTo(datePartitionCol.get.chronoUnit).format(datePartitionCol.get.formatter))
-  override val schemaMin: Option[GenericSchema] = None // schemaMin not meaningful for Kafka topic, as there is always a schema.
+
+  override def schemaMin: Option[GenericSchema] = None // minimal schema doesn't make sense, as schema is always fully defined.
 
   private val connection = getConnection[KafkaConnection](connectionId)
 
@@ -147,6 +152,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   else if (keySchema.isDefined) logger.warn(s"($id) keySchema is ignored if keyType = $keyType")
   if (valueType==KafkaColumnType.Json || valueType==KafkaColumnType.Avro) assert(valueSchema.nonEmpty, s"($id) If value type is Json or Avro, a valueSchema must be specified")
   else if (valueSchema.isDefined) logger.warn(s"($id) valueSchema is ignored if valueType = $valueType")
+  if (allowSchemaEvolution && Seq(keyType,valueType).intersect(Seq(JsonSchemaRegistry,AvroSchemaRegistry)).isEmpty) logger.warn(s"($id) allowSchemaEvolution=true is ignored if keyType or valueType is not set to Json/AvroSchemaRegistry")
   require(batchReadMaxOffsetsPerTask.isEmpty || batchReadMaxOffsetsPerTask.exists(_>0), s"($id) batchReadMaxOffsetsPerTask must be greater than 0")
 
   @transient lazy val keyConfluentConnector: Option[ConfluentConnector] = keyType match {
@@ -193,6 +199,8 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
     // check schema compatibility
     require(df.columns.toSet == Set("key","value"), s"($id) Expects columns key, value in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
+    keySchema.foreach(schema => validateSchema(schema, SparkSchema(df.schema("key").dataType.asInstanceOf[StructType]), "write (keySchema)"))
+    valueSchema.foreach(schema => validateSchema(schema, SparkSchema(df.schema("value").dataType.asInstanceOf[StructType]), "write (valueSchema)"))
     convertToKafka(keyType, df("key"), SubjectType.key, keySchema, eagerCheck = true)
     convertToKafka(valueType, df("value"), SubjectType.value, valueSchema, eagerCheck = true)
   }
@@ -339,6 +347,8 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
 
   private def convertToWriteDataFrame(df: DataFrame): DataFrame = {
     require(df.columns.toSet == Set("key","value"), s"($id) Expects columns key, value in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
+    keySchema.foreach(schema => validateSchema(schema, SparkSchema(df.schema("key").dataType.asInstanceOf[StructType]), "read (keySchema)"))
+    valueSchema.foreach(schema => validateSchema(schema, SparkSchema(df.schema("value").dataType.asInstanceOf[StructType]), "read (valueSchema)"))
     df.select(
       convertToKafka(keyType, col("key"), SubjectType.key, keySchema).as("key"),
       convertToKafka(valueType, col("value"), SubjectType.value, valueSchema).as("value")
@@ -426,8 +436,8 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
         to_avro(dataCol, avroSchema.toString)
       case KafkaColumnType.JsonSchemaRegistry | KafkaColumnType.AvroSchemaRegistry =>
         subjectType match {
-          case SubjectType.key => keyConfluentConnector.get.to_confluent(dataCol, topicName, subjectType, eagerCheck = eagerCheck)
-          case SubjectType.value => valueConfluentConnector.get.to_confluent(dataCol, topicName, subjectType, eagerCheck = eagerCheck)
+          case SubjectType.key => keyConfluentConnector.get.to_confluent(dataCol, topicName, subjectType, eagerCheck = eagerCheck, updateAllowed = allowSchemaEvolution)
+          case SubjectType.value => valueConfluentConnector.get.to_confluent(dataCol, topicName, subjectType, eagerCheck = eagerCheck, updateAllowed = allowSchemaEvolution)
         }
     }
   }
