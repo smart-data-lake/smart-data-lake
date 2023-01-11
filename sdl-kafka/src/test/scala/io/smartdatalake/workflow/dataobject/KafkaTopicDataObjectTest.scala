@@ -362,7 +362,7 @@ class KafkaTopicDataObjectTest extends FunSuite with  BeforeAndAfter with Embedd
 
     // create data object
     instanceRegistry.register(kafkaConnection)
-    val dataObject = KafkaTopicDataObject("kafka1", topicName = "topicJson", connectionId = "kafkaCon1", valueType = KafkaColumnType.AvroSchemaRegistry)
+    val dataObject = KafkaTopicDataObject("kafka1", topicName = "topicKafka", connectionId = "kafkaCon1", valueType = KafkaColumnType.AvroSchemaRegistry)
     val dataObjectAllowSchemaEvo = dataObject.copy(allowSchemaEvolution = true)
 
     // write json message incl. schema
@@ -373,8 +373,6 @@ class KafkaTopicDataObjectTest extends FunSuite with  BeforeAndAfter with Embedd
     // prepare data with updated schema (new nullable column)
     val dfExp1 = Seq(("hello", 1L, Some("test"))).toDF("txt", "num", "test")
       .select(lit(1).as("key"), struct("*").as("value"))
-
-    dfExp1.printSchema
 
     // check schema evolution disabled
     intercept[IncompatibleSchemaException](dataObject.initSparkDataFrame(dfExp1, Seq()))
