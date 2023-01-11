@@ -111,7 +111,7 @@ object Environment {
    * Set path level of user home to determine basedir automatically (Default=2 -> /user/myUserHome)
    */
   def hdfsAclsUserHomeLevel: Int = {
-    if (_hdfsAclsLimitToBasedir.isEmpty) {
+    if (_hdfsAclsUserHomeLevel.isEmpty) {
       _hdfsAclsUserHomeLevel = Some(
         EnvironmentUtil.getSdlParameter("hdfsAclsUserHomeLevel")
          .map(_.toInt).getOrElse(2)

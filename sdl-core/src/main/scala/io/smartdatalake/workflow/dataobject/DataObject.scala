@@ -69,7 +69,7 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
       }
       case _ => Unit
     }
-    // check lazy parsed schemaMin (note that it can match schema and schemaMin, an we need therefore two match statements)
+    // check lazy parsed schemaMin (note that it can match schema and schemaMin, and we therefore need two match statements)
     this match {
       case x: SchemaValidation => try{
         x.schemaMin.foreach(_.columns)
