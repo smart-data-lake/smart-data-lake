@@ -335,13 +335,13 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     require(config.hasPath("actions"), s"No configuration parsed or it does not have a section called actions")
     require(config.hasPath("dataObjects"), s"No configuration parsed or it does not have a section called dataObjects")
 
-    // parse config objects
+    // parse global config
     val globalConfig = GlobalConfig.from(config)
-    ConfigParser.parse(config, instanceRegistry) // share instance registry for custom code
-
-    // set environment
-    // Attention: if JVM is shared between different SDL jobs (e.g. Databricks cluster), this overrides values from earlier jobs!
     Environment._globalConfig = globalConfig
+
+    // parse config objects
+    ConfigParser.parse(config, instanceRegistry) // share instance registry for custom code
+    // Attention: if JVM is shared between different SDL jobs (e.g. Databricks cluster), this overrides values from earlier jobs!
     Environment._instanceRegistry = instanceRegistry
 
     val snapshotListener = new SnapshotStatusInfoListener()

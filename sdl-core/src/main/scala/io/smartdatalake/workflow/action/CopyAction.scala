@@ -77,6 +77,11 @@ case class CopyAction(override val id: ActionId,
 
   validateConfig()
 
+  override def prepare(implicit context: ActionPipelineContext): Unit = {
+    super.prepare
+    transformerDefs.foreach(_.prepare(id))
+  }
+
   override def transform(inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     applyTransformers(transformerDefs, inputSubFeed, outputSubFeed)
   }

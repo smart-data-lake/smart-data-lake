@@ -31,6 +31,7 @@ import java.net.URI
  * They can be set
  * - by Java system properties (prefixed with "sdl.", e.g. "sdl.hadoopAuthoritiesWithAclsRequired")
  * - by Environment variables (prefixed with "SDL_" and camelCase converted to uppercase, e.g. "SDL_HADOOP_AUTHORITIES_WITH_ACLS_REQUIRED")
+ * - by the global.environment configuration file section
  * - by a custom [[io.smartdatalake.app.SmartDataLakeBuilder]] implementation for your environment, which sets these variables directly.
  */
 object Environment {
@@ -50,90 +51,150 @@ object Environment {
    * The environment parameter can contain multiple authorities separated by comma.
    * An authority is compared against the filesystem URI with contains(...)
    */
-  var hadoopAuthoritiesWithAclsRequired: Seq[String] = {
-    EnvironmentUtil.getSdlParameter("hadoopAuthoritiesWithAclsRequired")
-      .toSeq.flatMap(_.split(','))
+  def hadoopAuthoritiesWithAclsRequired: Seq[String] = {
+    if (_hadoopAuthoritiesWithAclsRequired.isEmpty) {
+      _hadoopAuthoritiesWithAclsRequired = Some(
+        EnvironmentUtil.getSdlParameter("hadoopAuthoritiesWithAclsRequired")
+          .toSeq.flatMap(_.split(','))
+      )
+    }
+    _hadoopAuthoritiesWithAclsRequired.get
   }
+  var _hadoopAuthoritiesWithAclsRequired: Option[Seq[String]] = None
 
   /**
    * Modifying ACL's is only allowed below and including the following level (default=2)
    * See also [[io.smartdatalake.util.misc.AclUtil]]
    */
-  var hdfsAclsMinLevelPermissionModify: Int = {
-    EnvironmentUtil.getSdlParameter("hdfsAclsMinLevelPermissionModify")
-      .map(_.toInt).getOrElse(2)
+  def hdfsAclsMinLevelPermissionModify: Int = {
+    if (_hdfsAclsMinLevelPermissionModify.isEmpty) {
+      _hdfsAclsMinLevelPermissionModify = Some(
+        EnvironmentUtil.getSdlParameter("hdfsAclsMinLevelPermissionModify")
+          .map(_.toInt).getOrElse(2)
+      )
+    }
+    _hdfsAclsMinLevelPermissionModify.get
   }
+  var _hdfsAclsMinLevelPermissionModify: Option[Int] = None
 
   /**
    * Overwriting ACL's is only allowed below and including the following level (default=5)
    * See also [[io.smartdatalake.util.misc.AclUtil]]
    */
-  var hdfsAclsMinLevelPermissionOverwrite: Int = {
-    EnvironmentUtil.getSdlParameter("hdfsAclsMinLevelPermissionOverwrite")
-      .map(_.toInt).getOrElse(5)
+  def hdfsAclsMinLevelPermissionOverwrite: Int = {
+    if (_hdfsAclsMinLevelPermissionOverwrite.isEmpty) {
+      _hdfsAclsMinLevelPermissionOverwrite = Some(
+        EnvironmentUtil.getSdlParameter("hdfsAclsMinLevelPermissionOverwrite")
+         .map(_.toInt).getOrElse(5)
+      )
+    }
+    _hdfsAclsMinLevelPermissionOverwrite.get
   }
+  var _hdfsAclsMinLevelPermissionOverwrite: Option[Int] = None
 
   /**
    * Limit setting ACL's to Basedir (default=true)
    * See hdfsAclsUserHomeLevel or hdfsBasedir on how the basedir is determined
    */
-  var hdfsAclsLimitToBasedir: Boolean = {
-    EnvironmentUtil.getSdlParameter("hdfsAclsLimitToBasedir")
-      .map(_.toBoolean).getOrElse(true)
+  def hdfsAclsLimitToBasedir: Boolean = {
+    if (_hdfsAclsLimitToBasedir.isEmpty) {
+      _hdfsAclsLimitToBasedir = Some(
+        EnvironmentUtil.getSdlParameter("hdfsAclsLimitToBasedir")
+         .map(_.toBoolean).getOrElse(true)
+      )
+    }
+    _hdfsAclsLimitToBasedir.get
   }
+  var _hdfsAclsLimitToBasedir: Option[Boolean] = None
 
   /**
    * Set path level of user home to determine basedir automatically (Default=2 -> /user/myUserHome)
    */
-  var hdfsAclsUserHomeLevel: Int = {
-    EnvironmentUtil.getSdlParameter("hdfsAclsUserHomeLevel")
-      .map(_.toInt).getOrElse(2)
+  def hdfsAclsUserHomeLevel: Int = {
+    if (_hdfsAclsUserHomeLevel.isEmpty) {
+      _hdfsAclsUserHomeLevel = Some(
+        EnvironmentUtil.getSdlParameter("hdfsAclsUserHomeLevel")
+         .map(_.toInt).getOrElse(2)
+      )
+    }
+    _hdfsAclsUserHomeLevel.get
   }
+  var _hdfsAclsUserHomeLevel: Option[Int] = None
 
   /**
    * Set basedir explicitly.
    * This overrides automatically detected user home for acl constraints by hdfsAclsUserHomeLevel.
    */
-  var hdfsBasedir: Option[URI] = {
-    EnvironmentUtil.getSdlParameter("hdfsBasedir")
-      .map(new URI(_))
+  def hdfsBasedir: Option[URI] = {
+    if (_hdfsBasedir.isEmpty) {
+      _hdfsBasedir = Some(
+        EnvironmentUtil.getSdlParameter("hdfsBasedir")
+        .map(new URI(_))
+      )
+    }
+    _hdfsBasedir.get
   }
+  var _hdfsBasedir: Option[Option[URI]] = None
 
   /**
    * Set default hadoop schema and authority for path
    */
-  var hadoopDefaultSchemeAuthority: Option[URI] = {
-    EnvironmentUtil.getSdlParameter("hadoopDefaultSchemeAuthority")
-      .map(new URI(_))
+  def hadoopDefaultSchemeAuthority: Option[URI] = {
+    if (_hadoopDefaultSchemeAuthority.isEmpty) {
+      _hadoopDefaultSchemeAuthority = Some(
+        EnvironmentUtil.getSdlParameter("hadoopDefaultSchemeAuthority")
+          .map(new URI(_))
+      )
+    }
+    _hadoopDefaultSchemeAuthority.get
   }
+  var _hadoopDefaultSchemeAuthority: Option[Option[URI]] = None
 
   /**
    * Set to true to enable check for duplicate first class object definitions when loading configuration (default=true).
    * The check fails if Connections, DataObjects or Actions are defined in multiple locations.
    */
-  var enableCheckConfigDuplicates: Boolean = {
-    EnvironmentUtil.getSdlParameter("enableCheckConfigDuplicates")
-      .map(_.toBoolean).getOrElse(true)
+  def enableCheckConfigDuplicates: Boolean = {
+    if (_enableCheckConfigDuplicates.isEmpty) {
+      _enableCheckConfigDuplicates = Some(
+        EnvironmentUtil.getSdlParameter("enableCheckConfigDuplicates")
+          .map(_.toBoolean).getOrElse(true)
+      )
+    }
+    _enableCheckConfigDuplicates.get
   }
+  var _enableCheckConfigDuplicates: Option[Boolean] = None
 
   /**
    * ordering of columns in SchemaEvolution result
    * - true: result schema is ordered according to existing schema, new columns are appended
    * - false: result schema is ordered according to new schema, deleted columns are appended
    */
-  var schemaEvolutionNewColumnsLast: Boolean = {
-    EnvironmentUtil.getSdlParameter("schemaEvolutionNewColumnsLast")
-      .map(_.toBoolean).getOrElse(true)
+  def schemaEvolutionNewColumnsLast: Boolean = {
+    if (_schemaEvolutionNewColumnsLast.isEmpty) {
+      _schemaEvolutionNewColumnsLast = Some(
+        EnvironmentUtil.getSdlParameter("schemaEvolutionNewColumnsLast")
+          .map(_.toBoolean).getOrElse(true)
+      )
+    }
+    _schemaEvolutionNewColumnsLast.get
   }
+  var _schemaEvolutionNewColumnsLast: Option[Boolean] = None
 
   /**
    * If `true`, schema validation does not consider nullability of columns/fields when checking for equality.
    * If `false`, schema validation considers two columns/fields different when their nullability property is not equal.
    */
-  var schemaValidationIgnoresNullability: Boolean = {
-    EnvironmentUtil.getSdlParameter("schemaValidationIgnoresNullability")
-      .map(_.toBoolean).getOrElse(true)
+  def schemaValidationIgnoresNullability: Boolean = {
+    if (_schemaValidationIgnoresNullability.isEmpty) {
+      _schemaValidationIgnoresNullability = Some(
+        EnvironmentUtil.getSdlParameter("schemaValidationIgnoresNullability")
+          .map(_.toBoolean).getOrElse(true)
+      )
+    }
+    _schemaValidationIgnoresNullability.get
   }
+  var _schemaValidationIgnoresNullability: Option[Boolean] = None
 
   /**
    * If `true`, schema validation inspects the whole hierarchy of structured data types. This allows partial matches
@@ -144,23 +205,35 @@ object Environment {
    *          val schema = StructType.fromDDL("c1 STRING, c2 STRUCT(c2_1 INT, c2_2 STRING)") validates
    *          against StructType.fromDDL("c1 STRING, c2 STRUCT(c2_1 INT)") only if `schemaValidationDeepComarison == true`.
    */
-  var schemaValidationDeepComarison: Boolean = {
-    EnvironmentUtil.getSdlParameter("schemaValidationDeepComarison")
-      .map(_.toBoolean).getOrElse(true)
+  def schemaValidationDeepComarison: Boolean = {
+    if (_schemaValidationDeepComarison.isEmpty) {
+      _schemaValidationDeepComarison = Some(
+        EnvironmentUtil.getSdlParameter("schemaValidationDeepComarison")
+          .map(_.toBoolean).getOrElse(true)
+      )
+    }
+    _schemaValidationDeepComarison.get
   }
+  var _schemaValidationDeepComarison: Option[Boolean] = None
 
   /**
    * Set to true if you want to enable automatic caching of DataFrames that are used multiple times (default=true).
    */
-  var enableAutomaticDataFrameCaching: Boolean = {
-    EnvironmentUtil.getSdlParameter("enableAutomaticDataFrameCaching")
-      .map(_.toBoolean).getOrElse(true)
+  def enableAutomaticDataFrameCaching: Boolean = {
+    if (_enableAutomaticDataFrameCaching.isEmpty) {
+      _enableAutomaticDataFrameCaching = Some(
+        EnvironmentUtil.getSdlParameter("enableAutomaticDataFrameCaching")
+          .map(_.toBoolean).getOrElse(true)
+      )
+    }
+    _enableAutomaticDataFrameCaching.get
   }
+  var _enableAutomaticDataFrameCaching: Option[Boolean] = None
 
   /**
    * Set to true if you want to enable workaround to overwrite unpartitioned SparkFileDataObject on Azure ADLSv2 (default=false).
    */
-  var enableOverwriteUnpartitionedSparkFileDataObjectAdls: Boolean = {
+  def enableOverwriteUnpartitionedSparkFileDataObjectAdls: Boolean = {
     EnvironmentUtil.getSdlParameter("enableOverwriteUnpartitionedSparkFileDataObjectAdls")
       .map(_.toBoolean).getOrElse(false)
   }
@@ -168,83 +241,157 @@ object Environment {
   /**
    * Set log level for exceptions about skipped Actions, e.g. NoDataToProcessWarning (default=info).
    */
-  var taskSkippedExceptionLogLevel: Level = {
-    EnvironmentUtil.getSdlParameter("taskSkippedExceptionLogLevel")
-      .map(x => Level.valueOf(x.toLowerCase)).getOrElse(Level.INFO)
+  def taskSkippedExceptionLogLevel: Level = {
+    if (_taskSkippedExceptionLogLevel.isEmpty) {
+      _taskSkippedExceptionLogLevel = Some(
+        EnvironmentUtil.getSdlParameter("taskSkippedExceptionLogLevel")
+          .map(x => Level.valueOf(x.toLowerCase)).getOrElse(Level.INFO)
+      )
+    }
+    _taskSkippedExceptionLogLevel.get
   }
+  var _taskSkippedExceptionLogLevel: Option[Level] = None
 
   /**
    * Simplify final exception for better usability of log
    * - truncate stacktrace starting from "monix.*" entries
    * - limit logical plan in AnalysisException to 5 lines
    */
-  var simplifyFinalExceptionLog: Boolean = {
-    EnvironmentUtil.getSdlParameter("simplifyFinalExceptionLog")
-      .map(_.toBoolean).getOrElse(true)
+  def simplifyFinalExceptionLog: Boolean = {
+    if (_simplifyFinalExceptionLog.isEmpty) {
+      _simplifyFinalExceptionLog = Some(
+        EnvironmentUtil.getSdlParameter("simplifyFinalExceptionLog")
+          .map(_.toBoolean).getOrElse(true)
+      )
+    }
+    _simplifyFinalExceptionLog.get
   }
+  var _simplifyFinalExceptionLog: Option[Boolean] = None
 
   /**
    * Number of Executions to keep runtime data for in streaming mode (default = 10).
    * Must be bigger than 1.
    */
-  var runtimeDataNumberOfExecutionsToKeep: Int = {
-    val nb = EnvironmentUtil.getSdlParameter("runtimeDataNumberOfExecutionsToKeep")
-      .map(_.toInt).getOrElse(10)
-    assert(nb>1, "runtimeDataNumberOfExecutionsToKeep must be bigger than 1.")
-    // return
-    nb
+  def runtimeDataNumberOfExecutionsToKeep: Int = {
+    if (_runtimeDataNumberOfExecutionsToKeep.isEmpty) {
+      _runtimeDataNumberOfExecutionsToKeep = Some(
+        EnvironmentUtil.getSdlParameter("runtimeDataNumberOfExecutionsToKeep")
+          .map(_.toInt).getOrElse(10)
+      )
+      assert(_runtimeDataNumberOfExecutionsToKeep.get > 1, "runtimeDataNumberOfExecutionsToKeep must be bigger than 1.")
+    }
+    _runtimeDataNumberOfExecutionsToKeep.get
   }
+  var _runtimeDataNumberOfExecutionsToKeep: Option[Int] = None
 
   /**
    * If enabled the temp view name from versions <= 2.2.x is replaced with the new temp view name including a postfix.
    * This is enabled by default for backward compatibility.
    */
-  var replaceSqlTransformersOldTempViewName: Boolean = {
-    EnvironmentUtil.getSdlParameter("replaceSqlTransformersOldTempViewName")
-      .map(_.toBoolean).getOrElse(true)
+  def replaceSqlTransformersOldTempViewName: Boolean = {
+    if (_replaceSqlTransformersOldTempViewName.isEmpty) {
+      _replaceSqlTransformersOldTempViewName = Some(
+        EnvironmentUtil.getSdlParameter("replaceSqlTransformersOldTempViewName")
+          .map(_.toBoolean).getOrElse(true)
+      )
+    }
+    _replaceSqlTransformersOldTempViewName.get
   }
+  var _replaceSqlTransformersOldTempViewName: Option[Boolean] = None
 
   /**
    * If enabled, the sample data file for SparkFileDataObject is updated on every load from a file-based Action, otherwise it's just updated if it's missing.
    * The advantage of updating the sample file on every load is to enable automatic schema evolution.
    * This is disabled by default, as it might have performance impact if file size is big. It can be enabled on demand by setting the corresponding java property or environment variable.
    */
-  var updateSparkFileDataObjectSampleDataFile: Boolean = {
-    EnvironmentUtil.getSdlParameter("updateSparkFileDataObjectSampleDataFile")
-      .map(_.toBoolean).getOrElse(false)
+  def updateSparkFileDataObjectSampleDataFile: Boolean = {
+    if (_updateSparkFileDataObjectSampleDataFile.isEmpty) {
+      _updateSparkFileDataObjectSampleDataFile = Some(
+        EnvironmentUtil.getSdlParameter("updateSparkFileDataObjectSampleDataFile")
+          .map(_.toBoolean).getOrElse(false)
+      )
+    }
+    _updateSparkFileDataObjectSampleDataFile.get
   }
+  var _updateSparkFileDataObjectSampleDataFile: Option[Boolean] = None
 
   /**
    * If enabled, SparkFileDataObject checks in execution plan if there are files available during Exec phase.
    * NoDataToProcessWarning is thrown if there are no files found in the execution plan.
    */
-  var enableSparkFileDataObjectNoDataCheck: Boolean = {
-    EnvironmentUtil.getSdlParameter("enableSparkFileDataObjectNoDataCheck")
-      .map(_.toBoolean).getOrElse(true)
+  def enableSparkFileDataObjectNoDataCheck: Boolean = {
+    if (_enableSparkFileDataObjectNoDataCheck.isEmpty) {
+      _enableSparkFileDataObjectNoDataCheck = Some(
+        EnvironmentUtil.getSdlParameter("enableSparkFileDataObjectNoDataCheck")
+          .map(_.toBoolean).getOrElse(true)
+      )
+    }
+    _enableSparkFileDataObjectNoDataCheck.get
   }
+  var _enableSparkFileDataObjectNoDataCheck: Option[Boolean] = None
 
   /**
    * Maximal line length for DAG graph log, before switching to list mode.
    */
-  var dagGraphLogMaxLineLength: Int = {
-    val nb = EnvironmentUtil.getSdlParameter("dagGraphLogMaxLineLength")
-      .map(_.toInt).getOrElse(250)
-    // return
-    nb
+  def dagGraphLogMaxLineLength: Int = {
+    if (_dagGraphLogMaxLineLength.isEmpty) {
+      _dagGraphLogMaxLineLength = Some(
+        EnvironmentUtil.getSdlParameter("dagGraphLogMaxLineLength")
+          .map(_.toInt).getOrElse(250)
+      )
+    }
+    _dagGraphLogMaxLineLength.get
   }
+  var _dagGraphLogMaxLineLength: Option[Int] = None
 
   /**
    * If enabled, the schema file for SparkFileDataObject is updated on every load from a DataFrame-based Action, otherwise it's just updated if it's missing.
    * The advantage of updating the sample file on every load is to enable automatic schema evolution.
    * This is enabled by default, as it has not big impact on performance.
    */
-  var updateSparkFileDataObjectSchemaFile: Boolean = {
-    EnvironmentUtil.getSdlParameter("updateSparkFileDataObjectSchemaFile")
-      .map(_.toBoolean).getOrElse(true)
+  def updateSparkFileDataObjectSchemaFile: Boolean = {
+    if (_updateSparkFileDataObjectSchemaFile.isEmpty) {
+      _updateSparkFileDataObjectSchemaFile = Some(
+        EnvironmentUtil.getSdlParameter("updateSparkFileDataObjectSchemaFile")
+          .map(_.toBoolean).getOrElse(true)
+      )
+    }
+    _updateSparkFileDataObjectSchemaFile.get
   }
+  var _updateSparkFileDataObjectSchemaFile: Option[Boolean] = None
+
+  /**
+   * Parse schema files only when used, e.g. lazy.
+   * This improve startup speed for large configurations, and can fix problems with schemas not being available for some locations.
+   */
+  def parseSchemaFilesLazy: Boolean = {
+    if (_parseSchemaFilesLazy.isEmpty) {
+      _parseSchemaFilesLazy = Some(
+        EnvironmentUtil.getSdlParameter("parseSchemaFilesLazy")
+          .map(_.toBoolean).getOrElse(false)
+      )
+    }
+    _parseSchemaFilesLazy.get
+  }
+  var _parseSchemaFilesLazy: Option[Boolean] = None
+
+  /**
+   * Compile scala code of transformations only when used, e.g. lazy.
+   * This improves startup speed for large configurations, and can fix problems with code files not being available for some locations.
+   */
+  def compileScalaCodeLazy: Boolean = {
+    if (_compileScalaCodeLazy.isEmpty) {
+      _compileScalaCodeLazy = Some(
+        EnvironmentUtil.getSdlParameter("compileScalaCodeLazy")
+          .map(_.toBoolean).getOrElse(false)
+      )
+    }
+    _compileScalaCodeLazy.get
+  }
+  var _compileScalaCodeLazy: Option[Boolean] = None
 
   // static configurations
-  val configPathsForLocalSubstitution: Seq[String] = Seq(
+  def configPathsForLocalSubstitution: Seq[String] = Seq(
       "path", "table.name"
     , "create-sql", "createSql", "pre-read-sql", "preReadSql", "post-read-sql", "postReadSql", "pre-write-sql", "preWriteSql", "post-write-sql", "postWriteSql"
     , "executionMode.checkpointLocation", "execution-mode.checkpoint-location")

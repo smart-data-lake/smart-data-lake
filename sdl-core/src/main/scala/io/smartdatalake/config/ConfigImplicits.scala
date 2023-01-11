@@ -46,24 +46,13 @@ trait ConfigImplicits {
       .withFailOnSuperfluousKeys
 
   /**
-   * A [[ConfigReader]] reader that reads [[StructType]] values.
-   *
-   * This reader parses a Spark [[StructType]] by using the desired schema provider.
-   * The schema provider is included in the configuration value as prefix terminated by '#'.
-   * See [[SchemaProviderType]] for available providers.
-   */
-  implicit val structTypeReader: ConfigReader[StructType] = ConfigReader.fromTry { (c, p) =>
-    SchemaUtil.readSchemaFromConfigValue(c.getString(p))
-  }
-
-  /**
    * A [[ConfigReader]] reader that reads [[GenericSchema]] values.
    *
    * This reader parses a Spark [[StructType]] by using the desired schema provider.
    * The schema provider is included in the configuration value as prefix terminated by '#'.
    */
   implicit val genericSchemaReader: ConfigReader[GenericSchema] = ConfigReader.fromTry { (c, p) =>
-    SparkSchema(SchemaUtil.readSchemaFromConfigValue(c.getString(p)))
+    SchemaUtil.readSchemaFromConfigValue(c.getString(p), Environment.parseSchemaFilesLazy)
   }
 
   /**

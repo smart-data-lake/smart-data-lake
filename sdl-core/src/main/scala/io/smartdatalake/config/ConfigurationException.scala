@@ -34,14 +34,7 @@ private[smartdatalake] case class ConfigurationException(message: String, config
 }
 
 object ConfigurationException {
-
-  /**
-   * Create a new [[ConfigurationException]] with a message that the provided configuration path is missing.
-   *
-   * @param configurationPath The configuration path associated to this exception.
-   * @return a new [[ConfigurationException]] with default message.
-   */
-  def createMissingMessage(configurationPath: String): ConfigurationException = {
-      new ConfigurationException("Missing or faulty configuration for \"" + configurationPath + "", Some(configurationPath))
+  def fromException(message: String, path: String, t: Throwable): ConfigurationException = {
+    ConfigurationException(s"$message - ${t.getClass.getSimpleName}: ${t.getMessage}", Some(path), t)
   }
 }

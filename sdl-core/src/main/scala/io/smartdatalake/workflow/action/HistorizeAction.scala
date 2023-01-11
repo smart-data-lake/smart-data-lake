@@ -188,6 +188,7 @@ case class HistorizeAction(
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
     initSaveModeOptions
+    transformerDefs.foreach(_.prepare(id))
   }
 
   private def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
