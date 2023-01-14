@@ -29,7 +29,8 @@ import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
 
 /**
  * Execution mode to create custom partition execution mode logic.
- * Define a function which receives main input&output DataObject and returns partition values to process as Seq[Map[String,String]\]
+ *
+ * Define a function which receives main input&output DataObject and returns partition values to process as `Seq[Map[String,String]]`
  *
  * @param className           class name implementing trait [[CustomPartitionModeLogic]]
  * @param alternativeOutputId optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
@@ -66,6 +67,20 @@ object CustomPartitionMode extends FromConfigFactory[ExecutionMode] {
   }
 }
 
+/**
+ * A trait to be implemented for custom partition execution mode logic, to be used within execution mode [[CustomPartitionMode]].
+ */
 trait CustomPartitionModeLogic {
+  /**
+   * Function to implement to define custom partition execution mode logic.
+   *
+   * @param options Options specified in the configuration for this execution mode
+   * @param actionId Id of the action this execution mode is associated with
+   * @param input Input data object. Use input.listPartitions to get current partitions of the input DataObject
+   * @param output Output data object. Use output.listPartitions to get current partitions of the input DataObject
+   * @param givenPartitionValues Partition values specified with command line (start action) or passed from previous action
+   * @param context Current ActionPipelineContext. This includes feed name, SmartDataLakeBuilderConfig, execution phase and much more.
+   * @return Partitions selected or none, if the execution mode should not be applied.
+   */
   def apply(options: Map[String,String], actionId: ActionId, input: DataObject with CanHandlePartitions, output: DataObject with CanHandlePartitions, givenPartitionValues: Seq[Map[String,String]], context: ActionPipelineContext): Option[Seq[Map[String,String]]]
 }
