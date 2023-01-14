@@ -57,7 +57,7 @@
         "title" : "CustomPartitionMode",
         "required" : [ "type", "className" ],
         "additionalProperties" : false,
-        "description" : "Execution mode to create custom partition execution mode logic.\nDefine a function which receives main input&output DataObject and returns partition values to process as Seq[Map[String,String]\\\\]"
+        "description" : "Execution mode to create custom partition execution mode logic.\n\nDefine a function which receives main input&output DataObject and returns partition values to process as`Seq[Map[String,String]]`"
       },
       "DataFrameIncrementalMode" : {
         "type" : "object",
@@ -135,6 +135,22 @@
         "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "Execution mode to incrementally process file-based DataObjects, e.g. FileRefDataObjects and SparkFileDataObjects.\nFor FileRefDataObjects:\n- All existing files in the input DataObject are processed and removed (deleted or archived) after processing\n- Input partition values are applied to search for files and also used as output partition values\nFor SparkFileDataObjects:\n- Files processed are read from the DataFrames execution plan and removed (deleted or archived) after processing.\nNote that is only correct if no additional filters are applied in the DataFrame.\nA better implementation would be to observe files by a custom metric. Unfortunately there is a problem in Spark with that, see also[[CollectSetDeterministic]] \n- Partition values preserved."
+      },
+      "KafkaStateIncrementalMode" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "KafkaStateIncrementalMode"
+          },
+          "delayedMaxTimestampExpr" : {
+            "type" : "string",
+            "description" : "Optional expression to define a delay to read latest offsets from Kafka. The expression has to return a timestamp which is used to select ending offsets to read from Kafka.\nDefine a spark sql expression working with the attributes of[[DefaultExpressionData]] returning a timestamp.\nDefault is to read latest offsets existing in Kafka."
+          }
+        },
+        "title" : "KafkaStateIncrementalMode",
+        "required" : [ "type" ],
+        "additionalProperties" : false,
+        "description" : "A special incremental execution mode for Kafka Inputs, remembering the state from the last increment through the Kafka Consumer, e.g. committed offsets."
       },
       "PartitionDiffMode" : {
         "type" : "object",
@@ -224,7 +240,7 @@
           },
           "triggerType" : {
             "type" : "string",
-            "description" : "define execution interval of Spark streaming query. Possible values are Once (default), ProcessingTime & Continuous. See[[Trigger]] for details.\n                      Note that this is only applied if SDL is executed in streaming mode. If SDL is executed in normal mode, TriggerType=Once is used always.\nIf triggerType=Once, the action is repeated with Trigger.Once in SDL streaming mode."
+            "description" : "define execution interval of Spark streaming query. Possible values are Once (default), ProcessingTime & Continuous. See[[Trigger]] for details.\nNote that this is only applied if SDL is executed in streaming mode. If SDL is executed in normal mode, TriggerType=Once is used always.\nIf triggerType=Once, the action is repeated with Trigger.Once in SDL streaming mode."
           },
           "triggerTime" : {
             "type" : "string",
@@ -2469,9 +2485,9 @@
             "type" : "string",
             "description" : "An optional schema for parsing the value column. This has to be specified if valueType = Json or Avro to parse the corresponding content.\nDefine the schema by using one of the schema providers DDL, jsonSchemaFile, avroSchemaFile, xsdFile or caseClassName.\nThe schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.\nA DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING."
           },
-          "schemaMin" : {
+          "allowSchemaEvolution" : {
             "type" : "string",
-            "description" : "An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.\nDefine schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING."
+            "description" : "If set to true schema evolution within schema registry will automatically occur when writing to this DataObject with different key or value schema, otherwise SDL will stop with error.\nThis only applies if keyType or valueType is set to Json/AvroSchemaRegistry.\nKafka Schema Evolution implementation will update schema if existing records with old schema can be read with new schema (backward compatible). Otherwise an IncompatibleSchemaException is thrown."
           },
           "selectCols" : {
             "type" : "array",
@@ -2531,7 +2547,7 @@
         "title" : "KafkaTopicDataObject",
         "required" : [ "type", "topicName", "connectionId" ],
         "additionalProperties" : false,
-        "description" : "[[DataObject]]of type KafkaTopic.\nProvides details to an action to read from Kafka Topics using either\n[[org.apache.spark.sql.DataFrameReader]]or[[org.apache.spark.sql.streaming.DataStreamReader]] \n\nKey & value schema can be automatically read from and written to confluent schema registry for Json and Avro.\nJson and Avro can also be parsed with a fixed schema."
+        "description" : "[[DataObject]]of type KafkaTopic.\nProvides details to an action to read from Kafka Topics using either\n[[org.apache.spark.sql.DataFrameReader]]or[[org.apache.spark.sql.streaming.DataStreamReader]] \n\nKey & value schema can be automatically read from and written to confluent schema registry for Json and Avro.\nJson and Avro can also be parsed with a fixed schema.\n\nCan interpret record timestamp as SDLB partition values by setting datePartitionCol attribute. This allows to use this DataObject as input for PartitionDiffMode.\nThe DataObject does not support writing with SDLB partition values, as timestamp is autogenerated by Kafka using current time.\n\nSupport incremental output and use with DataObjectStateIncrementalMode."
       },
       "PKViolatorsDataObject" : {
         "type" : "object",
@@ -4963,7 +4979,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "WhitelistTransformer"
+                  "const" : "BlacklistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -4973,18 +4989,18 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnWhitelist" : {
+                "columnBlacklist" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
                   },
-                  "description" : "List of columns to keep from DataFrame"
+                  "description" : "List of columns to exclude from DataFrame"
                 }
               },
-              "title" : "WhitelistTransformer",
-              "required" : [ "columnWhitelist", "type" ],
+              "title" : "BlacklistTransformer",
+              "required" : [ "columnBlacklist", "type" ],
               "additionalProperties" : false,
-              "description" : "Apply a column whitelist to a DataFrame."
+              "description" : "Apply a column blacklist to a DataFrame."
             }, {
               "type" : "object",
               "properties" : {
@@ -5485,17 +5501,6 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "OptionsGenericDfTransformer"
-                }
-              },
-              "title" : "OptionsGenericDfTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
                   "const" : "FilterTransformer"
                 },
                 "name" : {
@@ -5519,6 +5524,17 @@
               "required" : [ "filterClause", "type" ],
               "additionalProperties" : false,
               "description" : "Apply a filter condition to a DataFrame."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "OptionsGenericDfTransformer"
+                }
+              },
+              "title" : "OptionsGenericDfTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
             }, {
               "type" : "object",
               "properties" : {
@@ -5556,7 +5572,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "BlacklistTransformer"
+                  "const" : "WhitelistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -5566,18 +5582,18 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnBlacklist" : {
+                "columnWhitelist" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
                   },
-                  "description" : "List of columns to exclude from DataFrame"
+                  "description" : "List of columns to keep from DataFrame"
                 }
               },
-              "title" : "BlacklistTransformer",
-              "required" : [ "columnBlacklist", "type" ],
+              "title" : "WhitelistTransformer",
+              "required" : [ "columnWhitelist", "type" ],
               "additionalProperties" : false,
-              "description" : "Apply a column blacklist to a DataFrame."
+              "description" : "Apply a column whitelist to a DataFrame."
             } ],
             "description" : "Configuration for a GenericDfTransformerDef to be applied"
           },
@@ -5981,6 +5997,8 @@
             }, {
               "$ref" : "#/definitions/ExecutionMode/FileIncrementalMoveMode"
             }, {
+              "$ref" : "#/definitions/ExecutionMode/KafkaStateIncrementalMode"
+            }, {
               "$ref" : "#/definitions/ExecutionMode/PartitionDiffMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/ProcessAllMode"
@@ -6139,6 +6157,8 @@
             }, {
               "$ref" : "#/definitions/ExecutionMode/FileIncrementalMoveMode"
             }, {
+              "$ref" : "#/definitions/ExecutionMode/KafkaStateIncrementalMode"
+            }, {
               "$ref" : "#/definitions/ExecutionMode/PartitionDiffMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/ProcessAllMode"
@@ -6253,6 +6273,8 @@
               "$ref" : "#/definitions/ExecutionMode/FailIfNoPartitionValuesMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/FileIncrementalMoveMode"
+            }, {
+              "$ref" : "#/definitions/ExecutionMode/KafkaStateIncrementalMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/PartitionDiffMode"
             }, {
@@ -6494,6 +6516,8 @@
             }, {
               "$ref" : "#/definitions/ExecutionMode/FileIncrementalMoveMode"
             }, {
+              "$ref" : "#/definitions/ExecutionMode/KafkaStateIncrementalMode"
+            }, {
               "$ref" : "#/definitions/ExecutionMode/PartitionDiffMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/ProcessAllMode"
@@ -6566,6 +6590,8 @@
               "$ref" : "#/definitions/ExecutionMode/FailIfNoPartitionValuesMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/FileIncrementalMoveMode"
+            }, {
+              "$ref" : "#/definitions/ExecutionMode/KafkaStateIncrementalMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/PartitionDiffMode"
             }, {
@@ -6771,6 +6797,8 @@
               "$ref" : "#/definitions/ExecutionMode/FailIfNoPartitionValuesMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/FileIncrementalMoveMode"
+            }, {
+              "$ref" : "#/definitions/ExecutionMode/KafkaStateIncrementalMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/PartitionDiffMode"
             }, {
