@@ -319,10 +319,10 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   /**
-   * Create a DataFrame filtered to the given offsets
-   * 1. split offsets into tasks according to maxOffsetsPerTask
-   * 2. Create DataFrames for all tasks
-   * 3. Union DataFrames
+   * Create a DataFrame filtered to the given offsets:
+   *   1. split offsets into tasks according to maxOffsetsPerTask
+   *   1. Create DataFrames for all tasks
+   *   1. Union DataFrames
    *
    * @return a DataFrame filtered to given offsets.
    */
@@ -522,6 +522,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   /**
    * Enable kafka incremental mode, e.g. storing state via Kafka Consumer as comitted offsets.
    * This is controlled by execution mode KafkaStateIncrementalMode.
+   *
    * TODO: this method and the two variables can be removed once execution mode result options are passed through the Action to the DataObject.
    */
   private[workflow] def enableKafkaStateIncrementalMode(delayedMaxTimestamp: Option[Timestamp] = None): Unit = {
@@ -559,12 +560,14 @@ object KafkaColumnType extends Enumeration {
 
 /**
  * Offsets to process per topic partition
+ *
  * Note: endOffset is exclusive
  */
 private case class TopicPartitionOffsets(topicPartition: TopicPartition, startOffset: Option[Long], endOffset: Option[Long]) {
 
   /**
    * Splits this TopicPartitionOffsets instance into multiple instances given the maximum offsets per task
+   *
    * Note: implementation is recursive
    */
   def split(maxOffsets: Int): Seq[TopicPartitionOffsets] = {
@@ -589,7 +592,8 @@ private object TopicPartitionOffsets {
 
   /**
    * Create string to use as starting/endingOffset option for Spark Kafka data source
-   * Output format: "<partitionNb:integer>":<offset:long>
+   *
+   * Output format: `"<partitionNb:integer>":<offset:long>``
    */
   def getOffsetForSpark(partition: Int, offset: Option[Long], defaultOffset: Int): String = {
     // if partition is empty we get no offset, but we have to define one for spark. Define defaultOffset for this.
@@ -598,7 +602,8 @@ private object TopicPartitionOffsets {
 
   /**
    * Parse starting/endingOffset used for Spark Kakfa data source from string
-   * Expected format: "<partitionNb:integer>:<offset:long>"
+   *
+   * Expected format: `"<partitionNb:integer>":<offset:long>`
    */
   def parseOffsetForSpark(offsetStr: String): (Int,Option[Long]) = {
     val offsetRegex = "\"([0-9]*)\":(-?[0-9]*)".r.anchored
