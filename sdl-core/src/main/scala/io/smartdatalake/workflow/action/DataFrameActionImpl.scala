@@ -179,7 +179,7 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
         if (phase == ExecutionPhase.Init && subFeed.hasReusableDataFrame && Environment.enableAutomaticDataFrameCaching)
           context.rememberDataFrameReuse(subFeed.dataObjectId, subFeed.partitionValues, id)
         // process subfeed
-        if (phase==ExecutionPhase.Exec) {
+        if (phase==ExecutionPhase.Exec || context.simulation) {
           // check if dataFrame must be created
           if (subFeed.dataFrame.isEmpty || subFeed.isDummy || subFeed.isStreaming.contains(true)) {
             // validate partition values existing for input

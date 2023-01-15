@@ -199,7 +199,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
           case dataObject: CanHandlePartitions => dataObject.partitions
           case _ => Seq()
         }
-        if (context.simulation) throw new IllegalStateException(s"Initial subfeed for $dataObjectId missing for dry run.")
+        if (context.simulation && Environment.failSimulationOnMissingInputSubFeeds) throw new IllegalStateException(s"Initial subfeed for $dataObjectId missing for dry run.")
         else InitSubFeed(dataObjectId, partitionValues).updatePartitionValues(partitions, breakLineageOnChange = false)
       }
   }
