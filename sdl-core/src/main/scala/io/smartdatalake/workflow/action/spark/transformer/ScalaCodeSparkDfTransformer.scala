@@ -22,14 +22,15 @@ package io.smartdatalake.workflow.action.spark.transformer
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.util.spark.DefaultExpressionData
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig.fnTransformType
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, OptionsSparkDfTransformer}
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig.fnTransformType
 import org.apache.hadoop.conf.Configuration
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.DataFrame
 
 /**
  * Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Scala code which is compiled at runtime.
@@ -45,11 +46,17 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
 case class ScalaCodeSparkDfTransformer(override val name: String = "scalaSparkTransform", override val description: Option[String] = None, code: Option[String] = None, file: Option[String] = None, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfTransformer {
-  private val fnTransform = {
+  private lazy val fnTransform = {
     implicit val defaultHadoopConf: Configuration = new Configuration()
     file.map(file => CustomCodeUtil.compileCode[fnTransformType](HdfsUtil.readHadoopFile(file)))
       .orElse(code.map(code => CustomCodeUtil.compileCode[fnTransformType](code)))
       .getOrElse(throw ConfigurationException(s"Either file or code must be defined for ScalaCodeSparkDfTransformer"))
+  }
+  if (!Environment.compileScalaCodeLazy) fnTransform
+  override def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = {
+    super.prepare(actionId)
+    // check lazy parsed transform function
+    fnTransform
   }
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit context: ActionPipelineContext): DataFrame = {
     fnTransform(context.sparkSession, options, df, dataObjectId.id)

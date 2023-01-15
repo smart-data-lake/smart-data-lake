@@ -19,14 +19,15 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.{FileIncrementalMoveMode, PartitionDiffMode, SDLSaveMode, SaveModeGenericOptions}
+import io.smartdatalake.definitions.{SDLSaveMode, SaveModeGenericOptions}
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.executionMode.{FileIncrementalMoveMode, PartitionDiffMode}
 import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
 import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.{SQLFractionExpectation, _}
+import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkException
@@ -135,7 +136,38 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(srcDOArchived.getFileRefs(Seq()).nonEmpty)
 
     // start second load without new files - schema should be present because of schema file
-    action1.resetExecutionResult()
+    intercept[NoDataToProcessWarning](action1.exec(Seq(srcSubFeed))(contextExec).head)
+  }
+
+  test("copy load incremental move mode (archive) V1 DataSource") {
+
+    // setup DataObjects
+    val feed = "copy"
+    val srcDO = XmlFileDataObject("src1", tempPath + s"/src1")
+    srcDO.deleteAll
+    instanceRegistry.register(srcDO)
+    val tgtDO = MockDataObject("tgt1")
+    instanceRegistry.register(tgtDO)
+
+    // prepare data
+    val executionMode = FileIncrementalMoveMode(archivePath = Some("archive"))
+    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, executionMode = Some(executionMode))
+    val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
+    srcDO.writeSparkDataFrame(l1, Seq())
+
+    // start load
+    val srcFiles = srcDO.getFileRefs(Seq()).map(_.fullPath)
+    assert(srcFiles.nonEmpty)
+    val srcSubFeed = SparkSubFeed(None, "src1", Seq())
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
+    action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed))
+
+    // check input archived by incremental move mode
+    assert(srcDO.getFileRefs(Seq()).isEmpty)
+    val srcDOArchived = XmlFileDataObject("src1", tempPath + s"/src1/archive")
+    assert(srcDOArchived.getFileRefs(Seq()).nonEmpty)
+
+    // start second load without new files - schema should be present because of schema file
     intercept[NoDataToProcessWarning](action1.exec(Seq(srcSubFeed))(contextExec).head)
   }
 
@@ -378,8 +410,9 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("20100101","jonson","rob",5),("20100103","doe","bob",3)).toDF("dt", "lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    action1.preInit(Seq(srcSubFeed), Seq())
-    val tgtSubFeed = action1.init(Seq(srcSubFeed)).head.asInstanceOf[SparkSubFeed]
+    val srcSubFeedWithPartitions = srcSubFeed.copy(partitionValues = Seq(PartitionValues(Map("dt"->"20100101")), PartitionValues(Map("dt"->"20100103"))))
+    action1.preInit(Seq(srcSubFeedWithPartitions), Seq())
+    val tgtSubFeed = action1.init(Seq(srcSubFeedWithPartitions)).head.asInstanceOf[SparkSubFeed]
 
     // check simulate
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
@@ -393,10 +426,12 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtDO.getSparkDataFrame().count == 2)
     action1.postExec(Seq(srcSubFeed),resultSubFeeds)(contextExec)
 
-    // simulate next run with no data
+    // next run with no data
     action1.reset
     action1.preInit(Seq(srcSubFeed), Seq())
-    val resultSubFeeds2 = intercept[NoDataToProcessWarning](action1.init(Seq(srcSubFeed)))
+    action1.init(Seq(srcSubFeed))
+    action1.preExec(Seq(srcSubFeed))(contextExec)
+    val resultSubFeeds2 = intercept[NoDataToProcessWarning](action1.exec(Seq(srcSubFeed))(contextExec))
     assert(resultSubFeeds2.results.get.head.isSkipped)
   }
 

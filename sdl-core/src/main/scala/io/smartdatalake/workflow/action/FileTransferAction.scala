@@ -21,9 +21,10 @@ package io.smartdatalake.workflow.action
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{Condition, ExecutionMode}
+import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.filetransfer.FileTransfer
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRef, FileRefDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
 

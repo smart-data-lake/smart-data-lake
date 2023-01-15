@@ -25,6 +25,7 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action._
+import io.smartdatalake.workflow.action.executionMode.{DataFrameIncrementalMode, ExecutionModeFailedException, FailIfNoPartitionValuesMode, PartitionDiffMode, ProcessAllMode, SparkStreamingMode}
 import io.smartdatalake.workflow.action.generic.transformer.{SQLDfTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
@@ -805,7 +806,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(srcDO)
     val tgt1DO = JsonFileDataObject( "tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SDLSaveMode.Append, jsonOptions = Some(Map("multiLine" -> "false")))
     instanceRegistry.register(tgt1DO)
-    val tgt2DO = JsonFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'), jsonOptions = Some(Map("multiLine" -> "false")))
+    val tgt2DO = JsonFileDataObject( "tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'), saveMode = SDLSaveMode.OverwriteOptimized, jsonOptions = Some(Map("multiLine" -> "false")))
     instanceRegistry.register(tgt2DO)
 
     // prepare DAG
@@ -1199,7 +1200,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode=Some(PartitionDiffMode(failConditions = Seq(Condition(expression = "year(runStartTime) > 2000", Some("testing"))))))
     val dag1: ActionDAGRun = ActionDAGRun(Seq(action1))
     dag1.prepare
-    val ex1 = intercept[TaskFailedException](dag1.init)
+    dag1.init
+    val ex1 = intercept[TaskFailedException](dag1.exec(contextExec))
     assert(ex1.cause.isInstanceOf[ExecutionModeFailedException])
     assert(ex1.cause.getMessage.contains("testing"))
 
@@ -1277,7 +1279,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // second dag run - skip action execution because there are no new partitions to process
     dag.prepare
-    val results = dag.init
+    dag.init
+    val results = dag.exec(contextExec)
     assert(results.head.isSkipped)
   }
 

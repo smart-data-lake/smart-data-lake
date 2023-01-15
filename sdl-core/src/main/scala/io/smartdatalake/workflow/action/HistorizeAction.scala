@@ -25,6 +25,7 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.historization.{Historization, HistorizationRecordOperations}
+import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfTransformerDef, SparkDfTransformerFunctionWrapper}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
@@ -188,6 +189,7 @@ case class HistorizeAction(
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
     initSaveModeOptions
+    transformerDefs.foreach(_.prepare(id))
   }
 
   private def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {

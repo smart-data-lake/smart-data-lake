@@ -1,8 +1,9 @@
 package io.smartdatalake.meta
 
 import com.github.takezoe.scaladoc.{Scaladoc => ScaladocAnnotation}
-import io.smartdatalake.definitions.{AuthMode, ExecutionMode, SaveModeOptions}
+import io.smartdatalake.definitions.{AuthMode, SaveModeOptions}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer, ValidationRule}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
@@ -206,7 +207,7 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
         p.typeSignature.typeArgs.head
       } else p.typeSignature
       val description = paramDescriptions.get(p.name.toString)
-        .orElse(superTypeMethodsWithoutParameters.map(s => extractScalaDoc(s.annotations).map(formatScaladoc(_))).find(_.isDefined).flatten) // use Scaladoc from first overridden method
+        .orElse(overriddenMethods.map(m => extractScalaDoc(m.annotations).map(formatScaladoc(_))).find(_.isDefined).flatten) // use Scaladoc from first overridden method
       GenericAttributeDef(p.name.encodedName.toString, tpe, description, isRequired = !isOptional && !hasDefaultValue, isOverride = isOverride, isDeprecated = isDeprecated)
     })
   }

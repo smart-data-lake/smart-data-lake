@@ -108,8 +108,8 @@ private[smartdatalake] trait FileRefDataObject extends FileDataObject {
   /**
    * Extract partition values from a given file path
    */
-  protected def extractPartitionValuesFromPath(filePath: String)(implicit context: ActionPipelineContext): PartitionValues = {
-    PartitionLayout.extractPartitionValues(partitionLayout().get, fileName, relativizePath(filePath))
+  protected def extractPartitionValuesFromFilePath(filePath: String)(implicit context: ActionPipelineContext): PartitionValues = {
+    PartitionLayout.extractPartitionValues(partitionLayout().get + fileName, relativizePath(filePath))
   }
 
   private[smartdatalake] def getFilenameFromPath(file: String): String = {

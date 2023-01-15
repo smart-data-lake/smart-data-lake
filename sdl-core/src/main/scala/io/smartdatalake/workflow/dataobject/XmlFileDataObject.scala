@@ -28,10 +28,12 @@ import io.smartdatalake.util.json.DefaultFlatteningParser
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.util.spark.DataFrameUtil.DataFrameReaderUtils
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.action.NoDataToProcessWarning
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{Path, PathFilter}
 import org.apache.spark.sql.functions.{input_file_name, lit}
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -87,71 +89,6 @@ case class XmlFileDataObject(override val id: DataObjectId,
 
   override val options: Map[String, String] = xmlOptions.getOrElse(Map()) ++ Seq(rowTag.map("rowTag" -> _)).flatten
 
-  /**
-   * Constructs an Apache Spark [[DataFrame]] from the underlying file content.
-   *
-   * As spark-xml doesn't support reading partitions, SDL needs to handle partitions on its own.
-   * This method overwrites standard getDataFrame method of SparkFileDataObject for this purpose.
-   *
-   * Example for spark-xml failure: reading partitioned XML-files with results in FileNotFoundException
-   *   session.read
-   *   .format("xml")
-   *   .options(Map("rowTag" -> "report"))
-   *   .schema(rawData.schema.get)
-   *   .load("partitionedDataObjectPath")
-   *   .show
-   */
-  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
-    implicit val session: SparkSession = context.sparkSession
-    import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
-
-    val wrongPartitionValues = PartitionValues.checkWrongPartitionValues(partitionValues, partitions)
-    assert(wrongPartitionValues.isEmpty, s"getDataFrame got request with PartitionValues keys ${wrongPartitionValues.mkString(",")} not included in $id partition columns ${partitions.mkString(", ")}")
-    assert(partitionValues.forall(pv => partitions.toSet.diff(pv.keys).isEmpty), "PartitionValues must include values for all partitions when reading XML-Data")
-
-    val schemaOpt = getSchema.map(_.inner)
-    if (!(schemaOpt.isDefined || checkFilesExisting)) {
-      //without either schema or data, no data frame can be created
-      require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined if there are no existing files.")
-    }
-
-    // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
-    if (!filesystem.exists(hadoopPath)) filesystem.mkdirs(hadoopPath)
-
-    val dfContent = if (partitions.isEmpty) {
-      session.read
-        .format(format)
-        .options(options)
-        .optionalSchema(schemaOpt)
-        .option("path", hadoopPath.toString) // spark-xml is a V1 source and only supports one path, which must be given as option...
-        .load()
-    } else {
-      val reader = session.read
-        .format(format)
-        .options(options)
-        .optionalSchema(schemaOpt)
-      val partitionValuesToRead = if (partitionValues.nonEmpty) partitionValues else listPartitions
-      // create data frame for every partition value and then build union
-      val pathsToRead = partitionValuesToRead.flatMap(pv => getConcretePaths(pv).map(path => (pv, path.toString)))
-      if (pathsToRead.nonEmpty)
-        pathsToRead.map { case (pv, path) =>
-          partitions.foldLeft(reader.option("path", path).load()) {
-            case (df,partition) => df.withColumn(partition, lit(pv(partition).toString))
-          }
-        }.reduce(_ union _)
-      else {
-        // if there are no paths to read then an empty DataFrame is created
-        require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")
-        DataFrameUtil.getEmptyDataFrame(schemaOpt.get)
-      }
-    }
-
-    val df = dfContent.withOptionalColumn(filenameColumn, input_file_name)
-
-    // finalize & return DataFrame
-    afterRead(df)
-  }
-
   override def afterRead(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame  = {
     val dfSuper = super.afterRead(df)
     if (flatten) {
@@ -160,9 +97,12 @@ case class XmlFileDataObject(override val id: DataObjectId,
     } else dfSuper
   }
 
-  override def writeDataFrameToPath(df: GenericDataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
+  override def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
     assert(partitions.isEmpty, "writing XML-Files with partitions is not supported by spark-xml")
-    super.writeDataFrameToPath(df, path, finalSaveMode)
+    super.writeSparkDataFrameToPath(df, path, finalSaveMode)
+    // add file extension to files, as spark-xml does not out-of-the-box
+    filesystem.globStatus(new Path(path, "part-*"), (path: Path) => !path.getName.contains("."))
+      .foreach(f => filesystem.rename(f.getPath, f.getPath.suffix(fileName.replace("*", ""))))
   }
 
   override def factory: FromConfigFactory[DataObject] = XmlFileDataObject

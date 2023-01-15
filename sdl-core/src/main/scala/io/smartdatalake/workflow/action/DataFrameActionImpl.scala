@@ -28,6 +28,7 @@ import io.smartdatalake.util.misc.ScalaUtil
 import io.smartdatalake.util.spark.DummyStreamProvider
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
+import io.smartdatalake.workflow.action.executionMode.{CustomMode, CustomPartitionMode, DataFrameIncrementalMode, DataObjectStateIncrementalMode, FailIfNoPartitionValuesMode, FileIncrementalMoveMode, PartitionDiffMode, ProcessAllMode, SparkStreamingMode}
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformerDef, PartitionValueTransformer}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
@@ -350,7 +351,7 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
         if (noData) logger.info(s"($id) no data to process for ${output.id} in streaming mode")
         // return
         Some(noData)
-      case None | Some(_: DataObjectStateIncrementalMode) | Some(_: PartitionDiffMode) | Some(_: DataFrameIncrementalMode) | Some(_: FailIfNoPartitionValuesMode) | Some(_: CustomPartitionMode) | Some(_: CustomMode) | Some(_: ProcessAllMode) | Some(_: FileIncrementalMoveMode) =>
+      case _ =>
         // Auto persist if dataFrame is reused later
         val preparedSubFeed = if (context.dataFrameReuseStatistics.contains((output.id, subFeed.partitionValues))) {
           val partitionValuesStr = if (subFeed.partitionValues.nonEmpty) s" and partitionValues ${subFeed.partitionValues.mkString(", ")}" else ""
@@ -364,7 +365,6 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
         output.writeDataFrame(preparedSubFeed.dataFrame.get, preparedSubFeed.partitionValues, isRecursiveInput, saveModeOptions)
         // return
         None // unknown
-      case x => throw new IllegalStateException( s"($id) ExecutionMode $x is not supported")
     }
   }
   private def getStreamingQueryName(dataObjectId: DataObjectId)(implicit context: ActionPipelineContext) = {
@@ -380,7 +380,7 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
     val inputDfsMap = inputSubFeeds.map(subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap
     val (outputDfsMap, _) = transformers.foldLeft((inputDfsMap,inputPartitionValues)){
       case ((inputDfsMap, inputPartitionValues), transformer) =>
-        val (outputDfsMap, outputPartitionValues) = transformer.applyTransformation(id, inputPartitionValues, inputDfsMap, getExecutionModeResultOptions)
+        val (outputDfsMap, outputPartitionValues) = transformer.applyTransformation(id, inputPartitionValues, inputDfsMap, executionModeResultOptions)
         (inputDfsMap ++ outputDfsMap, outputPartitionValues)
     }
     // create output subfeeds from transformed dataframes
@@ -395,7 +395,7 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
    */
   protected def applyTransformers(transformers: Seq[PartitionValueTransformer], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
     transformers.foldLeft(PartitionValues.oneToOneMapping(partitionValues)){
-      case (partitionValuesMap, transformer) => transformer.applyTransformation(id, partitionValuesMap, getExecutionModeResultOptions)
+      case (partitionValuesMap, transformer) => transformer.applyTransformation(id, partitionValuesMap, executionModeResultOptions)
     }
   }
 

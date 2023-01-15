@@ -18,7 +18,9 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.definitions.SDLSaveMode
+import com.typesafe.config.ConfigFactory
+import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
@@ -57,6 +59,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     dataObj.writeDataFrameToPath(SparkDataFrame(df1.where($"h1"==="B")), new Path(dataObj.hadoopPath, "h1=B"), SDLSaveMode.Overwrite)
 
     val dataObjPartitioned = dataObj.copy(partitions = Seq("h1"))
+    assert(dataObjPartitioned.getFileRefs(pv1).size == 2)
 
     // read with list of partition values
     val dfResult1 = dataObjPartitioned.getSparkDataFrame(pv1).cache
@@ -88,6 +91,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
       schema = Some(SparkSchema(schema)),
       rowTag = Some("entry"),
     )
+    assert(dataObj.getFileRefs(Seq()).size == 1)
 
     // read
     val dfResult2 = dataObj.getSparkDataFrame()
@@ -159,6 +163,31 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     val cntDescriptions = dfResult.select(functions.size($"descriptions.description")).as[Int].collect.toSeq
     assert(cntDescriptions == Seq(2))
   }
+
+  test("Parsing DataObjects schema file lazy in prepare phase") {
+
+    val testConfig = ConfigFactory.parseString(
+      s"""
+         | {
+         |    id = test
+         |    path = "temp/test"
+         |    schema = "xsdfile#temp/test/test.xsd;TestReport"
+         |    rowTag = TestReport
+         |    filenameColumn = _filename
+         | }
+         """.stripMargin)
+
+    // parse should succeed even if schema file is missing when parseSchemaFilesLazy=true
+    Environment._parseSchemaFilesLazy = Some(true)
+    val dataObj = XmlFileDataObject.fromConfig(testConfig)
+
+    // fail on prepare
+    intercept[ConfigurationException](dataObj.prepare)
+
+    // reset
+    Environment._parseSchemaFilesLazy = Some(false)
+  }
+
 
   private def createDataObject(path: String, schemaOpt: Option[StructType]): XmlFileDataObject = {
     val dataObj = XmlFileDataObject(id = "schemaTestXmlDO", path = path, schema = schemaOpt.map(SparkSchema))

@@ -260,9 +260,9 @@ class AclUtilTest extends FunSuite with BeforeAndAfter {
     val hdfsBaseDirOrg = Environment.hdfsBasedir
 
     // check basedir valdiation
-    Environment.hdfsBasedir = Some(new Path("hdfs://dfs.nameservices/user/app_other_dir").toUri)
+    Environment._hdfsBasedir = Some(Some(new Path("hdfs://dfs.nameservices/user/app_other_dir").toUri))
     AclUtil.checkBasedirPath("app_dir", new Path("hdfs://dfs.nameservices/user/app_other_dir"))
     intercept[IllegalArgumentException](AclUtil.checkBasedirPath("app_dir", new Path("hdfs://dfs.nameservices/user/app_dir")))
-    Environment.hdfsBasedir = hdfsBaseDirOrg // revert environment config
+    Environment._hdfsBasedir = Some(hdfsBaseDirOrg) // revert environment config
   }
 }

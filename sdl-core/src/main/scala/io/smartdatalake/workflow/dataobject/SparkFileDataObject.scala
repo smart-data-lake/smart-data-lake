@@ -34,8 +34,9 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.FileSourceScanExec
-import org.apache.spark.sql.execution.datasources.FileScanRDD
-import org.apache.spark.sql.functions.{col, input_file_name}
+import org.apache.spark.sql.execution.datasources.{DataSource, FileScanRDD}
+import org.apache.spark.sql.functions.{col, input_file_name, lit}
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import java.time.format.DateTimeFormatter
@@ -59,6 +60,11 @@ trait SparkFileDataObject extends HadoopFileDataObject
    * The Spark-Format provider to be used
    */
   def format: String
+
+  /**
+   * Hook to use different Spark-Format provider for reading
+   */
+  def readFormat: String = format // hook to use different provider for reading
 
   /**
    * The name of the (optional) additional column containing the source filename
@@ -122,7 +128,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
         if (filesystem.exists(sampleFile)) {
           logger.info(s"($id) Inferring schema from sample data file")
           val df = context.sparkSession.read
-            .format(format)
+            .format(readFormat)
             .options(options)
             .load(sampleFile.toString)
             .withOptionalColumn(filenameColumn, input_file_name)
@@ -152,7 +158,22 @@ trait SparkFileDataObject extends HadoopFileDataObject
   }
   private def sampleFile(implicit context: ActionPipelineContext) = new Path( new Path(hadoopPath, ".sample"), s"sampleData.${fileName.split('.').last.filter(_ != '*')}")
 
+  /**
+   * Hook for subclasses to ignore schema when calling Spark reader.
+   */
+  protected def ignoreSchemaForReader: Boolean = false
+
+  /**
+   * Hook for subclasses to switch to reading files one by one with Spark, as some DataSources dont support reading folders, e.g. spark-excel.
+   */
+  protected def handleFilesOneByOne: Boolean = false
+
   override def options: Map[String, String] = Map() // override options because of conflicting definitions in CanCreateSparkDataFrame and CanWriteSparkDataFrame
+
+  /**
+   * Hook to use different options for reading
+   */
+  protected def readOptions: Map[String, String] = options // hook to use different provider for reading
 
   /**
    * Constructs an Apache Spark [[DataFrame]] from the underlying file content.
@@ -176,8 +197,38 @@ trait SparkFileDataObject extends HadoopFileDataObject
     // Hadoop directory must exist for creating DataFrame below. Reading the DataFrame on read also for not yet existing data objects is needed to build the spark lineage of DataFrames.
     if (!filesystem.exists(hadoopPath)) filesystem.mkdirs(hadoopPath)
 
-    val incrementalOutputOptions = if (incrementalOutputState.isDefined && context.phase == ExecutionPhase.Exec) {
-      val previousOutputState = incrementalOutputState.get
+    // Prepare incremental output in exec phase
+    val incrementalOutputOptions = if (context.isExecPhase) getIncrementalOutputOptions
+    else Map[String,String]()
+
+    // get and customize content
+    var df = if (handleFilesOneByOne) getContentFilesOneByOne(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
+    else if (isV2ReadDataSource) getContentV2(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
+    else getContentV1(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
+    df = customizeContent(df)
+
+    // early check for no data to process.
+    // This also prevents an error on Databricks when using filesObserver if there are no files to process. See also [[CollectSetDeterministic]].
+    if (context.isExecPhase && Environment.enableSparkFileDataObjectNoDataCheck && SparkFileDataObject.tryGetFilesProcessedFromSparkPlan(id.id, df).exists(_.isEmpty))
+      throw NoDataToProcessWarning(id.id, s"($id) No files to process found in execution plan")
+
+    // add filename column
+    df = df.withOptionalColumn(filenameColumn, input_file_name)
+
+    // configure observer to get files processed for incremental execution mode
+    if (filesObservers.nonEmpty && context.isExecPhase) {
+      df = configureObservers(df)
+    }
+
+    // finalize & return DataFrame
+    afterRead(df)
+  }
+
+  /**
+   * Update incremental output state and prepare options for filtering DataSource.
+   */
+  protected def getIncrementalOutputOptions: Map[String,String] = {
+    incrementalOutputState.map { previousOutputState =>
       // Comparison of modifiedAfter and modifiedBefore are both exclusive on Microsecond level, but file timestamps maximum detail is milliseconds.
       // Actually comparison of one operator should be inclusive to avoid reading files in edge cases.
       // Current timestamp is also at millisecond level. If we subtract one microsecond from current timestamp we can avoid the problems because of exclusive comparison.
@@ -188,62 +239,155 @@ trait SparkFileDataObject extends HadoopFileDataObject
         "modifiedAfter" -> dateFormatter.format(fixWindowsTimezone(previousOutputState)),
         "modifiedBefore" -> dateFormatter.format(fixWindowsTimezone(incrementalOutputState.get))
       )
-    } else Map[String,String]()
+    }.getOrElse(Map[String, String]())
+  }
 
-    val dfContent = if (partitions.isEmpty || partitionValues.isEmpty) {
+  /**
+   * Hook for subclasses to customize content on read. Default 1:1.
+   */
+  protected def customizeContent(df: DataFrame)(implicit context: ActionPipelineContext) = df
+
+  /**
+   * Prepares the DataFrame with the content when reading.
+   * Uses Spark DataSource V2 interface.
+   */
+  protected def getContentV2(partitionValues: Seq[PartitionValues], schema: Option[StructType], incrementalOutputOptions: Map[String,String])(implicit context: ActionPipelineContext): DataFrame = {
+    implicit val session: SparkSession = context.sparkSession
+    if (partitions.isEmpty || partitionValues.isEmpty) {
       session.read
-        .format(format)
-        .options(options ++ incrementalOutputOptions)
-        .optionalSchema(schemaOpt)
+        .format(readFormat)
+        .options(readOptions ++ incrementalOutputOptions)
+        .optionalSchema(schema)
         .load(hadoopPath.toString)
     } else {
       val reader = session.read
-        .format(format)
-        .options(options ++ incrementalOutputOptions)
-        .optionalSchema(schemaOpt)
+        .format(readFormat)
+        .options(readOptions ++ incrementalOutputOptions)
+        .optionalSchema(schema)
         .option("basePath", hadoopPath.toString) // this is needed for partitioned tables when subdirectories are read directly; it then keeps the partition columns from the subdirectory path in the dataframe
-      val pathsToRead = partitionValues.flatMap(getConcretePaths).map(_.toString)
-      val df = if (pathsToRead.nonEmpty) Some(reader.load(pathsToRead:_*)) else None
-      df.filter(df => schemaOpt.isDefined || partitions.diff(df.columns).isEmpty) // filter DataFrames without partition columns as they are empty (this might happen if there is no schema specified and the partition is empty)
+      val pathsToRead = partitionValues.flatMap(getConcreteInitPaths).map(_.toString)
+      val df = if (pathsToRead.nonEmpty) Some(reader.load(pathsToRead: _*)) else None
+      df.filter(df => schema.isDefined || partitions.diff(df.columns).isEmpty) // filter DataFrames without partition columns as they are empty (this might happen if there is no schema specified and the partition is empty)
         .getOrElse {
           // if there are no paths to read for given partition values, handle no data
-          if (context.phase == ExecutionPhase.Exec) {
+          if (context.isExecPhase) {
             // skip action in exec phase
             throw NoDataToProcessWarning(id.id, s"($id) No existing files found for partition values ${partitionValues.mkString(", ")}.")
           } else {
             // create empty data frame in init phase
             require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")
-            DataFrameUtil.getEmptyDataFrame(schemaOpt.get)
+            DataFrameUtil.getEmptyDataFrame(schema.get)
           }
         }
     }
-
-    // early check for no data to process.
-    // This also prevents an error on Databricks when using filesObserver if there are no files to process. See also [[CollectSetDeterministic]].
-    if (context.phase == ExecutionPhase.Exec && Environment.enableSparkFileDataObjectNoDataCheck && SparkFileDataObject.getFilesProcessedFromSparkPlan(id.id, dfContent).isEmpty)
-      throw NoDataToProcessWarning(id.id, s"($id) No files to process found in execution plan")
-
-    // add filename column
-    var df = dfContent.withOptionalColumn(filenameColumn, input_file_name)
-
-    // configure observer to get files processed for incremental execution mode
-    if (filesObservers.nonEmpty && context.phase == ExecutionPhase.Exec) {
-      if (filesObservers.size > 1) logger.warn(s"($id) files observation is not yet well supported when using from multiple actions in parallel")
-      // force creating filenameColumn, and drop the it later again
-      val forcedFilenameColumn = "__filename"
-      if (filenameColumn.isEmpty) df = dfContent.withColumn(forcedFilenameColumn, input_file_name)
-      // initialize observers
-      df = filesObservers.foldLeft(df) {
-        case (df, (actionId,observer)) => observer.on(df, filenameColumn.getOrElse(forcedFilenameColumn))
-      }
-      filesObservers.clear
-      // drop forced filenameColumn
-      if (filenameColumn.isEmpty) df = df.drop(forcedFilenameColumn)
-    }
-
-    // finalize & return DataFrame
-    afterRead(df)
   }
+
+  /**
+   * Prepares the DataFrame with the content when reading.
+   * Uses Spark DataSource V1 interface. V1 interface has limited support for reading partitioned data.
+   * getContentV1 implements an approach to query a DataFrame per partition, adding partition columns and union all DataFrames.
+   */
+  protected def getContentV1(partitionValues: Seq[PartitionValues], schema: Option[StructType], incrementalOutputOptions: Map[String,String])(implicit context: ActionPipelineContext): DataFrame = {
+    implicit val session: SparkSession = context.sparkSession
+    if (partitions.isEmpty) {
+      session.read
+        .format(readFormat)
+        .options(readOptions ++ incrementalOutputOptions)
+        .optionalSchema(schema)
+        .option("path", hadoopPath.toString) // spark-xml is a V1 source and only supports one path, which must be given as option...
+        .load()
+    } else {
+      val schemaWithoutPartitions = schema.map(s => StructType(s.filterNot(f => partitions.contains(f.name))))
+      val reader = session.read
+        .format(readFormat)
+        .options(readOptions ++ incrementalOutputOptions)
+        .optionalSchema(schemaWithoutPartitions)
+      val partitionValuesToRead = if (partitionValues.nonEmpty) partitionValues else listPartitions
+      val pathsToRead = partitionValuesToRead.flatMap(pv => getConcreteFullPaths(pv).map(p => (extractPartitionValuesFromDirPath(p.toString), p)))
+        .filter{case (_,path) => filesystem.globStatus(new Path(path,fileName)).nonEmpty} // filter empty path to avoid NullPointerException in DataFrame
+      val df = if (pathsToRead.nonEmpty) Some(
+        pathsToRead.map { case (pv, path) =>
+          partitions.foldLeft(reader.option("path", path.toString).load()) { // spark-xml is a V1 source and only supports one path, which must be given as option...
+            case (df, partition) => df.withColumn(partition, lit(pv(partition).toString))
+          }
+        }.reduce(_ unionByName _)
+      ) else None
+      df.filter(df => schema.isDefined || partitions.diff(df.columns).isEmpty) // filter DataFrames without partition columns as they are empty (this might happen if there is no schema specified and the partition is empty)
+        .getOrElse {
+          // if there are no paths to read for given partition values, handle no data
+          if (context.isExecPhase) {
+            // skip action in exec phase
+            throw NoDataToProcessWarning(id.id, s"($id) No existing files found for partition values ${partitionValues.mkString(", ")}.")
+          } else {
+            // create empty data frame in init phase
+            require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")
+            DataFrameUtil.getEmptyDataFrame(schema.get)
+          }
+        }
+    }
+  }
+
+  /**
+   * Prepares the DataFrame with the content when reading.
+   * There are some DataSources which dont support reading multiple files, e.g. ExcelFileDataObject.
+   * getContentFilesOneByOne implements an approach to query a DataFrame per file, adding partition columns and union all DataFrames.
+   */
+  protected def getContentFilesOneByOne(partitionValues: Seq[PartitionValues], schema: Option[StructType], incrementalOutputOptions: Map[String,String])(implicit context: ActionPipelineContext): DataFrame = {
+    implicit val session: SparkSession = context.sparkSession
+    // search files to be read
+    val files = if (filesystem.getFileStatus(hadoopPath).isFile) Seq((PartitionValues(Map()),hadoopPath))
+    else  if (partitions.isEmpty) {
+      filesystem.globStatus(new Path(hadoopPath,fileName)).toSeq
+        .filter(_.isFile).map(fs => (PartitionValues(Map()),fs.getPath))
+    } else {
+      partitionValues.flatMap(pv => getConcreteFullPaths(pv, returnFiles = true).map(p => (extractPartitionValuesFromFilePath(p.toString),p)))
+    }
+    // get and union DataFrames per File
+    val schemaWithoutPartitions = schema.map(s => StructType(s.filterNot(f => partitions.contains(f.name))))
+    val reader = session.read
+      .format(readFormat)
+      .options(readOptions ++ incrementalOutputOptions)
+      .optionalSchema(schemaWithoutPartitions)
+    val df = if (files.nonEmpty) Some(
+      files.map { case (pv,p) =>
+        partitions.foldLeft(reader.option("path", p.toString).load()) {
+          case (df, partition) => df.withColumn(partition, lit(pv(partition).toString))
+        }
+      }.reduce(_ unionByName _)
+    ) else None
+    df.getOrElse {
+      // if there are no paths to read for given partition values, handle no data
+      if (context.isExecPhase) {
+        // skip action in exec phase
+        throw NoDataToProcessWarning(id.id, s"($id) No existing files found for partition values ${partitionValues.mkString(", ")}.")
+      } else {
+        // create empty data frame in init phase
+        require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")
+        DataFrameUtil.getEmptyDataFrame(schema.get)
+      }
+    }
+  }
+
+  /**
+   * configure filename observer
+   */
+  protected def configureObservers(dfInput: DataFrame): DataFrame = {
+    var df = dfInput
+    if (filesObservers.size > 1) logger.warn(s"($id) files observation is not yet well supported when using from multiple actions in parallel")
+    // force creating filenameColumn, and drop the it later again
+    val forcedFilenameColumn = "__filename"
+    if (filenameColumn.isEmpty) df = df.withColumn(forcedFilenameColumn, input_file_name)
+    // initialize observers
+    df = filesObservers.foldLeft(df) {
+      case (df, (actionId, observer)) => observer.on(df, filenameColumn.getOrElse(forcedFilenameColumn))
+    }
+    filesObservers.clear
+    // drop forced filenameColumn
+    if (filenameColumn.isEmpty) df = df.drop(forcedFilenameColumn)
+    // return
+    df
+  }
+
 
   /**
    * It seems that Hadoop on Windows returns modified date in local timezone, but according to documentation it should be in UTC.
@@ -274,17 +418,17 @@ trait SparkFileDataObject extends HadoopFileDataObject
   }
 
   // Store files observation object between call to setupFilesObserver until it is used in getSparkDataFrame.
-  @transient private val filesObservers: mutable.Map[ActionId, FilesSparkObservation] = mutable.Map()
+  @transient private val filesObservers: mutable.Map[ActionId, ExecutionPlanSparkFilenameObservation[Row]] = mutable.Map()
 
   /**
    * Setup an observation of files processed through custom metrics.
    * This is used for incremental processing to keep track of files processed.
    * Note that filenameColumn needs to be configured for the DataObject in order for this to work.
    */
-  def setupFilesObserver(actionId: ActionId): FilesSparkObservation = {
+  def setupFilesObserver(actionId: ActionId): SparkFilenameObservation[Row] = {
     logger.debug(s"($id) setting up files observer for $actionId")
     // return existing observation for this action if existing, otherwise create a new one.
-    filesObservers.getOrElseUpdate(actionId, new FilesSparkObservation(actionId.id + "/" + id.id))
+    filesObservers.getOrElseUpdate(actionId, new ExecutionPlanSparkFilenameObservation(actionId.id + "/" + id.id))
   }
 
   override def getStreamingDataFrame(options: Map[String, String], pipelineSchema: Option[StructType])(implicit context: ActionPipelineContext): DataFrame = {
@@ -295,8 +439,8 @@ trait SparkFileDataObject extends HadoopFileDataObject
 
     val schemaOpt = getSchema.map(_.inner).orElse(pipelineSchema).get
     val df = session.readStream
-      .format(format)
-      .options(options ++ this.options)
+      .format(readFormat)
+      .options(readOptions ++ this.options)
       .schema(schemaOpt)
       .load(hadoopPath.toString)
 
@@ -315,7 +459,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
     validateSchemaMin(SparkSchema(df.schema), "write")
     schema.foreach(schemaExpected => validateSchema(SparkSchema(df.schema), schemaExpected, "write"))
     // update current schema storage - this is to avoid schema inference and remember the schema if there is no data.
-    createSchemaFile(df)
+    if (!schema.isDefined) createSchemaFile(df)
   }
 
   private def createSchemaFile(df: DataFrame)(implicit context: ActionPipelineContext): Unit = {
@@ -422,47 +566,83 @@ trait SparkFileDataObject extends HadoopFileDataObject
     CompactionUtil.compactHadoopStandardPartitions(this, partitionValues)
   }
 
+  /**
+   * Check if this DataObject implements reading data using a Spark V2 DataSource.
+   */
+  def isV2ReadDataSource(implicit context: ActionPipelineContext): Boolean = {
+    DataSource.lookupDataSourceV2(readFormat, context.sparkSession.sessionState.conf).isDefined
+  }
+
 }
 
-object SparkFileDataObject {
+object SparkFileDataObject extends SmartDataLakeLogger {
   /**
    * This method is searching for files processed by a given DataFrame by looking at its execution plan.
    */
   private[smartdatalake] def getFilesProcessedFromSparkPlan(id: String, df: Dataset[_]): Seq[String] = {
-    df.queryExecution.executedPlan.collectFirst { case x: FileSourceScanExec => x }
-      .getOrElse(throw new IllegalStateException(s"($id) No FileSourceScanExec found in execution plan to check if there is data to process"))
-      .inputRDD.asInstanceOf[FileScanRDD].filePartitions.flatMap(_.files).map(_.filePath)
+    val fileSources = df.queryExecution.executedPlan.collect { case x: FileSourceScanExec => x }
+    if (fileSources.isEmpty) throw new IllegalStateException(s"($id) No FileSourceScanExec found in execution plan to check if there is data to process")
+    fileSources.flatMap(_.inputRDD.asInstanceOf[FileScanRDD].filePartitions.flatMap(_.files).map(_.filePath))
+  }
+  private[smartdatalake] def tryGetFilesProcessedFromSparkPlan(id: String, df: Dataset[_]): Option[Seq[String]] = try {
+    Some(getFilesProcessedFromSparkPlan(id, df))
+  } catch {
+    case x: IllegalStateException =>
+      logger.warn(x.getMessage)
+      None
   }
 }
 
 /**
- * Observation of files processed using custom metrics.
+ * An interface to implement observing filenames processed.
  */
-private[smartdatalake] class FilesSparkObservation(name: String) extends SparkObservation(name) with SmartDataLakeLogger {
-
-  var filesInExecutionPlan: Option[Seq[String]] = None
+private[smartdatalake] abstract class SparkFilenameObservation[T](name: String) extends SparkObservation(name) with SmartDataLakeLogger {
 
   /**
    * Setup observation of custom metric on Dataset.
    */
-  def on[T](ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
-    logger.debug(s"($name) add files observation to Dataset")
-    // Note: There is a Spark problem (NullPointerException with TypedImperativeAggregate (like CollectSetDeterministic) in observe if there is no data, but sometimes also occurs otherwise on prod...
-    // see also https://issues.apache.org/jira/browse/SPARK-39044
-    //on(ds, collect_set_deterministic(col(filenameColumnName)).as("filesProcessed"))
-
-    // Workaround - get files processed from DataFrames execution plan. Note that this might be incorrect if there are additional filters applied.
-    filesInExecutionPlan = Some(SparkFileDataObject.getFilesProcessedFromSparkPlan(name, ds))
-    ds
-  }
+  def on[T](ds: Dataset[T], filenameColumnName: String): Dataset[T]
 
   /**
    * Get processed files observation result.
    * Note that this blocks until the query finished successfully. Call only after Spark action was started on observed Dataset.
    */
+  def getFilesProcessed: Seq[String]
+}
+
+
+/**
+ * Get files processed by using Spark observer on filename column
+ * Note: There is a Spark problem - NullPointerException with TypedImperativeAggregate (like CollectSetDeterministic) in observe if there is no data, but sometimes also occurs otherwise on prod...
+ * see also https://issues.apache.org/jira/browse/SPARK-39044
+ */
+private[smartdatalake] class ObserverSparkFilenameObservation[T](name: String) extends SparkFilenameObservation[T](name) {
+  def on[T](ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
+    logger.debug(s"($name) add files observation to Dataset")
+    on(ds, true, collect_set_deterministic(col(filenameColumnName)).as("filesProcessed"))
+  }
+
   def getFilesProcessed: Seq[String] = {
-    //val files = waitFor().getOrElse("filesProcessed", throw new IllegalStateException(s"($name) Did not receive filesProcessed observation!"))
-    //  .asInstanceOf[Seq[String]]
+    waitFor().getOrElse("filesProcessed", throw new IllegalStateException(s"($name) Did not receive filesProcessed observation!"))
+      .asInstanceOf[Seq[String]]
+  }
+}
+
+/**
+ * Workaround for bug in ObserverSparkFilenameObservation - get files processed from DataFrames execution plan.
+ * Note that this might be incorrect if there are additional filters applied.
+ */
+private[smartdatalake] class ExecutionPlanSparkFilenameObservation[T](name: String) extends SparkFilenameObservation[T](name) {
+
+  private var filesInExecutionPlan: Option[Seq[String]] = None
+
+  def on[T](ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
+    logger.debug(s"($name) add files observation to Dataset")
+    filesInExecutionPlan = Some(SparkFileDataObject.getFilesProcessedFromSparkPlan(name, ds))
+    ds
+  }
+
+  override def getFilesProcessed: Seq[String] = {
     val files = filesInExecutionPlan.getOrElse(throw new IllegalStateException(s"($name) filesInExecutionPlan is empty!"))
     if (logger.isDebugEnabled()) logger.debug(s"($name) files processed: ${files.mkString(", ")}")
     files

@@ -26,6 +26,7 @@ private[smartdatalake] trait FileDataObject extends DataObject with CanHandlePar
 
   /**
    * The root path of the files that are handled by this DataObject.
+   * For most DataObjects this can be a directory or a specific file.
    */
   protected def path: String
 

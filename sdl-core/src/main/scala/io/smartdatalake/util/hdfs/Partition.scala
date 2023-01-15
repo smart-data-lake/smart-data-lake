@@ -56,6 +56,16 @@ case class PartitionValues(elements: Map[String, Any]) {
   def filterKeys(colNames: Seq[String]): PartitionValues = this.copy(elements = elements.filterKeys(colNames.contains))
   def addKey(key: String, value: Any): PartitionValues = if(!elements.contains(key)) this.copy(elements = elements + (key -> value)) else this
   def getMapString: Map[String,String] = elements.mapValues(_.toString)
+
+  /**
+   * Returns true if all given partitions are defined in this partition values instance
+   */
+  def isComplete(partitions: Seq[String]) = this.keys == partitions.toSet
+
+  /**
+   * Returns true if partition values defined by this instance are a valid "init" of given partitions
+   */
+  def isInitOf(partitions: Seq[String]) = partitions.inits.map(_.toSet).contains(this.keys)
 }
 
 object PartitionValues {
@@ -180,18 +190,19 @@ private[smartdatalake] object PartitionLayout {
       .map( m => m.group(1)).toSeq
   }
 
-  def extractPartitionValues(partitionLayout: String, fileName: String, path: String): PartitionValues = {
-    val tokens = extractTokens( partitionLayout )
+  def extractPartitionValues(partitionLayout: String, path: String): PartitionValues = {
+    val tokens = extractTokens(partitionLayout)
+    var partitionLayoutPattern = partitionLayout
     // quote regexp characters in partition layout
-    var partitionLayoutPrepared = raw"[\.\[\]]".r.replaceAllIn( partitionLayout + fileName, quoteMatch => raw"\\" + quoteMatch.group(0))
+    partitionLayoutPattern = raw"[\.\[\]]".r.replaceAllIn(partitionLayoutPattern, quoteMatch => raw"\\" + quoteMatch.group(0))
     // replace * to regexp .*
-    partitionLayoutPrepared = partitionLayoutPrepared.replace("*", ".*")
+    partitionLayoutPattern = partitionLayoutPattern.replace("*", ".*")
     // replace tokens in partition layout with a defined or default regexp
-    partitionLayoutPrepared = tokenRegex.replaceAllIn( partitionLayoutPrepared, {
+    partitionLayoutPattern = tokenRegex.replaceAllIn( partitionLayoutPattern, {
       tokenMatch => if (tokenMatch.group(3) != null) s"(${tokenMatch.group(3)})" else "(.*?)"
     })
     // create regex and match with path.
-    val partitionLayoutRegex = ("^" + partitionLayoutPrepared).r // add anchor at start of string.
+    val partitionLayoutRegex = s"^$partitionLayoutPattern$$".r
     partitionLayoutRegex.findFirstMatchIn(path) match {
       case Some(regexMatch) =>
         val tokenValues = (1 to regexMatch.groupCount).map( i => regexMatch.group(i))

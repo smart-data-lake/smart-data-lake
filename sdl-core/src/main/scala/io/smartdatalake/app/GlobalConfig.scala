@@ -58,6 +58,7 @@ import org.apache.spark.util.PrivateAccessor
  * @param synchronousStreamingTriggerIntervalSec Trigger interval for synchronous actions in streaming mode in seconds (default = 60 seconds)
  *                       The synchronous actions of the DAG will be executed with this interval if possile.
  *                       Note that for asynchronous actions there are separate settings, e.g. SparkStreamingMode.triggerInterval.
+ * @param environment    Override environment settings defined in Environment object by setting the corresponding key to the desired value (key in camelcase notation with the first letter in lowercase)
  */
 case class GlobalConfig(kryoClasses: Option[Seq[String]] = None
                         , sparkOptions: Option[Map[String, String]] = None
@@ -71,6 +72,7 @@ case class GlobalConfig(kryoClasses: Option[Seq[String]] = None
                         , secretProviders: Option[Map[String, SecretProviderConfig]] = None
                         , allowOverwriteAllPartitionsWithoutPartitionValues: Seq[DataObjectId] = Seq()
                         , synchronousStreamingTriggerIntervalSec: Int = 60
+                        , environment: Map[String, String] = Map()
                        )
 extends SmartDataLakeLogger {
 

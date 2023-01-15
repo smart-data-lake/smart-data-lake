@@ -21,8 +21,9 @@ package io.smartdatalake.workflow.action
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{Condition, ExecutionMode, SaveModeOptions}
+import io.smartdatalake.definitions.{Condition, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfTransformerDef}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataobject._
@@ -76,6 +77,11 @@ case class CopyAction(override val id: ActionId,
   override val transformerSubFeedSupportedTypes: Seq[Type] = transformerDefs.map(_.getSubFeedSupportedType)
 
   validateConfig()
+
+  override def prepare(implicit context: ActionPipelineContext): Unit = {
+    super.prepare
+    transformerDefs.foreach(_.prepare(id))
+  }
 
   override def transform(inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     applyTransformers(transformerDefs, inputSubFeed, outputSubFeed)
