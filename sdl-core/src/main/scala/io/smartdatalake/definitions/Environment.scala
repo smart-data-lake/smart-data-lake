@@ -390,6 +390,22 @@ object Environment {
   }
   var _compileScalaCodeLazy: Option[Boolean] = None
 
+  /**
+   * If true simulation runs fail when input subfeeds are missing.
+   * If false it will get a DataFrame from the input DataObject as a normal run would do.
+   * Default is to fail if an input subfeed is not defined.
+   */
+  def failSimulationOnMissingInputSubFeeds: Boolean = {
+    if (_failSimulationOnMissingInputSubFeeds.isEmpty) {
+      _failSimulationOnMissingInputSubFeeds = Some(
+        EnvironmentUtil.getSdlParameter("failSimulationOnMissingInputSubFeeds")
+          .map(_.toBoolean).getOrElse(true)
+      )
+    }
+    _failSimulationOnMissingInputSubFeeds.get
+  }
+  var _failSimulationOnMissingInputSubFeeds: Option[Boolean] = None
+
   // static configurations
   def configPathsForLocalSubstitution: Seq[String] = Seq(
       "path", "table.name"

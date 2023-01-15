@@ -288,32 +288,37 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
   /**
    * Start a simulation run.
-   * This executes the DAG and returns all subfeeds including the transformed DataFrames.
-   * Only prepare and init are executed.
-   * All initial subfeeds must be provided as input.
+   * This executes the DAG and returns all SubFeeds including the transformed DataFrames.
+   * Only prepare and init phase are executed.
+   * Actions and DataObjects needed have to be provided through implicit instanceRegistry parameter.
+   * The Actions to execute are selected by appConfig.feedSel attribute.
    *
-   * Note: this only works with SparkActions for now
+   * Note: this only works with DataFrameActions of the same SubFeed type, e.g. SparkSubFeed.
+   *
    * @param appConfig application configuration
    * @param initialSubFeeds initial subfeeds for DataObjects at the beginning of the DAG
    * @param dataObjectsState state for incremental DataObjects
+   * @param failOnMissingInputSubFeeds if true (default) all initial SubFeeds have to be provided in parameter `initialSubFeeds`. See also [[Environment.failSimulationOnMissingInputSubFeeds]].
    * @return tuple of list of final subfeeds and statistics (action count per RuntimeEventState)
    */
-  def startSimulation(appConfig: SmartDataLakeBuilderConfig, initialSubFeeds: Seq[SparkSubFeed], dataObjectsState: Seq[DataObjectState] = Seq())(implicit instanceRegistry: InstanceRegistry, session: SparkSession): (Seq[SparkSubFeed], Map[RuntimeEventState,Int]) = {
+  def startSimulation(appConfig: SmartDataLakeBuilderConfig, initialSubFeeds: Seq[SparkSubFeed], dataObjectsState: Seq[DataObjectState] = Seq(), failOnMissingInputSubFeeds: Boolean = true)(implicit instanceRegistry: InstanceRegistry, session: SparkSession): (Seq[DataFrameSubFeed], Map[RuntimeEventState,Int]) = {
+    Environment._failSimulationOnMissingInputSubFeeds = Some(failOnMissingInputSubFeeds)
     implicit val hadoopConf: Configuration = session.sparkContext.hadoopConfiguration
     val (subFeeds, stats) = exec(appConfig, SDLExecutionId.executionId1, runStartTime = LocalDateTime.now, attemptStartTime = LocalDateTime.now, actionsToSkip = Map(), initialSubFeeds = initialSubFeeds, dataObjectsState = dataObjectsState, stateStore = None, stateListeners = Seq(), simulation = true, globalConfig = GlobalConfig())
     (subFeeds.map(_.asInstanceOf[SparkSubFeed]), stats)
   }
 
   /**
-   * Starts a simulation run and registers all SDL first class objects that are defined in the config file which path is defined in parameter appConfig
+   * Similar to [[startSimulation]], but Actions and DataObjects are parsed from config files defined through appConfig.configuration attribute.
    */
-  def startSimulationWithConfigFile(appConfig: SmartDataLakeBuilderConfig, initialSubFeeds: Seq[SparkSubFeed], dataObjectsState: Seq[DataObjectState] = Seq())(session: SparkSession): (Seq[SparkSubFeed], Map[RuntimeEventState,Int]) = {
+  def startSimulationWithConfigFile(appConfig: SmartDataLakeBuilderConfig, initialSubFeeds: Seq[SparkSubFeed], dataObjectsState: Seq[DataObjectState] = Seq(), failOnMissingInputSubFeeds: Boolean = true)(session: SparkSession): (Seq[DataFrameSubFeed], Map[RuntimeEventState,Int]) = {
+    Environment._failSimulationOnMissingInputSubFeeds = Some(failOnMissingInputSubFeeds)
     val config = ConfigLoader.loadConfigFromFilesystem(appConfig.configuration.get, session.sparkContext.hadoopConfiguration)
     ConfigParser.parse(config, this.instanceRegistry)
-    startSimulation(appConfig, initialSubFeeds, dataObjectsState)(this.instanceRegistry, session)
+    startSimulation(appConfig, initialSubFeeds, dataObjectsState, failOnMissingInputSubFeeds)(this.instanceRegistry, session)
   }
 
-    /**
+  /**
    * Start run.
    * @return tuple of list of final subfeeds and statistics (action count per RuntimeEventState)
    */
@@ -388,7 +393,12 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     val actionDAGRun = ActionDAGRun(actionsToExec, actionsToSkip, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(context)
     val finalSubFeeds = try {
       if (simulation) {
-        require(actionsToExec.forall(_.isInstanceOf[DataFrameActionImpl]), s"Simulation needs all selected actions to be instances of DataFrameActionImpl. This is not the case for ${actionsToExec.filterNot(_.isInstanceOf[DataFrameActionImpl]).map(_.id).mkString(", ")}")
+        // check action type
+        val (dataFrameActions, otherActions) = actionsToExec.partition(_.isInstanceOf[DataFrameActionImpl])
+        require(otherActions.isEmpty, s"Simulation needs all selected actions to be instances of DataFrameActionImpl. This is not the case for ${otherActions.map(_.id).mkString(", ")}")
+        // check subFeedType
+        val actionBySubFeedType = dataFrameActions.map(_.asInstanceOf[DataFrameActionImpl]).groupBy(_.subFeedType)
+        require(actionBySubFeedType.size == 1, s"Simulation needs all selected actions to be instances of DataFrameActionImpl of the same subFeedType, e.g. SparkSubFeed. There are ${actionBySubFeedType.map{case (subFeedType, actions) => s"${actions.size} of ${actions.head.subFeedType.typeSymbol.name} (${actions.map(_.id).mkString(",")})"}.mkString(" and ")}")
         actionDAGRun.init(context)
       } else {
         actionDAGRun.prepare(context)
