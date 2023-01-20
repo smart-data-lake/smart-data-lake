@@ -29,7 +29,7 @@ import scala.collection.mutable
  * Registers instantiated SDL first class objects ([[io.smartdatalake.workflow.action.Action]]s,
  * [[io.smartdatalake.workflow.dataobject.DataObject]]s, etc.) and enables to retrieve instantiated instances.
  */
-private[smartdatalake] class InstanceRegistry {
+class InstanceRegistry {
 
   private[config] val instances: mutable.Map[ConfigObjectId, SdlConfigObject] = mutable.Map.empty
 

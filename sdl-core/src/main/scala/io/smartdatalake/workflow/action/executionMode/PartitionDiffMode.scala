@@ -68,12 +68,12 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
                              , applyPartitionValuesTransform: Boolean = false
                              , selectAdditionalInputExpression: Option[String] = None
                             ) extends ExecutionMode with ExecutionModeWithMainInputOutput {
-  private[smartdatalake] override val applyConditionsDef = applyCondition.toSeq.map(Condition(_))
-  private[smartdatalake] override val failConditionsDef = failCondition.toSeq.map(Condition(_)) ++ failConditions
+  override val applyConditionsDef = applyCondition.toSeq.map(Condition(_))
+  override val failConditionsDef = failCondition.toSeq.map(Condition(_)) ++ failConditions
 
-  private[smartdatalake] override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
+  override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
 
-  private[smartdatalake] override def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = {
+  override def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = {
     super.prepare(actionId)
     // validate fail condition
     failConditionsDef.foreach(_.syntaxCheck[PartitionDiffModeExpressionData](actionId, Some("failCondition")))
@@ -85,7 +85,7 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
     alternativeOutput
   }
 
-  private[smartdatalake] override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
+  override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
                                             , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])
                                            (implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
     val doApply = evaluateApplyConditions(actionId, subFeed)
@@ -188,7 +188,7 @@ case class PartitionDiffModeExpressionData(feed: String, application: String, ru
                                            , selectedInputPartitionValues: Seq[Map[String,String]], selectedOutputPartitionValues: Seq[Map[String,String]]) {
   override def toString: String = ProductUtil.formatObj(this)
 }
-private[smartdatalake] object PartitionDiffModeExpressionData {
+object PartitionDiffModeExpressionData {
   def from(context: ActionPipelineContext): PartitionDiffModeExpressionData = {
     PartitionDiffModeExpressionData(context.feed, context.application, context.executionId.runId, context.executionId.attemptId, context.referenceTimestamp.map(Timestamp.valueOf)
       , Timestamp.valueOf(context.runStartTime), Timestamp.valueOf(context.attemptStartTime), Seq(), Seq(), Seq(), Seq(), Seq())

@@ -22,7 +22,7 @@ import io.smartdatalake.workflow.ActionPipelineContext
 
 import java.io.InputStream
 
-private[smartdatalake] trait CanCreateInputStream {
+trait CanCreateInputStream {
 
   def createInputStream(path: String)(implicit context: ActionPipelineContext): InputStream
 

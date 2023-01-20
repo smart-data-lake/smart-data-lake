@@ -38,11 +38,11 @@ import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
  */
 case class CustomMode(className: String, override val alternativeOutputId: Option[DataObjectId] = None, options: Option[Map[String, String]] = None)
   extends ExecutionMode with ExecutionModeWithMainInputOutput {
-  private[smartdatalake] override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
+  override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
 
   private val impl = CustomCodeUtil.getClassInstanceByName[CustomModeLogic](className)
 
-  private[smartdatalake] override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
+  override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
                                             , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])
                                            (implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
     val output = alternativeOutput.getOrElse(mainOutput)

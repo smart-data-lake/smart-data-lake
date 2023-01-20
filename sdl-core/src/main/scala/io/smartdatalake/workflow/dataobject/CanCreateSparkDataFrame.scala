@@ -26,7 +26,7 @@ import org.apache.spark.sql.{DataFrame, DataFrameReader, DataFrameWriter}
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 
-private[smartdatalake] trait CanCreateSparkDataFrame extends CanCreateDataFrame { this: DataObject =>
+trait CanCreateSparkDataFrame extends CanCreateDataFrame { this: DataObject =>
 
   /**
    * Configured options for the Spark [[DataFrameReader]]/[[DataFrameWriter]].
