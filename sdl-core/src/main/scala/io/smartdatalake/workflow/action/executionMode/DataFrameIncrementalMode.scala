@@ -43,17 +43,17 @@ case class DataFrameIncrementalMode(compareCol: String
                                     , override val alternativeOutputId: Option[DataObjectId] = None
                                     , applyCondition: Option[Condition] = None
                                    ) extends ExecutionMode with ExecutionModeWithMainInputOutput {
-  private[smartdatalake] override val applyConditionsDef = applyCondition.toSeq
+  override val applyConditionsDef = applyCondition.toSeq
 
-  private[smartdatalake] override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
+  override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
 
-  private[smartdatalake] override def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = {
+  override def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = {
     super.prepare(actionId)
     // check alternativeOutput exists
     alternativeOutput
   }
 
-  private[smartdatalake] override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
+  override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
                                             , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])
                                            (implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
     assert(subFeed.isInstanceOf[DataFrameSubFeed], s"($actionId) DataFrameIncrementalMode needs DataFrameSubFeed to operate but received ${subFeed.getClass.getSimpleName}")
