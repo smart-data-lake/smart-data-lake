@@ -294,9 +294,9 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
     WriteSubFeedResult(outputSubFeed, noData)
     // get expectations metrics and check violations
     output match {
-      case evDataObject: DataObject with ExpectationValidation =>
+      case evDataObject: DataObject with ExpectationValidation with CanCreateDataFrame =>
         val scopeJobExpectationMetrics = subFeed.observation.map(_.waitFor()).getOrElse(Map())
-        val metrics = evDataObject.validateExpectations(subFeed.dataFrame.get, subFeed.partitionValues, scopeJobExpectationMetrics)
+        val metrics = evDataObject.validateExpectations(subFeed.dataFrame.get, evDataObject.getDataFrame(Seq(),subFeed.tpe), subFeed.partitionValues, scopeJobExpectationMetrics)
         WriteSubFeedResult(outputSubFeed, noData, Some(metrics))
       case _ =>
         WriteSubFeedResult(outputSubFeed, noData)
