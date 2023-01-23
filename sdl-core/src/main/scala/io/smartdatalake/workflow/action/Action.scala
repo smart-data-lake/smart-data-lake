@@ -290,7 +290,11 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * Handle class cast exception when getting objects from instance registry
    */
   private def getDataObject[T <: DataObject](dataObjectId: DataObjectId, role: String)(implicit registry: InstanceRegistry, ct: ClassTag[T], tt: TypeTag[T]): T = {
-    val dataObject = registry.get[T](dataObjectId)
+    val dataObject = try {
+      registry.get[T](dataObjectId)
+    } catch {
+      case _: NoSuchElementException => throw new NoSuchElementException(s"key not found in instance registry for $role: $dataObjectId")
+    }
     try {
       // force class cast on generic type (otherwise the ClassCastException is thrown later)
       ct.runtimeClass.cast(dataObject).asInstanceOf[T]
