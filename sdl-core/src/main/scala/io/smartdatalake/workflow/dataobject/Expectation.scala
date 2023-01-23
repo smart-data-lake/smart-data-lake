@@ -133,6 +133,7 @@ abstract class ExpectationDefaultImpl extends Expectation {
     import org.apache.spark.sql.functions._
     expectation.map { expectationStr =>
       val valueStr = value match {
+        case null => "null"
         case str: String => s"'$str'"
         case x => x.toString
       }
