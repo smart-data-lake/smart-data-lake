@@ -60,7 +60,7 @@ case class SQLDfTransformer(override val name: String = "sqlTransform", override
     val inputName = options.getOrElse(PREVIOUS_TRANSFORMER_NAME, dataObjectId.id)
     val inputViewName = ActionHelper.createTemporaryViewName(inputName)
     val inputViewNameOptions = Map(INPUT_VIEW_NAME -> inputViewName, s"${INPUT_VIEW_NAME}_$inputName" -> inputViewName)
-    var preparedSql = SparkExpressionUtil.substituteOptions(actionId, Some(s"transformers.$name.sqlCode"), code, options ++ inputViewNameOptions)
+    var preparedSql = SparkExpressionUtil.substituteOptions(actionId, Some(s"transformers.$name.code"), code, options ++ inputViewNameOptions)
     try {
       df.createOrReplaceTempView(s"$inputViewName")
       // for backward compatibility the temp view name from versions <= 2.2.x is replaced with the new temp view name including a postfix.
