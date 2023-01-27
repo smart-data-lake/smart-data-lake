@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import io.confluent.kafka.serializers.{KafkaJsonDeserializer, KafkaJsonDeserializerConfig, KafkaJsonSerializer}
 import io.github.embeddedkafka.schemaregistry.{EmbeddedKafka => EmbeddedKafkaWithSchemaRegistry}
+import io.smartdatalake.testutil.KafkaTestUtil
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.connection.KafkaConnection
