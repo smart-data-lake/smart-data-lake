@@ -18,8 +18,11 @@
  */
 package io.smartdatalake.app
 
+import io.smartdatalake.app.LocalAzureRelayAgentSmartDataLakeBuilder.agentParser
 import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.EnvironmentUtil
+import scopt.OParser
 
 import java.io.File
 
@@ -29,25 +32,32 @@ import java.io.File
  * Sets master to local[*] and deployMode to client by default.
  */
 object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
+  val localParser: OParser[_, SmartDataLakeBuilderConfig] = {
+    val builder = OParser.builder[SmartDataLakeBuilderConfig]
+    import builder._
+    OParser.sequence(
+      parser,
+      // optional master and deploy-mode settings to override defaults local[*] / client. Note that using something different than master=local is experimental.
+      opt[String]('m', "master")
+        .action((arg, config) => config.copy(master = Some(arg)))
+        .text("The Spark master URL passed to SparkContext (default=local[*], yarn, spark://HOST:PORT, mesos://HOST:PORT, k8s://HOST:PORT)."),
+      opt[String]('x', "deploy-mode")
+      .action((arg, config) => config.copy(deployMode = Some(arg)))
+      .text("The Spark deploy mode passed to SparkContext (default=client, cluster)."),
+    // optional kerberos authentication parameters for local mode
+    opt[String]('d', "kerberos-domain")
+      .action((arg, config) => config.copy(kerberosDomain = Some(arg)))
+      .text("Kerberos-Domain for authentication (USERNAME@KERBEROS-DOMAIN) in local mode."),
+    opt[String]('u', "username")
+      .action((arg, config) => config.copy(username = Some(arg)))
+      .text("Kerberos username for authentication (USERNAME@KERBEROS-DOMAIN) in local mode."),
+    opt[File]('k', "keytab-path")
+      .action((arg, config) => config.copy(keytabPath = Some(arg)))
+      .text("Path to the Kerberos keytab file for authentication in local mode.")
+    )
+  }
 
-  // optional master and deploy-mode settings to override defaults local[*] / client. Note that using something different than master=local is experimental.
-  parser.opt[String]('m', "master")
-    .action( (arg, config) => config.copy(master = Some(arg)))
-    .text("The Spark master URL passed to SparkContext (default=local[*], yarn, spark://HOST:PORT, mesos://HOST:PORT, k8s://HOST:PORT).")
-  parser.opt[String]('x', "deploy-mode")
-    .action( (arg, config) => config.copy(deployMode = Some(arg)))
-    .text("The Spark deploy mode passed to SparkContext (default=client, cluster).")
 
-  // optional kerberos authentication parameters for local mode
-  parser.opt[String]('d', "kerberos-domain")
-    .action((arg, config) => config.copy(kerberosDomain = Some(arg)))
-    .text("Kerberos-Domain for authentication (USERNAME@KERBEROS-DOMAIN) in local mode.")
-  parser.opt[String]('u', "username")
-    .action((arg, config) => config.copy(username = Some(arg)))
-    .text("Kerberos username for authentication (USERNAME@KERBEROS-DOMAIN) in local mode.")
-  parser.opt[File]('k', "keytab-path")
-    .action((arg, config) => config.copy(keytabPath = Some(arg)))
-    .text("Path to the Kerberos keytab file for authentication in local mode.")
 
   /**
    * Entry-Point of the application.
@@ -70,7 +80,7 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
     )
 
     // Parse all command line arguments
-    parseCommandLineArguments(args, config) match {
+    OParser.parse(localParser, args, config) match {
       case Some(config) =>
 
         // checking environment variables for local mode

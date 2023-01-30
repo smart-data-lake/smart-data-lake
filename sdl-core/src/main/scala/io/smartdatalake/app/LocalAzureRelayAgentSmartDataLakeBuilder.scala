@@ -20,26 +20,80 @@ package io.smartdatalake.app
 
 import io.smartdatalake.communication.agent.{AgentServerController, AzureRelayAgentServer, AzureRelayAgentServerConfig, JettyAgentServer, JettyAgentServerConfig}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
-import scopt.OptionParser
+import io.smartdatalake.util.hdfs.PartitionValues
+import scopt.{OParser, OptionParser}
+
+import java.io.File
 
 /**
  * Smart Data Lake Builder application for agent mode.
  *
  * Sets master to local[*] and deployMode to client by default.
  */
+
+case class LocalAzureRelayAgentSmartDataLakeBuilderConfig(override val feedSel: String = null,
+                                                          override val applicationName: Option[String] = None,
+                                                          override val configuration: Option[Seq[String]] = None,
+                                                          override val master: Option[String] = None,
+                                                          override val deployMode: Option[String] = None,
+                                                          override val username: Option[String] = None,
+                                                          override val kerberosDomain: Option[String] = None,
+                                                          override val keytabPath: Option[File] = None,
+                                                          override val partitionValues: Option[Seq[PartitionValues]] = None,
+                                                          override val multiPartitionValues: Option[Seq[PartitionValues]] = None,
+                                                          override val parallelism: Int = 1,
+                                                          override val statePath: Option[String] = None,
+                                                          override val overrideJars: Option[Seq[String]] = None,
+                                                          override val test: Option[TestMode.Value] = None,
+                                                          override val streaming: Boolean = false,
+                                                          azureRelayURL: Option[String] = None)
+  extends SmartDataLakeBuilderConfigTrait[LocalAzureRelayAgentSmartDataLakeBuilderConfig] {
+  override def withfeedSel(value: String): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(feedSel = value)
+
+  override def withapplicationName(value: Option[String]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(applicationName = value)
+
+  override def withconfiguration(value: Option[Seq[String]]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(configuration = value)
+
+  override def withmaster(value: Option[String]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(master = value)
+
+  override def withdeployMode(value: Option[String]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(deployMode = value)
+
+  override def withusername(value: Option[String]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(username = value)
+
+  override def withkerberosDomain(value: Option[String]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(kerberosDomain = value)
+
+  override def withkeytabPath(value: Option[File]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(keytabPath = value)
+
+  override def withpartitionValues(value: Option[Seq[PartitionValues]]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(partitionValues = value)
+
+  override def withmultiPartitionValues(value: Option[Seq[PartitionValues]]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(multiPartitionValues = value)
+
+  override def withparallelism(value: Int): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(parallelism = value)
+
+  override def withstatePath(value: Option[String]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(statePath = value)
+
+  override def withoverrideJars(value: Option[Seq[String]]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(overrideJars = value)
+
+  override def withtest(value: Option[TestMode.Value]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(test = value)
+
+  override def withstreaming(value: Boolean): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(streaming = value)
+}
+
 object LocalAzureRelayAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
-  val agentParser: OptionParser[AzureRelayAgentServerConfig] = new OptionParser[AzureRelayAgentServerConfig](appType) {
-    override def showUsageOnError: Option[Boolean] = Some(true)
-
-    head(appType, s"$appVersion")
-
-    parser.opt[String]('u', "url")
-      .action((arg, config) => config.copy(azureRelayURL = Some(arg)))
-      .text(s"Uri of the Azure Relay Hybrid Connection that this Server should connect to")
+  val agentParser: OParser[_, LocalAzureRelayAgentSmartDataLakeBuilderConfig] = {
+    val builder = OParser.builder[LocalAzureRelayAgentSmartDataLakeBuilderConfig]
+    import builder._
+    OParser.sequence(
+      parserGeneric(feedSelRequired = false),
+      opt[String]('u', "url")
+        .required
+        .action((arg, config) => config.copy(azureRelayURL = Some(arg)))
+        .text(s"Url of the Azure Relay Hybrid Connection that this Server should connect to")
+    )
   }
 
-   /**
+  /**
    * Entry-Point of the application.
    *
    * @param args Command-line arguments.
@@ -47,17 +101,7 @@ object LocalAzureRelayAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
   def main(args: Array[String]): Unit = {
     logger.info(s"Starting Program $appType v$appVersion")
 
-    // Set defaults from environment variables
-    val envconfig = initConfigFromEnvironment.copy(
-      master = sys.env.get("SDL_SPARK_MASTER_URL").orElse(Some("local[*]")),
-      deployMode = sys.env.get("SDL_SPARK_DEPLOY_MODE").orElse(Some("client")),
-      configuration = sys.env.get("SDL_CONFIGURATION").map(_.split(',')),
-      parallelism = sys.env.get("SDL_PARALELLISM").map(_.toInt).getOrElse(1),
-      statePath = sys.env.get("SDL_STATE_PATH"),
-      applicationName = Some("agent")
-    )
-
-    agentParser.parse(args, AzureRelayAgentServerConfig(sdlConfig = envconfig)) match {
+    OParser.parse(agentParser, args, LocalAzureRelayAgentSmartDataLakeBuilderConfig()) match {
       case Some(agentServerConfig) =>
         val agentController: AgentServerController = AgentServerController(new InstanceRegistry, this)
         AzureRelayAgentServer.start(agentServerConfig, agentController)

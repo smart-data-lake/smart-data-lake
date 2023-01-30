@@ -84,11 +84,9 @@ class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter {
     srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
 
-    val agentConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = None)
-
     val remoteSDLB = new DefaultSmartDataLakeBuilder()
     val agentController: AgentServerController = AgentServerController(remoteSDLB.instanceRegistry, remoteSDLB)
-    JettyAgentServer.start(JettyAgentServerConfig(sdlConfig = agentConfig), agentController)
+    JettyAgentServer.start(LocalJettyAgentSmartDataLakeBuilderConfig(feedSel = feedName, configuration = None), agentController)
 
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
       getClass.getResource("/configAgents/application-jettyagent.conf").getPath))

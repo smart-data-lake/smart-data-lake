@@ -19,11 +19,13 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.app.LocalSmartDataLakeBuilder.{appType, logAndThrowException}
-import io.smartdatalake.communication.agent.{JettyAgentServer, JettyAgentServerConfig, AgentServerController}
+import io.smartdatalake.communication.agent.JettyAgentServerConfig.{DefaultPort, MaxPortRetries}
+import io.smartdatalake.communication.agent.{AgentServerController, JettyAgentServer, JettyAgentServerConfig}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.SDLExecutionId
 import org.apache.hadoop.conf.Configuration
-import scopt.OptionParser
+import scopt.{OParser, OptionParser}
 
 import java.io.File
 import java.time.LocalDateTime
@@ -33,16 +35,68 @@ import java.time.LocalDateTime
  *
  * Sets master to local[*] and deployMode to client by default.
  */
+
+case class LocalJettyAgentSmartDataLakeBuilderConfig(override val  feedSel: String = null,
+                                                     override val  applicationName: Option[String] = None,
+                                                     override val  configuration: Option[Seq[String]] = None,
+                                                     override val  master: Option[String] = None,
+                                                     override val  deployMode: Option[String] = None,
+                                                     override val  username: Option[String] = None,
+                                                     override val  kerberosDomain: Option[String] = None,
+                                                     override val  keytabPath: Option[File] = None,
+                                                     override val  partitionValues: Option[Seq[PartitionValues]] = None,
+                                                     override val  multiPartitionValues: Option[Seq[PartitionValues]] = None,
+                                                     override val  parallelism: Int = 1,
+                                                     override val  statePath: Option[String] = None,
+                                                     override val  overrideJars: Option[Seq[String]] = None,
+                                                     override val  test: Option[TestMode.Value] = None,
+                                                     override val  streaming: Boolean = false,
+                                                          port: Int = DefaultPort,
+                                                          maxPortRetries: Int = MaxPortRetries
+                                                    )
+
+  extends SmartDataLakeBuilderConfigTrait[LocalJettyAgentSmartDataLakeBuilderConfig] {
+  override def withfeedSel(value: String): LocalJettyAgentSmartDataLakeBuilderConfig = copy(feedSel = value)
+
+  override def withapplicationName(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(applicationName = value)
+
+  override def withconfiguration(value: Option[Seq[String]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(configuration = value)
+
+  override def withmaster(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(master = value)
+
+  override def withdeployMode(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(deployMode = value)
+
+  override def withusername(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(username = value)
+
+  override def withkerberosDomain(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(kerberosDomain = value)
+
+  override def withkeytabPath(value: Option[File]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(keytabPath = value)
+
+  override def withpartitionValues(value: Option[Seq[PartitionValues]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(partitionValues = value)
+
+  override def withmultiPartitionValues(value: Option[Seq[PartitionValues]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(multiPartitionValues = value)
+
+  override def withparallelism(value: Int): LocalJettyAgentSmartDataLakeBuilderConfig = copy(parallelism = value)
+
+  override def withstatePath(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(statePath = value)
+
+  override def withoverrideJars(value: Option[Seq[String]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(overrideJars = value)
+
+  override def withtest(value: Option[TestMode.Value]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(test = value)
+
+  override def withstreaming(value: Boolean): LocalJettyAgentSmartDataLakeBuilderConfig = copy(streaming = value)
+}
 object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
-  val agentParser : OptionParser[JettyAgentServerConfig] = new OptionParser[JettyAgentServerConfig](appType) {
-    override def showUsageOnError: Option[Boolean] = Some(true)
-
-    head(appType, s"$appVersion")
-
-    parser.opt[Int]('p', "port")
-      .action((arg, config) => config.copy(agentPort = Some(arg)))
+  val agentParser: OParser[_, LocalJettyAgentSmartDataLakeBuilderConfig] = {
+    val builder = OParser.builder[LocalJettyAgentSmartDataLakeBuilderConfig]
+    import builder._
+    OParser.sequence(
+    parserGeneric(false),
+      opt[Int]('p', "port")
+      .action((arg, config) => config.copy(port = arg))
       .text(s"Port that this agent listens to. Default is ${JettyAgentServerConfig.DefaultPort}")
+    )
   }
 
    /**
@@ -53,17 +107,16 @@ object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
   def main(args: Array[String]): Unit = {
     logger.info(s"Starting Program $appType v$appVersion")
 
-    // Set defaults from environment variables
-    val envconfig = initConfigFromEnvironment.copy(
+    val envconfig = LocalJettyAgentSmartDataLakeBuilderConfig(
       master = sys.env.get("SDL_SPARK_MASTER_URL").orElse(Some("local[*]")),
       deployMode = sys.env.get("SDL_SPARK_DEPLOY_MODE").orElse(Some("client")),
       configuration = sys.env.get("SDL_CONFIGURATION").map(_.split(',')),
       parallelism = sys.env.get("SDL_PARALELLISM").map(_.toInt).getOrElse(1),
       statePath = sys.env.get("SDL_STATE_PATH"),
-      applicationName = Some("agent")
+      applicationName = Some("AgentServer")
     )
 
-    agentParser.parse(args, JettyAgentServerConfig(sdlConfig = envconfig)) match {
+    OParser.parse(agentParser, args, envconfig) match {
       case Some(agentServerConfig) =>
         val agentController: AgentServerController = AgentServerController(new InstanceRegistry, this)
         JettyAgentServer.start(agentServerConfig, agentController)

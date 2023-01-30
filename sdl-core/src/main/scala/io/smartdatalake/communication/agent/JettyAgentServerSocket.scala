@@ -13,6 +13,7 @@
 
 package io.smartdatalake.communication.agent
 
+import io.smartdatalake.app.LocalJettyAgentSmartDataLakeBuilderConfig
 import io.smartdatalake.communication.message.{SDLMessage, SDLMessageMetadata, SDLMessageType}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.{ActionDAGRunState, ExecutionPhase}
@@ -22,7 +23,7 @@ import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.Serialization.{read, writePretty}
 
 
-class JettyAgentServerSocket(config: JettyAgentServerConfig, agentController: AgentServerController) extends WebSocketAdapter with SmartDataLakeLogger {
+class JettyAgentServerSocket(config: LocalJettyAgentSmartDataLakeBuilderConfig, agentController: AgentServerController) extends WebSocketAdapter with SmartDataLakeLogger {
   implicit val format: Formats = ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)
 
   override def onWebSocketConnect(sess: Session): Unit = {
@@ -44,7 +45,7 @@ class JettyAgentServerSocket(config: JettyAgentServerConfig, agentController: Ag
     super.onWebSocketText(message)
     logger.info("Received " + message)
     val sdlMessage = read[SDLMessage](message)
-    val responseMessageOpt = agentController.handle(sdlMessage, config.sdlConfig)
+    val responseMessageOpt = agentController.handle(sdlMessage, config)
     if(responseMessageOpt.isDefined) sendSDLMessage(responseMessageOpt.get)
     else closeConnection()
   }

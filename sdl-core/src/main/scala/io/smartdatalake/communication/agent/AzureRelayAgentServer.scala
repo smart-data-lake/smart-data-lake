@@ -27,7 +27,7 @@ import java.nio.ByteBuffer
 import java.util.Scanner
 import java.util.concurrent.CompletableFuture
 import com.microsoft.azure.relay.{HybridConnectionChannel, HybridConnectionListener, RelayConnectionStringBuilder, TokenProvider}
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
+import io.smartdatalake.app.{LocalAzureRelayAgentSmartDataLakeBuilderConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.communication.message.{SDLMessage, SDLMessageType}
 import io.smartdatalake.workflow.{ActionDAGRunState, ExecutionPhase}
 import org.json4s.Formats
@@ -37,8 +37,8 @@ import org.json4s.jackson.Serialization.{read, writePretty}
 object AzureRelayAgentServer extends SmartDataLakeLogger {
   implicit val format: Formats = ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)
 
-  def start(config: AzureRelayAgentServerConfig, agentController: AgentServerController): Unit = {
-    val connectionParams = new RelayConnectionStringBuilder(config.url + System.getenv("SharedAccessKey"))
+  def start(config: LocalAzureRelayAgentSmartDataLakeBuilderConfig, agentController: AgentServerController): Unit = {
+    val connectionParams = new RelayConnectionStringBuilder(config.azureRelayURL.get + System.getenv("SharedAccessKey"))
 
     val tokenProvider = TokenProvider.createSharedAccessSignatureTokenProvider(connectionParams.getSharedAccessKeyName, connectionParams.getSharedAccessKey)
     val listener = new HybridConnectionListener(new URI(connectionParams.getEndpoint.toString + connectionParams.getEntityPath), tokenProvider)
@@ -59,7 +59,7 @@ object AzureRelayAgentServer extends SmartDataLakeLogger {
             val message = new String(bytesReceived.array, bytesReceived.arrayOffset, bytesReceived.remaining)
             logger.info("Received " + message)
             val sdlMessage = read[SDLMessage](message)
-            val responseMessageOpt = agentController.handle(sdlMessage, config.sdlConfig)
+            val responseMessageOpt = agentController.handle(sdlMessage, config)
             if (responseMessageOpt.isDefined) sendSDLMessage(responseMessageOpt.get, connection)
             else closeConnection(connection)
           }

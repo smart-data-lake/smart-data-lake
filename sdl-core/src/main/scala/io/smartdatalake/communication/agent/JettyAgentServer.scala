@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.communication.agent
 
+import io.smartdatalake.app.LocalJettyAgentSmartDataLakeBuilderConfig
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.util.PortUtils
 import org.eclipse.jetty.server._
@@ -34,7 +35,7 @@ object JettyAgentServer extends SmartDataLakeLogger {
   private val pool = new QueuedThreadPool(200)
   private val server = new Server(pool)
 
-  def start(config: JettyAgentServerConfig, serverController: AgentServerController): Unit = {
+  def start(config: LocalJettyAgentSmartDataLakeBuilderConfig, serverController: AgentServerController): Unit = {
     val contextHandler = getServletContextHandler(config, serverController)
     PortUtils.startOnPort(startServer(contextHandler), "AgentServer", config.port, config.maxPortRetries, logger)
   }
@@ -43,7 +44,7 @@ object JettyAgentServer extends SmartDataLakeLogger {
     server.stop()
   }
 
-  private def getServletContextHandler(config: JettyAgentServerConfig, serverController: AgentServerController): ContextHandlerCollection = {
+  private def getServletContextHandler(config: LocalJettyAgentSmartDataLakeBuilderConfig, serverController: AgentServerController): ContextHandlerCollection = {
     val handlers: ContextHandlerCollection = new ContextHandlerCollection()
 
     val socketHandler = createWebsocketHandler(config, serverController)
@@ -51,7 +52,7 @@ object JettyAgentServer extends SmartDataLakeLogger {
     handlers
   }
 
-  private def createWebsocketHandler(config: JettyAgentServerConfig, serverController: AgentServerController): ContextHandler = {
+  private def createWebsocketHandler(config: LocalJettyAgentSmartDataLakeBuilderConfig, serverController: AgentServerController): ContextHandler = {
     val contextHandler = new ContextHandler("/ws")
     val webSocketcreator: WebSocketCreator = new WebSocketCreator() {
       override def createWebSocket(request: ServletUpgradeRequest, response: ServletUpgradeResponse) = new JettyAgentServerSocket(config, serverController)
