@@ -95,7 +95,7 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   override def log(msg: String, loggerFunc: String => Unit): Unit = {
     loggerFunc(msg + System.lineSeparator() + DatasetHelper.showString(inner, truncate = 0))
   }
-  override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, Observation) = {
+  override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, DataFrameObservation) = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, aggregateColumns)
     // Some Spark data sources dont execute observations, e.g. jdbc. The generic observation can be forced for these cases.
     if (forceGenericObservation) {
