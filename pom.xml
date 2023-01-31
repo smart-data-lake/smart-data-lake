@@ -114,7 +114,6 @@
                 <scala.version>${scala.minor.version}.15</scala.version>
             </properties>
         </profile>
-		</profile>
         <profile>
             <id>test-sonar</id>
             <build>
