@@ -18,74 +18,19 @@
  */
 package io.smartdatalake.app
 
-import io.smartdatalake.app.LocalSmartDataLakeBuilder.{appType, logAndThrowException}
 import io.smartdatalake.communication.agent.JettyAgentServerConfig.{DefaultPort, MaxPortRetries}
 import io.smartdatalake.communication.agent.{AgentServerController, JettyAgentServer, JettyAgentServerConfig}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.SDLExecutionId
-import org.apache.hadoop.conf.Configuration
-import scopt.{OParser, OptionParser}
+import scopt.OParser
 
 import java.io.File
-import java.time.LocalDateTime
 
 /**
- * Smart Data Lake Builder application for agent mode.
+ * Smart Data Lake Builder application for agent mode using simple, unsecure websocket communication with Jetty.
+ * This is recommended for development use only.
  *
- * Sets master to local[*] and deployMode to client by default.
  */
-
-case class LocalJettyAgentSmartDataLakeBuilderConfig(override val  feedSel: String = null,
-                                                     override val  applicationName: Option[String] = None,
-                                                     override val  configuration: Option[Seq[String]] = None,
-                                                     override val  master: Option[String] = None,
-                                                     override val  deployMode: Option[String] = None,
-                                                     override val  username: Option[String] = None,
-                                                     override val  kerberosDomain: Option[String] = None,
-                                                     override val  keytabPath: Option[File] = None,
-                                                     override val  partitionValues: Option[Seq[PartitionValues]] = None,
-                                                     override val  multiPartitionValues: Option[Seq[PartitionValues]] = None,
-                                                     override val  parallelism: Int = 1,
-                                                     override val  statePath: Option[String] = None,
-                                                     override val  overrideJars: Option[Seq[String]] = None,
-                                                     override val  test: Option[TestMode.Value] = None,
-                                                     override val  streaming: Boolean = false,
-                                                          port: Int = DefaultPort,
-                                                          maxPortRetries: Int = MaxPortRetries
-                                                    )
-
-  extends SmartDataLakeBuilderConfigTrait[LocalJettyAgentSmartDataLakeBuilderConfig] {
-  override def withfeedSel(value: String): LocalJettyAgentSmartDataLakeBuilderConfig = copy(feedSel = value)
-
-  override def withapplicationName(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(applicationName = value)
-
-  override def withconfiguration(value: Option[Seq[String]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(configuration = value)
-
-  override def withmaster(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(master = value)
-
-  override def withdeployMode(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(deployMode = value)
-
-  override def withusername(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(username = value)
-
-  override def withkerberosDomain(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(kerberosDomain = value)
-
-  override def withkeytabPath(value: Option[File]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(keytabPath = value)
-
-  override def withpartitionValues(value: Option[Seq[PartitionValues]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(partitionValues = value)
-
-  override def withmultiPartitionValues(value: Option[Seq[PartitionValues]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(multiPartitionValues = value)
-
-  override def withparallelism(value: Int): LocalJettyAgentSmartDataLakeBuilderConfig = copy(parallelism = value)
-
-  override def withstatePath(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(statePath = value)
-
-  override def withoverrideJars(value: Option[Seq[String]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(overrideJars = value)
-
-  override def withtest(value: Option[TestMode.Value]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(test = value)
-
-  override def withstreaming(value: Boolean): LocalJettyAgentSmartDataLakeBuilderConfig = copy(streaming = value)
-}
 object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
   val agentParser: OParser[_, LocalJettyAgentSmartDataLakeBuilderConfig] = {
@@ -123,4 +68,54 @@ object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
       case None => logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
     }
   }
+}
+case class LocalJettyAgentSmartDataLakeBuilderConfig(override val feedSel: String = null,
+                                                     override val applicationName: Option[String] = None,
+                                                     override val configuration: Option[Seq[String]] = None,
+                                                     override val master: Option[String] = None,
+                                                     override val deployMode: Option[String] = None,
+                                                     override val username: Option[String] = None,
+                                                     override val kerberosDomain: Option[String] = None,
+                                                     override val keytabPath: Option[File] = None,
+                                                     override val partitionValues: Option[Seq[PartitionValues]] = None,
+                                                     override val multiPartitionValues: Option[Seq[PartitionValues]] = None,
+                                                     override val parallelism: Int = 1,
+                                                     override val statePath: Option[String] = None,
+                                                     override val overrideJars: Option[Seq[String]] = None,
+                                                     override val test: Option[TestMode.Value] = None,
+                                                     override val streaming: Boolean = false,
+                                                     port: Int = DefaultPort,
+                                                     maxPortRetries: Int = MaxPortRetries
+                                                    )
+
+  extends SmartDataLakeBuilderConfigTrait[LocalJettyAgentSmartDataLakeBuilderConfig] {
+  override def withfeedSel(value: String): LocalJettyAgentSmartDataLakeBuilderConfig = copy(feedSel = value)
+
+  override def withapplicationName(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(applicationName = value)
+
+  override def withconfiguration(value: Option[Seq[String]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(configuration = value)
+
+  override def withmaster(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(master = value)
+
+  override def withdeployMode(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(deployMode = value)
+
+  override def withusername(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(username = value)
+
+  override def withkerberosDomain(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(kerberosDomain = value)
+
+  override def withkeytabPath(value: Option[File]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(keytabPath = value)
+
+  override def withpartitionValues(value: Option[Seq[PartitionValues]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(partitionValues = value)
+
+  override def withmultiPartitionValues(value: Option[Seq[PartitionValues]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(multiPartitionValues = value)
+
+  override def withparallelism(value: Int): LocalJettyAgentSmartDataLakeBuilderConfig = copy(parallelism = value)
+
+  override def withstatePath(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(statePath = value)
+
+  override def withoverrideJars(value: Option[Seq[String]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(overrideJars = value)
+
+  override def withtest(value: Option[TestMode.Value]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(test = value)
+
+  override def withstreaming(value: Boolean): LocalJettyAgentSmartDataLakeBuilderConfig = copy(streaming = value)
 }

@@ -20,7 +20,6 @@
 package io.smartdatalake.workflow.agent
 
 import com.typesafe.config.Config
-import io.smartdatalake.communication.agent.{AgentClient, JettyAgentClient}
 import io.smartdatalake.config.SdlConfigObject.AgentId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.workflow.connection.Connection

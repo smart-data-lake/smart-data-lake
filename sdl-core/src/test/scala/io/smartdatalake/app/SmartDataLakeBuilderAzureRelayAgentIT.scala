@@ -50,18 +50,21 @@ object SmartDataLakeBuilderAzureRelayAgentIT extends App {
   val dfSrc1 = Seq("testData").toDF("testColumn")
   srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
-  val agentConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = None)
-  val remoteSDLB = new DefaultSmartDataLakeBuilder()
-  val agentController: AgentServerController = AgentServerController(remoteSDLB.instanceRegistry, remoteSDLB)
-  //Make sure this string matches the config from the file application-azureRelayAgent.conf
   val azureRelayUrl = "Endpoint=sb://relay-tbb-test.servicebus.windows.net/;EntityPath=relay-tbb-test-connection;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey="
+  val agentConfig = LocalAzureRelayAgentSmartDataLakeBuilderConfig(feedSel = feedName, configuration = None, azureRelayURL = Some(azureRelayUrl))
+  val remoteSDLB = new DefaultSmartDataLakeBuilder()
+  //Make sure this string matches the config from the file application-azureRelayAgent.conf
+  val agentController: AgentServerController = AgentServerController(remoteSDLB.instanceRegistry, remoteSDLB)
   val agentServerThread =
     Future {
-      AzureRelayAgentServer.start(AzureRelayAgentServerConfig(url = azureRelayUrl, sdlConfig = agentConfig), agentController)
+      AzureRelayAgentServer.start(agentConfig, agentController)
     }
+
+  val configFileResource = getClass.getResource("/configAgents/application-azureRelayAgent.conf")
+  require(configFileResource != null, "Please make sure the file application-azureRelayAgent.conf is included in the resources when running this test." +
+    "In IntelliJ, you can do this with the option Modify Classpath")
   Thread.sleep(5000)
-  val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
-    getClass.getResource("/configAgents/application-azureRelayAgent.conf").getPath))
+  val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(configFileResource.getPath))
   )
   //Run SDLB Main Instance
   sdlb.run(sdlConfig)

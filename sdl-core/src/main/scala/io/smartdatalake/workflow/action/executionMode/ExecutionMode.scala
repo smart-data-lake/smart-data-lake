@@ -19,8 +19,8 @@
 package io.smartdatalake.workflow.action.executionMode
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, ParsableFromConfig}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.{ConfigHolder, FromConfigFactory, InstanceRegistry, ParsableFromConfig}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.dag.DAGHelper.NodeId
 import io.smartdatalake.util.dag.ExceptionSeverity.ExceptionSeverity
@@ -45,7 +45,7 @@ import scala.reflect.runtime.universe.TypeTag
  * }
  * }}}
  */
-trait ExecutionMode extends ParsableFromConfig[ExecutionMode] with SmartDataLakeLogger {
+trait ExecutionMode extends ParsableFromConfig[ExecutionMode] with ConfigHolder with SmartDataLakeLogger {
   /**
    * Called in prepare phase to validate execution mode configuration
    */

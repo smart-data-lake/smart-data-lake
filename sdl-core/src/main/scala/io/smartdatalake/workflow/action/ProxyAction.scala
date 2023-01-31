@@ -19,19 +19,20 @@
 
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.communication.agent.{AgentClient, AzureRelayAgentClient, JettyAgentClient}
+import io.smartdatalake.communication.agent.AgentClient
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, SdlConfigObject}
-import io.smartdatalake.definitions.{Condition, ExecutionMode}
+import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.dag.DAGHelper.NodeId
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
+import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.agent.Agent
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.DataObject
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed, SubFeed}
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SubFeed}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.StructType
 
 case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.ActionId, agent: Agent) extends Action {
