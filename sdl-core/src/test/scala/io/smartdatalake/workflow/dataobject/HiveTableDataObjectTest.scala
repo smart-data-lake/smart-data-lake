@@ -262,7 +262,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
 
     // restrict default authority
     // remove 2 characters from the end to test that a substring is enough for restriction
-    Environment.hadoopAuthoritiesWithAclsRequired = Seq(HdfsUtil.getHadoopDefaultSchemeAuthority.toString.reverse.drop(2).reverse)
+    Environment._hadoopAuthoritiesWithAclsRequired = Some(Seq(HdfsUtil.getHadoopDefaultSchemeAuthority.toString.reverse.drop(2).reverse))
 
     try {
       // create data object
@@ -276,7 +276,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
 
     } finally {
       // reset restriction
-      Environment.hadoopAuthoritiesWithAclsRequired = Seq()
+      Environment._hadoopAuthoritiesWithAclsRequired = None
     }
 
   }

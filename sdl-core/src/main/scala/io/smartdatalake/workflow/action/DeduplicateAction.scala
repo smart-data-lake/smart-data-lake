@@ -24,6 +24,7 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfTransformerDef, SparkDfTransformerFunctionWrapper}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
@@ -129,6 +130,11 @@ case class DeduplicateAction(override val id: ActionId,
   override val transformerSubFeedSupportedTypes: Seq[Type] = transformerDefs.map(_.getSubFeedSupportedType) // deduplicate transformer can be ignored as it is generic
 
   validateConfig()
+
+  override def prepare(implicit context: ActionPipelineContext): Unit = {
+    super.prepare
+    transformerDefs.foreach(_.prepare(id))
+  }
 
   private def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
     val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)

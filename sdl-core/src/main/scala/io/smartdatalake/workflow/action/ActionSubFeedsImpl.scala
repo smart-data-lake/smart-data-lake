@@ -91,19 +91,28 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     var outputSubFeeds: Seq[S] = outputs.map(output =>
       updateOutputPartitionValues(output, subFeedConverter.get(mainInputSubFeed.toOutput(output.id)), Some(transformPartitionValues))
     )
-    // (re-)apply execution mode in init phase, streaming iteration or if not first action in pipeline (search for calls to resetExecutionResults for details)
-    if (executionModeResult.isEmpty) applyExecutionMode(mainInput, mainOutput, mainInputSubFeed, transformPartitionValues)
-    // apply execution mode result
-    executionModeResult.get.get match { // throws exception if execution mode is Failure
-      case Some(result) =>
-        inputSubFeeds = inputSubFeeds.map { subFeed =>
-          updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeedConverter.get(subFeed.applyExecutionModeResultForInput(result, mainInput.id)))
-        }
-        outputSubFeeds = outputSubFeeds.map(subFeed =>
-          // we need to transform inputPartitionValues again to outputPartitionValues so that partition values from partitions not existing in mainOutput are not lost.
-          updateOutputPartitionValues(outputMap(subFeed.dataObjectId), subFeedConverter.get(subFeed.applyExecutionModeResultForOutput(result)), Some(transformPartitionValues))
-        )
-      case _ => Unit
+    // apply execution mode only in exec phase
+    if (context.isExecPhase) {
+      // apply execution mode
+      val executionModeResult = try {
+        executionMode.flatMap(_.apply(id, mainInput, mainOutput, mainInputSubFeed, transformPartitionValues))
+      } catch {
+        // throw exception with skipped output subfeeds if "no data"
+        case ex: NoDataToProcessWarning if ex.results.isEmpty => throw ex.copy(results = Some(ActionHelper.createSkippedSubFeeds(outputs)))
+      }
+      // apply execution mode result
+      executionModeResult match { // throws exception if execution mode is Failure
+        case Some(result) =>
+          inputSubFeeds = inputSubFeeds.map { subFeed =>
+            updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeedConverter.get(subFeed.applyExecutionModeResultForInput(result, mainInput.id)))
+          }
+          outputSubFeeds = outputSubFeeds.map(subFeed =>
+            // we need to transform inputPartitionValues again to outputPartitionValues so that partition values from partitions not existing in mainOutput are not lost.
+            updateOutputPartitionValues(outputMap(subFeed.dataObjectId), subFeedConverter.get(subFeed.applyExecutionModeResultForOutput(result)), Some(transformPartitionValues))
+          )
+          executionModeResultOptions = result.options
+        case _ => Unit
+      }
     }
     inputSubFeeds = inputSubFeeds.map{ subFeed =>
       // prepare input SubFeed
@@ -114,6 +123,10 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     outputSubFeeds = outputSubFeeds.map(subFeed => addRunIdPartitionIfNeeded(outputMap(subFeed.dataObjectId), subFeed))
     (inputSubFeeds, outputSubFeeds)
   }
+
+  // Keep execution mode result in a variable for now.
+  // TODO: this should be a property of the SubFeed. Like that it is passed to the Action and its Input/Output DataObjects.
+  protected var executionModeResultOptions: Map[String,String] = Map()
 
   def postprocessOutputSubFeeds(subFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S] = {
     // assert all outputs have a subFeed
@@ -277,7 +290,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
 
   protected def validatePartitionValuesExisting(dataObject: DataObject with CanHandlePartitions, subFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = {
     // Existing partitions can only be checked if Action is at start of the DAG or if we are in Exec phase (previous Actions have been executed)
-    if (subFeed.partitionValues.nonEmpty && (context.phase == ExecutionPhase.Exec || subFeed.isDAGStart) && !subFeed.isSkipped) {
+    if (subFeed.partitionValues.nonEmpty && (context.isExecPhase || subFeed.isDAGStart) && !subFeed.isSkipped) {
       // filter partition value with keys that are a valid init of partition columns -> otherwise it can not be checked if the partition exists
       val inits = dataObject.partitions.inits.map(_.toSet)
       val validInitPartitionValues = subFeed.partitionValues.filter(pv => inits.contains(pv.keys))

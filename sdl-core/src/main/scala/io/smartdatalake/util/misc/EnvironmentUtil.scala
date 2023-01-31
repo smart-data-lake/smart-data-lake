@@ -19,6 +19,7 @@
 
 package io.smartdatalake.util.misc
 
+import io.smartdatalake.definitions.Environment
 import org.apache.spark.sql.SparkSession
 
 object EnvironmentUtil {
@@ -38,7 +39,7 @@ object EnvironmentUtil {
   }
 
   /**
-   * get environment parameter value from Java system properties or environment variables.
+   * get environment parameter value from Java system properties, environment variables or global.environment configuration file section.
    * To lookup java system properties the key is prefixed with "sdl.".
    * To lookup environment variables the key is prefixed with "SDL_" and camelcase notation is converted to uppercase notation separated by "_".
    * Java system properties have precedence over environment variables.
@@ -48,6 +49,7 @@ object EnvironmentUtil {
   def getSdlParameter(key: String): Option[String] = {
     sys.props.get("sdl."+key)
       .orElse(sys.env.get("SDL_"+camelCaseToUpper(key)))
+      .orElse(Option(Environment.globalConfig).flatMap(_.environment.get(key)))
   }
 
   private[smartdatalake] def camelCaseToUpper(key: String): String = key.replaceAll("([A-Z])", "_$1").toUpperCase

@@ -41,6 +41,7 @@ import scopt.{OParser, OParserBuilder}
 import java.io.File
 import java.time.{Duration, LocalDateTime}
 import scala.annotation.tailrec
+import scala.util.Try
 
 trait SmartDataLakeBuilderConfigTrait[R] {
   //All builder functions for all fields
@@ -352,9 +353,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     } catch {
       case e: Exception =>
         // try shutdown but catch potential exception
-        try {
-          shutdown
-        }
+        Try(shutdown)
         // throw original exception
         throw e
     }
@@ -452,13 +451,13 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     require(config.hasPath("actions"), s"No configuration parsed or it does not have a section called actions")
     require(config.hasPath("dataObjects"), s"No configuration parsed or it does not have a section called dataObjects")
 
-    // parse config objects
+    // parse global config
     val globalConfig = GlobalConfig.from(config)
-    ConfigParser.parse(config, instanceRegistry) // share instance registry for custom code
-
-    // set environment
-    // Attention: if JVM is shared between different SDL jobs (e.g. Databricks cluster), this overrides values from earlier jobs!
     Environment._globalConfig = globalConfig
+
+    // parse config objects
+    ConfigParser.parse(config, instanceRegistry) // share instance registry for custom code
+    // Attention: if JVM is shared between different SDL jobs (e.g. Databricks cluster), this overrides values from earlier jobs!
     Environment._instanceRegistry = instanceRegistry
 
     val snapshotListener = new SnapshotStatusInfoListener()
@@ -597,8 +596,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
               logger.info(s"As all actions of run_id ${context.executionId.runId} are skipped, run_id is not incremented for next execution")
               context
             }
-            // reset execution result before new execution
-            actionsSelected.foreach(_.resetExecutionResult())
             // remove spark caches so that new data is read in next iteration
             //TODO: in the future it might be interesting to keep some DataFrames cached for performance reason...
             if (context.hasSparkSession) context.sparkSession.sqlContext.clearCache()

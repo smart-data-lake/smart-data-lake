@@ -23,6 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
@@ -45,12 +46,12 @@ case class MockDataObject(override val id: DataObjectId, override val partitions
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = partitionValuesMock
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
-    dataFrameMock.getOrElse(throw new IllegalStateException("dataFrameMock not initialized"))
+    dataFrameMock.getOrElse(throw NoDataToProcessWarning("mock", s"($id) dataFrameMock not initialized"))
   }
 
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): Unit = {
-    assert(partitionValues.flatMap(_.keys).distinct.diff(partitions).isEmpty, "partitionValues keys dont match partition columns") // assert partition keys match
-    assert(partitions.diff(df.columns).isEmpty, "partition columns are missing in DataFrame")
+    assert(partitionValues.flatMap(_.keys).distinct.diff(partitions).isEmpty, s"($id) partitionValues keys dont match partition columns") // assert partition keys match
+    assert(partitions.diff(df.columns).isEmpty, s"($id) partition columns are missing in DataFrame")
     val inferredPartitionValues = if (partitionValues.isEmpty && partitions.nonEmpty) {
       // infer partition values
       df.select(partitions.map(col):_*).collect.map(row => PartitionValues(partitions.map(p => (p,row.getAs[Any](p))).toMap)).toSeq

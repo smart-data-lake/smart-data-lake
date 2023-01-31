@@ -23,6 +23,7 @@ import io.smartdatalake.config.ConfigUtil
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.json.{SchemaConverter => JsonSchemaConverter}
 import io.smartdatalake.workflow.dataframe._
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.avro.Schema
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.Encoders
@@ -152,49 +153,55 @@ object SchemaUtil {
    * Parses a Spark [[StructType]] by using the desired schema provider.
    * The schema provider is included in the configuration value as prefix terminated by '#'.
    */
-  def readSchemaFromConfigValue(schemaConfig: String): StructType = {
+  def readSchemaFromConfigValue(schemaConfig: String, lazyFileReading: Boolean = true): GenericSchema = {
     import io.smartdatalake.util.misc.SchemaProviderType._
     implicit lazy val defaultHadoopConf: Configuration = new Configuration()
     val (providerId, value) = ConfigUtil.parseProviderConfigValue(schemaConfig, Some(DDL.toString))
     SchemaProviderType.withName(providerId.toLowerCase) match {
       case DDL =>
-        getSchemaFromDdl(value)
+        SparkSchema(getSchemaFromDdl(value))
       case DDLFile =>
         val content = HdfsUtil.readHadoopFile(value)
-        getSchemaFromDdl(content)
+        SparkSchema(getSchemaFromDdl(content))
       case CaseClass =>
         val clazz = this.getClass.getClassLoader.loadClass(value)
         val mirror = scala.reflect.runtime.currentMirror
         val tpe = mirror.classSymbol(clazz).toType
-        getSchemaFromCaseClass(tpe)
+        SparkSchema(getSchemaFromCaseClass(tpe))
       case JavaBean =>
         val clazz = this.getClass.getClassLoader.loadClass(value)
-        getSchemaFromJavaBean(clazz)
+        SparkSchema(getSchemaFromJavaBean(clazz))
       case XsdFile =>
         val valueElements = value.split(";")
         assert(valueElements.size <= 3, s"XSD schema provider configuration error. Configuration format is '<path-to-xsd-file>;<row-tag>;<maxRecursion>', but received $value.")
         val path = valueElements.head
         val rowTag = valueElements.drop(1).headOption
         val maxRecursion = valueElements.drop(2).headOption.map(_.toInt)
-        val content = HdfsUtil.readHadoopFile(path)
-        val schema = getSchemaFromXsd(content, maxRecursion)
-        rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema)
+        if (!lazyFileReading) {
+          val content = HdfsUtil.readHadoopFile(path)
+          val schema = getSchemaFromXsd(content, maxRecursion)
+          SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
+        } else LazyGenericSchema(schemaConfig)
       case JsonSchemaFile =>
         val valueElements = value.split(";")
         assert(valueElements.size == 1 || valueElements.size == 2, s"Json schema provider configuration error. Configuration format is '<path-to-json-file>;<row-tag>', but received $value.")
         val path = valueElements.head
         val rowTag = valueElements.drop(1).headOption
-        val content = HdfsUtil.readHadoopFile(path)
-        val schema = getSchemaFromJsonSchema(content)
-        rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema)
+        if (!lazyFileReading) {
+          val content = HdfsUtil.readHadoopFile(path)
+          val schema = getSchemaFromJsonSchema(content)
+          SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
+        } else LazyGenericSchema(schemaConfig)
       case AvroSchemaFile =>
         val valueElements = value.split(";")
         assert(valueElements.size == 1 || valueElements.size == 2, s"Avro schema provider configuration error. Configuration format is '<path-to-avsc-file>;<row-tag>', but received $value.")
         val path = valueElements.head
         val rowTag = valueElements.drop(1).headOption
-        val content = HdfsUtil.readHadoopFile(path)
-        val schema = getSchemaFromAvroSchema(content)
-        rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema)
+        if (!lazyFileReading) {
+          val content = HdfsUtil.readHadoopFile(path)
+          val schema = getSchemaFromAvroSchema(content)
+          SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
+        } else LazyGenericSchema(schemaConfig)
     }
   }
 

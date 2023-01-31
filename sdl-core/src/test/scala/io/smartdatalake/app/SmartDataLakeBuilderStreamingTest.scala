@@ -22,12 +22,13 @@ package io.smartdatalake.app
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{InstanceRegistry, SdlConfigObject}
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
-import io.smartdatalake.definitions.{Environment, PartitionDiffMode, SparkStreamingMode}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action._
+import io.smartdatalake.workflow.action.executionMode.{PartitionDiffMode, SparkStreamingMode}
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
 import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, HiveTableDataObject, Table}

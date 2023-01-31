@@ -25,6 +25,7 @@ import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.misc.SchemaProviderType.SchemaProviderType
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.secrets.SecretProviderConfig
+import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
 import io.smartdatalake.workflow.action.spark.customlogic._
@@ -47,24 +48,13 @@ trait ConfigImplicits {
       .withFailOnSuperfluousKeys
 
   /**
-   * A [[ConfigReader]] reader that reads [[StructType]] values.
-   *
-   * This reader parses a Spark [[StructType]] by using the desired schema provider.
-   * The schema provider is included in the configuration value as prefix terminated by '#'.
-   * See [[SchemaProviderType]] for available providers.
-   */
-  implicit val structTypeReader: ConfigReader[StructType] = ConfigReader.fromTry { (c, p) =>
-    SchemaUtil.readSchemaFromConfigValue(c.getString(p))
-  }
-
-  /**
    * A [[ConfigReader]] reader that reads [[GenericSchema]] values.
    *
    * This reader parses a Spark [[StructType]] by using the desired schema provider.
    * The schema provider is included in the configuration value as prefix terminated by '#'.
    */
   implicit val genericSchemaReader: ConfigReader[GenericSchema] = ConfigReader.fromTry { (c, p) =>
-    SparkSchema(SchemaUtil.readSchemaFromConfigValue(c.getString(p)))
+    SchemaUtil.readSchemaFromConfigValue(c.getString(p), Environment.parseSchemaFilesLazy)
   }
 
   /**
@@ -93,7 +83,6 @@ trait ConfigImplicits {
   implicit val sparkUdfCreatorConfigReader: ConfigReader[SparkUDFCreatorConfig] = ConfigReader.derive[SparkUDFCreatorConfig]
   implicit val sparkRepartitionDefReader: ConfigReader[SparkRepartitionDef] = ConfigReader.derive[SparkRepartitionDef]
   implicit val secretProviderConfigReader: ConfigReader[SecretProviderConfig] = ConfigReader.derive[SecretProviderConfig]
-  implicit val executionModeReader: ConfigReader[ExecutionMode] = ConfigReader.derive[ExecutionMode]
   implicit val conditionReader: ConfigReader[Condition] = ConfigReader.derive[Condition]
   implicit val authModeReader: ConfigReader[AuthMode] = ConfigReader.derive[AuthMode]
   implicit val saveModeOptionsReader: ConfigReader[SaveModeOptions] = ConfigReader.derive[SaveModeOptions]
@@ -161,5 +150,14 @@ trait ConfigImplicits {
   implicit val connectionDefReader: ConfigReader[Connection] = ConfigReader.fromTry { (c, p) =>
     implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
     ConfigParser.parseConfigObject[Connection](c.getConfig(p))
+  }
+
+  /**
+   * A reader that reads [[ExecutionMode]] values.
+   * Note that Expectation must be parsed according to it's 'type' attribute by using SDL ConfigParser.
+   */
+  implicit val executionModeReader: ConfigReader[ExecutionMode] = ConfigReader.fromTry { (c, p) =>
+    implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
+    ConfigParser.parseConfigObject[ExecutionMode](c.getConfig(p))
   }
 }

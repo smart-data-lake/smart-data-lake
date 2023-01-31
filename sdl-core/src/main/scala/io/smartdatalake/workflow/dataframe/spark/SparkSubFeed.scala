@@ -20,10 +20,10 @@
 package io.smartdatalake.workflow.dataframe.spark
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.ExecutionModeResult
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.{DataFrameUtil, DummyStreamProvider}
 import io.smartdatalake.workflow._
+import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.dataframe._
 import org.apache.spark.sql.types.{ArrayType, StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, functions}
@@ -49,7 +49,7 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
                         override val isSkipped: Boolean = false,
                         override val isDummy: Boolean = false,
                         override val filter: Option[String] = None,
-                        @transient override val observation: Option[Observation] = None
+                        @transient override val observation: Option[DataFrameObservation] = None
                        )
   extends DataFrameSubFeed {
   @transient
@@ -130,7 +130,7 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
     this.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false, dataFrame = None)
   }
   override def withDataFrame(dataFrame: Option[GenericDataFrame]): SparkSubFeed = this.copy(dataFrame = dataFrame.map(_.asInstanceOf[SparkDataFrame]))
-  override def withObservation(observation: Option[Observation]): SparkSubFeed = this.copy(observation = observation)
+  override def withObservation(observation: Option[DataFrameObservation]): SparkSubFeed = this.copy(observation = observation)
   override def withPartitionValues(partitionValues: Seq[PartitionValues]): DataFrameSubFeed = this.copy(partitionValues = partitionValues)
   override def asDummy(): SparkSubFeed = this.copy(isDummy = true)
   override def withFilter(partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed = {

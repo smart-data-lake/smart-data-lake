@@ -18,17 +18,21 @@
  */
 package io.smartdatalake.workflow.action
 
+import java.sql.Timestamp
+import java.time.LocalDateTime
+import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.{ActionPipelineContext, InitSubFeed, SubFeed}
-import io.smartdatalake.workflow.dataframe.GenericDataFrame
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject}
+import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
+import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, InitSubFeed, SubFeed}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.TimestampType
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, SparkSession}
 
-import java.sql.Timestamp
-import java.time.LocalDateTime
 import scala.reflect.runtime.universe.Type
 
 /**
@@ -118,6 +122,7 @@ private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
   } catch {
     case e: IllegalArgumentException if e.getMessage.contains("DataObject schema is undefined") => None
     case e: AnalysisException if e.getMessage.contains("Table or view not found") => None
+    case _: NoDataToProcessWarning => None
   }
 
   /**

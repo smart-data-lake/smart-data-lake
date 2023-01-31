@@ -21,6 +21,7 @@ package io.smartdatalake.definitions
 
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
 import io.smartdatalake.util.spark.SparkExpressionUtil
+import io.smartdatalake.workflow.action.executionMode.PartitionDiffMode
 
 import scala.reflect.runtime.universe.TypeTag
 

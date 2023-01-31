@@ -28,6 +28,7 @@ import io.smartdatalake.util.spark.SparkExpressionUtil
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
+import io.smartdatalake.workflow.action.executionMode.{DataObjectStateIncrementalMode, ExecutionMode}
 import io.smartdatalake.workflow.dataobject.{CanCreateIncrementalOutput, DataObject, TransactionalSparkTableDataObject}
 import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions.expr
@@ -85,17 +86,10 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    */
   def executionCondition: Option[Condition]
 
-  // execution condition is evaluated in init phase and result must be stored for exec phase
-  protected var executionConditionResult: Option[(Boolean,Option[String])] = None
-
   /**
    * execution mode for this action.
    */
   def executionMode: Option[ExecutionMode]
-
-  // execution mode is evaluated in init phase and result must be stored for exec phase
-  protected var executionModeResult: Option[Try[Option[ExecutionModeResult]]] = None
-  def getExecutionModeResultOptions: Map[String,String] = executionModeResult.flatMap(_.get.map(_.options)).getOrElse(Map())
 
   /**
    * Spark SQL condition evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
@@ -161,55 +155,31 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit context: ActionPipelineContext): Unit = {
     // call execution mode hook
     executionMode.foreach(_.preInit(subFeeds,dataObjectsState))
-    // check execution condition
-    checkExecutionCondition(subFeeds)
   }
 
   /**
-   * Evaluate and check the executionCondition
-   * @throws TaskSkippedDontStopWarning if no data to process
+   * Evaluate and check the executionCondition in exec phase
+   * @throws TaskSkippedDontStopWarning if task is skipped
    */
   private def checkExecutionCondition(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
-    // evaluate execution condition in init phase or streaming iteration and store result
-    if (executionConditionResult.isEmpty) {
-      //noinspection MapGetOrElseBoolean
-      executionConditionResult = Some(executionCondition.map { c =>
-        // evaluate condition if existing
-        val data = SubFeedsExpressionData.fromSubFeeds(subFeeds)
-        if (!c.evaluate(id, Some("executionCondition"), data)) {
-          val descriptionText = c.description.map(d => s""""$d" """).getOrElse("")
-          val msg = s"""($id) execution skipped because of failed executionCondition ${descriptionText} expression="${c.expression}" $data"""
-          (false, Some(msg))
-        } else (true, None)
-      }.getOrElse {
-        // default behaviour: if no executionCondition is defined, Action is executed if no input subFeed is skipped.
-        val skippedSubFeeds = subFeeds.filter(_.isSkipped)
-        if (skippedSubFeeds.nonEmpty) {
-          val msg = s"""($id) execution skipped because input subFeeds are skipped: ${subFeeds.map(_.dataObjectId).mkString(", ")}"""
-          (false, Some(msg))
-        } else (true, None)
-      })
+    //noinspection MapGetOrElseBoolean
+    val skipMsg = executionCondition.map { c =>
+      // evaluate condition if existing
+      val data = SubFeedsExpressionData.fromSubFeeds(subFeeds)
+      if (!c.evaluate(id, Some("executionCondition"), data)) {
+        val descriptionText = c.description.map(d => s""""$d" """).getOrElse("")
+        Some(s"""($id) execution skipped because of failed executionCondition ${descriptionText}expression="${c.expression}" $data""")
+      } else None
+    }.getOrElse {
+      // default behaviour: if no executionCondition is defined, Action is executed if no input subFeed is skipped.
+      val skippedSubFeeds = subFeeds.filter(_.isSkipped)
+      if (skippedSubFeeds.nonEmpty) {
+        Some(s"""($id) execution skipped because input subFeeds are skipped: ${subFeeds.map(_.dataObjectId).mkString(", ")}""")
+      } else None
     }
     // check execution condition result
-    if (!executionConditionResult.get._1 && !context.appConfig.isDryRun) {
-      throw new TaskSkippedDontStopWarning(id.id, executionConditionResult.get._2.get, Some(ActionHelper.createSkippedSubFeeds(outputs)))
-    }
+    if (skipMsg.nonEmpty) throw new TaskSkippedDontStopWarning(id.id, skipMsg.get, Some(ActionHelper.createSkippedSubFeeds(outputs)))
   }
-
-  /**
-   * Applies the executionMode and stores result in executionModeResult variable
-   */
-  protected def applyExecutionMode(mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
-                                  , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
-                                  (implicit context: ActionPipelineContext): Unit = {
-    executionModeResult = Some(Try(
-      executionMode.flatMap(_.apply(id, mainInput, mainOutput, subFeed, partitionValuesTransform))
-    ).recover {
-      // throw exception with skipped output subfeeds if "no data"
-      case ex: NoDataToProcessWarning if ex.results.isEmpty => throw ex.copy(results = Some(ActionHelper.createSkippedSubFeeds(outputs)))
-    })
-  }
-
 
   /**
    * Initialize Action with [[SubFeed]]'s to be processed.
@@ -230,15 +200,10 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    */
   def preExec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
     if (isAsynchronousProcessStarted) return
-    // reset execution condition if not start Action in pipeline, because input for execution results could change between init and exec phase
-    val isStartAction = subFeeds.exists(subFeed => subFeed.isInstanceOf[InitSubFeed] && !subFeed.isSkipped)
-    if (!isStartAction) resetExecutionResult()
     // check execution condition
     checkExecutionCondition(subFeeds)
-    // throw execution mode failure exception if any
-    if (executionModeResult.exists(x => x.isFailure)) executionModeResult.get.get
     // init spark jobGroupId to identify metrics
-    setSparkJobMetadata()
+    setSparkJobMetadata() // TODO: this triggers creating spark session
     // otherwise continue processing
     inputs.foreach( input => input.preRead(findSubFeedPartitionValues(input.id, subFeeds)))
     outputs.foreach(_.preWrite) // Note: transformed subFeeds don't exist yet, that's why no partition values can be passed as parameters.
@@ -401,15 +366,6 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    */
   private[smartdatalake] def reset(implicit context: ActionPipelineContext): Unit = {
     runtimeData.clear()
-    resetExecutionResult()
-  }
-
-  /**
-   * Resets execution results of this Action for repeated execution
-   */
-  private[smartdatalake] def resetExecutionResult(): Unit = {
-    executionConditionResult = None
-    executionModeResult = None
   }
 
   /**

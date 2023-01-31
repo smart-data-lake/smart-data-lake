@@ -28,8 +28,8 @@ import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.util.spark.DefaultExpressionData
 import io.smartdatalake.util.webservice.ScalaJWebserviceClient
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig.fnTransformType
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, OptionsSparkDfTransformer}
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig.fnTransformType
 import org.apache.spark.sql.DataFrame
 import org.json4s._
 import org.json4s.jackson.{JsonMethods, Serialization}
@@ -54,18 +54,17 @@ import scala.util.{Failure, Success}
  */
 case class ScalaNotebookSparkDfTransformer(override val name: String = "scalaSparkTransform", override val description: Option[String] = None, url: String, functionName: String, authMode: Option[AuthMode] = None, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfTransformer {
   import ScalaNotebookSparkDfTransformer._
-  private var _fnTransform: Option[fnTransformType] = None
+  private lazy val fnTransform: fnTransformType = {
+    val notebookCode = prepareFunction(parseNotebook(downloadNotebook(url, authMode)), functionName)
+    compileCode(notebookCode)
+  }
   override def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = {
-    try {
-      val notebookCode = prepareFunction(parseNotebook(downloadNotebook(url, authMode)), functionName)
-      _fnTransform = Some(compileCode(notebookCode))
-    } catch {
-      case ex: Exception => throw new ConfigurationException(s"($actionId) " + ex.getMessage, None, ex)
-    }
+    super.prepare(actionId)
+    // check lazy parsed transform function
+    fnTransform
   }
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit context: ActionPipelineContext): DataFrame = {
-    assert(_fnTransform.isDefined, s"($actionId) prepare() must be called before transformWithOptions()")
-    _fnTransform.map(_(context.sparkSession, options, df, dataObjectId.id)).get
+    fnTransform(context.sparkSession, options, df, dataObjectId.id)
   }
   override def factory: FromConfigFactory[GenericDfTransformer] = ScalaNotebookSparkDfTransformer
 }

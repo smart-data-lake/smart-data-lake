@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action.generic.transformer
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
@@ -48,7 +48,11 @@ case class AdditionalColumnsTransformer(override val name: String = "additionalC
         df.withColumn(colName, lit(value.orNull))
     }
     val dfDerived = additionalDerivedColumns.foldLeft(dfLit){
-      case (df, (colName, deriveExpr)) => df.withColumn(colName, expr(deriveExpr))
+      case (df, (colName, deriveExpr)) => try {
+        df.withColumn(colName, expr(deriveExpr))
+      } catch {
+        case e: Exception => throw ConfigurationException(s"""($actionId) Creating additional derived column $colName using expression "$deriveExpr" failed: ${e.getMessage}""", Some(s"$name.$colName"), e)
+      }
     }
     dfDerived
   }

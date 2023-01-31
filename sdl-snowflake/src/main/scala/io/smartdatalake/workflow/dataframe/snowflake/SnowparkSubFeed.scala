@@ -22,8 +22,8 @@ package io.smartdatalake.workflow.dataframe.snowflake
 import com.snowflake.snowpark.types.{ArrayType, StringType, StructField, StructType}
 import com.snowflake.snowpark.{Column, functions}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.ExecutionModeResult
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion, SubFeed}
@@ -38,7 +38,7 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
                            override val isSkipped: Boolean = false,
                            override val isDummy: Boolean = false,
                            override val filter: Option[String] = None,
-                           @transient override val observation: Option[Observation] = None
+                           @transient override val observation: Option[DataFrameObservation] = None
                           )
   extends DataFrameSubFeed {
   @transient
@@ -113,7 +113,7 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
     this.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false, dataFrame = None)
   }
   override def withDataFrame(dataFrame: Option[GenericDataFrame]): SnowparkSubFeed = this.copy(dataFrame = dataFrame.map(_.asInstanceOf[SnowparkDataFrame]))
-  override def withObservation(observation: Option[Observation]): SnowparkSubFeed = this.copy(observation = observation)
+  override def withObservation(observation: Option[DataFrameObservation]): SnowparkSubFeed = this.copy(observation = observation)
   override def withPartitionValues(partitionValues: Seq[PartitionValues]): DataFrameSubFeed = this.copy(partitionValues = partitionValues)
   override def asDummy(): SnowparkSubFeed = this.copy(isDummy = true)
   override def withFilter(partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed = {

@@ -20,26 +20,23 @@ package io.smartdatalake.workflow.dataobject
 
 import io.confluent.kafka.serializers.{KafkaJsonDeserializer, KafkaJsonDeserializerConfig, KafkaJsonSerializer}
 import io.github.embeddedkafka.schemaregistry.{EmbeddedKafka => EmbeddedKafkaWithSchemaRegistry}
+import io.smartdatalake.testutil.KafkaTestUtil
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import org.apache.kafka.common.serialization.StringSerializer
+import org.apache.spark.sql.confluent.IncompatibleSchemaException
 import org.apache.spark.sql.functions.{lit, struct}
 import org.apache.spark.sql.streaming.Trigger
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 
 import java.nio.file.Files
+import java.sql.Timestamp
+import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 
-/**
- * Note about EmbeddedKafka compatibility:
- * The currently used version 2.4.1 (in sync with the kafka version of sparks parent pom) is not compatible with JDK14+
- * because of a change of InetSocketAddress::toString. Zookeeper doesn't start because of
- * "java.nio.channels.UnresolvedAddressException: Session 0x0 for server localhost/<unresolved>:6001, unexpected error, closing socket connection and attempting reconnect"
- * see also https://www.oracle.com/java/technologies/javase/14all-relnotes.html#JDK-8225499
- */
 class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with BeforeAndAfter with EmbeddedKafkaWithSchemaRegistry with DataObjectTestSuite with SmartDataLakeLogger {
 
   import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
@@ -47,18 +44,7 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
 
   private val kafkaConnection = KafkaConnection("kafkaCon1", brokers = "localhost:6001", schemaRegistry = Some("http://localhost:6002"))
 
-  private lazy val kafka = {
-    EmbeddedKafkaWithSchemaRegistry.start()
-  }
-
-  override def beforeAll() {
-    kafka // initialize lazy variable
-    Thread.sleep(1000)
-  }
-
-  override def afterAll(): Unit = {
-    kafka.stop(true)
-  }
+  KafkaTestUtil.start
 
   test("Can read and write from Kafka") {
     createCustomTopic("topic", Map(), 1, 1)
@@ -238,5 +224,155 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
 
     val actual = dfAct.as[(String,Long)].collect
     assert(actual.toSeq == expected)
+  }
+
+
+  test("incremental output mode with schema registry") {
+
+    // create data object
+    instanceRegistry.register(kafkaConnection)
+    val targetDO = KafkaTopicDataObject("kafka1", topicName = "topicIncremental", connectionId = "kafkaCon1", valueType = KafkaColumnType.AvroSchemaRegistry)
+
+    // write test data 1
+    val df1 = Seq((1, ("A", 1)), (2, ("A", 2)), (3, ("B", 3)), (4, ("B", 4))).toDF("key", "value")
+    targetDO.writeSparkDataFrame(df1)
+
+    // test 1
+    targetDO.setState(None) // initialize incremental output with empty state
+    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 4
+    val newState1 = targetDO.getState
+
+    // append test data 2
+    val df2 = Seq((5, ("B", 5))).toDF("key", "value")
+    targetDO.writeSparkDataFrame(df2)
+
+    // test 2
+    targetDO.setState(newState1)
+    val df2result = targetDO.getSparkDataFrame()(contextExec)
+    df2result.count shouldEqual 1
+    val newState2 = targetDO.getState
+
+    // test 3
+    targetDO.setState(newState2)
+    val df3result = targetDO.getSparkDataFrame()(contextExec)
+    df3result.count shouldEqual 0
+    val newState3 = targetDO.getState
+    assert(newState3 == newState2)
+
+    targetDO.getSparkDataFrame()(contextInit).count shouldEqual 5
+  }
+
+  test("kafka incremental mode") {
+
+    // create data object
+    instanceRegistry.register(kafkaConnection)
+    val targetDO = KafkaTopicDataObject("kafka1", topicName = "topicKafkaIncremental", connectionId = "kafkaCon1",
+      valueType = KafkaColumnType.String, options = Map("groupIdPrefix" -> "sdlb-testIncMode"))
+
+    // test 0a - read empty topic with delayedMaxTimestamp=now
+    targetDO.enableKafkaStateIncrementalMode(Some(Timestamp.from(Instant.now())))
+    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 0
+    targetDO.commitIncrementalOutputState
+
+    // test 0b - read empty topic
+    targetDO.enableKafkaStateIncrementalMode()
+    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 0
+    targetDO.commitIncrementalOutputState
+
+    // write test data 1
+    val df1 = Seq((1, "A"), (2, "A"), (3, "B"), (4, "B")).toDF("key", "value")
+    targetDO.writeSparkDataFrame(df1)
+
+    // test 1 - read first batch
+    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 4
+    targetDO.commitIncrementalOutputState
+
+    // append test data 2
+    val df2 = Seq((5, "B")).toDF("key", "value")
+    targetDO.writeSparkDataFrame(df2)
+
+    // test 2 - get new data
+    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 1
+    targetDO.commitIncrementalOutputState
+
+    // test 3 - no data
+    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 0
+    targetDO.commitIncrementalOutputState
+
+    // save current time to test delayedMaxTimestamp feature
+    val tstmpBeforeData3 = Timestamp.from(Instant.now())
+
+    // append test data 3
+    val df3 = Seq((6, "C")).toDF("key", "value")
+    targetDO.writeSparkDataFrame(df2)
+
+    // test 4 - no new data with delayedMaxTimestamp=tstmpBeforeData3
+    targetDO.enableKafkaStateIncrementalMode(Some(tstmpBeforeData3))
+    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 0
+    targetDO.commitIncrementalOutputState
+
+    // test 5 - new data with delayedMaxTimestamp=now
+    targetDO.enableKafkaStateIncrementalMode(Some(Timestamp.from(Instant.now())))
+    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 1
+    targetDO.commitIncrementalOutputState
+
+    // test 4 - no new data without delayedMaxTimestamp
+    targetDO.enableKafkaStateIncrementalMode()
+    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 0
+
+    // all data without incremental mode
+    targetDO.getSparkDataFrame()(contextInit).count shouldEqual 6
+  }
+
+  test("json schema evolution") {
+
+    // create data object
+    instanceRegistry.register(kafkaConnection)
+    val dataObject = KafkaTopicDataObject("kafka1", topicName = "topicJson", connectionId = "kafkaCon1", valueType = KafkaColumnType.JsonSchemaRegistry)
+    val dataObjectAllowSchemaEvo = dataObject.copy(allowSchemaEvolution = true)
+
+    // write json message incl. schema
+    val dfExp = Seq(("hello", 1L)).toDF("txt", "num")
+      .select(lit(1).as("key"), struct("*").as("value"))
+    dataObject.writeSparkDataFrame(dfExp)
+
+    // prepare data with updated schema (new column)
+    val dfExp1 = Seq(("hello", 1L, "test")).toDF("txt", "num", "test")
+      .select(lit(1).as("key"), struct("*").as("value"))
+
+    // check schema evolution disabled
+    intercept[IncompatibleSchemaException](dataObject.initSparkDataFrame(dfExp1,Seq()))
+    intercept[IncompatibleSchemaException](dataObject.writeSparkDataFrame(dfExp1))
+
+    dataObjectAllowSchemaEvo.initSparkDataFrame(dfExp1, Seq())
+    dataObjectAllowSchemaEvo.writeSparkDataFrame(dfExp1)
+
+    assert(dataObjectAllowSchemaEvo.getSparkDataFrame().select($"value.*").columns.toSeq == Seq("txt", "num", "test"))
+  }
+
+  test("avro schema evolution") {
+
+    // create data object
+    instanceRegistry.register(kafkaConnection)
+    val dataObject = KafkaTopicDataObject("kafka1", topicName = "topicKafka", connectionId = "kafkaCon1", valueType = KafkaColumnType.AvroSchemaRegistry)
+    val dataObjectAllowSchemaEvo = dataObject.copy(allowSchemaEvolution = true)
+
+    // write json message incl. schema
+    val dfExp = Seq(("hello", 1L)).toDF("txt", "num")
+      .select(lit(1).as("key"), struct("*").as("value"))
+    dataObject.writeSparkDataFrame(dfExp)
+
+    // prepare data with updated schema (new nullable column)
+    val dfExp1 = Seq(("hello", 1L, Some("test"))).toDF("txt", "num", "test")
+      .select(lit(1).as("key"), struct("*").as("value"))
+
+    // check schema evolution disabled
+    intercept[IncompatibleSchemaException](dataObject.initSparkDataFrame(dfExp1, Seq()))
+    intercept[IncompatibleSchemaException](dataObject.writeSparkDataFrame(dfExp1))
+
+    dataObjectAllowSchemaEvo.initSparkDataFrame(dfExp1, Seq())
+    dataObjectAllowSchemaEvo.writeSparkDataFrame(dfExp1)
+
+    assert(dataObjectAllowSchemaEvo.getSparkDataFrame().select($"value.*").columns.toSeq == Seq("txt", "num", "test"))
   }
 }

@@ -55,7 +55,7 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
    */
   def expectations: Seq[Expectation]
 
-  def setupConstraintsAndJobExpectations(df: GenericDataFrame)(implicit context: ActionPipelineContext): (GenericDataFrame, Observation) = {
+  def setupConstraintsAndJobExpectations(df: GenericDataFrame)(implicit context: ActionPipelineContext): (GenericDataFrame, DataFrameObservation) = {
     // add constraint validation column
     val dfConstraints = setupConstraintsValidation(df)
     // setup job expectations as DataFrame observation
@@ -63,7 +63,7 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
     val (dfJobExpectations, observation) = {
       implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
       val expectationColumns = (defaultExpectations ++ jobExpectations).flatMap(_.getAggExpressionColumns(this.id))
-      setupObservation(dfConstraints, expectationColumns, context.phase == ExecutionPhase.Exec)
+      setupObservation(dfConstraints, expectationColumns, context.isExecPhase)
     }
     // setup add caching if there are expectations with scope != job
     if (expectations.exists(_.scope != ExpectationScope.Job)) (dfJobExpectations.cache, observation)
@@ -171,7 +171,7 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
   }
 
   protected def forceGenericObservation = false
-  private def setupObservation(df: GenericDataFrame, expectationColumns: Seq[GenericColumn], isExecPhase: Boolean): (GenericDataFrame, Observation) = {
+  private def setupObservation(df: GenericDataFrame, expectationColumns: Seq[GenericColumn], isExecPhase: Boolean): (GenericDataFrame, DataFrameObservation) = {
     val (dfObserved, observation) = df.setupObservation(this.id + "-" + UUID.randomUUID(), expectationColumns, isExecPhase, forceGenericObservation)
     (dfObserved, observation)
   }

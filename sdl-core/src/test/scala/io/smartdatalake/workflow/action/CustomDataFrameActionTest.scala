@@ -23,6 +23,7 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskSkippedDontStopWarning
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.executionMode.{CustomMode, CustomModeLogic, ExecutionModeResult, PartitionDiffMode}
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
@@ -291,9 +292,9 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     val srcSubFeed1 = SparkSubFeed(None, "src1", Seq(), isSkipped = true)
     val srcSubFeed2 = SparkSubFeed(None, "src2", Seq(), isSkipped = true)
     val tgtSubFeed1 = SparkSubFeed(None, "tgt1", Seq(), isSkipped = true)
-    intercept[TaskSkippedDontStopWarning[_]](action1.preInit(Seq(srcSubFeed1,srcSubFeed2), Seq()))
-    intercept[TaskSkippedDontStopWarning[_]](action1.preExec(Seq(srcSubFeed1,srcSubFeed2)))
-    action1.postExec(Seq(srcSubFeed1,srcSubFeed2), Seq(tgtSubFeed1))
+    action1.preInit(Seq(srcSubFeed1,srcSubFeed2), Seq())
+    intercept[TaskSkippedDontStopWarning[_]](action1.preExec(Seq(srcSubFeed1,srcSubFeed2))(contextExec))
+    action1.postExec(Seq(srcSubFeed1,srcSubFeed2), Seq(tgtSubFeed1))(contextExec)
 
     // dont skip if one subfeed skipped
     val action2 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id),
