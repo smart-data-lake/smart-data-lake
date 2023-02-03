@@ -77,17 +77,17 @@
 			<artifactId>spark-sql_${scala.minor.version}</artifactId>
 		</dependency>
 
-		<dependency>
+<!--		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-hive_${scala.minor.version}</artifactId>
-			<!--Exclude for conflict with json library used in azure-relay-->
+			&lt;!&ndash;Exclude for conflict with json library used in azure-relay&ndash;&gt;
 			<exclusions>
 				<exclusion>
 					<artifactId>json</artifactId>
 					<groupId>com.tdunning</groupId>
 				</exclusion>
 			</exclusions>
-		</dependency>
+		</dependency>-->
 
 		<dependency>
 			<groupId>org.apache.spark</groupId>
