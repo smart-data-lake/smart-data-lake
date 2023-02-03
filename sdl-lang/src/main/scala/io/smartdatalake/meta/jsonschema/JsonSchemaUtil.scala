@@ -20,8 +20,8 @@
 package io.smartdatalake.meta.jsonschema
 
 import io.smartdatalake.app.GlobalConfig
-import io.smartdatalake.config.ParsableFromConfig
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
+import io.smartdatalake.config.{ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.meta.{GenericAttributeDef, GenericTypeDef, GenericTypeUtil, jsonschema}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.Action
