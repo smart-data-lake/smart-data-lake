@@ -528,7 +528,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // return result statistics as string
     (finalSubFeeds, actionDAGRun.getStatistics)
   }
-  private[smartdatalake] def agentExec(appConfig: SmartDataLakeBuilderConfig, phase: ExecutionPhase, executionId: SDLExecutionId = SDLExecutionId.executionId1, runStartTime: LocalDateTime = LocalDateTime.now(), attemptStartTime: LocalDateTime = LocalDateTime.now(), initialSubFeeds: Seq[SubFeed] = Seq(), dataObjectsState: Seq[DataObjectState]= Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, stateListeners: Seq[StateListener] = Seq(), simulation: Boolean = false, globalConfig: GlobalConfig = GlobalConfig())(implicit instanceRegistry: InstanceRegistry): Seq[SubFeed] = {
+  private[smartdatalake] def agentExec(appConfig: SmartDataLakeBuilderConfig, phase: ExecutionPhase, executionId: SDLExecutionId = SDLExecutionId.executionId1, runStartTime: LocalDateTime = LocalDateTime.now(), attemptStartTime: LocalDateTime = LocalDateTime.now(), initialSubFeeds: Seq[SubFeed] = Seq(), dataObjectsState: Seq[DataObjectState]= Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, stateListeners: Seq[StateListener] = Seq(), simulation: Boolean = false, globalConfig: GlobalConfig = GlobalConfig(enableHive = false))(implicit instanceRegistry: InstanceRegistry): Seq[SubFeed] = {
     // create and execute DAG
     val actionsToExecute = instanceRegistry.getActions
     logger.info(s"starting agentExecution ${appConfig.appName} runId=${executionId.runId} attemptId=${executionId.attemptId}")

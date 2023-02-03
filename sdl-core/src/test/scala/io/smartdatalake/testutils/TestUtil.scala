@@ -84,6 +84,9 @@ object TestUtil extends SmartDataLakeLogger {
   def getDefaultActionPipelineContext(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
     getDefaultActionPipelineContext(sessionHiveCatalog) // initialize with Spark session incl. Hive support
   }
+  def getDefaultActionPipelineContextWithoutHive(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
+    getDefaultActionPipelineContext(sessionWithoutHive) // initialize with Spark session without Hive support
+  }
 
   def getDefaultActionPipelineContext(sparkSession: SparkSession)(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
     val defaultHadoopConf = new SerializableHadoopConfiguration(new Configuration())
