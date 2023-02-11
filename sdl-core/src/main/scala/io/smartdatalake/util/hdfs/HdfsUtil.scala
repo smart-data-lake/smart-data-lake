@@ -273,18 +273,21 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    * Use getHadoopFsFromSpark if there is already a SparkSession.
    */
   def getHadoopFsWithDefaultConf(path: Path): FileSystem = {
-    path.getFileSystem(new Configuration())
+    getHadoopFsWithConf(path)(new Configuration())
   }
 
   /**
    * Get Hadoop Filesystem from specified Path with additional Configuration from the SparkSession
    */
   def getHadoopFsFromSpark(path: Path)(implicit session: SparkSession): FileSystem = {
-    path.getFileSystem(session.sparkContext.hadoopConfiguration)
+    getHadoopFsWithConf(path)(session.sparkContext.hadoopConfiguration)
   }
 
+  /**
+   * Get Hadoop Filesystem from specified Path with given Hadoop Configuration
+   */
   def getHadoopFsWithConf(path: Path)(implicit hadoopConf: Configuration): FileSystem = {
-    path.getFileSystem(hadoopConf)
+    Environment.fileSystemFactory.getFileSystem(path, hadoopConf)
   }
 
   def addLeadingSeparator(path: String): String = {
