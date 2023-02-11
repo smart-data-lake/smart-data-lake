@@ -20,6 +20,7 @@ package io.smartdatalake.definitions
 
 import io.smartdatalake.app.{GlobalConfig, SDLPlugin, StateListener}
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.util.hdfs.{DefaultFileSystemFactory, FileSystemFactory, UCFileSystemFactory}
 import io.smartdatalake.util.misc.{CustomCodeUtil, EnvironmentUtil}
 import org.apache.spark.sql.SparkSession
 import org.slf4j.event.Level
@@ -389,6 +390,26 @@ object Environment {
     _compileScalaCodeLazy.get
   }
   var _compileScalaCodeLazy: Option[Boolean] = None
+
+  /**
+   * Factory to use for creating Hadoop FileSystems.
+   * Configure a class name implementing [[FileSystemFactory]].
+   * Default is to use a special factory for Databricks with Unity Catalog, and standard Hadoop FileSystem creation otherwise.
+   */
+  def fileSystemFactory: FileSystemFactory = {
+    if (_fileSystemFactory.isEmpty) {
+      _fileSystemFactory = Some(
+        EnvironmentUtil.getSdlParameter("fileSystemFactory")
+          .map(CustomCodeUtil.getClassInstanceByName[FileSystemFactory])
+          .getOrElse{
+            if (UCFileSystemFactory.needUcFileSystem) new UCFileSystemFactory()
+            else new DefaultFileSystemFactory()
+          }
+      )
+    }
+    _fileSystemFactory.get
+  }
+  var _fileSystemFactory: Option[FileSystemFactory] = None
 
   /**
    * If true simulation runs fail when input subfeeds are missing.
