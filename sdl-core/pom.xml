@@ -44,8 +44,8 @@
 	<dependencies>
 		<dependency>
 			<groupId>com.databricks</groupId>
-			<artifactId>dbutils-api_2.11</artifactId>
-			<version>0.0.4</version>
+			<artifactId>dbutils-api_${scala.minor.version}</artifactId>
+			<version>0.0.5</version>
 		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>
