@@ -22,7 +22,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.{DeltaLakeModulePlugin, DeltaLakeTableDataObject, DeltaLakeTestUtils, HiveTableDataObject, Table}
+import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, IcebergModulePlugin, IcebergTableDataObject, IcebergTestUtils, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -31,10 +31,10 @@ import java.nio.file.Files
 import java.sql.Timestamp
 import java.time.LocalDateTime
 
-class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
+class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
 
   // set additional spark options for delta lake
-  protected implicit val session : SparkSession = DeltaLakeTestUtils.session
+  protected implicit val session : SparkSession = IcebergTestUtils.session
   import session.implicits._
 
   private val tempDir = Files.createTempDirectory("test")
@@ -51,8 +51,8 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
 
     // setup DataObjects
     val srcDO = MockDataObject("src1").register
-    val tgtTable = Table(Some("default"), "deduplicate_output", None, Some(Seq("lastname","firstname")))
-    val tgtDO = DeltaLakeTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable)
+    val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "deduplicate_output", primaryKey = Some(Seq("lastname","firstname")))
+    val tgtDO = IcebergTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable)
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
@@ -97,8 +97,9 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
 
     // setup DataObjects
     val srcDO = MockDataObject("src1").register
-    val tgtTable = Table(Some("default"), "deduplicate_output", None, Some(Seq("lastname","firstname")))
-    val tgtDO = DeltaLakeTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable)
+    instanceRegistry.register(srcDO)
+    val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "deduplicate_output", primaryKey = Some(Seq("lastname","firstname")))
+    val tgtDO = IcebergTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable)
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 

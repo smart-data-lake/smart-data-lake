@@ -43,7 +43,7 @@ class CopyWithMergeActionTest extends FunSuite with BeforeAndAfter {
   implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
-  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:file:target/JdbcTableDataObjectTest/hsqldb", "org.hsqldb.jdbcDriver")
+  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:CopyWithMergeActionTest", "org.hsqldb.jdbcDriver")
 
   before {
     instanceRegistry.clear()

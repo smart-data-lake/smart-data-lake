@@ -28,25 +28,25 @@ import io.smartdatalake.util.misc.AclDef
  *
  * @param id unique id of this connection
  * @param catalog optional catalog to be used for this connection
- * @param db hive db
+ * @param db database to be used for this connection
  * @param pathPrefix schema, authority and base path for tables directory on hadoop
  * @param acl permissions for files created with this connection
  * @param metadata
  */
-case class DeltaLakeTableConnection(override val id: ConnectionId,
-                                    catalog: Option[String] = None,
-                                    db: String,
-                                    pathPrefix: String,
-                                    acl: Option[AclDef] = None,
-                                    checkDeltaLakeSparkOptions: Boolean = true,
-                                    override val metadata: Option[ConnectionMetadata] = None
+case class IcebergTableConnection(override val id: ConnectionId,
+                                  catalog: Option[String] = None,
+                                  db: String,
+                                  pathPrefix: String,
+                                  acl: Option[AclDef] = None,
+                                  checkIcebergSparkOptions: Boolean = true,
+                                  override val metadata: Option[ConnectionMetadata] = None
                                ) extends Connection {
 
-  override def factory: FromConfigFactory[Connection] = DeltaLakeTableConnection
+  override def factory: FromConfigFactory[Connection] = IcebergTableConnection
 }
 
-object DeltaLakeTableConnection extends FromConfigFactory[Connection] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): DeltaLakeTableConnection = {
-    extract[DeltaLakeTableConnection](config)
+object IcebergTableConnection extends FromConfigFactory[Connection] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): IcebergTableConnection = {
+    extract[IcebergTableConnection](config)
   }
 }

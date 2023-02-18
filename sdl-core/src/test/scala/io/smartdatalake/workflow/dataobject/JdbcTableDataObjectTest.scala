@@ -29,7 +29,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
 
   import session.implicits._
 
-  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:file:target/JdbcTableDataObjectTest/hsqldb", "org.hsqldb.jdbcDriver")
+  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableDataObjectTest", "org.hsqldb.jdbcDriver")
 
   test("write and read jdbc table") {
     instanceRegistry.register(jdbcConnection)

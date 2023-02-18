@@ -33,10 +33,9 @@ import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import java.nio.file.Files
 
-class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
+class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
 
-  // set additional spark options for delta lake
-  protected implicit val session : SparkSession = DeltaLakeTestUtils.session
+  protected implicit val session : SparkSession = IcebergTestUtils.session
   import session.implicits._
 
   val tempDir = Files.createTempDirectory("tempHadoopDO")
@@ -50,19 +49,18 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.clear()
   }
 
-  test("CustomDf2DeltaTable") {
+  test("Write data") {
 
     // setup DataObjects
-    val feed = "customDf2Delta"
     val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
-    val targetTable = Table(db = Some("default"), name = "custom_df_copy", query = None)
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "custom_df_copy", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
-    val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable)
+    val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable)
     instanceRegistry.register(sourceDO)
     instanceRegistry.register(targetDO)
 
     // prepare & start load
-    val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id)
+    val testAction = CopyAction(id = s"load", inputId = sourceDO.id, outputId = targetDO.id)
     val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
     testAction.exec(Seq(srcSubFeed))(contextExec)
 
@@ -73,19 +71,19 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     assert(resultat)
   }
 
-  test("CustomDf2DeltaTable_partitioned") {
+  test("Write data partitioned") {
 
     // setup DataObjects
-    val feed = "customDf2Delta_partitioned"
     val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
-    val targetTable = Table(db = Some("default"), name = "custom_df_copy_partitioned", query = None)
+    val targetTable = Table(db = Some("iceberg1.default"), name = "custom_df_copy_partitioned", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
-    val targetDO = DeltaLakeTableDataObject(id="target", partitions=Seq("num"), path=Some(targetTablePath), table=targetTable)
+    val targetDO = IcebergTableDataObject(id="target", partitions=Seq("num"), path=Some(targetTablePath), table=targetTable)
+    targetDO.dropTable
     instanceRegistry.register(sourceDO)
     instanceRegistry.register(targetDO)
 
     // prepare & start load
-    val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id)
+    val testAction = CopyAction(id = s"load", inputId = sourceDO.id, outputId = targetDO.id)
     val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
     testAction.exec(Seq(srcSubFeed))(contextExec)
 
@@ -94,17 +92,13 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     val resultat: Boolean = expected.isEqual(actual)
     if (!resultat) TestUtil.printFailedTestResult("CustomDf2DeltaTable_partitioned",Seq())(actual)(expected)
     assert(resultat)
-
-    // move partition
     assert(targetDO.listPartitions.map(_.elements).toSet == Set(Map("num" -> "0"), Map("num" -> "1")))
-    targetDO.movePartitions(Seq((PartitionValues(Map("num" -> "0")), PartitionValues(Map("num" -> "2")))))
-    assert(targetDO.listPartitions.map(_.elements).toSet == Set(Map("num" -> "1"), Map("num" -> "2")))
   }
 
   test("SaveMode overwrite with different schema") {
-    val targetTable = Table(db = Some("default"), name = "test_overwrite", query = None)
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_overwrite", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
-    val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Overwrite, allowSchemaEvolution = true)
+    val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Overwrite, allowSchemaEvolution = true)
     targetDO.dropTable
 
     // first load
@@ -127,9 +121,9 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
   }
 
   test("SaveMode append with different schema") {
-    val targetTable = Table(db = Some("default"), name = "test_append", query = None)
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_append", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
-    val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Append, allowSchemaEvolution = true)
+    val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Append, allowSchemaEvolution = true)
     targetDO.dropTable
 
     // first load
@@ -144,17 +138,18 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     // 2nd load: append all with different schema
     val df2 = Seq(("ext","doe","john",10,"test"),("ext","smith","peter",1,"test"))
       .toDF("type", "lastname", "firstname", "rating2", "test")
+    targetDO.initSparkDataFrame(df2, Seq()) // for applying schema evolution
     targetDO.writeSparkDataFrame(df2)
     val actual2 = targetDO.getSparkDataFrame().filter($"lastname" === "doe")
     val result2 = actual2.count() == 2 && (df1.columns ++ df2.columns).toSet == actual2.columns.toSet
-    if (!result2) TestUtil.printFailedTestResult("SaveMode append",Seq())(actual2)(df2)
+    if (!result2) TestUtil.printFailedTestResult("SaveMode append with different schema",Seq())(actual2)(df2)
     assert(result2)
   }
 
   test("SaveMode overwrite and delete partition") {
-    val targetTable = Table(db = Some("default"), name = "test_overwrite", query = None)
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_overwrite", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
-    val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, partitions = Seq("type"), saveMode = SDLSaveMode.Overwrite)
+    val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, partitions = Seq("type"), saveMode = SDLSaveMode.Overwrite)
     targetDO.dropTable
 
     // first load
@@ -162,9 +157,9 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
-    val resultat: Boolean = df1.isEqual(actual)
-    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
-    assert(resultat)
+    val result = df1.isEqual(actual)
+    if (!result) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    assert(result)
 
     assert(targetDO.listPartitions.toSet == Set(PartitionValues(Map("type"->"ext")), PartitionValues(Map("type"->"int"))))
 
@@ -175,9 +170,9 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     targetDO.writeSparkDataFrame(df2, partitionValues = Seq(PartitionValues(Map("type"->"ext"))))
     val expected2 = df2.union(df1.where($"type"=!="ext"))
     val actual2 = targetDO.getSparkDataFrame()
-    val resultat2: Boolean = expected2.isEqual(actual2)
-    if (!resultat2) TestUtil.printFailedTestResult("SaveMode overwrite and delete partition",Seq())(actual2)(expected2)
-    assert(resultat2)
+    val resul2 = expected2.isEqual(actual2)
+    if (!resul2) TestUtil.printFailedTestResult("SaveMode overwrite and delete partition",Seq())(actual2)(expected2)
+    assert(resul2)
 
     // delete partition
     targetDO.deletePartitions(Seq(PartitionValues(Map("type"->"int"))))
@@ -185,9 +180,9 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
   }
 
   test("SaveMode append") {
-    val targetTable = Table(db = Some("default"), name = "test_append", query = None)
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_append", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
-    val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Append)
+    val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Append)
     targetDO.dropTable
 
     // first load
@@ -195,9 +190,9 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
-    val resultat = df1.isEqual(actual)
-    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
-    assert(resultat)
+    val result = df1.isEqual(actual)
+    if (!result) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    assert(result)
 
     // 2nd load: append data
     val df2 = Seq(("ext","doe","john",10),("ext","smith","peter",1))
@@ -211,9 +206,9 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
   }
 
   test("SaveMode merge") {
-    val targetTable = Table(db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
-    val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Merge)
+    val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Merge)
     targetDO.dropTable
 
     // first load
@@ -221,9 +216,9 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
-    val resultat = df1.isEqual(actual)
-    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
-    assert(resultat)
+    val result = df1.isEqual(actual)
+    if (!result) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    assert(result)
 
     // 2nd load: merge data by primary key
     val df2 = Seq(("ext","doe","john",10),("int","emma","brown",7))
@@ -232,15 +227,15 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     val actual2 = targetDO.getSparkDataFrame()
     val expected2 = Seq(("ext","doe","john",10),("ext","smith","peter",3),("int","emma","brown",7))
       .toDF("type", "lastname", "firstname", "rating")
-    val resultat2: Boolean = expected2.isEqual(actual2)
-    if (!resultat2) TestUtil.printFailedTestResult("SaveMode merge",Seq())(actual2)(expected2)
-    assert(resultat2)
+    val result2 = expected2.isEqual(actual2)
+    if (!result2) TestUtil.printFailedTestResult("SaveMode merge",Seq())(actual2)(expected2)
+    assert(result2)
   }
 
   test("SaveMode merge with schema evolution") {
-    val targetTable = Table(db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
-    val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Merge, options = Map("mergeSchema" -> "true"), allowSchemaEvolution = true)
+    val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Merge, options = Map("mergeSchema" -> "true"), allowSchemaEvolution = true)
     targetDO.dropTable
 
     // first load
@@ -248,31 +243,32 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
-    val resultat = df1.isEqual(actual)
-    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
-    assert(resultat)
+    val result = df1.isEqual(actual)
+    if (!result) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    assert(result)
 
     // 2nd load: merge data by primary key with different schema
     // - column 'rating' deleted -> existing records will keep column rating untouched (values are preserved and not set to null), new records will get new column rating set to null.
     // - column 'rating2' added -> existing records will get new column rating2 set to null
     val df2 = Seq(("ext","doe","john",10),("int","emma","brown",7))
       .toDF("type", "lastname", "firstname", "rating2")
+    targetDO.initSparkDataFrame(df2, Seq())
     targetDO.writeSparkDataFrame(df2)
     val actual2 = targetDO.getSparkDataFrame()
     val expected2 = Seq(("ext","doe","john",Some(5),Some(10)),("ext","smith","peter",Some(3),None),("int","emma","brown",None,Some(7)))
       .toDF("type", "lastname", "firstname", "rating", "rating2")
-    val resultat2: Boolean = expected2.isEqual(actual2)
-    if (!resultat2) TestUtil.printFailedTestResult("SaveMode merge",Seq())(actual2)(expected2)
-    assert(resultat2)
+    val result2 = expected2.isEqual(actual2)
+    if (!result2) TestUtil.printFailedTestResult("SaveMode merge",Seq())(actual2)(expected2)
+    assert(result2)
   }
 
   // Note that this is not possible with DeltaLake 1.0, as schema evolution with mergeStmt.insertExpr is not properly supported.
   // Unfortunately this is needed by HistorizeAction with merge.
   // We test for failure to be notified once it is working...
   test("SaveMode merge with updateCols and schema evolution - fails in deltalake 1.0") {
-    val targetTable = Table(db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
-    val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Merge, options = Map("mergeSchema" -> "true"), allowSchemaEvolution = true)
+    val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Merge, options = Map("mergeSchema" -> "true"), allowSchemaEvolution = true)
     targetDO.dropTable
 
     // first load
