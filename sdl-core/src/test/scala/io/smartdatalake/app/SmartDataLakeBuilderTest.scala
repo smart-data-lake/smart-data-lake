@@ -702,7 +702,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel="ids:act")
 
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
-    assert(srcDO != None)
     val dfSrc = Seq(("testData", "Foo"),("bar", "Space")).toDF("testColumn", "c?olumnN[ä]me")
 
     // Run SDLB
@@ -752,7 +751,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel="ids:act")
 
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
-    assert(srcDO != None)
     val dfSrc = Seq(("testData", "Foo"),("bar", "Space")).toDF("FOO", "noCamel")
 
     // Run SDLB

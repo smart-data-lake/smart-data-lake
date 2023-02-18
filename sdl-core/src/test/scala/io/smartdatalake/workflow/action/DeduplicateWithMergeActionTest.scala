@@ -41,7 +41,7 @@ class DeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val context = TestUtil.getDefaultActionPipelineContext
 
-  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:file:target/JdbcTableDataObjectTest/hsqldb", "org.hsqldb.jdbcDriver")
+  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:DeduplicateWithMergeActionTest", "org.hsqldb.jdbcDriver")
 
   private var tempDir: NioPath = _
   private var tempPath: String = _

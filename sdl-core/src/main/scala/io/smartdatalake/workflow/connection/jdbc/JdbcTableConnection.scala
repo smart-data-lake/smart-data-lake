@@ -22,7 +22,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{AuthMode, BasicAuthMode}
-import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger, TryWithResourcePool}
+import io.smartdatalake.util.misc.{SQLUtil, SchemaUtil, SmartDataLakeLogger, TryWithResourcePool}
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import io.smartdatalake.workflow.dataobject.JdbcTableDataObject
 import org.apache.commons.pool2.impl.{DefaultPooledObject, GenericObjectPool}
@@ -168,7 +168,7 @@ case class JdbcTableConnection(override val id: ConnectionId,
         .getOrElse(Map.empty[String, String])
       schema.fields.foreach { field =>
         // Change is here - dont quote if not case-sensitive and normal characters used:
-        val name = if(caseSensitive || JdbcTableDataObject.hasIdentifierSpecialChars(field.name)) dialect.quoteIdentifier(field.name)
+        val name = if(caseSensitive || SQLUtil.hasIdentifierSpecialChars(field.name)) dialect.quoteIdentifier(field.name)
           else field.name
         val typ = userSpecifiedColTypesMap
           .getOrElse(field.name, getJdbcType(field.dataType, dialect).databaseTypeDefinition)
