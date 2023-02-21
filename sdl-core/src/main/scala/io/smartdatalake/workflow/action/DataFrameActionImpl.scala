@@ -385,7 +385,7 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
     }
     // create output subfeeds from transformed dataframes
     outputSubFeeds.map { subFeed=>
-        val df = outputDfsMap.getOrElse(subFeed.dataObjectId.id, throw ConfigurationException(s"($id) No result found for output ${subFeed.dataObjectId}. Available tesults are ${outputDfsMap.keys.mkString(", ")}."))
+        val df = outputDfsMap.getOrElse(subFeed.dataObjectId.id, throw ConfigurationException(s"($id) No result found for output ${subFeed.dataObjectId}. Available results are ${outputDfsMap.keys.mkString(", ")}."))
         subFeed.withDataFrame(Some(df))
     }
   }
