@@ -22,61 +22,78 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ FromConfigFactory, InstanceRegistry }
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import org.mlflow.tracking.MlflowClient
 import com.typesafe.config.Config
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.mlflow.MLflowUtils.getOrCreateExperimentId
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.mlflow.{ MLflowPythonSparkEntryPoint, MLflowPythonUtil }
 import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{ DataFrame, SparkSession }
 
 import scala.reflect.runtime.universe.Type
 
 // TODO: model according to experiment definition
-case class MLFlowExperiment(experimentName: String)
+case class MLflowExperiment(experimentName: String)
 
 /**
  * [[DataObject]] for interaction with MLflow
  *
- * @param mlflowURI Uri of the MLflow server. Default is http://localhost:5000.
+ * @param trackingURI Uri of the MLflow server. Default is http://localhost:5000.
  * @param experimentName The name of the experiment stored in MLflow.
  */
-case class MlFlowDataObject(
-    override val id: DataObjectId,
-    mlflowURI: String,
-    experimentName: String,
-    override val metadata: Option[DataObjectMetadata] = None
-)(@transient implicit val instanceRegistry: InstanceRegistry)
-    extends DataObject
+case class MLflowDataObject(
+                             override val id: DataObjectId,
+                             trackingURI: String,
+                             experimentName: String,
+                             modelVariableName: String,
+                             override val metadata: Option[DataObjectMetadata] = None
+                           )(@transient implicit val instanceRegistry: InstanceRegistry)
+  extends DataObject
     with CanCreateSparkDataFrame
     with SmartDataLakeLogger {
 
-  // get MLflow client
-  val mlflowClient = new MlflowClient(mlflowURI)
+  // entry point for accessing dynamically Java objects living inside the JVM
+  var entryPoint: Option[MLflowPythonSparkEntryPoint] = None
+  var pythonMLflowApi: Option[MLflowPythonUtil] = None
 
-  // get experiment or create it
-  val experimentId = getOrCreateExperimentId(mlflowClient, experimentName)
+  override def prepare(implicit context: ActionPipelineContext): Unit = {
+    super.prepare
+    // create entry point
+    entryPoint = Some(new MLflowPythonSparkEntryPoint(context.sparkSession, options))
+    if (entryPoint.isEmpty) {
+      throw MLflowException("Creation of MLflowPythonSparkEntryPoint was not successful")
+    } else {
+      logger.info("Created MLflowPythonSparkEntryPoint")
+      pythonMLflowApi = Some(MLflowPythonUtil(entryPoint.get, trackingURI))
+      val experimentID = pythonMLflowApi
+        .getOrElse(throw MLflowException("PythonUtil for MLflow not ready"))
+        .getOrCreateExperimentID(experimentName)
+      logger.info(s"Working with MLflow experiment $experimentName with ID $experimentID")
+    }
+
+  }
 
   override def getSparkDataFrame(
-      partitionValues: Seq[PartitionValues] = Seq()
-  )(implicit context: ActionPipelineContext): DataFrame = {
+                                  partitionValues: Seq[PartitionValues] = Seq()
+                                )(implicit context: ActionPipelineContext): DataFrame = {
     implicit val session = context.sparkSession
     import session.implicits._
 
     // TODO: fetch latest run information and return as DataFrame
-    val df: DataFrame = Seq.empty[MLFlowExperiment].toDF()
+    val df: DataFrame = Seq.empty[MLflowExperiment].toDF()
     // return
     df
   }
 
-  override def factory: FromConfigFactory[DataObject] = MlFlowDataObject
+  override def factory: FromConfigFactory[DataObject] = MLflowDataObject
 
 }
 
-object MlFlowDataObject extends FromConfigFactory[DataObject] with SmartDataLakeLogger {
+object MLflowDataObject extends FromConfigFactory[DataObject] with SmartDataLakeLogger {
   override def fromConfig(
-      config: Config
-  )(implicit instanceRegistry: InstanceRegistry): MlFlowDataObject = {
-    extract[MlFlowDataObject](config)
+                           config: Config
+                         )(implicit instanceRegistry: InstanceRegistry): MLflowDataObject = {
+    extract[MLflowDataObject](config)
   }
 }
+
+case class MLflowException(msg: String, cause: Throwable = null) extends Exception(msg, cause)
+
