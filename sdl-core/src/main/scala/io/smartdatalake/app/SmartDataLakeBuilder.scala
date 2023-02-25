@@ -312,7 +312,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * Similar to [[startSimulation]], but Actions and DataObjects are parsed from config files defined through appConfig.configuration attribute.
    */
   def startSimulationWithConfigFile(appConfig: SmartDataLakeBuilderConfig, initialSubFeeds: Seq[SparkSubFeed], dataObjectsState: Seq[DataObjectState] = Seq(), failOnMissingInputSubFeeds: Boolean = true)(session: SparkSession): (Seq[DataFrameSubFeed], Map[RuntimeEventState,Int]) = {
-    Environment._failSimulationOnMissingInputSubFeeds = Some(failOnMissingInputSubFeeds)
     val config = ConfigLoader.loadConfigFromFilesystem(appConfig.configuration.get, session.sparkContext.hadoopConfiguration)
     ConfigParser.parse(config, this.instanceRegistry)
     startSimulation(appConfig, initialSubFeeds, dataObjectsState, failOnMissingInputSubFeeds)(this.instanceRegistry, session)
