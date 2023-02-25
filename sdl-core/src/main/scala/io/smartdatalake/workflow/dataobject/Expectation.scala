@@ -133,8 +133,8 @@ abstract class ExpectationDefaultImpl extends Expectation {
     import org.apache.spark.sql.functions._
     expectation.map { expectationStr =>
       val valueStr = value match {
-        case null => "null"
-        case str: String => s"'$str'"
+        case None => "null"
+        case x: String => x
         case x => x.toString
       }
       val validationExpr = s"$valueStr $expectationStr"
@@ -326,10 +326,10 @@ case class SQLQueryExpectation(override val name: String, override val descripti
       val resultRow = rows.head
       if (dfMetrics.schema.columns.size > 1) {
         dfMetrics.schema.columns.zipWithIndex.map {
-          case (c, idx) => (c, resultRow.get(idx))
+          case (c, idx) => (c, Option(resultRow.get(idx)).getOrElse(None))
         }.toMap
       } else {
-        Map(name -> resultRow.get(0))
+        Map(name -> Option(resultRow.get(0)).getOrElse(None))
       }
     } catch {
       case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse SQL code '$code': ${e.getClass.getSimpleName} ${e.getMessage}", Some(s"expectations.$name.code"), e)
