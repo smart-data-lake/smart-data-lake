@@ -90,11 +90,10 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
             val dfMetrics = df.groupBy(partitionedDataObject.partitions.map(functions.col)).agg(aggExpressions)
             val colNames = dfMetrics.schema.columns
             def colNameIndex(colName: String) = colNames.indexOf(colName)
-            val metrics = dfMetrics.collect.flatMap {
-              case row: GenericRow =>
-                val partitionValuesStr = partitionedDataObject.partitions.map(c => row.getAs[Any](colNameIndex(c)).toString).mkString(partitionDelimiter)
-                val metricsNameAndValue = jobPartitionExpectations.map(_._1).map(e => (e.name, row.getAs[Any](colNameIndex(e.name))))
-                metricsNameAndValue.map { case (name, value) => (name + partitionDelimiter + partitionValuesStr, value) }
+            val metrics = dfMetrics.collect.flatMap { row =>
+              val partitionValuesStr = partitionedDataObject.partitions.map(c => Option(row.getAs[Any](colNameIndex(c)).toString).getOrElse(None)).mkString(partitionDelimiter)
+              val metricsNameAndValue = jobPartitionExpectations.map(_._1).map(e => (e.name, Option(row.getAs[Any](colNameIndex(e.name))).getOrElse(None)))
+              metricsNameAndValue.map { case (name, value) => (name + partitionDelimiter + partitionValuesStr, value) }
             }
             metrics.toMap
           } else Map()
@@ -118,7 +117,7 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
       val colNames = dfMetrics.schema.columns
       def colNameIndex(colName: String) = colNames.indexOf(colName)
       val metrics = dfMetrics.collect.flatMap {
-        case row: GenericRow => allExpectationsWithExpressions.map(_._1).map(e => (e.name, row.getAs[Any](colNameIndex(e.name))))
+        case row: GenericRow => allExpectationsWithExpressions.map(_._1).map(e => (e.name, Option(row.getAs[Any](colNameIndex(e.name))).getOrElse(None)))
       }
       metrics.toMap
     } else Map()
