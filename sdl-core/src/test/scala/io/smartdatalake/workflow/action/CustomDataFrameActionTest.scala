@@ -30,24 +30,31 @@ import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTran
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
+import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
-import java.nio.file.Files
+import java.nio.file.{Files, Path => NioPath}
 
 class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
   import session.implicits._
 
-  private val tempDir = Files.createTempDirectory("test")
-  private val tempPath = tempDir.toAbsolutePath.toString
-
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
+  private var tempDir: NioPath = _
+  private var tempPath: String = _
+
   before {
     instanceRegistry.clear()
+    tempDir = Files.createTempDirectory("test")
+    tempPath = tempDir.toAbsolutePath.toString
+  }
+
+  after {
+    FileUtils.deleteDirectory(tempDir.toFile)
   }
 
   test("spark action with custom transformation class to load multiple sources into multiple targets") {
