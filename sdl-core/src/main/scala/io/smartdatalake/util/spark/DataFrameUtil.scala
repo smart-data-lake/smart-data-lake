@@ -355,6 +355,16 @@ private[smartdatalake] object DataFrameUtil {
   }
 
   /**
+   * Transforms name with dashs and underscores to LowerCamelCase.
+   */
+  def strToLowerCamelCase(x: String): String = {
+    val parts = x.split("[_\\- ]")
+    val camelCase = parts.map(_.capitalize).mkString
+    // lowercase first letter
+    camelCase.head.toLower +: camelCase.tail
+  }
+
+  /**
    * Transform a string with UTF8 chars (e.g. diacritics, umlauts) to ASCII chars (best effort)
    */
   def normalizeToAscii(x: String): String = {
