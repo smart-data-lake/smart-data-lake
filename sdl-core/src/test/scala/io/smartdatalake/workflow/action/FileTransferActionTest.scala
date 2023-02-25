@@ -52,16 +52,9 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     sshd.stop()
   }
 
-  private var tempDir: NioPath = _
-  private var tempPath: String = _
-
   before {
     instanceRegistry.clear()
     instanceRegistry.register(SftpFileRefConnection( "con1", "localhost", sshPort, BasicAuthMode("CLEAR#"+sshUser, "CLEAR#"+sshPwd), ignoreHostKeyVerification = true))
-  }
-
-  after {
-    FileUtils.deleteDirectory(tempDir.toFile)
   }
 
   test("copy file from sftp to hadoop without partitions") {
