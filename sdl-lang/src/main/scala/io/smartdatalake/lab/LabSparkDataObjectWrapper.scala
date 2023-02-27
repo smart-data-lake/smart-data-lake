@@ -17,7 +17,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.util.lab
+package io.smartdatalake.lab
 
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
