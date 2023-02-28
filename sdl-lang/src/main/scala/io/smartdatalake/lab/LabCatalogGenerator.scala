@@ -92,7 +92,7 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
   def generateDataObjectCatalogClass(packageName:String, className: String, registry: InstanceRegistry): String = {
     val entries = registry.getDataObjects.flatMap {
       case x: DataObject with CanCreateSparkDataFrame =>
-        Some(s"""lazy val ${DataFrameUtil.strToLowerCamelCase(x.id.id)} = LabSparkDataObjectWrapper(registry.get[${x.getClass.getName}]("${x.id.id}"), context)""")
+        Some(s"""lazy val ${DataFrameUtil.strToLowerCamelCase(x.id.id)} = LabSparkDataObjectWrapper(registry.get[${x.getClass.getName}](DataObjectId("${x.id.id}")), context)""")
       case x =>
         logger.info(s"No catalog entry created for ${x.id} of type ${x.getClass.getSimpleName}, as it does not implement CanCreateSparkDataFrame")
         None
@@ -100,6 +100,7 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
     s"""
     |package $packageName
     |import io.smartdatalake.config.InstanceRegistry
+    |import io.smartdatalake.config.SdlConfigObject.DataObjectId
     |import io.smartdatalake.workflow.ActionPipelineContext
     |import io.smartdatalake.lab.LabSparkDataObjectWrapper
     |case class $className(registry: InstanceRegistry, context: ActionPipelineContext) {
