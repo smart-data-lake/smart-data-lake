@@ -43,7 +43,7 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
       .text("One or multiple configuration files or directories containing configuration files for SDLB, separated by comma.")
     opt[String]('s', "srcDirectory")
       .required()
-      .action((value, c) => c.copy(packageName = value))
+      .action((value, c) => c.copy(srcDirectory = value))
       .text("Source directory where the scala file should be created. Must not include package path.")
     opt[String]('p', "packageName")
       .optional()
@@ -51,7 +51,7 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
       .text("Package name of scala class to create. Default: io.smartdatalake.generated")
     opt[String]('c', "className")
       .optional()
-      .action((value, c) => c.copy(packageName = value))
+      .action((value, c) => c.copy(className = value))
       .text("Class name of scala class to create. Default: DataObjectCatalog")
     help("help").text("Display the help text.")
   }
