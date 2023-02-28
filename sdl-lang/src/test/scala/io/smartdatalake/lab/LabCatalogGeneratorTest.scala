@@ -19,9 +19,11 @@
 
 package io.smartdatalake.lab
 
+import io.smartdatalake.util.misc.TryWithRessource
 import org.scalatest.FunSuite
 
 import java.nio.file.{Files, Paths}
+import scala.io.Source
 
 class LabCatalogGeneratorTest extends FunSuite {
   test("generate catalog") {
@@ -32,6 +34,8 @@ class LabCatalogGeneratorTest extends FunSuite {
     LabCatalogGenerator.generateDataObjectCatalog(config)
     val path = Paths.get(s"$srcDir/${packageName.split('.').mkString("/")}/$className.scala")
     assert(Files.exists(path))
-    assert(Files.readString(path).contains("dataObjectParquet12"))
+    assert(TryWithRessource.execSource(Source.fromFile(path.toFile)) {
+      x => x.getLines.exists(_.contains("dataObjectParquet12"))
+    })
   }
 }
