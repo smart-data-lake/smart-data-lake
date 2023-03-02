@@ -28,7 +28,6 @@ import io.smartdatalake.util.mlflow.{ MLflowPythonSparkEntryPoint, MLflowPythonU
 import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.{ DataFrame }
 
-
 // TODO: model according to experiment definition
 case class MLflowExperiment(experimentName: String)
 
@@ -42,7 +41,8 @@ case class MLflowDataObject(
                              override val id: DataObjectId,
                              trackingURI: String,
                              experimentName: String,
-                             modelVariableName: String,
+                             modelName: Option[String] = None,
+                             modelDescription: Option[String] = None,
                              override val metadata: Option[DataObjectMetadata] = None
                            )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject
@@ -53,6 +53,9 @@ case class MLflowDataObject(
   var entryPoint: Option[MLflowPythonSparkEntryPoint] = None
   var pythonMLflowApi: Option[MLflowPythonUtil] = None
 
+  //
+  var experimentId: Option[String] = None
+
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
     // create entry point
@@ -62,10 +65,10 @@ case class MLflowDataObject(
     } else {
       logger.info("Created MLflowPythonSparkEntryPoint")
       pythonMLflowApi = Some(MLflowPythonUtil(entryPoint.get, trackingURI))
-      val experimentID = pythonMLflowApi
+      experimentId = pythonMLflowApi
         .getOrElse(throw MLflowException("PythonUtil for MLflow not ready"))
         .getOrCreateExperimentID(experimentName)
-      logger.info(s"Working with MLflow experiment $experimentName with ID $experimentID")
+      logger.info(s"Working with MLflow experiment $experimentName with ID $experimentId")
     }
 
   }
