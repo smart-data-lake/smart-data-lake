@@ -20,24 +20,18 @@
 package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ ActionId, DataObjectId }
-import io.smartdatalake.config.{ ConfigurationException, FromConfigFactory, InstanceRegistry }
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
-import io.smartdatalake.workflow.action.generic.transformer.{ GenericDfsTransformer, GenericDfsTransformerDef }
+import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, GenericDfsTransformerDef}
 import io.smartdatalake.workflow.action.spark.transformer.PythonCodeDfsTransformer
-import io.smartdatalake.workflow.dataobject.{
-  CanCreateDataFrame,
-  CanWriteDataFrame,
-  DataObject,
-  MLflowDataObject,
-  MLflowException
-}
-import io.smartdatalake.workflow.{ ActionPipelineContext, DataFrameSubFeed, ExecutionPhase, SubFeed }
+import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase, SubFeed}
 import org.apache.hadoop.conf.Configuration
 
-import scala.reflect.runtime.universe.{ Type, typeOf }
+import scala.reflect.runtime.universe.{Type, typeOf}
 
 /**
  * This [[Action]] copies data between an input and output DataObject using DataFrames.
@@ -48,32 +42,32 @@ import scala.reflect.runtime.universe.{ Type, typeOf }
  * @param mlflowId id of the MLflow DataObject
  * @param runInfoId id of an DataObject that implements the CanCreateDataFrame trait. Here the run information of the training is written down
  * @param inputIds input DataObjects
- * @param trainIdSelector id of the DataObject that will be used for training
+ * @param predictIdSelector id of the DataObject that will be used for training
  * @param transformers optional list of transformations to apply. See [[spark.transformer]] for a list of included Transformers.
  *                     The transformations are applied according to the lists ordering.
  * @param pythonModelCode machine learning model provided directly as python code
  * @param pythonModelFile machine learning model provided as python file
  * @param registerModel register model in MLflow registry
  */
-case class MLflowTrainAction(
-                              override val id: ActionId,
-                              mlflowId: DataObjectId,
-                              runInfoId: DataObjectId,
-                              inputIds: Seq[DataObjectId],
-                              trainIdSelector: Option[String] = None,
-                              transformers: Seq[GenericDfsTransformer] = Seq(),
-                              pythonModelCode: Option[String] = None,
-                              pythonModelFile: Option[String] = None,
-                              registerModel: Boolean = false,
-                              override val breakDataFrameLineage: Boolean = false,
-                              override val persist: Boolean = false,
-                              override val mainInputId: Option[DataObjectId] = None,
-                              override val mainOutputId: Option[DataObjectId] = None,
-                              override val executionMode: Option[ExecutionMode] = None,
-                              override val executionCondition: Option[Condition] = None,
-                              override val metricsFailCondition: Option[String] = None,
-                              override val metadata: Option[ActionMetadata] = None,
-                            )(implicit instanceRegistry: InstanceRegistry)
+case class MLflowPredictAction(
+                                override val id: ActionId,
+                                mlflowId: DataObjectId,
+                                runInfoId: DataObjectId,
+                                inputIds: Seq[DataObjectId],
+                                predictIdSelector: Option[String] = None,
+                                transformers: Seq[GenericDfsTransformer] = Seq(),
+                                pythonModelCode: Option[String] = None,
+                                pythonModelFile: Option[String] = None,
+                                registerModel: Boolean = false,
+                                override val breakDataFrameLineage: Boolean = false,
+                                override val persist: Boolean = false,
+                                override val mainInputId: Option[DataObjectId] = None,
+                                override val mainOutputId: Option[DataObjectId] = None,
+                                override val executionMode: Option[ExecutionMode] = None,
+                                override val executionCondition: Option[Condition] = None,
+                                override val metricsFailCondition: Option[String] = None,
+                                override val metadata: Option[ActionMetadata] = None,
+                              )(implicit instanceRegistry: InstanceRegistry)
   extends DataFrameActionImpl {
 
   // get model code either from the file are directly from input
@@ -123,21 +117,21 @@ case class MLflowTrainAction(
          |run_info_schema = StructType([StructField("experimentId", StringType(), True), StructField("experimentName", StringType(), True), StructField("runId",StringType(),True), StructField("runName",StringType(),True),StructField("duration", FloatType(), True),StructField("date", TimestampType(), True), StructField("artifactPath", StringType(), True), StructField("modelUri", StringType(), True),StructField("estimatorName", StringType(), True)])
          |""".stripMargin
 
-    val getTrainingIdPython =
+    val getPredictionIdPython =
       f"""
          |import re
          |
          |class TrainingDataFrameError(Exception):
          |  pass
          |
-         |def get_train_id(selector: str, ids: list[str]):
+         |def get_predict_id(selector: str, ids: list[str]):
          |  if len(ids) > 1:
          |    # get DataObjectId according the given trainIdSelector
-         |    r = re.compile(".*${trainIdSelector.getOrElse("train")}.*")
-         |    possible_train_ids = list(filter(r.match, ids))
-         |    if len(possible_train_ids) != 1:
-         |      raise TrainingDataFrameError(f"Zero or multiple DataObjectIds detected for training {possible_train_ids}. One and only one DataObjectId must be provided for training. If only one Id is provided, this will be used. Otherwise the Id is selected using the case sensitive trainIdSelector (${trainIdSelector.get})")
-         |    return possible_train_ids[0]
+         |    r = re.compile(".*${predictIdSelector.getOrElse("predict")}.*")
+         |    possible_predict_ids = list(filter(r.match, ids))
+         |    if len(possible_predict_ids) != 1:
+         |      raise TrainingDataFrameError(f"Zero or multiple DataObjectIds detected for prediction {possible_predict_ids}. One and only one DataObjectId must be provided for training. If only one Id is provided, this will be used. Otherwise the Id is selected using the case sensitive trainIdSelector (${predictIdSelector.get})")
+         |    return possible_predict_ids[0]
          |  elif len(ids) == 1:
          |    return ids[0]
          |  else:
@@ -152,7 +146,7 @@ case class MLflowTrainAction(
           f"""
              |run_info_df = session.createDataFrame([], run_info_schema)
              |# check input
-             |train_id = get_train_id("$trainIdSelector", list(inputDfs.keys()))
+             |train_id = get_train_id("$predictIdSelector", list(inputDfs.keys()))
              |print(f"The following DataObjectId will be used for training: {train_id}")
              |# generate output dict
              |outDfs = {}
@@ -162,12 +156,13 @@ case class MLflowTrainAction(
 
         val initMlflowTransformer = PythonCodeDfsTransformer(
           name = "pythonInitTransformer",
-          code = Some(runInfoSchemaPython + getTrainingIdPython + initPython)
+          code = Some(runInfoSchemaPython + getPredictionIdPython + initPython)
         )
         transformerDefs :+ initMlflowTransformer
 
       case ExecutionPhase.Exec =>
-        val pythonTrainPrefixBoilerPlate = runInfoSchemaPython + getTrainingIdPython +
+        // TODO: change logic, only prediction needed
+        val pythonTrainPrefixBoilerPlate = runInfoSchemaPython + getPredictionIdPython +
           s"""
              |import mlflow
              |import json
@@ -181,7 +176,7 @@ case class MLflowTrainAction(
              |run = mlflow.active_run()
              |print("run_id: {}; status: {}".format(run.info.run_id, run.info.status))
              |# get training dataframe from SDL
-             |train_id = get_train_id("$trainIdSelector", list(inputDfs.keys()))
+             |train_id = get_train_id("$predictIdSelector", list(inputDfs.keys()))
              |print(f"The following DataObjectId will be used for training: {train_id}")
              |df = inputDfs[f"{train_id}"]
              |""".stripMargin
@@ -243,6 +238,7 @@ case class MLflowTrainAction(
   ): Unit = {
     super.postExec(inputSubFeeds, outputSubFeeds)
     // TODO: check if this is only executed if there was no failure during EXEC phase
+    // TODO: allow user to set the stage of the model if certain thresholds are met
     if (registerModel) {
       // model has been logged during transform phase
       val latestRunInfo = mlflow.pythonMLflowApi.get.setLatest(
@@ -253,11 +249,11 @@ case class MLflowTrainAction(
     }
   }
 
-  override def factory: FromConfigFactory[Action] = MLflowTrainAction
+  override def factory: FromConfigFactory[Action] = MLflowPredictAction
 }
 
-object MLflowTrainAction extends FromConfigFactory[Action] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): MLflowTrainAction = {
-    extract[MLflowTrainAction](config)
+object MLflowPredictAction extends FromConfigFactory[Action] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): MLflowPredictAction = {
+    extract[MLflowPredictAction](config)
   }
 }
