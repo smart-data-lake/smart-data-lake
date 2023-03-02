@@ -23,12 +23,18 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ ActionId, DataObjectId }
 import io.smartdatalake.config.{ ConfigurationException, FromConfigFactory, InstanceRegistry }
 import io.smartdatalake.definitions.Condition
-import io.smartdatalake.util.hdfs.{ HdfsUtil }
+import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{ GenericDfsTransformer, GenericDfsTransformerDef }
-import io.smartdatalake.workflow.action.spark.transformer.{ PythonCodeDfsTransformer }
-import io.smartdatalake.workflow.dataobject.{ CanCreateDataFrame, CanWriteDataFrame, DataObject, MLflowDataObject }
-import io.smartdatalake.workflow.{ ActionPipelineContext, DataFrameSubFeed, ExecutionPhase }
+import io.smartdatalake.workflow.action.spark.transformer.PythonCodeDfsTransformer
+import io.smartdatalake.workflow.dataobject.{
+  CanCreateDataFrame,
+  CanWriteDataFrame,
+  DataObject,
+  MLflowDataObject,
+  MLflowException
+}
+import io.smartdatalake.workflow.{ ActionPipelineContext, DataFrameSubFeed, ExecutionPhase, SubFeed }
 import org.apache.hadoop.conf.Configuration
 
 import scala.reflect.runtime.universe.{ Type, typeOf }
@@ -47,6 +53,7 @@ import scala.reflect.runtime.universe.{ Type, typeOf }
  *                     The transformations are applied according to the lists ordering.
  * @param pythonModelCode machine learning model provided directly as python code
  * @param pythonModelFile machine learning model provided as python file
+ * @param registerModel register model in MLflow registry
  */
 case class MLflowTrainAction(
                               override val id: ActionId,
@@ -57,6 +64,7 @@ case class MLflowTrainAction(
                               transformers: Seq[GenericDfsTransformer] = Seq(),
                               pythonModelCode: Option[String] = None,
                               pythonModelFile: Option[String] = None,
+                              registerModel: Boolean = false,
                               override val breakDataFrameLineage: Boolean = false,
                               override val persist: Boolean = false,
                               override val mainInputId: Option[DataObjectId] = None,
@@ -162,6 +170,7 @@ case class MLflowTrainAction(
         val pythonTrainPrefixBoilerPlate = runInfoSchemaPython + getTrainingIdPython +
           s"""
              |import mlflow
+             |import json
              |mlflow.set_tracking_uri("${mlflow.trackingURI}")
              |# set experiment name
              |mlflow.set_experiment("${mlflow.experimentName}")
@@ -191,7 +200,6 @@ case class MLflowTrainAction(
              |tz_info=ZoneInfo("Europe/Zurich")
              |date = datetime.fromtimestamp(int(run.info.start_time)/1000.0, tz=tz_info).strftime(time_format)
              |duration = (int(run.info.end_time)-int(run.info.start_time)) / 1000.0
-             |import json
              |model_history_list = json.loads(run.data.tags["mlflow.log-model.history"])
              |model_history = model_history_list[0]
              |artifact_path = model_history["artifact_path"]
@@ -228,6 +236,21 @@ case class MLflowTrainAction(
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
     transformerDefs.foreach(_.prepare(id))
+  }
+
+  override def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit
+                                                                                   context: ActionPipelineContext
+  ): Unit = {
+    super.postExec(inputSubFeeds, outputSubFeeds)
+    // TODO: check if this is only executed if there was no failure during EXEC phase
+    if (registerModel) {
+      // model has been logged during transform phase
+      val latestRunInfo = mlflow.pythonMLflowApi.get.setLatest(
+        mlflow.experimentId.getOrElse(throw MLflowException("No experimentId was set in the MLflowDataObject"))
+      )
+      // register Model does not wait until model is registered, so its not immediately visible within MLflow
+      mlflow.pythonMLflowApi.get.registerModel(latestRunInfo.modelUri, mlflow.experimentName)
+    }
   }
 
   override def factory: FromConfigFactory[Action] = MLflowTrainAction

@@ -18,7 +18,6 @@
  */
 package io.smartdatalake.util.mlflow
 
-import io.smartdatalake.util.mlflow.ModelType.ModelType
 import io.smartdatalake.util.spark.{ PythonSparkEntryPoint, PythonUtil }
 import org.apache.spark.sql.SparkSession
 
@@ -27,10 +26,13 @@ object ModelType extends Enumeration {
   val Sklearn, Tensorflow = Value
 }
 
+case class LatestRunInfo(experimentId: String, runId: String, modelUri: String)
+
 case class MLflowPythonUtil(entryPoint: MLflowPythonSparkEntryPoint, trackingURI: String) {
   val mlflowBoilerplate =
     s"""
        |import mlflow
+       |import json
        |# config tracking server
        |mlflow.set_tracking_uri("${trackingURI}")
        |""".stripMargin
@@ -48,6 +50,36 @@ case class MLflowPythonUtil(entryPoint: MLflowPythonSparkEntryPoint, trackingURI
 
     PythonUtil.execPythonSparkCode(entryPoint, mlflowBoilerplate + createExperimentCode)
     entryPoint.experimentId
+  }
+
+  def setLatest(experimentId: String): LatestRunInfo = {
+    val getLatestRunIdCode =
+      s"""
+         |from mlflow.entities import ViewType
+         |run = mlflow.search_runs(experiment_ids="$experimentId", filter_string="", run_view_type=ViewType.ACTIVE_ONLY,max_results=1, order_by=["start_time DESC"],output_format="list")[0]
+         |model_history_list = json.loads(run.data.tags["mlflow.log-model.history"])
+         |artifact_path = model_history_list[0]["artifact_path"]
+         |model_uri = f"runs:/{run.info.run_id}/{artifact_path}"
+         |run_id = run.info.run_id
+         |entryPoint.setLatestModelUri(model_uri)
+         |entryPoint.setLatestRunId(run_id)
+         |""".stripMargin
+    PythonUtil.execPythonSparkCode(entryPoint, mlflowBoilerplate + getLatestRunIdCode)
+
+    // return
+    LatestRunInfo(
+      experimentId = entryPoint.experimentId.getOrElse(""),
+      runId = entryPoint.latestRunId.getOrElse(""),
+      modelUri = entryPoint.latestRunId.getOrElse("")
+    )
+  }
+
+  def registerModel(modelUri: String, modelName: String, description: String = "") = {
+    val registerModelCode =
+      s"""
+         |model_details = mlflow.register_model(model_uri=$modelUri, name=$modelName)
+         |print(model_details)
+         |""".stripMargin
   }
 
   def logSklearnModelBoilerplate(): String = {
@@ -70,18 +102,25 @@ case class MLflowPythonUtil(entryPoint: MLflowPythonSparkEntryPoint, trackingURI
 }
 
 private[smartdatalake] class MLflowPythonSparkEntryPoint(
-                                                          override val session: SparkSession,
-                                                          options: Map[String, String],
-                                                          var experimentId: Option[String] = None,
-                                                          var modelUri: Option[String] = None
-                                                        ) extends PythonSparkEntryPoint(session, options) {
+    override val session: SparkSession,
+    options: Map[String, String],
+    var experimentId: Option[String] = None,
+    var latestRunId: Option[String] = None,
+    var modelUri: Option[String] = None
+) extends PythonSparkEntryPoint(session, options) {
 
   def setExperimentId(id: String): Unit = {
     experimentId = Some(id)
   }
-  def setModelUri(id: String): Unit = {
-    modelUri = Some(id)
+
+  def setLatestRunId(id: String): Unit = {
+    latestRunId = Some(id)
   }
+
+  def setLatestModelUri(uri: String): Unit = {
+    modelUri = Some(uri)
+  }
+
 }
 
 /**
