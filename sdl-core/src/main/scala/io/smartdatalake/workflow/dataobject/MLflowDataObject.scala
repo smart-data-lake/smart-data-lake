@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,9 +26,8 @@ import com.typesafe.config.Config
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.mlflow.{ MLflowPythonSparkEntryPoint, MLflowPythonUtil }
 import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.{ DataFrame, SparkSession }
+import org.apache.spark.sql.{ DataFrame }
 
-import scala.reflect.runtime.universe.Type
 
 // TODO: model according to experiment definition
 case class MLflowExperiment(experimentName: String)
@@ -96,4 +95,3 @@ object MLflowDataObject extends FromConfigFactory[DataObject] with SmartDataLake
 }
 
 case class MLflowException(msg: String, cause: Throwable = null) extends Exception(msg, cause)
-
