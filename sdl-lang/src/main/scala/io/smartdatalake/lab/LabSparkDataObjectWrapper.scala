@@ -26,6 +26,9 @@ import io.smartdatalake.workflow.dataobject.{CanCreateSparkDataFrame, CanHandleP
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.StructType
 
+/**
+ * A wrapper around a Spark DataObject simplifying the interface for interactive use.
+ */
 case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFrame](dataObject: T, context: ActionPipelineContext) {
   def get(): DataFrame = {
     dataObject.getSparkDataFrame()(context)
@@ -54,6 +57,7 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
     case _ => throw NotSupportedException(dataObject.id, "is not partitioned")
   }
   def schema: StructType = dataObject.getSparkDataFrame()(context).schema
+  def printSchema: Unit = dataObject.getSparkDataFrame()(context).printSchema()
 }
 
 case class NotSupportedException(id: ConfigObjectId, msg: String) extends Exception(s"$id} $msg")

@@ -28,8 +28,61 @@ import scopt.OptionParser
 import java.nio.file.{Files, Paths, StandardOpenOption}
 
 
-case class LabCatalogGeneratorConfig(configPaths: Seq[String] = null, srcDirectory: String = null, packageName: String = "io.smartdatalake.generated", className: String = "DataObjectCatalog")
+case class LabCatalogGeneratorConfig(configPaths: Seq[String] = null, srcDirectory: String = null, packageName: String = "io.smartdatalake.generated", dataObjectCatalogClassName: String = "DataObjectCatalog")
 
+/**
+ * Command line interface to generate a scala files that serve as catalog for SmartDataLakeBuilderLab.
+ * For now a catalog for DataObjects is created, but could be extended to Actions in the future.
+ *
+ * The compilation of the scala file has to be added in the build process of the SDLB application as a second compilation phase
+ * because it needs to parse the configuration, incl. potential transformers defined.
+ * In Maven this can be done by defining the following additional plugins and adding `sdl-lang` as additional project dependency:
+ * ```
+ *                         <!-- generate catalog scala code. -->
+ *                        <plugin>
+ *                                <groupId>org.codehaus.mojo</groupId>
+ *                                <artifactId>exec-maven-plugin</artifactId>
+ *                                <version>3.1.0</version>
+ *                                <executions>
+ *                                       <execution>
+ *                                                <id>generate-catalog</id>
+ *                                                <phase>prepare-package</phase>
+ *                                                <goals><goal>java</goal></goals>
+ *                                                <configuration>
+ *                                                        <mainClass>io.smartdatalake.lab.LabCatalogGenerator</mainClass>
+ *                                                        <arguments>
+ *                                                                <argument>--config</argument><argument>./config,./envConfig/ci.conf</argument>
+ *                                                                <argument>--srcDirectory</argument><argument>./src/main/scala-generated</argument>
+ *                                                                <argument>--packageName</argument><argument>ch.sbb.dlfw.generated</argument>
+ *                                                                <argument>--className</argument><argument>DlfwCatalog</argument>
+ *                                                        </arguments>
+ *                                                        <classpathScope>compile</classpathScope>
+ *                                                </configuration>
+ *                                        </execution>
+ *                                </executions>
+ *                        </plugin>
+ *
+ *                      <!-- Compiles Scala sources. -->
+ *                        <plugin>
+ *                                <groupId>net.alchim31.maven</groupId>
+ *                                <artifactId>scala-maven-plugin</artifactId>
+ *                                <executions>
+ *                                        <!-- add additional execution to compile generated catalog (see id generate-catalog) -->
+ *                                        <execution>
+ *                                                <id>compile-catalog</id>
+ *                                                <phase>prepare-package</phase>
+ *                                                <goals><goal>compile</goal></goals>
+ *                                                <configuration>
+ *                                                        <sourceDir>./src/main/scala-generated</sourceDir>
+ *                                                        <!--additionalClasspathElements>
+ *                                                                <additionalClasspathElement>target/classes</additionalClasspathElement>
+ *                                                        </additionalClasspathElements-->
+ *                                                </configuration>
+ *                                        </execution>
+ *                                </executions>
+ *                        </plugin>
+ * ```
+ */
 object LabCatalogGenerator extends SmartDataLakeLogger {
   import scala.reflect.runtime.universe._
 
@@ -51,7 +104,7 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
       .text("Package name of scala class to create. Default: io.smartdatalake.generated")
     opt[String]('c', "className")
       .optional()
-      .action((value, c) => c.copy(className = value))
+      .action((value, c) => c.copy(dataObjectCatalogClassName = value))
       .text("Class name of scala class to create. Default: DataObjectCatalog")
     help("help").text("Display the help text.")
   }
@@ -76,7 +129,7 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
     val (registry, _) = ConfigToolbox.loadAndParseConfig(config.configPaths)
 
     // write scala file
-    createDataObjectCatalogScalaFile(config.srcDirectory, config.packageName, config.className, registry)
+    createDataObjectCatalogScalaFile(config.srcDirectory, config.packageName, config.dataObjectCatalogClassName, registry)
   }
 
   def createDataObjectCatalogScalaFile(srcDir: String, packageName:String, className: String, registry: InstanceRegistry): Unit = {
