@@ -25,8 +25,8 @@ import io.smartdatalake.definitions.{DateColumnType, KeycloakClientSecretAuthMod
 import io.smartdatalake.testutils.custom.TestCustomDfCreator
 import io.smartdatalake.util.misc.{AclDef, AclElement}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
-import io.smartdatalake.workflow.connection.JdbcTableConnection
-import io.smartdatalake.workflow.dataobject.{Table, _}
+import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.scalatest.{FlatSpec, Matchers}
 

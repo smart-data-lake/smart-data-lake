@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.workflow.connection
+package io.smartdatalake.workflow.connection.jdbc
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.sql.SparkSession
@@ -34,6 +34,7 @@ import java.sql.ResultSet
 private[smartdatalake] abstract class JdbcCatalog(connection: JdbcTableConnection) extends SmartDataLakeLogger  {
   // get spark jdbc dialect definitions
   JdbcDialects.registerDialect(HSQLDbDialect)
+  JdbcDialects.registerDialect(MariaDbDialect)
   protected val jdbcDialect: JdbcDialect = JdbcDialects.get(connection.url)
   protected val isNoopDialect: Boolean = jdbcDialect.getClass.getSimpleName.startsWith("NoopDialect") // The default implementation is used for unknown url types
   // use jdbcDialect to define identifiers used for quoting
