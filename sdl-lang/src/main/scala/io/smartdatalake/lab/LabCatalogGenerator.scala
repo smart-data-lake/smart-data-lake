@@ -53,8 +53,8 @@ case class LabCatalogGeneratorConfig(configPaths: Seq[String] = null, srcDirecto
  *                                                        <arguments>
  *                                                                <argument>--config</argument><argument>./config,./envConfig/ci.conf</argument>
  *                                                                <argument>--srcDirectory</argument><argument>./src/main/scala-generated</argument>
- *                                                                <argument>--packageName</argument><argument>ch.sbb.dlfw.generated</argument>
- *                                                                <argument>--className</argument><argument>DlfwCatalog</argument>
+ *                                                                <argument>--packageName</argument><argument>io.smartdatalake.generated</argument>
+ *                                                                <argument>--className</argument><argument>DataObjectCatalog</argument>
  *                                                        </arguments>
  *                                                        <classpathScope>compile</classpathScope>
  *                                                </configuration>
