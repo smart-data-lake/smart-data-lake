@@ -39,3 +39,11 @@ case class SmartDataLakeBuilderLab[T](
   @transient val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(session, registry)
   @transient val data: T = dataObjectCatalogFactory(registry, context)
 }
+
+object SmartDataLakeBuilderLab {
+  /**
+   * Writing into DataObjects using SmartDataLakeBuilderLab is disabled by default, as this should be done through data pipelines and not interactively.
+   * It can be enabled by setting the following variable to true.
+   */
+  var enableWritingDataObjects = false
+}

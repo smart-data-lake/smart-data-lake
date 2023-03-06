@@ -33,18 +33,24 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
   def get(): DataFrame = {
     dataObject.getSparkDataFrame()(context)
   }
-  def get(topLevelPartitionValues: Seq[String]): DataFrame = {
-    assert(partitionColumns.nonEmpty, s"($dataObject.id) partition columns are empty but called get(...) with topLevelPartitionValues ${topLevelPartitionValues.mkString(",")}")
+  def get(topLevelPartitions: Seq[String]): DataFrame = {
+    if(partitionColumns.isEmpty) throw NotSupportedException(dataObject.id, s"DataObject is not partitioned but called get(...) with topLevelPartitions ${topLevelPartitions.mkString(",")}")
     val topLevelPartitionColumn = partitionColumns.head
-    dataObject.getSparkDataFrame(topLevelPartitionValues.map(p => PartitionValues(Map(topLevelPartitionColumn -> p))))(context)
+    dataObject.getSparkDataFrame(topLevelPartitions.map(p => PartitionValues(Map(topLevelPartitionColumn -> p))))(context)
   }
-  def getWithPartitionValues(partitionValues: Seq[Map[String,String]]): DataFrame = {
-    dataObject.getSparkDataFrame(partitionValues.map(PartitionValues(_)))(context)
+  def getWithPartitions(partitions: Seq[Map[String,String]]): DataFrame = {
+    if(partitionColumns.isEmpty) throw NotSupportedException(dataObject.id, s"DataObject is not partitioned but called getWithPartitions(...) with partitions ${partitions.mkString(",")}")
+    dataObject.getSparkDataFrame(partitions.map(PartitionValues(_)))(context)
   }
-  def write(dataFrame: DataFrame): Unit = {
+  def write(dataFrame: DataFrame, topLevelPartitions: Seq[String] = Seq()): Unit = {
+    writeWithPartitions(dataFrame, topLevelPartitions.map(p => Map(partitionColumns.head -> p)))
+  }
+  def writeWithPartitions(dataFrame: DataFrame, partitions: Seq[Map[String,String]]): Unit = {
+    if(!SmartDataLakeBuilderLab.enableWritingDataObjects) throw new IllegalAccessException("Writing into DataObjects using SmartDataLakeBuilderLab is disabled by default because it is not seen as best practice. Set SmartDataLakeBuilderLab.enableWritingDataObjects=true to remove this limitation if you know what you do.")
+    if(partitions.nonEmpty && partitionColumns.isEmpty) throw NotSupportedException(dataObject.id, s"DataObject is not partitioned but called getWithPartitions(...) with partitions ${partitions.mkString(",")}")
     dataObject match {
       case o: CanWriteSparkDataFrame =>
-        o.writeSparkDataFrame(dataFrame)(context)
+        o.writeSparkDataFrame(dataFrame, partitions.map(pv => PartitionValues(pv)))(context)
       case _ => throw NotSupportedException(dataObject.id, "can not write Spark DataFrames")
     }
   }
@@ -56,8 +62,9 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
     case o: CanHandlePartitions => o.listPartitions(context).map(_.elements.mapValues(_.toString))
     case _ => throw NotSupportedException(dataObject.id, "is not partitioned")
   }
+  def topLevelPartitions: Seq[String] = partitions.map(_(partitionColumns.head))
   def schema: StructType = dataObject.getSparkDataFrame()(context).schema
-  def printSchema: Unit = dataObject.getSparkDataFrame()(context).printSchema()
+  def printSchema(): Unit = dataObject.getSparkDataFrame()(context).printSchema()
 }
 
 case class NotSupportedException(id: ConfigObjectId, msg: String) extends Exception(s"$id} $msg")
