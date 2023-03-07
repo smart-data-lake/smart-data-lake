@@ -105,13 +105,13 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
 
   /**
    * Handle class cast exception when getting objects from instance registry
-   *
-   * @param connectionId
-   * @param registry
-   * @return
    */
   protected def getConnection[T <: Connection](connectionId: ConnectionId)(implicit registry: InstanceRegistry, ct: ClassTag[T], tt: TypeTag[T]): T = {
-    val connection: T = registry.get[T](connectionId)
+    val connection = try {
+      registry.get[T](connectionId)
+    } catch {
+      case _: NoSuchElementException => throw new NoSuchElementException(s"key not found in instance registry: $connectionId")
+    }
     try {
       // force class cast on generic type (otherwise the ClassCastException is thrown later)
       ct.runtimeClass.cast(connection).asInstanceOf[T]

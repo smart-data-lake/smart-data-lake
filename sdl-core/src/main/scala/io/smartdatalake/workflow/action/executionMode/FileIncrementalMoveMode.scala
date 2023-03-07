@@ -53,7 +53,7 @@ case class FileIncrementalMoveMode(archivePath: Option[String] = None) extends E
   /**
    * Check for files in input data object.
    */
-  private[smartdatalake] override def apply(actionId: ActionId, mainInput: DataObject
+  override def apply(actionId: ActionId, mainInput: DataObject
                                             , mainOutput: DataObject, subFeed: SubFeed
                                             , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])
                                            (implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
@@ -78,7 +78,7 @@ case class FileIncrementalMoveMode(archivePath: Option[String] = None) extends E
   /**
    * Remove/archive files after read
    */
-  private[smartdatalake] override def postExec(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, mainInputSubFeed: SubFeed, mainOutputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = {
+  override def postExec(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, mainInputSubFeed: SubFeed, mainOutputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = {
     (mainInput, mainOutputSubFeed) match {
       case (fileRefInput: FileRefDataObject, fileSubFeed: FileSubFeed) =>
         fileSubFeed.fileRefMapping.foreach {

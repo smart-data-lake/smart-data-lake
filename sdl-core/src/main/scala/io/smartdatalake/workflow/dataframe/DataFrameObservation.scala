@@ -23,7 +23,7 @@ package io.smartdatalake.workflow.dataframe
  * An Observation can observe metrics during evaluation of DataFrames.
  * In case the engine or implementation does not support observing metrics, they can also be calculated when calling waitFor method.
  */
-trait Observation {
+trait DataFrameObservation {
 
   /**
    * Get the observed metrics.
@@ -42,7 +42,7 @@ trait Observation {
  * Calculate metrics to fake observation result.
  * For Snowpark this is the only method to observe metrics.
  */
-private[smartdatalake] case class GenericCalculatedObservation(df: GenericDataFrame, aggregateColumns: GenericColumn*) extends Observation {
+private[smartdatalake] case class GenericCalculatedObservation(df: GenericDataFrame, aggregateColumns: GenericColumn*) extends DataFrameObservation {
   override def waitFor(timeoutSec: Int): Map[String, _] = {
     // calculate aggregate expressions on DataFrame
     val dfObservations = df.agg(aggregateColumns)
