@@ -47,7 +47,9 @@ object ConfigToolbox {
     val defaultHadoopConf: Configuration = new Configuration()
     val config = ConfigLoader.loadConfigFromFilesystem(locations, defaultHadoopConf)
     val globalConfig = GlobalConfig.from(config)
+    Environment._globalConfig = globalConfig
     val registry = ConfigParser.parse(config)
+    Environment._instanceRegistry = registry
     (registry, globalConfig)
   }
 
