@@ -6,9 +6,14 @@ on:
       - 'master-spark*'
     types: [closed]
 
+  # allow for manual releases from hotfix branches
+  # the version to create needs to be set correctly in all pom.xml files, e.g. by using `mvn versions:set -DnewVersion=x.y.z`
+  # then a normal release is created including tag, but without increasing version number on original branch
+  workflow_dispatch:
+
 jobs:
-  build-release:
-    if: github.event.pull_request.merged == true
+  deploy-release:
+    if: {{ github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch' }}
 
     runs-on: ubuntu-latest
 
@@ -79,7 +84,13 @@ jobs:
         git tag -f ${MVN_RELEASE_VERSION} -m "Release ${MVN_RELEASE_VERSION}"
         git push origin ${MVN_RELEASE_VERSION} # push tag
         
-    # DEVELOP BRANCH
+  update-snapshot-version:
+    needs: deploy-release
+    if: github.event_name != 'workflow_dispatch'
+
+    runs-on: ubuntu-latest
+
+    steps:
     - name: Develop Git Checkout
       run: |
         git fetch origin ${GITHUB_HEAD_REF}
@@ -106,7 +117,12 @@ jobs:
       run: |
         git push
 
-    # DOCUMENTATION BRANCH
+  publish-schema-json:
+    needs: deploy-release
+
+    runs-on: ubuntu-latest
+
+    steps:
     - name: Push sdl-schema.json to documentation branch
       run: |
         git fetch origin documentation
