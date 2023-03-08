@@ -30,8 +30,8 @@ To create a new Release from the current state in develop-spark* branch
 3. Wait for the build & deploy to succeed. It will
    - Build and deploy the artifacts to oss.sonatype.org
    - Create a tag for the version on master-spark3 branch
-   - Increase Snapshot version on develop-spark3 branch
    - Add the new sdl-schema.json file to documentation branch
+   - Increase Snapshot version on develop-spark3 branch
 4. Login to oss.sonatype.org, select "Staging Repositories" and release artifacts to maven central
 5. Select created version tag in Github and create Release notes
 
@@ -41,9 +41,10 @@ To fix problems on previous versions and create a new Hotfix Release
 1. Create a new branch named "hotfix/\<issueNb>" from the version tag that you need a fix for
 2. Implement & test the fix you need
 3. Create a second branch including your fix and create a PR to develop-spark3, so the fix will be included in future versions
-4. Update version in all pom.xml files to the Hotfix Version to be created using `mvn versions:set -DnewVersion=x.y.z-SNAPSHOT`
+4. Update version in all pom.xml files to the Hotfix Version to be created using `mvn versions:set -DnewVersion=x.y.z`
 5. Trigger the "Release Build" Action manually on Github and choose the corresponding hotfix branch to build. It will
     - Build and deploy the artifacts to oss.sonatype.org
     - Create a tag for the version on master-spark3 branch
+    - Add the new sdl-schema.json file to documentation branch
 4. Login to oss.sonatype.org, select "Staging Repositories" and release artifacts to maven central
 5. Select created version tag in Github and create Release notes
