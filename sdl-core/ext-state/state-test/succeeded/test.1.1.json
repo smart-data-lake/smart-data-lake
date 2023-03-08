@@ -7,8 +7,8 @@
   },
   "runId" : 1,
   "attemptId" : 1,
-  "runStartTime" : "2023-01-15T14:44:11.892181",
-  "attemptStartTime" : "2023-01-15T14:44:11.892185",
+  "runStartTime" : "2023-03-08T16:38:23.599267",
+  "attemptStartTime" : "2023-03-08T16:38:23.599272",
   "actionsState" : {
     "act" : {
       "executionId" : {
@@ -17,8 +17,8 @@
         "attemptId" : 1
       },
       "state" : "SUCCEEDED",
-      "startTstmp" : "2023-01-15T14:44:11.953367",
-      "duration" : "PT0.105679S",
+      "startTstmp" : "2023-03-08T16:38:23.667507",
+      "duration" : "PT0.166593S",
       "results" : [ {
         "subFeed" : {
           "type" : "SparkSubFeed",
@@ -32,7 +32,7 @@
           "stage" : "save",
           "num_tasks" : 1,
           "records_written" : 1,
-          "stage_duration" : "PT0.034S",
+          "stage_duration" : "PT0.045S",
           "bytes_written" : 20
         }
       } ],
