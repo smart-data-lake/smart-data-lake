@@ -51,7 +51,7 @@ object SmartDataLakeBuilderAzureRelayAgentIT extends App {
   val dfSrc1 = Seq("testData").toDF("testColumn")
   srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContextWithoutHive(sdlb.instanceRegistry))
 
-  val azureRelayUrl = "Endpoint=sb://relay-tbb-test.servicebus.windows.net/;EntityPath=relay-tbb-test-connection;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey="
+  val azureRelayUrl = "Endpoint=sb://relay-tbb-test2.servicebus.windows.net/;SharedAccessKeyName=tbb-test-policy;SharedAccessKey=TODO;EntityPath=tbb-test-connection"
   val agentConfig = LocalAzureRelayAgentSmartDataLakeBuilderConfig(feedSel = feedName, configuration = None, azureRelayURL = Some(azureRelayUrl))
   val remoteSDLB = new DefaultSmartDataLakeBuilder()
   //Make sure this string matches the config from the file application-azureRelayAgent.conf
