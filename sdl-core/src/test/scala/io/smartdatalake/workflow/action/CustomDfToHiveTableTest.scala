@@ -18,34 +18,45 @@
  */
 package io.smartdatalake.workflow.action
 
+import java.nio.file.{Files, Path => NioPath}
+import java.time.LocalDateTime
+import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.testutils.custom.{TestCustomDfCreator, TestCustomDfManyTypes}
+import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.action.spark.transformer.StandardizeSparkDatatypesTransformer
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.{CustomDfDataObject, HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
+import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types._
 import org.scalatest.{BeforeAndAfter, FunSuite}
-
-import java.nio.file.Files
 
 class CustomDfToHiveTableTest extends FunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
   import sessionHiveCatalog.implicits._
 
-  private val tempDir = Files.createTempDirectory("test")
-  private val tempPath = tempDir.toAbsolutePath.toString
-
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
-  before { instanceRegistry.clear() }
+  private var tempDir: NioPath = _
+  private var tempPath: String = _
+
+  before {
+    instanceRegistry.clear()
+    tempDir = Files.createTempDirectory("test")
+    tempPath = tempDir.toAbsolutePath.toString
+  }
+
+  after {
+    FileUtils.deleteDirectory(tempDir.toFile)
+  }
 
   test("Df2HiveTable: load custom data frame into Hive table. Reads Hive table into another data frame and compares the two data frames.") {
 

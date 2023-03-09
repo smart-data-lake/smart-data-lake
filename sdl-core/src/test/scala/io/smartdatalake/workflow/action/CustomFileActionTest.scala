@@ -26,25 +26,33 @@ import io.smartdatalake.workflow.action.executionMode.PartitionDiffMode
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomFileTransformer, CustomFileTransformerConfig}
 import io.smartdatalake.workflow.dataobject.CsvFileDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, InitSubFeed}
+import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import java.io.PrintWriter
-import java.nio.file.Files
+import java.nio.file.{Files, Path => NioPath}
 import scala.io.Source
 
 class CustomFileActionTest extends FunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
 
-  private val tempDir = Files.createTempDirectory("test")
-
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
+  private var tempDir: NioPath = _
+  private var tempPath: String = _
+
   before {
-    instanceRegistry.clear
+    instanceRegistry.clear()
+    tempDir = Files.createTempDirectory("test")
+    tempPath = tempDir.toAbsolutePath.toString
+  }
+
+  after {
+    FileUtils.deleteDirectory(tempDir.toFile)
   }
 
   test("custom csv-file transformation") {

@@ -35,8 +35,9 @@ class ConfigJsonExporterTest extends FunSuite {
   }
 
   test("test main") {
-    ConfigJsonExporter.main(Array("-c", getClass.getResource("/dagexporter/dagexporterTest.conf").getPath))
-    assert(new File("exportedConfig.json").exists())
+    val fileName = "target/exportedConfig.json"
+    ConfigJsonExporter.main(Array("-c", getClass.getResource("/dagexporter/dagexporterTest.conf").getPath, "-f", fileName))
+    assert(new File(fileName).exists())
   }
 
 

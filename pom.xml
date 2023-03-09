@@ -231,8 +231,8 @@
         <scala.minor.version>2.12</scala.minor.version>
         <scala.version>${scala.minor.version}.15</scala.version>
 
-        <spark.version>3.3.1</spark.version>
-        <spark-extensions.version>3.3.4</spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
+        <spark.version>3.3.2</spark.version>
+        <spark-extensions.version>3.3.5</spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
         <spark.minor.version>3.3</spark.minor.version> <!-- this is used in sdl-snowflake -->
 
         <!-- SPARK-PARENT start: properties copied from spark-parent pom version for spark-parent import in dependencyManagement -->
@@ -1040,7 +1040,6 @@
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-api</artifactId>
                 <version>${slf4j.version}</version>
-                <scope>${hadoop.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>

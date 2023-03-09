@@ -24,13 +24,14 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.ExecutionPhase
-import io.smartdatalake.workflow.connection.JdbcTableConnection
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+ import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+ import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, JdbcTableDataObject, Table}
+import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
-import java.nio.file.Files
+import java.nio.file.{Files, Path => NioPath}
 import java.sql.Timestamp
 import java.time.LocalDateTime
 
@@ -39,15 +40,21 @@ import java.time.LocalDateTime
    protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
    import session.implicits._
 
-   private val tempDir = Files.createTempDirectory("test")
-   private val tempPath = tempDir.toAbsolutePath.toString
-
    implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
    private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:file:target/JdbcTableDataObjectTest/hsqldb", "org.hsqldb.jdbcDriver")
 
+   private var tempDir: NioPath = _
+   private var tempPath: String = _
+
    before {
      instanceRegistry.clear()
+     tempDir = Files.createTempDirectory("test")
+     tempPath = tempDir.toAbsolutePath.toString
+   }
+
+   after {
+     FileUtils.deleteDirectory(tempDir.toFile)
    }
 
    test("historize load mergeModeEnable") {

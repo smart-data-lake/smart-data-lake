@@ -20,7 +20,7 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.app.BuildVersionInfo.buildVersionInfoFilename
-import io.smartdatalake.config.{ConfigLoader, ConfigToolbox, ConfigurationException, InstanceRegistry}
+import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, TryWithRessource}
 import scopt.OptionParser
 

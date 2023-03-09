@@ -459,7 +459,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
     validateSchemaMin(SparkSchema(df.schema), "write")
     schema.foreach(schemaExpected => validateSchema(SparkSchema(df.schema), schemaExpected, "write"))
     // update current schema storage - this is to avoid schema inference and remember the schema if there is no data.
-    if (!schema.isDefined) createSchemaFile(df)
+    if (!schema.isDefined && !context.simulation) createSchemaFile(df)
   }
 
   private def createSchemaFile(df: DataFrame)(implicit context: ActionPipelineContext): Unit = {

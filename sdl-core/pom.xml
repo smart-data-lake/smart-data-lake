@@ -46,12 +46,18 @@
 
 		<dependency>
 			<groupId>com.databricks</groupId>
-			<artifactId>dbutils-api_2.11</artifactId>
-			<version>0.0.4</version>
+			<artifactId>dbutils-api_${scala.minor.version}</artifactId>
+			<version>0.0.5</version>
 		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
+		</dependency>
+		<!-- Log4j2 needs this to read configuration in yaml format -->
+		<dependency>
+			<groupId>com.fasterxml.jackson.dataformat</groupId>
+			<artifactId>jackson-dataformat-yaml</artifactId>
+			<version>${fasterxml.jackson.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>com.github.scopt</groupId>
@@ -286,11 +292,6 @@
 		<dependency>
 			<groupId>org.scalacheck</groupId>
 			<artifactId>scalacheck_${scala.minor.version}</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.logging.log4j</groupId>
-			<artifactId>log4j-api</artifactId>
 			<scope>test</scope>
 		</dependency>
 

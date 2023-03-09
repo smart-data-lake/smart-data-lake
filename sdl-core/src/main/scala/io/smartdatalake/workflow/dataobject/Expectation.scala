@@ -24,11 +24,14 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigHolder, ConfigurationException, FromConfigFactory, InstanceRegistry, ParsableFromConfig}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.util.spark.SparkExpressionUtil
+import io.smartdatalake.workflow.action.ActionHelper
+import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer.INPUT_VIEW_NAME
 import io.smartdatalake.workflow.dataframe.spark.SparkColumn
-import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn}
+import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn, GenericDataFrame}
 import io.smartdatalake.workflow.dataobject.ExpectationScope.{ExpectationScope, Job}
 import io.smartdatalake.workflow.dataobject.ExpectationSeverity.ExpectationSeverity
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql.Column
 
 /**
@@ -56,7 +59,18 @@ trait Expectation extends ParsableFromConfig[Expectation] with ConfigHolder with
    * Other options are 'All' and 'JobPartitions', which are implemented by reading the output data again.
    */
   def scope: ExpectationScope = Job
+
+  /**
+   * Create aggregate expressions that will be evaluated to create metrics.
+   * @return a list of aggregate expressions
+   */
   def getAggExpressionColumns(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions): Seq[GenericColumn]
+
+  /**
+   * Define a custom evaluation of the DataObjects data and return metrics, as alternative to creating aggregate expressions (by defining getAggExpressionColumns).
+   * @param df DataFrame of the processed DataObject filtered by scope.
+   */
+  def getCustomMetrics(dataObjectId: DataObjectId, df: GenericDataFrame)(implicit context: ActionPipelineContext): Map[String,_] = Map()
 
   /**
    * Create columns to validate the expectation and return error message if failed.
@@ -110,29 +124,17 @@ object ExpectationSeverity extends Enumeration {
   val Warn: Value = Value("Warn")
 }
 
-
 /**
- * Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level.
- *
- * @param aggExpression SQL aggregate expression to evaluate on dataset, e.g. count(*).
- * @param expectation Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0".
- *                    Together with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.
- *                    If no expectation is defined, the aggExpression evaluation result is just recorded in metrics.
+ * Default implementation for getValidationErrorColumn for metric of type `any`.
  */
-case class SQLExpectation(override val name: String, override val description: Option[String] = None, aggExpression: String, expectation: Option[String] = None, override val scope: ExpectationScope = Job, override val failedSeverity: ExpectationSeverity = ExpectationSeverity.Error )
-  extends Expectation {
-  def getAggExpressionColumns(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions): Seq[GenericColumn] = {
-    try {
-      Seq(functions.expr(aggExpression).as(name))
-    } catch {
-      case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse SQL aggExpression '$aggExpression'", Some(s"expectations.$name.aggExpression"), e)
-    }
-  }
+abstract class ExpectationDefaultImpl extends Expectation {
+  def expectation: Option[String]
   def getValidationColumn(dataObjectId: DataObjectId, value: Any): Option[Column] = {
     import org.apache.spark.sql.functions._
     expectation.map { expectationStr =>
       val valueStr = value match {
-        case str: String => s"'$str'"
+        case None => "null"
+        case x: String => x
         case x => x.toString
       }
       val validationExpr = s"$valueStr $expectationStr"
@@ -143,6 +145,7 @@ case class SQLExpectation(override val name: String, override val description: O
       }
     }
   }
+
   def getValidationErrorColumn(dataObjectId: DataObjectId, value: Any, metricName: String = name)(implicit context: ActionPipelineContext): Option[Column] = {
     import org.apache.spark.sql.functions._
     getValidationColumn(dataObjectId, value).map { validationCol =>
@@ -153,18 +156,38 @@ case class SQLExpectation(override val name: String, override val description: O
       }
     }
   }
-  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[SparkColumn],Map[String,_]) = {
+
+  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String, _], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[SparkColumn], Map[String, _]) = {
     if (scope == ExpectationScope.JobPartition) {
       val cols = metrics.keys.filter(_.startsWith(name + ExpectationValidation.partitionDelimiter))
         .flatMap { n =>
-          val value = getMetric[Any](dataObjectId,metrics,name)
+          val value = getMetric[Any](dataObjectId, metrics, name)
           getValidationErrorColumn(dataObjectId, value, n).map(SparkColumn)
         }.toSeq
       (cols, metrics)
     } else {
-      val value = getMetric[Any](dataObjectId,metrics,name)
+      val value = getMetric[Any](dataObjectId, metrics, name)
       val col = getValidationErrorColumn(dataObjectId, value).map(SparkColumn)
       (col.toSeq, metrics)
+    }
+  }
+}
+
+/**
+ * Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level.
+ *
+ * @param aggExpression SQL aggregate expression to evaluate on dataset, e.g. count(*).
+ * @param expectation Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0".
+ *                    Together with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.
+ *                    If no expectation is defined, the aggExpression evaluation result is just recorded in metrics.
+ */
+case class SQLExpectation(override val name: String, override val description: Option[String] = None, aggExpression: String, override val expectation: Option[String] = None, override val scope: ExpectationScope = Job, override val failedSeverity: ExpectationSeverity = ExpectationSeverity.Error )
+  extends ExpectationDefaultImpl {
+  def getAggExpressionColumns(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions): Seq[GenericColumn] = {
+    try {
+      Seq(functions.expr(aggExpression).as(name))
+    } catch {
+      case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse SQL aggExpression '$aggExpression'", Some(s"expectations.$name.aggExpression"), e)
     }
   }
   override def factory: FromConfigFactory[Expectation] = SQLExpectation
@@ -265,6 +288,62 @@ object SQLFractionExpectation extends FromConfigFactory[Expectation] {
   }
 }
 
+
+/**
+ * Definition of an expectation based on a SQL query to be evaluate on dataset-level.
+ * The SQL query will be evaluated in a separate Spark job against the DataFrame.
+ *
+ * @param code a SQL query returning a single row. All column will be added as metrics.
+ *             If there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.
+ *             The special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query.
+ * @param expectation Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0".
+ *                    Together with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.
+ *                    If no expectation is defined, the aggExpression evaluation result is just recorded in metrics.
+ */
+case class SQLQueryExpectation(override val name: String, override val description: Option[String] = None, code: String, override val expectation: Option[String] = None, override val scope: ExpectationScope = Job, override val failedSeverity: ExpectationSeverity = ExpectationSeverity.Error )
+  extends ExpectationDefaultImpl {
+  assert(scope != ExpectationScope.JobPartition, "scope=JobPartition not supported by SQLQueryExpectation for now")
+  override def getAggExpressionColumns(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions): Seq[GenericColumn] = {
+    // SQLQueryExpectation implements getCustomMetrics and does not need getAggExpressionColumns
+    Seq()
+  }
+  override def getCustomMetrics(dataObjectId: DataObjectId, df: GenericDataFrame)(implicit context: ActionPipelineContext): Map[String, _] = {
+    val function = DataFrameSubFeed.getFunctions(df.subFeedType)
+    val inputName = dataObjectId.id
+    val inputViewName = ActionHelper.createTemporaryViewName(inputName)
+    val inputViewNameOptions = Map(INPUT_VIEW_NAME -> inputViewName, s"${INPUT_VIEW_NAME}_$inputName" -> inputViewName)
+    val preparedSql = SparkExpressionUtil.substituteOptions(dataObjectId, Some(s"expectations.$name.code"), code, inputViewNameOptions)
+    try {
+      df.createOrReplaceTempView(s"$inputViewName")
+      // create DataFrame from SQL
+      logger.debug(s"($dataObjectId.expectations.$name) Preparing DataFrame from SQL statement: $preparedSql")
+      val dfMetrics = function.sql(preparedSql, dataObjectId)
+      if (dfMetrics.schema.columns.size > 1 && !dfMetrics.schema.columns.contains(name)) throw new RuntimeException(s"($dataObjectId) Query of SQLQueryExpectation $name returns more than one column and no column is named the same as the expectation")
+      logger.info(s"($dataObjectId) collecting custom metrics for SQLQueryExpectation $name")
+      val rows = dfMetrics.collect
+      if (rows.isEmpty) throw new RuntimeException(s"($dataObjectId) Result of SQLQueryExpectation $name is empty")
+      if (rows.size > 1) throw new RuntimeException(s"($dataObjectId) Result of SQLQueryExpectation $name has more than one row (${rows.size})")
+      val resultRow = rows.head
+      if (dfMetrics.schema.columns.size > 1) {
+        dfMetrics.schema.columns.zipWithIndex.map {
+          case (c, idx) => (c, Option(resultRow.get(idx)).getOrElse(None))
+        }.toMap
+      } else {
+        Map(name -> Option(resultRow.get(0)).getOrElse(None))
+      }
+    } catch {
+      case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse SQL code '$code': ${e.getClass.getSimpleName} ${e.getMessage}", Some(s"expectations.$name.code"), e)
+    }
+  }
+  override def factory: FromConfigFactory[Expectation] = SQLQueryExpectation
+}
+
+object SQLQueryExpectation extends FromConfigFactory[Expectation] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SQLQueryExpectation = {
+    extract[SQLQueryExpectation](config)
+  }
+}
+
 /**
  * Definition of an expectation based on the number of records.
  *
@@ -292,7 +371,7 @@ case class CountExpectation(override val name: String = "count", override val de
       }
     }
   }
-  private def getValidationErrorColumn(dataObjectId: DataObjectId, countMetric: Long, metricName: String = name)(implicit context: ActionPipelineContext): Option[Column] = {
+  def getValidationErrorColumn(dataObjectId: DataObjectId, countMetric: Long, metricName: String = name)(implicit context: ActionPipelineContext): Option[Column] = {
     getValidationColumn(dataObjectId, countMetric).map { validationCol =>
       try {
         import org.apache.spark.sql.functions._

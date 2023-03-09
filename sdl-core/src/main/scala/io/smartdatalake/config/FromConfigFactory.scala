@@ -30,7 +30,7 @@ import configs.ConfigReader
  *
  * @tparam CO the type that is parsed by this factory.
  */
-private[smartdatalake] trait FromConfigFactory[+CO <: ParsableFromConfig[CO]] extends ConfigImplicits {
+trait FromConfigFactory[+CO <: ParsableFromConfig[CO]] extends ConfigImplicits {
 
   /**
    * Factory method for parsing (case) classes from [[Config]]s.

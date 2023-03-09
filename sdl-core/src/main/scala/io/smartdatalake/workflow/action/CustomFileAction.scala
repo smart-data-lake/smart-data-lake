@@ -114,7 +114,7 @@ case class CustomFileAction(override val id: ActionId,
   override def postprocessOutputSubFeedCustomized(subFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {
     // create output sample file in init-phase
     if (context.phase == ExecutionPhase.Init) {
-      subFeed.fileRefMapping.map(_.head).foreach {
+      subFeed.fileRefMapping.flatMap(_.headOption).foreach {
         sampleFileRefMapping =>
           val sampleFile = output.createSampleFile
           // exec only if output returned a sample file to create

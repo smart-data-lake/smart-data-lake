@@ -23,7 +23,7 @@ import io.smartdatalake.workflow.ActionPipelineContext
 
 import java.io.OutputStream
 
-private[smartdatalake] trait CanCreateOutputStream {
+trait CanCreateOutputStream {
 
   /**
    * This is called before any output stream is created to initialize writing.
