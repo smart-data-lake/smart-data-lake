@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.util.mlflow
 
-import io.smartdatalake.util.spark.{ PythonSparkEntryPoint, PythonUtil }
+import io.smartdatalake.util.spark.{PythonSparkEntryPoint, PythonUtil}
 import org.apache.spark.sql.SparkSession
 
 object ModelType extends Enumeration {
@@ -102,12 +102,12 @@ case class MLflowPythonUtil(entryPoint: MLflowPythonSparkEntryPoint, trackingURI
 }
 
 private[smartdatalake] class MLflowPythonSparkEntryPoint(
-    override val session: SparkSession,
-    options: Map[String, String],
-    var experimentId: Option[String] = None,
-    var latestRunId: Option[String] = None,
-    var modelUri: Option[String] = None
-) extends PythonSparkEntryPoint(session, options) {
+                                                          override val session: SparkSession,
+                                                          options: Map[String, String],
+                                                          var experimentId: Option[String] = None,
+                                                          var latestRunId: Option[String] = None,
+                                                          var modelUri: Option[String] = None
+                                                        ) extends PythonSparkEntryPoint(session, options) {
 
   def setExperimentId(id: String): Unit = {
     experimentId = Some(id)

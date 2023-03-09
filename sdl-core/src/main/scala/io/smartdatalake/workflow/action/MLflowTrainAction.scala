@@ -40,11 +40,6 @@ import org.apache.hadoop.conf.Configuration
 import scala.reflect.runtime.universe.{ Type, typeOf }
 
 /**
- * This [[Action]] copies data between an input and output DataObject using DataFrames.
- * The input DataObject reads the data and converts it to a DataFrame according to its definition.
- * The DataFrame might be transformed using SQL or DataFrame transformations.
- * Then the output DataObjects writes the DataFrame to the output according to its definition.
- *
  * @param mlflowId id of the MLflow DataObject
  * @param runInfoId id of an DataObject that implements the CanCreateDataFrame trait. Here the run information of the training is written down
  * @param inputIds input DataObjects
@@ -120,7 +115,7 @@ case class MLflowTrainAction(
     val runInfoSchemaPython =
       f"""
          |from pyspark.sql.types import StructField, StructType, MapType, StringType, IntegerType, FloatType, TimestampType
-         |run_info_schema = StructType([StructField("experimentId", StringType(), True), StructField("experimentName", StringType(), True), StructField("runId",StringType(),True), StructField("runName",StringType(),True),StructField("duration", FloatType(), True),StructField("date", TimestampType(), True), StructField("artifactPath", StringType(), True), StructField("modelUri", StringType(), True),StructField("estimatorName", StringType(), True)])
+         |run_info_schema = StructType([StructField("experimentId", StringType(), True), StructField("experimentName", StringType(), True), StructField("modelName", StringType(), True), StructField("runId",StringType(),True), StructField("runName",StringType(),True),StructField("duration", FloatType(), True),StructField("date", TimestampType(), True), StructField("artifactPath", StringType(), True), StructField("modelUri", StringType(), True),StructField("estimatorName", StringType(), True)])
          |""".stripMargin
 
     val getTrainingIdPython =
@@ -205,7 +200,7 @@ case class MLflowTrainAction(
              |artifact_path = model_history["artifact_path"]
              |estimator_name = run.data.tags["estimator_name"]
              |model_uri = f"runs:/{run.info.run_id}/{artifact_path}"
-             |run_info = [{"experimentId": f"{run.info.experiment_id}","experimentName": "${mlflow.experimentName}", "runId": f"{run.info.run_id}", "runName": f"{run.info.run_name}", "duration": duration, "date": datetime.strptime(date,time_format), "artifactPath":f"{artifact_path}", "modelUri": f"{model_uri}","estimatorName":estimator_name}]
+             |run_info = [{"experimentId": f"{run.info.experiment_id}","experimentName": "${mlflow.experimentName}","modelName": "${mlflow.modelName}", "runId": f"{run.info.run_id}", "runName": f"{run.info.run_name}", "duration": duration, "date": datetime.strptime(date,time_format), "artifactPath":f"{artifact_path}", "modelUri": f"{model_uri}","estimatorName":estimator_name}]
              |run_info_df = session.createDataFrame(run_info, run_info_schema)
              |run_info_df.show(5)
              |# generate output dict
