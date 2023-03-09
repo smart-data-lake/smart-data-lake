@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -51,7 +51,7 @@ object SmartDataLakeBuilderAzureRelayAgentIT extends App {
   val dfSrc1 = Seq("testData").toDF("testColumn")
   srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContextWithoutHive(sdlb.instanceRegistry))
 
-  val azureRelayUrl = "Endpoint=sb://relay-tbb-test2.servicebus.windows.net/;SharedAccessKeyName=tbb-test-policy;SharedAccessKey=TODO;EntityPath=tbb-test-connection"
+  val azureRelayUrl = "Endpoint=sb://relay-tbb-test2.servicebus.windows.net/;SharedAccessKeyName=tbb-test-policy;EntityPath=tbb-test-connection;SharedAccessKey="
   val agentConfig = LocalAzureRelayAgentSmartDataLakeBuilderConfig(feedSel = feedName, configuration = None, azureRelayURL = Some(azureRelayUrl))
   val remoteSDLB = new DefaultSmartDataLakeBuilder()
   //Make sure this string matches the config from the file application-azureRelayAgent.conf

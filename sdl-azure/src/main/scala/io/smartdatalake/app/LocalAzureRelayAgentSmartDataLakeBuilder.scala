@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,15 +18,18 @@
  */
 package io.smartdatalake.app
 
-import io.smartdatalake.communication.agent.{AgentServerController, AzureRelayAgentServer, AzureRelayAgentServerConfig, JettyAgentServer, JettyAgentServerConfig}
+import io.smartdatalake.app.{SmartDataLakeBuilder, SmartDataLakeBuilderConfigTrait, TestMode}
+import io.smartdatalake.communication.agent.{AgentServerController, AzureRelayAgentServer}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import scopt.{OParser, OptionParser}
+import scopt.OParser
 
 import java.io.File
 
 /**
  * Smart Data Lake Builder application for agent mode.
+ * Please make sure you deactivated the profile spark-hive when compiling you application as spark-hive.
+ * See the end of the file sdl-core/pom.xml for more information.
  *
  * Sets master to local[*] and deployMode to client by default.
  */

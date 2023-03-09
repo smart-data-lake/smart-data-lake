@@ -27,7 +27,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, ConnectionId,
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.ExecutionPhase
 import io.smartdatalake.workflow.action.{Action, ProxyAction}
-import io.smartdatalake.workflow.agent.AzureRelayAgent
+import io.smartdatalake.workflow.agent.JettyAgent
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject._
@@ -57,7 +57,7 @@ class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter {
 
     val actionToSend = sdlb.instanceRegistry.getActions.filter(_.id.id == "remote-to-cloud").head.asInstanceOf[ProxyAction].wrappedAction
 
-    val sdlMessage = AgentClient.prepareHoconInstructions(actionToSend, Nil, AzureRelayAgent(AgentId("dummyId"), "dummyUrl", sdlb.instanceRegistry.getConnections.map(connection => connection.id.id -> connection).toMap), ExecutionPhase.Exec)
+    val sdlMessage = AgentClient.prepareHoconInstructions(actionToSend, Nil, JettyAgent(AgentId("dummyId"), "dummyUrl", sdlb.instanceRegistry.getConnections.map(connection => connection.id.id -> connection).toMap), ExecutionPhase.Exec)
     val configFromString = ConfigFactory.parseString(sdlMessage.agentInstruction.get.hoconConfig, ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF))
 
     val dataObjects: Map[DataObjectId, DataObject] = getDataObjectConfigMap(configFromString)

@@ -18,9 +18,7 @@
  */
 package io.smartdatalake.app
 
-import io.smartdatalake.app.LocalAzureRelayAgentSmartDataLakeBuilder.agentParser
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.EnvironmentUtil
 import scopt.OParser
 
@@ -42,21 +40,20 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
         .action((arg, config) => config.copy(master = Some(arg)))
         .text("The Spark master URL passed to SparkContext (default=local[*], yarn, spark://HOST:PORT, mesos://HOST:PORT, k8s://HOST:PORT)."),
       opt[String]('x', "deploy-mode")
-      .action((arg, config) => config.copy(deployMode = Some(arg)))
-      .text("The Spark deploy mode passed to SparkContext (default=client, cluster)."),
-    // optional kerberos authentication parameters for local mode
-    opt[String]('d', "kerberos-domain")
-      .action((arg, config) => config.copy(kerberosDomain = Some(arg)))
-      .text("Kerberos-Domain for authentication (USERNAME@KERBEROS-DOMAIN) in local mode."),
-    opt[String]('u', "username")
-      .action((arg, config) => config.copy(username = Some(arg)))
-      .text("Kerberos username for authentication (USERNAME@KERBEROS-DOMAIN) in local mode."),
-    opt[File]('k', "keytab-path")
-      .action((arg, config) => config.copy(keytabPath = Some(arg)))
-      .text("Path to the Kerberos keytab file for authentication in local mode.")
+        .action((arg, config) => config.copy(deployMode = Some(arg)))
+        .text("The Spark deploy mode passed to SparkContext (default=client, cluster)."),
+      // optional kerberos authentication parameters for local mode
+      opt[String]('d', "kerberos-domain")
+        .action((arg, config) => config.copy(kerberosDomain = Some(arg)))
+        .text("Kerberos-Domain for authentication (USERNAME@KERBEROS-DOMAIN) in local mode."),
+      opt[String]('u', "username")
+        .action((arg, config) => config.copy(username = Some(arg)))
+        .text("Kerberos username for authentication (USERNAME@KERBEROS-DOMAIN) in local mode."),
+      opt[File]('k', "keytab-path")
+        .action((arg, config) => config.copy(keytabPath = Some(arg)))
+        .text("Path to the Kerberos keytab file for authentication in local mode.")
     )
   }
-
 
 
   /**
@@ -84,8 +81,8 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
       case Some(config) =>
 
         // checking environment variables for local mode
-        require( !EnvironmentUtil.isWindowsOS || System.getenv("HADOOP_HOME")!=null, "Env variable HADOOP_HOME needs to be set in local mode in Windows!" )
-        require( !config.master.contains("yarn") || System.getenv("SPARK_HOME")!=null, "Env variable SPARK_HOME needs to be set in local mode with master=yarn!" )
+        require(!EnvironmentUtil.isWindowsOS || System.getenv("HADOOP_HOME") != null, "Env variable HADOOP_HOME needs to be set in local mode in Windows!")
+        require(!config.master.contains("yarn") || System.getenv("SPARK_HOME") != null, "Env variable SPARK_HOME needs to be set in local mode with master=yarn!")
 
         // authenticate with kerberos if configured
         if (config.kerberosDomain.isDefined) {

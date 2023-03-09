@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,20 +19,17 @@
 
 package io.smartdatalake.communication.agent
 
-import io.smartdatalake.util.misc.SmartDataLakeLogger
-
-import java.net.URI
-import java.net.URISyntaxException
-import java.nio.ByteBuffer
-import java.util.Scanner
-import java.util.concurrent.CompletableFuture
 import com.microsoft.azure.relay.{HybridConnectionChannel, HybridConnectionListener, RelayConnectionStringBuilder, TokenProvider}
-import io.smartdatalake.app.{LocalAzureRelayAgentSmartDataLakeBuilderConfig, SmartDataLakeBuilderConfig}
+import io.smartdatalake.app.LocalAzureRelayAgentSmartDataLakeBuilderConfig
 import io.smartdatalake.communication.message.{SDLMessage, SDLMessageType}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.{ActionDAGRunState, ExecutionPhase}
 import org.json4s.Formats
 import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.Serialization.{read, writePretty}
+
+import java.net.URI
+import java.nio.ByteBuffer
 
 object AzureRelayAgentServer extends SmartDataLakeLogger {
   implicit val format: Formats = ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)
