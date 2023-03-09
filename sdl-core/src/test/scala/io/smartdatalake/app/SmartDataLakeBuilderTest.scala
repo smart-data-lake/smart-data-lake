@@ -704,16 +704,14 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
     assert(srcDO != None)
     val dfSrc = Seq(("testData", "Foo"),("bar", "Space")).toDF("testColumn", "c?olumnN[ä]me")
-    srcDO.writeDataFrame(SparkDataFrame(dfSrc), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
     // Run SDLB
-    sdlb.startSimulation(sdlConfig, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc)), srcDO.id, Seq())))
+    val (outputSubFeeds, _) = sdlb.startSimulation(sdlConfig, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc)), srcDO.id, Seq())))
 
     // check result
-    val tgt = instanceRegistry.get[CsvFileDataObject]("tgt")
-    val dfTgt = tgt.getSparkDataFrame()
-    val colName = dfTgt.columns
-    assert(colName.toSeq == Seq("test_column", "column_naeme"))
+    val dfTgt = outputSubFeeds.head.dataFrame.get
+    val colName = dfTgt.schema.columns
+    assert(colName == Seq("test_column", "column_naeme"))
   }
 
 
@@ -756,16 +754,14 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
     assert(srcDO != None)
     val dfSrc = Seq(("testData", "Foo"),("bar", "Space")).toDF("FOO", "noCamel")
-    srcDO.writeDataFrame(SparkDataFrame(dfSrc), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
     // Run SDLB
-    sdlb.startSimulation(sdlConfig, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc)), srcDO.id, Seq())))
+    val (outputSubFeeds, _) = sdlb.startSimulation(sdlConfig, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc)), srcDO.id, Seq())))
 
     // check result
-    val tgt = instanceRegistry.get[CsvFileDataObject]("tgt")
-    val dfTgt = tgt.getSparkDataFrame()
-    val colName = dfTgt.columns
-    assert(colName.toSeq == Seq("foo", "nocamel"))
+    val dfTgt = outputSubFeeds.head.dataFrame.get
+    val colName = dfTgt.schema.columns
+    assert(colName == Seq("foo", "nocamel"))
   }
 
 
